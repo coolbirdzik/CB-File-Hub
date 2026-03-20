@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background circle -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M54,27
+            C70.57,27 84,40.43 84,57
+            C84,73.57 70.57,87 54,87
+            C37.43,87 24,73.57 24,57
+            C24,40.43 37.43,27 54,27Z"/>
+    <!-- Folder icon inside -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,45 L68,45 L68,69 L40,69 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,45 L48,39 L58,39 L62,45 L68,45"/>
+    <!-- CB text -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M44,53 L52,53 L52,61 L44,61 Z"/>
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M56,53 L64,53 L64,56 L60,56 L60,53 L56,53 Z M56,58 L60,58 L60,61 L56,61 Z"/>
+</vector>

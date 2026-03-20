@@ -4,8 +4,8 @@
 #define MyAppName "CB File Hub"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "COOLBIRDZIK"
-#define MyAppURL "https://github.com/nth-zik/coolbird-tagify"
-#define MyAppExeName "coolbird_tagify.exe"
+#define MyAppURL "https://github.com/coolbirdzik/cb-file-hub"
+#define MyAppExeName "cb_file_hub.exe"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.

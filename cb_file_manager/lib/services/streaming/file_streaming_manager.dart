@@ -5,9 +5,9 @@
 /// such as browsing directories, uploading and downloading files, creating and
 /// deleting directories, and more.
 
-export 'ftp_client.dart';
-export 'ftp_commands.dart';
-export 'ftp_response.dart';
-export 'ftp_file_info.dart';
-export 'ftp_service_adapter.dart';
+export 'package:cb_file_manager/services/network_browsing/ftp_client/ftp_client.dart';
+export 'package:cb_file_manager/services/network_browsing/ftp_client/ftp_commands.dart';
+export 'package:cb_file_manager/services/network_browsing/ftp_client/ftp_response.dart';
+export 'package:cb_file_manager/services/network_browsing/ftp_client/ftp_file_info.dart';
+export 'package:cb_file_manager/services/network_browsing/ftp_client/ftp_service_adapter.dart';
 

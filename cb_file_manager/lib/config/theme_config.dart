@@ -4,57 +4,80 @@ import 'theme_factory.dart';
 enum AppThemeType {
   light,
   dark,
-  amoled,
+}
+
+enum AppAccentColor {
   blue,
+  teal,
   green,
-  purple,
+  lime,
+  yellow,
   orange,
+  red,
+  magenta,
+  purple,
 }
 
 class ThemeConfig {
-  static const Color primaryColor = Color(0xFF2196F3);
-  static const Color primaryColorDark = Color(0xFF1976D2);
-  static const Color accentColor = Color(0xFF03DAC6);
+  static const AppAccentColor defaultAccentColor = AppAccentColor.blue;
 
   static const Map<AppThemeType, String> themeNames = {
     AppThemeType.light: 'Light',
     AppThemeType.dark: 'Dark',
-    AppThemeType.amoled: 'AMOLED',
-    AppThemeType.blue: 'Ocean Blue',
-    AppThemeType.green: 'Forest Green',
-    AppThemeType.purple: 'Royal Purple',
-    AppThemeType.orange: 'Sunset Orange',
   };
 
-  static ThemeData getTheme(AppThemeType themeType) {
+  static const Map<AppAccentColor, String> accentNames = {
+    AppAccentColor.blue: 'Blue',
+    AppAccentColor.teal: 'Teal',
+    AppAccentColor.green: 'Green',
+    AppAccentColor.lime: 'Lime',
+    AppAccentColor.yellow: 'Yellow',
+    AppAccentColor.orange: 'Orange',
+    AppAccentColor.red: 'Red',
+    AppAccentColor.magenta: 'Magenta',
+    AppAccentColor.purple: 'Purple',
+  };
+
+  static const Map<AppAccentColor, Color> accentSeedColors = {
+    AppAccentColor.blue: Color(0xFF0078D4),
+    AppAccentColor.teal: Color(0xFF00B294),
+    AppAccentColor.green: Color(0xFF107C10),
+    AppAccentColor.lime: Color(0xFF7FBA00),
+    AppAccentColor.yellow: Color(0xFFF9C80E),
+    AppAccentColor.orange: Color(0xFFF7630C),
+    AppAccentColor.red: Color(0xFFE81123),
+    AppAccentColor.magenta: Color(0xFFB4009E),
+    AppAccentColor.purple: Color(0xFF744DA9),
+  };
+
+  static Color getAccentSeedColor(AppAccentColor accentColor) {
+    return accentSeedColors[accentColor] ??
+        accentSeedColors[defaultAccentColor]!;
+  }
+
+  static ThemeData getTheme(
+    AppThemeType themeType, {
+    AppAccentColor accentColor = defaultAccentColor,
+  }) {
     switch (themeType) {
       case AppThemeType.light:
-        return lightTheme;
+        return getLightTheme(accentColor: accentColor);
       case AppThemeType.dark:
-        return darkTheme;
-      case AppThemeType.amoled:
-        return amoledTheme;
-      case AppThemeType.blue:
-        return blueTheme;
-      case AppThemeType.green:
-        return greenTheme;
-      case AppThemeType.purple:
-        return purpleTheme;
-      case AppThemeType.orange:
-        return orangeTheme;
+        return getDarkTheme(accentColor: accentColor);
     }
   }
 
-  // Light Theme
-  static ThemeData get lightTheme {
+  static ThemeData getLightTheme({
+    AppAccentColor accentColor = defaultAccentColor,
+  }) {
     final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: primaryColor,
+      seedColor: getAccentSeedColor(accentColor),
       brightness: Brightness.light,
-      background: const Color(0xFFF5F7FA),
-      surface: const Color(0xFFFAFBFD),
+      background: const Color(0xFFFFFFFF),
+      surface: const Color(0xFFFFFFFF),
     );
 
-    return ThemeFactory.createTheme(
+    final theme = ThemeFactory.createTheme(
       colorScheme: colorScheme,
       brightness: Brightness.light,
       options: const ThemeOptions(
@@ -64,36 +87,21 @@ class ThemeConfig {
         cardElevation: 0.0,
       ),
     );
-  }
 
-  // Dark Theme
-  static ThemeData get darkTheme {
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: primaryColor,
-      brightness: Brightness.dark,
-      background: const Color(0xFF121212),
-      surface: const Color(0xFF1F1F1F),
-    );
-
-    return ThemeFactory.createTheme(
-      colorScheme: colorScheme,
-      brightness: Brightness.dark,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
-      ),
+    return theme.copyWith(
+      scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+      canvasColor: const Color(0xFFFFFFFF),
     );
   }
 
-  // AMOLED Theme (Pure Black)
-  static ThemeData get amoledTheme {
+  static ThemeData getDarkTheme({
+    AppAccentColor accentColor = defaultAccentColor,
+  }) {
     final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: primaryColor,
+      seedColor: getAccentSeedColor(accentColor),
       brightness: Brightness.dark,
-      background: Colors.black,
-      surface: const Color(0xFF0A0A0A),
+      background: const Color(0xFF0E0E0E),
+      surface: const Color(0xFF181818),
     );
 
     return ThemeFactory.createTheme(
@@ -108,91 +116,23 @@ class ThemeConfig {
     );
   }
 
-  // Blue Theme
-  static ThemeData get blueTheme {
-    const blueColor = Color(0xFF0D47A1);
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: blueColor,
-      brightness: Brightness.light,
-      background: const Color(0xFFF2F6FC),
-      surface: const Color(0xFFF8FBFF),
-    );
+  static ThemeData get lightTheme => getLightTheme();
+  static ThemeData get darkTheme => getDarkTheme();
 
-    return ThemeFactory.createTheme(
-      colorScheme: colorScheme,
-      brightness: Brightness.light,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
-      ),
-    );
-  }
+  // --------------------------------------------------------------------
+  // Theme tokens and helpers
+  // --------------------------------------------------------------------
 
-  // Green Theme
-  static ThemeData get greenTheme {
-    const greenColor = Color(0xFF2E7D32);
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: greenColor,
-      brightness: Brightness.light,
-      background: const Color(0xFFF3F8F1),
-      surface: const Color(0xFFF8FCF6),
-    );
-
-    return ThemeFactory.createTheme(
-      colorScheme: colorScheme,
-      brightness: Brightness.light,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
-      ),
-    );
-  }
-
-  // Purple Theme
-  static ThemeData get purpleTheme {
-    const purpleColor = Color(0xFF6A1B9A);
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: purpleColor,
-      brightness: Brightness.light,
-      background: const Color(0xFFF6EFF8),
-      surface: const Color(0xFFFCF9FD),
-    );
-
-    return ThemeFactory.createTheme(
-      colorScheme: colorScheme,
-      brightness: Brightness.light,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
-      ),
-    );
-  }
-
-  // Orange Theme
-  static ThemeData get orangeTheme {
-    const orangeColor = Color(0xFFE65100);
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: orangeColor,
-      brightness: Brightness.light,
-      background: const Color(0xFFFFF5E8),
-      surface: const Color(0xFFFFFBF5),
-    );
-
-    return ThemeFactory.createTheme(
-      colorScheme: colorScheme,
-      brightness: Brightness.light,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
-      ),
-    );
-  }
+  /// Address-bar / input container fill colour.
+  ///
+  /// Intended to be defined in one place so the same tone can be used
+  /// throughout the app.  Light mode is a very light black overlay (≈7 %) on
+  /// white; dark mode is a subtle white overlay (≈10 %) on dark surfaces.
+  ///
+  /// You can obtain the value directly via the static helper below, or via
+  /// the convenience extension on ThemeData.
+  static Color addressBarFillColorFor(Brightness brightness) =>
+      brightness == Brightness.light
+          ? Colors.black.withValues(alpha: 0.07)
+          : Colors.white.withValues(alpha: 0.10);
 }

@@ -15,6 +15,7 @@ import 'package:path_provider/path_provider.dart';
 /// AppLogger.perf('Perf message') // performance logs (written to perf log file in debug)
 /// ```
 class AppLogger {
+  static final List<String> _recentLogs = <String>[];
   static final Logger _logger = Logger(
     printer: PrettyPrinter(
       methodCount: 2,
@@ -30,27 +31,62 @@ class AppLogger {
   /// Log a debug message
   static void debug(dynamic message, {Object? error, StackTrace? stackTrace}) {
     _logger.d(message, error: error, stackTrace: stackTrace);
+    _emitToConsole(
+      'DEBUG',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 500,
+    );
   }
 
   /// Log an info message
   static void info(dynamic message, {Object? error, StackTrace? stackTrace}) {
     _logger.i(message, error: error, stackTrace: stackTrace);
+    _emitToConsole(
+      'INFO',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 800,
+    );
   }
 
   /// Log a warning message
   static void warning(dynamic message,
       {Object? error, StackTrace? stackTrace}) {
     _logger.w(message, error: error, stackTrace: stackTrace);
+    _emitToConsole(
+      'WARN',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 900,
+    );
   }
 
   /// Log an error message
   static void error(dynamic message, {Object? error, StackTrace? stackTrace}) {
     _logger.e(message, error: error, stackTrace: stackTrace);
+    _emitToConsole(
+      'ERROR',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 1000,
+    );
   }
 
   /// Log a fatal error message
   static void fatal(dynamic message, {Object? error, StackTrace? stackTrace}) {
     _logger.f(message, error: error, stackTrace: stackTrace);
+    _emitToConsole(
+      'FATAL',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 1200,
+    );
   }
 
   /// Performance log helper — writes to logger and appends to a perf log file
@@ -86,6 +122,61 @@ class AppLogger {
     } catch (_) {
       // ignore — logging must not crash the app
     }
+  }
+
+  static void _emitToConsole(
+    String levelName,
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    required int level,
+  }) {
+    final buffer = StringBuffer()
+      ..write('[$levelName] ')
+      ..write(message);
+
+    if (error != null) {
+      buffer
+        ..write(' | error=')
+        ..write(error);
+    }
+
+    final text = buffer.toString();
+    _recentLogs.add(text);
+    if (_recentLogs.length > 200) {
+      _recentLogs.removeRange(0, _recentLogs.length - 200);
+    }
+
+    try {
+      developer.log(
+        text,
+        name: 'cb_file_manager',
+        level: level,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } catch (_) {}
+
+    try {
+      debugPrint(text);
+      if (stackTrace != null) {
+        debugPrint(stackTrace.toString());
+      }
+    } catch (_) {}
+
+    try {
+      print(text);
+      if (stackTrace != null) {
+        print(stackTrace.toString());
+      }
+    } catch (_) {}
+  }
+
+  static String get recentLogsText => _recentLogs.join('\n');
+
+  static String get recentLogsTail {
+    final start = _recentLogs.length > 40 ? _recentLogs.length - 40 : 0;
+    return _recentLogs.sublist(start).join('\n');
   }
 
   /// Set the log level

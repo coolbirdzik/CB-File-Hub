@@ -39,8 +39,12 @@ class SystemScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.transparent,
       appBar: showAppBar
           ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
               title: Text(title),
               actions: actions,
               // Replace the close button with a back button
@@ -49,7 +53,10 @@ class SystemScreen extends StatelessWidget {
               leading: Navigator.canPop(context) ? const BackButton() : null,
             )
           : null,
-      body: child,
+      body: Container(
+        color: Colors.transparent,
+        child: child,
+      ),
     );
   }
 

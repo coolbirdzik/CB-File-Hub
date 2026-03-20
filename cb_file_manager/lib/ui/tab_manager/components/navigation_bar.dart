@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../core/tab_manager.dart';
+import '../../../config/theme_config.dart';
 import 'address_bar_menu.dart';
 import 'path_autocomplete_text_field.dart';
 
@@ -54,7 +55,6 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
       });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -110,11 +110,17 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
                   borderRadius: BorderRadius.circular(16.0),
                   borderSide: BorderSide.none,
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                  borderSide: BorderSide.none,
+                ),
                 filled: true,
-                fillColor: Theme.of(context)
-                    .inputDecorationTheme
-                    .fillColor
-                    ?.withValues(alpha: 0.7),
+                fillColor: ThemeConfig.addressBarFillColorFor(
+                    Theme.of(context).brightness),
               ),
               textInputAction: TextInputAction.go,
             ),
@@ -159,8 +165,3 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
     }
   }
 }
-
-
-
-
-

@@ -857,6 +857,13 @@ class VideoThumbnailHelper {
             if (!request.completer.isCompleted) {
               request.completer.complete(result);
             }
+            // Always notify listeners so widgets that relied solely on the
+            // stream (e.g. the proactive-queue path in LazyVideoThumbnail)
+            // receive the signal even when _generateThumbnailInternal returned
+            // a cached path without firing the notification itself.
+            try {
+              _thumbnailReadyController.add(request.videoPath);
+            } catch (_) {}
           } else {
             if (!request.completer.isCompleted) {
               request.completer.complete(null);

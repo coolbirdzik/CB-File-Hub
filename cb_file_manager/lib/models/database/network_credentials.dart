@@ -1,36 +1,14 @@
-import 'package:objectbox/objectbox.dart';
-
-@Entity()
 class NetworkCredentials {
-  @Id()
   int id = 0;
-
-  // Loại dịch vụ (SMB, FTP, WebDAV)
   String serviceType;
-
-  // Địa chỉ server
   String host;
-
-  // Tên người dùng
   String username;
-
-  // Mật khẩu (lưu ý: trong thực tế nên mã hóa mật khẩu trước khi lưu)
   String password;
-
-  // Port tùy chọn
   int? port;
-
-  // Domain cho SMB/CIFS
   String? domain;
-
-  // Các tùy chọn bổ sung dạng JSON string
   String? additionalOptions;
-
-  // Thời gian lần cuối kết nối
-  @Property(type: PropertyType.date)
   DateTime lastConnected;
 
-  // Constructor
   NetworkCredentials({
     required this.serviceType,
     required this.host,
@@ -42,13 +20,42 @@ class NetworkCredentials {
     DateTime? lastConnected,
   }) : lastConnected = lastConnected ?? DateTime.now();
 
-  // Helper để so sánh host (bỏ qua protocol, port)
-  @Transient() // Đánh dấu property này không được lưu trong database
-  String get normalizedHost => host
-      .replaceAll(RegExp(r'^[a-z]+://'), '') // Bỏ protocol (smb://, ftp://)
-      .replaceAll(RegExp(r':\d+$'), ''); // Bỏ port
+  factory NetworkCredentials.fromDatabaseMap(Map<String, Object?> map) {
+    return NetworkCredentials(
+      serviceType: map['service_type'] as String? ?? '',
+      host: map['host'] as String? ?? '',
+      username: map['username'] as String? ?? '',
+      password: map['password'] as String? ?? '',
+      port: map['port'] as int?,
+      domain: map['domain'] as String?,
+      additionalOptions: map['additional_options'] as String?,
+      lastConnected: DateTime.fromMillisecondsSinceEpoch(
+        map['last_connected'] as int? ?? 0,
+      ),
+    )..id = map['id'] as int? ?? 0;
+  }
 
-  // Tạo key duy nhất để tìm kiếm trong database
-  @Index()
-  String get uniqueKey => '$serviceType:$normalizedHost:$username';
+  Map<String, Object?> toDatabaseMap() {
+    return <String, Object?>{
+      'id': id == 0 ? null : id,
+      'service_type': serviceType,
+      'host': host,
+      'normalized_host': normalizedHost.toLowerCase(),
+      'username': username,
+      'password': password,
+      'port': port,
+      'domain': domain,
+      'additional_options': additionalOptions,
+      'last_connected': lastConnected.millisecondsSinceEpoch,
+    };
+  }
+
+  String get normalizedHost {
+    return host
+        .replaceAll(RegExp(r'^[a-z]+://'), '')
+        .replaceAll(RegExp(r':\d+$'), '');
+  }
+
+  String get uniqueKey =>
+      '$serviceType:${normalizedHost.toLowerCase()}:$username';
 }

@@ -1,5 +1,5 @@
 import 'package:cb_file_manager/models/database/database_provider.dart';
-import 'package:cb_file_manager/models/objectbox/objectbox_database_provider.dart';
+import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'dart:async'; // Thêm import này để sử dụng Completer
 import 'dart:convert'; // Added for JSON encoding/decoding
 import 'dart:io'; // Added for File operations
@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter/foundation.dart';
+import 'package:sqflite_common/sqlite_api.dart';
 
 /// Database manager for centralizing access to the database
 class DatabaseManager implements IDatabaseProvider {
@@ -41,13 +42,15 @@ class DatabaseManager implements IDatabaseProvider {
   Future<void> initialize() async {
     // Sử dụng semaphore để đảm bảo chỉ một lần khởi tạo được thực hiện
     return _initSemaphore.run(() async {
-      if (_isInitialized) {
+      // Check both flags inside the semaphore to prevent race between
+      // concurrent callers who both passed the outer check.
+      if (_isInitialized && _provider != null) {
         return;
       }
 
       try {
         // Tạo provider mà không cần khởi tạo UserPreferences
-        _provider = ObjectBoxDatabaseProvider();
+        _provider = SqliteDatabaseProvider();
 
         // Thêm cơ chế retry để đảm bảo database khởi động được
         int retryCount = 0;
@@ -74,9 +77,9 @@ class DatabaseManager implements IDatabaseProvider {
 
         _isInitialized = true;
       } catch (e) {
-        _isInitialized = true;
+        _isInitialized = false;
 
-        // Rethrow để caller có thể xử lý theo cách riêng
+        // Preserve retry capability for later calls after a transient failure.
         rethrow;
       }
     });
@@ -86,6 +89,11 @@ class DatabaseManager implements IDatabaseProvider {
   @override
   bool isInitialized() {
     return _isInitialized;
+  }
+
+  @override
+  String? getLastErrorMessage() {
+    return _provider.getLastErrorMessage();
   }
 
   /// Close the database connection
@@ -172,6 +180,21 @@ class DatabaseManager implements IDatabaseProvider {
     return tags.toSet();
   }
 
+  /// Get all standalone tags in the database
+  @override
+  Future<Set<String>> getStandaloneTags() async {
+    await _ensureInitialized();
+    final tags = await _provider.getStandaloneTags();
+    return tags.toSet();
+  }
+
+  /// Replace all standalone tags in the database
+  @override
+  Future<bool> replaceStandaloneTags(List<String> tags) async {
+    await _ensureInitialized();
+    return _provider.replaceStandaloneTags(tags);
+  }
+
   /// Get a string preference
   @override
   Future<String?> getStringPreference(String key,
@@ -237,6 +260,54 @@ class DatabaseManager implements IDatabaseProvider {
     return _provider.deletePreference(key);
   }
 
+  /// Get all user preferences as raw data
+  @override
+  Future<List<Map<String, dynamic>>> getAllPreferencesRaw() async {
+    await _ensureInitialized();
+    return _provider.getAllPreferencesRaw();
+  }
+
+  /// Get a page of user preferences as raw data
+  @override
+  Future<List<Map<String, dynamic>>> getPreferencesRawPage({
+    required int offset,
+    required int limit,
+  }) async {
+    await _ensureInitialized();
+    return _provider.getPreferencesRawPage(offset: offset, limit: limit);
+  }
+
+  /// Get the total number of raw preference rows
+  @override
+  Future<int> getPreferencesRawCount() async {
+    await _ensureInitialized();
+    return _provider.getPreferencesRawCount();
+  }
+
+  /// Get all file tags as raw data
+  @override
+  Future<List<Map<String, dynamic>>> getAllFileTagsRaw() async {
+    await _ensureInitialized();
+    return _provider.getAllFileTagsRaw();
+  }
+
+  /// Get a page of file tags as raw data
+  @override
+  Future<List<Map<String, dynamic>>> getFileTagsRawPage({
+    required int offset,
+    required int limit,
+  }) async {
+    await _ensureInitialized();
+    return _provider.getFileTagsRawPage(offset: offset, limit: limit);
+  }
+
+  /// Get the total number of raw file tag rows
+  @override
+  Future<int> getFileTagsRawCount() async {
+    await _ensureInitialized();
+    return _provider.getFileTagsRawCount();
+  }
+
   /// Set whether cloud sync is enabled
   @override
   void setCloudSyncEnabled(bool enabled) {
@@ -273,15 +344,26 @@ class DatabaseManager implements IDatabaseProvider {
     try {
       await _ensureInitialized();
 
+      debugPrint('ExportDatabase: Starting export...');
+
       // Get all tags in the system
       final Map<String, List<String>> tagsData = {};
       final uniqueTags = await getAllUniqueTags();
+      debugPrint('ExportDatabase: Found ${uniqueTags.length} unique tags');
 
       // For each tag, get all files with that tag
       for (final tag in uniqueTags) {
         final files = await findFilesByTag(tag);
+        debugPrint('ExportDatabase: Tag "$tag" has ${files.length} files');
         tagsData[tag] = files;
       }
+
+      // Count total entries
+      int totalEntries = 0;
+      for (final files in tagsData.values) {
+        totalEntries += files.length;
+      }
+      debugPrint('ExportDatabase: Total tag entries to export: $totalEntries');
 
       // Create a data structure to export
       final Map<String, dynamic> exportData = {
@@ -292,6 +374,7 @@ class DatabaseManager implements IDatabaseProvider {
 
       // Convert to JSON
       final jsonString = jsonEncode(exportData);
+      debugPrint('ExportDatabase: JSON string length: ${jsonString.length}');
 
       String filePath;
 
@@ -309,62 +392,172 @@ class DatabaseManager implements IDatabaseProvider {
       final file = File(filePath);
       await file.writeAsString(jsonString);
 
+      debugPrint('ExportDatabase: Exported to $filePath');
       return filePath;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('ExportDatabase error: $e');
+      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
 
   /// Import database data from a JSON file
-  Future<bool> importDatabase(String filePath) async {
+  Future<bool> importDatabase(String filePath,
+      {bool skipFileExistenceCheck = false}) async {
     try {
-      await _ensureInitialized();
+      debugPrint('ImportDatabase: Starting import from $filePath');
+
+      // Ensure database is initialized first
+      if (!_isInitialized) {
+        debugPrint(
+            'ImportDatabase: Database not initialized, initializing now...');
+        await initialize();
+      }
+
+      debugPrint(
+          'ImportDatabase: Database is initialized, isInitialized=$_isInitialized');
 
       // Read from file
-      final file = File(filePath);
-      final jsonString = await file.readAsString();
+      final exportFile = File(filePath);
+      if (!await exportFile.exists()) {
+        debugPrint('ImportDatabase: Export file not found at $filePath');
+        return false;
+      }
+
+      final jsonString = await exportFile.readAsString();
+      debugPrint(
+          'ImportDatabase: Read ${jsonString.length} characters from file');
 
       // Parse JSON
       final Map<String, dynamic> importData = jsonDecode(jsonString);
+      debugPrint(
+          'ImportDatabase: Parsed JSON, keys: ${importData.keys.toList()}');
+
+      int importedTagCount = 0;
+      int skippedFileCount = 0;
+      int failedCount = 0;
 
       // Import tags
       if (importData.containsKey('tags')) {
         final Map<String, dynamic> tagsData = importData['tags'];
+        debugPrint('ImportDatabase: Found ${tagsData.length} tags to import');
 
         // Process each tag
         for (final tag in tagsData.keys) {
           final List<dynamic> files = tagsData[tag];
+          debugPrint(
+              'ImportDatabase: Processing tag "$tag" with ${files.length} files');
 
           // Add the tag to each file
-          for (final file in files) {
-            if (file is String) {
-              // Check if file exists before adding tag
-              final fileExists = File(file).existsSync();
-              if (fileExists) {
-                await addTagToFile(file, tag);
+          for (final filePathEntry in files) {
+            if (filePathEntry is String) {
+              try {
+                if (skipFileExistenceCheck) {
+                  // Skip file existence check - import tags regardless of file presence
+                  // This is useful for network drives or files that will be added later
+                  final success = await addTagToFile(filePathEntry, tag);
+                  if (success) {
+                    importedTagCount++;
+                  } else {
+                    failedCount++;
+                  }
+                } else {
+                  // Check if file exists before adding tag
+                  final fileExists = File(filePathEntry).existsSync();
+                  if (fileExists) {
+                    final success = await addTagToFile(filePathEntry, tag);
+                    if (success) {
+                      importedTagCount++;
+                    } else {
+                      failedCount++;
+                    }
+                  } else {
+                    skippedFileCount++;
+                    debugPrint(
+                        'ImportDatabase: Skipping file (not exists): $filePathEntry');
+                  }
+                }
+              } catch (e) {
+                debugPrint(
+                    'ImportDatabase: Error adding tag "$tag" to file "$filePathEntry": $e');
+                failedCount++;
               }
             }
           }
         }
+
+        debugPrint(
+            'ImportDatabase: Summary - imported: $importedTagCount, skipped: $skippedFileCount, failed: $failedCount');
+      } else {
+        debugPrint('ImportDatabase: No "tags" key found in import file');
+        // Try to import as the old format where key is file path and value is list of tags
+        debugPrint(
+            'ImportDatabase: Checking for old format (file path -> tags list)...');
+
+        for (final key in importData.keys) {
+          if (key == 'tags' || key == 'exportDate' || key == 'version') {
+            continue;
+          }
+
+          final value = importData[key];
+          if (value is List) {
+            final filePath = key;
+            final tags = value.cast<String>();
+            debugPrint(
+                'ImportDatabase: Old format - file: $filePath, tags: $tags');
+
+            for (final tag in tags) {
+              try {
+                final success = await addTagToFile(filePath, tag);
+                if (success) {
+                  importedTagCount++;
+                }
+              } catch (e) {
+                debugPrint(
+                    'ImportDatabase: Error adding tag "$tag" to file "$filePath": $e');
+              }
+            }
+          }
+        }
+
+        debugPrint(
+            'ImportDatabase: Old format import complete, imported: $importedTagCount');
       }
 
-      return true;
-    } catch (e) {
+      // Note: TagManager cache clearing should be handled by the caller after successful import
+      // to ensure UI properly refreshes with new data
+      if (importedTagCount > 0) {
+        debugPrint(
+            'ImportDatabase: Import completed successfully with $importedTagCount tags');
+        debugPrint(
+            'ImportDatabase: Caller should clear TagManager cache to refresh UI');
+      }
+
+      return importedTagCount > 0;
+    } catch (e, stackTrace) {
+      debugPrint('ImportDatabase error: $e');
+      debugPrint('Stack trace: $stackTrace');
       return false;
     }
   }
 
-  /// Lấy đối tượng Store của ObjectBox để các service khác sử dụng
-  dynamic getStore() {
+  @override
+  Future<int> countUniqueTaggedFiles() async {
+    await _ensureInitialized();
+    return _provider.countUniqueTaggedFiles();
+  }
+
+  /// Returns the shared SQLite database instance.
+  Future<Database> getDatabase() async {
     if (!_isInitialized) {
-      throw StateError('DatabaseManager has not been initialized yet');
+      await _ensureInitialized();
     }
 
-    if (_provider is ObjectBoxDatabaseProvider) {
-      return (_provider as ObjectBoxDatabaseProvider).getStore();
+    if (_provider is SqliteDatabaseProvider) {
+      return (_provider as SqliteDatabaseProvider).getDatabase();
     }
 
-    return null;
+    throw StateError('Active database provider does not expose SQLite access');
   }
 }
 
@@ -374,35 +567,26 @@ class _AsyncSemaphore {
   final List<Completer<void>> _queue = [];
 
   Future<T> run<T>(Future<T> Function() task) async {
-    final completer = Completer<void>();
-
-    // Thêm vào hàng đợi
-    _queue.add(completer);
-
-    // Xử lý hàng đợi nếu chưa có tác vụ nào đang chạy
-    if (!_running) {
-      _processQueue();
+    // Nếu đang chạy, đợi trong hàng đợi
+    if (_running) {
+      final completer = Completer<void>();
+      _queue.add(completer);
+      await completer.future;
     }
 
-    // Đợi lượt của mình
-    await completer.future;
-
-    try {
-      // Thực hiện tác vụ
-      return await task();
-    } finally {
-      // Đánh dấu hoàn thành và xử lý tiếp hàng đợi
-      _running = false;
-      _processQueue();
-    }
-  }
-
-  void _processQueue() {
-    if (_queue.isEmpty) return;
     _running = true;
 
-    // Lấy completer đầu tiên và hoàn thành nó
-    final completer = _queue.removeAt(0);
-    completer.complete();
+    try {
+      return await task();
+    } finally {
+      _running = false;
+      // Xử lý các task trong hàng đợi
+      while (_queue.isNotEmpty) {
+        final completer = _queue.removeAt(0);
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      }
+    }
   }
 }

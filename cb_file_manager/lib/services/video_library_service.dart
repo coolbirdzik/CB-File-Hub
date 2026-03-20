@@ -1,16 +1,18 @@
 import 'dart:io';
-import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as path;
+import 'package:sqflite/sqflite.dart' as sqflite;
+import 'package:sqflite_common/sqlite_api.dart';
+
+import '../helpers/core/filesystem_utils.dart';
+import '../helpers/tags/tag_manager.dart';
+import '../models/database/sqlite_database_provider.dart';
 import '../models/objectbox/video_library.dart';
 import '../models/objectbox/video_library_config.dart';
 import '../models/objectbox/video_library_file.dart';
-import '../models/objectbox/objectbox_database_provider.dart';
-import '../objectbox.g.dart'; // Import generated ObjectBox code
-import '../helpers/core/filesystem_utils.dart';
-import '../helpers/tags/tag_manager.dart';
-import 'package:path/path.dart' as path;
 
-/// Service class for managing video libraries and their file associations
+/// Service class for managing video libraries and their file associations.
 class VideoLibraryService {
   static final VideoLibraryService _instance = VideoLibraryService._internal();
 
@@ -18,66 +20,50 @@ class VideoLibraryService {
 
   VideoLibraryService._internal();
 
-  final ObjectBoxDatabaseProvider _dbProvider = ObjectBoxDatabaseProvider();
-  Store? _store;
-  Completer<Store>? _storeCompleter;
+  final SqliteDatabaseProvider _dbProvider = SqliteDatabaseProvider();
 
-  Future<Store> _getStore() async {
-    // If store is already initialized, return it immediately
-    if (_store != null) {
-      return _store!;
-    }
-
-    // If initialization is in progress, wait for it
-    if (_storeCompleter != null) {
-      return await _storeCompleter!.future;
-    }
-
-    // Start initialization
-    _storeCompleter = Completer<Store>();
-    try {
-      await _dbProvider.initialize();
-      _store = _dbProvider.getStore();
-      _storeCompleter!.complete(_store!);
-      return _store!;
-    } catch (e) {
-      _storeCompleter!.completeError(e);
-      _storeCompleter = null; // Reset on error to allow retry
-      rethrow;
-    }
+  Future<Database> _getDatabase() async {
+    await _dbProvider.initialize();
+    return _dbProvider.getDatabase();
   }
 
-  /// Initialize the service
   Future<void> initialize() async {
-    debugPrint('VideoLibraryService: Initializing');
-    _store = await _getStore();
+    await _getDatabase();
   }
 
-  /// Get all video libraries
   Future<List<VideoLibrary>> getAllLibraries() async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibrary>();
-      return box.getAll();
-    } catch (e) {
-      debugPrint('Error getting all video libraries: $e');
-      return [];
+      final database = await _getDatabase();
+      final rows = await database.query(
+        'video_libraries',
+        orderBy: 'modified_at DESC, id DESC',
+      );
+      return rows.map(VideoLibrary.fromDatabaseMap).toList(growable: false);
+    } catch (error) {
+      debugPrint('Error getting all video libraries: $error');
+      return <VideoLibrary>[];
     }
   }
 
-  /// Get video library by ID
   Future<VideoLibrary?> getLibraryById(int id) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibrary>();
-      return box.get(id);
-    } catch (e) {
-      debugPrint('Error getting video library by ID: $e');
+      final database = await _getDatabase();
+      final rows = await database.query(
+        'video_libraries',
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        return null;
+      }
+      return VideoLibrary.fromDatabaseMap(rows.first);
+    } catch (error) {
+      debugPrint('Error getting video library by ID: $error');
       return null;
     }
   }
 
-  /// Create a new video library
   Future<VideoLibrary?> createLibrary({
     required String name,
     String? description,
@@ -87,356 +73,408 @@ class VideoLibraryService {
     VideoLibraryConfig? config,
   }) async {
     try {
-      final store = await _getStore();
-      final libraryBox = store.box<VideoLibrary>();
-      final configBox = store.box<VideoLibraryConfig>();
+      final database = await _getDatabase();
+      final existing = await database.query(
+        'video_libraries',
+        columns: <String>['id'],
+        where: 'LOWER(name) = ?',
+        whereArgs: <Object?>[name.toLowerCase()],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        throw Exception('Video library with name "$name" already exists');
+      }
 
-      // Create library
       final library = VideoLibrary(
         name: name,
         description: description,
         coverImagePath: coverImagePath,
         colorTheme: colorTheme,
       );
-
-      final libraryId = libraryBox.put(library);
+      final libraryId =
+          await database.insert('video_libraries', library.toDatabaseMap());
       library.id = libraryId;
 
-      // Create config
       final libraryConfig = config ??
           VideoLibraryConfig(
             videoLibraryId: libraryId,
             directories: directories?.join(',') ?? '',
           );
+      libraryConfig.videoLibraryId = libraryId;
+      final configId = await database.insert(
+        'video_library_configs',
+        libraryConfig.toDatabaseMap(),
+      );
+      libraryConfig.id = configId;
 
-      if (config == null) {
-        libraryConfig.videoLibraryId = libraryId;
-      }
-
-      configBox.put(libraryConfig);
-
-      debugPrint('Created video library: ${library.name} (ID: $libraryId)');
       return library;
-    } catch (e) {
-      debugPrint('Error creating video library: $e');
+    } catch (error) {
+      debugPrint('Error creating video library: $error');
       return null;
     }
   }
 
-  /// Update an existing video library
   Future<bool> updateLibrary(VideoLibrary library) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibrary>();
+      final database = await _getDatabase();
       library.updateModifiedTime();
-      box.put(library);
-      debugPrint('Updated video library: ${library.name}');
+      await database.update(
+        'video_libraries',
+        library.toDatabaseMap(),
+        where: 'id = ?',
+        whereArgs: <Object?>[library.id],
+      );
       return true;
-    } catch (e) {
-      debugPrint('Error updating video library: $e');
+    } catch (error) {
+      debugPrint('Error updating video library: $error');
       return false;
     }
   }
 
-  /// Delete a video library and all its file associations
   Future<bool> deleteLibrary(int libraryId) async {
     try {
-      final store = await _getStore();
-      final libraryBox = store.box<VideoLibrary>();
-      final configBox = store.box<VideoLibraryConfig>();
-      final fileBox = store.box<VideoLibraryFile>();
-
-      // Delete all associated files
-      final fileQuery = fileBox
-          .query(VideoLibraryFile_.videoLibraryId.equals(libraryId))
-          .build();
-      final filesToDelete = fileQuery.find();
-      fileQuery.close();
-
-      for (final file in filesToDelete) {
-        fileBox.remove(file.id);
-      }
-
-      // Delete config
-      final configQuery = configBox
-          .query(VideoLibraryConfig_.videoLibraryId.equals(libraryId))
-          .build();
-      final configs = configQuery.find();
-      configQuery.close();
-
-      for (final config in configs) {
-        configBox.remove(config.id);
-      }
-
-      // Delete library
-      libraryBox.remove(libraryId);
-
-      debugPrint('Deleted video library ID: $libraryId');
+      final database = await _getDatabase();
+      await database.transaction((txn) async {
+        await txn.delete(
+          'video_library_files',
+          where: 'video_library_id = ?',
+          whereArgs: <Object?>[libraryId],
+        );
+        await txn.delete(
+          'video_library_configs',
+          where: 'video_library_id = ?',
+          whereArgs: <Object?>[libraryId],
+        );
+        await txn.delete(
+          'video_libraries',
+          where: 'id = ?',
+          whereArgs: <Object?>[libraryId],
+        );
+      });
       return true;
-    } catch (e) {
-      debugPrint('Error deleting video library: $e');
+    } catch (error) {
+      debugPrint('Error deleting video library: $error');
       return false;
     }
   }
 
-  /// Get all files in a video library (from directories and manual additions)
   Future<List<String>> getLibraryFiles(int libraryId) async {
     try {
       final config = await getLibraryConfig(libraryId);
-      if (config == null) return [];
+      if (config == null) {
+        return <String>[];
+      }
 
-      final Set<String> allFiles = {};
+      final allFiles = <String>{};
 
-      // Get files from directories
       if (config.directoriesList.isNotEmpty) {
-        for (final dir in config.directoriesList) {
-          final dirPath = dir.trim();
-          if (dirPath.isEmpty) continue;
-
-          final directory = Directory(dirPath);
-          if (!directory.existsSync()) continue;
+        for (final directoryPath in config.directoriesList) {
+          final directory = Directory(directoryPath.trim());
+          if (!directory.existsSync()) {
+            continue;
+          }
 
           final files = await getAllVideos(
-            dirPath,
+            directoryPath,
             recursive: config.includeSubdirectories,
           );
-
-          allFiles.addAll(files.map((f) => f.path));
+          allFiles.addAll(files.map((file) => file.path));
         }
       }
 
-      // Get manually added files
-      final store = await _getStore();
-      final fileBox = store.box<VideoLibraryFile>();
-      final query = fileBox
-          .query(VideoLibraryFile_.videoLibraryId.equals(libraryId))
-          .build();
-      final manualFiles = query.find();
-      query.close();
+      final database = await _getDatabase();
+      final rows = await database.query(
+        'video_library_files',
+        where: 'video_library_id = ?',
+        whereArgs: <Object?>[libraryId],
+      );
+      allFiles.addAll(
+        rows.map((row) => row['file_path']).whereType<String>(),
+      );
 
-      allFiles.addAll(manualFiles.map((f) => f.filePath));
-
-      return allFiles.toList();
-    } catch (e) {
-      debugPrint('Error getting library files: $e');
-      return [];
+      return allFiles.toList(growable: false);
+    } catch (error) {
+      debugPrint('Error getting library files: $error');
+      return <String>[];
     }
   }
 
-  /// Add a single file to a library (manual addition)
-  Future<bool> addFileToLibrary(int libraryId, String filePath,
-      {String? caption}) async {
+  Future<bool> addFileToLibrary(
+    int libraryId,
+    String filePath, {
+    String? caption,
+  }) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibraryFile>();
-
-      // Check if already exists
-      final query = box
-          .query(VideoLibraryFile_.videoLibraryId
-              .equals(libraryId)
-              .and(VideoLibraryFile_.filePath.equals(filePath)))
-          .build();
-      final existing = query.findFirst();
-      query.close();
-
-      if (existing != null) {
-        debugPrint('File already in library: $filePath');
+      final database = await _getDatabase();
+      final existing = await database.query(
+        'video_library_files',
+        columns: <String>['id'],
+        where: 'video_library_id = ? AND file_path = ?',
+        whereArgs: <Object?>[libraryId, filePath],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
         return true;
       }
+
+      final nextOrderIndex = sqflite.Sqflite.firstIntValue(
+            await database.rawQuery(
+              '''
+              SELECT MAX(order_index)
+              FROM video_library_files
+              WHERE video_library_id = ?
+              ''',
+              <Object?>[libraryId],
+            ),
+          ) ??
+          -1;
 
       final libraryFile = VideoLibraryFile(
         videoLibraryId: libraryId,
         filePath: filePath,
         caption: caption,
+        orderIndex: nextOrderIndex + 1,
+      );
+      await database.insert(
+        'video_library_files',
+        libraryFile.toDatabaseMap(),
       );
 
-      box.put(libraryFile);
-
-      // Update library modified time
       final library = await getLibraryById(libraryId);
       if (library != null) {
         await updateLibrary(library);
       }
 
-      debugPrint('Added file to library: $filePath');
       return true;
-    } catch (e) {
-      debugPrint('Error adding file to library: $e');
+    } catch (error) {
+      debugPrint('Error adding file to library: $error');
       return false;
     }
   }
 
-  /// Add multiple files to a library
   Future<int> addFilesToLibrary(int libraryId, List<String> filePaths) async {
+    if (filePaths.isEmpty) return 0;
+
+    final database = await _getDatabase();
     int successCount = 0;
-    for (final filePath in filePaths) {
-      final success = await addFileToLibrary(libraryId, filePath);
-      if (success) successCount++;
+
+    await database.transaction((txn) async {
+      for (final filePath in filePaths) {
+        final existing = await txn.query(
+          'video_library_files',
+          columns: <String>['id'],
+          where: 'video_library_id = ? AND file_path = ?',
+          whereArgs: <Object?>[libraryId, filePath],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) continue;
+
+        final nextOrderIndex = sqflite.Sqflite.firstIntValue(
+              await txn.rawQuery(
+                'SELECT MAX(order_index) FROM video_library_files WHERE video_library_id = ?',
+                <Object?>[libraryId],
+              ),
+            ) ??
+            -1;
+
+        final libraryFile = VideoLibraryFile(
+          videoLibraryId: libraryId,
+          filePath: filePath,
+          orderIndex: nextOrderIndex + 1,
+        );
+        await txn.insert(
+          'video_library_files',
+          libraryFile.toDatabaseMap(),
+        );
+        successCount++;
+      }
+    });
+
+    if (successCount > 0) {
+      final library = await getLibraryById(libraryId);
+      if (library != null) {
+        await updateLibrary(library);
+      }
     }
+
     return successCount;
   }
 
-  /// Add all videos from a folder to a library
-  Future<int> addFolderToLibrary(int libraryId, String folderPath,
-      {bool recursive = true}) async {
+  Future<int> addFolderToLibrary(
+    int libraryId,
+    String folderPath, {
+    bool recursive = true,
+  }) async {
     try {
       final videos = await getAllVideos(folderPath, recursive: recursive);
-      return await addFilesToLibrary(
-          libraryId, videos.map((f) => f.path).toList());
-    } catch (e) {
-      debugPrint('Error adding folder to library: $e');
+      return addFilesToLibrary(
+        libraryId,
+        videos.map((file) => file.path).toList(growable: false),
+      );
+    } catch (error) {
+      debugPrint('Error adding folder to library: $error');
       return 0;
     }
   }
 
-  /// Remove a file from a library
   Future<bool> removeFileFromLibrary(int libraryId, String filePath) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibraryFile>();
+      final database = await _getDatabase();
+      final deleted = await database.delete(
+        'video_library_files',
+        where: 'video_library_id = ? AND file_path = ?',
+        whereArgs: <Object?>[libraryId, filePath],
+      );
+      if (deleted == 0) {
+        return false;
+      }
 
-      final query = box
-          .query(VideoLibraryFile_.videoLibraryId
-              .equals(libraryId)
-              .and(VideoLibraryFile_.filePath.equals(filePath)))
-          .build();
-      final file = query.findFirst();
-      query.close();
-
-      if (file == null) return false;
-
-      box.remove(file.id);
-
-      // Update library modified time
       final library = await getLibraryById(libraryId);
       if (library != null) {
         await updateLibrary(library);
       }
 
-      debugPrint('Removed file from library: $filePath');
       return true;
-    } catch (e) {
-      debugPrint('Error removing file from library: $e');
+    } catch (error) {
+      debugPrint('Error removing file from library: $error');
       return false;
     }
   }
 
-  /// Check if a file is in a library
   Future<bool> isFileInLibrary(int libraryId, String filePath) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibraryFile>();
-
-      final query = box
-          .query(VideoLibraryFile_.videoLibraryId
-              .equals(libraryId)
-              .and(VideoLibraryFile_.filePath.equals(filePath)))
-          .build();
-      final result = query.findFirst();
-      query.close();
-
-      return result != null;
-    } catch (e) {
-      debugPrint('Error checking if file in library: $e');
+      final database = await _getDatabase();
+      final count = sqflite.Sqflite.firstIntValue(
+            await database.rawQuery(
+              '''
+              SELECT COUNT(*)
+              FROM video_library_files
+              WHERE video_library_id = ? AND file_path = ?
+              ''',
+              <Object?>[libraryId, filePath],
+            ),
+          ) ??
+          0;
+      return count > 0;
+    } catch (error) {
+      debugPrint('Error checking if file in library: $error');
       return false;
     }
   }
 
-  /// Get video library configuration
   Future<VideoLibraryConfig?> getLibraryConfig(int libraryId) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibraryConfig>();
-
-      final query = box
-          .query(VideoLibraryConfig_.videoLibraryId.equals(libraryId))
-          .build();
-      final config = query.findFirst();
-      query.close();
-
-      return config;
-    } catch (e) {
-      debugPrint('Error getting library config: $e');
+      final database = await _getDatabase();
+      final rows = await database.query(
+        'video_library_configs',
+        where: 'video_library_id = ?',
+        whereArgs: <Object?>[libraryId],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        return null;
+      }
+      return VideoLibraryConfig.fromDatabaseMap(rows.first);
+    } catch (error) {
+      debugPrint('Error getting library config: $error');
       return null;
     }
   }
 
-  /// Update video library configuration
   Future<bool> updateLibraryConfig(VideoLibraryConfig config) async {
     try {
-      final store = await _getStore();
-      final box = store.box<VideoLibraryConfig>();
-      box.put(config);
-      debugPrint(
-          'Updated library config for library: ${config.videoLibraryId}');
+      final database = await _getDatabase();
+      if (config.id == 0) {
+        final existing = await database.query(
+          'video_library_configs',
+          columns: <String>['id'],
+          where: 'video_library_id = ?',
+          whereArgs: <Object?>[config.videoLibraryId],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) {
+          config.id = existing.first['id'] as int? ?? 0;
+        }
+      }
+
+      await database.insert(
+        'video_library_configs',
+        config.toDatabaseMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
       return true;
-    } catch (e) {
-      debugPrint('Error updating library config: $e');
+    } catch (error) {
+      debugPrint('Error updating library config: $error');
       return false;
     }
   }
 
-  /// Add a directory to library config
   Future<bool> addDirectoryToLibrary(
       int libraryId, String directoryPath) async {
     try {
       final config = await getLibraryConfig(libraryId);
-      if (config == null) return false;
+      if (config == null) {
+        return false;
+      }
 
-      final dirs = config.directoriesList;
-      if (!dirs.contains(directoryPath)) {
-        dirs.add(directoryPath);
-        config.directoriesList = dirs;
-        return await updateLibraryConfig(config);
+      final directories = config.directoriesList;
+      if (!directories.contains(directoryPath)) {
+        directories.add(directoryPath);
+        config.directoriesList = directories;
+        return updateLibraryConfig(config);
       }
       return true;
-    } catch (e) {
-      debugPrint('Error adding directory to library: $e');
+    } catch (error) {
+      debugPrint('Error adding directory to library: $error');
       return false;
     }
   }
 
-  /// Remove a directory from library config
   Future<bool> removeDirectoryFromLibrary(
-      int libraryId, String directoryPath) async {
+    int libraryId,
+    String directoryPath,
+  ) async {
     try {
       final config = await getLibraryConfig(libraryId);
-      if (config == null) return false;
+      if (config == null) {
+        return false;
+      }
 
-      final dirs = config.directoriesList;
-      dirs.remove(directoryPath);
-      config.directoriesList = dirs;
-      return await updateLibraryConfig(config);
-    } catch (e) {
-      debugPrint('Error removing directory from library: $e');
+      final directories = config.directoriesList;
+      directories.remove(directoryPath);
+      config.directoriesList = directories;
+      return updateLibraryConfig(config);
+    } catch (error) {
+      debugPrint('Error removing directory from library: $error');
       return false;
     }
   }
 
-  /// Get videos by tag (uses TagManager)
-  Future<List<String>> getVideosByTag(String tag,
-      {int? libraryId, bool globalSearch = false}) async {
+  Future<List<String>> getVideosByTag(
+    String tag, {
+    int? libraryId,
+    bool globalSearch = false,
+  }) async {
     try {
       List<FileSystemEntity> taggedFiles;
 
       if (globalSearch || libraryId == null) {
-        // Global tag search
         taggedFiles = await TagManager.findFilesByTagGlobally(tag);
       } else {
-        // Search within library directories
         final config = await getLibraryConfig(libraryId);
-        if (config == null || config.directoriesList.isEmpty) return [];
+        if (config == null || config.directoriesList.isEmpty) {
+          return <String>[];
+        }
 
-        final Set<FileSystemEntity> allTaggedFiles = {};
-        for (final dir in config.directoriesList) {
-          final files = await TagManager.findFilesByTag(dir, tag);
+        final allTaggedFiles = <FileSystemEntity>{};
+        for (final directory in config.directoriesList) {
+          final files = await TagManager.findFilesByTag(directory, tag);
           allTaggedFiles.addAll(files);
         }
-        taggedFiles = allTaggedFiles.toList();
+        taggedFiles = allTaggedFiles.toList(growable: false);
       }
 
-      // Filter to only video files
-      final videoExtensions = [
+      const videoExtensions = <String>{
         '.mp4',
         '.avi',
         '.mov',
@@ -448,87 +486,86 @@ class VideoLibraryService {
         '.mpg',
         '.mpeg',
         '.3gp',
-        '.ogv'
-      ];
+        '.ogv',
+      };
 
-      final videoPaths = taggedFiles
+      return taggedFiles
           .whereType<File>()
-          .where((f) =>
-              videoExtensions.contains(path.extension(f.path).toLowerCase()))
-          .map((f) => f.path)
-          .toList();
-
-      return videoPaths;
-    } catch (e) {
-      debugPrint('Error getting videos by tag: $e');
-      return [];
+          .where(
+            (file) => videoExtensions
+                .contains(path.extension(file.path).toLowerCase()),
+          )
+          .map((file) => file.path)
+          .toList(growable: false);
+    } catch (error) {
+      debugPrint('Error getting videos by tag: $error');
+      return <String>[];
     }
   }
 
-  /// Search videos by name or tag
-  Future<List<String>> searchVideos(String query,
-      {int? libraryId, bool searchTags = true}) async {
+  Future<List<String>> searchVideos(
+    String query, {
+    int? libraryId,
+    bool searchTags = true,
+  }) async {
     try {
       List<String> allVideos;
 
       if (libraryId != null) {
         allVideos = await getLibraryFiles(libraryId);
       } else {
-        // Global search - get from all libraries
         final libraries = await getAllLibraries();
-        final Set<String> allFiles = {};
+        final allFiles = <String>{};
         for (final library in libraries) {
           final files = await getLibraryFiles(library.id);
           allFiles.addAll(files);
         }
-        allVideos = allFiles.toList();
+        allVideos = allFiles.toList(growable: false);
       }
 
-      // Filter by filename
       final queryLower = query.toLowerCase();
       final matchingVideos = allVideos
-          .where((filePath) =>
-              path.basename(filePath).toLowerCase().contains(queryLower))
-          .toList();
+          .where(
+            (filePath) =>
+                path.basename(filePath).toLowerCase().contains(queryLower),
+          )
+          .toList(growable: true);
 
-      // If searching tags, also include tag matches
       if (searchTags && query.isNotEmpty) {
-        final taggedVideos = await getVideosByTag(query,
-            libraryId: libraryId, globalSearch: libraryId == null);
+        final taggedVideos = await getVideosByTag(
+          query,
+          libraryId: libraryId,
+          globalSearch: libraryId == null,
+        );
         matchingVideos.addAll(taggedVideos);
       }
 
-      return matchingVideos.toSet().toList(); // Remove duplicates
-    } catch (e) {
-      debugPrint('Error searching videos: $e');
-      return [];
+      return matchingVideos.toSet().toList(growable: false);
+    } catch (error) {
+      debugPrint('Error searching videos: $error');
+      return <String>[];
     }
   }
 
-  /// Refresh library (rescan directories)
   Future<void> refreshLibrary(int libraryId) async {
     try {
       final config = await getLibraryConfig(libraryId);
-      if (config == null) return;
+      if (config == null) {
+        return;
+      }
 
       final files = await getLibraryFiles(libraryId);
       config.updateScanStats(files.length);
       await updateLibraryConfig(config);
-
-      debugPrint('Refreshed library $libraryId: ${files.length} files found');
-    } catch (e) {
-      debugPrint('Error refreshing library: $e');
+    } catch (error) {
+      debugPrint('Error refreshing library: $error');
     }
   }
 
-  /// Get video count for a library
   Future<int> getLibraryVideoCount(int libraryId) async {
     final files = await getLibraryFiles(libraryId);
     return files.length;
   }
 
-  /// Dispose resources
-  void dispose() {
-    debugPrint('VideoLibraryService: Disposing');
-  }
+  void dispose() {}
 }

@@ -319,7 +319,8 @@ class _DriveViewState extends State<DriveView> {
     required _DriveEntry drive,
     required bool compact,
   }) {
-    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final bool isDarkMode = theme.brightness == Brightness.dark;
     final _DriveSpaceInfo space = drive.spaceInfo;
 
     final Color progressColor = space.usageRatio > 0.9
@@ -334,10 +335,14 @@ class _DriveViewState extends State<DriveView> {
     final Color subtitleColor =
         isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
 
+    final cardColor = theme.colorScheme.surface.withValues(
+      alpha: isDarkMode ? 0.58 : 0.64,
+    );
+
     return Card(
       key: key,
       margin: EdgeInsets.zero,
-      color: isDarkMode ? Colors.grey[850] : Colors.white,
+      color: cardColor,
       elevation: 0,
       child: GestureDetector(
         onSecondaryTapDown: _isDesktopPlatform

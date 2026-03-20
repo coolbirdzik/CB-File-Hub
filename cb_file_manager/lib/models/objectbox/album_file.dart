@@ -1,34 +1,13 @@
-import 'package:objectbox/objectbox.dart';
-import '../../objectbox.g.dart';
-
-/// Entity class for storing album-file associations in ObjectBox
-@Entity()
+/// Data model for a file inside an album.
 class AlbumFile {
-  /// Primary key ID
-  @Id()
   int id = 0;
-
-  /// Album ID reference
-  @Index()
   int albumId;
-
-  /// Path to the file
-  @Index()
   String filePath;
-
-  /// Order/position of the file within the album
   int orderIndex;
-
-  /// Timestamp when file was added to album
   DateTime addedAt;
-
-  /// Optional custom caption for this file in the album
   String? caption;
-
-  /// Whether this file is marked as album cover
   bool isCover;
 
-  /// Creates a new album-file association
   AlbumFile({
     required this.albumId,
     required this.filePath,
@@ -38,7 +17,31 @@ class AlbumFile {
     this.isCover = false,
   }) : addedAt = addedAt ?? DateTime.now();
 
-  /// Creates a copy of this album file with updated fields
+  factory AlbumFile.fromDatabaseMap(Map<String, Object?> map) {
+    return AlbumFile(
+      albumId: map['album_id'] as int? ?? 0,
+      filePath: map['file_path'] as String? ?? '',
+      orderIndex: map['order_index'] as int? ?? 0,
+      addedAt: DateTime.fromMillisecondsSinceEpoch(
+        map['added_at'] as int? ?? 0,
+      ),
+      caption: map['caption'] as String?,
+      isCover: (map['is_cover'] as int? ?? 0) == 1,
+    )..id = map['id'] as int? ?? 0;
+  }
+
+  Map<String, Object?> toDatabaseMap() {
+    return <String, Object?>{
+      'id': id == 0 ? null : id,
+      'album_id': albumId,
+      'file_path': filePath,
+      'order_index': orderIndex,
+      'added_at': addedAt.millisecondsSinceEpoch,
+      'caption': caption,
+      'is_cover': isCover ? 1 : 0,
+    };
+  }
+
   AlbumFile copyWith({
     int? albumId,
     String? filePath,
@@ -60,21 +63,23 @@ class AlbumFile {
   @override
   String toString() {
     return 'AlbumFile{id: $id, albumId: $albumId, filePath: $filePath, '
-           'orderIndex: $orderIndex, addedAt: $addedAt, '
-           'caption: $caption, isCover: $isCover}';
+        'orderIndex: $orderIndex, addedAt: $addedAt, '
+        'caption: $caption, isCover: $isCover}';
   }
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) return true;
+    if (identical(this, other)) {
+      return true;
+    }
     return other is AlbumFile &&
-           other.id == id &&
-           other.albumId == albumId &&
-           other.filePath == filePath &&
-           other.orderIndex == orderIndex &&
-           other.addedAt == addedAt &&
-           other.caption == caption &&
-           other.isCover == isCover;
+        other.id == id &&
+        other.albumId == albumId &&
+        other.filePath == filePath &&
+        other.orderIndex == orderIndex &&
+        other.addedAt == addedAt &&
+        other.caption == caption &&
+        other.isCover == isCover;
   }
 
   @override

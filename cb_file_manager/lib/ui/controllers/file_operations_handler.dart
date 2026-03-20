@@ -300,9 +300,7 @@ class FileOperationsHandler {
     final l10n = AppLocalizations.of(context)!;
     final name = _entityBaseName(entity);
     bloc.add(CopyFile(entity));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.copiedToClipboard(name))),
-    );
+    _showSnackBarSafe(context, l10n.copiedToClipboard(name));
   }
 
   static void copyFilesToClipboard({
@@ -317,9 +315,7 @@ class FileOperationsHandler {
     final message = entities.length == 1
         ? l10n.copiedToClipboard(_entityBaseName(entities.first))
         : '${entities.length} items copied to clipboard';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    _showSnackBarSafe(context, message);
   }
 
   static void cutToClipboard({
@@ -331,9 +327,7 @@ class FileOperationsHandler {
     final l10n = AppLocalizations.of(context)!;
     final name = _entityBaseName(entity);
     bloc.add(CutFile(entity));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.cutToClipboard(name))),
-    );
+    _showSnackBarSafe(context, l10n.cutToClipboard(name));
   }
 
   static void cutFilesToClipboard({
@@ -348,9 +342,7 @@ class FileOperationsHandler {
     final message = entities.length == 1
         ? l10n.cutToClipboard(_entityBaseName(entities.first))
         : '${entities.length} items cut to clipboard';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    _showSnackBarSafe(context, message);
   }
 
   static void pasteFromClipboard({
@@ -361,9 +353,18 @@ class FileOperationsHandler {
     final bloc = folderListBloc ?? context.read<FolderListBloc>();
     final l10n = AppLocalizations.of(context)!;
     bloc.add(PasteFile(destinationPath));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.pasting)),
-    );
+    _showSnackBarSafe(context, l10n.pasting);
+  }
+
+  /// Safely shows a snackbar, falling back to debugPrint if no ScaffoldMessenger is available.
+  static void _showSnackBarSafe(BuildContext context, String message) {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (_) {
+      debugPrint('FileOperationsHandler: ScaffoldMessenger unavailable — $message');
+    }
   }
 
   static Future<void> showRenameDialog({
@@ -437,12 +438,9 @@ class FileOperationsHandler {
 
     bloc.add(RenameFileOrFolder(entity, newName));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isFile ? l10n.renamedFileTo(newName) : l10n.renamedFolderTo(newName),
-        ),
-      ),
+    _showSnackBarSafe(
+      context,
+      isFile ? l10n.renamedFileTo(newName) : l10n.renamedFolderTo(newName),
     );
   }
 

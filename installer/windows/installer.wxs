@@ -65,7 +65,7 @@
     <DirectoryRef Id="ApplicationProgramsFolder">
       <Component Id="ApplicationShortcut">
         <Shortcut Id="ApplicationStartMenuShortcut" Name="CB File Hub"
-          Description="Launch CB File Hub" Target="[INSTALLFOLDER]coolbird_tagify.exe"
+          Description="Launch CB File Hub" Target="[INSTALLFOLDER]cb_file_hub.exe"
           WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
         <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
         <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]" Name="installed"
@@ -77,7 +77,7 @@
     <StandardDirectory Id="DesktopFolder">
       <Component Id="DesktopShortcut">
         <Shortcut Id="ApplicationDesktopShortcut" Name="CB File Hub"
-          Description="Launch CB File Hub" Target="[INSTALLFOLDER]coolbird_tagify.exe"
+          Description="Launch CB File Hub" Target="[INSTALLFOLDER]cb_file_hub.exe"
           WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
         <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]"
           Name="desktopShortcut" Type="integer" Value="1" KeyPath="yes" />

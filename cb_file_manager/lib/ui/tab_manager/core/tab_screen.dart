@@ -12,7 +12,6 @@ import 'tab_paths.dart';
 import '../../drawer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'tabbed_folder/tabbed_folder_list_screen.dart';
-import '../../screens/settings/settings_screen.dart';
 import 'package:flutter/gestures.dart'; // Import for mouse scrolling
 import '../desktop/scrollable_tab_bar.dart'; // Import our custom ScrollableTabBar
 import '../desktop/desktop_tab_drag_data.dart';
@@ -393,6 +392,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final isTablet = _isTablet(context);
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
+    final desktopUnifiedChromeColor = _isDesktop
+        ? (isDarkMode
+            ? theme.colorScheme.surface.withValues(alpha: 0.32)
+            : const Color(0xFFFFFFFF).withValues(alpha: 0.22))
+        : theme.scaffoldBackgroundColor;
+    final desktopBodyTintColor = _isDesktop ? desktopUnifiedChromeColor : null;
+    final desktopTopBarColor = _isDesktop ? Colors.transparent : null;
+    final desktopActiveTabColor = _isDesktop ? Colors.transparent : null;
 
     return BlocProvider(
       create: (context) => DrawerCubit()
@@ -618,13 +625,15 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                               _clearTabSelectionWhenClickOutsideStrip,
                           child: Scaffold(
                             key: _scaffoldKey,
+                            backgroundColor: desktopBodyTintColor,
                             // Modern AppBar, always present on tablet/desktop for custom title bar
                             appBar: isTablet
                                 ? AppBar(
                                     automaticallyImplyLeading: false,
                                     elevation: 0,
-                                    backgroundColor:
-                                        theme.scaffoldBackgroundColor,
+                                    backgroundColor: desktopTopBarColor,
+                                    surfaceTintColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
                                     leading: !_isDrawerPinned
                                         ? IconButton(
                                             icon: Icon(
@@ -638,6 +647,18 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             tooltip: MaterialLocalizations.of(
                                                     context)
                                                 .openAppDrawerTooltip,
+                                            style: IconButton.styleFrom(
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12.0),
+                                              ),
+                                              backgroundColor: isDarkMode
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.04)
+                                                  : theme
+                                                      .colorScheme.onSurface
+                                                      .withValues(alpha: 0.05),
+                                            ),
                                             onPressed: () => _scaffoldKey
                                                 .currentState
                                                 ?.openDrawer(),
@@ -652,6 +673,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                         child: ScrollableTabBar(
                                           controller:
                                               _tabController, // Ensure this controller has the correct length
+                                          barBackgroundColor:
+                                              desktopTopBarColor,
+                                          activeTabBackgroundColor:
+                                              desktopActiveTabColor,
                                           onTabPrimaryClick:
                                               (index, shiftPressed) {
                                             if (index >= state.tabs.length)
@@ -815,10 +840,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                         child: IconButton(
                                           icon: Icon(
                                             PhosphorIconsLight.dotsThree,
-                                            color: isDarkMode
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.8)
-                                                : theme.colorScheme.primary,
+                                            color: theme.colorScheme.primary,
                                             size: 22,
                                           ),
                                           style: IconButton.styleFrom(
@@ -827,10 +849,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                   BorderRadius.circular(16.0),
                                             ),
                                             backgroundColor: isDarkMode
-                                                ? Colors.white
-                                                    .withValues(alpha: 0.03)
+                                                ? theme.colorScheme.primary
+                                                    .withValues(alpha: 0.06)
                                                 : theme.colorScheme.primary
-                                                    .withValues(alpha: 0.05),
+                                                    .withValues(alpha: 0.07),
                                           ),
                                           onPressed: () =>
                                               _showTabOptions(context),
@@ -850,6 +872,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                   )
                                 : null,
                             body: Row(
+                              key: const ValueKey<String>(
+                                  'tab-screen-content-block'),
                               children: [
                                 // Pinned drawer (if enabled)
                                 if (_isDrawerPinned)
@@ -866,23 +890,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                   ),
                                 // Main content area with subtle container styling
                                 Expanded(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: theme.scaffoldBackgroundColor,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(16),
-                                        bottomLeft: Radius.circular(16),
-                                      ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(16),
-                                        bottomLeft: Radius.circular(16),
-                                      ),
-                                      child: _buildContent(
-                                          context, state, isTablet),
-                                    ),
-                                  ),
+                                  child:
+                                      _buildContent(context, state, isTablet),
                                 ),
                               ],
                             ),
@@ -1614,12 +1623,20 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 text: context.tr.settings,
                 onTap: () {
                   RouteUtils.safePopDialog(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
-                    ),
+                  final tabBloc = BlocProvider.of<TabManagerBloc>(context);
+                  final existingTab = tabBloc.state.tabs.firstWhere(
+                    (tab) => tab.path == kSettingsPath,
+                    orElse: () => TabData(id: '', name: '', path: ''),
                   );
+                  if (existingTab.id.isNotEmpty) {
+                    tabBloc.add(SwitchToTab(existingTab.id));
+                  } else {
+                    tabBloc.add(AddTab(
+                      path: kSettingsPath,
+                      name: context.tr.settings,
+                      switchToTab: true,
+                    ));
+                  }
                 },
               ),
               // Native Streaming Test removed - using flutter_vlc_player now

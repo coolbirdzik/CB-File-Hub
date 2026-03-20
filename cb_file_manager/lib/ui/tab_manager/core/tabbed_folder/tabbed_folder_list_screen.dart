@@ -198,6 +198,25 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   bool _isDrivesMode() => _isDrivesPathValue(_currentPath);
 
+  Widget _buildAcrylicContentContainer({
+    required BuildContext context,
+    required Widget child,
+  }) {
+    if (isDesktopPlatform) {
+      return child;
+    }
+
+    return FluentBackground.container(
+      context: context,
+      enableBlur: true,
+      blurAmount: 10.0,
+      opacity: 0.70,
+      backgroundColor: null,
+      padding: EdgeInsets.zero,
+      child: child,
+    );
+  }
+
   String _displayPathForInput(String path) {
     return _isDrivesPathValue(path) ? '' : path;
   }
@@ -987,9 +1006,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               child: AppProgressIndicatorBeautiful(),
             ),
           Expanded(
-            child: FluentBackground.container(
+            child: _buildAcrylicContentContainer(
               context: context,
-              enableBlur: isDesktopPlatform,
               child: tab_components.DriveView(
                 tabId: widget.tabId,
                 folderListBloc: _folderListBloc,
@@ -1041,9 +1059,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             child: AppProgressIndicatorBeautiful(),
           ),
         Expanded(
-          child: FluentBackground.container(
+          child: _buildAcrylicContentContainer(
             context: context,
-            enableBlur: isDesktopPlatform,
             child: shouldShowSkeleton
                 ? _buildSkeletonLoader(state) // Show skeleton while loading
                 : _buildMainContent(

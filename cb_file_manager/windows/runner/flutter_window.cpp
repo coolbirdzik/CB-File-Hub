@@ -107,6 +107,20 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   case WM_FONTCHANGE:
     flutter_controller_->engine()->ReloadSystemFonts();
     break;
+  case WM_SYSCOMMAND:
+  {
+    // Block the Alt+Space system menu popup.  With TitleBarStyle.hidden the
+    // native system menu is not useful (custom caption buttons are rendered
+    // by Flutter).  We keep WS_SYSMENU in the window style because
+    // WS_MINIMIZEBOX depends on it for taskbar click-to-minimize, but
+    // suppress the menu itself here.
+    const WORD cmd = wparam & 0xFFF0;
+    if (cmd == SC_KEYMENU)
+    {
+      return 0;
+    }
+    break;
+  }
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);

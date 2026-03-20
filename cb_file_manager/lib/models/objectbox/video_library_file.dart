@@ -1,30 +1,12 @@
-import 'package:objectbox/objectbox.dart';
-
-/// Entity class for storing video library file associations in ObjectBox
-@Entity()
+/// Data model for a file inside a video library.
 class VideoLibraryFile {
-  /// Primary key ID
-  @Id()
   int id = 0;
-
-  /// Video Library ID this file belongs to
-  @Index()
   int videoLibraryId;
-
-  /// Full path to the video file
-  @Index()
   String filePath;
-
-  /// When this file was added to the library
   DateTime addedAt;
-
-  /// Optional caption or description
   String? caption;
-
-  /// Order index for manual sorting
   int orderIndex;
 
-  /// Creates a new video library file association
   VideoLibraryFile({
     required this.videoLibraryId,
     required this.filePath,
@@ -33,7 +15,29 @@ class VideoLibraryFile {
     this.orderIndex = 0,
   }) : addedAt = addedAt ?? DateTime.now();
 
-  /// Creates a copy of this file with updated fields
+  factory VideoLibraryFile.fromDatabaseMap(Map<String, Object?> map) {
+    return VideoLibraryFile(
+      videoLibraryId: map['video_library_id'] as int? ?? 0,
+      filePath: map['file_path'] as String? ?? '',
+      addedAt: DateTime.fromMillisecondsSinceEpoch(
+        map['added_at'] as int? ?? 0,
+      ),
+      caption: map['caption'] as String?,
+      orderIndex: map['order_index'] as int? ?? 0,
+    )..id = map['id'] as int? ?? 0;
+  }
+
+  Map<String, Object?> toDatabaseMap() {
+    return <String, Object?>{
+      'id': id == 0 ? null : id,
+      'video_library_id': videoLibraryId,
+      'file_path': filePath,
+      'added_at': addedAt.millisecondsSinceEpoch,
+      'caption': caption,
+      'order_index': orderIndex,
+    };
+  }
+
   VideoLibraryFile copyWith({
     int? videoLibraryId,
     String? filePath,
@@ -58,7 +62,9 @@ class VideoLibraryFile {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) return true;
+    if (identical(this, other)) {
+      return true;
+    }
     return other is VideoLibraryFile &&
         other.id == id &&
         other.videoLibraryId == videoLibraryId &&

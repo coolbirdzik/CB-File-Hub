@@ -237,10 +237,21 @@ class _TagManagementHelper {
       BuildContext context, String tagName) async {
     try {
       await TagManager.initialize();
-      final tempFilePath =
-          '/temp/tag_creation_placeholder_${DateTime.now().millisecondsSinceEpoch}';
-      await TagManager.addTag(tempFilePath, tagName);
-      await TagManager.removeTag(tempFilePath, tagName);
+      final created = await TagManager.addStandaloneTag(tagName);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      if (!created) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể lưu thẻ vào cơ sở dữ liệu'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -249,6 +260,9 @@ class _TagManagementHelper {
         ),
       );
     } catch (e) {
+      if (!context.mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi khi tạo thẻ: $e'),
@@ -452,8 +466,3 @@ class _NetworkHelper {
     );
   }
 }
-
-
-
-
-

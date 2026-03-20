@@ -187,14 +187,14 @@ class _FolderGridItemState extends State<FolderGridItem> {
                                             decoration: BoxDecoration(
                                               color: Theme.of(context)
                                                   .colorScheme
-                                                  .surface
-                                                  .withValues(alpha: 0.9),
+                                                  .primaryContainer
+                                                  .withValues(alpha: 0.85),
                                               borderRadius:
                                                   BorderRadius.circular(
                                                       badgeRadius),
                                             ),
                                             child: Icon(
-                                              PhosphorIconsLight.folder,
+                                              PhosphorIconsFill.folder,
                                               size: badgeIconSize,
                                               color: Theme.of(context)
                                                   .colorScheme
@@ -208,10 +208,20 @@ class _FolderGridItemState extends State<FolderGridItem> {
                               ),
                             ),
                           ),
-                          // Text section
-                          SizedBox(
+                          // Text section — tinted for folder distinction
+                          Container(
                             height: textHeight,
                             width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer
+                                  .withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.only(
+                                bottomLeft: Radius.circular(cardRadius),
+                                bottomRight: Radius.circular(cardRadius),
+                              ),
+                            ),
                             child: Center(
                               child: Padding(
                                 padding:
@@ -326,18 +336,17 @@ class _FolderGridItemState extends State<FolderGridItem> {
                               top: 6,
                               left: 6,
                               child: Container(
-                                padding: const EdgeInsets.all(4.0),
+                                padding: const EdgeInsets.all(5.0),
                                 decoration: BoxDecoration(
                                   color: Theme.of(context)
                                       .colorScheme
-                                      .surface
-                                      .withValues(alpha: 0.9),
-                                  borderRadius: BorderRadius.circular(6.0),
-                                  boxShadow: [],
+                                      .primaryContainer
+                                      .withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(8.0),
                                 ),
                                 child: Icon(
-                                  PhosphorIconsLight.folder,
-                                  size: 14,
+                                  PhosphorIconsFill.folder,
+                                  size: 16,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
@@ -346,10 +355,20 @@ class _FolderGridItemState extends State<FolderGridItem> {
                         ),
                       ),
                     ),
-                    // Text section
-                    SizedBox(
+                    // Text section — tinted for folder distinction
+                    Container(
                       height: 40,
                       width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer
+                            .withValues(alpha: 0.25),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(16.0),
+                          bottomRight: Radius.circular(16.0),
+                        ),
+                      ),
                       child: Center(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),

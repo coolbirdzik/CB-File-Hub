@@ -144,19 +144,18 @@ class _CaptionButtonState extends State<_CaptionButton> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.theme.brightness == Brightness.dark;
-    final baseIconColor = isDark
-        ? Colors.white.withValues(alpha: 0.8)
-        : widget.theme.colorScheme.primary;
+    final accentColor = widget.theme.colorScheme.primary;
+    final baseIconColor = accentColor;
     final idleBg = isDark
-        ? Colors.white.withValues(alpha: 0.03)
-        : widget.theme.colorScheme.primary.withValues(alpha: 0.05);
+        ? accentColor.withValues(alpha: 0.06)
+        : accentColor.withValues(alpha: 0.07);
     final hoverBg = widget.isCloseButton
         ? widget.theme.colorScheme.error
         : (isDark
-            ? widget.theme.colorScheme.onSurface.withValues(alpha: 0.10)
-            : widget.theme.colorScheme.onSurface.withValues(alpha: 0.12));
+            ? accentColor.withValues(alpha: 0.16)
+            : accentColor.withValues(alpha: 0.14));
     final hoverIconColor =
-        widget.isCloseButton ? widget.theme.colorScheme.onError : widget.theme.colorScheme.onSurface;
+        widget.isCloseButton ? widget.theme.colorScheme.onError : accentColor;
 
     return Tooltip(
       message: _dynamicTooltip ?? widget.tooltip,

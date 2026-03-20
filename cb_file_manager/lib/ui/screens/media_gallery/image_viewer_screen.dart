@@ -810,7 +810,6 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           onPressed: () => _showImageInfo(context, _allImages[_currentIndex]),
                         ),
                         PopupMenuButton<String>(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           iconColor: Colors.white,
                           onSelected: (value) {
                             switch (value) {

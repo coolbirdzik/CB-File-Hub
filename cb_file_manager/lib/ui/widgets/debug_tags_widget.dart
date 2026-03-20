@@ -13,15 +13,145 @@ class DebugTagsWidget extends StatefulWidget {
 
 class _DebugTagsWidgetState extends State<DebugTagsWidget> {
   bool _isLoading = true;
+  bool _isSeeding = false;
   String _debugInfo = '';
   Set<String> _allTags = {};
   Map<String, int> _popularTags = {};
-  bool _useObjectBox = false;
+  bool _useDatabase = true;
+
+  // Sample tag categories for realistic seed data
+  static const List<String> _categories = [
+    'Music',
+    'Video',
+    'Photo',
+    'Work',
+    'Personal',
+    'Project',
+    'Archive',
+    'Important',
+    'Draft',
+    'Final',
+  ];
+
+  static const List<String> _adjectives = [
+    'Urgent',
+    'Review',
+    'Pending',
+    'Completed',
+    'Archived',
+    'Backup',
+    'Temp',
+    'New',
+    'Old',
+    'Favorite',
+  ];
+
+  static const List<String> _suffixes = [
+    'Q1',
+    'Q2',
+    'Q3',
+    'Q4',
+    '2024',
+    '2025',
+    '2026',
+    'v1',
+    'v2',
+    'v3',
+    'Final',
+    'Draft',
+    'Backup',
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadDebugInfo();
+  }
+
+  Future<void> _seedTags(int count) async {
+    setState(() {
+      _isSeeding = true;
+    });
+
+    try {
+      int savedCount = 0;
+      final List<String> tagsToSeed = [];
+      for (int i = 0; i < count; i++) {
+        final category = _categories[i % _categories.length];
+        final adjective = _adjectives[i % _adjectives.length];
+        final suffix = _suffixes[i % _suffixes.length];
+        final tag = '$category - $adjective $suffix ${i + 1}';
+        tagsToSeed.add(tag);
+      }
+
+      savedCount = await TagManager.addMultipleStandaloneTags(tagsToSeed);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Successfully seeded $savedCount/$count tags!')),
+        );
+        await _loadDebugInfo();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error seeding tags: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSeeding = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _clearAllTags() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Tags'),
+        content: Text(
+            'Are you sure you want to delete all ${_allTags.length} tags? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      for (final tag in _allTags) {
+        await TagManager.deleteTagGlobally(tag);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All tags cleared!')),
+        );
+        await _loadDebugInfo();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error clearing tags: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _loadDebugInfo() async {
@@ -33,7 +163,7 @@ class _DebugTagsWidgetState extends State<DebugTagsWidget> {
       // Initialize preferences
       final preferences = UserPreferences.instance;
       await preferences.init();
-      _useObjectBox = preferences.isUsingObjectBox();
+      _useDatabase = true;
 
       // Initialize TagManager
       await TagManager.initialize();
@@ -54,7 +184,7 @@ class _DebugTagsWidgetState extends State<DebugTagsWidget> {
       setState(() {
         _debugInfo = '''
 === DEBUG TAGS SYSTEM ===
-ObjectBox enabled: $_useObjectBox
+SQLite enabled: $_useDatabase
 Total unique tags found: ${allTags.length}
 Database tags: ${dbTags.length}
 Popular tags: ${popularTags.length}
@@ -79,6 +209,27 @@ Popular Tags: $popularTags
       appBar: AppBar(
         title: const Text('Debug Tags'),
         actions: [
+          if (_isSeeding)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.plus),
+              tooltip: 'Seed 20 tags',
+              onPressed: () => _seedTags(20),
+            ),
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.trash),
+              tooltip: 'Clear all tags',
+              onPressed: _allTags.isEmpty ? null : _clearAllTags,
+            ),
+          ],
           IconButton(
             icon: const Icon(PhosphorIconsLight.arrowsClockwise),
             onPressed: _loadDebugInfo,
@@ -182,9 +333,3 @@ Popular Tags: $popularTags
     );
   }
 }
-
-
-
-
-
-

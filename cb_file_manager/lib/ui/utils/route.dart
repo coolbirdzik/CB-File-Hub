@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/main.dart' show goHome, CBFileApp;
+import 'package:cb_file_manager/services/windowing/window_acrylic_service.dart';
 
 class RouteUtils {
   // Remove redundant methods and keep only the most robust navigation method
@@ -65,7 +66,9 @@ class RouteUtils {
       } catch (homeError) {
         debugPrint('Failed to go home: $homeError');
         // If even going home fails, restart the app
-        runApp(const CBFileApp());
+        runApp(CBFileApp(
+          windowAcrylicService: WindowAcrylicService(),
+        ));
       }
     }
   }

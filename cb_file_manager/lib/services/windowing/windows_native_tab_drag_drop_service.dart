@@ -142,4 +142,49 @@ class WindowsNativeTabDragDropService {
       await _channel.invokeMethod<bool>('forceActivateWindow');
     } catch (_) {}
   }
+
+  static Future<void> setNativeCaptionVisible(bool visible) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>(
+        'setNativeCaptionVisible',
+        <String, dynamic>{'visible': visible},
+      );
+    } catch (_) {}
+  }
+
+  static Future<void> setNativeSystemMenuVisible(bool visible) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>(
+        'setNativeSystemMenuVisible',
+        <String, dynamic>{'visible': visible},
+      );
+    } catch (_) {}
+  }
+
+  static Future<void> fitWindowToWorkArea() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('fitWindowToWorkArea');
+    } catch (_) {}
+  }
+
+  static Future<void> setWindowsSystemBackdrop({
+    required bool enabled,
+    bool preferAcrylic = true,
+    bool isDarkMode = false,
+  }) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>(
+        'setWindowsSystemBackdrop',
+        <String, dynamic>{
+          'enabled': enabled,
+          'preferAcrylic': preferAcrylic,
+          'isDarkMode': isDarkMode,
+        },
+      );
+    } catch (_) {}
+  }
 }

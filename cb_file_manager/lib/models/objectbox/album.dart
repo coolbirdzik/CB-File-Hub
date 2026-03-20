@@ -1,36 +1,14 @@
-import 'package:objectbox/objectbox.dart';
-import '../../objectbox.g.dart';
-
-/// Entity class for storing custom albums in ObjectBox
-@Entity()
+/// Data model for a custom album.
 class Album {
-  /// Primary key ID
-  @Id()
   int id = 0;
-
-  /// Album name
-  @Index()
   String name;
-
-  /// Album description (optional)
   String? description;
-
-  /// Album cover image path (optional)
   String? coverImagePath;
-
-  /// Creation timestamp
   DateTime createdAt;
-
-  /// Last modified timestamp
   DateTime modifiedAt;
-
-  /// Album color theme (hex color code, optional)
   String? colorTheme;
-
-  /// Whether this is a system album or user-created
   bool isSystemAlbum;
 
-  /// Creates a new album
   Album({
     required this.name,
     this.description,
@@ -39,15 +17,42 @@ class Album {
     DateTime? modifiedAt,
     this.colorTheme,
     this.isSystemAlbum = false,
-  }) : createdAt = createdAt ?? DateTime.now(),
-       modifiedAt = modifiedAt ?? DateTime.now();
+  })  : createdAt = createdAt ?? DateTime.now(),
+        modifiedAt = modifiedAt ?? DateTime.now();
 
-  /// Updates the modified timestamp
+  factory Album.fromDatabaseMap(Map<String, Object?> map) {
+    return Album(
+      name: map['name'] as String? ?? '',
+      description: map['description'] as String?,
+      coverImagePath: map['cover_image_path'] as String?,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        map['created_at'] as int? ?? 0,
+      ),
+      modifiedAt: DateTime.fromMillisecondsSinceEpoch(
+        map['modified_at'] as int? ?? 0,
+      ),
+      colorTheme: map['color_theme'] as String?,
+      isSystemAlbum: (map['is_system_album'] as int? ?? 0) == 1,
+    )..id = map['id'] as int? ?? 0;
+  }
+
+  Map<String, Object?> toDatabaseMap() {
+    return <String, Object?>{
+      'id': id == 0 ? null : id,
+      'name': name,
+      'description': description,
+      'cover_image_path': coverImagePath,
+      'created_at': createdAt.millisecondsSinceEpoch,
+      'modified_at': modifiedAt.millisecondsSinceEpoch,
+      'color_theme': colorTheme,
+      'is_system_album': isSystemAlbum ? 1 : 0,
+    };
+  }
+
   void updateModifiedTime() {
     modifiedAt = DateTime.now();
   }
 
-  /// Creates a copy of this album with updated fields
   Album copyWith({
     String? name,
     String? description,
@@ -71,22 +76,24 @@ class Album {
   @override
   String toString() {
     return 'Album{id: $id, name: $name, description: $description, '
-           'createdAt: $createdAt, modifiedAt: $modifiedAt, '
-           'isSystemAlbum: $isSystemAlbum}';
+        'createdAt: $createdAt, modifiedAt: $modifiedAt, '
+        'isSystemAlbum: $isSystemAlbum}';
   }
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) return true;
+    if (identical(this, other)) {
+      return true;
+    }
     return other is Album &&
-           other.id == id &&
-           other.name == name &&
-           other.description == description &&
-           other.coverImagePath == coverImagePath &&
-           other.createdAt == createdAt &&
-           other.modifiedAt == modifiedAt &&
-           other.colorTheme == colorTheme &&
-           other.isSystemAlbum == isSystemAlbum;
+        other.id == id &&
+        other.name == name &&
+        other.description == description &&
+        other.coverImagePath == coverImagePath &&
+        other.createdAt == createdAt &&
+        other.modifiedAt == modifiedAt &&
+        other.colorTheme == colorTheme &&
+        other.isSystemAlbum == isSystemAlbum;
   }
 
   @override

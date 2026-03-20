@@ -133,10 +133,6 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
-          width: 1.5,
-        ),
       ),
       child: TextField(
         controller: widget.pathController,
@@ -151,8 +147,11 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           border: InputBorder.none,
           hintText: 'Enter path...',
           hintStyle: TextStyle(
-            color:
-                Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+            color: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.color
+                ?.withValues(alpha: 0.6),
           ),
         ),
         style: TextStyle(
@@ -180,8 +179,3 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
     );
   }
 }
-
-
-
-
-

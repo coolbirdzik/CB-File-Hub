@@ -1,50 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'dart:convert';
-import 'package:flutter/services.dart'; // For SystemUiOverlayStyle
-import 'package:flutter/foundation.dart'; // For kDebugMode
-import 'package:flutter/scheduler.dart'; // For frame scheduling
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/tab_manager/core/tab_main_screen.dart';
 import 'helpers/tags/tag_manager.dart';
-import 'package:media_kit/media_kit.dart'; // Import Media Kit
-// Ensure Windows video native libraries (mpv) are bundled.
-// This import is a no-op at runtime but required at build time.
-// Note: If media_kit_libs_windows_video is available in your environment,
-// you can import it here to bundle mpv DLLs. We avoid importing it directly
-// to prevent build failures when the package isn't present locally.
-import 'package:window_manager/window_manager.dart'; // Import window_manager
+import 'package:media_kit/media_kit.dart';
+import 'package:window_manager/window_manager.dart';
 import 'ui/components/video/pip_window/desktop_pip_window.dart';
-import 'helpers/media/media_kit_audio_helper.dart'; // Import our audio helper
-import 'helpers/core/user_preferences.dart'; // Import user preferences
-import 'helpers/media/folder_thumbnail_service.dart'; // Import thumbnail service
-import 'helpers/media/video_thumbnail_helper.dart'; // Import our video thumbnail helper
-import 'helpers/ui/frame_timing_optimizer.dart'; // Import our new frame timing optimizer
-import 'helpers/tags/batch_tag_manager.dart'; // Import batch tag manager
-import 'models/database/database_manager.dart'; // Import database manager
-import 'services/network_credentials_service.dart'; // Import network credentials service
-import 'providers/theme_provider.dart'; // Import theme provider
-import 'config/theme_config.dart'; // Import theme config
-import 'package:flutter_localizations/flutter_localizations.dart'; // Import for localization
-import 'config/language_controller.dart'; // Import our language controller
-import 'config/languages/app_localizations_delegate.dart'; // Import our localization delegate
-import 'services/streaming_service_manager.dart'; // Import streaming service manager
-import 'ui/utils/safe_navigation_wrapper.dart'; // Import safe navigation wrapper
-import 'core/service_locator.dart'; // Import service locator
-import 'package:cb_file_manager/services/album_service.dart'; // Import AlbumService
+import 'helpers/media/media_kit_audio_helper.dart';
+import 'helpers/core/user_preferences.dart';
+import 'helpers/media/folder_thumbnail_service.dart';
+import 'helpers/media/video_thumbnail_helper.dart';
+import 'helpers/ui/frame_timing_optimizer.dart';
+import 'helpers/tags/batch_tag_manager.dart';
+import 'models/database/database_manager.dart';
+import 'services/network_credentials_service.dart';
+import 'providers/theme_provider.dart';
+import 'config/theme_config.dart';
+import 'config/fluent_theme_config.dart';
+import 'config/design_system_config.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'config/language_controller.dart';
+import 'config/languages/app_localizations_delegate.dart';
+import 'services/streaming_service_manager.dart';
+import 'ui/utils/safe_navigation_wrapper.dart';
+import 'ui/utils/desktop_acrylic_backdrop.dart';
+import 'core/service_locator.dart';
+import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'services/windowing/window_startup_payload.dart';
 import 'services/windowing/windows_native_tab_drag_drop_service.dart';
+import 'services/windowing/window_acrylic_service.dart';
+import 'dev/dev_overlay.dart';
 // Permission explainer is pushed from TabMainScreen; no direct import needed here
 
 // Global access to test the video thumbnail screen (for development)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-const List<String> _debugLogAllowList = <String>['VideoPlayer', 'VLC'];
+const List<String> _debugLogAllowList = <String>[
+  'VideoPlayer',
+  'VLC',
+  'TAG_RENAME',
+  'SEED_DIRECT',
+  '[DevTools]',
+  '[TagManager]',
+  '[SQLite]',
+];
+
+// Error patterns to suppress (Flutter engine-level issues that don't affect functionality)
+const List<String> _debugLogSuppressList = <String>[
+  'accessibility_bridge.cc', // Windows AXTree update errors
+  'Failed to update ui::AXTree',
+  'Nodes left pending',
+];
 
 /// Launch file path from OS (e.g. double-click when app is default for video)
 List<String> _launchPaths = [];
@@ -94,6 +111,11 @@ void _configureDebugPrintFiltering() {
 }
 
 bool _shouldAllowLog(String message) {
+  for (final token in _debugLogSuppressList) {
+    if (message.contains(token)) {
+      return false;
+    }
+  }
   for (final token in _debugLogAllowList) {
     if (message.contains(token)) {
       return true;
@@ -102,11 +124,29 @@ bool _shouldAllowLog(String message) {
   return false;
 }
 
+Future<bool> _resolveInitialNativeBackdropDarkMode() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final storedTheme = prefs.getString('app_theme')?.trim().toLowerCase();
+    if (storedTheme == AppThemeType.dark.name || storedTheme == 'amoled') {
+      return true;
+    }
+    if (storedTheme == AppThemeType.light.name ||
+        storedTheme == 'blue' ||
+        storedTheme == 'green' ||
+        storedTheme == 'purple' ||
+        storedTheme == 'orange') {
+      return false;
+    }
+  } catch (_) {}
+
+  return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+      Brightness.dark;
+}
+
 void main(List<String> args) async {
   _launchPaths = List.from(args);
-  // Catch any errors during app initialization
   runZonedGuarded(() async {
-    // Ensure Flutter is initialized before using platform plugins
     WidgetsFlutterBinding.ensureInitialized();
     _configureDebugPrintFiltering();
     final env = Platform.environment;
@@ -118,14 +158,10 @@ void main(List<String> args) async {
     final windowRole =
         (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
     final isPip = env['CB_PIP_MODE'] == '1';
+    final windowAcrylicService = WindowAcrylicService();
+    final initialNativeBackdropDarkMode =
+        await _resolveInitialNativeBackdropDarkMode();
     final List<Future<void> Function()> deferredSecondaryInitializers = [];
-
-    // Native event loop init removed to avoid build issues when package
-    // artifacts are not present locally.
-
-    // Note: If you use media_kit_native_event_loop, initialize it here.
-    // We avoid importing it directly to prevent build failures when
-    // the package isn't available in the environment.
 
     if (isDesktopPlatform) {
       try {
@@ -133,18 +169,15 @@ void main(List<String> args) async {
       } catch (_) {}
 
       if (!isPip) {
-        // Show desktop windows as soon as possible.
-        const windowOptions = WindowOptions(
+        final windowOptions = WindowOptions(
           center: true,
           backgroundColor: Colors.transparent,
           titleBarStyle: TitleBarStyle.hidden,
-          windowButtonVisibility: true,
-          minimumSize: Size(800, 600),
+          windowButtonVisibility: !Platform.isWindows,
+          minimumSize: const Size(800, 600),
         );
 
         try {
-          // For secondary windows, avoid blocking startup on window option
-          // application. We'll show/focus immediately and let options settle.
           if (isSecondaryWindow) {
             unawaited(windowManager.waitUntilReadyToShow(windowOptions));
           } else {
@@ -153,6 +186,12 @@ void main(List<String> args) async {
         } catch (_) {}
 
         if (Platform.isWindows) {
+          try {
+            await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
+              false,
+            );
+          } catch (_) {}
+
           if (isSecondaryWindow) {
             if (startHidden || windowRole == 'spare') {
               try {
@@ -176,59 +215,59 @@ void main(List<String> args) async {
               unawaited(windowManager.setResizable(true));
               unawaited(windowManager.setPreventClose(false));
               unawaited(windowManager.setSkipTaskbar(false));
+              await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
+                false,
+              );
             } catch (_) {}
           }
         }
       }
+
+      if (!isPip) {
+        try {
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          await windowAcrylicService.applyDesktopAcrylicBackground(
+            isDesktopPlatform: isDesktopPlatform,
+            isPipWindow: isPip,
+            isDarkMode: initialNativeBackdropDarkMode,
+          );
+        } catch (_) {}
+      }
     }
 
     // Configure frame timing and rendering for better performance
-    // This helps prevent the "Reported frame time is older than the last one" error
-    // Note: Removed incorrect schedulerPhase setter that caused compilation error
-
-    // Initialize frame timing optimizer
     if (isSecondaryWindow && !isPip) {
-      deferredSecondaryInitializers.add(() async {
+      try {
         await FrameTimingOptimizer().initialize();
-      });
+      } catch (_) {}
     } else {
-      await FrameTimingOptimizer().initialize();
+      try {
+        await FrameTimingOptimizer().initialize();
+      } catch (_) {}
     }
 
     // Platform-specific optimizations
     if (isDesktopPlatform) {
-      // For desktop platforms, configure Skia resource cache for better image handling
       SystemChannels.skia.invokeMethod<void>(
           'Skia.setResourceCacheMaxBytes', 512 * 1024 * 1024);
     } else if (Platform.isAndroid || Platform.isIOS) {
-      // For mobile platforms, show full system UI by default
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
           overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
-      // Apply specific settings for better rendering on mobile
       SystemChrome.setSystemUIChangeCallback((systemOverlaysAreVisible) async {
         return;
       });
     }
 
-    // Add a frame callback to help with frame pacing
     SchedulerBinding.instance.addPostFrameCallback((_) {
       FrameTimingOptimizer().optimizeImageRendering();
     });
 
-    // Tối ưu ImageCache để quản lý bộ nhớ tốt hơn khi scroll
-    PaintingBinding.instance.imageCache.maximumSize =
-        200; // Giới hạn số lượng hình ảnh
+    PaintingBinding.instance.imageCache.maximumSize = 200;
     PaintingBinding.instance.imageCache.maximumSizeBytes =
-        100 * 1024 * 1024; // Giới hạn ~100MB
+        100 * 1024 * 1024;
 
     // Initialize Media Kit with proper audio configuration
-    if (isSecondaryWindow && !isPip) {
-      deferredSecondaryInitializers.add(() async {
-        MediaKit.ensureInitialized();
-      });
-    } else {
-      MediaKit.ensureInitialized();
-    }
+    MediaKit.ensureInitialized();
 
     // Initialize our audio helper to ensure sound works
     if (Platform.isWindows) {
@@ -253,10 +292,6 @@ void main(List<String> args) async {
       await StreamingServiceManager.initialize();
     }
 
-    // Do not request permissions at startup; handled via explainer UI on demand
-
-    // Setup dependency injection container
-    // This must be done before initializing any services
     await setupServiceLocator();
     debugPrint('Service locator initialized successfully');
 
@@ -283,7 +318,6 @@ void main(List<String> args) async {
         debugPrint('Error initializing user preferences: $e');
       }
 
-      // Initialize language controller
       await locator<LanguageController>().initialize();
     }
 
@@ -296,11 +330,8 @@ void main(List<String> args) async {
         } else {
           debugPrint('Database manager already initialized');
         }
-        final store = dbManager.getStore();
-        if (store != null) {
-          final networkCredService = locator<NetworkCredentialsService>();
-          await networkCredService.init(store);
-        }
+        final networkCredService = locator<NetworkCredentialsService>();
+        await networkCredService.init();
 
         await BatchTagManager.initialize();
         await TagManager.initialize();
@@ -342,9 +373,6 @@ void main(List<String> args) async {
       await initializeHeavyBackgroundServices();
     }
 
-    // Streaming functionality is now handled directly by StreamingHelper with network services
-
-    // If PiP env flag is set, run ultra‑lightweight PiP window instead of full app
     if (env['CB_PIP_MODE'] == '1' &&
         (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       Map<String, dynamic> args = {};
@@ -355,7 +383,6 @@ void main(List<String> args) async {
           if (decoded is Map<String, dynamic>) args = decoded;
         } catch (_) {}
       }
-      // Lightweight shell for PiP window: MaterialApp with dark theme
       runApp(MaterialApp(
         theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
         debugShowCheckedModeBanner: false,
@@ -368,7 +395,10 @@ void main(List<String> args) async {
     runApp(
       ChangeNotifierProvider(
         create: (context) => locator<ThemeProvider>(),
-        child: CBFileApp(startupPayload: startupPayload),
+        child: CBFileApp(
+          startupPayload: startupPayload,
+          windowAcrylicService: windowAcrylicService,
+        ),
       ),
     );
 
@@ -388,73 +418,86 @@ void main(List<String> args) async {
   }));
 }
 
-// no-op helper removed; using jsonDecode directly
-
 // Navigate directly to home screen - updated to use the tabbed interface
 void goHome(BuildContext context) {
   try {
-    // Check if the context is mounted before navigating
     if (!context.mounted) {
       debugPrint('Context not mounted, cannot navigate');
       return;
     }
 
-    // Most reliable way to navigate home - create a fresh route with TabMainScreen
     final route = MaterialPageRoute(
       builder: (_) => const TabMainScreen(),
     );
 
-    // Replace entire navigation stack with home
     Navigator.of(context, rootNavigator: true)
         .pushAndRemoveUntil(route, (r) => false);
   } catch (e) {
     debugPrint('Error navigating home: $e');
-    // Last resort fallback
-    runApp(const CBFileApp());
+    runApp(CBFileApp(
+      windowAcrylicService: WindowAcrylicService(),
+    ));
   }
 }
 
 class CBFileApp extends StatefulWidget {
   final WindowStartupPayload? startupPayload;
-  const CBFileApp({Key? key, this.startupPayload}) : super(key: key);
+  final WindowAcrylicService windowAcrylicService;
+  const CBFileApp({
+    Key? key,
+    this.startupPayload,
+    required this.windowAcrylicService,
+  }) : super(key: key);
 
   @override
   State<CBFileApp> createState() => _CBFileAppState();
 }
 
-class _CBFileAppState extends State<CBFileApp> with WidgetsBindingObserver {
-  // Language controller for handling language changes
+class _CBFileAppState extends State<CBFileApp>
+    with WidgetsBindingObserver, WindowListener {
   final LanguageController _languageController = locator<LanguageController>();
+  int _acrylicSyncGeneration = 0;
+  bool? _lastAppliedNativeBackdropDarkMode;
+  AcrylicBackdropMode? _lastBackdropMode;
   ValueNotifier<Locale>? _localeNotifier;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (Platform.isWindows) {
+      windowManager.addListener(this);
+    }
 
-    // Initialize the frame timing optimizer once the app is loaded
     SchedulerBinding.instance.addPostFrameCallback((_) {
       FrameTimingOptimizer().optimizeBeforeHeavyOperation();
     });
 
-    // If launched with a video file (e.g. set as default on Windows), open it
     if (Platform.isWindows) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _handleLaunchFiles();
       });
     }
-    // On Android: open video from intent (Open with / default app)
     if (Platform.isAndroid) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _handleAndroidLaunchVideo();
       });
     }
 
-    // Initialize locale notifier
     _localeNotifier = _languageController.languageNotifier;
     _localeNotifier?.addListener(() {
       setState(() {});
     });
+
+    if (_useDesktopAcrylicVisuals) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final themeProvider = context.read<ThemeProvider>();
+        _triggerAcrylicReapplyBurst(
+          includeImmediate: true,
+          forcedIsDarkMode: _resolveNativeBackdropDarkMode(themeProvider),
+        );
+      });
+    }
   }
 
   @override
@@ -466,50 +509,386 @@ class _CBFileAppState extends State<CBFileApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    if (Platform.isWindows) {
+      windowManager.removeListener(this);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _localeNotifier?.removeListener(() {});
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return SafeNavigationWrapper(
-      child: MaterialApp(
-        title: 'CB File Hub',
-        // Always start at main; we'll push explainer modally if needed
-        home: TabMainScreen(startupPayload: widget.startupPayload),
-        navigatorKey: navigatorKey, // Add navigator key for global access
-        // Dynamic theming: use selected theme for light, and selected dark theme for dark
-        theme:
-            context.watch<ThemeProvider>().currentTheme == AppThemeType.dark ||
-                    context.watch<ThemeProvider>().currentTheme ==
-                        AppThemeType.amoled
-                ? ThemeConfig.lightTheme
-                : context.watch<ThemeProvider>().themeData,
-        darkTheme:
-            context.watch<ThemeProvider>().currentTheme == AppThemeType.dark ||
-                    context.watch<ThemeProvider>().currentTheme ==
-                        AppThemeType.amoled
-                ? context.watch<ThemeProvider>().themeData
-                : ThemeConfig.darkTheme,
-        themeMode: context.watch<ThemeProvider>().themeMode,
-        debugShowCheckedModeBanner: false,
+  void onWindowMaximize() {
+    if (!mounted) return;
+    _triggerAcrylicReapplyBurst(
+      includeImmediate: true,
+      forcedIsDarkMode:
+          _resolveNativeBackdropDarkMode(context.read<ThemeProvider>()),
+    );
+  }
 
-        // Add localization support
-        locale: _languageController.currentLocale,
-        localizationsDelegates: const [
-          AppLocalizationsDelegate(),
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('vi', ''), // Vietnamese
-          Locale('en', ''), // English
-        ],
+  @override
+  void onWindowUnmaximize() {
+    if (!mounted) return;
+    _triggerAcrylicReapplyBurst(
+      includeImmediate: true,
+      forcedIsDarkMode:
+          _resolveNativeBackdropDarkMode(context.read<ThemeProvider>()),
+    );
+  }
+
+  @override
+  void onWindowRestore() {
+    if (!mounted) return;
+    _triggerAcrylicReapplyBurst(
+      includeImmediate: true,
+      forcedIsDarkMode:
+          _resolveNativeBackdropDarkMode(context.read<ThemeProvider>()),
+    );
+  }
+
+  bool get _useDesktopFluentShell =>
+      (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
+      DesignSystemConfig.enableFluentDesktopShell &&
+      !DesignSystemConfig.enableLegacyMaterialDesktopShell;
+
+  bool get _useDesktopAcrylicVisuals =>
+      (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
+      DesignSystemConfig.enableDesktopAcrylicWindowBackground;
+
+  ThemeData _resolveMaterialLightTheme(ThemeProvider provider) {
+    final isDarkTheme = provider.currentTheme == AppThemeType.dark;
+    return isDarkTheme
+        ? ThemeConfig.getLightTheme(accentColor: provider.currentAccentColor)
+        : provider.themeData;
+  }
+
+  ThemeData _resolveMaterialDarkTheme(ThemeProvider provider) {
+    final isDarkTheme = provider.currentTheme == AppThemeType.dark;
+    return isDarkTheme
+        ? provider.themeData
+        : ThemeConfig.getDarkTheme(accentColor: provider.currentAccentColor);
+  }
+
+  fluent.FluentThemeData _resolveFluentLightTheme(ThemeProvider provider) {
+    final isDarkTheme = provider.currentTheme == AppThemeType.dark;
+    return isDarkTheme
+        ? FluentThemeConfig.getTheme(
+            AppThemeType.light,
+            accentColor: provider.currentAccentColor,
+            acrylicStrength: provider.desktopAcrylicStrength,
+          )
+        : provider.fluentThemeData;
+  }
+
+  fluent.FluentThemeData _resolveFluentDarkTheme(ThemeProvider provider) {
+    final isDarkTheme = provider.currentTheme == AppThemeType.dark;
+    return isDarkTheme
+        ? provider.fluentThemeData
+        : FluentThemeConfig.getTheme(
+            AppThemeType.dark,
+            accentColor: provider.currentAccentColor,
+            acrylicStrength: provider.desktopAcrylicStrength,
+          );
+  }
+
+  ThemeData _createDesktopAcrylicMaterialBridgeTheme(
+    ThemeData baseTheme,
+    Brightness brightness,
+    double strength,
+  ) {
+    final double normalizedStrength = strength.clamp(0.0, 2.0).toDouble();
+    final bool isLightMode = brightness == Brightness.light;
+    const Color fluentLightBackground2 = Color(0xFFF3F4F7);
+    const Color fluentLightBackground3 = Color(0xFFFFFFFF);
+
+    double opacityByStrength({
+      required double solidAtMin,
+      required double glassAtMax,
+    }) {
+      return solidAtMin + (glassAtMax - solidAtMin) * normalizedStrength;
+    }
+
+    final scaffoldOpacity = brightness == Brightness.dark
+        ? opacityByStrength(solidAtMin: 0.90, glassAtMax: 0.34)
+        : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.92);
+    final appBarOpacity = brightness == Brightness.dark
+        ? opacityByStrength(solidAtMin: 0.94, glassAtMax: 0.46)
+        : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.93);
+    final surfaceOpacity = brightness == Brightness.dark
+        ? opacityByStrength(solidAtMin: 0.88, glassAtMax: 0.40)
+        : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.90);
+    final containerOpacity = brightness == Brightness.dark
+        ? opacityByStrength(solidAtMin: 0.84, glassAtMax: 0.36)
+        : opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.88);
+    final lowContainerOpacity = brightness == Brightness.dark
+        ? opacityByStrength(solidAtMin: 0.80, glassAtMax: 0.32)
+        : opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.86);
+    final lowestContainerOpacity = brightness == Brightness.dark
+        ? opacityByStrength(solidAtMin: 0.76, glassAtMax: 0.28)
+        : opacityByStrength(solidAtMin: 0.97, glassAtMax: 0.84);
+
+    final colorScheme = baseTheme.colorScheme;
+    const Color lightSurfaceBase = fluentLightBackground3;
+    const Color lightContainerBase = fluentLightBackground2;
+    final Color effectiveSurfaceBase =
+        isLightMode ? lightSurfaceBase : colorScheme.surface;
+    final Color effectiveContainerBase =
+        isLightMode ? lightContainerBase : colorScheme.surfaceContainer;
+
+    final bridgedColorScheme = colorScheme.copyWith(
+      surface: effectiveSurfaceBase.withValues(alpha: surfaceOpacity),
+      surfaceBright:
+          (isLightMode ? lightSurfaceBase : colorScheme.surfaceBright)
+              .withValues(alpha: surfaceOpacity),
+      surfaceDim: (isLightMode ? lightContainerBase : colorScheme.surfaceDim)
+          .withValues(alpha: surfaceOpacity),
+      surfaceContainer:
+          effectiveContainerBase.withValues(alpha: containerOpacity),
+      surfaceContainerHigh:
+          effectiveContainerBase.withValues(alpha: containerOpacity),
+      surfaceContainerHighest:
+          effectiveContainerBase.withValues(alpha: containerOpacity),
+      surfaceContainerLow:
+          effectiveSurfaceBase.withValues(alpha: lowContainerOpacity),
+      surfaceContainerLowest:
+          effectiveSurfaceBase.withValues(alpha: lowestContainerOpacity),
+      inverseSurface:
+          colorScheme.inverseSurface.withValues(alpha: surfaceOpacity),
+      surfaceTint: Colors.transparent,
+    );
+
+    final cardColor =
+        effectiveContainerBase.withValues(alpha: containerOpacity);
+    final dialogColor = effectiveContainerBase;
+    final menuColor =
+        effectiveContainerBase.withValues(alpha: containerOpacity);
+
+    return baseTheme.copyWith(
+      colorScheme: bridgedColorScheme,
+      scaffoldBackgroundColor:
+          baseTheme.scaffoldBackgroundColor.withValues(alpha: scaffoldOpacity),
+      canvasColor: baseTheme.canvasColor.withValues(alpha: scaffoldOpacity),
+      cardColor: cardColor,
+      cardTheme: baseTheme.cardTheme.copyWith(
+        color: cardColor,
+      ),
+      dialogTheme: baseTheme.dialogTheme.copyWith(
+        backgroundColor: dialogColor,
+      ),
+      popupMenuTheme: baseTheme.popupMenuTheme.copyWith(
+        color: menuColor,
+      ),
+      bottomSheetTheme: baseTheme.bottomSheetTheme.copyWith(
+        backgroundColor: dialogColor,
+        modalBackgroundColor: dialogColor,
+      ),
+      appBarTheme: baseTheme.appBarTheme.copyWith(
+        backgroundColor: (baseTheme.appBarTheme.backgroundColor ??
+                baseTheme.scaffoldBackgroundColor)
+            .withValues(alpha: appBarOpacity),
+        surfaceTintColor: Colors.transparent,
       ),
     );
   }
-}
 
-// Explainer navigation handled inside TabMainScreen on first frame
+  bool _resolveNativeBackdropDarkMode(ThemeProvider provider) {
+    if (provider.themeMode == ThemeMode.dark) {
+      return true;
+    }
+    if (provider.themeMode == ThemeMode.light) {
+      return provider.currentTheme == AppThemeType.dark;
+    }
+    return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark;
+  }
+
+  void _triggerAcrylicReapplyBurst({
+    bool includeImmediate = false,
+    bool? forcedIsDarkMode,
+  }) {
+    if (!Platform.isWindows || !_useDesktopAcrylicVisuals) return;
+    final themeProvider = context.read<ThemeProvider>();
+    if (themeProvider.isWallpaperMode) {
+      _disableNativeBackdrop();
+      return;
+    }
+    final bool isDarkMode =
+        forcedIsDarkMode ?? _resolveNativeBackdropDarkMode(themeProvider);
+    _lastAppliedNativeBackdropDarkMode = isDarkMode;
+
+    final int generation = ++_acrylicSyncGeneration;
+    final List<int> delaysMs = <int>[
+      if (includeImmediate) 0,
+      80,
+      180,
+      320,
+      560,
+    ];
+
+    for (final int delayMs in delaysMs) {
+      unawaited(
+        Future<void>.delayed(Duration(milliseconds: delayMs), () async {
+          if (!mounted || generation != _acrylicSyncGeneration) return;
+          if (Platform.isWindows) {
+            try {
+              await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
+                false,
+              );
+            } catch (_) {}
+          }
+          try {
+            await widget.windowAcrylicService.applyDesktopAcrylicBackground(
+              isDesktopPlatform: true,
+              isPipWindow: false,
+              isDarkMode: isDarkMode,
+            );
+          } catch (_) {}
+        }),
+      );
+    }
+  }
+
+  void _disableNativeBackdrop() {
+    if (!Platform.isWindows) return;
+    unawaited(
+      WindowsNativeTabDragDropService.setWindowsSystemBackdrop(
+        enabled: false,
+      ),
+    );
+  }
+
+  Widget _buildMaterialHostApp(ThemeProvider themeProvider) {
+    final lightTheme = _resolveMaterialLightTheme(themeProvider);
+    final darkTheme = _resolveMaterialDarkTheme(themeProvider);
+    final acrylicStrength = themeProvider.desktopAcrylicStrength;
+    final resolvedLightTheme = _useDesktopAcrylicVisuals
+        ? _createDesktopAcrylicMaterialBridgeTheme(
+            lightTheme,
+            Brightness.light,
+            acrylicStrength,
+          )
+        : lightTheme;
+    final resolvedDarkTheme = _useDesktopAcrylicVisuals
+        ? _createDesktopAcrylicMaterialBridgeTheme(
+            darkTheme,
+            Brightness.dark,
+            acrylicStrength,
+          )
+        : darkTheme;
+
+    return MaterialApp(
+      title: 'CB File Hub',
+      home: TabMainScreen(startupPayload: widget.startupPayload),
+      navigatorKey: navigatorKey,
+      theme: resolvedLightTheme,
+      darkTheme: resolvedDarkTheme,
+      themeMode: themeProvider.themeMode,
+      debugShowCheckedModeBanner: false,
+      locale: _languageController.currentLocale,
+      localizationsDelegates: const [
+        AppLocalizationsDelegate(),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('vi', ''),
+        Locale('en', ''),
+      ],
+      builder: (context, child) {
+        final wrappedChild = child ?? const SizedBox.shrink();
+        if (!_useDesktopAcrylicVisuals) return wrappedChild;
+        return DesktopAcrylicBackdrop(
+          brightness: Theme.of(context).brightness,
+          child: wrappedChild,
+        );
+      },
+    );
+  }
+
+  Widget _buildFluentHostApp(ThemeProvider themeProvider) {
+    return fluent.FluentApp(
+      title: 'CB File Hub',
+      home: TabMainScreen(startupPayload: widget.startupPayload),
+      navigatorKey: navigatorKey,
+      theme: _resolveFluentLightTheme(themeProvider),
+      darkTheme: _resolveFluentDarkTheme(themeProvider),
+      themeMode: themeProvider.themeMode,
+      debugShowCheckedModeBanner: false,
+      locale: _languageController.currentLocale,
+      localizationsDelegates: const [
+        AppLocalizationsDelegate(),
+        fluent.FluentLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('vi', ''),
+        Locale('en', ''),
+      ],
+      builder: (context, child) {
+        final brightness = fluent.FluentTheme.of(context).brightness;
+        final resolvedTheme = brightness == Brightness.dark
+            ? _resolveMaterialDarkTheme(themeProvider)
+            : _resolveMaterialLightTheme(themeProvider);
+        if (!_useDesktopAcrylicVisuals) {
+          return child ?? const SizedBox.shrink();
+        }
+        final materialTheme = _createDesktopAcrylicMaterialBridgeTheme(
+          resolvedTheme,
+          brightness,
+          themeProvider.desktopAcrylicStrength,
+        );
+
+        return Theme(
+          data: materialTheme,
+          child: DesktopAcrylicBackdrop(
+            brightness: brightness,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final bool isDarkMode = _resolveNativeBackdropDarkMode(themeProvider);
+    final backdropMode = themeProvider.backdropMode;
+
+    if (_useDesktopAcrylicVisuals && Platform.isWindows) {
+      final modeChanged =
+          _lastBackdropMode != null && _lastBackdropMode != backdropMode;
+      final darkModeChanged = _lastAppliedNativeBackdropDarkMode != isDarkMode;
+
+      if (modeChanged || darkModeChanged) {
+        _lastAppliedNativeBackdropDarkMode = isDarkMode;
+        _lastBackdropMode = backdropMode;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _triggerAcrylicReapplyBurst(
+            includeImmediate: true,
+            forcedIsDarkMode: isDarkMode,
+          );
+        });
+      }
+      _lastBackdropMode ??= backdropMode;
+    }
+
+    final appContent = SafeNavigationWrapper(
+      child: _useDesktopFluentShell
+          ? _buildFluentHostApp(themeProvider)
+          : _buildMaterialHostApp(themeProvider),
+    );
+    final app =
+        isDevOverlayEnabled ? DevOverlay(child: appContent) : appContent;
+
+    if (Platform.isWindows) {
+      return ExcludeSemantics(child: app);
+    }
+    return app;
+  }
+}

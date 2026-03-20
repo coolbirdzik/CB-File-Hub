@@ -530,7 +530,6 @@ class MobileFileActionsController {
 
     showDialog(
       context: context,
-      barrierColor: Colors.transparent,
       builder: (context) => Align(
         alignment: Alignment.topCenter,
         child: Material(

@@ -1,36 +1,14 @@
-import 'package:objectbox/objectbox.dart';
-import '../../objectbox.g.dart';
-
-/// Entity class for storing video libraries in ObjectBox
-@Entity()
+/// Data model for a video library.
 class VideoLibrary {
-  /// Primary key ID
-  @Id()
   int id = 0;
-
-  /// Library name
-  @Index()
   String name;
-
-  /// Library description (optional)
   String? description;
-
-  /// Library cover image path (optional)
   String? coverImagePath;
-
-  /// Creation timestamp
   DateTime createdAt;
-
-  /// Last modified timestamp
   DateTime modifiedAt;
-
-  /// Library color theme (hex color code, optional)
   String? colorTheme;
-
-  /// Whether this is a system library or user-created
   bool isSystemLibrary;
 
-  /// Creates a new video library
   VideoLibrary({
     required this.name,
     this.description,
@@ -42,12 +20,39 @@ class VideoLibrary {
   })  : createdAt = createdAt ?? DateTime.now(),
         modifiedAt = modifiedAt ?? DateTime.now();
 
-  /// Updates the modified timestamp
+  factory VideoLibrary.fromDatabaseMap(Map<String, Object?> map) {
+    return VideoLibrary(
+      name: map['name'] as String? ?? '',
+      description: map['description'] as String?,
+      coverImagePath: map['cover_image_path'] as String?,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        map['created_at'] as int? ?? 0,
+      ),
+      modifiedAt: DateTime.fromMillisecondsSinceEpoch(
+        map['modified_at'] as int? ?? 0,
+      ),
+      colorTheme: map['color_theme'] as String?,
+      isSystemLibrary: (map['is_system_library'] as int? ?? 0) == 1,
+    )..id = map['id'] as int? ?? 0;
+  }
+
+  Map<String, Object?> toDatabaseMap() {
+    return <String, Object?>{
+      'id': id == 0 ? null : id,
+      'name': name,
+      'description': description,
+      'cover_image_path': coverImagePath,
+      'created_at': createdAt.millisecondsSinceEpoch,
+      'modified_at': modifiedAt.millisecondsSinceEpoch,
+      'color_theme': colorTheme,
+      'is_system_library': isSystemLibrary ? 1 : 0,
+    };
+  }
+
   void updateModifiedTime() {
     modifiedAt = DateTime.now();
   }
 
-  /// Creates a copy of this library with updated fields
   VideoLibrary copyWith({
     String? name,
     String? description,
@@ -77,7 +82,9 @@ class VideoLibrary {
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) return true;
+    if (identical(this, other)) {
+      return true;
+    }
     return other is VideoLibrary &&
         other.id == id &&
         other.name == name &&

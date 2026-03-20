@@ -92,7 +92,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
 
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
-      unawaited(_loadRecentPaths().then((_) => _updateSuggestions(force: true)));
+      unawaited(
+          _loadRecentPaths().then((_) => _updateSuggestions(force: true)));
       _updateSuggestions(force: true);
       return;
     }
@@ -140,8 +141,7 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
     if (!_shouldSuggestFromFileSystem(query)) return <String>[];
 
     final sep = Platform.pathSeparator;
-    final normalized =
-        Platform.isWindows ? query.replaceAll('/', '\\') : query;
+    final normalized = Platform.isWindows ? query.replaceAll('/', '\\') : query;
 
     String parent;
     String prefix;
@@ -169,8 +169,7 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
       final List<String> matches = <String>[];
       for (final candidate in entries) {
         final name = p.basename(candidate);
-        final comparable =
-            Platform.isWindows ? name.toLowerCase() : name;
+        final comparable = Platform.isWindows ? name.toLowerCase() : name;
         if (prefixLower.isEmpty || comparable.startsWith(prefixLower)) {
           matches.add(candidate);
           if (matches.length >= widget.maxSuggestions) break;
@@ -196,7 +195,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
         if (next.length >= widget.maxSuggestions) break;
       }
     } else {
-      final fs = await Future<List<String>>(() => _filesystemSuggestions(query));
+      final fs =
+          await Future<List<String>>(() => _filesystemSuggestions(query));
       if (!mounted || token != _computeToken) return;
 
       for (final v in fs) {
@@ -254,7 +254,6 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
         final size = renderBox?.size ?? Size.zero;
 
         final theme = Theme.of(context);
-        final borderColor = theme.colorScheme.outline.withValues(alpha: 0.25);
 
         return Positioned(
           width: size.width,
@@ -270,7 +269,6 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
                 constraints: const BoxConstraints(maxHeight: 320),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    border: Border.all(color: borderColor),
                     borderRadius: BorderRadius.circular(16.0),
                   ),
                   child: ListView.builder(
@@ -374,9 +372,3 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
     );
   }
 }
-
-
-
-
-
-

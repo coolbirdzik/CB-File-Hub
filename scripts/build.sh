@@ -54,7 +54,7 @@ verify_windows_release_bundle() {
         return 1
     fi
 
-    [ -f "$release_dir/coolbird_tagify.exe" ] || missing_files+=("coolbird_tagify.exe")
+    [ -f "$release_dir/cb_file_hub.exe" ] || missing_files+=("cb_file_hub.exe")
     [ -f "$release_dir/flutter_windows.dll" ] || missing_files+=("flutter_windows.dll")
 
     local ffmpeg_patterns=(
@@ -639,8 +639,8 @@ build_macos() {
         print_info "Creating ZIP package..."
         mkdir -p "$BUILD_DIR/macos/portable"
         cd "$BUILD_DIR/macos/Build/Products/Release"
-        zip -r "../../../portable/CBFileHub-macOS.zip" coolbird_tagify.app
-        cd ../../../../../..
+        zip -r "../../../portable/CBFileHub-macOS.zip" cb_file_hub.app
+        cd ../.../../../../.
         
         print_success "macOS build completed!"
         print_info "Output: $BUILD_DIR/macos/portable/CBFileHub-macOS.zip"

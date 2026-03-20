@@ -11,8 +11,7 @@ import 'package:cb_file_manager/utils/app_logger.dart';
 
 /// A utility class for managing file tags globally
 ///
-/// Tags are stored in a central global tags file instead of per directory
-/// or in ObjectBox database if enabled
+/// Tags are stored in SQLite and can still import legacy JSON data.
 class TagManager {
   // Singleton instance
   static TagManager? _instance;
@@ -26,13 +25,15 @@ class TagManager {
   // Path to the global tags file (initialized lazily)
   static String? _globalTagsPath;
 
-  // Database manager for ObjectBox storage
+  // Database manager for SQLite storage
   static DatabaseManager? _databaseManager;
 
-  // Flag to determine if we're using ObjectBox
-  static bool _useObjectBox = false;
+  // Flag indicating if database storage is available
+  static bool _useDatabase = false;
+  static String? _lastStandaloneTagError;
+  static final List<String> _standaloneTagDiagnostics = <String>[];
 
-  // User preferences for checking if ObjectBox is enabled
+  // User preferences for checking if Database is enabled
   static final UserPreferences _preferences = UserPreferences.instance;
 
   // Thêm một StreamController để phát thông báo khi tags thay đổi
@@ -45,26 +46,17 @@ class TagManager {
   // Cache for tags to avoid constantly reading from files
   static final Map<String, List<String>> _tagCache = {};
 
-  // Add a stream controller to notify tag changes globally
-  final _tagChangesController = StreamController<String>.broadcast();
-
-  // Stream for global tag changes that any widget can listen to
-  Stream<String> get onGlobalTagChanged => _tagChangesController.stream;
-
   // Method to notify the app about tag changes
   void notifyTagChanged(String filePath) {
     debugPrint("TagManager: Notifying tag change for path: $filePath");
-    // Add to instance stream
-    _tagChangesController.add(filePath);
-
-    // Also add to the static stream that FileGridItem is listening to
+    // Fire the static stream that FileGridItem and other widgets are listening to
     _tagChangeController.add(filePath);
   }
 
-  /// Dispose resources
+  /// Dispose resources — only closes the static controller (shared singleton).
+  /// The instance no longer owns its own controller.
   void dispose() {
-    _tagChangesController.close();
-    _tagChangeController.close();
+    // No-op: static controller is shared and closed by the framework
   }
 
   // Private singleton constructor
@@ -78,6 +70,20 @@ class TagManager {
     }
     return _instance!;
   }
+
+  static void _recordStandaloneTagDiagnostic(String message) {
+    final timestamp = DateTime.now().toIso8601String();
+    _standaloneTagDiagnostics.add('[$timestamp] $message');
+    if (_standaloneTagDiagnostics.length > 30) {
+      _standaloneTagDiagnostics.removeRange(
+        0,
+        _standaloneTagDiagnostics.length - 30,
+      );
+    }
+  }
+
+  static String get standaloneTagDiagnostics =>
+      _standaloneTagDiagnostics.join('\n');
 
   /// Check if a file has a specific tag
   ///
@@ -99,8 +105,8 @@ class TagManager {
 
     final Map<String, int> tagFrequency = {};
 
-    if (_useObjectBox && _databaseManager != null) {
-      // Get all unique tags from ObjectBox
+    if (_useDatabase && _databaseManager != null) {
+      // Get all unique tags from Database
       final allUniqueTags = await _databaseManager!.getAllUniqueTags();
 
       // Count how many files each tag appears in
@@ -147,37 +153,29 @@ class TagManager {
   /// Initialize the global tags system by determining the storage path
   static Future<void> initialize() async {
     try {
-      // Check if ObjectBox is enabled from user preferences
+      AppLogger.debug('[TagManager] initialize start');
+      _recordStandaloneTagDiagnostic('initialize:start');
       await _preferences.init();
-      _useObjectBox = _preferences.isUsingObjectBox();
-
-      if (_useObjectBox) {
-        // Initialize database manager - get instance but check if it's already initialized
-        _databaseManager = DatabaseManager.getInstance();
-        if (!_databaseManager!.isInitialized()) {
-          await _databaseManager!.initialize();
-        }
-      } else {
-        if (_globalTagsPath != null) return; // Already initialized
-
-        // Initialize JSON storage
-        final appDir = await getApplicationDocumentsDirectory();
-        final cbFileHubDir = Directory('${appDir.path}/cb_file_hub');
-
-        // Create the directory if it doesn't exist
-        if (!await cbFileHubDir.exists()) {
-          await cbFileHubDir.create(recursive: true);
-        }
-
-        _globalTagsPath = '${cbFileHubDir.path}/$globalTagsFilename';
+      _databaseManager = DatabaseManager.getInstance();
+      if (!_databaseManager!.isInitialized()) {
+        await _databaseManager!.initialize();
       }
-    } catch (e) {
-      _useObjectBox = false;
+      _useDatabase = true;
+      _recordStandaloneTagDiagnostic('initialize:success useDatabase=true');
+      AppLogger.info('[TagManager] initialize success',
+          error: 'useDatabase=true');
+    } catch (error) {
+      _recordStandaloneTagDiagnostic('initialize:fallback error=$error');
+      AppLogger.error('[TagManager] initialize fallback', error: error);
+      debugPrint('TagManager initialization fallback: $error');
+      _useDatabase = false;
 
-      // Fallback to a location in the user's home directory
-      final home =
-          Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
-      _globalTagsPath = '$home/$globalTagsFilename';
+      final appDir = await getApplicationDocumentsDirectory();
+      final cbFileHubDir = Directory('${appDir.path}/cb_file_hub');
+      if (!await cbFileHubDir.exists()) {
+        await cbFileHubDir.create(recursive: true);
+      }
+      _globalTagsPath = '${cbFileHubDir.path}/$globalTagsFilename';
     }
   }
 
@@ -289,8 +287,8 @@ class TagManager {
     await initialize();
 
     try {
-      if (_useObjectBox && _databaseManager != null) {
-        // Use ObjectBox to get tags
+      if (_useDatabase && _databaseManager != null) {
+        // Use Database to get tags
         final tags = await _databaseManager!.getTagsForFile(filePath);
         _tagsCache[filePath] = tags;
         return tags;
@@ -351,8 +349,8 @@ class TagManager {
     await initialize();
 
     try {
-      if (_useObjectBox && _databaseManager != null) {
-        // Use ObjectBox - still need to query one by one, but database is fast
+      if (_useDatabase && _databaseManager != null) {
+        // Use Database - still need to query one by one, but database is fast
         for (final path in uncachedPaths) {
           final tags = await _databaseManager!.getTagsForFile(path);
           _tagsCache[path] = tags;
@@ -411,7 +409,7 @@ class TagManager {
   static Future<void> _saveRecentTags() async {
     try {
       await initialize();
-      if (_useObjectBox && _databaseManager != null) {
+      if (_useDatabase && _databaseManager != null) {
         final jsonString = json.encode(_recentTags);
         await _databaseManager!.saveStringPreference('recent_tags', jsonString);
       } else {
@@ -431,7 +429,7 @@ class TagManager {
       await initialize();
       String? jsonString;
 
-      if (_useObjectBox && _databaseManager != null) {
+      if (_useDatabase && _databaseManager != null) {
         jsonString = await _databaseManager!.getStringPreference('recent_tags');
       } else {
         // Fallback to SharedPreferences for JSON mode
@@ -459,25 +457,36 @@ class TagManager {
       await _loadRecentTags();
     }
 
-    // Extract tag names from the list and limit by count
+    // Extract tag names from the list
     final List<String> recentTagNames =
-        _recentTags.take(limit).map((item) => item['tag'] as String).toList();
+        _recentTags.map((item) => item['tag'] as String).toList();
+
+    // Filter out tags that no longer exist in the database
+    // so that deleted tags don't reappear in the recent list
+    final Set<String> validTags = await getAllUniqueTags('');
+
+    final List<String> filteredRecent = recentTagNames
+        .where((tag) => validTags.contains(tag))
+        .toList();
+
+    // Take only up to the limit
+    final List<String> result = filteredRecent.take(limit).toList();
 
     // If we don't have enough stored recent tags, supplement with popular tags
-    if (recentTagNames.length < limit) {
+    if (result.length < limit) {
       // Get popular tags excluding the ones we already have
       final popularTags =
           await TagManager.instance.getPopularTags(limit: limit * 2);
 
       for (final entry in popularTags.entries) {
-        if (recentTagNames.length >= limit) break;
-        if (!recentTagNames.contains(entry.key)) {
-          recentTagNames.add(entry.key);
+        if (result.length >= limit) break;
+        if (!result.contains(entry.key)) {
+          result.add(entry.key);
         }
       }
     }
 
-    return recentTagNames;
+    return result;
   }
 
   /// Static wrapper for instance method
@@ -490,7 +499,7 @@ class TagManager {
         addToRecentTags(tag.trim());
       }
 
-      if (_useObjectBox && _databaseManager != null) {
+      if (_useDatabase && _databaseManager != null) {
         return await _databaseManager!.addTagToFile(filePath, tag);
       } else {
         Map<String, dynamic> tagsData = await _loadGlobalTags();
@@ -523,7 +532,7 @@ class TagManager {
     try {
       await initialize();
 
-      if (_useObjectBox && _databaseManager != null) {
+      if (_useDatabase && _databaseManager != null) {
         return await _databaseManager!.removeTagFromFile(filePath, tag);
       } else {
         Map<String, dynamic> tagsData = await _loadGlobalTags();
@@ -594,8 +603,8 @@ class TagManager {
       // First validate tags (remove empty ones)
       final validTags = tags.where((tag) => tag.trim().isNotEmpty).toList();
 
-      if (_useObjectBox && _databaseManager != null) {
-        // Use ObjectBox to set tags
+      if (_useDatabase && _databaseManager != null) {
+        // Use Database to set tags
         final success =
             await _databaseManager!.setTagsForFile(filePath, validTags);
 
@@ -659,8 +668,8 @@ class TagManager {
     try {
       await initialize();
 
-      if (_useObjectBox && _databaseManager != null) {
-        // Use ObjectBox to get all unique tags
+      if (_useDatabase && _databaseManager != null) {
+        // Use Database to get all unique tags
         allTags.addAll(await _databaseManager!.getAllUniqueTags());
       } else {
         // Use original implementation for JSON file
@@ -676,6 +685,10 @@ class TagManager {
           }
         }
       }
+
+      // Standalone tags are global tags too and should be visible anywhere
+      // the app asks for the full tag catalog.
+      allTags.addAll(await getStandaloneTags());
 
       return allTags;
     } catch (e) {
@@ -713,8 +726,8 @@ class TagManager {
       debugPrint('Normalized directory path: $normalizedDirPath');
 
       // Step 1: First search current directory (faster)
-      if (_useObjectBox && _databaseManager != null) {
-        // Use ObjectBox to find files by tag
+      if (_useDatabase && _databaseManager != null) {
+        // Use Database to find files by tag
         final filePaths = await _databaseManager!.findFilesByTag(normalizedTag);
         debugPrint(
             'Found ${filePaths.length} file paths with tag: "$normalizedTag"');
@@ -851,8 +864,8 @@ class TagManager {
       // Xóa cache để đảm bảo dữ liệu mới nhất
       clearCache();
 
-      if (_useObjectBox && _databaseManager != null) {
-        // Use ObjectBox to find files by tag - QUAN TRỌNG: Tìm kiếm chính xác dựa trên tag
+      if (_useDatabase && _databaseManager != null) {
+        // Use Database to find files by tag - QUAN TRỌNG: Tìm kiếm chính xác dựa trên tag
         final filePaths = await _databaseManager!.findFilesByTag(normalizedTag);
         debugPrint(
             'Found ${filePaths.length} file paths with tag: "$normalizedTag"');
@@ -936,7 +949,7 @@ class TagManager {
     _globalTagsPath = null;
 
     // Force re-initialize database connection
-    if (_useObjectBox && _databaseManager != null) {
+    if (_useDatabase && _databaseManager != null) {
       try {
         // Chỉ log, không block luồng
         debugPrint("Resetting database connection...");
@@ -985,8 +998,8 @@ class TagManager {
 
                   // Only migrate if the file exists
                   if (await file.exists()) {
-                    if (_useObjectBox && _databaseManager != null) {
-                      // Save to ObjectBox
+                    if (_useDatabase && _databaseManager != null) {
+                      // Save to Database
                       await _databaseManager!.setTagsForFile(filePath, tags);
                     } else {
                       // Save to JSON file
@@ -1007,7 +1020,7 @@ class TagManager {
       }
 
       // Save the updated global tags if using JSON storage
-      if (!_useObjectBox) {
+      if (!_useDatabase) {
         await _saveGlobalTags(globalTags);
       }
 
@@ -1018,24 +1031,24 @@ class TagManager {
     }
   }
 
-  /// Migrate from JSON file storage to ObjectBox database
+  /// Migrate from JSON file storage to Database
   ///
   /// This function loads all tags from the global JSON file
-  /// and migrates them to the ObjectBox database.
-  static Future<int> migrateFromJsonToObjectBox() async {
+  /// and migrates them to the Database.
+  static Future<int> migrateFromJsonToDatabase() async {
     int migratedFileCount = 0;
 
     try {
       await initialize();
 
-      if (!_useObjectBox || _databaseManager == null) {
-        throw Exception('ObjectBox is not enabled');
+      if (!_useDatabase || _databaseManager == null) {
+        throw Exception('SQLite storage is not available');
       }
 
       // Load all tags from the JSON file
       final tagsData = await _loadGlobalTags();
 
-      // Migrate each file's tags to ObjectBox
+      // Migrate each file's tags to SQLite
       for (final filePath in tagsData.keys) {
         final tags = List<String>.from(tagsData[filePath]);
         if (tags.isNotEmpty) {
@@ -1047,10 +1060,10 @@ class TagManager {
         }
       }
 
-      debugPrint('Migrated $migratedFileCount files to ObjectBox database');
+      debugPrint('Migrated $migratedFileCount files to SQLite database');
       return migratedFileCount;
     } catch (e) {
-      debugPrint('Error migrating from JSON to ObjectBox: $e');
+      debugPrint('Error migrating from JSON to SQLite: $e');
       return migratedFileCount;
     }
   }
@@ -1069,6 +1082,9 @@ class TagManager {
         await removeTag(path, tag);
       }
 
+      // Also remove from standalone tags if present
+      await removeStandaloneTag(tag);
+
       // Clear cache to ensure fresh data
       clearCache();
 
@@ -1082,17 +1098,332 @@ class TagManager {
     }
   }
 
+  static Set<String> _decodeStandaloneTagsJson(String? encodedTags) {
+    if (encodedTags == null || encodedTags.isEmpty) {
+      return <String>{};
+    }
+
+    try {
+      final decoded = jsonDecode(encodedTags);
+      if (decoded is List) {
+        return decoded.cast<String>().toSet();
+      }
+    } catch (e) {
+      debugPrint('Error parsing standalone tags: $e');
+    }
+
+    return <String>{};
+  }
+
+  static Future<Set<String>> _loadStandaloneTagsFromDatabase() async {
+    if (!_useDatabase || _databaseManager == null) {
+      return <String>{};
+    }
+
+    return await _databaseManager!.getStandaloneTags();
+  }
+
+  static Future<Set<String>> _loadLegacyStandaloneTags() async {
+    final legacyTags = <String>{};
+
+    if (_useDatabase && _databaseManager != null) {
+      final encodedTags =
+          await _databaseManager!.getStringPreference('standalone_tags');
+      legacyTags.addAll(_decodeStandaloneTagsJson(encodedTags));
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    legacyTags
+        .addAll(_decodeStandaloneTagsJson(prefs.getString('standalone_tags')));
+    return legacyTags;
+  }
+
+  static Future<bool> _persistStandaloneTags(Set<String> standaloneTags) async {
+    try {
+      if (_useDatabase && _databaseManager != null) {
+        print(
+            '[SEED_DIRECT] persist db count=${standaloneTags.length} useDatabase=$_useDatabase');
+        _recordStandaloneTagDiagnostic(
+          'persist:database count=${standaloneTags.length}',
+        );
+        AppLogger.debug(
+          '[TagManager] Persisting standalone tags to database',
+          error: 'count=${standaloneTags.length}',
+        );
+        final savedToDatabase = await _databaseManager!
+            .replaceStandaloneTags(standaloneTags.toList());
+        if (savedToDatabase) {
+          print(
+              '[SEED_DIRECT] persist db success count=${standaloneTags.length}');
+          _lastStandaloneTagError = null;
+          _recordStandaloneTagDiagnostic(
+            'persist:database success count=${standaloneTags.length}',
+          );
+          AppLogger.info(
+            '[TagManager] Persisted standalone tags to database',
+            error: 'count=${standaloneTags.length}',
+          );
+          await _databaseManager!.deletePreference('standalone_tags');
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('standalone_tags');
+          return true;
+        }
+        _lastStandaloneTagError = _databaseManager!.getLastErrorMessage() ??
+            'replaceStandaloneTags returned false';
+        print('[SEED_DIRECT] persist db failed error=$_lastStandaloneTagError');
+        _recordStandaloneTagDiagnostic(
+          'persist:database failed error=$_lastStandaloneTagError',
+        );
+        AppLogger.error(
+          '[TagManager] Failed to persist standalone tags to database',
+          error: _lastStandaloneTagError,
+        );
+        return false;
+      }
+
+      final encodedTags = jsonEncode(standaloneTags.toList());
+      final prefs = await SharedPreferences.getInstance();
+      final saved = await prefs.setString('standalone_tags', encodedTags);
+      print('[SEED_DIRECT] persist shared_preferences saved=$saved');
+      _lastStandaloneTagError =
+          saved ? null : 'SharedPreferences.setString returned false';
+      _recordStandaloneTagDiagnostic(
+        'persist:shared_preferences saved=$saved count=${standaloneTags.length}',
+      );
+      AppLogger.warning(
+        '[TagManager] Persisted standalone tags using SharedPreferences fallback',
+        error: 'count=${standaloneTags.length} saved=$saved',
+      );
+      return saved;
+    } catch (e) {
+      print('[SEED_DIRECT] persist exception=$e');
+      _lastStandaloneTagError = e.toString();
+      _recordStandaloneTagDiagnostic('persist:exception error=$e');
+      AppLogger.error(
+        '[TagManager] Exception while persisting standalone tags',
+        error: e,
+      );
+      debugPrint('Error persisting standalone tags: $e');
+      return false;
+    }
+  }
+
+  static String? get lastStandaloneTagError => _lastStandaloneTagError;
+
+  static Future<Set<String>> _getStandaloneTagsFromActiveStorage() async {
+    if (_useDatabase && _databaseManager != null) {
+      _recordStandaloneTagDiagnostic('load:backend=database');
+      final sqliteTags = await _loadStandaloneTagsFromDatabase();
+      final legacyTags = await _loadLegacyStandaloneTags();
+      final mergedTags = <String>{...sqliteTags, ...legacyTags};
+      _recordStandaloneTagDiagnostic(
+        'load:counts sqlite=${sqliteTags.length} legacy=${legacyTags.length} merged=${mergedTags.length}',
+      );
+
+      if (mergedTags.isEmpty) {
+        return <String>{};
+      }
+
+      if (legacyTags.isNotEmpty &&
+          legacyTags.difference(sqliteTags).isNotEmpty) {
+        await _persistStandaloneTags(mergedTags);
+      }
+
+      return mergedTags;
+    }
+
+    _recordStandaloneTagDiagnostic('load:backend=shared_preferences');
+    return await _loadLegacyStandaloneTags();
+  }
+
+  /// Batch-add multiple standalone tags at once (1 read + 1 write, much faster than calling addStandaloneTag N times)
+  static Future<int> addMultipleStandaloneTags(List<String> tags) async {
+    try {
+      await initialize();
+
+      final standaloneTags = <String>{...await getStandaloneTags()};
+
+      final before = standaloneTags.length;
+      standaloneTags.addAll(tags);
+      _recordStandaloneTagDiagnostic(
+        'addMultiple:incoming=${tags.length} before=$before after=${standaloneTags.length}',
+      );
+      AppLogger.debug(
+        '[TagManager] addMultipleStandaloneTags',
+        error:
+            'incoming=${tags.length} before=$before after=${standaloneTags.length}',
+      );
+      final saved = await _persistStandaloneTags(standaloneTags);
+      if (!saved) {
+        _recordStandaloneTagDiagnostic(
+          'addMultiple:failed error=$_lastStandaloneTagError',
+        );
+        return 0;
+      }
+
+      _tagChangeController.add('global:standalone_tags_bulk_added');
+      _recordStandaloneTagDiagnostic(
+        'addMultiple:success added=${standaloneTags.length - before}',
+      );
+      return standaloneTags.length - before;
+    } catch (e) {
+      debugPrint('Error adding multiple standalone tags: $e');
+      return 0;
+    }
+  }
+
+  /// Saves a standalone tag (created but not yet assigned to any file)
+  static Future<bool> addStandaloneTag(String tag) async {
+    try {
+      await initialize();
+
+      final standaloneTags = await getStandaloneTags();
+      standaloneTags.add(tag);
+      final saved = await _persistStandaloneTags(standaloneTags);
+      if (!saved) {
+        return false;
+      }
+
+      // Notify about standalone tag change
+      _tagChangeController.add('global:standalone_tag_added:$tag');
+      return true;
+    } catch (e) {
+      debugPrint('Error adding standalone tag: $e');
+      return false;
+    }
+  }
+
+  /// Gets all standalone tags from the active storage backend
+  static Future<Set<String>> getStandaloneTags() async {
+    try {
+      await initialize();
+      return await _getStandaloneTagsFromActiveStorage();
+    } catch (e) {
+      debugPrint('Error getting standalone tags: $e');
+    }
+    return <String>{};
+  }
+
+  /// Removes a standalone tag from the active storage backend
+  static Future<void> removeStandaloneTag(String tag) async {
+    try {
+      await initialize();
+      final standaloneTags = await getStandaloneTags();
+      standaloneTags.remove(tag);
+      await _persistStandaloneTags(standaloneTags);
+      _tagChangeController.add('global:standalone_tag_removed:$tag');
+    } catch (e) {
+      debugPrint('Error removing standalone tag: $e');
+    }
+  }
+
+  /// Renames a standalone tag in the active storage backend
+  static Future<void> _renameStandaloneTag(String oldTag, String newTag) async {
+    try {
+      await initialize();
+      final standaloneTags = await getStandaloneTags();
+      if (!standaloneTags.contains(oldTag)) {
+        return;
+      }
+
+      standaloneTags.remove(oldTag);
+      standaloneTags.add(newTag);
+      await _persistStandaloneTags(standaloneTags);
+    } catch (e) {
+      debugPrint('Error renaming standalone tag: $e');
+    }
+  }
+
+  /// Renames a tag across all files in the system
+  static Future<bool> renameTag(String oldTag, String newTag) async {
+    final instance = TagManager.instance;
+
+    if (oldTag.isEmpty || newTag.isEmpty) {
+      return false;
+    }
+
+    if (oldTag.toLowerCase() == newTag.toLowerCase()) {
+      return true;
+    }
+
+    try {
+      // First, rename standalone tag
+      await _renameStandaloneTag(oldTag, newTag);
+
+      // Update file-based tags — separate paths for SQLite and JSON
+      try {
+        if (_useDatabase && _databaseManager != null) {
+          // SQLite path: query database directly, independent of JSON file
+          final filesWithTag = await instance
+              ._findFilesByTagInternal(oldTag.toLowerCase().trim());
+          debugPrint(
+              'TagManager.renameTag: Found ${filesWithTag.length} files with tag "$oldTag" in SQLite');
+
+          for (final path in filesWithTag) {
+            final currentTags = await getTags(path);
+            final updatedTags = currentTags.map((t) {
+              if (t.toLowerCase() == oldTag.toLowerCase()) {
+                return newTag;
+              }
+              return t;
+            }).toList();
+            await _databaseManager!.setTagsForFile(path, updatedTags);
+          }
+        } else {
+          // JSON file path
+          final tagsData = await _loadGlobalTags();
+          if (tagsData.isNotEmpty) {
+            final filesWithTag = <String>[];
+
+            for (final entry in tagsData.entries) {
+              final tags = List<String>.from(entry.value);
+              if (tags.any((t) => t.toLowerCase() == oldTag.toLowerCase())) {
+                filesWithTag.add(entry.key);
+              }
+            }
+
+            for (final path in filesWithTag) {
+              final currentTags = List<String>.from(tagsData[path] ?? []);
+              final updatedTags = currentTags.map((t) {
+                if (t.toLowerCase() == oldTag.toLowerCase()) {
+                  return newTag;
+                }
+                return t;
+              }).toList();
+              tagsData[path] = updatedTags;
+            }
+
+            await _saveGlobalTags(tagsData);
+          }
+        }
+      } catch (e2) {
+        debugPrint('Error updating file tags (non-fatal): $e2');
+      }
+
+      clearCache();
+
+      // Notify about the change
+      instance.notifyTagChanged("global:tag_renamed:$oldTag:$newTag");
+      _tagChangeController.add("global:tag_renamed:$oldTag:$newTag");
+
+      return true;
+    } catch (e) {
+      debugPrint('Error renaming tag: $e');
+      return false;
+    }
+  }
+
   /// Find all files that have a specific tag (internal implementation)
   Future<List<String>> _findFilesByTagInternal(String tag) async {
     try {
-      // If using ObjectBox
-      if (_useObjectBox && _databaseManager != null) {
+      // If using Database
+      if (_useDatabase && _databaseManager != null) {
         // Query the database for files with this tag
         final tagLowercase = tag.toLowerCase().trim();
         final results = await _databaseManager!.findFilesByTag(tagLowercase);
         return results;
       } else {
-        // Use the file search implementation without ObjectBox
+        // Use the file search implementation without Database
         return await _searchByTag(tag);
       }
     } catch (e) {
@@ -1101,7 +1432,7 @@ class TagManager {
     }
   }
 
-  /// Search files by tag without using ObjectBox
+  /// Search files by tag without using Database
   Future<List<String>> _searchByTag(String tag) async {
     final List<String> results = [];
 

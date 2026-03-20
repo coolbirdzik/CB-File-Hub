@@ -1,13 +1,14 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import './utils/route.dart';
 import './tab_manager/core/tab_main_screen.dart';
-import 'package:cb_file_manager/ui/screens/settings/settings_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -82,166 +83,206 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final bool isDarkMode = theme.brightness == Brightness.dark;
+    final Color windowsLightDrawerTopBase = Color.alphaBlend(
+      theme.colorScheme.primary.withValues(alpha: 0.01),
+      const Color(0xFFFFFFFF),
+    );
+    const Color windowsLightDrawerBottomBase = Color(0xFFFFFFFF);
+    final double topTintAlpha =
+        isDesktopPlatform ? (isDarkMode ? 0.84 : 0.70) : 1.0;
+    final double bottomTintAlpha =
+        isDesktopPlatform ? (isDarkMode ? 0.80 : 0.64) : 0.85;
+    final bool usePinnedIntegratedStyle = widget.isPinned && isDesktopPlatform;
 
     return Drawer(
       elevation: 0,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-      ),
+      backgroundColor: Colors.transparent,
+      shape: usePinnedIntegratedStyle
+          ? const RoundedRectangleBorder(borderRadius: BorderRadius.zero)
+          : const RoundedRectangleBorder(
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+            ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(20),
-          bottomRight: Radius.circular(20),
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                theme.colorScheme.surface,
-                theme.colorScheme.surfaceContainerLowest
-                    .withValues(alpha: 0.85),
+        borderRadius: usePinnedIntegratedStyle
+            ? BorderRadius.zero
+            : const BorderRadius.only(
+                topRight: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (isDesktopPlatform && !usePinnedIntegratedStyle)
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: const SizedBox.expand(),
+              ),
+            Container(
+              decoration: BoxDecoration(
+                color: usePinnedIntegratedStyle
+                    ? (isDarkMode
+                        ? theme.colorScheme.surface.withValues(alpha: 0.22)
+                        : windowsLightDrawerBottomBase.withValues(alpha: 0.62))
+                    : null,
+                gradient: usePinnedIntegratedStyle
+                    ? null
+                    : LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          isDarkMode
+                              ? theme.colorScheme.surface
+                                  .withValues(alpha: topTintAlpha)
+                              : windowsLightDrawerTopBase.withValues(
+                                  alpha: topTintAlpha),
+                          isDarkMode
+                              ? theme.colorScheme.surfaceContainerLowest
+                                  .withValues(alpha: bottomTintAlpha)
+                              : windowsLightDrawerBottomBase.withValues(
+                                  alpha: bottomTintAlpha),
+                        ],
+                      ),
+              ),
+            ),
+            Column(
+              children: [
+                // Modern drawer header
+                DrawerHeaderWidget(
+                  isPinned: widget.isPinned,
+                  onPinStateChanged: widget.onPinStateChanged,
+                ),
+
+                // Scrollable menu items
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 12),
+                    children: [
+                      // Main navigation items
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.house,
+                        title: context.tr.home,
+                        onTap: () => _navigateTo(context, '#home', 'Home'),
+                      ),
+
+                      BlocBuilder<DrawerCubit, DrawerState>(
+                        builder: (context, drawerState) {
+                          return PinnedSectionWidget(
+                            key: ValueKey<String>(
+                              'pinned-${drawerState.activeTabId}-${drawerState.isPinnedExpanded}',
+                            ),
+                            onNavigate: (path, name) => _navigateTo(
+                              context,
+                              path,
+                              name,
+                              isStorage: true,
+                            ),
+                            initialExpanded: drawerState.isPinnedExpanded,
+                            onExpansionChanged: (isExpanded) {
+                              context
+                                  .read<DrawerCubit>()
+                                  .setPinnedExpanded(isExpanded);
+                            },
+                          );
+                        },
+                      ),
+
+                      // Storage section with expansion
+                      BlocBuilder<DrawerCubit, DrawerState>(
+                        builder: (context, drawerState) {
+                          return StorageSectionWidget(
+                            key: ValueKey<String>(
+                              'storage-${drawerState.activeTabId}-${drawerState.isStorageExpanded}',
+                            ),
+                            onNavigate: (path, name) => _navigateTo(
+                              context,
+                              path,
+                              name,
+                              isStorage: true,
+                            ),
+                            onTrashTap: () =>
+                                _navigateTo(context, '#trash', 'Trash'),
+                            initialExpanded: drawerState.isStorageExpanded,
+                            onExpansionChanged: (isExpanded) {
+                              context
+                                  .read<DrawerCubit>()
+                                  .setStorageExpanded(isExpanded);
+                            },
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.image,
+                        title: context.tr.imageGallery,
+                        onTap: () => _navigateTo(
+                          context,
+                          '#gallery',
+                          context.tr.imageGallery,
+                        ),
+                      ),
+
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.videoCamera,
+                        title: context.tr.videoGallery,
+                        onTap: () => _navigateTo(
+                          context,
+                          '#video',
+                          context.tr.videoGallery,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Tags section
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.tag,
+                        title: context.tr.tags,
+                        onTap: () => _navigateTo(context, '#tags', 'Tags'),
+                      ),
+
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.wifiHigh,
+                        title: context.tr.networksMenu,
+                        onTap: () => _navigateTo(
+                            context, '#network', context.tr.networkTab),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: theme.colorScheme.outlineVariant
+                              .withValues(alpha: 0.45),
+                        ),
+                      ),
+
+                      // Settings and info section
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.gear,
+                        title: context.tr.settings,
+                        onTap: () {
+                          _navigateTo(context, kSettingsPath, context.tr.settings);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Footer with app info
+                _buildDrawerFooter(theme),
               ],
             ),
-          ),
-          child: Column(
-            children: [
-              // Modern drawer header
-              DrawerHeaderWidget(
-                isPinned: widget.isPinned,
-                onPinStateChanged: widget.onPinStateChanged,
-              ),
-
-              // Scrollable menu items
-              Expanded(
-                child: ListView(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                  children: [
-                    // Main navigation items
-                    DrawerNavigationItem(
-                      icon: PhosphorIconsLight.house,
-                      title: context.tr.home,
-                      onTap: () => _navigateTo(context, '#home', 'Home'),
-                    ),
-
-                    BlocBuilder<DrawerCubit, DrawerState>(
-                      builder: (context, drawerState) {
-                        return PinnedSectionWidget(
-                          key: ValueKey<String>(
-                            'pinned-${drawerState.activeTabId}-${drawerState.isPinnedExpanded}',
-                          ),
-                          onNavigate: (path, name) => _navigateTo(
-                            context,
-                            path,
-                            name,
-                            isStorage: true,
-                          ),
-                          initialExpanded: drawerState.isPinnedExpanded,
-                          onExpansionChanged: (isExpanded) {
-                            context
-                                .read<DrawerCubit>()
-                                .setPinnedExpanded(isExpanded);
-                          },
-                        );
-                      },
-                    ),
-
-                    // Storage section with expansion
-                    BlocBuilder<DrawerCubit, DrawerState>(
-                      builder: (context, drawerState) {
-                        return StorageSectionWidget(
-                          key: ValueKey<String>(
-                            'storage-${drawerState.activeTabId}-${drawerState.isStorageExpanded}',
-                          ),
-                          onNavigate: (path, name) => _navigateTo(
-                            context,
-                            path,
-                            name,
-                            isStorage: true,
-                          ),
-                          onTrashTap: () =>
-                              _navigateTo(context, '#trash', 'Trash'),
-                          initialExpanded: drawerState.isStorageExpanded,
-                          onExpansionChanged: (isExpanded) {
-                            context
-                                .read<DrawerCubit>()
-                                .setStorageExpanded(isExpanded);
-                          },
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    DrawerNavigationItem(
-                      icon: PhosphorIconsLight.image,
-                      title: context.tr.imageGallery,
-                      onTap: () => _navigateTo(
-                        context,
-                        '#gallery',
-                        context.tr.imageGallery,
-                      ),
-                    ),
-
-                    DrawerNavigationItem(
-                      icon: PhosphorIconsLight.videoCamera,
-                      title: context.tr.videoGallery,
-                      onTap: () => _navigateTo(
-                        context,
-                        '#video',
-                        context.tr.videoGallery,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Tags section
-                    DrawerNavigationItem(
-                      icon: PhosphorIconsLight.tag,
-                      title: context.tr.tags,
-                      onTap: () => _navigateTo(context, '#tags', 'Tags'),
-                    ),
-
-                    DrawerNavigationItem(
-                      icon: PhosphorIconsLight.wifiHigh,
-                      title: context.tr.networksMenu,
-                      onTap: () => _navigateTo(
-                          context, '#network', context.tr.networkTab),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: theme.colorScheme.outlineVariant
-                            .withValues(alpha: 0.45),
-                      ),
-                    ),
-
-                    // Settings and info section
-                    DrawerNavigationItem(
-                      icon: PhosphorIconsLight.gear,
-                      title: context.tr.settings,
-                      onTap: () {
-                        if (!widget.isPinned) RouteUtils.safePopDialog(context);
-                        _showSettingsDialog(widget.parentContext);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // Footer with app info
-              _buildDrawerFooter(theme),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -372,15 +413,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSettingsDialog(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const SettingsScreen(),
       ),
     );
   }

@@ -1,154 +1,160 @@
 # CB File Hub
 
-[![Build and Test](https://github.com/nth-zik/coolbird-tagify/actions/workflows/build-test.yml/badge.svg)](https://github.com/nth-zik/coolbird-tagify/actions/workflows/build-test.yml)
-[![Release](https://github.com/nth-zik/coolbird-tagify/actions/workflows/release.yml/badge.svg)](https://github.com/nth-zik/coolbird-tagify/actions/workflows/release.yml)
+[![Build and Test](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml)
+[![Release](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A powerful cross-platform file manager built with Flutter, supporting local and network (SMB) file access with advanced media playback capabilities.
+CB File Hub is a cross-platform file manager focused on large personal media libraries. It is built for the situation where movies, photos, clips, and folders keep growing until finding the right thing to watch feels harder than watching it.
 
-## ✨ Features
+Instead of acting like a generic explorer, the app is designed to reduce browsing fatigue: faster visual scanning, tag-based organization, tabbed navigation on both desktop and mobile, network playback, and albums that can organize themselves with rules.
 
-- 📁 **File Management**: Browse, organize, and manage files across multiple platforms
-- 🌐 **Network Support**: Access files via SMB/CIFS network shares
-- 🎥 **Media Playback**: Built-in video player with advanced controls
-- 🖼️ **Thumbnail Generation**: Fast thumbnail generation for images and videos
-- 📌 **Sidebar Pinning**: Pin drives, folders, or files into a dedicated `Pinned` drawer section
-- 🧠 **Workspace Restore**: Optionally restore last opened tab and per-tab drawer expansion state
-- 🌍 **Multi-language**: Support for multiple languages including Vietnamese
-- 🎨 **Modern UI**: Clean and intuitive user interface
-- 💾 **Local Database**: Fast file indexing with ObjectBox
-- 🔄 **Cross-platform**: Works on Windows, Android, Linux, and macOS
+## Screenshots
 
-## 📦 Downloads
+<table>
+  <tr>
+    <td><img src="screenshots/window_main_light.png" alt="Windows library view" /></td>
+    <td><img src="screenshots/window_add_tag.png" alt="Windows tag editor" /></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/android_main.png" alt="Android home screen" width="260" /></td>
+    <td align="center"><img src="screenshots/android_tab.png" alt="Android tabbed browsing" width="260" /></td>
+  </tr>
+</table>
 
-Download the latest release for your platform:
+## Why This App Exists
+
+This project started from a very personal problem: a movie and photo collection that became too large to browse comfortably. File names were not enough, folder trees became noisy, and searching for something to watch or review took too much effort.
+
+CB File Hub focuses on solving that workflow with a media-first file manager that helps you browse visually, organize flexibly, and jump back into your library without losing context.
+
+## Highlights
+
+- **Media-first file management**: Browse local folders with layouts that work better for photos, videos, and mixed libraries than a plain file list.
+- **Tabbed browsing on desktop and mobile**: Open multiple locations at once, switch contexts quickly, and keep parallel browsing flows alive on both Windows and Android.
+- **Tag files and search by tags**: Add tags to files, reuse popular tags, and search with single or multiple tags to narrow a large library fast.
+- **Smart albums with dynamic rules**: Build albums that automatically collect matching files from selected source folders using filename-based rules.
+- **Choose the video thumbnail frame**: Control the extraction position used for video thumbnails so previews represent the part of the clip that actually matters.
+- **Watch videos over SMB and FTP**: Open and stream media from network locations without turning your workflow into manual copy-paste.
+- **Fast thumbnails for local and network media**: Generate thumbnails for images, videos, folders, and supported network files with caching to keep browsing responsive.
+- **Pinned places and workspace memory**: Pin important folders in the sidebar and restore the last tab workspace with per-tab drawer state.
+- **Built-in galleries for photos and videos**: Move from raw folder browsing into image and video focused views when you want to scan a collection visually.
+- **Cross-platform foundation**: Built with Flutter and currently targeting Windows, Android, Linux, and macOS.
+
+## Main Features
+
+### File management and browsing
+
+- Browse local storage and network locations in a unified interface.
+- Open directories in multiple tabs.
+- Use the same tab-oriented workflow across desktop and mobile.
+- Pin folders, drives, or favorite locations to the sidebar.
+- Restore the last opened tab workspace when returning to the app.
+
+### Tagging and discovery
+
+- Add tags to files to create your own organization layer beyond folder names.
+- Search by tag using direct tag paths and multi-tag filtering.
+- Reuse recent and popular tags for faster tagging.
+- Display tags directly in file and gallery views for quick visual context.
+
+### Media workflow
+
+- Generate image, video, and folder thumbnails.
+- Tune video thumbnail extraction position from settings.
+- Browse dedicated image and video gallery views.
+- Use the built-in video player for local and supported network files.
+- Support desktop-oriented media workflows such as external opening and focused playback.
+
+### Network access
+
+- Browse SMB shares.
+- Connect to FTP servers.
+- Generate thumbnails for supported network files.
+- Stream supported media directly from network locations.
+- Store network credentials locally for faster reconnects.
+
+### Album automation
+
+- Create albums for curated collections.
+- Create smart albums driven by dynamic rules.
+- Match files into albums automatically based on filename patterns.
+- Scope rules to selected source folders so albums stay relevant instead of noisy.
+
+## Platforms
+
+- Windows
+- Android
+- Linux
+- macOS
+
+## Downloads
+
+Latest packaged builds are published here:
+
+[Download Latest Release](https://github.com/coolbirdzik/cb-file-hub/releases/latest)
+
+Available package types include:
+
+- Windows: portable ZIP, EXE installer, MSI installer
+- Android: APK and AAB
+- Linux: `tar.gz`
+- macOS: ZIP
+
+## Quick Start
 
 ### Windows
 
-- **MSI Installer** (Recommended): Easy installation with shortcuts
-- **Portable ZIP**: Extract and run without installation
+1. Download the latest Windows package from the releases page.
+2. Install with the EXE or MSI package, or extract the portable ZIP.
+3. Run `cb_file_manager.exe`.
 
 ### Android
 
-- **APK**: Direct installation (enable "Unknown Sources")
-- **AAB**: For Google Play Store distribution
-
-### Linux
-
-- **tar.gz**: Extract and run
-
-### macOS
-
-- **ZIP**: Extract and move to Applications
-
-[📥 Download Latest Release](https://github.com/nth-zik/coolbird-tagify/releases/latest)
-
-## 🚀 Quick Start
-
-### Windows
-
-**Option 1: MSI Installer (Recommended)**
-
-1. Download `CBFileHub-Setup-vX.X.X.msi`
-2. Run the installer
-3. Launch from Start Menu or Desktop shortcut
-
-**Option 2: Portable**
-
-1. Download `CBFileHub-vX.X.X-windows.zip`
-2. Extract to any folder
-3. Run `cb_file_hub.exe`
-
-**Note:** On Windows, you can run scripts using Git Bash (comes with Git for Windows)
-
-### Android
-
-1. Download `CBFileHub-vX.X.X-arm64-v8a.apk`
-2. Enable "Install from Unknown Sources" in Settings
-3. Install and launch
+1. Download the latest APK.
+2. Allow installation from unknown sources if needed.
+3. Install and launch the app.
 
 ### Linux
 
 ```bash
-# Extract
-tar -xzf CBFileHub-vX.X.X-linux.tar.gz
-
-# Run
+tar -xzf CBFileManager-<version>-linux.tar.gz
 cd bundle
-./cb_file_hub
+./cb_file_manager
 ```
 
 ### macOS
 
-1. Download `CBFileHub-vX.X.X-macos.zip`
-2. Extract and move to Applications
-3. Right-click and select "Open" (first time only)
+1. Download the macOS ZIP package.
+2. Extract it and move the app into `Applications`.
+3. Open it from Finder.
 
-## 🛠️ Development
+## Development
 
 ### Prerequisites
 
 - Flutter SDK 3.24.0 or later
 - Dart SDK 2.15.0 or later
-- Platform-specific requirements:
-  - **Windows**: Visual Studio 2022 with C++ tools
-  - **Android**: Android SDK, Java JDK 17+
-  - **Linux**: GTK3 development libraries
-  - **macOS**: Xcode, CocoaPods
+- Visual Studio 2022 with C++ tools for Windows builds
+- Android SDK and JDK 17+ for Android builds
+- GTK3 development libraries for Linux builds
+- Xcode and CocoaPods for macOS builds
 
-### Setup
+### Local setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/nth-zik/coolbird-tagify.git
-cd coolbirdfm-flutter
-
-# Navigate to project directory
-cd cb_file_manager
-
-# Install dependencies
+git clone https://github.com/coolbirdzik/cb-file-hub.git
+cd cb-file-hub/cb_file_manager
 flutter pub get
-
-# Run the app
 flutter run
 ```
 
-**Note for Windows users:** Use Git Bash or WSL to run bash scripts.
-
-### Using Interactive Script (Easiest)
+Enable the developer overlay only for local development:
 
 ```bash
-# Make executable (first time)
-chmod +x scripts/build.sh
-
-# Run interactive menu
-./scripts/build.sh
+flutter run --dart-define=CB_SHOW_DEV_OVERLAY=true
 ```
 
-Select from the menu:
-
-- Build targets (Windows, Android, Linux, etc.)
-- Development tools (clean, test, analyze)
-- Release management
-
-#### Using Makefile (For automation)
-
-```bash
-# Show all commands
-make help
-
-# Build for your platform
-make windows      # Windows portable
-make android      # Android APK
-make linux        # Linux
-
-# Build all platforms
-make all
-```
-
-**Windows users:** Use Git Bash (comes with Git for Windows) to run these commands.
-
-#### Manual Build
+### Build commands
 
 ```bash
 # Windows
@@ -167,131 +173,55 @@ flutter build linux --release
 flutter build macos --release
 ```
 
-See [scripts/README.md](scripts/README.md) for detailed build instructions.
-
-## 🧪 Testing
+You can also use the helper scripts:
 
 ```bash
-# Run all tests
+chmod +x scripts/build.sh
+./scripts/build.sh
+```
+
+Or use `make` targets:
+
+```bash
+make help
+make windows
+make android
+make linux
+make all
+```
+
+## Testing
+
+```bash
 flutter test
-
-# Run with coverage
-flutter test --coverage
-
-# Analyze code
 flutter analyze
-
-# Format code
-dart format .
+dart format --output=none --set-exit-if-changed .
 ```
 
-## 📚 Documentation
+## Project Structure
 
-- [Quick Start Guide](QUICK_START.md) - Get started quickly with make commands
-- [Build Instructions](scripts/README.md) - Detailed build documentation
-- [Windows Setup Guide](WINDOWS_SETUP.md) - Guide for Windows users
-- [Windows Build Fix](WINDOWS_BUILD_FIX.md) - Troubleshooting Windows build issues
-- [Release Guide](RELEASE_GUIDE.md) - How to create releases
-- [Contributing](CONTRIBUTING.md) - Contribution guidelines
-- [Changelog](CHANGELOG.md) - Version history
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Quick Contribution Steps
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 🐛 Bug Reports
-
-Found a bug? Please [open an issue](https://github.com/nth-zik/coolbird-tagify/issues/new) with:
-
-- Clear description
-- Steps to reproduce
-- Expected vs actual behavior
-- Screenshots (if applicable)
-- Environment details
-
-## 💡 Feature Requests
-
-Have an idea? [Open a feature request](https://github.com/nth-zik/coolbird-tagify/issues/new) and describe:
-
-- The problem you're trying to solve
-- Your proposed solution
-- Any alternatives you've considered
-
-## 📋 Roadmap
-
-- [ ] Cloud storage integration (Google Drive, Dropbox)
-- [ ] File encryption support
-- [ ] Advanced search with filters
-- [ ] Batch operations
-- [ ] Plugin system
-- [ ] iOS support
-- [ ] Web version
-
-## 🏗️ Architecture
-
-```
+```text
 cb_file_manager/
 ├── lib/
-│   ├── main.dart              # App entry point
-│   ├── models/                # Data models
-│   ├── views/                 # UI screens
-│   ├── widgets/               # Reusable widgets
-│   ├── services/              # Business logic
-│   │   ├── file_service.dart
-│   │   ├── smb_service.dart
-│   │   └── video_service.dart
-│   ├── utils/                 # Utilities
-│   └── constants/             # Constants
-├── test/                      # Tests
-├── assets/                    # Assets
-└── pubspec.yaml              # Dependencies
+├── assets/
+├── test/
+└── pubspec.yaml
 ```
 
-## 🔧 Technologies
+## Documentation
 
-- **Framework**: Flutter 3.24.0
-- **Language**: Dart
-- **Database**: ObjectBox
-- **Video Player**: Media Kit, VLC Player
-- **Network**: SMB/CIFS via mobile_smb_native
-- **State Management**: flutter_bloc, Provider
-- **Build Tools**: GitHub Actions, WiX Toolset
+- [Quick Start Guide](QUICK_START.md)
+- [Build Instructions](scripts/README.md)
+- [Windows Setup Guide](WINDOWS_SETUP.md)
+- [Windows Build Fix Notes](WINDOWS_BUILD_FIX.md)
+- [Release Guide](RELEASE_GUIDE.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
-## 📊 Project Stats
+## Contributing
 
-![GitHub stars](https://img.shields.io/github/stars/YOUR_USERNAME/coolbirdfm-flutter?style=social)
-![GitHub forks](https://img.shields.io/github/forks/YOUR_USERNAME/coolbirdfm-flutter?style=social)
-![GitHub issues](https://img.shields.io/github/issues/YOUR_USERNAME/coolbirdfm-flutter)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/YOUR_USERNAME/coolbirdfm-flutter)
+Contributions are welcome. Open an issue for bugs or feature requests, or submit a pull request if you want to improve the app.
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Flutter team for the amazing framework
-- All contributors who help improve this project
-- Open source libraries used in this project
-
-## 📞 Contact
-
-- **Issues**: [GitHub Issues](https://github.com/nth-zik/coolbird-tagify/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/nth-zik/coolbird-tagify/discussions)
-- **Email**: your.email@example.com
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=YOUR_USERNAME/coolbirdfm-flutter&type=Date)](https://star-history.com/#YOUR_USERNAME/coolbirdfm-flutter&Date)
-
----
-
-Made with ❤️ by the CB File Hub team
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

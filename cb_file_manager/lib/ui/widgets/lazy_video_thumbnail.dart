@@ -290,9 +290,12 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
         }
 
         // Not cached — check if proactiveGenerateAll already queued it.
-        // If so, just wait for the onThumbnailReady stream notification.
+        // If so, wait for the onThumbnailReady stream notification, but also
+        // start cache polling as a safety net in case the stream event is
+        // missed (e.g. cache-hit early-return in _generateThumbnailInternal).
         if (VideoThumbnailHelper.isPathQueued(widget.videoPath)) {
           _isGeneratingNotifier.value = true;
+          _startCachePolling();
           return;
         }
 
@@ -566,36 +569,45 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     );
   }
 
-  // PERFORMANCE: Replaced periodic polling with event-driven approach
-  // The cache polling timer was causing performance issues during scrolling
-  // Now we rely on the thumbnail ready stream subscription instead
+  // Polls the cache periodically as a safety net for missed stream events.
+  // Uses a short interval with a max attempt count to bound total overhead.
+  static const int _maxPollAttempts = 5;
+  static const Duration _pollInterval = Duration(milliseconds: 2000);
+  int _pollAttempts = 0;
+
   void _startCachePolling() {
     _cachePollTimer?.cancel();
+    _pollAttempts = 0;
+    _schedulePollAttempt();
+  }
 
-    // Single delayed check instead of periodic polling
-    // This dramatically reduces timer overhead during scrolling
-    _cachePollTimer = Timer(const Duration(milliseconds: 2000), () async {
-      if (!mounted) {
-        return;
-      }
+  void _schedulePollAttempt() {
+    _cachePollTimer = Timer(_pollInterval, () async {
+      if (!mounted) return;
 
-      if (_thumbnailPathNotifier.value != null || _isLoading) {
-        return;
-      }
+      // Stop if we already have a thumbnail or exceeded max attempts
+      if (_thumbnailPathNotifier.value != null || _isLoading) return;
+
+      _pollAttempts++;
 
       try {
         final cached =
             await VideoThumbnailHelper.getFromCache(widget.videoPath);
         if (cached != null && mounted) {
-          // IMPORTANT: Use setState to ensure widget rebuilds
           setState(() {
             _thumbnailPathNotifier.value = cached;
             _isThumbnailGenerated = true;
             _shouldRegenerateThumbnail = false;
           });
           _onThumbnailGenerated(cached);
+          return; // Success — stop polling
         }
       } catch (_) {}
+
+      // Schedule next attempt if we haven't hit the limit
+      if (mounted && _pollAttempts < _maxPollAttempts) {
+        _schedulePollAttempt();
+      }
     });
   }
 

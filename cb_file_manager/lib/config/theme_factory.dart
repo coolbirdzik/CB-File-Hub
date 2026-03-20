@@ -34,17 +34,15 @@ class ThemeFactory {
   }) {
     final opts = options ?? const ThemeOptions();
     final bool isLight = brightness == Brightness.light;
-    final Color scaffoldColor = isLight
-        ? _blend(colorScheme.surface, colorScheme.primary, 0.035)
-        : colorScheme.surface;
-    final Color appBarColor = isLight
-        ? _blend(colorScheme.surface, colorScheme.primary, 0.02)
-        : colorScheme.surface;
+    final Color scaffoldColor =
+        isLight ? colorScheme.surface : colorScheme.surface;
+    final Color appBarColor =
+        isLight ? colorScheme.surface : colorScheme.surface;
     final Color cardColor = isLight
-        ? _blend(colorScheme.surface, Colors.black, 0.01)
+        ? _blend(colorScheme.surface, Colors.black, 0.045)
         : colorScheme.surface;
     final Color inputFillColor = isLight
-        ? _blend(colorScheme.surface, Colors.black, 0.015)
+        ? _blend(colorScheme.surface, Colors.black, 0.035)
         : colorScheme.surface;
     final Color lightBorder = Colors.black.withValues(alpha: 0.08);
 
@@ -54,7 +52,7 @@ class ThemeFactory {
       primaryColor: colorScheme.primary,
       scaffoldBackgroundColor: scaffoldColor,
       colorScheme: colorScheme,
-      
+
       // AppBar Theme
       appBarTheme: AppBarTheme(
         backgroundColor: appBarColor,
@@ -91,12 +89,14 @@ class ThemeFactory {
 
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isLight ? colorScheme.primary : colorScheme.onSurface,
+          foregroundColor:
+              isLight ? colorScheme.primary : colorScheme.onSurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(opts.borderRadius),
           ),
           side: BorderSide(
-            color: (isLight ? colorScheme.primary : Colors.white).withValues(alpha: 0.3),
+            color: (isLight ? colorScheme.primary : Colors.white)
+                .withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -104,7 +104,8 @@ class ThemeFactory {
 
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: isLight ? colorScheme.primary : colorScheme.onSurface,
+          foregroundColor:
+              isLight ? colorScheme.primary : colorScheme.onSurface,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
@@ -150,7 +151,8 @@ class ThemeFactory {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: inputFillColor,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
@@ -234,9 +236,8 @@ class ThemeFactory {
       ),
 
       // Divider Color
-      dividerColor: isLight
-          ? Colors.black.withValues(alpha: 0.12)
-          : Colors.grey.shade700,
+      dividerColor:
+          isLight ? Colors.black.withValues(alpha: 0.12) : Colors.grey.shade700,
     );
   }
 
@@ -253,8 +254,27 @@ class ThemeFactory {
     );
 
     final resolvedSurface = surface ?? background ?? baseScheme.surface;
-    return baseScheme.copyWith(
-      surface: resolvedSurface,
-    );
+    if (brightness == Brightness.light) {
+      final surfaceLowest = resolvedSurface;
+      final surfaceLow = _blend(resolvedSurface, Colors.black, 0.02);
+      final surfaceContainer = _blend(resolvedSurface, Colors.black, 0.04);
+      final surfaceHigh = _blend(resolvedSurface, Colors.black, 0.06);
+      final surfaceHighest = _blend(resolvedSurface, Colors.black, 0.08);
+      final surfaceDim = _blend(resolvedSurface, Colors.black, 0.10);
+      final surfaceBright = resolvedSurface;
+
+      return baseScheme.copyWith(
+        surface: resolvedSurface,
+        surfaceContainerLowest: surfaceLowest,
+        surfaceContainerLow: surfaceLow,
+        surfaceContainer: surfaceContainer,
+        surfaceContainerHigh: surfaceHigh,
+        surfaceContainerHighest: surfaceHighest,
+        surfaceDim: surfaceDim,
+        surfaceBright: surfaceBright,
+      );
+    }
+
+    return baseScheme.copyWith(surface: resolvedSurface);
   }
 }

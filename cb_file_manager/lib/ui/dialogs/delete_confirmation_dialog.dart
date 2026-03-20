@@ -97,9 +97,7 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
       return Focus(
         focusNode: _dialogFocusNode,
         onKeyEvent: _handleKeyEvent,
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
+      child: Dialog(
           alignment: Alignment.center,
           child: _DesktopConfirmationWindow(
             title: widget.title,
@@ -208,8 +206,6 @@ class _DesktopConfirmationWindow extends StatelessWidget {
 
     return Material(
       elevation: 0,
-      color: Colors.transparent,
-      shadowColor: Colors.black.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(16.0),
       child: Container(
         width: 450,

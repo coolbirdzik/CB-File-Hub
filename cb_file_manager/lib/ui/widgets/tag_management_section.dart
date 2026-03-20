@@ -3,7 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
-import 'package:cb_file_manager/ui/tab_manager/components/tag_dialogs.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 /// A reusable tag management section that can be used in different places
 /// like the file details screen and tag dialogs
@@ -26,6 +26,12 @@ class TagManagementSection extends StatefulWidget {
   /// Initial set of tags
   final List<String>? initialTags;
 
+  /// Callback when pending changes count changes (for badge updates)
+  final VoidCallback? onPendingChangesChanged;
+
+  /// Callback when the section's state is ready (after first build)
+  final void Function(TagManagementSection section)? onSectionReady;
+
   const TagManagementSection({
     Key? key,
     required this.filePath,
@@ -34,17 +40,30 @@ class TagManagementSection extends StatefulWidget {
     this.showPopularTags = true,
     this.showFileTagsHeader = true,
     this.initialTags,
+    this.onPendingChangesChanged,
+    this.onSectionReady,
   }) : super(key: key);
 
   @override
   State<TagManagementSection> createState() => _TagManagementSectionState();
 
-  /// Save current tag changes to the file
-  void saveChanges() {
-    // Find the current state and save changes
+  /// Returns true if there are unsaved changes
+  bool get hasPendingChanges {
+    final state = _TagManagementSectionState.of(this);
+    return state?.hasPendingChanges ?? false;
+  }
+
+  /// Returns the number of pending changes
+  int get pendingChangesCount {
+    final state = _TagManagementSectionState.of(this);
+    return state?.pendingChangesCount ?? 0;
+  }
+
+  /// Saves pending changes to the file
+  Future<void> saveChanges() async {
     final state = _TagManagementSectionState.of(this);
     if (state != null) {
-      state.saveChanges();
+      await state.saveChanges();
     }
   }
 
@@ -71,7 +90,15 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   List<String> _tagSuggestions = [];
   List<String> _selectedTags = [];
   List<String> _originalTags = []; // Store original tags to detect changes
+  bool _hasPendingChanges = false;
+  int _pendingChangesCount = 0;
   final FocusNode _tagFocusNode = FocusNode();
+
+  /// Public getter: true if there are unsaved changes
+  bool get hasPendingChanges => _hasPendingChanges;
+
+  /// Public getter: number of pending changes
+  int get pendingChangesCount => _pendingChangesCount;
   late final TagColorManager _colorManager = TagColorManager.instance;
 
   // Thêm key để xác định vị trí của input
@@ -79,6 +106,15 @@ class _TagManagementSectionState extends State<TagManagementSection> {
 
   // Vị trí và kích thước của input field
   double _inputYPosition = 0;
+
+  /// Compute pending changes count and update flags
+  void _updatePendingChanges() {
+    final added = _selectedTags.where((t) => !_originalTags.contains(t)).length;
+    final removed = _originalTags.where((t) => !_selectedTags.contains(t)).length;
+    _hasPendingChanges = added > 0 || removed > 0;
+    _pendingChangesCount = added + removed;
+    widget.onPendingChangesChanged?.call();
+  }
 
   @override
   void initState() {
@@ -93,6 +129,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     // Thêm post-frame callback để đo kích thước input sau khi render
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateInputPosition();
+      // Notify parent when the section is ready
+      widget.onSectionReady?.call(widget);
     });
   }
 
@@ -153,13 +191,19 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       setState(() {
         _selectedTags = List.from(currentTags);
         _originalTags = List.from(currentTags); // Store original state
+        _hasPendingChanges = false;
+        _pendingChangesCount = 0;
       });
     }
   }
 
   // Save all changes to file
   Future<void> saveChanges() async {
-    if (!mounted) return;
+    debugPrint('TagManagementSection.saveChanges() START');
+    if (!mounted) {
+      debugPrint('TagManagementSection.saveChanges() SKIP - not mounted');
+      return;
+    }
 
     try {
       // Get tags to add (those in _selectedTags but not in _originalTags)
@@ -170,13 +214,17 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       List<String> tagsToRemove =
           _originalTags.where((tag) => !_selectedTags.contains(tag)).toList();
 
+      debugPrint('saveChanges: tagsToAdd=$tagsToAdd tagsToRemove=$tagsToRemove');
+
       // Process removals
       for (String tag in tagsToRemove) {
+        debugPrint('saveChanges: removing tag "$tag"');
         await TagManager.removeTag(widget.filePath, tag);
       }
 
       // Process additions
       for (String tag in tagsToAdd) {
+        debugPrint('saveChanges: adding tag "$tag"');
         await TagManager.addTag(widget.filePath, tag.trim());
       }
 
@@ -190,7 +238,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
 
       // Refresh tags if needed
       _refreshTags();
+      debugPrint('TagManagementSection.saveChanges() DONE');
     } catch (e) {
+      debugPrint('TagManagementSection.saveChanges() ERROR: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving tags: $e')),
@@ -281,11 +331,11 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                         width: 1,
                       ),
                     ),
-                    labelText: 'Tag Name',
+                    labelText: AppLocalizations.of(context)!.tagName,
                     labelStyle: const TextStyle(
                       fontSize: 18,
                     ),
-                    hintText: 'Enter tag name',
+                    hintText: AppLocalizations.of(context)!.enterTagName,
                     hintStyle: const TextStyle(
                       fontSize: 18,
                     ),
@@ -301,6 +351,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                     setState(() {
                       _selectedTags = List.from(updatedTags);
                     });
+                    _updatePendingChanges();
                   },
                   onTextChanged: (value) {
                     _updateTagSuggestions(value);
@@ -313,6 +364,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                           _selectedTags.add(value.trim());
                         }
                       });
+                      _updatePendingChanges();
                     }
                   },
                   chipBuilder: (context, tag) {
@@ -323,6 +375,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                         setState(() {
                           _selectedTags.remove(removedTag);
                         });
+                        _updatePendingChanges();
                       },
                       onSelected: (selectedTag) {},
                     );
@@ -339,115 +392,110 @@ class _TagManagementSectionState extends State<TagManagementSection> {
           ],
         ),
 
-        // Tag suggestions - hiển thị dưới dạng overlay đè lên các phần tử khác
+        // Tag suggestions - displayed as overlay below the input field
         if (_tagSuggestions.isNotEmpty)
           Positioned(
-            top: _inputYPosition > 0
-                ? _inputYPosition
-                : 95, // Vị trí ngay bên dưới input
+            top: _inputYPosition > 0 ? _inputYPosition : 95,
             left: 0,
             right: 0,
-            child: Material(
-              color: Colors.transparent,
-              elevation: 0,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 250),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? theme.colorScheme.surfaceContainerHigh : theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    color: isDarkMode ? theme.colorScheme.surfaceContainerHigh : theme.colorScheme.surface,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 250),
+              decoration: BoxDecoration(
+                color: isDarkMode
+                    ? const Color(0xFF2D2D2D)
+                    : const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    child: Row(
                       children: [
-                        Container(
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.1),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          child: Row(
-                            children: [
-                              Icon(
-                                PhosphorIconsLight.magnifyingGlass,
-                                size: 18,
-                                color: theme.colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Tag Suggestions',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                              const Spacer(),
-                              // Thêm nút đóng
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _tagSuggestions = [];
-                                  });
-                                },
-                                child: Icon(
-                                  PhosphorIconsLight.x,
-                                  size: 20,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
+                        const Icon(PhosphorIconsLight.magnifyingGlass, size: 18, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(
+                          AppLocalizations.of(context)!.tagSuggestions,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white,
                           ),
                         ),
-                        Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: theme.dividerColor),
-                        Expanded(
-                          // Wrap ListView.builder with Expanded
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            physics: const ClampingScrollPhysics(),
-                            itemCount: _tagSuggestions.length > 6
-                                ? 6
-                                : _tagSuggestions.length,
-                            itemBuilder: (context, index) {
-                              final suggestion = _tagSuggestions[index];
-                              return Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () {
-                                    if (!_selectedTags.contains(suggestion)) {
-                                      // Only add to selected tags instead of immediately applying
-                                      setState(() {
-                                        _selectedTags.add(suggestion);
-                                        _tagSuggestions =
-                                            []; // Clear suggestions after selection
-                                      });
-                                    }
-                                  },
-                                  child: ListTile(
-                                    dense: true,
-                                    leading:
-                                        const Icon(PhosphorIconsLight.tag, size: 20),
-                                    title: Text(
-                                      suggestion,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _tagSuggestions = [];
+                            });
+                          },
+                          child: const Icon(PhosphorIconsLight.x, size: 20, color: Colors.white),
                         ),
                       ],
                     ),
                   ),
-                ),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: _tagSuggestions.length > 6 ? 6 : _tagSuggestions.length,
+                      itemBuilder: (context, index) {
+                        final suggestion = _tagSuggestions[index];
+                        return InkWell(
+                          onTap: () {
+                            if (!_selectedTags.contains(suggestion)) {
+                              setState(() {
+                                _selectedTags.add(suggestion);
+                                _tagSuggestions = [];
+                              });
+                            }
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDarkMode
+                                  ? const Color(0xFF2D2D2D)
+                                  : const Color(0xFFFFFFFF),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: theme.dividerColor,
+                                  width: 0.5,
+                                ),
+                              ),
+                            ),
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(
+                                PhosphorIconsLight.tag,
+                                size: 20,
+                                color: theme.colorScheme.primary,
+                              ),
+                              title: Text(
+                                suggestion,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -485,6 +533,314 @@ class _TagManagementSectionState extends State<TagManagementSection> {
             }
           });
         },
+      ),
+    );
+  }
+}
+
+/// Widget to display a list of popular tags with animation and hover effects
+class PopularTagsWidget extends StatelessWidget {
+  final Function(String) onTagSelected;
+  final int limit;
+
+  const PopularTagsWidget({
+    Key? key,
+    required this.onTagSelected,
+    this.limit = 20,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, int>>(
+      future: TagManager.instance.getPopularTags(limit: limit),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final popularTags = snapshot.data ?? {};
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  PhosphorIconsLight.star,
+                  size: 18,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.amber[300]
+                      : Colors.amber,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  AppLocalizations.of(context)!.popularTags,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            AnimatedTagList(
+              tags: popularTags.keys.toList(),
+              counts: popularTags,
+              onTagSelected: onTagSelected,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Widget to display a list of recently used tags with animation and hover effects
+class RecentTagsWidget extends StatelessWidget {
+  final Function(String) onTagSelected;
+  final int limit;
+
+  const RecentTagsWidget({
+    Key? key,
+    required this.onTagSelected,
+    this.limit = 20,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<String>>(
+      future: TagManager.getRecentTags(limit: limit),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final recentTags = snapshot.data ?? [];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  PhosphorIconsLight.clockCounterClockwise,
+                  size: 18,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[400]
+                      : Colors.grey[700],
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  AppLocalizations.of(context)!.recentTags,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            AnimatedTagList(
+              tags: recentTags,
+              onTagSelected: onTagSelected,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// An animated tag list that shows tags with hover effects and animations
+class AnimatedTagList extends StatelessWidget {
+  final List<String> tags;
+  final Map<String, int>? counts;
+  final Function(String) onTagSelected;
+
+  const AnimatedTagList({
+    Key? key,
+    required this.tags,
+    required this.onTagSelected,
+    this.counts,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 8.0,
+      children: tags.map((tag) {
+        final count = counts != null ? counts![tag] : null;
+        final displayText = count != null ? '$tag ($count)' : tag;
+
+        return AnimatedTagChip(
+          tag: tag,
+          displayText: displayText,
+          onTap: () => onTagSelected(tag),
+        );
+      }).toList(),
+    );
+  }
+}
+
+/// An animated tag chip with hover effects
+class AnimatedTagChip extends StatefulWidget {
+  final String tag;
+  final String displayText;
+  final VoidCallback onTap;
+
+  const AnimatedTagChip({
+    Key? key,
+    required this.tag,
+    required this.onTap,
+    required this.displayText,
+  }) : super(key: key);
+
+  @override
+  State<AnimatedTagChip> createState() => _AnimatedTagChipState();
+}
+
+class _AnimatedTagChipState extends State<AnimatedTagChip>
+    with SingleTickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _elevationAnimation;
+  late final TagColorManager _colorManager = TagColorManager.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _elevationAnimation = Tween<double>(begin: 0, end: 2).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Get tag color from TagColorManager
+    final tagColor = _colorManager.getTagColor(widget.tag);
+
+    // If tag has a custom color, use it; otherwise use theme colors
+    // ignore: unnecessary_null_comparison
+    final bool hasCustomColor = tagColor != null;
+
+    // Dynamic colors based on hover state and tag color
+    final Color backgroundColor = hasCustomColor
+        ? (tagColor.withValues(alpha: _isHovered ? 0.3 : 0.2))
+        : (_isHovered
+            ? (isDark
+                ? Colors.blue.withValues(alpha: 0.3)
+                : theme.colorScheme.primary.withValues(alpha: 0.15))
+            : (isDark ? Colors.grey[700]! : Colors.grey[200]!));
+
+    final Color textColor = hasCustomColor
+        ? (tagColor)
+        : (_isHovered
+            ? (isDark ? Colors.white : theme.colorScheme.primary)
+            : (isDark ? Colors.grey[200]! : Colors.grey[800]!));
+
+    final Color iconColor = hasCustomColor
+        ? (tagColor)
+        : (_isHovered
+            ? (isDark ? Colors.white : theme.colorScheme.primary)
+            : (isDark ? Colors.grey[400]! : Colors.grey[600]!));
+
+    final Color borderColor = hasCustomColor
+        ? (tagColor.withValues(alpha: _isHovered ? 0.8 : 0.3))
+        : (_isHovered
+            ? theme.colorScheme.primary.withValues(alpha: 0.5)
+            : Colors.transparent);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) {
+        setState(() => _isHovered = true);
+        _controller.forward();
+      },
+      onExit: (_) {
+        setState(() => _isHovered = false);
+        _controller.reverse();
+      },
+      child: GestureDetector(
+        onTap: () {
+          _controller.forward().then((_) => _controller.reverse());
+          widget.onTap();
+        },
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Material(
+                elevation: _elevationAnimation.value,
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: borderColor,
+                      width: 1,
+                    ),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        PhosphorIconsLight.tag,
+                        size: 14,
+                        color: iconColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          widget.displayText,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 13,
+                            fontWeight:
+                                _isHovered ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      if (_isHovered) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          PhosphorIconsLight.plusCircle,
+                          size: 14,
+                          color: iconColor,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

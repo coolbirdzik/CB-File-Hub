@@ -41,6 +41,7 @@ class FileListViewBuilder {
   }
 
   /// Build the appropriate view based on the current view mode
+  /// If [searchResults] is provided, it will be used instead of state.files and state.folders
   static Widget build({
     required FolderListState state,
     required SelectionState selectionState,
@@ -66,14 +67,29 @@ class FileListViewBuilder {
     required ValueChanged<double> onPreviewPaneWidthCommitted,
     required VoidCallback onPreviewPaneToggled,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
+    List<FileSystemEntity>? searchResults,
   }) {
     // Apply frame timing optimizations before heavy list/grid operations
     FrameTimingOptimizer().optimizeBeforeHeavyOperation();
 
+    // When searchResults is provided, create a modified state with search results as files/folders
+    // This allows using the same build functions for both normal view and search results
+    final FolderListState displayState;
+    if (searchResults != null) {
+      final searchFolders = searchResults.whereType<Directory>().toList();
+      final searchFiles = searchResults.whereType<File>().toList();
+      displayState = state.copyWith(
+        folders: searchFolders,
+        files: searchFiles,
+      );
+    } else {
+      displayState = state;
+    }
+
     // Use separate builders for each view type to prevent complete tree rebuilds
-    if (state.viewMode == ViewMode.gridPreview && isDesktopPlatform) {
+    if (displayState.viewMode == ViewMode.gridPreview && isDesktopPlatform) {
       return _buildGridPreviewView(
-        state: state,
+        state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
         onNavigateToPath: onNavigateToPath,
@@ -97,10 +113,10 @@ class FileListViewBuilder {
       );
     }
 
-    if (state.viewMode == ViewMode.grid ||
-        state.viewMode == ViewMode.gridPreview) {
+    if (displayState.viewMode == ViewMode.grid ||
+        displayState.viewMode == ViewMode.gridPreview) {
       return _buildGridView(
-        state: state,
+        state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
         onNavigateToPath: onNavigateToPath,
@@ -115,9 +131,9 @@ class FileListViewBuilder {
         onZoomLevelChanged: onZoomLevelChanged,
         onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
       );
-    } else if (state.viewMode == ViewMode.details) {
+    } else if (displayState.viewMode == ViewMode.details) {
       return _buildDetailsView(
-        state: state,
+        state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
         onNavigateToPath: onNavigateToPath,
@@ -134,7 +150,7 @@ class FileListViewBuilder {
       );
     } else {
       return _buildListView(
-        state: state,
+        state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
         onNavigateToPath: onNavigateToPath,

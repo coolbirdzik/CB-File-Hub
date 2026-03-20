@@ -501,6 +501,13 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get openInNewTab => 'Open in New Tab';
   @override
+  String get viewFilesWithTag => 'View Files with Tag';
+  @override
+  String get renameTag => 'Rename Tag';
+  @override
+  String tagRenamed(String oldTag, String newTag) =>
+      'Tag "$oldTag" renamed to "$newTag"';
+  @override
   String get openInSplitView => 'Open in Split View';
   @override
   String get changeColor => 'Change Color';
@@ -525,6 +532,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get enterTagName => 'Enter tag name...';
   @override
+  String get tagName => 'Tag name';
+  @override
+  String get enterNewTagName => 'Enter new tag name...';
+  @override
   String tagAlreadyExists(String tagName) => 'Tag "$tagName" already exists';
   @override
   String tagCreatedSuccessfully(String tagName) =>
@@ -536,9 +547,15 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get selectTagToRemove => 'Select a tag to remove:';
   @override
+  String get doubleClickToRename => 'Double-click to rename';
+  @override
   String get openingFolder => 'Opening folder: ';
   @override
   String get folderNotFound => 'Folder not found: ';
+  @override
+  String get refreshTags => 'Refresh tags';
+  @override
+  String tagsRefreshed(int count) => 'Tags refreshed - $count tags loaded';
 
   // Gallery
   @override
@@ -552,7 +569,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get databaseStorage => 'Database Storage';
   @override
-  String get useObjectBox => 'Use ObjectBox Database';
+  String get useDatabaseStorage => 'Use SQLite Database';
+  @override
+  String get databaseStorageEnabled =>
+      'Using SQLite for efficient local database storage';
   @override
   String get databaseDescription =>
       'Store tags and preferences in a local database';
@@ -560,7 +580,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get jsonStorage => 'Using JSON file for basic storage';
   @override
   String get objectBoxStorage =>
-      'Using ObjectBox for efficient local database storage';
+      'Using SQLite for efficient local database storage'; // Legacy
 
   // Cloud sync
   @override
@@ -579,8 +599,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get cloudSyncDisabled => 'Cloud sync is disabled';
   @override
-  String get enableObjectBoxForCloud =>
-      'Enable ObjectBox database to use cloud sync';
+  String get enableDatabaseForCloud =>
+      'Enable SQLite database to use cloud sync';
 
   // Database statistics
   @override
@@ -592,9 +612,43 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get popularTags => 'Most Popular Tags';
   @override
+  String get recentTags => 'Recent Tags';
+  @override
+  String get selectedTags => 'Selected tags:';
+  @override
+  String batchAddTags(int count) => 'Add tags to $count files';
+  @override
+  String get applyingChanges => 'Applying changes...';
+  @override
+  String tagsUpdated(int count, int added, int removed) {
+    var msg = 'Tags updated for $count files';
+    final parts = <String>[];
+    if (added > 0) parts.add('added $added');
+    if (removed > 0) parts.add('removed $removed');
+    if (parts.isNotEmpty) msg += ' (${parts.join(', ')})';
+    return msg;
+  }
+  @override
+  String get tagSuggestions => 'Tag Suggestions';
+  @override
+  String get advancedDatabaseSettings => 'Advanced Database Settings';
+  @override
   String get noTagsFound => 'No tags found';
   @override
   String get refreshStatistics => 'Refresh Statistics';
+
+  // Raw Data Viewer
+  @override
+  String get viewRawData => 'View Raw Data';
+  @override
+  String get rawDataPreferences => 'Preferences';
+  @override
+  String get rawDataTags => 'File Tags';
+  @override
+  String get rawDataDescription =>
+      'View raw data stored in the database (for debugging)';
+  @override
+  String get noDataFound => 'No data found';
 
   // Import/Export
   @override
@@ -880,6 +934,27 @@ class EnglishLocalizations implements AppLocalizations {
   String get sortBySize => 'Sort by size';
   @override
   String get sortByDate => 'Sort by date';
+
+  // Bulk Selection
+  @override
+  String get bulkSelect => 'Bulk select';
+  @override
+  String get selectAllTags => 'Select all';
+  @override
+  String selectAllOnAllPages(int totalCount) => 'Select all ($totalCount tags)';
+  @override
+  String get deselectAllTags => 'Deselect all';
+  @override
+  String tagsSelected(int count) =>
+      '$count tag${count == 1 ? '' : 's'} selected';
+  @override
+  String bulkDeleteConfirmationTitle() => 'Delete selected tags?';
+  @override
+  String bulkDeleteConfirmationText(int count) =>
+      'Are you sure you want to delete $count tag${count == 1 ? '' : 's'}? This action cannot be undone.';
+  @override
+  String bulkDeleteSuccess(int count) =>
+      'Successfully deleted $count tag${count == 1 ? '' : 's'}';
 
   // Search errors
   @override

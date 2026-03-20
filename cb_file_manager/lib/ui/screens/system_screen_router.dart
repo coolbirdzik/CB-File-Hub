@@ -28,6 +28,7 @@ import 'package:cb_file_manager/ui/screens/video_library/video_hub_screen.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import '../utils/route.dart';
 import 'trash_bin/trash_bin_screen.dart';
+import 'settings/settings_screen.dart';
 import 'package:path/path.dart' as pathlib;
 
 /// A router that handles system screens and special paths
@@ -85,6 +86,8 @@ class SystemScreenRouter {
         return const AutoRulesScreen();
       case '#trash':
         return const TrashBinScreen();
+      case '#settings':
+        return const SettingsScreen();
       case '#network':
         return const NetworkConnectionScreen();
       case '#smb':
@@ -137,7 +140,6 @@ class SystemScreenRouter {
     return const Center(child: Text('Invalid album ID'));
   }
 
-
   static Widget _handleImageRoute(
       BuildContext context, String path, String tabId, String cacheKey) {
     String filePath = '';
@@ -188,27 +190,22 @@ class SystemScreenRouter {
 
   static Widget _handleSearchRoute(
       BuildContext context, String path, String tabId, String cacheKey) {
-    if (_cachedWidgets.containsKey(cacheKey)) {
-      if (!_loggedKeys.contains(cacheKey)) {
-        _loggedKeys.add(cacheKey);
-      }
-      return _cachedWidgets[cacheKey]!;
-    }
+    _cachedWidgets.remove(cacheKey);
 
     final String tag = UriUtils.extractTagFromSearchPath(path) ??
         path.substring('#search?tag='.length);
 
-    final widgetToCache = TabbedFolderListScreen(
+    final widget = TabbedFolderListScreen(
       key: ValueKey('tag_search_$cacheKey'),
       path: path,
       tabId: tabId,
       searchTag: tag,
       globalTagSearch: true,
+      showAppBar: !(Platform.isAndroid || Platform.isIOS),
     );
 
-    _cachedWidgets[cacheKey] = widgetToCache;
     _loggedKeys.add(cacheKey);
-    return widgetToCache;
+    return widget;
   }
 
   /// Handles network paths (smb://, ftp://, etc.)
@@ -419,6 +416,3 @@ class SystemScreenRouter {
     }
   }
 }
-
-
-

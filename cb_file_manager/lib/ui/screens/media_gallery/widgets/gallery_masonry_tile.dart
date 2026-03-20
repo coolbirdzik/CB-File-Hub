@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
@@ -68,10 +69,11 @@ class GalleryMasonryTile extends StatelessWidget {
   Widget _buildTileContent(double ratio, ThemeData theme, String fileName) {
     return Stack(
       children: [
+        // Main image container with flat, borderless design
         ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           child: Container(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
             child: AspectRatio(
               aspectRatio: ratio,
               child: Hero(
@@ -81,7 +83,7 @@ class GalleryMasonryTile extends StatelessWidget {
                   isVideo: false,
                   isImage: true,
                   fit: BoxFit.cover,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(8),
                   fallbackBuilder: () => Center(
                     child: Icon(
                       PhosphorIconsLight.imageBroken,
@@ -95,57 +97,86 @@ class GalleryMasonryTile extends StatelessWidget {
           ),
         ),
 
-        // Filename label at bottom with gradient background
+        // Frosted glass filename label at bottom
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.6),
-                ],
-              ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(8),
+              bottomRight: Radius.circular(8),
             ),
-            child: Text(
-              fileName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.5),
+                    ],
+                  ),
+                ),
+                child: Text(
+                  fileName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
             ),
           ),
         ),
 
         if (tags.isNotEmpty) TagsOverlay(tags: tags, gridSize: gridSize),
+        
+        // Selection overlay with frosted glass effect
         if (isSelectionMode)
           Positioned(
             top: 8,
             right: 8,
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSelected ? PhosphorIconsLight.checkCircle : PhosphorIconsLight.circle,
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        
+        // Subtle selection border
+        if (isSelected)
+          Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.7),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isSelected ? PhosphorIconsLight.checkCircle : PhosphorIconsLight.circle,
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
-                size: 24,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                  width: 2,
+                ),
               ),
             ),
           ),

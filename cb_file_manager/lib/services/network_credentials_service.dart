@@ -1,37 +1,60 @@
-import 'package:flutter/foundation.dart';
-import '../models/database/network_credentials.dart';
-import '../objectbox.g.dart';
+import 'dart:async';
 import 'dart:convert';
 
-/// Service để quản lý thông tin đăng nhập mạng lưu trong ObjectBox
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../models/database/network_credentials.dart';
+import '../models/database/sqlite_database_provider.dart';
+
+/// Stores and looks up saved network credentials.
 class NetworkCredentialsService {
   static final NetworkCredentialsService _instance =
       NetworkCredentialsService._();
 
   factory NetworkCredentialsService() => _instance;
 
-  late Box<NetworkCredentials> _credentialsBox;
+  final SqliteDatabaseProvider _dbProvider = SqliteDatabaseProvider();
+  final List<NetworkCredentials> _credentialsCache = <NetworkCredentials>[];
+  Future<void>? _initializing;
   bool _isInitialized = false;
 
   NetworkCredentialsService._();
 
-  /// Khởi tạo service với tham chiếu đến ObjectBox store
-  Future<void> init(Store store) async {
+  Future<void> init() => initialize();
+
+  Future<void> initialize() async {
     if (_isInitialized) {
       return;
     }
 
+    if (_initializing != null) {
+      await _initializing;
+      return;
+    }
+
+    _initializing = _loadCache();
     try {
-      _credentialsBox = Box<NetworkCredentials>(store);
-      _isInitialized = true;
-    } catch (e, stackTrace) {
-      debugPrint('NetworkCredentialsService: Error initializing: $e');
-      debugPrint('NetworkCredentialsService: Stack trace: $stackTrace');
-      rethrow;
+      await _initializing;
+    } finally {
+      _initializing = null;
     }
   }
 
-  /// Lưu thông tin đăng nhập mới
+  Future<void> _loadCache() async {
+    await _dbProvider.initialize();
+    final database = await _dbProvider.getDatabase();
+    final rows = await database.query(
+      'network_credentials',
+      orderBy: 'last_connected DESC, id DESC',
+    );
+
+    _credentialsCache
+      ..clear()
+      ..addAll(rows.map(NetworkCredentials.fromDatabaseMap));
+    _isInitialized = true;
+  }
+
   Future<int> saveCredentials({
     required String serviceType,
     required String host,
@@ -41,71 +64,48 @@ class NetworkCredentialsService {
     String? domain,
     Map<String, dynamic>? additionalOptions,
   }) async {
-    try {
-      _checkInitialized();
+    await initialize();
+    final database = await _dbProvider.getDatabase();
 
-      // Tạo đối tượng cần lưu
-      final credentials = NetworkCredentials(
-        serviceType: serviceType,
-        host: host,
-        username: username,
-        password: password,
-        port: port,
-        domain: domain,
-        additionalOptions:
-            additionalOptions != null ? jsonEncode(additionalOptions) : null,
-        lastConnected: DateTime.now(),
-      );
+    final credentials = NetworkCredentials(
+      serviceType: serviceType,
+      host: host,
+      username: username,
+      password: password,
+      port: port,
+      domain: domain,
+      additionalOptions:
+          additionalOptions != null ? jsonEncode(additionalOptions) : null,
+      lastConnected: DateTime.now(),
+    );
 
-      // Tìm thông tin đăng nhập có sẵn bằng cách lấy tất cả rồi lọc thủ công
-      final allCredentials = _credentialsBox.getAll();
+    final existingIndex = _credentialsCache.indexWhere(
+      (item) =>
+          item.serviceType == serviceType &&
+          item.normalizedHost.toLowerCase() ==
+              credentials.normalizedHost.toLowerCase() &&
+          item.username == username,
+    );
 
-      NetworkCredentials? existingCredentials;
-      for (var cred in allCredentials) {
-        if (cred.serviceType == serviceType &&
-            cred.host == host &&
-            cred.username == username) {
-          existingCredentials = cred;
-          break;
-        }
-      }
-
-      if (existingCredentials != null) {
-        // Cập nhật thông tin đăng nhập hiện có
-        existingCredentials.password = password;
-        existingCredentials.port = port;
-        existingCredentials.domain = domain;
-        existingCredentials.additionalOptions = credentials.additionalOptions;
-        existingCredentials.lastConnected = DateTime.now();
-
-        try {
-          final result = _credentialsBox.put(existingCredentials);
-          return result;
-        } catch (e) {
-          debugPrint(
-              'NetworkCredentialsService: Error updating existing credential: $e');
-          rethrow;
-        }
-      } else {
-        // Lưu thông tin đăng nhập mới
-        try {
-          final result = _credentialsBox.put(credentials);
-          return result;
-        } catch (e) {
-          debugPrint(
-              'NetworkCredentialsService: Error saving new credential: $e');
-          rethrow;
-        }
-      }
-    } catch (e, stackTrace) {
-      debugPrint(
-          'NetworkCredentialsService: Error saving network credentials: $e');
-      debugPrint('NetworkCredentialsService: Stack trace: $stackTrace');
-      rethrow;
+    if (existingIndex >= 0) {
+      credentials.id = _credentialsCache[existingIndex].id;
     }
+
+    final id = await database.insert(
+      'network_credentials',
+      credentials.toDatabaseMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    credentials.id = id;
+
+    if (existingIndex >= 0) {
+      _credentialsCache.removeAt(existingIndex);
+    }
+    _credentialsCache.insert(0, credentials);
+
+    return id;
   }
 
-  /// Tìm thông tin đăng nhập cho host và service
   NetworkCredentials? findCredentials({
     required String serviceType,
     required String host,
@@ -113,76 +113,70 @@ class NetworkCredentialsService {
   }) {
     _checkInitialized();
 
-    try {
-      // Chuẩn hóa host
-      final normalizedHost = host
-          .replaceAll(RegExp(r'^[a-z]+://'), '')
-          .replaceAll(RegExp(r':\d+$'), '');
+    final normalizedHost = host
+        .replaceAll(RegExp(r'^[a-z]+://'), '')
+        .replaceAll(RegExp(r':\d+$'), '')
+        .toLowerCase();
 
-      // Lấy tất cả thông tin đăng nhập và lọc thủ công
-      final allCredentials = _credentialsBox.getAll();
+    NetworkCredentials? bestMatch;
 
-      // Tìm credential phù hợp nhất - ưu tiên exact match
-      NetworkCredentials? bestMatch;
-
-      for (var cred in allCredentials) {
-        // Chuẩn hóa host của credential để so sánh
-        final credNormalizedHost = cred.host
-            .replaceAll(RegExp(r'^[a-z]+://'), '')
-            .replaceAll(RegExp(r':\d+$'), '');
-
-        bool serviceMatches = cred.serviceType == serviceType;
-        bool hostMatches = credNormalizedHost ==
-            normalizedHost; // Exact match thay vì contains
-
-        if (serviceMatches && hostMatches) {
-          // Nếu username được chỉ định, ưu tiên exact match
-          if (username != null && username.isNotEmpty) {
-            if (cred.username == username) {
-              return cred; // Exact match - return ngay
-            }
-          } else {
-            // Nếu không chỉ định username, lấy credential có username không trống
-            if (cred.username.isNotEmpty) {
-              if (bestMatch == null ||
-                  cred.lastConnected.isAfter(bestMatch.lastConnected)) {
-                bestMatch = cred;
-              }
-            }
-          }
-        }
+    for (final credentials in _credentialsCache) {
+      if (credentials.serviceType != serviceType) {
+        continue;
+      }
+      if (credentials.normalizedHost.toLowerCase() != normalizedHost) {
+        continue;
       }
 
-      return bestMatch;
-    } catch (e) {
-      debugPrint('Error finding credentials: $e');
-      return null;
+      if (username != null && username.isNotEmpty) {
+        if (credentials.username == username) {
+          return credentials;
+        }
+        continue;
+      }
+
+      if (bestMatch == null ||
+          credentials.lastConnected.isAfter(bestMatch.lastConnected)) {
+        bestMatch = credentials;
+      }
     }
+
+    return bestMatch;
   }
 
-  /// Lấy tất cả thông tin đăng nhập đã lưu cho một loại dịch vụ
   List<NetworkCredentials> getCredentialsByServiceType(String serviceType) {
     _checkInitialized();
 
+    return _credentialsCache
+        .where((credentials) => credentials.serviceType == serviceType)
+        .toList(growable: false);
+  }
+
+  bool deleteCredentials(int id) {
+    _checkInitialized();
+
+    final existingLength = _credentialsCache.length;
+    _credentialsCache.removeWhere((credentials) => credentials.id == id);
+    final removed = _credentialsCache.length != existingLength;
+    if (removed) {
+      unawaited(_deleteCredentialsFromDatabase(id));
+    }
+    return removed;
+  }
+
+  Future<void> _deleteCredentialsFromDatabase(int id) async {
     try {
-      // Lấy tất cả thông tin đăng nhập và lọc thủ công
-      final allCredentials = _credentialsBox.getAll();
-      return allCredentials
-          .where((cred) => cred.serviceType == serviceType)
-          .toList();
-    } catch (e) {
-      debugPrint('Error getting credentials by service type: $e');
-      return [];
+      final database = await _dbProvider.getDatabase();
+      await database.delete(
+        'network_credentials',
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+      );
+    } catch (error) {
+      debugPrint('Error deleting credentials: $error');
     }
   }
 
-  /// Xóa thông tin đăng nhập cụ thể
-  bool deleteCredentials(int id) {
-    _checkInitialized();
-    return _credentialsBox.remove(id);
-  }
-
-  /// Kiểm tra đã khởi tạo service chưa
   void _checkInitialized() {
     if (!_isInitialized) {
       throw StateError(

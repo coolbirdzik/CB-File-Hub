@@ -5,10 +5,10 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/video_library/create_video_library_dialog.dart';
 import 'package:cb_file_manager/ui/screens/video_library/video_library_settings_screen.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
-import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_helpers.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'dart:io';
 
 /// Video Hub Screen - Main screen for managing video libraries
 class VideoHubScreen extends StatefulWidget {
@@ -132,197 +132,194 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context)!;
 
-    return BaseScreen(
-      title: localizations.videoHubTitle,
-      actions: [
-        IconButton(
-          icon: const Icon(PhosphorIconsLight.plus),
-          onPressed: _showCreateLibraryDialog,
-          tooltip: localizations.createVideoLibrary,
-        ),
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'refresh':
-                _refreshData();
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'refresh',
-              child: Row(
-                children: [
-                  const Icon(PhosphorIconsLight.arrowClockwise),
-                  const SizedBox(width: 8),
-                  Text(localizations.refresh),
-                ],
+    // Match home_screen background pattern
+    final isLightMode = theme.brightness == Brightness.light;
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final double desktopLightAlpha = isDesktopPlatform ? 0.42 : 1.0;
+    final backgroundGradientColors = isLightMode
+        ? <Color>[
+            theme.colorScheme.surfaceContainerLowest
+                .withValues(alpha: desktopLightAlpha),
+            theme.colorScheme.surfaceContainerLow
+                .withValues(alpha: desktopLightAlpha),
+            Color.alphaBlend(
+              theme.colorScheme.primary.withValues(alpha: 0.02),
+              theme.colorScheme.surfaceContainer
+                  .withValues(alpha: desktopLightAlpha),
+            ).withValues(alpha: desktopLightAlpha),
+          ]
+        : <Color>[];
+    final darkBackgroundColor =
+        isDesktopPlatform ? theme.colorScheme.surface.withValues(alpha: 0.30) : theme.colorScheme.surface;
+
+    return Scaffold(
+      backgroundColor: isDesktopPlatform
+          ? Colors.transparent
+          : (isLightMode
+              ? theme.colorScheme.surfaceContainerLowest
+              : theme.scaffoldBackgroundColor),
+      body: Container(
+        decoration: isDesktopPlatform
+            ? const BoxDecoration(color: Colors.transparent)
+            : (isLightMode
+                ? BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: backgroundGradientColors,
+                    ),
+                  )
+                : BoxDecoration(
+                    color: darkBackgroundColor,
+                  )),
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
+          child: CustomScrollView(
+            slivers: [
+              // Welcome Section
+              SliverToBoxAdapter(
+                child: _buildWelcomeSection(theme, localizations, isLightMode, isDesktopPlatform),
               ),
-            ),
-          ],
-        ),
-      ],
-      body: RefreshIndicator(
-        onRefresh: _refreshData,
-        child: CustomScrollView(
-          slivers: [
-            // Welcome Section
-            SliverToBoxAdapter(
-              child: _buildWelcomeSection(theme, localizations),
-            ),
 
-            // Statistics
-            SliverToBoxAdapter(
-              child: _buildStatistics(theme, localizations),
-            ),
-
-            // Libraries Grid
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: _isLoading
-                  ? const SliverFillRemaining(
-                      child: Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : _libraries.isEmpty
-                      ? SliverFillRemaining(
-                          child: _buildEmptyState(theme, localizations),
-                        )
-                      : SliverGrid(
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 300,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 1.2,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
+              // Libraries Grid
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: _isLoading
+                    ? const SliverFillRemaining(
+                        child: Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : _libraries.isEmpty
+                        ? SliverFillRemaining(
+                            child: _buildEmptyState(theme, localizations, isLightMode, isDesktopPlatform),
+                          )
+                        : SliverGrid(
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 300,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 1.2,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
                             (context, index) {
                               return _buildLibraryCard(
-                                  theme, localizations, _libraries[index]);
+                                  theme, localizations, _libraries[index], isLightMode, isDesktopPlatform);
                             },
-                            childCount: _libraries.length,
+                              childCount: _libraries.length,
+                            ),
                           ),
-                        ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateLibraryDialog,
+        tooltip: localizations.createVideoLibrary,
+        child: const Icon(PhosphorIconsLight.plus),
       ),
     );
   }
 
-  Widget _buildWelcomeSection(ThemeData theme, AppLocalizations localizations) {
+  Widget _buildWelcomeSection(ThemeData theme, AppLocalizations localizations, bool isLightMode, bool isDesktopPlatform) {
+    final cs = theme.colorScheme;
+    final welcomeGradientColors = isLightMode
+        ? <Color>[
+            Color.alphaBlend(
+              cs.primary.withValues(alpha: 0.09),
+              cs.surfaceContainerHigh,
+            ).withValues(alpha: isDesktopPlatform ? 0.44 : 1.0),
+            Color.alphaBlend(
+              cs.primary.withValues(alpha: 0.05),
+              cs.surfaceContainer,
+            ).withValues(alpha: isDesktopPlatform ? 0.40 : 1.0),
+          ]
+        : <Color>[];
+    final darkWelcomeColor = isDesktopPlatform
+        ? cs.surfaceContainerHigh.withValues(alpha: 0.52)
+        : cs.surfaceContainerHigh;
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.secondaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: isLightMode ? null : darkWelcomeColor,
+        gradient: isLightMode
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: welcomeGradientColors,
+              )
+            : null,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            PhosphorIconsLight.filmStrip,
-            size: 48,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            localizations.videoHubWelcome,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatistics(ThemeData theme, AppLocalizations localizations) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              theme,
-              localizations.videoLibraries,
-              '${_libraries.length}',
-              PhosphorIconsLight.folderOpen,
-              theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              theme,
-              localizations.totalVideos,
-              '$_totalVideos',
-              PhosphorIconsLight.videoCamera,
-              theme.colorScheme.tertiary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    ThemeData theme,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
+          Row(
+            children: [
+              Icon(
+                PhosphorIconsLight.filmStrip,
+                color: theme.colorScheme.primary,
+                size: 30,
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      localizations.videoHubTitle,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      localizations.videoHubWelcome,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!_isLoading)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '$_totalVideos',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      Text(
+                        localizations.videos,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
         ],
       ),
@@ -333,7 +330,10 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     ThemeData theme,
     AppLocalizations localizations,
     VideoLibrary library,
+    bool isLightMode,
+    bool isDesktopPlatform,
   ) {
+    final cs = theme.colorScheme;
     final cardColor = VideoLibraryHelpers.getColorFromHex(
       library.colorTheme,
       theme.colorScheme.primaryContainer,
@@ -344,22 +344,18 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       builder: (context, snapshot) {
         final videoCount = snapshot.data ?? 0;
 
-        return Card(
-          elevation: 0,
+        return Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
           child: InkWell(
             onTap: () => _navigateToLibrary(library),
             borderRadius: BorderRadius.circular(16),
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  colors: [
-                    cardColor.withValues(alpha: 0.3),
-                    cardColor.withValues(alpha: 0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: isLightMode
+                    ? cs.surface.withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
+                    : cs.surface,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,7 +440,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
                       borderRadius: const BorderRadius.only(
                         bottomLeft: Radius.circular(16),
                         bottomRight: Radius.circular(16),
@@ -476,17 +472,48 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme, AppLocalizations localizations) {
+  Widget _buildEmptyState(ThemeData theme, AppLocalizations localizations, bool isLightMode, bool isDesktopPlatform) {
+    final cs = theme.colorScheme;
+    final emptyStateGradientColors = isLightMode
+        ? <Color>[
+            Color.alphaBlend(
+              cs.secondary.withValues(alpha: 0.08),
+              cs.surfaceContainerHigh,
+            ).withValues(alpha: isDesktopPlatform ? 0.44 : 1.0),
+            Color.alphaBlend(
+              cs.secondary.withValues(alpha: 0.04),
+              cs.surfaceContainer,
+            ).withValues(alpha: isDesktopPlatform ? 0.40 : 1.0),
+          ]
+        : <Color>[];
+    final darkEmptyStateColor = isDesktopPlatform
+        ? cs.surfaceContainerHigh.withValues(alpha: 0.52)
+        : cs.surfaceContainerHigh;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            PhosphorIconsLight.filmStrip,
-            size: 80,
-            color: theme.colorScheme.outline,
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isLightMode ? null : darkEmptyStateColor,
+              gradient: isLightMode
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: emptyStateGradientColors,
+                    )
+                  : null,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              PhosphorIconsLight.filmStrip,
+              size: 64,
+              color: cs.secondary.withValues(alpha: 0.6),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
             localizations.noVideoSources,
             style: theme.textTheme.titleLarge,

@@ -338,7 +338,11 @@ Win32Window::MessageHandler(HWND hwnd,
   }
 
   case WM_ACTIVATE:
-    if (child_content_ != nullptr)
+    // Only set focus when the window is being activated (WA_ACTIVE or
+    // WA_CLICKACTIVE).  Calling SetFocus during WA_INACTIVE (deactivation)
+    // can cause the window to fight for foreground status and prevent the
+    // Windows Shell from minimizing it via the taskbar button.
+    if (child_content_ != nullptr && LOWORD(wparam) != WA_INACTIVE)
     {
       SetFocus(child_content_);
     }

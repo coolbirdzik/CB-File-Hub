@@ -497,6 +497,13 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get openInNewTab => 'Mở trong tab mới';
   @override
+  String get viewFilesWithTag => 'Xem tệp với thẻ';
+  @override
+  String get renameTag => 'Đổi tên thẻ';
+  @override
+  String tagRenamed(String oldTag, String newTag) =>
+      'Thẻ "$oldTag" đã đổi tên thành "$newTag"';
+  @override
   String get openInSplitView => 'Mở ở chế độ chia đôi';
   @override
   String get changeColor => 'Thay đổi màu';
@@ -521,6 +528,10 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get enterTagName => 'Nhập tên thẻ...';
   @override
+  String get tagName => 'Tên thẻ';
+  @override
+  String get enterNewTagName => 'Nhập tên thẻ mới...';
+  @override
   String tagAlreadyExists(String tagName) => 'Thẻ "$tagName" đã tồn tại';
   @override
   String tagCreatedSuccessfully(String tagName) =>
@@ -532,9 +543,15 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get selectTagToRemove => 'Vui lòng chọn thẻ để xóa:';
   @override
+  String get doubleClickToRename => 'Nhấn đúp để đổi tên';
+  @override
   String get openingFolder => 'Opening folder: ';
   @override
-  String get folderNotFound => 'Folder not found: ';
+  String get folderNotFound => 'Thư mục không tìm thấy: ';
+  @override
+  String get refreshTags => 'Làm mới tags';
+  @override
+  String tagsRefreshed(int count) => 'Đã làm mới tags - $count tags đã tải';
 
   // Gallery
   @override
@@ -576,15 +593,18 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get databaseStorage => 'Lưu trữ cơ sở dữ liệu';
   @override
-  String get useObjectBox => 'Sử dụng cơ sở dữ liệu ObjectBox';
+  String get useDatabaseStorage => 'Sử dụng cơ sở dữ liệu SQLite';
   @override
   String get databaseDescription =>
       'Lưu trữ thẻ và tùy chọn trong cơ sở dữ liệu cục bộ';
   @override
   String get jsonStorage => 'Đang sử dụng tệp JSON cho lưu trữ cơ bản';
   @override
+  String get databaseStorageEnabled =>
+      'Đang sử dụng SQLite cho lưu trữ cơ sở dữ liệu hiệu quả';
+  @override
   String get objectBoxStorage =>
-      'Đang sử dụng ObjectBox cho lưu trữ cơ sở dữ liệu hiệu quả';
+      'Đang sử dụng SQLite cho lưu trữ cơ sở dữ liệu hiệu quả'; // Legacy
 
   // Cloud sync
   @override
@@ -602,8 +622,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cloudSyncDisabled => 'Đồng bộ hóa đám mây đang tắt';
   @override
-  String get enableObjectBoxForCloud =>
-      'Bật cơ sở dữ liệu ObjectBox để sử dụng đồng bộ đám mây';
+  String get enableDatabaseForCloud =>
+      'Bật cơ sở dữ liệu SQLite để sử dụng đồng bộ đám mây';
 
   // Database statistics
   @override
@@ -615,9 +635,43 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get popularTags => 'Thẻ phổ biến nhất';
   @override
+  String get recentTags => 'Thẻ gần đây';
+  @override
+  String get selectedTags => 'Thẻ đã chọn:';
+  @override
+  String batchAddTags(int count) => 'Thêm thẻ cho $count tệp';
+  @override
+  String get applyingChanges => 'Đang áp dụng thay đổi...';
+  @override
+  String tagsUpdated(int count, int added, int removed) {
+    var msg = 'Đã cập nhật tags cho $count tệp';
+    final parts = <String>[];
+    if (added > 0) parts.add('thêm $added');
+    if (removed > 0) parts.add('xóa $removed');
+    if (parts.isNotEmpty) msg += ' (${parts.join(', ')})';
+    return msg;
+  }
+  @override
+  String get tagSuggestions => 'Gợi ý thẻ';
+  @override
+  String get advancedDatabaseSettings => 'Cài đặt cơ sở dữ liệu nâng cao';
+  @override
   String get noTagsFound => 'Không tìm thấy thẻ nào';
   @override
   String get refreshStatistics => 'Làm mới thống kê';
+
+  // Raw Data Viewer
+  @override
+  String get viewRawData => 'Xem dữ liệu thô';
+  @override
+  String get rawDataPreferences => 'Cài đặt';
+  @override
+  String get rawDataTags => 'Thẻ file';
+  @override
+  String get rawDataDescription =>
+      'Xem dữ liệu thô lưu trong database (để debug)';
+  @override
+  String get noDataFound => 'Không tìm thấy dữ liệu';
 
   // Import/Export
   @override
@@ -903,6 +957,26 @@ class VietnameseLocalizations implements AppLocalizations {
   String get sortBySize => 'Sắp xếp theo kích thước';
   @override
   String get sortByDate => 'Sắp xếp theo ngày';
+
+  // Bulk Selection
+  @override
+  String get bulkSelect => 'Chọn nhiều';
+  @override
+  String get selectAllTags => 'Chọn tất cả';
+  @override
+  String selectAllOnAllPages(int totalCount) => 'Chọn tất cả ($totalCount thẻ)';
+  @override
+  String get deselectAllTags => 'Bỏ chọn tất cả';
+  @override
+  String tagsSelected(int count) => 'Đã chọn $count thẻ';
+  @override
+  String bulkDeleteConfirmationTitle() => 'Xóa các thẻ đã chọn?';
+  @override
+  String bulkDeleteConfirmationText(int count) =>
+      'Bạn có chắc muốn xóa $count thẻ? Hành động này không thể hoàn tác.';
+  @override
+  String bulkDeleteSuccess(int count) =>
+      'Đã xóa thành công $count thẻ';
 
   // Search errors
   @override

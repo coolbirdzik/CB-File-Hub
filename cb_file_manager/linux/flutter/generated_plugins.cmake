@@ -5,7 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   media_kit_video
   mobile_smb_native
-  objectbox_flutter_libs
   screen_retriever_linux
   url_launcher_linux
   volume_controller

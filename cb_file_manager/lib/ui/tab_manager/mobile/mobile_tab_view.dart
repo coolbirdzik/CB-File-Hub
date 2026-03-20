@@ -633,8 +633,9 @@ class MobileTabView extends StatelessWidget {
 
     // Check for common folders
     final lowerPath = path.toLowerCase();
-    if (lowerPath.contains('download'))
+    if (lowerPath.contains('download')) {
       return PhosphorIconsLight.downloadSimple;
+    }
     if (lowerPath.contains('picture') ||
         lowerPath.contains('photo') ||
         lowerPath.contains('dcim')) {
@@ -1056,6 +1057,10 @@ extension MobileTabViewDynamicMenu on MobileTabView {
   /// Returns false for other system paths (#home, #gallery, #video, #tags, etc.)
   bool _shouldShowMobileActionBar(String path) {
     if (isDrivesPath(path)) {
+      return true;
+    }
+
+    if (path.startsWith('#search?tag=')) {
       return true;
     }
 

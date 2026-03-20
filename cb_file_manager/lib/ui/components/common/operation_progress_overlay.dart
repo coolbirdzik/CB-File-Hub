@@ -42,12 +42,16 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
     final active = _controller.active;
     _autoDismissTimer?.cancel();
 
-    // On desktop, show as a dialog window when operation starts
-    if (OperationProgressOverlay._isDesktop &&
-        active != null &&
+    // Show as a modal dialog when explicitly requested.
+    if (active != null &&
+        !active.isMinimized &&
         active.isRunning &&
         !_isShowingDialog) {
-      _showDesktopWindow();
+      if (OperationProgressOverlay._isDesktop) {
+        _showDesktopWindow();
+      } else {
+        _showMobileDialog();
+      }
       return;
     }
 
@@ -82,8 +86,29 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        barrierColor: Colors.transparent,
         builder: (context) => _DesktopProgressWindow(
+          controller: _controller,
+        ),
+      ).then((_) {
+        _isShowingDialog = false;
+      });
+    });
+  }
+
+  void _showMobileDialog() {
+    if (_isShowingDialog) return;
+    _isShowingDialog = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        _isShowingDialog = false;
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _MobileProgressDialog(
           controller: _controller,
         ),
       ).then((_) {
@@ -102,7 +127,7 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
     }
 
     // On mobile, show the bottom status bar overlay
-    if (active == null) return const SizedBox.shrink();
+    if (active == null || !active.isMinimized) return const SizedBox.shrink();
 
     return Positioned(
       left: 0,
@@ -151,7 +176,9 @@ class _OperationProgressStatusBar extends StatelessWidget {
     }
 
     final label = entry.isRunning
-        ? (entry.isIndeterminate ? l10n.processing : '${entry.completed}/${entry.total}')
+        ? (entry.isIndeterminate
+            ? l10n.processing
+            : '${entry.completed}/${entry.total}')
         : (entry.status == OperationProgressStatus.success
             ? l10n.done
             : l10n.errorTitle);
@@ -198,7 +225,8 @@ class _OperationProgressStatusBar extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   LinearProgressIndicator(
-                    value: entry.isIndeterminate ? null : entry.progressFraction,
+                    value:
+                        entry.isIndeterminate ? null : entry.progressFraction,
                     minHeight: 6,
                     borderRadius: BorderRadius.circular(999),
                   ),
@@ -235,6 +263,92 @@ class _DesktopProgressWindow extends StatefulWidget {
 
   @override
   State<_DesktopProgressWindow> createState() => _DesktopProgressWindowState();
+}
+
+class _MobileProgressDialog extends StatefulWidget {
+  final OperationProgressController controller;
+
+  const _MobileProgressDialog({
+    required this.controller,
+  });
+
+  @override
+  State<_MobileProgressDialog> createState() => _MobileProgressDialogState();
+}
+
+class _MobileProgressDialogState extends State<_MobileProgressDialog> {
+  Timer? _autoDismissTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    _autoDismissTimer?.cancel();
+    widget.controller.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  void _onChanged() {
+    final active = widget.controller.active;
+    _autoDismissTimer?.cancel();
+
+    if (active == null || active.isMinimized) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    if (active.isFinished && active.status == OperationProgressStatus.success) {
+      _autoDismissTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        final latest = widget.controller.active;
+        if (latest != null &&
+            latest.id == active.id &&
+            latest.status == OperationProgressStatus.success) {
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+          widget.controller.dismiss();
+        }
+      });
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.controller.active;
+    if (active == null) {
+      return const SizedBox.shrink();
+    }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: screenWidth.clamp(280.0, 420.0),
+        ),
+        child: _ProgressWindowContent(
+          entry: active,
+          onMinimize: widget.controller.minimize,
+          onDismiss: () {
+            widget.controller.dismiss();
+            if (Navigator.canPop(context)) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+      ),
+    );
+  }
 }
 
 class _DesktopProgressWindowState extends State<_DesktopProgressWindow> {
@@ -302,8 +416,6 @@ class _DesktopProgressWindowState extends State<_DesktopProgressWindow> {
     }
 
     return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
       alignment: Alignment.bottomRight,
       insetPadding: const EdgeInsets.all(20),
       child: _ProgressWindowContent(
@@ -383,7 +495,9 @@ class _ProgressWindowContent extends StatelessWidget {
           maxHeight: 180,
         ),
         decoration: BoxDecoration(
-          color: isDark ? theme.colorScheme.surfaceContainerHigh : theme.colorScheme.surface,
+          color: isDark
+              ? theme.colorScheme.surfaceContainerHigh
+              : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -486,7 +600,9 @@ class _WindowTitleBar extends StatelessWidget {
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surfaceContainerLow,
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surfaceContainerLow,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
@@ -560,7 +676,3 @@ class _TitleBarButton extends StatelessWidget {
     );
   }
 }
-
-
-
-

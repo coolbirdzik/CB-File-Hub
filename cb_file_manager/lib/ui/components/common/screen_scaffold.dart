@@ -53,6 +53,7 @@ class ScreenScaffold extends StatelessWidget {
 
     if (useSelectionAppBar) {
       return Scaffold(
+        backgroundColor: isDesktop ? Colors.transparent : null,
         appBar: tab_components.SelectionAppBar(
           selectedCount: selectionState.selectedCount,
           selectedFileCount: selectionState.selectedFilePaths.length,
@@ -71,13 +72,14 @@ class ScreenScaffold extends StatelessWidget {
     }
 
     return Scaffold(
+      backgroundColor: isDesktop ? Colors.transparent : null,
       appBar: showAppBar
           ? FluentBackground.appBar(
               context: context,
               title: showSearchBar ? searchBar : pathNavigationBar,
               actions: actions,
-              blurAmount: 12.0,
-              opacity: 0.6,
+              blurAmount: isDesktop ? 18.0 : 12.0,
+              opacity: isDesktop ? 0.18 : 0.6,
             )
           : null,
       body: body,

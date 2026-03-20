@@ -14,6 +14,8 @@ import 'desktop_tab_drag_data.dart';
 class ScrollableTabBar extends StatefulWidget {
   final TabController controller;
   final List<Widget> tabs;
+  final Color? barBackgroundColor;
+  final Color? activeTabBackgroundColor;
   final bool isScrollable;
   final EdgeInsetsGeometry? labelPadding;
   final TabBarIndicatorSize? indicatorSize;
@@ -40,6 +42,8 @@ class ScrollableTabBar extends StatefulWidget {
     Key? key,
     required this.controller,
     required this.tabs,
+    this.barBackgroundColor,
+    this.activeTabBackgroundColor,
     this.isScrollable = true,
     this.labelPadding,
     this.indicatorSize,
@@ -82,8 +86,10 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
     final isDarkMode = theme.brightness == Brightness.dark;
 
     // Modern tab colors
-    final tabBackgroundColor = theme.scaffoldBackgroundColor;
-    final activeTabColor = theme.scaffoldBackgroundColor;
+    final tabBackgroundColor =
+        widget.barBackgroundColor ?? theme.scaffoldBackgroundColor;
+    final activeTabColor =
+        widget.activeTabBackgroundColor ?? tabBackgroundColor;
     final hoverColor = theme.colorScheme.surfaceContainerHigh;
 
     Widget windowCaptionButtons = Platform.isWindows
@@ -845,15 +851,13 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.theme.brightness == Brightness.dark;
-    final baseIconColor = isDark
-        ? Colors.white.withValues(alpha: 0.8)
-        : widget.theme.colorScheme.primary;
+    final accentColor = widget.theme.colorScheme.primary;
     final idleBg = isDark
-        ? Colors.white.withValues(alpha: 0.03)
-        : widget.theme.colorScheme.primary.withValues(alpha: 0.05);
+        ? accentColor.withValues(alpha: 0.06)
+        : accentColor.withValues(alpha: 0.07);
     final hoverBg = isDark
-        ? widget.theme.colorScheme.onSurface.withValues(alpha: 0.10)
-        : widget.theme.colorScheme.onSurface.withValues(alpha: 0.12);
+        ? accentColor.withValues(alpha: 0.16)
+        : accentColor.withValues(alpha: 0.14);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -873,7 +877,7 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
           child: Icon(
             PhosphorIconsLight.plus,
             size: 18,
-            color: baseIconColor,
+            color: accentColor,
           ),
         ),
       ),
@@ -970,8 +974,9 @@ class _ModernTabState extends State<_ModernTab>
     final hoverColor = isDarkMode
         ? cs.surfaceContainerHighest.withValues(alpha: 0.75)
         : cs.surfaceContainerHighest.withValues(alpha: 0.95);
-    final selectedFillColor = primaryColor.withValues(alpha: isDarkMode ? 0.22 : 0.12);
-    final activeFillColor = widget.theme.colorScheme.surface;
+    final selectedFillColor =
+        primaryColor.withValues(alpha: isDarkMode ? 0.22 : 0.12);
+    final activeFillColor = widget.activeTabColor;
     const inactiveFillColor = Colors.transparent;
 
     return MouseRegion(
@@ -985,7 +990,8 @@ class _ModernTabState extends State<_ModernTab>
               ? cs.onSurface
               : (widget.isActive
                   ? cs.onSurface
-                  : cs.onSurfaceVariant.withValues(alpha: isDarkMode ? 0.94 : 1.0));
+                  : cs.onSurfaceVariant
+                      .withValues(alpha: isDarkMode ? 0.94 : 1.0));
 
           return _OptimizedTabInteraction(
             onPrimaryDown: widget.onPrimaryDown,
@@ -1028,15 +1034,17 @@ class _ModernTabState extends State<_ModernTab>
                               style: TextStyle(
                                 color: effectiveLabelColor,
                                 fontSize: 13,
-                                fontWeight:
-                                    widget.isActive ? FontWeight.w600 : FontWeight.w500,
+                                fontWeight: widget.isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
                               ).merge(widget.labelStyle),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(right: 24.0),
+                                      padding:
+                                          const EdgeInsets.only(right: 24.0),
                                       child: Center(child: widget.child),
                                     ),
                                   ),
@@ -1053,7 +1061,8 @@ class _ModernTabState extends State<_ModernTab>
                           top: 0,
                           height: 2,
                           child: ColoredBox(
-                            color: cs.primary.withValues(alpha: isDarkMode ? 0.75 : 0.65),
+                            color: cs.primary
+                                .withValues(alpha: isDarkMode ? 0.75 : 0.65),
                           ),
                         ),
                     ],
@@ -1281,9 +1290,3 @@ class _NativeTabDragHandleState extends State<_NativeTabDragHandle> {
     );
   }
 }
-
-
-
-
-
-

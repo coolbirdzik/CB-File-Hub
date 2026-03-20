@@ -64,36 +64,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isLightMode = theme.brightness == Brightness.light;
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     final localizations = AppLocalizations.of(context)!;
     final size = MediaQuery.of(context).size;
 
+    const desktopUnifiedBackgroundColor = Colors.transparent;
+    final double desktopLightAlpha = isDesktopPlatform ? 0.42 : 1.0;
     final backgroundGradientColors = isLightMode
         ? <Color>[
-            cs.surfaceContainerLowest,
-            cs.surfaceContainerLow,
+            cs.surfaceContainerLowest.withValues(alpha: desktopLightAlpha),
+            cs.surfaceContainerLow.withValues(alpha: desktopLightAlpha),
             Color.alphaBlend(
-              cs.primary.withValues(alpha: 0.04),
-              cs.surfaceContainer,
-            ),
+              cs.primary.withValues(alpha: 0.02),
+              cs.surfaceContainer.withValues(alpha: desktopLightAlpha),
+            ).withValues(alpha: desktopLightAlpha),
           ]
-        : <Color>[
-            cs.surface,
-            cs.surface.withValues(alpha: 0.8),
-            cs.primaryContainer.withValues(alpha: 0.1),
-          ];
+        : const <Color>[];
+    final darkBackgroundColor =
+        isDesktopPlatform ? cs.surface.withValues(alpha: 0.30) : cs.surface;
 
     return Scaffold(
-      backgroundColor: isLightMode
-          ? cs.surfaceContainerLowest
-          : theme.scaffoldBackgroundColor,
+      backgroundColor: isDesktopPlatform
+          ? Colors.transparent
+          : (isLightMode
+              ? cs.surfaceContainerLowest
+              : theme.scaffoldBackgroundColor),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: backgroundGradientColors,
-          ),
-        ),
+        decoration: isDesktopPlatform
+            ? const BoxDecoration(color: desktopUnifiedBackgroundColor)
+            : (isLightMode
+                ? BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: backgroundGradientColors,
+                    ),
+                  )
+                : BoxDecoration(
+                    color: darkBackgroundColor,
+                  )),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
@@ -134,31 +144,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildWelcomeSection(ThemeData theme) {
     final cs = theme.colorScheme;
     final isLightMode = theme.brightness == Brightness.light;
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     final welcomeGradientColors = isLightMode
         ? <Color>[
             Color.alphaBlend(
               cs.primary.withValues(alpha: 0.09),
               cs.surfaceContainerHigh,
-            ),
+            ).withValues(alpha: isDesktopPlatform ? 0.44 : 1.0),
             Color.alphaBlend(
               cs.primary.withValues(alpha: 0.05),
               cs.surfaceContainer,
-            ),
+            ).withValues(alpha: isDesktopPlatform ? 0.40 : 1.0),
           ]
-        : <Color>[
-            cs.primaryContainer,
-            cs.primaryContainer.withValues(alpha: 0.8),
-          ];
+        : const <Color>[];
+    final darkWelcomeColor = isDesktopPlatform
+        ? cs.surfaceContainerHigh.withValues(alpha: 0.52)
+        : cs.surfaceContainerHigh;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: welcomeGradientColors,
-        ),
+        color: isLightMode ? null : darkWelcomeColor,
+        gradient: isLightMode
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: welcomeGradientColors,
+              )
+            : null,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -166,24 +181,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      cs.primary,
-                      cs.primary.withValues(alpha: 0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  PhosphorIconsLight.house,
-                  color: cs.onPrimary,
-                  size: 28,
-                ),
+              Icon(
+                PhosphorIconsLight.house,
+                color: cs.primary,
+                size: 32,
               ),
               const SizedBox(width: 20),
               Expanded(
@@ -216,7 +217,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isLightMode
-                  ? cs.surfaceContainerHighest.withValues(alpha: 0.75)
+                  ? cs.surfaceContainerHighest.withValues(
+                      alpha: isDesktopPlatform ? 0.44 : 0.75,
+                    )
                   : cs.surface.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(16),
             ),
@@ -396,6 +399,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<Color> gradientColors,
     VoidCallback onTap,
   ) {
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isLightMode = theme.brightness == Brightness.light;
     return LayoutBuilder(
       builder: (context, constraints) {
         // Adjust padding and spacing for smaller screens
@@ -414,28 +420,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Container(
               padding: EdgeInsets.all(cardPadding),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
+                color: isLightMode
+                    ? theme.colorScheme.surface.withValues(
+                        alpha: isDesktopPlatform ? 0.46 : 1.0,
+                      )
+                    : theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: EdgeInsets.all(iconPadding),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: gradientColors,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: iconSize,
-                      color: Colors.white,
-                    ),
+                  Icon(
+                    icon,
+                    size: iconSize + 4,
+                    color: gradientColors[0],
                   ),
                   SizedBox(height: spacing),
                   Flexible(
@@ -475,13 +474,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildPinnedSection(ThemeData theme, AppLocalizations localizations) {
     final cs = theme.colorScheme;
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isLightMode = theme.brightness == Brightness.light;
     return BlocBuilder<DrawerCubit, DrawerState>(
       builder: (context, state) {
         if (state.pinnedPaths.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: cs.surface,
+              color: isLightMode
+                  ? cs.surface.withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
+                  : cs.surface,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
@@ -509,7 +513,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: cs.surface,
+            color: isLightMode
+                ? cs.surface.withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
+                : cs.surface,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -535,19 +541,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ThemeData theme, AppLocalizations localizations, ColorScheme cs) {
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [cs.primary, cs.primary.withValues(alpha: 0.8)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            PhosphorIconsLight.pushPin,
-            color: cs.onPrimary,
-            size: 20,
-          ),
+        Icon(
+          PhosphorIconsLight.pushPin,
+          color: cs.primary,
+          size: 24,
         ),
         const SizedBox(width: 16),
         Text(
@@ -568,10 +565,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     String title,
     VoidCallback onTap,
   ) {
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isLightMode = theme.brightness == Brightness.light;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: isLightMode
+            ? theme.colorScheme.surface
+                .withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Material(
@@ -622,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(PhosphorIconsLight.pushPinSlash, size: 20),
+                  icon: const Icon(PhosphorIconsLight.pushPinSlash, size: 20),
                   onPressed: () {
                     context.read<DrawerCubit>().togglePinnedPath(path);
                   },

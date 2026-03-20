@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Thêm import cho SystemUiOverlayStyle
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io'; // Thêm import cho Platform
-import 'package:phosphor_flutter/phosphor_flutter.dart'; 
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../config/theme_config.dart';
 import 'core/tab_manager.dart';
 import 'core/tab_data.dart';
-import '../screens/settings/settings_screen.dart';
+import 'core/tab_paths.dart';
 import 'tabbed_folder_list_screen.dart';
 import '../screens/network_browsing/network_connection_screen.dart';
 import '../screens/network_browsing/network_browser_screen.dart';
@@ -322,12 +323,20 @@ class MobileTabView extends StatelessWidget {
                       title: const Text('Cài đặt'),
                       onTap: () {
                         RouteUtils.safePopDialog(bottomSheetContext);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SettingsScreen(),
-                          ),
+                        final tabBloc = BlocProvider.of<TabManagerBloc>(context);
+                        final existingTab = tabBloc.state.tabs.firstWhere(
+                          (tab) => tab.path == kSettingsPath,
+                          orElse: () => TabData(id: '', name: '', path: ''),
                         );
+                        if (existingTab.id.isNotEmpty) {
+                          tabBloc.add(SwitchToTab(existingTab.id));
+                        } else {
+                          tabBloc.add(AddTab(
+                            path: kSettingsPath,
+                            name: 'Cài đặt',
+                            switchToTab: true,
+                          ));
+                        }
                       },
                     ),
                   ],
@@ -665,7 +674,9 @@ class MobileTabView extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        tab.isPinned ? PhosphorIconsLight.pushPin : PhosphorIconsLight.folder,
+                        tab.isPinned
+                            ? PhosphorIconsLight.pushPin
+                            : PhosphorIconsLight.folder,
                         size: 18,
                         color: isActive
                             ? theme.colorScheme.primary
@@ -693,8 +704,8 @@ class MobileTabView extends StatelessWidget {
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        color: theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(16.0),
                       ),
                       alignment: Alignment.center,
@@ -957,7 +968,9 @@ class MobileTabView extends StatelessWidget {
 
                       return ListTile(
                         leading: Icon(
-                          index == 0 ? PhosphorIconsLight.desktop : PhosphorIconsLight.folder,
+                          index == 0
+                              ? PhosphorIconsLight.desktop
+                              : PhosphorIconsLight.folder,
                           color: theme.colorScheme.primary,
                         ),
                         title: Text(
@@ -1040,7 +1053,8 @@ class MobileTabView extends StatelessWidget {
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: isCurrentPath
-                                    ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                                    ? theme.colorScheme.primary
+                                        .withValues(alpha: 0.2)
                                     : isDarkMode
                                         ? Colors.grey[800]
                                         : Colors.grey[200],
@@ -1151,6 +1165,9 @@ class AddressBarWidget extends StatelessWidget {
   final String path;
   final String name;
   final VoidCallback onTap;
+  // `isDarkMode` is retained for backwards compatibility but no longer
+  // used; the theme itself dictates the fill color via the
+  // [addressBarFillColor] extension.
   final bool isDarkMode;
 
   const AddressBarWidget({
@@ -1172,8 +1189,9 @@ class AddressBarWidget extends StatelessWidget {
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
         decoration: BoxDecoration(
-          // Nền rõ ràng cho thanh địa chỉ (đồng nhất dark)
-          color: isDarkMode ? const Color(0xFF0F2C4C) : Colors.grey[200],
+          // background comes from themeconfig helper instead of hardcoded color
+          color:
+              ThemeConfig.addressBarFillColorFor(Theme.of(context).brightness),
           borderRadius: BorderRadius.circular(16.0),
         ),
         child: Row(
@@ -1204,10 +1222,3 @@ class AddressBarWidget extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-

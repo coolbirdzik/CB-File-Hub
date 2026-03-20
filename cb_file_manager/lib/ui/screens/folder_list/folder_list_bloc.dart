@@ -84,7 +84,6 @@ AppLocalizations _l10nNoContext() {
 
 class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   StreamSubscription? _tagChangeSubscription;
-  StreamSubscription? _globalTagChangeSubscription;
   StreamSubscription<String>? _directoryWatcherSubscription;
   final DirectoryWatcherService _directoryWatcher =
       DirectoryWatcherService.instance;
@@ -102,14 +101,6 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
     // Register for local tag change events
     _tagChangeSubscription = TagManager.onTagChanged.listen(_onTagsChanged);
-
-    // Register for global tag change notifications
-    // NOTE: _onGlobalTagChanged now requires emit, so it cannot be used directly in this subscription.
-    // If you need to handle global tag changes here, dispatch an event instead.
-    _globalTagChangeSubscription =
-        TagManager.instance.onGlobalTagChanged.listen((filePath) {
-      // You may want to add a custom event here if needed.
-    });
 
     // Register for directory file system changes (auto-refresh on file changes)
     _directoryWatcherSubscription = _directoryWatcher.onDirectoryRefresh.listen(
@@ -217,7 +208,6 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   Future<void> close() {
     // Cancel all subscriptions when bloc is closed
     _tagChangeSubscription?.cancel();
-    _globalTagChangeSubscription?.cancel();
     _directoryWatcherSubscription?.cancel();
     _directoryWatcher.stopWatching();
     return super.close();

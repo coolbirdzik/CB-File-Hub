@@ -1,50 +1,19 @@
-import 'package:objectbox/objectbox.dart';
-
-/// Entity class for storing video library configuration in ObjectBox
-@Entity()
+/// Data model for video library scanning configuration.
 class VideoLibraryConfig {
-  /// Primary key ID
-  @Id()
   int id = 0;
-
-  /// Video Library ID this config belongs to
-  @Index()
   int videoLibraryId;
-
-  /// Include subdirectories when scanning
   bool includeSubdirectories;
-
-  /// Supported file extensions (comma-separated)
   String fileExtensions;
-
-  /// Auto refresh when directory changes
   bool autoRefresh;
-
-  /// Maximum number of files to include
   int maxFileCount;
-
-  /// Sort files by: 'name', 'date', 'size'
   String sortBy;
-
-  /// Sort in ascending order
   bool sortAscending;
-
-  /// Exclude patterns (comma-separated regex patterns)
   String excludePatterns;
-
-  /// Enable auto rules for this library
   bool enableAutoRules;
-
-  /// Directories to scan (comma-separated paths)
   String directories;
-
-  /// Last scan timestamp
   DateTime? lastScanTime;
-
-  /// Number of files found in last scan
   int fileCount;
 
-  /// Creates a new video library config
   VideoLibraryConfig({
     required this.videoLibraryId,
     this.includeSubdirectories = true,
@@ -61,46 +30,82 @@ class VideoLibraryConfig {
     this.fileCount = 0,
   });
 
-  /// Get file extensions as list
-  List<String> get fileExtensionsList {
-    if (fileExtensions.isEmpty) return [];
-    return fileExtensions.split(',').map((e) => e.trim()).toList();
+  factory VideoLibraryConfig.fromDatabaseMap(Map<String, Object?> map) {
+    final lastScanTimeValue = map['last_scan_time'];
+    return VideoLibraryConfig(
+      videoLibraryId: map['video_library_id'] as int? ?? 0,
+      includeSubdirectories: (map['include_subdirectories'] as int? ?? 0) == 1,
+      fileExtensions: map['file_extensions'] as String? ?? '',
+      autoRefresh: (map['auto_refresh'] as int? ?? 0) == 1,
+      maxFileCount: map['max_file_count'] as int? ?? 0,
+      sortBy: map['sort_by'] as String? ?? 'date',
+      sortAscending: (map['sort_ascending'] as int? ?? 0) == 1,
+      excludePatterns: map['exclude_patterns'] as String? ?? '',
+      enableAutoRules: (map['enable_auto_rules'] as int? ?? 0) == 1,
+      directories: map['directories'] as String? ?? '',
+      lastScanTime: lastScanTimeValue == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(lastScanTimeValue as int),
+      fileCount: map['file_count'] as int? ?? 0,
+    )..id = map['id'] as int? ?? 0;
   }
 
-  /// Set file extensions from list
+  Map<String, Object?> toDatabaseMap() {
+    return <String, Object?>{
+      'id': id == 0 ? null : id,
+      'video_library_id': videoLibraryId,
+      'include_subdirectories': includeSubdirectories ? 1 : 0,
+      'file_extensions': fileExtensions,
+      'auto_refresh': autoRefresh ? 1 : 0,
+      'max_file_count': maxFileCount,
+      'sort_by': sortBy,
+      'sort_ascending': sortAscending ? 1 : 0,
+      'exclude_patterns': excludePatterns,
+      'enable_auto_rules': enableAutoRules ? 1 : 0,
+      'directories': directories,
+      'last_scan_time': lastScanTime?.millisecondsSinceEpoch,
+      'file_count': fileCount,
+    };
+  }
+
+  List<String> get fileExtensionsList {
+    if (fileExtensions.isEmpty) {
+      return <String>[];
+    }
+    return fileExtensions.split(',').map((entry) => entry.trim()).toList();
+  }
+
   set fileExtensionsList(List<String> extensions) {
     fileExtensions = extensions.join(',');
   }
 
-  /// Get exclude patterns as list
   List<String> get excludePatternsList {
-    if (excludePatterns.isEmpty) return [];
-    return excludePatterns.split(',').map((e) => e.trim()).toList();
+    if (excludePatterns.isEmpty) {
+      return <String>[];
+    }
+    return excludePatterns.split(',').map((entry) => entry.trim()).toList();
   }
 
-  /// Set exclude patterns from list
   set excludePatternsList(List<String> patterns) {
     excludePatterns = patterns.join(',');
   }
 
-  /// Get directories as list
   List<String> get directoriesList {
-    if (directories.isEmpty) return [];
-    return directories.split(',').map((e) => e.trim()).toList();
+    if (directories.isEmpty) {
+      return <String>[];
+    }
+    return directories.split(',').map((entry) => entry.trim()).toList();
   }
 
-  /// Set directories from list
-  set directoriesList(List<String> dirs) {
-    directories = dirs.join(',');
+  set directoriesList(List<String> values) {
+    directories = values.join(',');
   }
 
-  /// Update scan statistics
   void updateScanStats(int foundFileCount) {
     lastScanTime = DateTime.now();
     fileCount = foundFileCount;
   }
 
-  /// Creates a copy of this config with updated fields
   VideoLibraryConfig copyWith({
     int? videoLibraryId,
     bool? includeSubdirectories,

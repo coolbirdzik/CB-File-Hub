@@ -39,7 +39,7 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
   }
 
   bool _isDarkTheme(AppThemeType theme) {
-    return theme == AppThemeType.dark || theme == AppThemeType.amoled;
+    return theme == AppThemeType.dark;
   }
 
   Future<void> _previewTheme(AppThemeType themeType) async {
@@ -103,7 +103,8 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
                               width: 88,
                               height: 88,
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.surfaceContainerHighest,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
@@ -179,13 +180,14 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
                                   ? const SizedBox(
                                       height: 18,
                                       width: 18,
-                                      child:
-                                          CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
                                     )
                                   : Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(context.tr.themeOnboardingContinue),
+                                        Text(
+                                            context.tr.themeOnboardingContinue),
                                         const SizedBox(width: 8),
                                         const Icon(
                                           PhosphorIconsLight.arrowRight,
@@ -304,4 +306,3 @@ class _ThemeCircleOption extends StatelessWidget {
     );
   }
 }
-

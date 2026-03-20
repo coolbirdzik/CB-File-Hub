@@ -1,4 +1,4 @@
-import 'package:cb_file_manager/models/objectbox/objectbox_database_provider.dart';
+import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 
 /// Interface for database providers
 abstract class IDatabaseProvider {
@@ -7,6 +7,9 @@ abstract class IDatabaseProvider {
 
   /// Check if database is initialized
   bool isInitialized();
+
+  /// Get the last database error message, if any
+  String? getLastErrorMessage();
 
   /// Close the database
   Future<void> close();
@@ -28,6 +31,12 @@ abstract class IDatabaseProvider {
 
   /// Get all unique tags in the database
   Future<Set<String>> getAllUniqueTags();
+
+  /// Get all standalone tags stored in the database
+  Future<Set<String>> getStandaloneTags();
+
+  /// Replace all standalone tags stored in the database
+  Future<bool> replaceStandaloneTags(List<String> tags);
 
   /// Get a string preference
   Future<String?> getStringPreference(String key, {String? defaultValue});
@@ -67,6 +76,34 @@ abstract class IDatabaseProvider {
 
   /// Sync data from the cloud
   Future<bool> syncFromCloud();
+
+  /// Get all user preferences as raw data
+  Future<List<Map<String, dynamic>>> getAllPreferencesRaw();
+
+  /// Get a page of raw user preferences
+  Future<List<Map<String, dynamic>>> getPreferencesRawPage({
+    required int offset,
+    required int limit,
+  });
+
+  /// Get the total number of raw user preferences rows
+  Future<int> getPreferencesRawCount();
+
+  /// Get all file tags as raw data
+  Future<List<Map<String, dynamic>>> getAllFileTagsRaw();
+
+  /// Get a page of raw file tags
+  Future<List<Map<String, dynamic>>> getFileTagsRawPage({
+    required int offset,
+    required int limit,
+  });
+
+  /// Get the total number of raw file tag rows
+  Future<int> getFileTagsRawCount();
+
+  /// Count unique files that have at least one tag.
+  /// Uses a single SQL query (COUNT DISTINCT) instead of loading all file paths.
+  Future<int> countUniqueTaggedFiles();
 }
 
 /// Factory for creating database providers
@@ -74,15 +111,13 @@ class DatabaseProviderFactory {
   /// Create a database provider instance based on type
   static IDatabaseProvider create(DatabaseType type) {
     switch (type) {
-      case DatabaseType.objectBox:
-        return ObjectBoxDatabaseProvider();
-      // Add more cases here for different database implementations
+      case DatabaseType.sqlite:
+        return SqliteDatabaseProvider();
     }
   }
 }
 
 /// Enum for database types
 enum DatabaseType {
-  objectBox,
-  // Add more database types as needed
+  sqlite,
 }

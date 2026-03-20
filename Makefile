@@ -237,7 +237,7 @@ build-macos: clean deps
 	cd $(PROJECT_DIR) && $(FLUTTER) build macos --release
 	@echo "$(BLUE)Creating ZIP package...$(NC)"
 	@mkdir -p $(BUILD_DIR)/macos/portable
-	cd $(BUILD_DIR)/macos/Build/Products/Release && zip -r ../../../portable/CBFileHub-macOS.zip coolbird_tagify.app
+	cd $(BUILD_DIR)/macos/Build/Products/Release && zip -r ../../../portable/CBFileHub-macOS.zip cb_file_hub.app
 	@echo "$(GREEN)macOS build completed!$(NC)"
 	@echo "Output: $(BUILD_DIR)/macos/portable/CBFileHub-macOS.zip"
 

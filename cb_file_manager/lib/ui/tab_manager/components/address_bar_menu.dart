@@ -19,7 +19,11 @@ class AddressBarMenu extends StatelessWidget {
     }
 
     return PopupMenuButton<AddressBarMenuItem>(
-      icon: const Icon(PhosphorIconsLight.dotsThree, size: 20),
+      icon: Icon(
+        PhosphorIconsLight.dotsThree,
+        size: 20,
+        color: Theme.of(context).colorScheme.primary,
+      ),
       tooltip: tooltip ?? 'Tùy chọn',
       onSelected: (item) {
         item.onTap();

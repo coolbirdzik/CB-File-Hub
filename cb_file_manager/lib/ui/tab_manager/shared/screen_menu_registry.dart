@@ -238,10 +238,19 @@ class _TagManagementHelper {
       BuildContext context, String tagName) async {
     try {
       await TagManager.initialize();
-      final tempFilePath =
-          '/temp/tag_creation_placeholder_${DateTime.now().millisecondsSinceEpoch}';
-      await TagManager.addTag(tempFilePath, tagName);
-      await TagManager.removeTag(tempFilePath, tagName);
+      final created = await TagManager.addStandaloneTag(tagName);
+
+      if (!created) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context)!.errorCreatingTag),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

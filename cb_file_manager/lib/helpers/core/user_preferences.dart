@@ -26,9 +26,9 @@ class UserPreferences {
   SharedPreferences? _preferences;
   bool _initialized = false;
 
-  // Database manager for storing preferences in ObjectBox
+  // Database manager for storing preferences in SQLite.
   DatabaseManager? _databaseManager;
-  bool _useObjectBox = true;
+  bool _useDatabaseStorage = true;
 
   // Stream controller for theme changes
   final StreamController<ThemeMode> _themeChangeController =
@@ -54,7 +54,7 @@ class UserPreferences {
   static const String _videoThumbnailTimestampKey = 'video_thumbnail_timestamp';
   static const String _videoThumbnailPercentageKey =
       'video_thumbnail_percentage';
-  static const String _useObjectBoxKey = 'use_objectbox_storage';
+  static const String _useDatabaseStorageKey = 'use_database_storage';
   static const String _columnVisibilityKey = 'column_visibility';
   static const String _showFileTagsKey = 'show_file_tags';
   static const String _previewPaneVisibleKey = 'preview_pane_visible';
@@ -117,34 +117,21 @@ class UserPreferences {
 
   /// Initialize the preferences
   Future<void> init() async {
-    // Skip initialization if already done
-    if (_initialized) return;
+    if (_initialized) {
+      return;
+    }
+
+    _preferences ??= await SharedPreferences.getInstance();
+    _databaseManager ??= DatabaseManager.getInstance();
 
     try {
-      // Khởi tạo SharedPreferences trước
-      _preferences ??= await SharedPreferences.getInstance();
-
-      // Kiểm tra thiết lập hiện tại từ SharedPreferences
-      _useObjectBox = _preferences?.getBool(_useObjectBoxKey) ?? false;
-
-      // Khởi tạo ObjectBox chỉ nếu cần thiết và cẩn thận để tránh vòng lặp
-      if (_useObjectBox) {
-        _databaseManager = DatabaseManager.getInstance();
-
-        // QUAN TRỌNG: Chỉ khởi tạo nếu chưa được khởi tạo
-        // Tránh việc gọi lại như trước đây, chỉ sử dụng phiên bản đã khởi tạo
-        if (_databaseManager != null && !_databaseManager!.isInitialized()) {
-          // Đánh dấu đã khởi tạo trước để tránh vòng lặp
-          _initialized = true;
-        }
-      }
-
+      await _databaseManager!.initialize();
+      _useDatabaseStorage = true;
+      await _preferences?.setBool(_useDatabaseStorageKey, true);
+    } catch (_) {
+      _useDatabaseStorage = false;
+    } finally {
       _initialized = true;
-    } catch (e) {
-      // Fallback to SharedPreferences nếu có lỗi
-      _useObjectBox = false;
-      await _preferences?.setBool(_useObjectBoxKey, false);
-      _initialized = true; // Vẫn đánh dấu là đã khởi tạo để tránh lặp lại
     }
   }
 
@@ -153,9 +140,14 @@ class UserPreferences {
     return _initialized;
   }
 
-  /// Migrate existing preferences from SharedPreferences to ObjectBox
-  Future<void> _migratePreferencesToObjectBox() async {
+  /// Migrates SharedPreferences values into SQLite on first run.
+  // ignore: unused_element
+  Future<void> _migratePreferencesToDatabase() async {
     try {
+      _databaseManager ??= DatabaseManager.getInstance();
+      await _databaseManager!.initialize();
+      _useDatabaseStorage = true;
+
       // Only migrate if not already done
       final migrationDone = await _databaseManager!.getBoolPreference(
         'migration_done',
@@ -246,154 +238,97 @@ class UserPreferences {
         // Mark migration as done
         await _databaseManager!.saveBoolPreference('migration_done', true);
       }
-    } catch (e) {
-      // Fallback to SharedPreferences
-      _useObjectBox = false;
-      await _preferences?.setBool(_useObjectBoxKey, false);
-    }
+    } catch (_) {}
   }
 
-  /// Enable or disable ObjectBox as the preference storage
-  Future<bool> setUseObjectBox(bool useObjectBox) async {
-    if (useObjectBox == _useObjectBox) return true;
-
-    try {
-      // Initialize ObjectBox if we're enabling it
-      if (useObjectBox) {
-        // Make sure database manager is initialized
-        _databaseManager ??= DatabaseManager.getInstance();
-        await _databaseManager!.initialize();
-        await _migratePreferencesToObjectBox();
-      }
-
-      _useObjectBox = useObjectBox;
-      return await _preferences?.setBool(_useObjectBoxKey, useObjectBox) ??
-          false;
-    } catch (e) {
-      return false;
-    }
+  /// Backward-compatible no-op. Preferences are always stored in SQLite.
+  Future<bool> setUseDatabaseStorage(bool useDatabaseStorage) async {
+    // This is now a no-op as we enforce database usage
+    _useDatabaseStorage = true;
+    // We still save the preference for potential future flags or legacy compatibility
+    return await _savePreference<bool>(
+        _useDatabaseStorageKey, _useDatabaseStorage);
   }
 
-  /// Enable or disable ObjectBox as the preference storage
-  Future<bool> setUsingObjectBox(bool useObjectBox) async {
-    if (useObjectBox == _useObjectBox) return true;
-
-    try {
-      // Initialize ObjectBox if we're enabling it
-      if (useObjectBox) {
-        // Make sure database manager is initialized
-        _databaseManager ??= DatabaseManager.getInstance();
-        await _databaseManager!.initialize();
-        await _migratePreferencesToObjectBox();
-      }
-
-      _useObjectBox = useObjectBox;
-      return await _preferences?.setBool(_useObjectBoxKey, useObjectBox) ??
-          false;
-    } catch (e) {
-      return false;
-    }
+  /// Backward-compatible no-op. Preferences are always stored in SQLite.
+  Future<bool> setUsingDatabaseStorage(bool useDatabaseStorage) async {
+    return setUseDatabaseStorage(useDatabaseStorage);
   }
 
   /// Set whether cloud sync is enabled
   Future<bool> setCloudSyncEnabled(bool enabled) async {
     try {
+      _databaseManager ??= DatabaseManager.getInstance();
       await _databaseManager!.initialize();
       _databaseManager!.setCloudSyncEnabled(enabled);
       return true;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  /// Check if we're using ObjectBox for storage
-  bool isUsingObjectBox() {
-    return _useObjectBox;
+  /// Check if we're using database for storage
+  bool isUsingDatabaseStorage() {
+    return true;
   }
 
-  /// Generic method to get a preference value
-  /// Automatically handles SharedPreferences and ObjectBox storage backends
+  /// Generic method to read a preference value from SQLite.
   Future<T?> _getPreference<T>(
     String key, {
     T? defaultValue,
   }) async {
-    if (_useObjectBox && _databaseManager != null) {
-      // Handle ObjectBox storage
-      if (T == int) {
-        return await _databaseManager!.getIntPreference(
-          key,
-          defaultValue: defaultValue as int?,
-        ) as T?;
-      } else if (T == double) {
-        return await _databaseManager!.getDoublePreference(
-          key,
-          defaultValue: defaultValue as double?,
-        ) as T?;
-      } else if (T == bool) {
-        return await _databaseManager!.getBoolPreference(
-          key,
-          defaultValue: defaultValue as bool?,
-        ) as T?;
-      } else if (T == String) {
-        return await _databaseManager!.getStringPreference(
-          key,
-          defaultValue: defaultValue as String?,
-        ) as T?;
-      }
-    } else {
-      // Handle SharedPreferences storage
-      if (T == int) {
-        return _preferences?.getInt(key) as T? ?? defaultValue;
-      } else if (T == double) {
-        return _preferences?.getDouble(key) as T? ?? defaultValue;
-      } else if (T == bool) {
-        return _preferences?.getBool(key) as T? ?? defaultValue;
-      } else if (T == String) {
-        return _preferences?.getString(key) as T? ?? defaultValue;
-      }
+    await init();
+    _databaseManager ??= DatabaseManager.getInstance();
+
+    if (T == int) {
+      return await _databaseManager!.getIntPreference(
+        key,
+        defaultValue: defaultValue as int?,
+      ) as T?;
+    } else if (T == double) {
+      return await _databaseManager!.getDoublePreference(
+        key,
+        defaultValue: defaultValue as double?,
+      ) as T?;
+    } else if (T == bool) {
+      return await _databaseManager!.getBoolPreference(
+        key,
+        defaultValue: defaultValue as bool?,
+      ) as T?;
+    } else if (T == String) {
+      return await _databaseManager!.getStringPreference(
+        key,
+        defaultValue: defaultValue as String?,
+      ) as T?;
     }
     return defaultValue;
   }
 
-  /// Generic method to save a preference value
-  /// Automatically handles SharedPreferences and ObjectBox storage backends
+  /// Generic method to persist a preference value into SQLite.
   Future<bool> _savePreference<T>(
     String key,
     T value,
   ) async {
-    if (_useObjectBox && _databaseManager != null) {
-      // Handle ObjectBox storage
-      if (value is int) {
-        return await _databaseManager!.saveIntPreference(key, value);
-      } else if (value is double) {
-        return await _databaseManager!.saveDoublePreference(key, value);
-      } else if (value is bool) {
-        return await _databaseManager!.saveBoolPreference(key, value);
-      } else if (value is String) {
-        return await _databaseManager!.saveStringPreference(key, value);
-      }
-    } else {
-      // Handle SharedPreferences storage
-      if (value is int) {
-        return await _preferences?.setInt(key, value) ?? false;
-      } else if (value is double) {
-        return await _preferences?.setDouble(key, value) ?? false;
-      } else if (value is bool) {
-        return await _preferences?.setBool(key, value) ?? false;
-      } else if (value is String) {
-        return await _preferences?.setString(key, value) ?? false;
-      }
+    await init();
+    _databaseManager ??= DatabaseManager.getInstance();
+
+    if (value is int) {
+      return _databaseManager!.saveIntPreference(key, value);
+    } else if (value is double) {
+      return _databaseManager!.saveDoublePreference(key, value);
+    } else if (value is bool) {
+      return _databaseManager!.saveBoolPreference(key, value);
+    } else if (value is String) {
+      return _databaseManager!.saveStringPreference(key, value);
     }
     return false;
   }
 
   /// Generic method to delete a preference
   Future<bool> _deletePreference(String key) async {
-    if (_useObjectBox && _databaseManager != null) {
-      return await _databaseManager!.deletePreference(key);
-    } else {
-      return await _preferences?.remove(key) ?? false;
-    }
+    await init();
+    _databaseManager ??= DatabaseManager.getInstance();
+    return _databaseManager!.deletePreference(key);
   }
 
   /// Get image gallery thumbnail size (as grid count - higher means smaller thumbnails)
@@ -1114,8 +1049,8 @@ class UserPreferences {
         // Generate a default path in app documents directory
         final directory = await getApplicationDocumentsDirectory();
         final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-        filePath =
-            path.join(directory.path, 'cb_file_hub_preferences_$timestamp.json');
+        filePath = path.join(
+            directory.path, 'cb_file_hub_preferences_$timestamp.json');
       }
 
       // Write to file
@@ -1190,7 +1125,7 @@ class UserPreferences {
 
       // Export database
       bool databaseExported = false;
-      if (_useObjectBox) {
+      if (_useDatabaseStorage) {
         _databaseManager ??= DatabaseManager.getInstance();
         if (_databaseManager!.isInitialized()) {
           // Get all tags in the system

@@ -257,6 +257,9 @@ abstract class AppLocalizations {
   String get changeTagColor;
   String get deleteTagFromAllFiles;
   String get openInNewTab;
+  String get viewFilesWithTag;
+  String get renameTag;
+  String tagRenamed(String oldTag, String newTag);
   String get openInSplitView;
   String get changeColor;
   String get noFilesWithTag;
@@ -269,13 +272,18 @@ abstract class AppLocalizations {
   String get editTags;
   String get newTagTitle;
   String get enterTagName;
+  String get tagName;
+  String get enterNewTagName;
   String tagAlreadyExists(String tagName);
   String tagCreatedSuccessfully(String tagName);
   String get errorCreatingTag;
   String get tagsSavedSuccessfully;
   String get selectTagToRemove;
+  String get doubleClickToRename;
   String get openingFolder;
   String get folderNotFound;
+  String get refreshTags;
+  String tagsRefreshed(int count);
 
   // Sorting
   String get sort;
@@ -283,6 +291,16 @@ abstract class AppLocalizations {
   String get sortByPopularity;
   String get sortByRecent;
   String get sortBySize;
+
+  // Bulk Selection
+  String get bulkSelect;
+  String get selectAllTags;
+  String selectAllOnAllPages(int totalCount);
+  String get deselectAllTags;
+  String tagsSelected(int count);
+  String bulkDeleteConfirmationTitle();
+  String bulkDeleteConfirmationText(int count);
+  String bulkDeleteSuccess(int count);
   String get sortByDate;
 
   // Gallery
@@ -336,10 +354,12 @@ abstract class AppLocalizations {
   // Additional translations for database settings
   String get databaseSettings;
   String get databaseStorage;
-  String get useObjectBox;
-  String get databaseDescription;
+  String get useDatabaseStorage;
+  String get databaseStorageEnabled;
+  String
+      get objectBoxStorage; // Kept for backward compatibility if needed, or remove if unused
   String get jsonStorage;
-  String get objectBoxStorage;
+  String get databaseDescription;
 
   // Cloud sync
   String get cloudSync;
@@ -349,15 +369,29 @@ abstract class AppLocalizations {
   String get syncFromCloud;
   String get cloudSyncEnabled;
   String get cloudSyncDisabled;
-  String get enableObjectBoxForCloud;
+  String get enableDatabaseForCloud;
 
   // Database statistics
   String get databaseStatistics;
   String get totalUniqueTags;
   String get taggedFiles;
   String get popularTags;
+  String get recentTags;
+  String get selectedTags;
+  String get tagSuggestions;
+  String batchAddTags(int count);
+  String get applyingChanges;
+  String tagsUpdated(int count, int added, int removed);
+  String get advancedDatabaseSettings;
   String get noTagsFound;
   String get refreshStatistics;
+
+  // Raw Data Viewer
+  String get viewRawData;
+  String get rawDataPreferences;
+  String get rawDataTags;
+  String get rawDataDescription;
+  String get noDataFound;
 
   // Import/Export
   String get importExportDatabase;

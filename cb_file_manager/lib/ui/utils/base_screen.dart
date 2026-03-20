@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/ui/drawer.dart';
@@ -157,14 +159,21 @@ class _BaseScreenState extends State<BaseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine background color - use transparent on desktop for acrylic effect
+    final bool isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final Color? resolvedBackgroundColor = widget.backgroundColor ?? (isDesktop ? Colors.transparent : null);
+
     return BlocProvider(
       create: (_) => DrawerCubit()..loadStorageLocations(),
       child: PopScope(
         canPop: true,
         child: Scaffold(
         key: _scaffoldKey, // Use instance-specific key
+        extendBodyBehindAppBar: isDesktop,
         appBar: (widget.showAppBar && !_inAndroidPip)
             ? AppBar(
+                backgroundColor: isDesktop ? Colors.transparent : null,
+                elevation: isDesktop ? 0 : null,
                 title: Text(widget.title),
                 leading: widget.automaticallyImplyLeading
                     ? _buildLeadingIcon(context)
@@ -195,8 +204,11 @@ class _BaseScreenState extends State<BaseScreen> {
             _toggleDrawerPin();
           },
         ),
-        body: widget.body,
-        backgroundColor: widget.backgroundColor,
+        body: Container(
+          color: isDesktop ? Colors.transparent : null,
+          child: widget.body,
+        ),
+        backgroundColor: resolvedBackgroundColor,
         floatingActionButton: widget.floatingActionButton,
         bottomNavigationBar: widget.bottomNavigationBar,
         resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,

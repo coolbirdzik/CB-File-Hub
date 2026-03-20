@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
-import 'package:cb_file_manager/ui/utils/base_screen.dart';
+import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/config/language_controller.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/network/win32_smb_helper.dart';
@@ -11,10 +13,11 @@ import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/ui/screens/settings/database_settings_screen.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/config/theme_config.dart';
+import 'package:cb_file_manager/config/design_system_config.dart';
 import 'package:cb_file_manager/providers/theme_provider.dart';
+import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -29,24 +32,25 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final UserPreferences _preferences = UserPreferences.instance;
   final LanguageController _languageController = LanguageController();
-  late String _currentLanguageCode;
-  late bool _isLoading = true;
+  final DatabaseManager _databaseManager = DatabaseManager.getInstance();
+  String _currentLanguageCode = 'en';
+  bool _isLoading = true;
 
   // Video thumbnail percentage value
-  late int _videoThumbnailPercentage;
+  int _videoThumbnailPercentage = 30;
 
   // Thumbnail generation mode ('fast' or 'custom')
-  late String _thumbnailMode;
+  String _thumbnailMode = 'fast';
 
   // Max concurrent thumbnail generation tasks
-  late int _maxConcurrency;
+  int _maxConcurrency = 4;
 
   // Show file tags setting
-  late bool _showFileTags;
-  late bool _rememberTabWorkspace;
+  bool _showFileTags = true;
+  bool _rememberTabWorkspace = false;
 
   // Use system default app for video (false = in-app player by default)
-  late bool _useSystemDefaultForVideo;
+  bool _useSystemDefaultForVideo = false;
   bool _isThemeExpanded = false;
   bool _isLanguageExpanded = false;
   String _appVersion = '';
@@ -54,10 +58,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const String _appAuthor = 'COOLBIRDZIK - ngtanhung41@gmail.com';
 
   // Cache clearing states
-  final bool _isClearingVideoCache = false;
+  bool _isClearingVideoCache = false;
   bool _isClearingNetworkCache = false;
   bool _isClearingTempFiles = false;
   bool _isClearingCache = false;
+
+  // Database section state
+  bool _isCloudSyncEnabled = false;
+  bool _isSyncingCloud = false;
+  Map<String, int> _popularTags = {};
+  int _totalTagCount = 0;
+  int _totalFileCount = 0;
+  bool _isDatabaseStatsLoading = false;
 
   // Cache info (sizes are on-disk bytes)
   bool _isLoadingCacheInfo = false;
@@ -75,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadPreferences();
     _loadCacheInfo();
     _loadAppInfo();
+    _loadDatabaseStats();
   }
 
   Future<void> _loadAppInfo() async {
@@ -103,7 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
           await _preferences.getUseSystemDefaultForVideo();
-      _preferences.isUsingObjectBox();
+      _preferences.isUsingDatabaseStorage();
 
       if (mounted) {
         setState(() {
@@ -271,6 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _clearVideoThumbnailCache() async {
     setState(() {
+      _isClearingVideoCache = true;
       _isClearingCache = true;
     });
 
@@ -314,6 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } finally {
       if (mounted) {
         setState(() {
+          _isClearingVideoCache = false;
           _isClearingCache = false;
         });
       }
@@ -385,26 +400,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BaseScreen(
-      title: AppLocalizations.of(context)!.settings,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildQuickSettingsSection(),
-                  const SizedBox(height: 24),
-                  _buildMediaSettingsSection(),
-                  const SizedBox(height: 24),
-                  _buildCacheManagementSection(),
-                  const SizedBox(height: 24),
-                  _buildDatabaseSection(),
-                ],
-              ),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: [
+          // Header bar giống như file browser
+          Container(
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(PhosphorIconsLight.arrowLeft),
+                  onPressed: () => _handleBack(context),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(context)!.settings,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
             ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildQuickSettingsSection(),
+                        const SizedBox(height: 24),
+                        _buildMediaSettingsSection(),
+                        const SizedBox(height: 24),
+                        _buildCacheManagementSection(),
+                        const SizedBox(height: 24),
+                        _buildDatabaseSection(),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
+  }
+
+  /// Handle back navigation - close tab or pop navigator
+  void _handleBack(BuildContext context) {
+    // Try to get TabManagerBloc
+    TabManagerBloc? tabBloc;
+    try {
+      tabBloc = context.read<TabManagerBloc>();
+    } catch (_) {
+      tabBloc = null;
+    }
+
+    if (tabBloc != null) {
+      final activeTab = tabBloc.state.activeTab;
+      if (activeTab != null) {
+        // Close the settings tab
+        tabBloc.add(CloseTab(activeTab.id));
+        return;
+      }
+    }
+
+    // Fallback to navigator pop
+    Navigator.of(context).pop();
   }
 
   Widget _buildQuickSettingsSection() {
@@ -876,44 +940,661 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  bool _isDatabaseSectionExpanded = true;
+  bool _isDatabaseSectionExpandedCloudSync = false;
+  bool _isDatabaseSectionExpandedTags = false;
+
   Widget _buildDatabaseSection() {
-    return _buildSectionCard(
-      title: AppLocalizations.of(context)!.databaseSettings,
-      icon: PhosphorIconsLight.database,
-      children: [
-        _buildCompactSettingTile(
-          title: AppLocalizations.of(context)!.databaseSettings,
-          subtitle: AppLocalizations.of(context)!.databaseDescription,
-          icon: PhosphorIconsLight.gear,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const DatabaseSettingsScreen(),
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    PhosphorIconsLight.database,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(context)!.databaseSettings,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: AnimatedRotation(
+                    duration: const Duration(milliseconds: 180),
+                    turns: _isDatabaseSectionExpanded ? 0.5 : 0,
+                    child: const Icon(PhosphorIconsLight.caretDown, size: 16),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isDatabaseSectionExpanded = !_isDatabaseSectionExpanded;
+                    });
+                    if (_isDatabaseSectionExpanded && _totalTagCount == 0) {
+                      _loadDatabaseStats();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          // Quick actions (always visible)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: const Icon(PhosphorIconsLight.uploadSimple, size: 20),
+            title: Text(
+              AppLocalizations.of(context)!.exportSettings,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              AppLocalizations.of(context)!.exportDescription,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(PhosphorIconsLight.caretRight, size: 16),
+            onTap: () => _exportDatabase(context),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: const Icon(PhosphorIconsLight.downloadSimple, size: 20),
+            title: Text(
+              AppLocalizations.of(context)!.importSettings,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              AppLocalizations.of(context)!.importDescription,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(PhosphorIconsLight.caretRight, size: 16),
+            onTap: () => _importDatabase(context),
+          ),
+          // Expanded content
+          if (_isDatabaseSectionExpanded) ...[
+            const Divider(),
+            // Database Type Info
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        PhosphorIconsLight.checkCircle,
+                        size: 16,
+                        color: Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Using SQLite Database',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    AppLocalizations.of(context)!.databaseDescription,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Cloud Sync Section
+            ExpansionTile(
+              initiallyExpanded: _isDatabaseSectionExpandedCloudSync,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  _isDatabaseSectionExpandedCloudSync = expanded;
+                });
+              },
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              leading: const Icon(PhosphorIconsLight.cloudArrowUp, size: 20),
+              title: const Text(
+                'Cloud Sync',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              subtitle: Text(
+                _isCloudSyncEnabled ? 'Enabled' : 'Disabled',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              trailing: Switch(
+                value: _isCloudSyncEnabled,
+                onChanged: _toggleCloudSync,
+              ),
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sync your tags and albums across devices',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isCloudSyncEnabled && !_isSyncingCloud
+                                  ? _syncToCloud
+                                  : null,
+                              icon: _isSyncingCloud
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(PhosphorIconsLight.cloudArrowUp, size: 16),
+                              label: Text(AppLocalizations.of(context)!.upload, style: const TextStyle(fontSize: 12)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isCloudSyncEnabled && !_isSyncingCloud
+                                  ? _syncFromCloud
+                                  : null,
+                              icon: const Icon(PhosphorIconsLight.cloudArrowDown, size: 16),
+                              label: Text(AppLocalizations.of(context)!.download, style: const TextStyle(fontSize: 12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            // Popular Tags + Stats Section
+            if (_isDatabaseStatsLoading)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        icon: PhosphorIconsLight.tag,
+                        label: AppLocalizations.of(context)!.totalUniqueTags,
+                        value: _totalTagCount.toString(),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        icon: PhosphorIconsLight.file,
+                        label: AppLocalizations.of(context)!.taggedFiles,
+                        value: _totalFileCount.toString(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_popularTags.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppLocalizations.of(context)!.popularTags,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _popularTags.entries.map((entry) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  entry.key,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${entry.value}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              // Open Advanced Database Settings
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: OutlinedButton.icon(
+                  onPressed: _openAdvancedDatabaseSettings,
+                  icon: const Icon(PhosphorIconsLight.gear, size: 16),
+                  label: Text(AppLocalizations.of(context)!.advancedDatabaseSettings),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadDatabaseStats() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isDatabaseStatsLoading = true;
+    });
+
+    try {
+      await _databaseManager.initialize();
+
+      // Load cloud sync state
+      _isCloudSyncEnabled = _databaseManager.isCloudSyncEnabled();
+
+      // Get all unique tags
+      final allTags = await _databaseManager.getAllUniqueTags();
+      if (!mounted) return;
+
+      _totalTagCount = allTags.length;
+
+      // Count unique files with at least one tag using a single efficient SQL query
+      // (replaces the previous O(n) loop that called findFilesByTag per tag)
+      _totalFileCount = await _databaseManager.countUniqueTaggedFiles();
+
+      // Get popular tags (top 5)
+      _popularTags = await TagManager.instance.getPopularTags(limit: 5);
+    } catch (e) {
+      debugPrint('Error loading database stats: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDatabaseStatsLoading = false;
+        });
+      }
+    }
+  }
+
+  void _openAdvancedDatabaseSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const DatabaseSettingsScreen(),
+      ),
+    );
+  }
+
+  Future<void> _toggleCloudSync(bool value) async {
+    try {
+      _databaseManager.setCloudSyncEnabled(value);
+      await _preferences.setCloudSyncEnabled(value);
+      if (mounted) {
+        setState(() {
+          _isCloudSyncEnabled = value;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(value ? AppLocalizations.of(context)!.cloudSyncEnabled : AppLocalizations.of(context)!.cloudSyncDisabled),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling cloud sync: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncToCloud() async {
+    if (!_isCloudSyncEnabled) return;
+    setState(() => _isSyncingCloud = true);
+    try {
+      final success = await _databaseManager.syncToCloud();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'Synced to cloud successfully' : 'Failed to sync to cloud'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error syncing to cloud: $e');
+    } finally {
+      if (mounted) setState(() => _isSyncingCloud = false);
+    }
+  }
+
+  Future<void> _syncFromCloud() async {
+    if (!_isCloudSyncEnabled) return;
+    setState(() => _isSyncingCloud = true);
+    try {
+      final success = await _databaseManager.syncFromCloud();
+      if (success) {
+        await _loadDatabaseStats();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'Synced from cloud successfully' : 'Failed to sync from cloud'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error syncing from cloud: $e');
+    } finally {
+      if (mounted) setState(() => _isSyncingCloud = false);
+    }
+  }
+
+  Future<void> _exportDatabase(BuildContext context) async {
+    try {
+      String? saveLocation = await FilePicker.platform.saveFile(
+        dialogTitle: AppLocalizations.of(context)!.saveDatabaseExport,
+        fileName:
+            'cb_file_hub_db_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (saveLocation != null) {
+        final dbManager = DatabaseManager.getInstance();
+        final filePath = await dbManager.exportDatabase(customPath: saveLocation);
+        if (filePath != null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(AppLocalizations.of(context)!.exportSuccess + filePath),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(AppLocalizations.of(context)!.exportFailed),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.errorExporting + e.toString()),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importDatabase(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final filePath = result.files.single.path!;
+        
+        // Show loading dialog
+        if (!mounted) return;
+        
+        // Store the navigator key to close dialog later
+        late NavigatorState navigator;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            navigator = Navigator.of(dialogContext);
+            return PopScope(
+              canPop: false,
+              child: AlertDialog(
+                content: Row(
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(width: 20),
+                    const Text('Importing database...'),
+                  ],
+                ),
               ),
             );
           },
-        ),
-        _buildCompactSettingTile(
-          title: AppLocalizations.of(context)!.exportSettings,
-          subtitle: AppLocalizations.of(context)!.exportDescription,
-          icon: PhosphorIconsLight.uploadSimple,
-          onTap: _exportSettings,
-        ),
-        _buildCompactSettingTile(
-          title: AppLocalizations.of(context)!.importSettings,
-          subtitle: AppLocalizations.of(context)!.importDescription,
-          icon: PhosphorIconsLight.downloadSimple,
-          onTap: _importSettings,
-        ),
-        _buildCompactSettingTile(
-          title: AppLocalizations.of(context)!.settingsData,
-          subtitle: AppLocalizations.of(context)!.viewManageSettings,
-          icon: PhosphorIconsLight.chartPie,
-          onTap: _showSettingsData,
-        ),
-      ],
-    );
+        );
+
+        try {
+          final dbManager = DatabaseManager.getInstance();
+          
+          // Use skipFileExistenceCheck: true to allow importing tags for files
+          // that don't exist yet (e.g., network drives, files to be added later)
+          final success = await dbManager.importDatabase(
+            filePath,
+            skipFileExistenceCheck: true,
+          );
+
+          // Close loading dialog
+          if (mounted) {
+            navigator.pop();
+          }
+
+          if (success) {
+            // Clear TagManager cache after successful import to ensure UI refreshes
+            // This fixes the issue where background shows empty after import
+            try {
+              // Clear the static cache in TagManager
+              TagManager.clearCache();
+              debugPrint('SettingsScreen: Cleared TagManager cache after import');
+            } catch (e) {
+              debugPrint('SettingsScreen: Error clearing cache: $e');
+            }
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context)!.importSuccess),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context)!.importFailed),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          // Close loading dialog on error
+          if (mounted) {
+            try {
+              navigator.pop();
+            } catch (_) {}
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(AppLocalizations.of(context)!.errorImporting + e.toString()),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.importCancelled),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle picker errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.errorImporting + e.toString()),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSectionCard({
@@ -1030,6 +1711,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final currentTheme = themeProvider.currentTheme;
         final currentThemeName =
             ThemeConfig.themeNames[currentTheme] ?? currentTheme.name;
+        final currentAccent = themeProvider.currentAccentColor;
+        final currentAccentName =
+            ThemeConfig.accentNames[currentAccent] ?? currentAccent.name;
+        final showDesktopAcrylicControl =
+            DesignSystemConfig.enableDesktopAcrylicWindowBackground;
 
         return Theme(
           data: theme.copyWith(dividerColor: Colors.transparent),
@@ -1050,7 +1736,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             subtitle: Text(
-              currentThemeName,
+              '$currentThemeName • Accent: $currentAccentName',
               style: TextStyle(
                 fontSize: 12,
                 color: theme.colorScheme.onSurfaceVariant,
@@ -1063,26 +1749,335 @@ class _SettingsScreenState extends State<SettingsScreen> {
               turns: _isThemeExpanded ? 0.5 : 0,
               child: const Icon(PhosphorIconsLight.caretDown, size: 16),
             ),
-            children: AppThemeType.values.map((themeType) {
-              final title = ThemeConfig.themeNames[themeType] ?? themeType.name;
-              return RadioListTile<AppThemeType>(
-                dense: true,
-                value: themeType,
-                groupValue: currentTheme,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                title: Text(
-                  title,
-                  style: const TextStyle(fontSize: 13),
-                ),
-                onChanged: (value) {
-                  if (value == null) return;
-                  context.read<ThemeProvider>().setTheme(value);
-                },
-              );
-            }).toList(growable: false),
+            children: [
+              ...AppThemeType.values.map((themeType) {
+                final title =
+                    ThemeConfig.themeNames[themeType] ?? themeType.name;
+                return RadioListTile<AppThemeType>(
+                  dense: true,
+                  value: themeType,
+                  groupValue: currentTheme,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    context.read<ThemeProvider>().setTheme(value);
+                  },
+                );
+              }),
+              _buildAccentColorControl(themeProvider),
+              if (showDesktopAcrylicControl) ...[
+                _buildBackdropModeControl(themeProvider),
+                _buildDesktopAcrylicStrengthControl(themeProvider),
+              ],
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAccentColorControl(ThemeProvider themeProvider) {
+    final selectedAccent = themeProvider.currentAccentColor;
+    final selectedAccentName =
+        ThemeConfig.accentNames[selectedAccent] ?? selectedAccent.name;
+    final accents =
+        ThemeConfig.accentSeedColors.entries.toList(growable: false);
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Accent Color',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Current accent: $selectedAccentName',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: accents.map((entry) {
+              final accent = entry.key;
+              final color = entry.value;
+              final isSelected = accent == selectedAccent;
+              return Tooltip(
+                message: ThemeConfig.accentNames[accent] ?? accent.name,
+                child: InkWell(
+                  onTap: () => context.read<ThemeProvider>().setAccentColor(
+                        accent,
+                      ),
+                  borderRadius: BorderRadius.circular(99),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.18),
+                                blurRadius: 6,
+                                spreadRadius: 0.2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBackdropModeControl(ThemeProvider themeProvider) {
+    final theme = Theme.of(context);
+    final mode = themeProvider.backdropMode;
+    final imagePath = themeProvider.backdropImagePath;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Backdrop Mode',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            mode == AcrylicBackdropMode.wallpaper
+                ? 'Using system wallpaper as backdrop.'
+                : 'Using system dynamic acrylic backdrop.',
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildModeChip(
+                label: 'Dynamic',
+                icon: PhosphorIconsLight.monitor,
+                isSelected: mode == AcrylicBackdropMode.dynamic,
+                onTap: () =>
+                    themeProvider.setBackdropMode(AcrylicBackdropMode.dynamic),
+              ),
+              const SizedBox(width: 8),
+              _buildModeChip(
+                label: 'Wallpaper',
+                icon: PhosphorIconsLight.image,
+                isSelected: mode == AcrylicBackdropMode.wallpaper,
+                onTap: () => themeProvider
+                    .setBackdropMode(AcrylicBackdropMode.wallpaper),
+              ),
+            ],
+          ),
+          if (mode == AcrylicBackdropMode.wallpaper) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    imagePath != null && imagePath.isNotEmpty
+                        ? imagePath.split(Platform.pathSeparator).last
+                        : 'No system wallpaper detected',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 30,
+                  child: OutlinedButton.icon(
+                    onPressed: () => themeProvider.refreshSystemWallpaper(),
+                    icon: const Icon(PhosphorIconsLight.arrowsClockwise,
+                        size: 14),
+                    label:
+                        const Text('Refresh', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                SizedBox(
+                  height: 30,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.image,
+                        allowMultiple: false,
+                      );
+                      if (result != null &&
+                          result.files.isNotEmpty &&
+                          result.files.first.path != null) {
+                        await themeProvider
+                            .setBackdropImagePath(result.files.first.path);
+                      }
+                    },
+                    icon: const Icon(PhosphorIconsLight.folderOpen, size: 14),
+                    label: const Text('Custom', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (imagePath != null && imagePath.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  height: 80,
+                  width: double.infinity,
+                  child: Image.file(
+                    File(imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: theme.colorScheme.errorContainer,
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Image not found',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopAcrylicStrengthControl(ThemeProvider themeProvider) {
+    final value = themeProvider.desktopAcrylicStrength;
+    final percentage = (value * 100).round();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Desktop Acrylic Strength',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Adjust blur and tint intensity for desktop backdrop ($percentage%).',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Slider(
+            min: 0,
+            max: 2,
+            divisions: 20,
+            value: value,
+            label: '$percentage%',
+            onChanged: (nextValue) {
+              context.read<ThemeProvider>().setDesktopAcrylicStrength(
+                    nextValue,
+                    persist: false,
+                  );
+            },
+            onChangeEnd: (nextValue) {
+              context.read<ThemeProvider>().setDesktopAcrylicStrength(
+                    nextValue,
+                    persist: true,
+                  );
+            },
+          ),
+        ],
+      ),
     );
   }
 

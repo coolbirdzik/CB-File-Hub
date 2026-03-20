@@ -99,14 +99,18 @@ class GalleryListView extends StatelessWidget {
             margin: EdgeInsets.zero,
             decoration: BoxDecoration(
               color: isSelected
-                  ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                  ? theme.colorScheme.primary.withValues(alpha: 0.08)
                   : Colors.transparent,
             ),
             child: listTile,
           );
         } else {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: listTile,
           );
         }

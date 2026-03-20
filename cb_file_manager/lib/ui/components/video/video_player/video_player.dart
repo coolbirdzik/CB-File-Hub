@@ -688,12 +688,6 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
       final userPreferences = UserPreferences.instance;
       await userPreferences.init();
 
-      // Enable ObjectBox for persistent storage
-      if (!userPreferences.isUsingObjectBox()) {
-        await userPreferences.setUseObjectBox(true);
-        debugPrint('Enabled ObjectBox for UserPreferences storage');
-      }
-
       final savedVolume = await userPreferences.getVideoPlayerVolume();
       _lastVolume = savedVolume > 0 ? savedVolume : _lastVolume;
       final savedMuted = await userPreferences.getVideoPlayerMute();
@@ -1869,8 +1863,8 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child:
-                    const Icon(PhosphorIconsLight.musicNote, size: 80, color: Colors.white),
+                child: const Icon(PhosphorIconsLight.musicNote,
+                    size: 80, color: Colors.white),
               ),
               const SizedBox(height: 32),
               Text(
@@ -1924,7 +1918,8 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
             const SizedBox(width: 16),
             IconButton(
               onPressed: () => _player!.next(),
-              icon: const Icon(PhosphorIconsLight.skipForward, color: Colors.white, size: 32),
+              icon: const Icon(PhosphorIconsLight.skipForward,
+                  color: Colors.white, size: 32),
             ),
           ],
         );
@@ -2674,7 +2669,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
           return VideoPlayerControlButton(
             icon: isMuted
                 ? PhosphorIconsLight.speakerSlash
-                : (vol < 50 ? PhosphorIconsLight.speakerLow : PhosphorIconsLight.speakerHigh),
+                : (vol < 50
+                    ? PhosphorIconsLight.speakerLow
+                    : PhosphorIconsLight.speakerHigh),
             onPressed: _toggleMute,
             enabled: true,
             tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -2690,7 +2687,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
           return VideoPlayerControlButton(
             icon: isMuted
                 ? PhosphorIconsLight.speakerSlash
-                : (vol < 0.5 ? PhosphorIconsLight.speakerLow : PhosphorIconsLight.speakerHigh),
+                : (vol < 0.5
+                    ? PhosphorIconsLight.speakerLow
+                    : PhosphorIconsLight.speakerHigh),
             onPressed: _toggleMute,
             enabled: true,
             tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -2989,7 +2988,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
         valueListenable: _vlcController!,
         builder: (context, v, _) {
           return VideoPlayerControlButton(
-            icon: v.isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
+            icon: v.isPlaying
+                ? PhosphorIconsLight.pause
+                : PhosphorIconsLight.play,
             onPressed: _togglePlayPause,
             size: 40,
             padding: 10,
@@ -3002,7 +3003,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
         valueListenable: _exoController!,
         builder: (context, v, _) {
           return VideoPlayerControlButton(
-            icon: v.isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
+            icon: v.isPlaying
+                ? PhosphorIconsLight.pause
+                : PhosphorIconsLight.play,
             onPressed: _togglePlayPause,
             size: 40,
             padding: 10,
@@ -3017,7 +3020,8 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
         builder: (context, snapshot) {
           final isPlaying = snapshot.data ?? _player!.state.playing;
           return VideoPlayerControlButton(
-            icon: isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
+            icon:
+                isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
             onPressed: _togglePlayPause,
             size: 40,
             padding: 10,
@@ -3050,7 +3054,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
               return VideoPlayerControlButton(
                 icon: isMuted
                     ? PhosphorIconsLight.speakerSlash
-                    : (vol < 50 ? PhosphorIconsLight.speakerLow : PhosphorIconsLight.speakerHigh),
+                    : (vol < 50
+                        ? PhosphorIconsLight.speakerLow
+                        : PhosphorIconsLight.speakerHigh),
                 onPressed: _toggleMute,
                 enabled: true,
                 tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -3066,7 +3072,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
               return VideoPlayerControlButton(
                 icon: isMuted
                     ? PhosphorIconsLight.speakerSlash
-                    : (vol < 0.5 ? PhosphorIconsLight.speakerLow : PhosphorIconsLight.speakerHigh),
+                    : (vol < 0.5
+                        ? PhosphorIconsLight.speakerLow
+                        : PhosphorIconsLight.speakerHigh),
                 onPressed: _toggleMute,
                 enabled: true,
                 tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -4881,8 +4889,3 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
     }
   }
 }
-
-
-
-
-

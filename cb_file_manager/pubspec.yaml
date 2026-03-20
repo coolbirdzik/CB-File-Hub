@@ -44,13 +44,13 @@ dependencies:
   diacritic: ^0.1.6 # Vietnamese text normalization
   # FTP connection - using custom implementation
 
-  # ObjectBox database dependencies
-  objectbox: ^4.3.0
-  objectbox_flutter_libs: ^4.3.0
+  sqflite: ^2.4.2
+  sqflite_common: ^2.5.5
+  sqflite_common_ffi: ^2.3.6
 
   # Media Kit packages for cross-platform video playback (including Windows)
   media_kit: ^1.1.11 # Primary package
-  media_kit_video: ^1.2.5 # Video widget
+  media_kit_video: ^1.3.1 # Video widget (1.3.1 fixes Windows crash: notify VideoOutput.Resize on platform thread)
   media_kit_native_event_loop: ^1.0.9 # Support for platforms
   media_kit_libs_windows_video: ^1.0.11 # Windows video support
   media_kit_libs_android_video: ^1.3.7 # Android video support
@@ -76,6 +76,7 @@ dependencies:
   uuid: ^4.0.0
   flutter_staggered_grid_view: ^0.7.0
   logger: ^2.0.0
+  fluent_ui: ^4.13.0
 
   ffi: any
   network_info_plus: ^6.1.4
@@ -98,7 +99,6 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^2.0.0
   build_runner: ^2.4.6
-  objectbox_generator: ^4.2.0
 
 # Ghi đè các phiên bản gói phụ thuộc để giải quyết xung đột
 dependency_overrides:

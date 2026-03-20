@@ -138,54 +138,88 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     _localizations = localizations; // Initialize localizations field
     final size = MediaQuery.of(context).size;
 
+    // Match home_screen background pattern
+    final isLightMode = theme.brightness == Brightness.light;
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final double desktopLightAlpha = isDesktopPlatform ? 0.42 : 1.0;
+    final backgroundGradientColors = isLightMode
+        ? <Color>[
+            theme.colorScheme.surfaceContainerLowest
+                .withValues(alpha: desktopLightAlpha),
+            theme.colorScheme.surfaceContainerLow
+                .withValues(alpha: desktopLightAlpha),
+            Color.alphaBlend(
+              theme.colorScheme.primary.withValues(alpha: 0.02),
+              theme.colorScheme.surfaceContainer
+                  .withValues(alpha: desktopLightAlpha),
+            ).withValues(alpha: desktopLightAlpha),
+          ]
+        : <Color>[];
+    final darkBackgroundColor =
+        isDesktopPlatform ? theme.colorScheme.surface.withValues(alpha: 0.30) : theme.colorScheme.surface;
+
     return Scaffold(
+      backgroundColor: isDesktopPlatform
+          ? Colors.transparent
+          : (isLightMode
+              ? theme.colorScheme.surfaceContainerLowest
+              : theme.scaffoldBackgroundColor),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.colorScheme.surface,
-              theme.colorScheme.surface.withValues(alpha: 0.8),
-              theme.colorScheme.primaryContainer.withValues(alpha: 0.1),
-            ],
-          ),
-        ),
+        decoration: isDesktopPlatform
+            ? const BoxDecoration(color: Colors.transparent)
+            : (isLightMode
+                ? BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: backgroundGradientColors,
+                    ),
+                  )
+                : BoxDecoration(
+                    color: darkBackgroundColor,
+                  )),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
             child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: size.width > 800 ? 48 : 20,
-                vertical: 32,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Welcome section
-                      _buildWelcomeSection(theme),
-                      const SizedBox(height: 40),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome section - full width
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: size.width > 800 ? 32 : 16,
+                      vertical: 24,
+                    ),
+                    child: _buildWelcomeSection(theme, isLightMode, isDesktopPlatform),
+                  ),
 
-                      // Gallery actions
-                      _buildGalleryActions(theme, localizations),
-                      const SizedBox(height: 40),
-
-                      // Featured albums
-                      if (_featuredAlbums.isNotEmpty || _loadingFeaturedAlbums)
-                        _buildFeaturedAlbums(theme),
-                      if (_featuredAlbums.isNotEmpty || _loadingFeaturedAlbums)
+                  // Gallery actions
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: size.width > 800 ? 48 : 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildGalleryActions(theme, localizations),
                         const SizedBox(height: 40),
 
-                      // Stats overview
-                      _buildStatsOverview(theme),
-                      const SizedBox(height: 32),
-                    ],
+                        // Featured albums
+                        if (_featuredAlbums.isNotEmpty || _loadingFeaturedAlbums)
+                          _buildFeaturedAlbums(theme),
+                        if (_featuredAlbums.isNotEmpty || _loadingFeaturedAlbums)
+                          const SizedBox(height: 40),
+
+                        // Stats overview
+                        _buildStatsOverview(theme),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -194,49 +228,47 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     );
   }
 
-  Widget _buildWelcomeSection(ThemeData theme) {
+  Widget _buildWelcomeSection(ThemeData theme, bool isLightMode, bool isDesktopPlatform) {
     final cs = theme.colorScheme;
+    final welcomeGradientColors = isLightMode
+        ? <Color>[
+            Color.alphaBlend(
+              cs.primary.withValues(alpha: 0.09),
+              cs.surfaceContainerHigh,
+            ).withValues(alpha: isDesktopPlatform ? 0.44 : 1.0),
+            Color.alphaBlend(
+              cs.primary.withValues(alpha: 0.05),
+              cs.surfaceContainer,
+            ).withValues(alpha: isDesktopPlatform ? 0.40 : 1.0),
+          ]
+        : <Color>[];
+    final darkWelcomeColor = isDesktopPlatform
+        ? cs.surfaceContainerHigh.withValues(alpha: 0.52)
+        : cs.surfaceContainerHigh;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            cs.primaryContainer,
-            cs.primaryContainer.withValues(alpha: 0.8),
-          ],
-        ),
+        color: isLightMode ? null : darkWelcomeColor,
+        gradient: isLightMode
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: welcomeGradientColors,
+              )
+            : null,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: cs.outline.withValues(alpha: 0.1),
-          width: 1,
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      cs.primary,
-                      cs.primary.withValues(alpha: 0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  PhosphorIconsLight.images,
-                  color: cs.onPrimary,
-                  size: 28,
-                ),
+              Icon(
+                PhosphorIconsLight.images,
+                color: cs.primary,
+                size: 32,
               ),
               const SizedBox(width: 20),
               Expanded(
@@ -246,15 +278,15 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                     Text(
                       _localizations.galleryHub,
                       style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: cs.onPrimaryContainer,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       _localizations.managePhotosAndAlbums,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onPrimaryContainer.withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
@@ -266,14 +298,11 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 8,
+                    vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: cs.surface.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: cs.outline.withValues(alpha: 0.2),
-                    ),
+                    color: cs.surface.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
                     children: [
@@ -453,31 +482,17 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
             child: Container(
               padding: EdgeInsets.all(cardPadding),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
+                color: theme.colorScheme.surface.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: EdgeInsets.all(iconPadding),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: gradientColors,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: iconSize,
-                      color: Colors.white,
-                    ),
+                  Icon(
+                    icon,
+                    size: iconSize + 4,
+                    color: gradientColors[0],
                   ),
                   SizedBox(height: spacing),
                   Flexible(
@@ -651,42 +666,25 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+            color: theme.colorScheme.surface.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.1),
-            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          theme.colorScheme.secondary,
-                          theme.colorScheme.secondary.withValues(alpha: 0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      PhosphorIconsLight.folder,
-                      size: 20,
-                      color: theme.colorScheme.onSecondary,
-                    ),
+                  Icon(
+                    PhosphorIconsLight.folder,
+                    size: 22,
+                    color: theme.colorScheme.secondary,
                   ),
                   const Spacer(),
                   PopupMenuButton<String>(
                     icon: Icon(
                       PhosphorIconsLight.dotsThreeVertical,
                       size: 16,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     onSelected: (value) {
                       if (value == 'remove') {
@@ -698,7 +696,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                         value: 'remove',
                         child: Row(
                           children: [
-                            Icon(PhosphorIconsLight.star, size: 16),
+                            const Icon(PhosphorIconsLight.star, size: 16),
                             const SizedBox(width: 8),
                             Text(_localizations.removeFromFeatured),
                           ],
@@ -728,7 +726,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                         album.description!,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.7),
+                              .withValues(alpha: 0.6),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -748,11 +746,8 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: theme.colorScheme.surface.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

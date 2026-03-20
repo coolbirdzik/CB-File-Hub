@@ -10,31 +10,25 @@ import 'package:cb_file_manager/helpers/tags/batch_tag_manager.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'dart:ui' as ui; // Import for ImageFilter
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
-import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import '../../utils/route.dart';
 import '../core/tab_manager.dart';
 import '../core/tab_data.dart';
 
 /// Opens a new tab with search results for the selected tag
 void _openTagSearchTab(BuildContext context, String tag) {
-  // Create a unique system ID for this tag search
   final searchSystemId = UriUtils.buildTagSearchPath(tag);
   final tabName = 'Tag: $tag';
 
-  // Get tab manager
   final tabBloc = BlocProvider.of<TabManagerBloc>(context);
 
-  // Check if this tab already exists
   final existingTab = tabBloc.state.tabs.firstWhere(
     (tab) => tab.path == searchSystemId,
     orElse: () => TabData(id: '', name: '', path: ''),
   );
 
   if (existingTab.id.isNotEmpty) {
-    // If tab exists, switch to it
     tabBloc.add(SwitchToTab(existingTab.id));
   } else {
-    // Otherwise, create a new tab for this tag search
     tabBloc.add(
       AddTab(
         path: searchSystemId,
@@ -47,38 +41,28 @@ void _openTagSearchTab(BuildContext context, String tag) {
 
 /// Dialog for adding a tag to a file
 void showAddTagToFileDialog(BuildContext context, String filePath) {
-  // Get screen size for responsive dialog sizing
   final Size screenSize = MediaQuery.of(context).size;
-  final double dialogWidth = screenSize.width * 0.5; // 50% of screen width
-  final double dialogHeight = screenSize.height * 0.6; // 60% of screen height
+  final double dialogWidth = screenSize.width * 0.5;
+  final double dialogHeight = screenSize.height * 0.6;
 
-  // Function to directly refresh the UI in parent components
   void refreshParentUI(BuildContext dialogContext, String filePath,
       {bool preserveScroll = true}) {
-    // Clear tag cache immediately
     TagManager.clearCache();
-
-    // Notify the application about tag changes so any listening components can update
-    // Add a special prefix if we need to preserve scroll position
     if (preserveScroll) {
       TagManager.instance.notifyTagChanged("preserve_scroll:$filePath");
     } else {
       TagManager.instance.notifyTagChanged(filePath);
     }
-
-    // Also send a direct notification without prefix to ensure it's caught
     TagManager.instance.notifyTagChanged(filePath);
-
-    // Add a global notification to ensure all listeners are triggered
     TagManager.instance.notifyTagChanged("global:tag_updated");
   }
 
+  late TagManagementSection _tagSection;
+  bool _tagSectionReady = false;
+
   showDialog(
     context: context,
-    builder: (context) {
-      // Create a reference to the TagManagementSection widget
-      late TagManagementSection tagManagementSection;
-
+    builder: (dialogContext) {
       return StatefulBuilder(
         builder: (context, setState) {
           return BackdropFilter(
@@ -86,14 +70,9 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
             child: AlertDialog(
               title: Text(
                 AppLocalizations.of(context)!.addTag,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               content: Container(
                 width: double.maxFinite,
@@ -104,15 +83,17 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                 child: SingleChildScrollView(
-                  child: Builder(
-                    builder: (context) {
-                      tagManagementSection = TagManagementSection(
-                        filePath: filePath,
-                        onTagsUpdated: () {
-                          refreshParentUI(context, filePath);
-                        },
-                      );
-                      return tagManagementSection;
+                  child: TagManagementSection(
+                    filePath: filePath,
+                    onTagsUpdated: () {
+                      refreshParentUI(context, filePath);
+                    },
+                    onPendingChangesChanged: () {
+                      setState(() {});
+                    },
+                    onSectionReady: (section) {
+                      _tagSection = section;
+                      _tagSectionReady = true;
                     },
                   ),
                 ),
@@ -120,42 +101,43 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
               actions: [
                 TextButton(
                   onPressed: () {
-                    // Discard changes
-                    tagManagementSection.discardChanges();
-                    RouteUtils.safePopDialog(context);
+                    Navigator.of(context, rootNavigator: true).pop();
                   },
                   style: TextButton.styleFrom(
                     textStyle: const TextStyle(fontSize: 16),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
-                  child:
-                      Text(AppLocalizations.of(context)!.cancel.toUpperCase()),
+                  child: Text(AppLocalizations.of(context)!.close.toUpperCase()),
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    // Save changes
-                    tagManagementSection.saveChanges();
+                    final l10n = AppLocalizations.of(context)!;
+                    debugPrint('SAVE: pressed, _tagSectionReady=$_tagSectionReady');
 
-                    // Make sure to notify the parent UI of changes
-                    refreshParentUI(context, filePath);
+                    if (!_tagSectionReady) {
+                      debugPrint('SAVE: section not ready');
+                      return;
+                    }
 
-                    // Show success notification
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(AppLocalizations.of(context)!
-                            .tagsSavedSuccessfully),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-
-                    // Close the dialog
-                    RouteUtils.safePopDialog(context);
+                    try {
+                      debugPrint('SAVE: calling saveChanges');
+                      await _tagSection.saveChanges();
+                      debugPrint('SAVE: save done, closing');
+                      refreshParentUI(context, filePath);
+                      Navigator.of(context, rootNavigator: true).pop();
+                    } catch (e) {
+                      debugPrint('SAVE: error=$e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.errorSavingTags(e.toString())),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     textStyle: const TextStyle(fontSize: 16),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
                   child: Text(AppLocalizations.of(context)!.save.toUpperCase()),
                 ),
@@ -232,32 +214,20 @@ void showDeleteTagDialog(
                   onPressed: () async {
                     if (selectedTag != null) {
                       try {
-                        // First remove the tag directly for immediate effect
                         await TagManager.removeTag(filePath, selectedTag!);
-
-                        // Clear tag cache to ensure fresh data
                         TagManager.clearCache();
 
                         if (context.mounted) {
                           try {
-                            // Try to notify bloc to update UI if available
                             final bloc = BlocProvider.of<FolderListBloc>(
                                 context,
                                 listen: false);
-
-                            // Only notify about the specific tag removal
-                            // Do NOT refresh the entire list
                             bloc.add(RemoveTagFromFile(filePath, selectedTag!));
-                          } catch (e) {
-                            // Bloc not available in this context - it's okay, just continue
-                          }
+                          } catch (e) {}
 
-                          // Directly notify with a special prefix to indicate
-                          // this is just a tag change and shouldn't trigger a full reload
                           TagManager.instance
                               .notifyTagChanged("tag_only:$filePath");
 
-                          // Show confirmation
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(AppLocalizations.of(context)!
@@ -302,10 +272,9 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   List<String> tagSuggestions = [];
   List<String> selectedTags = [];
 
-  // Get screen size for responsive dialog sizing - match single tag dialog
   final Size screenSize = MediaQuery.of(context).size;
-  final double dialogWidth = screenSize.width * 0.5; // 50% of screen width
-  final double dialogHeight = screenSize.height * 0.6; // 60% of screen height
+  final double dialogWidth = screenSize.width * 0.5;
+  final double dialogHeight = screenSize.height * 0.6;
 
   void updateTagSuggestions(String text) async {
     if (text.isEmpty) {
@@ -313,13 +282,11 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
       return;
     }
 
-    // Get tag suggestions based on current input
     final suggestions = await TagManager.instance.searchTags(text);
     tagSuggestions =
         suggestions.where((tag) => !selectedTags.contains(tag)).toList();
   }
 
-  // Function to add a tag directly
   void addTag(String tag) {
     if (tag.trim().isEmpty) return;
 
@@ -329,14 +296,11 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     }
   }
 
-  // Function to directly refresh the UI in parent components
   void refreshParentUIBatch() {
-    // Clear tag cache immediately
     TagManager.clearCache();
 
     try {
       if (context.mounted && selectedFiles.isNotEmpty) {
-        // Notify tag changes for each file with preserve_scroll prefix
         for (final file in selectedFiles) {
           TagManager.instance.notifyTagChanged("preserve_scroll:$file");
         }
@@ -344,7 +308,6 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     } catch (e) {}
   }
 
-  // Create BatchTagManager instance and find common tags
   final batchTagManager = BatchTagManager.getInstance();
   batchTagManager.findCommonTags(selectedFiles).then((commonTags) {
     if (!context.mounted) return;
@@ -371,10 +334,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
             }
 
             void handleTagSelected(String tag) {
-              // Close the dialog first
               RouteUtils.safePopDialog(context);
-
-              // Navigate to tag search page
               _openTagSearchTab(context, tag);
             }
 
@@ -382,7 +342,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
               filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
               child: AlertDialog(
                 title: Text(
-                  'Thêm thẻ cho ${selectedFiles.length} tệp',
+                  AppLocalizations.of(context)!.batchAddTags(selectedFiles.length),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -405,7 +365,6 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Input field for tags
                         Focus(
                           focusNode: focusNode,
                           child: ChipsInput<String>(
@@ -414,8 +373,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
-                              labelText: 'Tên thẻ',
-                              hintText: 'Nhập tên thẻ...',
+                              labelText: AppLocalizations.of(context)!.tagName,
+                              hintText: AppLocalizations.of(context)!.enterTagName,
                               prefixIcon: const Icon(PhosphorIconsLight.tag),
                               filled: true,
                               fillColor: Theme.of(context).brightness ==
@@ -444,8 +403,6 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                             },
                           ),
                         ),
-
-                        // Tag suggestions
                         if (tagSuggestions.isNotEmpty)
                           Container(
                             margin: const EdgeInsets.only(top: 8),
@@ -482,17 +439,14 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                               },
                             ),
                           ),
-
                         const SizedBox(height: 24),
-
-                        // Display selected tags
                         if (selectedTags.isNotEmpty)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Thẻ đã chọn:',
-                                style: TextStyle(
+                              Text(
+                                AppLocalizations.of(context)!.selectedTags,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
@@ -516,15 +470,9 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                               ),
                             ],
                           ),
-
                         const SizedBox(height: 24),
-
-                        // Popular tags section using the reusable widget
                         PopularTagsWidget(onTagSelected: handleTagSelected),
-
                         const SizedBox(height: 24),
-
-                        // Recent tags section using the reusable widget
                         RecentTagsWidget(onTagSelected: handleTagSelected),
                       ],
                     ),
@@ -540,38 +488,31 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                     ),
-                    child: const Text('HỦY'),
+                    child: Text(AppLocalizations.of(context)!.cancel.toUpperCase()),
                   ),
                   ElevatedButton(
                     onPressed: () async {
                       if (context.mounted) {
                         try {
-                          // Hiển thị thông báo đang xử lý
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Đang áp dụng thay đổi...'),
-                              duration: Duration(seconds: 1),
+                            SnackBar(
+                              content: Text(AppLocalizations.of(context)!.applyingChanges),
+                              duration: const Duration(seconds: 1),
                             ),
                           );
 
-                          // Clear tag cache first
                           TagManager.clearCache();
 
-                          // First get common tags among all files
                           final commonTags = await batchTagManager
                               .findCommonTags(selectedFiles);
 
-                          // Keeping track of changes for summary report
                           int tagsAdded = 0;
                           int tagsRemoved = 0;
 
-                          // For each file, we need to check existing tags and handle differences
                           for (final filePath in selectedFiles) {
-                            // Get original tags for this file with fresh data
                             final existingTags =
                                 await TagManager.getTags(filePath);
 
-                            // Calculate the final tag set
                             final Set<String> originalTagsSet =
                                 Set.from(existingTags);
                             final Set<String> currentTagsSet =
@@ -579,27 +520,22 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                             final Set<String> commonTagsSet =
                                 Set.from(commonTags);
 
-                            // Create updated tags set - keep non-common tags and add selected tags
                             final updatedTags =
                                 Set<String>.from(originalTagsSet);
 
-                            // Remove common tags that are no longer selected
                             final commonTagsToRemove =
                                 commonTagsSet.difference(currentTagsSet);
                             updatedTags.removeAll(commonTagsToRemove);
                             tagsRemoved += commonTagsToRemove.length;
 
-                            // Add newly selected tags
                             final tagsToAdd =
                                 currentTagsSet.difference(originalTagsSet);
                             updatedTags.addAll(tagsToAdd);
                             tagsAdded += tagsToAdd.length;
 
-                            // Set all tags at once - most reliable approach
                             await TagManager.setTags(
                                 filePath, updatedTags.toList());
 
-                            // Try to notify the bloc about changes, with proper error handling
                             try {
                               if (context.mounted) {
                                 final bloc = BlocProvider.of<FolderListBloc>(
@@ -612,37 +548,19 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                   bloc.add(AddTagToFile(filePath, tag));
                                 }
                               }
-                            } catch (e) {
-                              // Bloc not available in this context - it's okay, just continue
-                            }
+                            } catch (e) {}
                           }
 
-                          // Make sure to notify the parent UI of changes
                           refreshParentUIBatch();
 
-                          // Hiển thị thông báo tổng kết
                           if (context.mounted) {
-                            String message =
-                                'Đã cập nhật tags cho ${selectedFiles.length} tệp';
-                            if (tagsAdded > 0 || tagsRemoved > 0) {
-                              message += ' (';
-                              if (tagsAdded > 0) {
-                                message += 'thêm $tagsAdded';
-                              }
-                              if (tagsAdded > 0 && tagsRemoved > 0) {
-                                message += ', ';
-                              }
-                              if (tagsRemoved > 0) {
-                                message += 'xóa $tagsRemoved';
-                              }
-                              message += ')';
-                            }
-
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(message)),
+                              SnackBar(
+                                content: Text(AppLocalizations.of(context)!
+                                    .tagsUpdated(selectedFiles.length, tagsAdded, tagsRemoved)),
+                              ),
                             );
 
-                            // Close the dialog
                             RouteUtils.safePopDialog(context);
                           }
                         } catch (e) {
@@ -661,7 +579,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                     ),
-                    child: const Text('LƯU'),
+                    child: Text(AppLocalizations.of(context)!.save.toUpperCase()),
                   ),
                 ],
               ),
@@ -673,330 +591,18 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   });
 }
 
-/// Widget to display a list of popular tags with animation and hover effects
-class PopularTagsWidget extends StatelessWidget {
-  final Function(String) onTagSelected;
-  final int limit;
-
-  const PopularTagsWidget({
-    Key? key,
-    required this.onTagSelected,
-    this.limit = 20,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, int>>(
-      future: TagManager.instance.getPopularTags(limit: limit),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final popularTags = snapshot.data ?? {};
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.star,
-                  size: 18,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.amber[300]
-                      : Colors.amber,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Thẻ phổ biến:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            AnimatedTagList(
-              tags: popularTags.keys.toList(),
-              counts: popularTags,
-              onTagSelected: onTagSelected,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Widget to display a list of recently used tags with animation and hover effects
-class RecentTagsWidget extends StatelessWidget {
-  final Function(String) onTagSelected;
-  final int limit;
-
-  const RecentTagsWidget({
-    Key? key,
-    required this.onTagSelected,
-    this.limit = 20,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<String>>(
-      future: TagManager.getRecentTags(limit: limit),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final recentTags = snapshot.data ?? [];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.clockCounterClockwise,
-                  size: 18,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[400]
-                      : Colors.grey[700],
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Thẻ gần đây:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            AnimatedTagList(
-              tags: recentTags,
-              onTagSelected: onTagSelected,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// An animated tag list that shows tags with hover effects and animations
-class AnimatedTagList extends StatelessWidget {
-  final List<String> tags;
-  final Map<String, int>? counts;
-  final Function(String) onTagSelected;
-
-  const AnimatedTagList({
-    Key? key,
-    required this.tags,
-    required this.onTagSelected,
-    this.counts,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8.0,
-      runSpacing: 8.0,
-      children: tags.map((tag) {
-        final count = counts != null ? counts![tag] : null;
-        final displayText = count != null ? '$tag ($count)' : tag;
-
-        return AnimatedTagChip(
-          tag: tag,
-          displayText: displayText,
-          onTap: () => onTagSelected(tag),
-        );
-      }).toList(),
-    );
-  }
-}
-
-/// An animated tag chip with hover effects
-class AnimatedTagChip extends StatefulWidget {
-  final String tag;
-  final String displayText;
-  final VoidCallback onTap;
-
-  const AnimatedTagChip({
-    Key? key,
-    required this.tag,
-    required this.onTap,
-    required this.displayText,
-  }) : super(key: key);
-
-  @override
-  State<AnimatedTagChip> createState() => _AnimatedTagChipState();
-}
-
-class _AnimatedTagChipState extends State<AnimatedTagChip>
-    with SingleTickerProviderStateMixin {
-  bool _isHovered = false;
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _elevationAnimation;
-  late final TagColorManager _colorManager = TagColorManager.instance;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 150),
-      vsync: this,
-    );
-
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
-    _elevationAnimation = Tween<double>(begin: 0, end: 2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    // Get tag color from TagColorManager
-    final tagColor = _colorManager.getTagColor(widget.tag);
-
-    // If tag has a custom color, use it; otherwise use theme colors
-    // ignore: unnecessary_null_comparison
-    final bool hasCustomColor = tagColor != null;
-
-    // Dynamic colors based on hover state and tag color
-    final Color backgroundColor = hasCustomColor
-        ? (tagColor.withValues(alpha: _isHovered ? 0.3 : 0.2))
-        : (_isHovered
-            ? (isDark
-                ? Colors.blue.withValues(alpha: 0.3)
-                : theme.colorScheme.primary.withValues(alpha: 0.15))
-            : (isDark ? Colors.grey[700]! : Colors.grey[200]!));
-
-    final Color textColor = hasCustomColor
-        ? (tagColor)
-        : (_isHovered
-            ? (isDark ? Colors.white : theme.colorScheme.primary)
-            : (isDark ? Colors.grey[200]! : Colors.grey[800]!));
-
-    final Color iconColor = hasCustomColor
-        ? (tagColor)
-        : (_isHovered
-            ? (isDark ? Colors.white : theme.colorScheme.primary)
-            : (isDark ? Colors.grey[400]! : Colors.grey[600]!));
-
-    final Color borderColor = hasCustomColor
-        ? (tagColor.withValues(alpha: _isHovered ? 0.8 : 0.3))
-        : (_isHovered
-            ? theme.colorScheme.primary.withValues(alpha: 0.5)
-            : Colors.transparent);
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click, // Use hand cursor on hover
-      onEnter: (_) {
-        setState(() => _isHovered = true);
-        _controller.forward();
-      },
-      onExit: (_) {
-        setState(() => _isHovered = false);
-        _controller.reverse();
-      },
-      child: GestureDetector(
-        onTap: () {
-          // Play a quick "press" animation
-          _controller.forward().then((_) => _controller.reverse());
-          widget.onTap();
-        },
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Material(
-                elevation: _elevationAnimation.value,
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: backgroundColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: borderColor,
-                      width: 1,
-                    ),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        PhosphorIconsLight.tag,
-                        size: 14,
-                        color: iconColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.displayText,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 13,
-                          fontWeight:
-                              _isHovered ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      if (_isHovered) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          PhosphorIconsLight.plusCircle,
-                          size: 14,
-                          color: iconColor,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-// Helper function to add a tag to multiple files
-
-// Helper function to add a tag to multiple files without notifications
-
 /// Dialog for managing all tags
 void showManageTagsDialog(
     BuildContext context, List<String> allTags, String currentPath,
     {List<String>? selectedFiles}) {
-  // If there are selected files, just show the remove tags dialog
   if (selectedFiles != null && selectedFiles.isNotEmpty) {
     showRemoveTagsDialog(context, selectedFiles);
     return;
   }
 
-  // If no files are selected, show a notification
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
-      content: Text('Vui lòng chọn các file để xóa thẻ'),
+      content: Text('Please select files to remove tags'),
       duration: Duration(seconds: 2),
     ),
   );
@@ -1004,14 +610,11 @@ void showManageTagsDialog(
 
 /// Shows dialog to remove tags from multiple files
 void showRemoveTagsDialog(BuildContext context, List<String> filePaths) {
-  // Function to directly refresh the UI in parent components
   void refreshParentUIRemoveTags() {
-    // Clear tag cache immediately
     TagManager.clearCache();
 
     try {
       if (context.mounted && filePaths.isNotEmpty) {
-        // Notify tag changes for each file with preserve_scroll prefix
         for (final file in filePaths) {
           TagManager.instance.notifyTagChanged("preserve_scroll:$file");
         }
@@ -1048,7 +651,7 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
   final Set<String> _commonTags = {};
   final Set<String> _selectedTagsToRemove = {};
   bool _isLoading = true;
-  bool _isRemoving = false; // Added to track removal process
+  bool _isRemoving = false;
 
   @override
   void initState() {
@@ -1056,18 +659,15 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
     _loadTagsForFiles();
   }
 
-  /// Loads tags for all selected files and finds the common tags
   Future<void> _loadTagsForFiles() async {
     setState(() => _isLoading = true);
 
     try {
-      // For each file, get its tags
       for (final filePath in widget.filePaths) {
         final tags = await TagManager.getTags(filePath);
         _fileTagMap[filePath] = tags.toSet();
 
         if (_fileTagMap.keys.length == 1) {
-          // First file
           _commonTags.addAll(tags);
         } else {
           _commonTags.retainAll(tags.toSet());
@@ -1083,7 +683,6 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
     }
   }
 
-  /// Toggles a tag selection for removal
   void _toggleTagSelection(String tag) {
     setState(() {
       if (_selectedTagsToRemove.contains(tag)) {
@@ -1094,7 +693,6 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
     });
   }
 
-  /// Removes the selected tags from all files
   Future<void> _removeSelectedTags() async {
     if (_selectedTagsToRemove.isEmpty) {
       RouteUtils.safePopDialog(context);
@@ -1106,30 +704,25 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
     try {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đang xóa thẻ...'),
-            duration: Duration(seconds: 1),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.applyingChanges),
+            duration: const Duration(seconds: 1),
           ),
         );
       }
 
-      // Loop through each tag to remove and call BatchTagManager for each.
       for (final tagToRemove in _selectedTagsToRemove) {
         await BatchTagManager.removeTagFromFilesStatic(
             widget.filePaths, tagToRemove);
 
-        // Try to notify the bloc about tag removal, with proper error handling
         if (mounted) {
           try {
-            // Check if BlocProvider is available before trying to access it
             final bloc =
                 BlocProvider.of<FolderListBloc>(context, listen: false);
             for (final filePath in widget.filePaths) {
               bloc.add(RemoveTagFromFile(filePath, tagToRemove));
             }
-          } catch (e) {
-            // Bloc not available in this context - it's okay, just continue
-          }
+          } catch (e) {}
         }
       }
 
@@ -1139,19 +732,17 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Đã xóa ${_selectedTagsToRemove.length} thẻ khỏi ${widget.filePaths.length} tệp'),
+              'Đã xóa ${_selectedTagsToRemove.length} thẻ khỏi ${widget.filePaths.length} tệp',
+            ),
           ),
         );
 
-        // Clear tag cache
         TagManager.clearCache();
 
-        // Notify about tag changes to refresh UI
         for (final file in widget.filePaths) {
           TagManager.instance.notifyTagChanged("preserve_scroll:$file");
         }
 
-        // Call the callback so parent components know about the changes
         widget.onTagsRemoved();
       }
     } catch (e) {
@@ -1174,12 +765,11 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // Get screen size for responsive dialog sizing
     final Size screenSize = MediaQuery.of(context).size;
     final double dialogWidth =
-        screenSize.width * 0.5; // Match single tag dialog
+        screenSize.width * 0.5;
     final double dialogHeight =
-        screenSize.height * 0.6; // Match single tag dialog
+        screenSize.height * 0.6;
 
     return BackdropFilter(
       filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
@@ -1207,13 +797,13 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_isLoading)
-                const Expanded(
+                Expanded(
                   child: Center(
                       child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
                       Text("Đang tải thẻ...")
                     ],
                   )),
@@ -1248,15 +838,16 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16.0),
                           child: Text(
-                              "Đã chọn: ${_selectedTagsToRemove.length} thẻ",
+                              AppLocalizations.of(context)!
+                                  .tagsSelected(_selectedTagsToRemove.length),
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.error,
                                 fontWeight: FontWeight.bold,
                               )),
                         ),
-                      const Text(
+                      Text(
                         'Chọn thẻ chung để xóa:',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1308,7 +899,7 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
               textStyle: const TextStyle(fontSize: 16),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            child: const Text('HỦY'),
+            child: Text(AppLocalizations.of(context)!.cancel.toUpperCase()),
           ),
           ElevatedButton(
             onPressed: _selectedTagsToRemove.isEmpty ||
@@ -1331,15 +922,11 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('XÓA THẺ'),
+                : Text(AppLocalizations.of(context)!.removeTag.toUpperCase()),
           ),
         ],
       ),
     );
   }
-}
 
-
-
-
-
+} 

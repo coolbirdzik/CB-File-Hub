@@ -8,7 +8,6 @@
 
 #include <media_kit_video/media_kit_video_plugin.h>
 #include <mobile_smb_native/mobile_smb_native_plugin.h>
-#include <objectbox_flutter_libs/objectbox_flutter_libs_plugin.h>
 #include <screen_retriever_linux/screen_retriever_linux_plugin.h>
 #include <url_launcher_linux/url_launcher_plugin.h>
 #include <volume_controller/volume_controller_plugin.h>
@@ -21,9 +20,6 @@ void fl_register_plugins(FlPluginRegistry* registry) {
   g_autoptr(FlPluginRegistrar) mobile_smb_native_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "MobileSmbNativePlugin");
   mobile_smb_native_plugin_register_with_registrar(mobile_smb_native_registrar);
-  g_autoptr(FlPluginRegistrar) objectbox_flutter_libs_registrar =
-      fl_plugin_registry_get_registrar_for_plugin(registry, "ObjectboxFlutterLibsPlugin");
-  objectbox_flutter_libs_plugin_register_with_registrar(objectbox_flutter_libs_registrar);
   g_autoptr(FlPluginRegistrar) screen_retriever_linux_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "ScreenRetrieverLinuxPlugin");
   screen_retriever_linux_plugin_register_with_registrar(screen_retriever_linux_registrar);
