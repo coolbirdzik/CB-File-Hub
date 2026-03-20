@@ -212,7 +212,8 @@ class FileView extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Icon(PhosphorIconsLight.arrowDown,
-                              size: 16, color: Theme.of(context).colorScheme.onSurface),
+                              size: 16,
+                              color: Theme.of(context).colorScheme.onSurface),
                         ],
                       ),
                     ),
@@ -628,6 +629,3 @@ class _FolderDetailsItemWrapper extends StatelessWidget {
     );
   }
 }
-
-
-

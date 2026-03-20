@@ -20,7 +20,8 @@ class WindowCaptionButtons extends StatelessWidget {
     this.onClose,
   }) : super(key: key);
 
-  bool get _isDesktop => Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  bool get _isDesktop =>
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +136,9 @@ class _CaptionButtonState extends State<_CaptionButton> {
       final isMax = await windowManager.isMaximized();
       if (!mounted) return;
       setState(() {
-        _dynamicIcon = isMax ? PhosphorIconsLight.cornersIn : PhosphorIconsLight.cornersOut;
+        _dynamicIcon = isMax
+            ? PhosphorIconsLight.cornersIn
+            : PhosphorIconsLight.cornersOut;
         _dynamicTooltip = isMax ? 'Restore' : 'Maximize';
       });
     } catch (_) {}
@@ -204,8 +207,3 @@ class _WindowStateListener extends WindowListener {
   @override
   void onWindowRestore() => onChange();
 }
-
-
-
-
-

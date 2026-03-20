@@ -67,7 +67,8 @@ class GalleryListView extends StatelessWidget {
           subtitle: FutureBuilder<FileStat>(
             future: file.stat(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+              if (snapshot.connectionState == ConnectionState.waiting ||
+                  !snapshot.hasData) {
                 return Text(AppLocalizations.of(context)!.loading);
               }
 
@@ -85,7 +86,8 @@ class GalleryListView extends StatelessWidget {
           trailing: isSelectionMode
               ? Checkbox(
                   value: isSelected,
-                  onChanged: (value) => onSelectionChanged(file, value ?? false),
+                  onChanged: (value) =>
+                      onSelectionChanged(file, value ?? false),
                 )
               : null,
           onTap: isSelectionMode
@@ -140,7 +142,3 @@ class GalleryListView extends StatelessWidget {
     }
   }
 }
-
-
-
-

@@ -1659,7 +1659,8 @@ class VideoThumbnailHelper {
     defaultFallback() => Container(
           color: Colors.grey[300],
           child: const Center(
-            child: Icon(PhosphorIconsLight.filmStrip, size: 40, color: Colors.grey),
+            child: Icon(PhosphorIconsLight.filmStrip,
+                size: 40, color: Colors.grey),
           ),
         );
 
@@ -2322,8 +2323,3 @@ class _ThumbnailRequest {
     this.thumbnailSize,
   });
 }
-
-
-
-
-

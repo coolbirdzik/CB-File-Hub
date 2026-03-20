@@ -178,7 +178,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           File(album.coverImagePath!),
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return Icon(PhosphorIconsLight.imageSquare, size: 30);
+                            return Icon(PhosphorIconsLight.imageSquare,
+                                size: 30);
                           },
                         ),
                       )
@@ -220,7 +221,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           '$fileCount ${fileCount == 1 ? 'image' : 'images'}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         );
                       },
@@ -266,7 +268,9 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       title: 'Albums',
       actions: [
         IconButton(
-          icon: Icon(_isGridView ? PhosphorIconsLight.listBullets : PhosphorIconsLight.gridFour),
+          icon: Icon(_isGridView
+              ? PhosphorIconsLight.listBullets
+              : PhosphorIconsLight.gridFour),
           tooltip: _isGridView ? 'List view' : 'Grid view',
           onPressed: () {
             setState(() => _isGridView = !_isGridView);
@@ -463,7 +467,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(PhosphorIconsLight.trash, size: 16, color: Colors.red),
+                              Icon(PhosphorIconsLight.trash,
+                                  size: 16, color: Colors.red),
                               SizedBox(width: 8),
                               Text('Delete')
                             ],
@@ -494,7 +499,10 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                       final count = snapshot.data ?? 0;
                       return Text(
                         '$count ${count == 1 ? 'image' : 'images'}',
-                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       );
                     },
                   ),
@@ -622,6 +630,3 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     }
   }
 }
-
-
-

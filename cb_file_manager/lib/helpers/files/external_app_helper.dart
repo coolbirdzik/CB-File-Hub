@@ -115,7 +115,9 @@ class ExternalAppHelper {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Icon(
-                  isInstalled ? PhosphorIconsLight.androidLogo : PhosphorIconsLight.deviceMobile,
+                  isInstalled
+                      ? PhosphorIconsLight.androidLogo
+                      : PhosphorIconsLight.deviceMobile,
                   size: 24,
                   color: Colors.white,
                 ),
@@ -133,7 +135,9 @@ class ExternalAppHelper {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Icon(
-              isInstalled ? PhosphorIconsLight.androidLogo : PhosphorIconsLight.deviceMobile,
+              isInstalled
+                  ? PhosphorIconsLight.androidLogo
+                  : PhosphorIconsLight.deviceMobile,
               size: 24,
               color: Colors.white,
             ),
@@ -150,7 +154,9 @@ class ExternalAppHelper {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Icon(
-            isInstalled ? PhosphorIconsLight.androidLogo : PhosphorIconsLight.deviceMobile,
+            isInstalled
+                ? PhosphorIconsLight.androidLogo
+                : PhosphorIconsLight.deviceMobile,
             size: 24,
             color: Colors.white,
           ),
@@ -462,7 +468,3 @@ class ExternalAppHelper {
     }
   }
 }
-
-
-
-

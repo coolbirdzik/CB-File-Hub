@@ -120,7 +120,8 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   color: Colors.grey[200],
-                  child: const Icon(PhosphorIconsLight.imageBroken, color: Colors.grey),
+                  child: const Icon(PhosphorIconsLight.imageBroken,
+                      color: Colors.grey),
                 );
               },
             )
@@ -171,8 +172,8 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
                   color: Colors.green.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child:
-                    const Icon(PhosphorIconsLight.sparkle, color: Colors.white, size: 12),
+                child: const Icon(PhosphorIconsLight.sparkle,
+                    color: Colors.white, size: 12),
               ),
             ),
         ],
@@ -294,7 +295,3 @@ class FileInfo {
     required this.isImage,
   });
 }
-
-
-
-

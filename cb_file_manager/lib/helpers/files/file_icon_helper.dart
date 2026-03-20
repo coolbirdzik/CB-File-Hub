@@ -29,7 +29,8 @@ class FileIconHelper {
     if (_iconCache.containsKey(cacheKey)) {
       AppLogger.debug('APK_ICON_DEBUG:Using cached icon for: $cacheKey');
       final cachedIcon = _iconCache[cacheKey]!;
-      AppLogger.debug('APK_ICON_DEBUG:Cached icon type: ${cachedIcon.runtimeType}');
+      AppLogger.debug(
+          'APK_ICON_DEBUG:Cached icon type: ${cachedIcon.runtimeType}');
       return cachedIcon;
     }
 
@@ -37,13 +38,15 @@ class FileIconHelper {
 
     // For images and videos, return a generic icon
     if (_isImageFile(extension)) {
-      final icon = Icon(PhosphorIconsLight.image, size: size, color: Colors.blue);
+      final icon =
+          Icon(PhosphorIconsLight.image, size: size, color: Colors.blue);
       _iconCache[cacheKey] = icon;
       return icon;
     }
 
     if (_isVideoFile(extension)) {
-      final icon = Icon(PhosphorIconsLight.videoCamera, size: size, color: Colors.red);
+      final icon =
+          Icon(PhosphorIconsLight.videoCamera, size: size, color: Colors.red);
       _iconCache[cacheKey] = icon;
       return icon;
     }
@@ -65,7 +68,8 @@ class FileIconHelper {
         if (appInfo != null) {
           AppLogger.debug(
               'APK_ICON_DEBUG:Got app info: ${appInfo.appName} (installed: ${appInfo.isInstalled})');
-          AppLogger.debug('APK_ICON_DEBUG:App icon type: ${appInfo.icon.runtimeType}');
+          AppLogger.debug(
+              'APK_ICON_DEBUG:App icon type: ${appInfo.icon.runtimeType}');
 
           // Use the installed app icon
           final Widget appIcon = SizedBox(
@@ -80,7 +84,8 @@ class FileIconHelper {
           AppLogger.debug('APK_ICON_DEBUG:Returning appIcon widget');
           return appIcon;
         } else {
-          AppLogger.debug('APK_ICON_DEBUG:No app info returned for APK, using fallback');
+          AppLogger.debug(
+              'APK_ICON_DEBUG:No app info returned for APK, using fallback');
           // Use fallback APK icon
           final Widget fallbackIcon = Icon(
             PhosphorIconsLight.deviceMobile,
@@ -90,7 +95,8 @@ class FileIconHelper {
           AppLogger.debug(
               'APK_ICON_DEBUG:Created fallback icon: ${fallbackIcon.runtimeType}');
           _iconCache[cacheKey] = fallbackIcon;
-          AppLogger.debug('APK_ICON_DEBUG:Cached fallback icon with key: $cacheKey');
+          AppLogger.debug(
+              'APK_ICON_DEBUG:Cached fallback icon with key: $cacheKey');
           AppLogger.debug('APK_ICON_DEBUG:Returning fallback icon');
           return fallbackIcon;
         }
@@ -133,11 +139,12 @@ class FileIconHelper {
     // Fallback to generic file type icons using registry
     final iconData = FileTypeRegistry.getIcon('.$extension');
     final iconColor = FileTypeRegistry.getColor('.$extension');
-    
+
     final icon = Icon(iconData, size: size, color: iconColor);
-    
+
     if (extension == 'apk') {
-      AppLogger.debug('APK_ICON_DEBUG:Created generic APK icon: ${icon.runtimeType}');
+      AppLogger.debug(
+          'APK_ICON_DEBUG:Created generic APK icon: ${icon.runtimeType}');
     }
 
     _iconCache[cacheKey] = icon;
@@ -217,7 +224,8 @@ class FileIconHelper {
     final String cacheKey = '${file.path}_$size';
     _iconCache.remove(cacheKey); // Remove from cache first
 
-    AppLogger.debug('APK_ICON_DEBUG:Force refreshing APK icon for: ${file.path}');
+    AppLogger.debug(
+        'APK_ICON_DEBUG:Force refreshing APK icon for: ${file.path}');
     return await getIconForFile(file, size: size);
   }
 
@@ -244,7 +252,8 @@ class FileIconHelper {
       size: 24,
       color: Colors.green,
     );
-    AppLogger.debug('APK_ICON_DEBUG:Test icon created: ${testIcon.runtimeType}');
+    AppLogger.debug(
+        'APK_ICON_DEBUG:Test icon created: ${testIcon.runtimeType}');
 
     // Force clear all cache
     _iconCache.clear();
@@ -270,7 +279,3 @@ class FileIconHelper {
     return FileTypeRegistry.isCategory(extension, FileCategory.video);
   }
 }
-
-
-
-

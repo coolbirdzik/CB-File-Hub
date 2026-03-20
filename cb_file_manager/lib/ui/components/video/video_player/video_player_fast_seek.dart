@@ -119,7 +119,3 @@ class FastSeekIndicator extends StatelessWidget {
     );
   }
 }
-
-
-
-

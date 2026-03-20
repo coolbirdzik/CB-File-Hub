@@ -478,7 +478,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         padding: const EdgeInsets.only(bottom: 8.0),
                         child: Text(
                           'No locations selected. Add folders to scan for this album.',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant),
                         ),
                       ),
                     Flexible(
@@ -698,7 +701,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+            style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error),
             child: const Text('Remove'),
           ),
         ],
@@ -874,26 +878,26 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           onPressed: _showSearchDialog,
         ),
         // Grid size control
-          IconButton(
-            icon: Icon(PhosphorIconsLight.squaresFour),
-            tooltip: 'Grid Size',
-            onPressed: () => SharedActionBar.showGridSizeDialog(
-              context,
-              currentGridSize: _thumbnailSize.round(),
-              onApply: (size) async {
-                setState(() {
-                  _thumbnailSize = size.toDouble();
-                });
-                try {
-                  await _preferences
-                      .setImageGalleryThumbnailSize(size.toDouble());
-                } catch (_) {}
-              },
-              sizeMode: GridSizeMode.columns,
-              minGridSize: UserPreferences.minThumbnailSize.round(),
-              maxGridSize: UserPreferences.maxThumbnailSize.round(),
-            ),
+        IconButton(
+          icon: Icon(PhosphorIconsLight.squaresFour),
+          tooltip: 'Grid Size',
+          onPressed: () => SharedActionBar.showGridSizeDialog(
+            context,
+            currentGridSize: _thumbnailSize.round(),
+            onApply: (size) async {
+              setState(() {
+                _thumbnailSize = size.toDouble();
+              });
+              try {
+                await _preferences
+                    .setImageGalleryThumbnailSize(size.toDouble());
+              } catch (_) {}
+            },
+            sizeMode: GridSizeMode.columns,
+            minGridSize: UserPreferences.minThumbnailSize.round(),
+            maxGridSize: UserPreferences.maxThumbnailSize.round(),
           ),
+        ),
         // Shuffle toggle
         IconButton(
           icon: Icon(PhosphorIconsLight.shuffle),
@@ -1128,7 +1132,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     value: (_totalProgress > 0)
                         ? _currentProgress / _totalProgress
                         : null,
-                    backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.2),
                   ),
                 ],
               ),
@@ -1156,7 +1163,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               : 'No images match your search',
                           style: TextStyle(
                             fontSize: 18,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -1164,7 +1172,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           'Add images to start building your album',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -1247,6 +1256,3 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     );
   }
 }
-
-
-

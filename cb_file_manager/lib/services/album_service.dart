@@ -298,7 +298,8 @@ class AlbumService {
   }
 
   /// Checks if a file is already in an album (within an active transaction).
-  Future<bool> _isFileInAlbumTxn(DatabaseExecutor txn, int albumId, String filePath) async {
+  Future<bool> _isFileInAlbumTxn(
+      DatabaseExecutor txn, int albumId, String filePath) async {
     final count = sqflite.Sqflite.firstIntValue(
           await txn.rawQuery(
             'SELECT COUNT(*) FROM album_files WHERE album_id = ? AND file_path = ?',

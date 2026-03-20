@@ -21,7 +21,7 @@ final GetIt locator = GetIt.instance;
 /// It registers all singleton services that will be used throughout the application.
 Future<void> setupServiceLocator() async {
   // Core services - these are fundamental services needed by other services
-  
+
   // Register UserPreferences as a lazy singleton
   // Lazy singleton means it will only be instantiated when first accessed
   locator.registerLazySingleton<UserPreferences>(
@@ -34,14 +34,14 @@ Future<void> setupServiceLocator() async {
   );
 
   // Media and file services
-  
+
   // Register AlbumService for managing photo/video albums
   locator.registerLazySingleton<AlbumService>(
     () => AlbumService.instance,
   );
 
   // Tag management services
-  
+
   // Register TagManager for file tagging functionality
   locator.registerLazySingleton<TagManager>(
     () => TagManager.instance,
@@ -53,7 +53,7 @@ Future<void> setupServiceLocator() async {
   );
 
   // Network services
-  
+
   // Register NetworkCredentialsService for storing network credentials
   locator.registerLazySingleton<NetworkCredentialsService>(
     () => NetworkCredentialsService(),
@@ -65,7 +65,7 @@ Future<void> setupServiceLocator() async {
   );
 
   // UI services
-  
+
   // Register ThemeProvider for theme management
   // Note: This is registered as a factory since it extends ChangeNotifier
   // and we want to ensure proper lifecycle management

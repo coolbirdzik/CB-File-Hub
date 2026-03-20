@@ -628,6 +628,7 @@ class EnglishLocalizations implements AppLocalizations {
     if (parts.isNotEmpty) msg += ' (${parts.join(', ')})';
     return msg;
   }
+
   @override
   String get tagSuggestions => 'Tag Suggestions';
   @override

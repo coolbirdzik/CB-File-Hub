@@ -116,7 +116,8 @@ class VideoPlayerErrorWidget extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(PhosphorIconsLight.warningCircle, color: Colors.red, size: 64),
+          const Icon(PhosphorIconsLight.warningCircle,
+              color: Colors.red, size: 64),
           const SizedBox(height: 16),
           Text(
             'Error playing media',
@@ -214,8 +215,7 @@ class _VideoPlayerLoadingWidgetState extends State<VideoPlayerLoadingWidget> {
           tween: Tween(begin: 0.0, end: 1.0),
           builder: (context, value, child) {
             return Transform.scale(
-              scale:
-                  0.5 + (0.5 * (0.5 + 0.5 * math.sin(value * 2 * math.pi))),
+              scale: 0.5 + (0.5 * (0.5 + 0.5 * math.sin(value * 2 * math.pi))),
               child: Container(
                 width: 20,
                 height: 20,
@@ -243,10 +243,10 @@ class _VideoPlayerLoadingWidgetState extends State<VideoPlayerLoadingWidget> {
           delay: index * 0.2,
           duration: const Duration(milliseconds: 600),
           builder: (av) {
-            final scale = 0.5 +
-                (0.5 * (0.5 + 0.5 * math.sin(av * 2 * math.pi)));
-            final opacity = 0.3 +
-                (0.7 * (0.5 + 0.5 * math.sin(av * 2 * math.pi)));
+            final scale =
+                0.5 + (0.5 * (0.5 + 0.5 * math.sin(av * 2 * math.pi)));
+            final opacity =
+                0.3 + (0.7 * (0.5 + 0.5 * math.sin(av * 2 * math.pi)));
             return Transform.scale(
               scale: scale,
               child: Container(
@@ -308,8 +308,8 @@ class _VideoPlayerVlcPlaceholderState extends State<VideoPlayerVlcPlaceholder> {
                   delay: index * 0.3,
                   duration: const Duration(milliseconds: 800),
                   builder: (av) {
-                    final opacity = 0.2 +
-                        (0.8 * (0.5 + 0.5 * math.sin(av * 2 * math.pi)));
+                    final opacity =
+                        0.2 + (0.8 * (0.5 + 0.5 * math.sin(av * 2 * math.pi)));
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       width: 6,
@@ -329,8 +329,3 @@ class _VideoPlayerVlcPlaceholderState extends State<VideoPlayerVlcPlaceholder> {
     );
   }
 }
-
-
-
-
-

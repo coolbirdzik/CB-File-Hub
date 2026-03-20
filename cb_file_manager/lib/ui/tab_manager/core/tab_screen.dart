@@ -655,8 +655,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                               backgroundColor: isDarkMode
                                                   ? Colors.white
                                                       .withValues(alpha: 0.04)
-                                                  : theme
-                                                      .colorScheme.onSurface
+                                                  : theme.colorScheme.onSurface
                                                       .withValues(alpha: 0.05),
                                             ),
                                             onPressed: () => _scaffoldKey

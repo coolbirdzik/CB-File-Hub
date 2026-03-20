@@ -26,7 +26,8 @@ class VideoInfoDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _infoRow(l10n.fileName, file.path.split(Platform.pathSeparator).last),
+            _infoRow(
+                l10n.fileName, file.path.split(Platform.pathSeparator).last),
             const Divider(),
             _infoRow(l10n.filePath, file.path),
             const Divider(),

@@ -160,60 +160,62 @@ class _BaseScreenState extends State<BaseScreen> {
   @override
   Widget build(BuildContext context) {
     // Determine background color - use transparent on desktop for acrylic effect
-    final bool isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final Color? resolvedBackgroundColor = widget.backgroundColor ?? (isDesktop ? Colors.transparent : null);
+    final bool isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final Color? resolvedBackgroundColor =
+        widget.backgroundColor ?? (isDesktop ? Colors.transparent : null);
 
     return BlocProvider(
       create: (_) => DrawerCubit()..loadStorageLocations(),
       child: PopScope(
         canPop: true,
         child: Scaffold(
-        key: _scaffoldKey, // Use instance-specific key
-        extendBodyBehindAppBar: isDesktop,
-        appBar: (widget.showAppBar && !_inAndroidPip)
-            ? AppBar(
-                backgroundColor: isDesktop ? Colors.transparent : null,
-                elevation: isDesktop ? 0 : null,
-                title: Text(widget.title),
-                leading: widget.automaticallyImplyLeading
-                    ? _buildLeadingIcon(context)
-                    : null,
-                actions: <Widget>[
-                  // // Always add the menu button as the first action
-                  // IconButton(
-                  //   icon: const Icon(PhosphorIconsLight.list),
-                  //   onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                  // ),
+          key: _scaffoldKey, // Use instance-specific key
+          extendBodyBehindAppBar: isDesktop,
+          appBar: (widget.showAppBar && !_inAndroidPip)
+              ? AppBar(
+                  backgroundColor: isDesktop ? Colors.transparent : null,
+                  elevation: isDesktop ? 0 : null,
+                  title: Text(widget.title),
+                  leading: widget.automaticallyImplyLeading
+                      ? _buildLeadingIcon(context)
+                      : null,
+                  actions: <Widget>[
+                    // // Always add the menu button as the first action
+                    // IconButton(
+                    //   icon: const Icon(PhosphorIconsLight.list),
+                    //   onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                    // ),
 
-                  // // Home button for emergency navigation
-                  // IconButton(
-                  //   icon: const Icon(PhosphorIconsLight.house),
-                  //   tooltip: context.tr.home,
-                  //   onPressed: () => goHome(context),
-                  // ),
+                    // // Home button for emergency navigation
+                    // IconButton(
+                    //   icon: const Icon(PhosphorIconsLight.house),
+                    //   tooltip: context.tr.home,
+                    //   onPressed: () => goHome(context),
+                    // ),
 
-                  // Add any additional actions
-                  if (widget.actions != null) ...widget.actions!,
-                ],
-              )
-            : null,
-        drawer: CBDrawer(
-          context,
-          isPinned: _isDrawerPinned,
-          onPinStateChanged: (isPinned) {
-            _toggleDrawerPin();
-          },
+                    // Add any additional actions
+                    if (widget.actions != null) ...widget.actions!,
+                  ],
+                )
+              : null,
+          drawer: CBDrawer(
+            context,
+            isPinned: _isDrawerPinned,
+            onPinStateChanged: (isPinned) {
+              _toggleDrawerPin();
+            },
+          ),
+          body: Container(
+            color: isDesktop ? Colors.transparent : null,
+            child: widget.body,
+          ),
+          backgroundColor: resolvedBackgroundColor,
+          floatingActionButton: widget.floatingActionButton,
+          bottomNavigationBar: widget.bottomNavigationBar,
+          resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
         ),
-        body: Container(
-          color: isDesktop ? Colors.transparent : null,
-          child: widget.body,
-        ),
-        backgroundColor: resolvedBackgroundColor,
-        floatingActionButton: widget.floatingActionButton,
-        bottomNavigationBar: widget.bottomNavigationBar,
-        resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
       ),
-    ),
     );
   }
 
@@ -264,7 +266,3 @@ class _BaseScreenState extends State<BaseScreen> {
     );
   }
 }
-
-
-
-

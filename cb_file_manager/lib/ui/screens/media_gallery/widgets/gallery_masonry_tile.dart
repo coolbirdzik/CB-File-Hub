@@ -73,7 +73,8 @@ class GalleryMasonryTile extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            color: theme.colorScheme.surfaceContainerHighest
+                .withValues(alpha: 0.2),
             child: AspectRatio(
               aspectRatio: ratio,
               child: Hero(
@@ -139,7 +140,7 @@ class GalleryMasonryTile extends StatelessWidget {
         ),
 
         if (tags.isNotEmpty) TagsOverlay(tags: tags, gridSize: gridSize),
-        
+
         // Selection overlay with frosted glass effect
         if (isSelectionMode)
           Positioned(
@@ -156,7 +157,9 @@ class GalleryMasonryTile extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isSelected ? PhosphorIconsLight.checkCircle : PhosphorIconsLight.circle,
+                    isSelected
+                        ? PhosphorIconsLight.checkCircle
+                        : PhosphorIconsLight.circle,
                     color: isSelected
                         ? theme.colorScheme.primary
                         : theme.colorScheme.onSurface.withValues(alpha: 0.6),
@@ -166,7 +169,7 @@ class GalleryMasonryTile extends StatelessWidget {
               ),
             ),
           ),
-        
+
         // Subtle selection border
         if (isSelected)
           Positioned.fill(
@@ -184,7 +187,3 @@ class GalleryMasonryTile extends StatelessWidget {
     );
   }
 }
-
-
-
-

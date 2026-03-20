@@ -25,7 +25,8 @@ class GridZoomConstraints {
     int maxValue = UserPreferences.maxGridZoomLevel,
   }) {
     final safeWidth = math.max(0.0, availableWidth - (spacing * 2));
-    final maxColumns = ((safeWidth + spacing) / (minItemWidth + spacing)).floor();
+    final maxColumns =
+        ((safeWidth + spacing) / (minItemWidth + spacing)).floor();
     final cappedColumns = maxColumns.clamp(minValue, maxValue).toInt();
     if (mode == GridSizeMode.columns) {
       return cappedColumns;
@@ -38,8 +39,7 @@ class GridZoomConstraints {
         spacing: spacing,
         minWidth: gridMinWidth,
       );
-      final columns =
-          ((safeWidth + spacing) / (itemWidth + spacing)).floor();
+      final columns = ((safeWidth + spacing) / (itemWidth + spacing)).floor();
       if (columns <= cappedColumns) {
         return zoom;
       }

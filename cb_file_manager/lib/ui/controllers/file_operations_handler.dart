@@ -363,7 +363,8 @@ class FileOperationsHandler {
         SnackBar(content: Text(message)),
       );
     } catch (_) {
-      debugPrint('FileOperationsHandler: ScaffoldMessenger unavailable — $message');
+      debugPrint(
+          'FileOperationsHandler: ScaffoldMessenger unavailable — $message');
     }
   }
 

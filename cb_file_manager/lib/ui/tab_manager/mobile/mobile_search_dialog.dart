@@ -63,7 +63,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
   Future<void> _loadPopularTags() async {
     try {
       // Use cache if available and fresh (< 5 minutes old)
-      if (_cachedPopularTags != null && _cacheTime != null &&
+      if (_cachedPopularTags != null &&
+          _cacheTime != null &&
           DateTime.now().difference(_cacheTime!) < const Duration(minutes: 5)) {
         return;
       }
@@ -147,7 +148,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
             decoration: InputDecoration(
               hintText: localizations.searchByNameOrTag,
               hintStyle: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
               prefixIcon: Icon(
                 PhosphorIconsLight.magnifyingGlass,
@@ -163,8 +165,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                     )
                   : null,
               filled: true,
-              fillColor:
-                  theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              fillColor: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.3),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16.0),
                 borderSide: BorderSide.none,
@@ -333,8 +335,3 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
 
   // _buildTip helper removed as current UI doesn't render tips
 }
-
-
-
-
-

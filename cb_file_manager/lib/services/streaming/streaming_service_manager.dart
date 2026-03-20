@@ -19,9 +19,7 @@ class StreamingServiceManager {
       // _helpers.add(NativeSmbStreamingHelper()); // Removed - using flutter_vlc_player
 
       // Sort helpers by priority (highest first)
-      _helpers.sort((a, b) => (b)
-          .priority
-          .compareTo((a).priority));
+      _helpers.sort((a, b) => (b).priority.compareTo((a).priority));
 
       debugPrint(
           'StreamingServiceManager: Initialized with ${_helpers.length} helpers');

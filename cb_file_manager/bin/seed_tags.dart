@@ -101,9 +101,8 @@ Future<void> runSeedTool(List<String> args, int seedCount) async {
 }
 
 String? findDbFile() {
-  final home = Platform.environment['HOME'] ??
-      Platform.environment['USERPROFILE'] ??
-      '';
+  final home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
   final documents = '$home/Documents';
 
   final candidates = <String>[
@@ -171,8 +170,8 @@ String _escapeParam(Object? param) {
 }
 
 Future<void> listTags(String dbPath) async {
-  final tags = await queryDb(dbPath,
-    "SELECT DISTINCT tag FROM file_tags ORDER BY tag;");
+  final tags =
+      await queryDb(dbPath, "SELECT DISTINCT tag FROM file_tags ORDER BY tag;");
 
   print('');
   print('=== Tags in database (${tags.length}) ===');
@@ -196,8 +195,8 @@ Future<void> clearTags(String dbPath) async {
 
 Future<void> addTag(String dbPath, String tag) async {
   // Get first file path
-  final files = await queryDb(dbPath,
-    "SELECT DISTINCT file_path FROM file_tags LIMIT 1;");
+  final files = await queryDb(
+      dbPath, "SELECT DISTINCT file_path FROM file_tags LIMIT 1;");
 
   String filePath;
   if (files.isEmpty) {
@@ -273,8 +272,8 @@ Future<void> seedTags(String dbPath, int count) async {
   ];
 
   // Get first file path or create placeholder
-  var files = await queryDb(dbPath,
-    "SELECT DISTINCT file_path FROM file_tags LIMIT 1;");
+  var files = await queryDb(
+      dbPath, "SELECT DISTINCT file_path FROM file_tags LIMIT 1;");
 
   String filePath;
   if (files.isEmpty) {

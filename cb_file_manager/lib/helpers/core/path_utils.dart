@@ -1,7 +1,6 @@
 /// Common path utilities used across helpers
 library path_utils;
 
-
 /// Replace characters that are not allowed in file names with '_'.
 String sanitizePath(String path) {
   return path.replaceAll(RegExp(r'[<>:"|?*]'), '_');

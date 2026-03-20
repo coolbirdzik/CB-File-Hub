@@ -110,7 +110,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   /// Compute pending changes count and update flags
   void _updatePendingChanges() {
     final added = _selectedTags.where((t) => !_originalTags.contains(t)).length;
-    final removed = _originalTags.where((t) => !_selectedTags.contains(t)).length;
+    final removed =
+        _originalTags.where((t) => !_selectedTags.contains(t)).length;
     _hasPendingChanges = added > 0 || removed > 0;
     _pendingChangesCount = added + removed;
     widget.onPendingChangesChanged?.call();
@@ -214,7 +215,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       List<String> tagsToRemove =
           _originalTags.where((tag) => !_selectedTags.contains(tag)).toList();
 
-      debugPrint('saveChanges: tagsToAdd=$tagsToAdd tagsToRemove=$tagsToRemove');
+      debugPrint(
+          'saveChanges: tagsToAdd=$tagsToAdd tagsToRemove=$tagsToRemove');
 
       // Process removals
       for (String tag in tagsToRemove) {
@@ -342,8 +344,10 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                     prefixIcon: const Icon(PhosphorIconsLight.tag, size: 24),
                     filled: true,
                     fillColor: isDarkMode
-                        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7)
-                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        ? theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.7)
+                        : theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
                   ),
                   style: const TextStyle(fontSize: 18),
                   onChanged: (updatedTags) async {
@@ -418,14 +422,17 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(16)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(PhosphorIconsLight.magnifyingGlass, size: 18, color: Colors.white),
+                        const Icon(PhosphorIconsLight.magnifyingGlass,
+                            size: 18, color: Colors.white),
                         const SizedBox(width: 8),
                         Text(
                           AppLocalizations.of(context)!.tagSuggestions,
@@ -442,7 +449,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                               _tagSuggestions = [];
                             });
                           },
-                          child: const Icon(PhosphorIconsLight.x, size: 20, color: Colors.white),
+                          child: const Icon(PhosphorIconsLight.x,
+                              size: 20, color: Colors.white),
                         ),
                       ],
                     ),
@@ -451,7 +459,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                     child: ListView.builder(
                       shrinkWrap: true,
                       physics: const ClampingScrollPhysics(),
-                      itemCount: _tagSuggestions.length > 6 ? 6 : _tagSuggestions.length,
+                      itemCount: _tagSuggestions.length > 6
+                          ? 6
+                          : _tagSuggestions.length,
                       itemBuilder: (context, index) {
                         final suggestion = _tagSuggestions[index];
                         return InkWell(
@@ -486,7 +496,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                                 suggestion,
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: isDarkMode ? Colors.white : Colors.black87,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black87,
                                 ),
                               ),
                             ),
@@ -821,8 +833,9 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
                           style: TextStyle(
                             color: textColor,
                             fontSize: 13,
-                            fontWeight:
-                                _isHovered ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: _isHovered
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -845,7 +858,3 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
     );
   }
 }
-
-
-
-

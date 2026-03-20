@@ -80,7 +80,7 @@ class FileTypeUtils {
   static String getFileTypeCategory(String filePath) {
     final extension = getFileExtension(filePath);
     final category = FileTypeRegistry.getCategory(extension);
-    
+
     switch (category) {
       case FileCategory.image:
         return 'image';

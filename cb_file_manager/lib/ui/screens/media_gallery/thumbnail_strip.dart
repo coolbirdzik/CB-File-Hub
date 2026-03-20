@@ -94,7 +94,9 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
             margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
             decoration: BoxDecoration(
               border: Border.all(
-                color: isCurrentImage ? Theme.of(context).colorScheme.primary : Colors.transparent,
+                color: isCurrentImage
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
                 width: 2.0,
               ),
               borderRadius: BorderRadius.circular(16),
@@ -147,8 +149,3 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
     );
   }
 }
-
-
-
-
-

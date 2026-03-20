@@ -37,9 +37,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     });
 
     final libraries = await _service.getAllLibraries();
-    
+
     if (!mounted) return;
-    
+
     setState(() {
       _libraries = libraries;
     });
@@ -50,7 +50,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       final count = await _service.getLibraryVideoCount(library.id);
       total += count;
     }
-    
+
     if (mounted) {
       setState(() {
         _totalVideos = total;
@@ -72,12 +72,13 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
 
   Future<void> _deleteLibrary(VideoLibrary library) async {
     final localizations = AppLocalizations.of(context)!;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(localizations.deleteVideoLibrary),
-        content: Text(localizations.deleteVideoLibraryConfirmation(library.name)),
+        content:
+            Text(localizations.deleteVideoLibraryConfirmation(library.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -96,9 +97,10 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
 
     if (confirmed == true) {
       final success = await _service.deleteLibrary(library.id);
-      
+
       if (success && mounted) {
-        VideoLibraryHelpers.showSuccessMessage(context, localizations.libraryDeletedSuccessfully);
+        VideoLibraryHelpers.showSuccessMessage(
+            context, localizations.libraryDeletedSuccessfully);
         _refreshData();
       }
     }
@@ -117,11 +119,13 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   }
 
   void _navigateToSettings(VideoLibrary library) {
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       MaterialPageRoute(
         builder: (context) => VideoLibrarySettingsScreen(library: library),
       ),
-    ).then((_) {
+    )
+        .then((_) {
       // Refresh libraries after returning from settings
       _refreshData();
     });
@@ -150,8 +154,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
             ).withValues(alpha: desktopLightAlpha),
           ]
         : <Color>[];
-    final darkBackgroundColor =
-        isDesktopPlatform ? theme.colorScheme.surface.withValues(alpha: 0.30) : theme.colorScheme.surface;
+    final darkBackgroundColor = isDesktopPlatform
+        ? theme.colorScheme.surface.withValues(alpha: 0.30)
+        : theme.colorScheme.surface;
 
     return Scaffold(
       backgroundColor: isDesktopPlatform
@@ -179,7 +184,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
             slivers: [
               // Welcome Section
               SliverToBoxAdapter(
-                child: _buildWelcomeSection(theme, localizations, isLightMode, isDesktopPlatform),
+                child: _buildWelcomeSection(
+                    theme, localizations, isLightMode, isDesktopPlatform),
               ),
 
               // Libraries Grid
@@ -193,7 +199,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                       )
                     : _libraries.isEmpty
                         ? SliverFillRemaining(
-                            child: _buildEmptyState(theme, localizations, isLightMode, isDesktopPlatform),
+                            child: _buildEmptyState(theme, localizations,
+                                isLightMode, isDesktopPlatform),
                           )
                         : SliverGrid(
                             gridDelegate:
@@ -204,10 +211,14 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                               childAspectRatio: 1.2,
                             ),
                             delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              return _buildLibraryCard(
-                                  theme, localizations, _libraries[index], isLightMode, isDesktopPlatform);
-                            },
+                              (context, index) {
+                                return _buildLibraryCard(
+                                    theme,
+                                    localizations,
+                                    _libraries[index],
+                                    isLightMode,
+                                    isDesktopPlatform);
+                              },
                               childCount: _libraries.length,
                             ),
                           ),
@@ -224,7 +235,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 
-  Widget _buildWelcomeSection(ThemeData theme, AppLocalizations localizations, bool isLightMode, bool isDesktopPlatform) {
+  Widget _buildWelcomeSection(ThemeData theme, AppLocalizations localizations,
+      bool isLightMode, bool isDesktopPlatform) {
     final cs = theme.colorScheme;
     final welcomeGradientColors = isLightMode
         ? <Color>[
@@ -283,7 +295,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                     Text(
                       localizations.videoHubWelcome,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onPrimaryContainer
+                            .withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -312,7 +325,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                       Text(
                         localizations.videos,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.7),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -354,7 +368,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: isLightMode
-                    ? cs.surface.withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
+                    ? cs.surface
+                        .withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
                     : cs.surface,
               ),
               child: Column(
@@ -394,7 +409,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(PhosphorIconsLight.trash, color: Theme.of(context).colorScheme.error),
+                                  Icon(PhosphorIconsLight.trash,
+                                      color:
+                                          Theme.of(context).colorScheme.error),
                                   const SizedBox(width: 8),
                                   Text(localizations.delete),
                                 ],
@@ -440,7 +457,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.2),
                       borderRadius: const BorderRadius.only(
                         bottomLeft: Radius.circular(16),
                         bottomRight: Radius.circular(16),
@@ -472,7 +490,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme, AppLocalizations localizations, bool isLightMode, bool isDesktopPlatform) {
+  Widget _buildEmptyState(ThemeData theme, AppLocalizations localizations,
+      bool isLightMode, bool isDesktopPlatform) {
     final cs = theme.colorScheme;
     final emptyStateGradientColors = isLightMode
         ? <Color>[
@@ -536,6 +555,3 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 }
-
-
-

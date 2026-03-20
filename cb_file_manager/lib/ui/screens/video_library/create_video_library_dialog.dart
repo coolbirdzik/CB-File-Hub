@@ -41,7 +41,8 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
 
   Future<void> _pickDirectory() async {
     final selectedDirectory = await VideoLibraryHelpers.pickDirectory();
-    if (selectedDirectory != null && !_selectedDirectories.contains(selectedDirectory)) {
+    if (selectedDirectory != null &&
+        !_selectedDirectories.contains(selectedDirectory)) {
       setState(() {
         _selectedDirectories.add(selectedDirectory);
       });
@@ -56,7 +57,7 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
 
   Future<void> _createLibrary() async {
     final localizations = AppLocalizations.of(context)!;
-    
+
     if (_nameController.text.trim().isEmpty) {
       VideoLibraryHelpers.showErrorMessage(context, localizations.enterTagName);
       return;
@@ -73,10 +74,12 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
     );
 
     if (library != null && mounted) {
-      VideoLibraryHelpers.showSuccessMessage(context, localizations.libraryCreatedSuccessfully);
+      VideoLibraryHelpers.showSuccessMessage(
+          context, localizations.libraryCreatedSuccessfully);
       Navigator.of(context).pop(library);
     } else if (mounted) {
-      VideoLibraryHelpers.showErrorMessage(context, localizations.operationFailed);
+      VideoLibraryHelpers.showErrorMessage(
+          context, localizations.operationFailed);
     }
   }
 
@@ -150,7 +153,8 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                         ),
                       ),
                       child: isSelected
-                          ? const Icon(PhosphorIconsLight.check, color: Colors.white)
+                          ? const Icon(PhosphorIconsLight.check,
+                              color: Colors.white)
                           : null,
                     ),
                   );
@@ -210,6 +214,3 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
     );
   }
 }
-
-
-

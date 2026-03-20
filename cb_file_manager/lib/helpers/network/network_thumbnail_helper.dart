@@ -859,7 +859,8 @@ class NetworkThumbnailHelper {
     final remaining = parts.length > 4
         ? parts.sublist(4).map(Uri.decodeComponent).toList()
         : <String>[];
-    final encodedPath = [share, ...remaining].map(Uri.encodeComponent).join('/');
+    final encodedPath =
+        [share, ...remaining].map(Uri.encodeComponent).join('/');
     return 'smb://$host/$encodedPath';
   }
 

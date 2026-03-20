@@ -323,7 +323,8 @@ class MobileTabView extends StatelessWidget {
                       title: const Text('Cài đặt'),
                       onTap: () {
                         RouteUtils.safePopDialog(bottomSheetContext);
-                        final tabBloc = BlocProvider.of<TabManagerBloc>(context);
+                        final tabBloc =
+                            BlocProvider.of<TabManagerBloc>(context);
                         final existingTab = tabBloc.state.tabs.firstWhere(
                           (tab) => tab.path == kSettingsPath,
                           orElse: () => TabData(id: '', name: '', path: ''),

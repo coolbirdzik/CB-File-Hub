@@ -15,7 +15,8 @@ class LanguageController {
   static const String defaultLanguage = vietnamese;
 
   // Controller for language changes
-  final _languageController = ValueNotifier<Locale>(const Locale(defaultLanguage));
+  final _languageController =
+      ValueNotifier<Locale>(const Locale(defaultLanguage));
   ValueNotifier<Locale> get languageNotifier => _languageController;
 
   // Key for storing language preference

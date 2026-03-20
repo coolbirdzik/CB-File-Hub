@@ -263,7 +263,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.delete, style: TextStyle(color: theme.colorScheme.error)),
+            child: Text(l10n.delete,
+                style: TextStyle(color: theme.colorScheme.error)),
           ),
         ],
       ),
@@ -312,7 +313,6 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
       }
     }
   }
-
 
   void _updateDefaultPort() {
     switch (_selectedService) {
@@ -392,7 +392,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
       debugPrint('Error connecting to server: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.connectionFailed(e.toString()))),
+          SnackBar(
+              content: Text(AppLocalizations.of(context)!
+                  .connectionFailed(e.toString()))),
         );
       }
     } finally {
@@ -403,9 +405,6 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
       }
     }
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -513,7 +512,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: Icon(PhosphorIconsLight.pencilSimple,
+                                        icon: Icon(
+                                            PhosphorIconsLight.pencilSimple,
                                             size: 16),
                                         onPressed: () {
                                           // Stop dropdown from closing
@@ -645,7 +645,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.error.withOpacity(0.1),
-                            border: Border.all(color: theme.colorScheme.error.withOpacity(0.3)),
+                            border: Border.all(
+                                color:
+                                    theme.colorScheme.error.withOpacity(0.3)),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Row(
@@ -656,7 +658,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                               Expanded(
                                 child: Text(
                                   state.errorMessage!,
-                                  style: TextStyle(color: theme.colorScheme.error),
+                                  style:
+                                      TextStyle(color: theme.colorScheme.error),
                                 ),
                               ),
                             ],
@@ -764,7 +767,3 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
     );
   }
 }
-
-
-
-

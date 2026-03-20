@@ -233,7 +233,8 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
     } catch (_) {}
 
     return ListTile(
-      leading: Icon(PhosphorIconsLight.desktop, color: theme.colorScheme.tertiary),
+      leading:
+          Icon(PhosphorIconsLight.desktop, color: theme.colorScheme.tertiary),
       title: Text(host),
       subtitle: Text(context.tr.connecting),
       onTap: () => _openTabForConnection(entry.key, host),
@@ -245,7 +246,8 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
     final theme = Theme.of(context);
 
     return ListTile(
-      leading: Icon(PhosphorIconsLight.cloudArrowUp, color: theme.colorScheme.primary),
+      leading: Icon(PhosphorIconsLight.cloudArrowUp,
+          color: theme.colorScheme.primary),
       title: Text(credentials.host),
       subtitle: Text(credentials.username),
       trailing: IconButton(
@@ -266,6 +268,3 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
     );
   }
 }
-
-
-

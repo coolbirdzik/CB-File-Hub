@@ -78,8 +78,9 @@ extension _VlcSmbExt on _VideoPlayerState {
     required bool autoPlay,
   }) {
     final auth = _parseSmbAuth(smbMrl);
-    final baseUrl =
-        useUserInfoInUrl && auth.hasUserInfo ? auth.originalUrl : auth.urlWithoutUserInfo;
+    final baseUrl = useUserInfoInUrl && auth.hasUserInfo
+        ? auth.originalUrl
+        : auth.urlWithoutUserInfo;
     final smbUser = auth.userName ?? auth.user;
 
     // Avoid embedding credentials (even username-only) in the SMB URL.
@@ -96,13 +97,17 @@ extension _VlcSmbExt on _VideoPlayerState {
       if (!useUserInfoInUrl) ':file-caching=$cachingMs',
       if (!useUserInfoInUrl && smbUser != null && smbUser.isNotEmpty)
         ':smb-user=$smbUser',
-      if (!useUserInfoInUrl && auth.password != null && auth.password!.isNotEmpty)
+      if (!useUserInfoInUrl &&
+          auth.password != null &&
+          auth.password!.isNotEmpty)
         ':smb-pwd=${auth.password}',
       if (!useUserInfoInUrl && auth.domain != null && auth.domain!.isNotEmpty)
         ':smb-domain=${auth.domain}',
       if (!useUserInfoInUrl && smbUser != null && smbUser.isNotEmpty)
         '--smb-user=$smbUser',
-      if (!useUserInfoInUrl && auth.password != null && auth.password!.isNotEmpty)
+      if (!useUserInfoInUrl &&
+          auth.password != null &&
+          auth.password!.isNotEmpty)
         '--smb-pwd=${auth.password}',
       if (!useUserInfoInUrl && auth.domain != null && auth.domain!.isNotEmpty)
         '--smb-domain=${auth.domain}',

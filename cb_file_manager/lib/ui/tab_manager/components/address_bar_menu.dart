@@ -39,7 +39,10 @@ class AddressBarMenu extends StatelessWidget {
                 size: 18,
                 color: item.enabled
                     ? Theme.of(context).colorScheme.onSurface
-                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -190,8 +193,3 @@ class AddressBarMenuItems {
     );
   }
 }
-
-
-
-
-

@@ -226,7 +226,8 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     _isThumbnailGenerated = false;
     _shouldRegenerateThumbnail = true;
     _thumbnailVersion++; // Increment version to force Image widget rebuild
-    _isLoading = false; // BUGFIX: Reset loading state so _loadThumbnail doesn't early-return
+    _isLoading =
+        false; // BUGFIX: Reset loading state so _loadThumbnail doesn't early-return
     _hasSyncLoadLog = false; // Reset frame log flag when cache is cleared
     _hasFrameLoadLog = false; // Reset frame log flag when cache is cleared
 
@@ -723,8 +724,3 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     );
   }
 }
-
-
-
-
-

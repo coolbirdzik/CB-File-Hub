@@ -119,7 +119,9 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
         // View toggle button
         IconButton(
           icon: Icon(
-            isGridView ? PhosphorIconsLight.list : PhosphorIconsLight.squaresFour,
+            isGridView
+                ? PhosphorIconsLight.list
+                : PhosphorIconsLight.squaresFour,
             size: 24,
           ),
           tooltip: isGridView ? 'Switch to list view' : 'Switch to grid view',
@@ -240,7 +242,3 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
-
-
-
-

@@ -107,8 +107,3 @@ class _SearchTipItem extends StatelessWidget {
     );
   }
 }
-
-
-
-
-

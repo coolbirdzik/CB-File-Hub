@@ -116,8 +116,8 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       if (result != null) {
         // Persist smart flag mapping
         try {
-          await SmartAlbumService.instance.setSmartAlbum(
-              result.id, _isSmartAlbum);
+          await SmartAlbumService.instance
+              .setSmartAlbum(result.id, _isSmartAlbum);
         } catch (_) {}
         if (mounted) {
           Navigator.of(context).pop(result);
@@ -316,6 +316,3 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
     );
   }
 }
-
-
-

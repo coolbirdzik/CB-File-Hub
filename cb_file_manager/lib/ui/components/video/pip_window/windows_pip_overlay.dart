@@ -230,8 +230,12 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(_isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
-                      color: Colors.white, size: 16),
+                  icon: Icon(
+                      _isPlaying
+                          ? PhosphorIconsLight.pause
+                          : PhosphorIconsLight.play,
+                      color: Colors.white,
+                      size: 16),
                   onPressed: () async {
                     if (_player == null) return;
                     if (_player!.state.playing) {
@@ -248,7 +252,8 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: const Icon(PhosphorIconsLight.x, color: Colors.white, size: 16),
+                  icon: const Icon(PhosphorIconsLight.x,
+                      color: Colors.white, size: 16),
                   onPressed: () {
                     final pos = _position.inMilliseconds;
                     final vol = (_player?.state.volume ?? 100).toDouble();
@@ -307,7 +312,8 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
             Text(VideoPlayerUtils.formatDuration(_duration),
                 style: const TextStyle(color: Colors.white70, fontSize: 11)),
             const SizedBox(width: 8),
-            const Icon(PhosphorIconsLight.speakerHigh, color: Colors.white70, size: 14),
+            const Icon(PhosphorIconsLight.speakerHigh,
+                color: Colors.white70, size: 14),
             SizedBox(
               width: 80,
               child: Slider(
@@ -408,9 +414,3 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
     }
   }
 }
-
-
-
-
-
-

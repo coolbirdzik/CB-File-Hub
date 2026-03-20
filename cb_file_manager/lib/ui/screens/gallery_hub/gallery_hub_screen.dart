@@ -156,8 +156,9 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
             ).withValues(alpha: desktopLightAlpha),
           ]
         : <Color>[];
-    final darkBackgroundColor =
-        isDesktopPlatform ? theme.colorScheme.surface.withValues(alpha: 0.30) : theme.colorScheme.surface;
+    final darkBackgroundColor = isDesktopPlatform
+        ? theme.colorScheme.surface.withValues(alpha: 0.30)
+        : theme.colorScheme.surface;
 
     return Scaffold(
       backgroundColor: isDesktopPlatform
@@ -193,7 +194,8 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                       horizontal: size.width > 800 ? 32 : 16,
                       vertical: 24,
                     ),
-                    child: _buildWelcomeSection(theme, isLightMode, isDesktopPlatform),
+                    child: _buildWelcomeSection(
+                        theme, isLightMode, isDesktopPlatform),
                   ),
 
                   // Gallery actions
@@ -208,9 +210,11 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                         const SizedBox(height: 40),
 
                         // Featured albums
-                        if (_featuredAlbums.isNotEmpty || _loadingFeaturedAlbums)
+                        if (_featuredAlbums.isNotEmpty ||
+                            _loadingFeaturedAlbums)
                           _buildFeaturedAlbums(theme),
-                        if (_featuredAlbums.isNotEmpty || _loadingFeaturedAlbums)
+                        if (_featuredAlbums.isNotEmpty ||
+                            _loadingFeaturedAlbums)
                           const SizedBox(height: 40),
 
                         // Stats overview
@@ -228,7 +232,8 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     );
   }
 
-  Widget _buildWelcomeSection(ThemeData theme, bool isLightMode, bool isDesktopPlatform) {
+  Widget _buildWelcomeSection(
+      ThemeData theme, bool isLightMode, bool isDesktopPlatform) {
     final cs = theme.colorScheme;
     final welcomeGradientColors = isLightMode
         ? <Color>[
@@ -417,7 +422,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                       ? _localizations.browseAllYourPictures
                       : _localizations.browseAllYourPhotos,
                   PhosphorIconsLight.image,
-                  [theme.colorScheme.primary, theme.colorScheme.primary.withValues(alpha: 0.7)],
+                  [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primary.withValues(alpha: 0.7)
+                  ],
                   () => _navigateToAllImages(),
                 ),
                 _buildActionCard(
@@ -425,7 +433,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                   'Albums',
                   _localizations.organizeInAlbums,
                   PhosphorIconsLight.folder,
-                  [theme.colorScheme.tertiary, theme.colorScheme.tertiary.withValues(alpha: 0.7)],
+                  [
+                    theme.colorScheme.tertiary,
+                    theme.colorScheme.tertiary.withValues(alpha: 0.7)
+                  ],
                   () => _navigateToAlbums(),
                 ),
                 _buildActionCard(
@@ -435,7 +446,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                       ? _localizations.picturesFolder
                       : _localizations.photosFromCamera,
                   PhosphorIconsLight.camera,
-                  [theme.colorScheme.tertiary, theme.colorScheme.tertiary.withValues(alpha: 0.7)],
+                  [
+                    theme.colorScheme.tertiary,
+                    theme.colorScheme.tertiary.withValues(alpha: 0.7)
+                  ],
                   () => _navigateToCamera(),
                 ),
                 _buildActionCard(
@@ -445,7 +459,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                       ? _localizations.downloadedFiles
                       : _localizations.downloadedImages,
                   PhosphorIconsLight.downloadSimple,
-                  [theme.colorScheme.secondary, theme.colorScheme.secondary.withValues(alpha: 0.7)],
+                  [
+                    theme.colorScheme.secondary,
+                    theme.colorScheme.secondary.withValues(alpha: 0.7)
+                  ],
                   () => _navigateToDownloads(),
                 ),
               ],
@@ -579,7 +596,8 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
             ),
             const Spacer(),
             IconButton(
-              icon: Icon(PhosphorIconsLight.gear,
+              icon: Icon(
+                PhosphorIconsLight.gear,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
               onPressed: () => _openFeaturedAlbumsSettings(),
@@ -977,6 +995,3 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     _loadFeaturedAlbums();
   }
 }
-
-
-

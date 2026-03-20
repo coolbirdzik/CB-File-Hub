@@ -14,6 +14,7 @@ import 'package:cb_file_manager/ui/components/video/video_player/video_player_ap
 class VideoPlayerFullScreen extends StatefulWidget {
   /// Local file (use when path is available, e.g. file:// on Android).
   final File? file;
+
   /// Android content:// URI when opened via "Open with" / default app.
   final String? contentUri;
 
@@ -21,8 +22,8 @@ class VideoPlayerFullScreen extends StatefulWidget {
     Key? key,
     this.file,
     this.contentUri,
-  }) : assert(file != null || (contentUri != null && contentUri.isNotEmpty)),
-       super(key: key);
+  })  : assert(file != null || (contentUri != null && contentUri.isNotEmpty)),
+        super(key: key);
 
   @override
   _VideoPlayerFullScreenState createState() => _VideoPlayerFullScreenState();
@@ -161,8 +162,8 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
                   actions: [
                     if (widget.file != null)
                       IconButton(
-                        icon:
-                            const Icon(PhosphorIconsLight.info, color: Colors.white70),
+                        icon: const Icon(PhosphorIconsLight.info,
+                            color: Colors.white70),
                         onPressed: () => _showVideoInfo(context),
                       ),
                   ],
@@ -281,7 +282,3 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     );
   }
 }
-
-
-
-

@@ -154,8 +154,9 @@ class _SkeletonState extends State<Skeleton>
     const double minItemWidth = 72.0;
     final double width = MediaQuery.of(context).size.width;
     final double safeWidth = math.max(0.0, width - (gridPadding * 2));
-    final int maxColumns =
-        ((safeWidth + spacing) / (minItemWidth + spacing)).floor().clamp(1, 1000);
+    final int maxColumns = ((safeWidth + spacing) / (minItemWidth + spacing))
+        .floor()
+        .clamp(1, 1000);
     final int crossAxisCount =
         requestedCrossAxisCount.clamp(1, maxColumns).toInt();
 
@@ -247,7 +248,10 @@ class _SkeletonListItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -287,8 +291,8 @@ class _SkeletonListItem extends StatelessWidget {
                   height: 12,
                   borderRadius: BorderRadius.circular(6),
                   controller: controller,
-                  delay: Duration(
-                      milliseconds: (index * 80 + 120).clamp(0, 920)),
+                  delay:
+                      Duration(milliseconds: (index * 80 + 120).clamp(0, 920)),
                 ),
               ],
             ),
@@ -328,7 +332,10 @@ class _SkeletonGridItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+          color: Theme.of(context)
+              .colorScheme
+              .surfaceContainerHighest
+              .withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -388,7 +395,10 @@ class _SkeletonMasonryItem extends StatelessWidget {
         aspectRatio: aspectRatio,
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: ClipRRect(
@@ -515,4 +525,3 @@ Color _skeletonColor(BuildContext context) {
   return theme.colorScheme.surfaceContainerHighest
       .withValues(alpha: theme.brightness == Brightness.dark ? 0.35 : 0.6);
 }
-

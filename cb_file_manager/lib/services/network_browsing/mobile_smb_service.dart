@@ -75,8 +75,7 @@ class MobileSMBService implements ISmbService {
           username = config.username;
           password = config.password;
           domain = config.domain ?? '';
-        } else {
-        }
+        } else {}
       }
 
       // 2. Get the relative SMB path from the tab path
@@ -320,7 +319,8 @@ class MobileSMBService implements ISmbService {
     );
 
     try {
-      final ok = await _smbClient.connect(config).timeout(const Duration(seconds: 6));
+      final ok =
+          await _smbClient.connect(config).timeout(const Duration(seconds: 6));
       _isConnected = ok;
       return ok;
     } catch (_) {
@@ -829,7 +829,3 @@ class MobileSMBService implements ISmbService {
     }
   }
 }
-
-
-
-

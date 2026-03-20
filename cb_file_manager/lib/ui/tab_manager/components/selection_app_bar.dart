@@ -105,7 +105,3 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 }
-
-
-
-

@@ -349,6 +349,3 @@ class _TagInputChipState extends State<TagInputChip>
     );
   }
 }
-
-
-

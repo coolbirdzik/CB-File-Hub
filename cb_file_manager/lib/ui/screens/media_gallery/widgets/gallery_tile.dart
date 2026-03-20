@@ -39,7 +39,8 @@ class GalleryTile extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.2),
               child: Hero(
                 tag: file.path,
                 child: ThumbnailLoader(
@@ -59,7 +60,7 @@ class GalleryTile extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Frosted glass filename label at bottom
           Positioned(
             bottom: 0,
@@ -73,7 +74,8 @@ class GalleryTile extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -100,11 +102,10 @@ class GalleryTile extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Tags overlay
-          if (tags.isNotEmpty) 
-            TagsOverlay(tags: tags, gridSize: gridSize),
-          
+          if (tags.isNotEmpty) TagsOverlay(tags: tags, gridSize: gridSize),
+
           // Selection overlay with frosted glass effect
           if (isSelectionMode)
             Positioned(
@@ -121,15 +122,19 @@ class GalleryTile extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isSelected ? PhosphorIconsLight.checkCircle : PhosphorIconsLight.circle,
-                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      isSelected
+                          ? PhosphorIconsLight.checkCircle
+                          : PhosphorIconsLight.circle,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       size: 20,
                     ),
                   ),
                 ),
               ),
             ),
-          
+
           // Subtle hover/selection border
           if (isSelected)
             Positioned.fill(
@@ -148,7 +153,3 @@ class GalleryTile extends StatelessWidget {
     );
   }
 }
-
-
-
-

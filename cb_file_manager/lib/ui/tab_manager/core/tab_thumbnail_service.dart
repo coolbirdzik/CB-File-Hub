@@ -30,8 +30,9 @@ class TabThumbnailService {
       }
 
       final Uint8List pngBytes = byteData.buffer.asUint8List();
-      
-      debugPrint('TabThumbnailService: Captured thumbnail (${pngBytes.length} bytes)');
+
+      debugPrint(
+          'TabThumbnailService: Captured thumbnail (${pngBytes.length} bytes)');
       return pngBytes;
     } catch (e) {
       debugPrint('TabThumbnailService: Error capturing thumbnail: $e');

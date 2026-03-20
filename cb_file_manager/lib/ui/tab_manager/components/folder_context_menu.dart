@@ -323,7 +323,8 @@ class FolderContextMenu {
         Icon(icon, size: 20),
         const SizedBox(width: 12),
         Expanded(child: Text(title)),
-        if (hasTrailingArrow) const Icon(PhosphorIconsLight.arrowRight, size: 20),
+        if (hasTrailingArrow)
+          const Icon(PhosphorIconsLight.arrowRight, size: 20),
       ],
     );
   }
@@ -530,8 +531,9 @@ class FolderContextMenu {
                       if (value == null || value.isEmpty) {
                         return Text(l10n.thumbnailAuto);
                       }
-                      final displayValue =
-                          value.startsWith('video::') ? value.substring(7) : value;
+                      final displayValue = value.startsWith('video::')
+                          ? value.substring(7)
+                          : value;
                       return Text(displayValue);
                     },
                   ),
@@ -551,14 +553,15 @@ class FolderContextMenu {
 
                           final isImage =
                               FileTypeUtils.isImageFile(selectedPath);
-                          final isVideo = VideoThumbnailHelper
-                              .isSupportedVideoFormat(selectedPath);
+                          final isVideo =
+                              VideoThumbnailHelper.isSupportedVideoFormat(
+                                  selectedPath);
                           if (!isImage && !isVideo) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                      AppLocalizations.of(context)!.invalidThumbnailFile),
+                                  content: Text(AppLocalizations.of(context)!
+                                      .invalidThumbnailFile),
                                 ),
                               );
                             }
@@ -612,7 +615,8 @@ class FolderContextMenu {
       if (scaffoldMessenger.mounted) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.errorGettingFolderProperties(e.toString())),
+            content: Text(AppLocalizations.of(context)!
+                .errorGettingFolderProperties(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -635,9 +639,3 @@ class FolderContextMenu {
     }
   }
 }
-
-
-
-
-
-

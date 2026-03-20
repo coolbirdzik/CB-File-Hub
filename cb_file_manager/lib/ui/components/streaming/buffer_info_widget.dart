@@ -155,7 +155,8 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
                             boxShadow: _isActive
                                 ? [
                                     BoxShadow(
-                                      color: _getBufferColor().withValues(alpha: 0.5),
+                                      color: _getBufferColor()
+                                          .withValues(alpha: 0.5),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),
@@ -288,5 +289,3 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
     );
   }
 }
-
-

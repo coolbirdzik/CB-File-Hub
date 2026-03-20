@@ -57,7 +57,8 @@ class TagsOverlay extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(PhosphorIconsLight.tag, color: Colors.white, size: 12),
+                  const Icon(PhosphorIconsLight.tag,
+                      color: Colors.white, size: 12),
                   const SizedBox(width: 2),
                   Text(
                     '${tags.length}',
@@ -112,7 +113,3 @@ class TagsOverlay extends StatelessWidget {
     );
   }
 }
-
-
-
-

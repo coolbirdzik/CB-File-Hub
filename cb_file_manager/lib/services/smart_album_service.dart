@@ -25,10 +25,10 @@ class SmartAlbumService {
       final f = File(path);
       if (!await f.exists()) {
         return {
-        'smartAlbumIds': <int>[],
-        'roots': <String, List<String>>{},
-        'cache': <String, Map<String, dynamic>>{},
-      };
+          'smartAlbumIds': <int>[],
+          'roots': <String, List<String>>{},
+          'cache': <String, Map<String, dynamic>>{},
+        };
       }
       final content = await f.readAsString();
       return jsonDecode(content) as Map<String, dynamic>;
@@ -60,7 +60,8 @@ class SmartAlbumService {
 
   Future<void> setSmartAlbum(int albumId, bool smart) async {
     final data = await _read();
-    final ids = ((data['smartAlbumIds'] as List?) ?? []).map((e) => e as int).toSet();
+    final ids =
+        ((data['smartAlbumIds'] as List?) ?? []).map((e) => e as int).toSet();
     if (smart) {
       ids.add(albumId);
     } else {
@@ -83,7 +84,9 @@ class SmartAlbumService {
 
   Future<void> setScanRoots(int albumId, List<String> directories) async {
     final data = await _read();
-    final roots = (data['roots'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as List).map((e) => e.toString()).toList())) ?? {};
+    final roots = (data['roots'] as Map?)?.map((k, v) => MapEntry(
+            k.toString(), (v as List).map((e) => e.toString()).toList())) ??
+        {};
     roots['$albumId'] = directories.toSet().toList();
     data['roots'] = roots;
     await _write(data);
@@ -130,7 +133,8 @@ class SmartAlbumService {
 
   Future<void> setCachedFiles(int albumId, List<String> files) async {
     final data = await _read();
-    final cache = (data['cache'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? {};
+    final cache =
+        (data['cache'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? {};
     cache['$albumId'] = {
       'files': files,
       'lastScan': DateTime.now().toIso8601String(),

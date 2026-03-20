@@ -51,8 +51,7 @@ class TabMainScreen extends StatefulWidget {
 }
 
 class _TabMainScreenState extends State<TabMainScreen> {
-  static const String _themeOnboardingDoneKey =
-      'theme_onboarding_completed_v1';
+  static const String _themeOnboardingDoneKey = 'theme_onboarding_completed_v1';
 
   late TabManagerBloc _tabManagerBloc;
   late NetworkBrowsingBloc _networkBrowsingBloc;
@@ -145,7 +144,8 @@ class _TabMainScreenState extends State<TabMainScreen> {
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           backgroundColor: theme.colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -346,5 +346,3 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
     );
   }
 }
-
-

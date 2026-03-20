@@ -641,7 +641,3 @@ class FileTypeRegistry {
         .toList();
   }
 }
-
-
-
-

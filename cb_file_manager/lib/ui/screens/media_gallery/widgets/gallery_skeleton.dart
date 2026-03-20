@@ -5,7 +5,8 @@ import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 
 /// Gallery skeleton for image/video gallery screens
 /// Now uses unified skeleton system with automatic mobile/desktop adaptation
-@Deprecated('Use SkeletonHelper.mediaGallery() instead for consistent skeleton loading')
+@Deprecated(
+    'Use SkeletonHelper.mediaGallery() instead for consistent skeleton loading')
 class GallerySkeleton extends StatelessWidget {
   final bool isGrid;
   final double thumbnailSize;

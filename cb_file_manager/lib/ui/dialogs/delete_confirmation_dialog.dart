@@ -42,7 +42,7 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _confirmButtonFocusNode.requestFocus();
     });
-    
+
     // Listen to focus changes to rebuild UI
     _confirmButtonFocusNode.addListener(_onFocusChange);
     _cancelButtonFocusNode.addListener(_onFocusChange);
@@ -97,7 +97,7 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
       return Focus(
         focusNode: _dialogFocusNode,
         onKeyEvent: _handleKeyEvent,
-      child: Dialog(
+        child: Dialog(
           alignment: Alignment.center,
           child: _DesktopConfirmationWindow(
             title: widget.title,
@@ -153,9 +153,8 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                   onPressed: () => Navigator.of(context).pop(true),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.red,
-                    backgroundColor: isFocused
-                        ? Colors.red.withValues(alpha: 0.1)
-                        : null,
+                    backgroundColor:
+                        isFocused ? Colors.red.withValues(alpha: 0.1) : null,
                     side: isFocused
                         ? const BorderSide(color: Colors.red, width: 2)
                         : null,
@@ -163,7 +162,8 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                   child: Text(
                     widget.confirmText,
                     style: TextStyle(
-                      fontWeight: isFocused ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          isFocused ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 );
@@ -393,9 +393,3 @@ class _WindowTitleBar extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-

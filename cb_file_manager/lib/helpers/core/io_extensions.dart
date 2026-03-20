@@ -67,8 +67,7 @@ extension DirectoryExtension on Directory {
   /// Count files in the directory (non-recursive)
   Future<int> fileCount() async {
     try {
-      final files =
-          await list().where((entity) => entity is File).toList();
+      final files = await list().where((entity) => entity is File).toList();
       return files.length;
     } catch (e) {
       return 0;

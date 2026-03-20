@@ -41,7 +41,8 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   int gridZoomLevel = 4; // Default zoom level
 
   /// Column visibility settings for details view
-  ColumnVisibility columnVisibility = const ColumnVisibility(); // Default visibility
+  ColumnVisibility columnVisibility =
+      const ColumnVisibility(); // Default visibility
 
   /// Whether to show file tags
   bool showFileTags = true; // Default value to prevent LateInitializationError
@@ -155,10 +156,9 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
 
   /// Set view mode directly to a specific mode
   void setViewMode(ViewMode mode, {String? tabId}) {
-    final effectiveMode =
-        !isDesktopPlatform && mode == ViewMode.gridPreview
-            ? ViewMode.grid
-            : mode;
+    final effectiveMode = !isDesktopPlatform && mode == ViewMode.gridPreview
+        ? ViewMode.grid
+        : mode;
     setState(() {
       viewMode = effectiveMode;
     });
@@ -257,4 +257,3 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     );
   }
 }
-

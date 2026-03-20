@@ -317,11 +317,13 @@ class _SearchDialogState extends State<SearchDialog> {
                 ? 'Đang tìm kiếm theo tag... (ví dụ: #important)'
                 : 'Tìm kiếm tệp hoặc dùng # để tìm theo tag',
             border: InputBorder.none,
-            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            hintStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
             prefixIcon: _isSearchingTags
                 ? Icon(PhosphorIconsLight.tag,
                     color: Theme.of(context).colorScheme.onSurfaceVariant)
-                : Icon(PhosphorIconsLight.magnifyingGlass, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                : Icon(PhosphorIconsLight.magnifyingGlass,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           autofocus: true,
@@ -401,7 +403,8 @@ class _SearchDialogState extends State<SearchDialog> {
 
   Widget _buildFolderItem(Directory folder) {
     return ListTile(
-      leading: Icon(PhosphorIconsLight.folder, color: Theme.of(context).colorScheme.primary),
+      leading: Icon(PhosphorIconsLight.folder,
+          color: Theme.of(context).colorScheme.primary),
       title: Text(folder.basename()),
       onTap: () {
         Navigator.pop(context); // Close search dialog
@@ -510,7 +513,3 @@ class _SearchDialogState extends State<SearchDialog> {
     );
   }
 }
-
-
-
-

@@ -172,7 +172,8 @@ class _StreamSpeedIndicatorState extends State<StreamSpeedIndicator>
                             boxShadow: _isActive
                                 ? [
                                     BoxShadow(
-                                      color: Colors.green.withValues(alpha: 0.5),
+                                      color:
+                                          Colors.green.withValues(alpha: 0.5),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),
@@ -342,5 +343,3 @@ class SpeedGraphPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
-
-

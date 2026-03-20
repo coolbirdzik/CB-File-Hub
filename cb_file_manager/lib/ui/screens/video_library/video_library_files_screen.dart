@@ -352,7 +352,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
       height: 48,
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
+        color: isDark
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: theme.colorScheme.outline.withValues(alpha: 0.3),
@@ -675,6 +677,3 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
     tag_dialogs.showDeleteTagDialog(context, filePath, tags);
   }
 }
-
-
-

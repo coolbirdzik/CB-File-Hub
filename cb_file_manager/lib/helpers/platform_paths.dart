@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 class PlatformPaths {
-  static bool get isDesktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  static bool get isDesktop =>
+      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
   static bool get isMobile => Platform.isAndroid || Platform.isIOS;
 
   /// Get the appropriate Pictures directory for the current platform
@@ -28,7 +29,7 @@ class PlatformPaths {
       final documentsDir = await getApplicationDocumentsDirectory();
       return documentsDir.path;
     }
-    
+
     // Fallback
     final documentsDir = await getApplicationDocumentsDirectory();
     return documentsDir.path;
@@ -57,7 +58,7 @@ class PlatformPaths {
       final documentsDir = await getApplicationDocumentsDirectory();
       return documentsDir.path;
     }
-    
+
     // Fallback
     final documentsDir = await getApplicationDocumentsDirectory();
     return documentsDir.path;
@@ -86,7 +87,7 @@ class PlatformPaths {
       final documentsDir = await getApplicationDocumentsDirectory();
       return documentsDir.path;
     }
-    
+
     // Fallback
     final documentsDir = await getApplicationDocumentsDirectory();
     return documentsDir.path;
@@ -115,7 +116,7 @@ class PlatformPaths {
       final documentsDir = await getApplicationDocumentsDirectory();
       return documentsDir.path;
     }
-    
+
     // Fallback
     final documentsDir = await getApplicationDocumentsDirectory();
     return documentsDir.path;

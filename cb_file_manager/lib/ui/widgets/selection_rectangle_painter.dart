@@ -62,4 +62,3 @@ class SelectionRectanglePainter extends CustomPainter {
         oldDelegate.borderColor != borderColor;
   }
 }
-

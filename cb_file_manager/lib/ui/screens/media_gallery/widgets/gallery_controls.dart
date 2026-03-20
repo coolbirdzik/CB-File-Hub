@@ -21,7 +21,7 @@ class GalleryControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    
+
     return Stack(
       children: [
         if (searchQuery != null && searchQuery!.isNotEmpty)
@@ -32,7 +32,8 @@ class GalleryControls extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
@@ -40,7 +41,7 @@ class GalleryControls extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(
-                        PhosphorIconsLight.magnifyingGlass, 
+                        PhosphorIconsLight.magnifyingGlass,
                         size: 20,
                         color: theme.colorScheme.primary,
                       ),
@@ -54,7 +55,7 @@ class GalleryControls extends StatelessWidget {
                       ),
                       IconButton(
                         icon: Icon(
-                          PhosphorIconsLight.x, 
+                          PhosphorIconsLight.x,
                           size: 20,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -82,7 +83,8 @@ class GalleryControls extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   onTap: onToggleMasonry,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12),
@@ -91,13 +93,17 @@ class GalleryControls extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          isMasonry ? PhosphorIconsLight.gridFour : PhosphorIconsLight.squaresFour,
+                          isMasonry
+                              ? PhosphorIconsLight.gridFour
+                              : PhosphorIconsLight.squaresFour,
                           color: theme.colorScheme.primary,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          isMasonry ? l10n.masonryLayoutName : l10n.viewModeGrid,
+                          isMasonry
+                              ? l10n.masonryLayoutName
+                              : l10n.viewModeGrid,
                           style: TextStyle(
                             color: theme.colorScheme.onSurface,
                             fontSize: 12,
@@ -116,7 +122,3 @@ class GalleryControls extends StatelessWidget {
     );
   }
 }
-
-
-
-

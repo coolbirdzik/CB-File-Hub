@@ -479,7 +479,8 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                icon: const Icon(PhosphorIconsLight.skipBack, color: Colors.white),
+                icon: const Icon(PhosphorIconsLight.skipBack,
+                    color: Colors.white),
                 iconSize: 36,
                 onPressed: () {},
               ),
@@ -501,7 +502,8 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
               ),
               const SizedBox(width: 16),
               IconButton(
-                icon: const Icon(PhosphorIconsLight.skipForward, color: Colors.white),
+                icon: const Icon(PhosphorIconsLight.skipForward,
+                    color: Colors.white),
                 iconSize: 36,
                 onPressed: () {},
               ),
@@ -607,6 +609,3 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
     );
   }
 }
-
-
-

@@ -290,8 +290,8 @@ class _TagManagementHelper {
             if (dialogContext.mounted) {
               ScaffoldMessenger.of(dialogContext).showSnackBar(
                 SnackBar(
-                    content:
-                        Text(AppLocalizations.of(dialogContext)!.searchingFor(value))),
+                    content: Text(AppLocalizations.of(dialogContext)!
+                        .searchingFor(value))),
               );
             }
           },
@@ -478,8 +478,3 @@ class _NetworkHelper {
     );
   }
 }
-
-
-
-
-

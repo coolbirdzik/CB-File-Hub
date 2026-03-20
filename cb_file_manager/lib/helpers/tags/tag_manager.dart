@@ -465,9 +465,8 @@ class TagManager {
     // so that deleted tags don't reappear in the recent list
     final Set<String> validTags = await getAllUniqueTags('');
 
-    final List<String> filteredRecent = recentTagNames
-        .where((tag) => validTags.contains(tag))
-        .toList();
+    final List<String> filteredRecent =
+        recentTagNames.where((tag) => validTags.contains(tag)).toList();
 
     // Take only up to the limit
     final List<String> result = filteredRecent.take(limit).toList();

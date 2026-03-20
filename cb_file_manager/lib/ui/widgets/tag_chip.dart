@@ -53,11 +53,11 @@ class TagChip extends StatelessWidget {
         ),
         backgroundColor: displayColor,
         visualDensity: isCompact ? VisualDensity.compact : null,
-        padding:
-            isCompact ? const EdgeInsets.all(1) : const EdgeInsets.all(2),
+        padding: isCompact ? const EdgeInsets.all(1) : const EdgeInsets.all(2),
         deleteIconColor: theme.colorScheme.onPrimary,
-        deleteIcon:
-            onDeleted != null ? const Icon(PhosphorIconsLight.x, size: 14) : null,
+        deleteIcon: onDeleted != null
+            ? const Icon(PhosphorIconsLight.x, size: 14)
+            : null,
         onDeleted: onDeleted,
         elevation: 0,
         side: BorderSide.none,
@@ -65,6 +65,3 @@ class TagChip extends StatelessWidget {
     );
   }
 }
-
-
-

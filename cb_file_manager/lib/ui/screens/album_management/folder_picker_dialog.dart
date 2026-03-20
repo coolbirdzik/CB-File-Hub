@@ -139,16 +139,16 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
     if (context.mounted) {
       showDialog(
         context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('Adding folder to album...'),
-          ],
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Adding folder to album...'),
+            ],
+          ),
         ),
-      ),
       );
     }
 
@@ -266,7 +266,8 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 border: Border(
-                  bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                  bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant),
                 ),
               ),
               child: Column(
@@ -323,14 +324,18 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                               Icon(
                                 PhosphorIconsLight.folderOpen,
                                 size: 64,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'No folders found',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -348,7 +353,8 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                  top: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant),
                 ),
               ),
               child: Row(
@@ -383,6 +389,3 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
     );
   }
 }
-
-
-

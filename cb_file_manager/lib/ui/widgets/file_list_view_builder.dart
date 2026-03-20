@@ -1092,5 +1092,3 @@ class _PreviewResizeHandle extends StatelessWidget {
     );
   }
 }
-
-

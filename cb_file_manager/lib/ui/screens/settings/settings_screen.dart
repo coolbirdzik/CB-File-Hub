@@ -418,7 +418,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Expanded(
                   child: Text(
                     AppLocalizations.of(context)!.settings,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -1003,7 +1004,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           // Quick actions (always visible)
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             leading: const Icon(PhosphorIconsLight.uploadSimple, size: 20),
             title: Text(
               AppLocalizations.of(context)!.exportSettings,
@@ -1021,7 +1023,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _exportDatabase(context),
           ),
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             leading: const Icon(PhosphorIconsLight.downloadSimple, size: 20),
             title: Text(
               AppLocalizations.of(context)!.importSettings,
@@ -1084,7 +1087,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _isDatabaseSectionExpandedCloudSync = expanded;
                 });
               },
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              tilePadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               leading: const Icon(PhosphorIconsLight.cloudArrowUp, size: 20),
               title: const Text(
@@ -1135,10 +1139,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ? const SizedBox(
                                       width: 14,
                                       height: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
                                     )
-                                  : const Icon(PhosphorIconsLight.cloudArrowUp, size: 16),
-                              label: Text(AppLocalizations.of(context)!.upload, style: const TextStyle(fontSize: 12)),
+                                  : const Icon(PhosphorIconsLight.cloudArrowUp,
+                                      size: 16),
+                              label: Text(AppLocalizations.of(context)!.upload,
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1147,8 +1154,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               onPressed: _isCloudSyncEnabled && !_isSyncingCloud
                                   ? _syncFromCloud
                                   : null,
-                              icon: const Icon(PhosphorIconsLight.cloudArrowDown, size: 16),
-                              label: Text(AppLocalizations.of(context)!.download, style: const TextStyle(fontSize: 12)),
+                              icon: const Icon(
+                                  PhosphorIconsLight.cloudArrowDown,
+                                  size: 16),
+                              label: Text(
+                                  AppLocalizations.of(context)!.download,
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ),
                         ],
@@ -1225,7 +1236,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   entry.key,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Theme.of(context).colorScheme.primary,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
@@ -1233,9 +1245,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 5, vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
@@ -1265,7 +1276,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _openAdvancedDatabaseSettings,
                   icon: const Icon(PhosphorIconsLight.gear, size: 16),
-                  label: Text(AppLocalizations.of(context)!.advancedDatabaseSettings),
+                  label: Text(
+                      AppLocalizations.of(context)!.advancedDatabaseSettings),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 40),
                   ),
@@ -1371,7 +1383,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(value ? AppLocalizations.of(context)!.cloudSyncEnabled : AppLocalizations.of(context)!.cloudSyncDisabled),
+            content: Text(value
+                ? AppLocalizations.of(context)!.cloudSyncEnabled
+                : AppLocalizations.of(context)!.cloudSyncDisabled),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1397,7 +1411,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Synced to cloud successfully' : 'Failed to sync to cloud'),
+            content: Text(success
+                ? 'Synced to cloud successfully'
+                : 'Failed to sync to cloud'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1420,7 +1436,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Synced from cloud successfully' : 'Failed to sync from cloud'),
+            content: Text(success
+                ? 'Synced from cloud successfully'
+                : 'Failed to sync from cloud'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1444,12 +1462,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (saveLocation != null) {
         final dbManager = DatabaseManager.getInstance();
-        final filePath = await dbManager.exportDatabase(customPath: saveLocation);
+        final filePath =
+            await dbManager.exportDatabase(customPath: saveLocation);
         if (filePath != null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(AppLocalizations.of(context)!.exportSuccess + filePath),
+                content: Text(
+                    AppLocalizations.of(context)!.exportSuccess + filePath),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -1470,7 +1490,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.errorExporting + e.toString()),
+            content: Text(
+                AppLocalizations.of(context)!.errorExporting + e.toString()),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
@@ -1488,10 +1509,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
-        
+
         // Show loading dialog
         if (!mounted) return;
-        
+
         // Store the navigator key to close dialog later
         late NavigatorState navigator;
         showDialog(
@@ -1516,7 +1537,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         try {
           final dbManager = DatabaseManager.getInstance();
-          
+
           // Use skipFileExistenceCheck: true to allow importing tags for files
           // that don't exist yet (e.g., network drives, files to be added later)
           final success = await dbManager.importDatabase(
@@ -1535,11 +1556,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             try {
               // Clear the static cache in TagManager
               TagManager.clearCache();
-              debugPrint('SettingsScreen: Cleared TagManager cache after import');
+              debugPrint(
+                  'SettingsScreen: Cleared TagManager cache after import');
             } catch (e) {
               debugPrint('SettingsScreen: Error clearing cache: $e');
             }
-            
+
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -1565,10 +1587,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             try {
               navigator.pop();
             } catch (_) {}
-            
+
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(AppLocalizations.of(context)!.errorImporting + e.toString()),
+                content: Text(AppLocalizations.of(context)!.errorImporting +
+                    e.toString()),
                 behavior: SnackBarBehavior.floating,
                 backgroundColor: Theme.of(context).colorScheme.error,
               ),
@@ -1588,7 +1611,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.errorImporting + e.toString()),
+            content: Text(
+                AppLocalizations.of(context)!.errorImporting + e.toString()),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).colorScheme.error,
           ),

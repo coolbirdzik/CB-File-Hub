@@ -26,7 +26,9 @@ class ErrorView extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            isNetworkPath ? PhosphorIconsLight.wifiX : PhosphorIconsLight.warningCircle,
+            isNetworkPath
+                ? PhosphorIconsLight.wifiX
+                : PhosphorIconsLight.warningCircle,
             size: 72,
             color: Colors.grey,
           ),
@@ -67,7 +69,3 @@ class ErrorView extends StatelessWidget {
     );
   }
 }
-
-
-
-

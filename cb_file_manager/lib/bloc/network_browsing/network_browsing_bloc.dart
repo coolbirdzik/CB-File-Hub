@@ -183,10 +183,9 @@ class NetworkBrowsingBloc
     required NetworkServiceBase service,
   }) async {
     try {
-      final Duration timeout =
-          (Platform.isAndroid || Platform.isIOS)
-              ? const Duration(seconds: 12)
-              : const Duration(seconds: 8);
+      final Duration timeout = (Platform.isAndroid || Platform.isIOS)
+          ? const Duration(seconds: 12)
+          : const Duration(seconds: 8);
 
       List<FileSystemEntity> contents;
       try {
@@ -207,7 +206,8 @@ class NetworkBrowsingBloc
 
       if (requestId != _activeDirectoryRequestId) return;
 
-      final validContents = contents.where((item) => item.path.isNotEmpty).toList();
+      final validContents =
+          contents.where((item) => item.path.isNotEmpty).toList();
       final List<Directory> directories = <Directory>[];
       final List<File> files = <File>[];
 
@@ -228,12 +228,10 @@ class NetworkBrowsingBloc
 
         processedCount++;
 
-        final bool shouldEmitFirstBatch =
-            processedCount == firstBatchSize &&
-                processedCount < validContents.length;
-        final bool shouldEmitBatch =
-            processedCount % batchSize == 0 &&
-                processedCount < validContents.length;
+        final bool shouldEmitFirstBatch = processedCount == firstBatchSize &&
+            processedCount < validContents.length;
+        final bool shouldEmitBatch = processedCount % batchSize == 0 &&
+            processedCount < validContents.length;
 
         if (shouldEmitFirstBatch || shouldEmitBatch) {
           add(

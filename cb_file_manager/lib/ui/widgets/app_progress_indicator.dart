@@ -25,8 +25,8 @@ class AppProgressIndicator extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final effectiveBackgroundColor =
-        backgroundColor ?? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3);
+    final effectiveBackgroundColor = backgroundColor ??
+        colorScheme.surfaceContainerHighest.withValues(alpha: 0.3);
     final effectiveValueColor = valueColor ?? colorScheme.primary;
     final effectiveBorderRadius =
         borderRadius ?? BorderRadius.circular(height! / 2);
@@ -203,4 +203,3 @@ class _AppProgressIndicatorBeautifulState
     );
   }
 }
-

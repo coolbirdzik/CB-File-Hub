@@ -63,7 +63,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
   final double _minScale = 0.5;
   final double _maxScale = 5.0;
-  
+
   // Check if platform is mobile
   bool _isMobile() {
     return Platform.isAndroid || Platform.isIOS;
@@ -72,7 +72,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
   @override
   void initState() {
     super.initState();
-    
+
     // Image is precached before navigation, no need to evict
     _initImageList();
     _transformationController = TransformationController();
@@ -160,13 +160,14 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                 // If we have imageBytes (screenshot case), reorder list to put screenshot first
                 // This keeps PageController at page 0 showing the correct image
                 if (widget.imageBytes != null && index != 0) {
-                  debugPrint('🔄 Reordering list - moving screenshot from index $index to 0');
+                  debugPrint(
+                      '🔄 Reordering list - moving screenshot from index $index to 0');
                   final screenshot = images[index];
                   images.removeAt(index);
                   images.insert(0, screenshot);
                   debugPrint('   ✅ Screenshot now at index 0');
                 }
-                
+
                 _allImages = images;
                 // Keep _currentIndex = 0 to match PageController
                 debugPrint('📋 Updated image list: ${images.length} images');
@@ -342,7 +343,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                     const Divider(),
                     _infoRow('Size', fileSize),
                     const Divider(),
-                    _infoRow('Type', pathlib.extension(file.path).toUpperCase()),
+                    _infoRow(
+                        'Type', pathlib.extension(file.path).toUpperCase()),
                     const Divider(),
                     _infoRow('Last modified',
                         '${modified.day}/${modified.month}/${modified.year} ${modified.hour}:${modified.minute.toString().padLeft(2, '0')}'),
@@ -607,7 +609,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
   Widget _buildImageWidget(File file, int index) {
     // Use preloaded bytes if this file matches the widget.file path
     final useBytes = file.path == widget.file.path && widget.imageBytes != null;
-    
+
     if (useBytes) {
       debugPrint('📸 Using Image.memory for screenshot: ${file.path}');
       debugPrint('   Bytes length: ${widget.imageBytes!.length}');
@@ -639,7 +641,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
         },
       );
     }
-    
+
     return Image.file(
       file,
       fit: BoxFit.contain,
@@ -665,7 +667,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(PhosphorIconsLight.imageBroken, size: 80, color: Colors.white.withAlpha(179)),
+        Icon(PhosphorIconsLight.imageBroken,
+            size: 80, color: Colors.white.withAlpha(179)),
         const SizedBox(height: 16),
         Text('Failed to display image',
             style: TextStyle(color: Colors.white.withAlpha(179))),
@@ -758,18 +761,22 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                         Expanded(
                           child: LayoutBuilder(
                             builder: (context, constraints) {
-                              return ClipRect(child: FittedBox(
+                              return ClipRect(
+                                  child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 alignment: Alignment.centerLeft,
                                 child: ConstrainedBox(
-                                  constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                                  constraints: BoxConstraints(
+                                      maxWidth: constraints.maxWidth),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        pathlib.basename(_allImages[_currentIndex].path),
+                                        pathlib.basename(
+                                            _allImages[_currentIndex].path),
                                         style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -798,7 +805,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(PhosphorIconsLight.shareFat, size: 20),
+                          icon:
+                              const Icon(PhosphorIconsLight.shareFat, size: 20),
                           tooltip: 'Share',
                           color: Colors.white,
                           onPressed: _shareImage,
@@ -807,7 +815,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           icon: const Icon(PhosphorIconsLight.info, size: 20),
                           tooltip: 'Info',
                           color: Colors.white,
-                          onPressed: () => _showImageInfo(context, _allImages[_currentIndex]),
+                          onPressed: () => _showImageInfo(
+                              context, _allImages[_currentIndex]),
                         ),
                         PopupMenuButton<String>(
                           iconColor: Colors.white,
@@ -842,35 +851,43 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           itemBuilder: (context) => const [
                             PopupMenuItem(
                               value: 'rotate_right',
-                              child: Text('Rotate right 90°', style: TextStyle(color: Colors.white)),
+                              child: Text('Rotate right 90°',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'rotate_left',
-                              child: Text('Rotate left 90°', style: TextStyle(color: Colors.white)),
+                              child: Text('Rotate left 90°',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'toggle_thumbs',
-                              child: Text('Toggle thumbnails', style: TextStyle(color: Colors.white)),
+                              child: Text('Toggle thumbnails',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'edit',
-                              child: Text('Edit (brightness/contrast)', style: TextStyle(color: Colors.white)),
+                              child: Text('Edit (brightness/contrast)',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'open_with',
-                              child: Text('Open with...', style: TextStyle(color: Colors.white)),
+                              child: Text('Open with...',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'copy_path',
-                              child: Text('Copy file path', style: TextStyle(color: Colors.white)),
+                              child: Text('Copy file path',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'fullscreen',
-                              child: Text('Toggle fullscreen', style: TextStyle(color: Colors.white)),
+                              child: Text('Toggle fullscreen',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                             PopupMenuItem(
                               value: 'delete',
-                              child: Text('Move to trash', style: TextStyle(color: Colors.white)),
+                              child: Text('Move to trash',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                           ],
                         ),
@@ -881,246 +898,269 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
               // Main image viewer area
               Expanded(
                 child: Listener(
-            onPointerDown: (PointerDownEvent event) {
-              // Mouse button 4 is usually the back button (button value is 8)
-              if (event.buttons == 8 && _currentIndex > 0) {
-                _pageController.previousPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              }
-              // Mouse button 5 is usually the forward button (button value is 16)
-              else if (event.buttons == 16 &&
-                  _currentIndex < _allImages.length - 1) {
-                _pageController.nextPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              }
-            },
-            child: SafeArea(
-              top: false,
-              bottom: false,
-              child: Column(
-                children: [
-                  // Main image viewer
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _toggleControls,
-                      child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: _allImages.length,
-                      onPageChanged: (index) {
-                        setState(() {
-                          _currentIndex = index;
-                          // Reset transformation when changing pages
-                          _transformationController.value = Matrix4.identity();
-                          _rotation = 0.0;
-                        });
-                        // Tiền tải ảnh kế tiếp và trước đó khi người dùng chuyển ảnh
-                        _prefetchNeighboringImages();
-                      },
-                      itemBuilder: (context, index) {
-                        final file = _allImages[index];
-                        return Center(
+                  onPointerDown: (PointerDownEvent event) {
+                    // Mouse button 4 is usually the back button (button value is 8)
+                    if (event.buttons == 8 && _currentIndex > 0) {
+                      _pageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                    // Mouse button 5 is usually the forward button (button value is 16)
+                    else if (event.buttons == 16 &&
+                        _currentIndex < _allImages.length - 1) {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    }
+                  },
+                  child: SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        // Main image viewer
+                        Expanded(
                           child: GestureDetector(
-                            onDoubleTapDown: _handleDoubleTap,
-                            child: InteractiveViewer(
-                              transformationController: _transformationController,
-                              minScale: _minScale,
-                              maxScale: _maxScale,
-                              // Use default constrained: true to honor viewport constraints
-                              child: Center(
-                                key: ValueKey(file.path),
-                                child: Transform.rotate(
-                                  angle: _rotation * pi / 180,
-                                  child: _buildImageWidget(file, index),
+                            onTap: _toggleControls,
+                            child: PageView.builder(
+                              controller: _pageController,
+                              itemCount: _allImages.length,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentIndex = index;
+                                  // Reset transformation when changing pages
+                                  _transformationController.value =
+                                      Matrix4.identity();
+                                  _rotation = 0.0;
+                                });
+                                // Tiền tải ảnh kế tiếp và trước đó khi người dùng chuyển ảnh
+                                _prefetchNeighboringImages();
+                              },
+                              itemBuilder: (context, index) {
+                                final file = _allImages[index];
+                                return Center(
+                                  child: GestureDetector(
+                                    onDoubleTapDown: _handleDoubleTap,
+                                    child: InteractiveViewer(
+                                      transformationController:
+                                          _transformationController,
+                                      minScale: _minScale,
+                                      maxScale: _maxScale,
+                                      // Use default constrained: true to honor viewport constraints
+                                      child: Center(
+                                        key: ValueKey(file.path),
+                                        child: Transform.rotate(
+                                          angle: _rotation * pi / 180,
+                                          child: _buildImageWidget(file, index),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+
+                        // Thumbnail strip at the bottom
+                        if (_controlsVisible &&
+                            _showThumbnailStrip &&
+                            _allImages.length > 1)
+                          Container(
+                            height: 70,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.8),
+                              border: const Border(
+                                top: BorderSide(
+                                  color: Colors.white24,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            child: ThumbnailStrip(
+                              images: _allImages,
+                              currentIndex: _currentIndex,
+                              onThumbnailTap: (index) {
+                                _pageController.animateToPage(
+                                  index,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              },
+                            ),
+                          ),
+                        // Bottom toolbar (don't show if thumbnail strip is visible)
+                        if (_controlsVisible && !_showThumbnailStrip)
+                          Container(
+                            height: _isMobile() ? 72 : 56,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.85),
+                                  Colors.black.withValues(alpha: 0.55),
+                                  Colors.transparent,
+                                ],
+                              ),
+                              border: const Border(
+                                top: BorderSide(
+                                  color: Colors.white24,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            child: SafeArea(
+                              top: false,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (_allImages.length > 1)
+                                      IconButton(
+                                        icon: const Icon(
+                                            PhosphorIconsLight.arrowLeft,
+                                            size: 22),
+                                        tooltip: 'Previous',
+                                        color: Colors.white,
+                                        padding: const EdgeInsets.all(8),
+                                        constraints: const BoxConstraints(),
+                                        onPressed: _currentIndex > 0
+                                            ? () {
+                                                _pageController.previousPage(
+                                                  duration: const Duration(
+                                                      milliseconds: 300),
+                                                  curve: Curves.easeInOut,
+                                                );
+                                              }
+                                            : null,
+                                      ),
+                                    IconButton(
+                                      icon: const Icon(PhosphorIconsLight.minus,
+                                          size: 22),
+                                      tooltip: 'Zoom out',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _zoomOut,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                          PhosphorIconsLight.arrowsClockwise,
+                                          size: 22),
+                                      tooltip: 'Reset view',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _zoomReset,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(PhosphorIconsLight.plus,
+                                          size: 22),
+                                      tooltip: 'Zoom in',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _zoomIn,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(PhosphorIconsLight.info,
+                                          size: 22),
+                                      tooltip: 'Info',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _showImageInfo(
+                                          context, _allImages[_currentIndex]),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                          PhosphorIconsLight.shareFat,
+                                          size: 22),
+                                      tooltip: 'Share',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _shareImage,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(PhosphorIconsLight.trash,
+                                          size: 22),
+                                      tooltip: 'Delete',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _deleteImage(context),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        _isFullscreen
+                                            ? PhosphorIconsLight.arrowsIn
+                                            : PhosphorIconsLight.arrowsOut,
+                                        size: 22,
+                                      ),
+                                      tooltip: _isFullscreen
+                                          ? 'Exit fullscreen'
+                                          : 'Fullscreen',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _toggleFullscreen,
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        _slideshowPlaying
+                                            ? PhosphorIconsLight.pause
+                                            : PhosphorIconsLight.play,
+                                        size: 22,
+                                      ),
+                                      tooltip: _slideshowPlaying
+                                          ? 'Pause slideshow'
+                                          : 'Play slideshow',
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.all(8),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: _toggleSlideshow,
+                                    ),
+                                    if (_allImages.length > 1)
+                                      IconButton(
+                                        icon: const Icon(
+                                            PhosphorIconsLight.arrowRight,
+                                            size: 22),
+                                        tooltip: 'Next',
+                                        color: Colors.white,
+                                        padding: const EdgeInsets.all(8),
+                                        constraints: const BoxConstraints(),
+                                        onPressed: _currentIndex <
+                                                _allImages.length - 1
+                                            ? () {
+                                                _pageController.nextPage(
+                                                  duration: const Duration(
+                                                      milliseconds: 300),
+                                                  curve: Curves.easeInOut,
+                                                );
+                                              }
+                                            : null,
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                        );
-                      },
+                      ],
                     ),
                   ),
                 ),
-                
-                // Thumbnail strip at the bottom
-                if (_controlsVisible &&
-                    _showThumbnailStrip &&
-                    _allImages.length > 1)
-                  Container(
-                    height: 70,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.8),
-                      border: const Border(
-                        top: BorderSide(
-                          color: Colors.white24,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: ThumbnailStrip(
-                      images: _allImages,
-                      currentIndex: _currentIndex,
-                      onThumbnailTap: (index) {
-                        _pageController.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                    ),
-                  ),
-                // Bottom toolbar (don't show if thumbnail strip is visible)
-                if (_controlsVisible && !_showThumbnailStrip)
-                  Container(
-                    height: _isMobile() ? 72 : 56,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.85),
-                          Colors.black.withValues(alpha: 0.55),
-                          Colors.transparent,
-                        ],
-                      ),
-                      border: const Border(
-                        top: BorderSide(
-                          color: Colors.white24,
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                    child: SafeArea(
-                      top: false,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                          if (_allImages.length > 1)
-                            IconButton(
-                              icon: const Icon(PhosphorIconsLight.arrowLeft, size: 22),
-                              tooltip: 'Previous',
-                              color: Colors.white,
-                              padding: const EdgeInsets.all(8),
-                              constraints: const BoxConstraints(),
-                              onPressed: _currentIndex > 0
-                                  ? () {
-                                      _pageController.previousPage(
-                                        duration: const Duration(milliseconds: 300),
-                                        curve: Curves.easeInOut,
-                                      );
-                                    }
-                                  : null,
-                            ),
-                          IconButton(
-                            icon: const Icon(PhosphorIconsLight.minus, size: 22),
-                            tooltip: 'Zoom out',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _zoomOut,
-                          ),
-                          IconButton(
-                            icon: const Icon(PhosphorIconsLight.arrowsClockwise, size: 22),
-                            tooltip: 'Reset view',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _zoomReset,
-                          ),
-                          IconButton(
-                            icon: const Icon(PhosphorIconsLight.plus, size: 22),
-                            tooltip: 'Zoom in',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _zoomIn,
-                          ),
-                          IconButton(
-                            icon: const Icon(PhosphorIconsLight.info, size: 22),
-                            tooltip: 'Info',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _showImageInfo(context, _allImages[_currentIndex]),
-                          ),
-                          IconButton(
-                            icon: const Icon(PhosphorIconsLight.shareFat, size: 22),
-                            tooltip: 'Share',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _shareImage,
-                          ),
-                          IconButton(
-                            icon: const Icon(PhosphorIconsLight.trash, size: 22),
-                            tooltip: 'Delete',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _deleteImage(context),
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _isFullscreen
-                                  ? PhosphorIconsLight.arrowsIn
-                                  : PhosphorIconsLight.arrowsOut,
-                              size: 22,
-                            ),
-                            tooltip: _isFullscreen ? 'Exit fullscreen' : 'Fullscreen',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _toggleFullscreen,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _slideshowPlaying
-                                  ? PhosphorIconsLight.pause
-                                  : PhosphorIconsLight.play,
-                              size: 22,
-                            ),
-                            tooltip: _slideshowPlaying ? 'Pause slideshow' : 'Play slideshow',
-                            color: Colors.white,
-                            padding: const EdgeInsets.all(8),
-                            constraints: const BoxConstraints(),
-                            onPressed: _toggleSlideshow,
-                          ),
-                          if (_allImages.length > 1)
-                            IconButton(
-                              icon: const Icon(PhosphorIconsLight.arrowRight, size: 22),
-                              tooltip: 'Next',
-                              color: Colors.white,
-                              padding: const EdgeInsets.all(8),
-                              constraints: const BoxConstraints(),
-                              onPressed: _currentIndex < _allImages.length - 1
-                                  ? () {
-                                      _pageController.nextPage(
-                                        duration: const Duration(milliseconds: 300),
-                                        curve: Curves.easeInOut,
-                                      );
-                                    }
-                                  : null,
-                            ),
-                        ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            ),
-            ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
-      ),
       );
     } else {
       // Edit mode UI with sliders for adjustments
@@ -1212,7 +1252,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                   // Brightness slider
                   Row(
                     children: [
-                      const Icon(PhosphorIconsLight.sun, color: Colors.white, size: 20),
+                      const Icon(PhosphorIconsLight.sun,
+                          color: Colors.white, size: 20),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Slider(
@@ -1269,7 +1310,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                               horizontal: 12, vertical: 8),
                           minimumSize: const Size(100, 36),
                         ),
-                        icon: const Icon(PhosphorIconsLight.arrowsClockwise, size: 18),
+                        icon: const Icon(PhosphorIconsLight.arrowsClockwise,
+                            size: 18),
                         label: const Text('Reset'),
                       ),
                       const SizedBox(width: 16),
@@ -1289,7 +1331,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                               horizontal: 12, vertical: 8),
                           minimumSize: const Size(100, 36),
                         ),
-                        icon: const Icon(PhosphorIconsLight.floppyDisk, size: 18),
+                        icon:
+                            const Icon(PhosphorIconsLight.floppyDisk, size: 18),
                         label: const Text('Save Copy'),
                       ),
                     ],
@@ -1361,6 +1404,3 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     return '${(bytes / pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
   }
 }
-
-
-

@@ -56,4 +56,3 @@ class ThumbnailContent extends StatelessWidget {
     );
   }
 }
-

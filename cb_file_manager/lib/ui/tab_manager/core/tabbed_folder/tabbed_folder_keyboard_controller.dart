@@ -69,17 +69,21 @@ class TabbedFolderKeyboardController {
     if (key == LogicalKeyboardKey.delete) {
       // Check shift key state from both event and hardware keyboard for reliability
       final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed ||
-          HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
-          HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
-      
+          HardwareKeyboard.instance.logicalKeysPressed
+              .contains(LogicalKeyboardKey.shiftLeft) ||
+          HardwareKeyboard.instance.logicalKeysPressed
+              .contains(LogicalKeyboardKey.shiftRight);
+
       debugPrint('Delete key pressed - Shift: $isShiftPressed');
-      
+
       onDelete(isShiftPressed);
       return KeyEventResult.handled;
     }
 
     // Ctrl+A - Select all
-    if (isCtrlPressed && key == LogicalKeyboardKey.keyA && onSelectAll != null) {
+    if (isCtrlPressed &&
+        key == LogicalKeyboardKey.keyA &&
+        onSelectAll != null) {
       debugPrint('Ctrl+A pressed - Select all');
       onSelectAll();
       return KeyEventResult.handled;
@@ -114,10 +118,11 @@ class TabbedFolderKeyboardController {
     }
 
     // F5 or Ctrl+R - Refresh
-    if ((key == LogicalKeyboardKey.f5 || 
-        (isCtrlPressed && key == LogicalKeyboardKey.keyR)) && 
+    if ((key == LogicalKeyboardKey.f5 ||
+            (isCtrlPressed && key == LogicalKeyboardKey.keyR)) &&
         onRefresh != null) {
-      debugPrint('${key == LogicalKeyboardKey.f5 ? "F5" : "Ctrl+R"} pressed - Refresh');
+      debugPrint(
+          '${key == LogicalKeyboardKey.f5 ? "F5" : "Ctrl+R"} pressed - Refresh');
       onRefresh();
       return KeyEventResult.handled;
     }
@@ -137,9 +142,8 @@ class TabbedFolderKeyboardController {
         _getNavigableItems(folderListState, currentFilter);
     if (items.isEmpty) return KeyEventResult.ignored;
 
-    final bool isGridLayout =
-        folderListState.viewMode == ViewMode.grid ||
-            folderListState.viewMode == ViewMode.gridPreview;
+    final bool isGridLayout = folderListState.viewMode == ViewMode.grid ||
+        folderListState.viewMode == ViewMode.gridPreview;
     final int crossAxisCount = isGridLayout
         ? (gridCrossAxisCount ?? folderListState.gridZoomLevel).clamp(1, 999)
         : 1;

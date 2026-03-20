@@ -39,7 +39,9 @@ class BreadcrumbNavigation extends StatelessWidget {
           child: Text(
             displayName,
             style: TextStyle(
-              color: isLast ? Theme.of(context).colorScheme.onSurfaceVariant : Theme.of(context).colorScheme.primary,
+              color: isLast
+                  ? Theme.of(context).colorScheme.onSurfaceVariant
+                  : Theme.of(context).colorScheme.primary,
               fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -160,6 +162,3 @@ class BreadcrumbItem {
 
   BreadcrumbItem(this.path, this.displayName);
 }
-
-
-

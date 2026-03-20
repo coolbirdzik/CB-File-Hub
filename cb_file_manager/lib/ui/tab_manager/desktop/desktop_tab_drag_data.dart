@@ -9,4 +9,3 @@ class DesktopTabDragData {
     required this.tab,
   });
 }
-

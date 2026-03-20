@@ -18,9 +18,7 @@ class StreamingServiceManager {
       // _helpers.add(NativeSmbStreamingHelper()); // Removed - using flutter_vlc_player
 
       // Sort helpers by priority (highest first)
-      _helpers.sort((a, b) => (b)
-          .priority
-          .compareTo((a).priority));
+      _helpers.sort((a, b) => (b).priority.compareTo((a).priority));
 
       _initialized = true;
     } catch (e) {
@@ -77,10 +75,7 @@ class StreamingServiceManager {
 
       // Check if we have any native streaming helpers
       return _helpers.any((helper) =>
-          (helper)
-              .name
-              .toLowerCase()
-              .contains('native') &&
+          (helper).name.toLowerCase().contains('native') &&
           (helper).priority >= 1000);
     } catch (e) {
       AppLogger.error('Error checking native streaming availability', error: e);

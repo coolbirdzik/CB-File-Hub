@@ -185,8 +185,3 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
     );
   }
 }
-
-
-
-
-

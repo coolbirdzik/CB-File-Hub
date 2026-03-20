@@ -40,7 +40,7 @@ class _VideoLibrarySettingsScreenState
     });
 
     final config = await _service.getLibraryConfig(widget.library.id);
-    
+
     if (mounted) {
       setState(() {
         _config = config;
@@ -52,12 +52,13 @@ class _VideoLibrarySettingsScreenState
   Future<void> _addDirectory() async {
     final selectedDirectory = await VideoLibraryHelpers.pickDirectory();
     if (selectedDirectory != null && _config != null) {
-      final success =
-          await _service.addDirectoryToLibrary(widget.library.id, selectedDirectory);
-      
+      final success = await _service.addDirectoryToLibrary(
+          widget.library.id, selectedDirectory);
+
       if (success && mounted) {
         final localizations = AppLocalizations.of(context)!;
-        VideoLibraryHelpers.showSuccessMessage(context, localizations.sourceAdded);
+        VideoLibraryHelpers.showSuccessMessage(
+            context, localizations.sourceAdded);
         _loadConfig();
       }
     }
@@ -68,10 +69,11 @@ class _VideoLibrarySettingsScreenState
 
     final success =
         await _service.removeDirectoryFromLibrary(widget.library.id, directory);
-    
+
     if (success && mounted) {
       final localizations = AppLocalizations.of(context)!;
-      VideoLibraryHelpers.showSuccessMessage(context, localizations.sourceRemoved);
+      VideoLibraryHelpers.showSuccessMessage(
+          context, localizations.sourceRemoved);
       _loadConfig();
     }
   }
@@ -81,7 +83,7 @@ class _VideoLibrarySettingsScreenState
 
     final updatedConfig = _config!.copyWith(includeSubdirectories: value);
     final success = await _service.updateLibraryConfig(updatedConfig);
-    
+
     if (success) {
       setState(() {
         _config = updatedConfig;
@@ -91,11 +93,12 @@ class _VideoLibrarySettingsScreenState
 
   Future<void> _rescanLibrary() async {
     final localizations = AppLocalizations.of(context)!;
-    
-    VideoLibraryHelpers.showSuccessMessage(context, localizations.scanForVideos);
+
+    VideoLibraryHelpers.showSuccessMessage(
+        context, localizations.scanForVideos);
 
     await _service.refreshLibrary(widget.library.id);
-    
+
     if (mounted) {
       _loadConfig();
     }
@@ -152,7 +155,8 @@ class _VideoLibrarySettingsScreenState
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Icon(PhosphorIconsLight.filmStrip, color: theme.colorScheme.primary),
+                      Icon(PhosphorIconsLight.filmStrip,
+                          color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
                       Text(
                         '${_config!.fileCount} ${localizations.videos.toLowerCase()}',
@@ -238,7 +242,3 @@ class _VideoLibrarySettingsScreenState
     );
   }
 }
-
-
-
-

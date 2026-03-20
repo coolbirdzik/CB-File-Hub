@@ -77,7 +77,8 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(PhosphorIconsLight.dotsThreeVertical, color: Colors.white, size: 24),
+      icon: const Icon(PhosphorIconsLight.dotsThreeVertical,
+          color: Colors.white, size: 24),
       color: Colors.black.withValues(alpha: 0.9),
       tooltip: 'Advanced Controls',
       onSelected: (String value) {
@@ -161,7 +162,8 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
           value: 'sleep_timer',
           child: _VideoPlayerMenuTile(
             icon: PhosphorIconsLight.moon,
-            title: sleepDuration != null ? 'Sleep Timer (Active)' : 'Sleep Timer',
+            title:
+                sleepDuration != null ? 'Sleep Timer (Active)' : 'Sleep Timer',
             iconColor: sleepDuration != null ? Colors.orange : Colors.white,
             titleColor: sleepDuration != null ? Colors.orange : Colors.white,
           ),
@@ -178,8 +180,3 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
     );
   }
 }
-
-
-
-
-

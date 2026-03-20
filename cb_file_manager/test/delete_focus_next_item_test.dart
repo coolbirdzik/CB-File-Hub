@@ -105,4 +105,3 @@ void main() {
     expect(next, equals('/c.mp4'));
   });
 }
-

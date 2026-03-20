@@ -18,7 +18,9 @@ class AppTheme {
   static MaterialColor createMaterialColor(Color color) {
     List<double> strengths = <double>[.05, .1, .2, .3, .4, .5, .6, .7, .8, .9];
     Map<int, Color> swatch = {};
-    final int r = (color.r * 255.0).round(), g = (color.g * 255.0).round(), b = (color.b * 255.0).round();
+    final int r = (color.r * 255.0).round(),
+        g = (color.g * 255.0).round(),
+        b = (color.b * 255.0).round();
 
     for (final double strength in strengths) {
       final double ds = 0.5 - strength;

@@ -22,10 +22,10 @@ void main() {
     ));
 
     final next = await bloc.stream.first;
-    expect(next.selectedFilePaths, containsAll(<String>['/a.mp4', '/b.mp4', '/c.mp4']));
+    expect(next.selectedFilePaths,
+        containsAll(<String>['/a.mp4', '/b.mp4', '/c.mp4']));
     expect(next.lastSelectedPath, equals('/c.mp4'));
 
     await bloc.close();
   });
 }
-

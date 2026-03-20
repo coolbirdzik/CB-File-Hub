@@ -23,7 +23,9 @@ class SharedActionBar {
           Icon(
             icon,
             size: 20,
-            color: option == currentOption ? Theme.of(context).colorScheme.primary : null,
+            color: option == currentOption
+                ? Theme.of(context).colorScheme.primary
+                : null,
           ),
           const SizedBox(width: 10),
           Text(
@@ -31,12 +33,15 @@ class SharedActionBar {
             style: TextStyle(
               fontWeight:
                   option == currentOption ? FontWeight.bold : FontWeight.normal,
-              color: option == currentOption ? Theme.of(context).colorScheme.primary : null,
+              color: option == currentOption
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
             ),
           ),
           const Spacer(),
           if (option == currentOption)
-            Icon(PhosphorIconsLight.check, color: Theme.of(context).colorScheme.primary, size: 20),
+            Icon(PhosphorIconsLight.check,
+                color: Theme.of(context).colorScheme.primary, size: 20),
         ],
       ),
     );
@@ -64,9 +69,7 @@ class SharedActionBar {
       minValue: minGridSize,
       maxValue: maxGridSize,
     );
-    int size = currentGridSize
-        .clamp(minGridSize, dynamicMax)
-        .toInt();
+    int size = currentGridSize.clamp(minGridSize, dynamicMax).toInt();
     final l10n = AppLocalizations.of(context)!;
 
     showDialog(
@@ -74,8 +77,7 @@ class SharedActionBar {
       builder: (BuildContext context) {
         return StatefulBuilder(builder: (context, setState) {
           final sliderMax = math.max(minGridSize, dynamicMax).toInt();
-          final sliderDivisions =
-              math.max(1, sliderMax - minGridSize).toInt();
+          final sliderDivisions = math.max(1, sliderMax - minGridSize).toInt();
           return AlertDialog(
             title: Text(l10n.adjustGridSizeTitle),
             content: Column(
@@ -89,10 +91,8 @@ class SharedActionBar {
                   label: l10n.gridSizeLabel(size.round()),
                   onChanged: (double value) {
                     setState(() {
-                      size = value
-                          .round()
-                          .clamp(minGridSize, sliderMax)
-                          .toInt();
+                      size =
+                          value.round().clamp(minGridSize, sliderMax).toInt();
                     });
                   },
                 ),
@@ -400,18 +400,10 @@ class SharedActionBar {
               l10n.sortDateCreatedNewest,
               PhosphorIconsLight.clock,
               currentSortOption),
-          buildSortMenuItem(
-              context,
-              SortOption.sizeAsc,
-              l10n.sortSizeSmallest,
-              PhosphorIconsLight.chartBar,
-              currentSortOption),
-          buildSortMenuItem(
-              context,
-              SortOption.sizeDesc,
-              l10n.sortSizeLargest,
-              PhosphorIconsLight.chartBar,
-              currentSortOption),
+          buildSortMenuItem(context, SortOption.sizeAsc, l10n.sortSizeSmallest,
+              PhosphorIconsLight.chartBar, currentSortOption),
+          buildSortMenuItem(context, SortOption.sizeDesc, l10n.sortSizeLargest,
+              PhosphorIconsLight.chartBar, currentSortOption),
           const PopupMenuDivider(),
           buildSortMenuItem(context, SortOption.typeAsc, l10n.sortTypeAsc,
               PhosphorIconsLight.file, currentSortOption),
@@ -455,8 +447,7 @@ class SharedActionBar {
       actions.add(
         IconButton(
           icon: const Icon(PhosphorIconsLight.splitVertical),
-          tooltip:
-              isPreviewPaneVisible ? l10n.hidePreview : l10n.showPreview,
+          tooltip: isPreviewPaneVisible ? l10n.hidePreview : l10n.showPreview,
           onPressed: onPreviewPaneToggled,
         ),
       );
@@ -488,7 +479,9 @@ class SharedActionBar {
                 Icon(
                   PhosphorIconsLight.list,
                   size: 20,
-                  color: viewMode == ViewMode.list ? Theme.of(context).colorScheme.primary : null,
+                  color: viewMode == ViewMode.list
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Text(
@@ -497,7 +490,9 @@ class SharedActionBar {
                     fontWeight: viewMode == ViewMode.list
                         ? FontWeight.bold
                         : FontWeight.normal,
-                    color: viewMode == ViewMode.list ? Theme.of(context).colorScheme.primary : null,
+                    color: viewMode == ViewMode.list
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                 ),
                 const Spacer(),
@@ -514,7 +509,9 @@ class SharedActionBar {
                 Icon(
                   PhosphorIconsLight.squaresFour,
                   size: 20,
-                  color: viewMode == ViewMode.grid ? Theme.of(context).colorScheme.primary : null,
+                  color: viewMode == ViewMode.grid
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Text(
@@ -523,7 +520,9 @@ class SharedActionBar {
                     fontWeight: viewMode == ViewMode.grid
                         ? FontWeight.bold
                         : FontWeight.normal,
-                    color: viewMode == ViewMode.grid ? Theme.of(context).colorScheme.primary : null,
+                    color: viewMode == ViewMode.grid
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                 ),
                 const Spacer(),
@@ -541,8 +540,9 @@ class SharedActionBar {
                   Icon(
                     PhosphorIconsLight.splitVertical,
                     size: 20,
-                    color:
-                        viewMode == ViewMode.gridPreview ? Theme.of(context).colorScheme.primary : null,
+                    color: viewMode == ViewMode.gridPreview
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -551,8 +551,9 @@ class SharedActionBar {
                       fontWeight: viewMode == ViewMode.gridPreview
                           ? FontWeight.bold
                           : FontWeight.normal,
-                      color:
-                          viewMode == ViewMode.gridPreview ? Theme.of(context).colorScheme.primary : null,
+                      color: viewMode == ViewMode.gridPreview
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
                     ),
                   ),
                   const Spacer(),
@@ -569,7 +570,9 @@ class SharedActionBar {
                 Icon(
                   PhosphorIconsLight.listBullets,
                   size: 20,
-                  color: viewMode == ViewMode.details ? Theme.of(context).colorScheme.primary : null,
+                  color: viewMode == ViewMode.details
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Text(
@@ -578,7 +581,9 @@ class SharedActionBar {
                     fontWeight: viewMode == ViewMode.details
                         ? FontWeight.bold
                         : FontWeight.normal,
-                    color: viewMode == ViewMode.details ? Theme.of(context).colorScheme.primary : null,
+                    color: viewMode == ViewMode.details
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                 ),
                 const Spacer(),
@@ -621,6 +626,3 @@ class SharedActionBar {
     return actions;
   }
 }
-
-
-

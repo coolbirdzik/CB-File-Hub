@@ -197,7 +197,8 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
                           : l10n.grantAllPermissions),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -253,8 +254,12 @@ class _PermissionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(
-              granted ? PhosphorIconsLight.checkCircle : PhosphorIconsLight.warningCircle,
-              color: granted ? Theme.of(context).colorScheme.tertiary : Theme.of(context).colorScheme.secondary,
+              granted
+                  ? PhosphorIconsLight.checkCircle
+                  : PhosphorIconsLight.warningCircle,
+              color: granted
+                  ? Theme.of(context).colorScheme.tertiary
+                  : Theme.of(context).colorScheme.secondary,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -278,6 +283,3 @@ class _PermissionCard extends StatelessWidget {
     );
   }
 }
-
-
-

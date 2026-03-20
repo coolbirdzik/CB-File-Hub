@@ -129,7 +129,8 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
               const SizedBox(height: 8),
               Text(
                 l10n.useAddButtonToAddConnection,
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                style: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
               ),
             ],
           ),
@@ -167,7 +168,8 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
           title: Text(displayName, overflow: TextOverflow.ellipsis),
           subtitle: Text(subtitle),
           trailing: IconButton(
-            icon: Icon(PhosphorIconsLight.xCircle, color: theme.colorScheme.error),
+            icon: Icon(PhosphorIconsLight.xCircle,
+                color: theme.colorScheme.error),
             onPressed: () => _disconnectService(path),
             tooltip: l10n.disconnect,
           ),
@@ -290,6 +292,3 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
     }
   }
 }
-
-
-

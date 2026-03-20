@@ -196,7 +196,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           if (mounted) {
             setState(() {
               _allTags = tags.toList();
-              _allTags.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+              _allTags
+                  .sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
               _filterTags();
               _isInitialLoading = false;
             });

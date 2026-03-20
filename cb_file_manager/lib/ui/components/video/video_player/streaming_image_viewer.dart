@@ -157,7 +157,8 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(PhosphorIconsLight.warningCircle, color: Colors.red, size: 64),
+            const Icon(PhosphorIconsLight.warningCircle,
+                color: Colors.red, size: 64),
             const SizedBox(height: 16),
             Text(
               l10n.errorLoadingImage,
@@ -200,7 +201,8 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(PhosphorIconsLight.imageBroken, color: Colors.red, size: 64),
+                    const Icon(PhosphorIconsLight.imageBroken,
+                        color: Colors.red, size: 64),
                     const SizedBox(height: 16),
                     Text(
                       l10n.failedToDisplayImage,
@@ -223,7 +225,3 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
     );
   }
 }
-
-
-
-

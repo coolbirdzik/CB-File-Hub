@@ -26,7 +26,7 @@ class SoftCheckbox extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final effectiveSize = compact ? size - 4 : size;
-    
+
     return GestureDetector(
       onTap: onChanged != null ? () => _handleTap() : null,
       child: AnimatedContainer(
@@ -123,7 +123,7 @@ class SoftCheckboxInline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTap: onChanged != null ? () => onChanged!(!value) : null,
       child: AnimatedContainer(
@@ -135,9 +135,8 @@ class SoftCheckboxInline extends StatelessWidget {
           borderRadius: BorderRadius.circular(size / 3.5),
           color: value ? theme.colorScheme.primary : Colors.transparent,
           border: Border.all(
-            color: value 
-                ? theme.colorScheme.primary 
-                : theme.colorScheme.outline,
+            color:
+                value ? theme.colorScheme.primary : theme.colorScheme.outline,
             width: 1.5,
           ),
         ),

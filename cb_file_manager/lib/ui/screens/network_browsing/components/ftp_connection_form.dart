@@ -108,7 +108,8 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
       }
     } catch (e) {
       setState(() {
-        _connectionError = AppLocalizations.of(context)!.connectionFailed(e.toString());
+        _connectionError =
+            AppLocalizations.of(context)!.connectionFailed(e.toString());
       });
     } finally {
       if (mounted) {
@@ -260,8 +261,3 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
     );
   }
 }
-
-
-
-
-

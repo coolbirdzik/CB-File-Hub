@@ -38,8 +38,7 @@ class AppThemeResolver {
         : provider.fluentThemeData;
   }
 
-  static fluent.FluentThemeData resolveFluentDarkTheme(
-      ThemeProvider provider) {
+  static fluent.FluentThemeData resolveFluentDarkTheme(ThemeProvider provider) {
     return provider.currentTheme == AppThemeType.dark
         ? provider.fluentThemeData
         : FluentThemeConfig.getTheme(
@@ -80,29 +79,23 @@ class AppThemeResolver {
       return solidAtMin + (glassAtMax - solidAtMin) * normalizedStrength;
     }
 
-    double scaffoldOpacity() => isLight
-        ? opacityFor(0.99, 0.92)
-        : opacityFor(0.90, 0.34);
+    double scaffoldOpacity() =>
+        isLight ? opacityFor(0.99, 0.92) : opacityFor(0.90, 0.34);
 
-    double appBarOpacity() => isLight
-        ? opacityFor(0.99, 0.93)
-        : opacityFor(0.94, 0.46);
+    double appBarOpacity() =>
+        isLight ? opacityFor(0.99, 0.93) : opacityFor(0.94, 0.46);
 
-    double surfaceOpacity() => isLight
-        ? opacityFor(0.99, 0.90)
-        : opacityFor(0.88, 0.40);
+    double surfaceOpacity() =>
+        isLight ? opacityFor(0.99, 0.90) : opacityFor(0.88, 0.40);
 
-    double containerOpacity() => isLight
-        ? opacityFor(0.98, 0.88)
-        : opacityFor(0.84, 0.36);
+    double containerOpacity() =>
+        isLight ? opacityFor(0.98, 0.88) : opacityFor(0.84, 0.36);
 
-    double lowContainerOpacity() => isLight
-        ? opacityFor(0.98, 0.86)
-        : opacityFor(0.80, 0.32);
+    double lowContainerOpacity() =>
+        isLight ? opacityFor(0.98, 0.86) : opacityFor(0.80, 0.32);
 
-    double lowestContainerOpacity() => isLight
-        ? opacityFor(0.97, 0.84)
-        : opacityFor(0.76, 0.28);
+    double lowestContainerOpacity() =>
+        isLight ? opacityFor(0.97, 0.84) : opacityFor(0.76, 0.28);
 
     final colorScheme = baseTheme.colorScheme;
     final Color lightSurfaceBase =
@@ -115,9 +108,8 @@ class AppThemeResolver {
       surfaceBright:
           (isLight ? fluentLightBackground3 : colorScheme.surfaceBright)
               .withValues(alpha: surfaceOpacity()),
-      surfaceDim:
-          (isLight ? fluentLightBackground2 : colorScheme.surfaceDim)
-              .withValues(alpha: surfaceOpacity()),
+      surfaceDim: (isLight ? fluentLightBackground2 : colorScheme.surfaceDim)
+          .withValues(alpha: surfaceOpacity()),
       surfaceContainer:
           lightContainerBase.withValues(alpha: containerOpacity()),
       surfaceContainerHigh:
@@ -141,15 +133,13 @@ class AppThemeResolver {
 
     return baseTheme.copyWith(
       colorScheme: bridged,
-      scaffoldBackgroundColor:
-          baseTheme.scaffoldBackgroundColor.withValues(alpha: scaffoldOpacity()),
-      canvasColor:
-          baseTheme.canvasColor.withValues(alpha: scaffoldOpacity()),
+      scaffoldBackgroundColor: baseTheme.scaffoldBackgroundColor
+          .withValues(alpha: scaffoldOpacity()),
+      canvasColor: baseTheme.canvasColor.withValues(alpha: scaffoldOpacity()),
       cardColor: cardColor,
       cardTheme: baseTheme.cardTheme.copyWith(color: cardColor),
       dialogTheme: baseTheme.dialogTheme.copyWith(backgroundColor: dialogColor),
-      popupMenuTheme:
-          baseTheme.popupMenuTheme.copyWith(color: menuColor),
+      popupMenuTheme: baseTheme.popupMenuTheme.copyWith(color: menuColor),
       bottomSheetTheme: baseTheme.bottomSheetTheme.copyWith(
         backgroundColor: dialogColor,
         modalBackgroundColor: dialogColor,
@@ -176,8 +166,9 @@ class AppThemeResolver {
     if (!useAcrylicVisuals) return base;
     return createAcrylicBridgeTheme(
       baseTheme: base,
-      brightness:
-          provider.currentTheme == AppThemeType.dark ? Brightness.dark : Brightness.light,
+      brightness: provider.currentTheme == AppThemeType.dark
+          ? Brightness.dark
+          : Brightness.light,
       acrylicStrength: acrylicStrength,
     );
   }

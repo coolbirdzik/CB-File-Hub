@@ -84,7 +84,8 @@ Future<String?> showMediaPickerDialog(
       final dialogHeight = mediaQuery.size.height * 0.78;
 
       return AlertDialog(
-        title: Text(config.title ?? AppLocalizations.of(dialogContext)!.browseFiles),
+        title: Text(
+            config.title ?? AppLocalizations.of(dialogContext)!.browseFiles),
         content: SizedBox(
           width: dialogWidth,
           height: dialogHeight,
@@ -95,7 +96,8 @@ Future<String?> showMediaPickerDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: Text(AppLocalizations.of(dialogContext)!.cancel.toUpperCase()),
+            child:
+                Text(AppLocalizations.of(dialogContext)!.cancel.toUpperCase()),
           ),
         ],
       );
@@ -168,8 +170,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     return path.isWithin(root, normalizedCandidate);
   }
 
-  bool get _restrictToRoot =>
-      widget.config.restrictToRoot && _rootPath != null;
+  bool get _restrictToRoot => widget.config.restrictToRoot && _rootPath != null;
 
   bool get _canNavigateUp {
     final parent = path.dirname(_currentPath);
@@ -480,8 +481,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                 ],
                 onPressed: (index) {
                   setState(() {
-                    _viewMode =
-                        index == 0 ? MediaPickerViewMode.grid : MediaPickerViewMode.list;
+                    _viewMode = index == 0
+                        ? MediaPickerViewMode.grid
+                        : MediaPickerViewMode.list;
                   });
                 },
                 borderRadius: BorderRadius.circular(16.0),
@@ -971,9 +973,3 @@ class _PickerVideoThumbnailState extends State<_PickerVideoThumbnail> {
     return _fallbackTile(isVideo: true, isImage: false);
   }
 }
-
-
-
-
-
-

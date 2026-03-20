@@ -37,14 +37,10 @@ class FilePreviewPane extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surface
-                .withValues(alpha: 0.9),
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
             border: Border(
               bottom: BorderSide(
-                color:
-                    Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -211,10 +207,8 @@ class _PreviewPlaceholder extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: color),
+            style:
+                Theme.of(context).textTheme.bodyMedium?.copyWith(color: color),
             textAlign: TextAlign.center,
           ),
         ],
@@ -276,6 +270,3 @@ class _PdfPreviewState extends State<_PdfPreview> {
     );
   }
 }
-
-
-

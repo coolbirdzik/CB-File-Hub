@@ -328,8 +328,7 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                        '${l10n.failedToDeleteConnection}: $e'),
+                    content: Text('${l10n.failedToDeleteConnection}: $e'),
                     backgroundColor: theme.colorScheme.error,
                   ),
                 );
@@ -394,7 +393,8 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
       _refreshData();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.sampleConnectionAddedSuccess),
+          content:
+              Text(AppLocalizations.of(context)!.sampleConnectionAddedSuccess),
           backgroundColor: theme.colorScheme.tertiary,
         ),
       );
@@ -451,15 +451,15 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
                   Text(
                     l10n.noWebdavConnections,
                     style: theme.textTheme.headlineSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     l10n.addConnectionOrSampleToStart,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -522,7 +522,8 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
     } catch (_) {}
 
     return ListTile(
-      leading: Icon(PhosphorIconsLight.globe, color: theme.colorScheme.tertiary),
+      leading:
+          Icon(PhosphorIconsLight.globe, color: theme.colorScheme.tertiary),
       title: Text(host),
       subtitle: Text(l10n.connecting),
       onTap: () => _openTabForConnection(entry.key, host),
@@ -564,12 +565,14 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
                 )
               else ...[
                 IconButton(
-                  icon: Icon(PhosphorIconsLight.pencilSimple, color: theme.colorScheme.secondary),
+                  icon: Icon(PhosphorIconsLight.pencilSimple,
+                      color: theme.colorScheme.secondary),
                   onPressed: () => _editConnection(credentials),
                   tooltip: loc.editConnection,
                 ),
                 IconButton(
-                  icon: Icon(PhosphorIconsLight.trash, color: theme.colorScheme.error),
+                  icon: Icon(PhosphorIconsLight.trash,
+                      color: theme.colorScheme.error),
                   onPressed: () => _deleteConnection(credentials),
                   tooltip: loc.deleteConnection,
                 ),
@@ -604,6 +607,3 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
     }
   }
 }
-
-
-

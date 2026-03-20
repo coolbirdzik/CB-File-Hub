@@ -136,7 +136,3 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
     );
   }
 }
-
-
-
-

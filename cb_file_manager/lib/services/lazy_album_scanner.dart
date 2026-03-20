@@ -150,7 +150,6 @@ class LazyAlbumScanner {
     }
   }
 
-
   /// Check if file is image
   bool _isImageFile(String extension) {
     const imageExtensions = {

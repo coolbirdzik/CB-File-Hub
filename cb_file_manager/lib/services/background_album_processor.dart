@@ -45,7 +45,8 @@ class BackgroundAlbumProcessor {
     // Start new watcher
     _watchers[dirPath] = dir.watch(recursive: true).listen(
           (event) => _handleFileSystemEvent(dirPath, event, onFileAdded),
-          onError: (error) => AppLogger.error('Error watching $dirPath', error: error),
+          onError: (error) =>
+              AppLogger.error('Error watching $dirPath', error: error),
         );
   }
 

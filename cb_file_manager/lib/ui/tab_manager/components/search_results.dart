@@ -346,7 +346,8 @@ class _SearchResultsViewState extends State<SearchResultsView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(PhosphorIconsLight.folder, size: 48, color: Colors.amber),
+                  const Icon(PhosphorIconsLight.folder,
+                      size: 48, color: Colors.amber),
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -369,8 +370,3 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     );
   }
 }
-
-
-
-
-

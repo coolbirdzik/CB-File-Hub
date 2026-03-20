@@ -34,8 +34,8 @@ class FolderAppBarActions {
       onViewModeToggled: onViewModeToggled,
       onViewModeSelected: onViewModeSelected,
       onRefresh: onRefresh,
-      onGridSizePressed: folderListState.viewMode == ViewMode.grid
-          || folderListState.viewMode == ViewMode.gridPreview
+      onGridSizePressed: folderListState.viewMode == ViewMode.grid ||
+              folderListState.viewMode == ViewMode.gridPreview
           ? () => SharedActionBar.showGridSizeDialog(
                 context,
                 currentGridSize: folderListState.gridZoomLevel,

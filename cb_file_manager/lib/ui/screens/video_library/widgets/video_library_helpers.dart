@@ -30,16 +30,16 @@ class VideoLibraryHelpers {
   /// Parse color from hex string (e.g., "#FF0000" or "#FF0000FF")
   static Color? parseColorFromHex(String? hexString) {
     if (hexString == null || hexString.isEmpty) return null;
-    
+
     try {
       // Remove # if present
       String hex = hexString.replaceFirst('#', '');
-      
+
       // Handle both formats: RRGGBB and AARRGGBB
       if (hex.length == 6) {
         hex = 'FF$hex'; // Add alpha channel if missing
       }
-      
+
       return Color(int.parse(hex, radix: 16));
     } catch (e) {
       debugPrint('Error parsing color: $e');
@@ -52,4 +52,3 @@ class VideoLibraryHelpers {
     return parseColorFromHex(hexString) ?? fallback;
   }
 }
-

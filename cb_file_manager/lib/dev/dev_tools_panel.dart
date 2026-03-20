@@ -22,12 +22,17 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor = isDark ? Colors.grey.shade900 : Colors.grey.shade100;
-    final headerColor = isDark ? Colors.deepPurple.shade800 : Colors.deepPurple.shade400;
+    final backgroundColor =
+        isDark ? Colors.grey.shade900 : Colors.grey.shade100;
+    final headerColor =
+        isDark ? Colors.deepPurple.shade800 : Colors.deepPurple.shade400;
     final textColor = isDark ? Colors.white : Colors.black87;
     final textSecondaryColor = isDark ? Colors.white70 : Colors.black54;
-    final surfaceColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03);
-    final buttonColor = isDark ? Colors.deepPurple.shade300 : Colors.deepPurple.shade600;
+    final surfaceColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.black.withValues(alpha: 0.03);
+    final buttonColor =
+        isDark ? Colors.deepPurple.shade300 : Colors.deepPurple.shade600;
     final dangerColor = isDark ? Colors.red.shade400 : Colors.red.shade600;
 
     return Material(
@@ -63,8 +68,8 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
                   const Spacer(),
                   GestureDetector(
                     onTap: widget.onClose,
-                    child: Icon(Icons.close,
-                        color: textSecondaryColor, size: 18),
+                    child:
+                        Icon(Icons.close, color: textSecondaryColor, size: 18),
                   ),
                 ],
               ),
@@ -114,10 +119,13 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
       isLoading: _isSeeding,
       onTap: () => _seedTags(100),
       onLongPress: () => _showSeedCountDialog(),
-      iconColor: isDark ? Colors.deepPurple.shade300 : Colors.deepPurple.shade600,
+      iconColor:
+          isDark ? Colors.deepPurple.shade300 : Colors.deepPurple.shade600,
       textColor: isDark ? Colors.white : Colors.black87,
       textSecondaryColor: isDark ? Colors.white54 : Colors.black54,
-      surfaceColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+      surfaceColor: isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.black.withValues(alpha: 0.03),
     );
   }
 
@@ -133,7 +141,9 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
       iconColor: isDark ? Colors.red.shade400 : Colors.red.shade600,
       textColor: isDark ? Colors.white : Colors.black87,
       textSecondaryColor: isDark ? Colors.white54 : Colors.black54,
-      surfaceColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+      surfaceColor: isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.black.withValues(alpha: 0.03),
     );
   }
 

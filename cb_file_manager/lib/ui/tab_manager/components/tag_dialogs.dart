@@ -70,9 +70,11 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
             child: AlertDialog(
               title: Text(
                 AppLocalizations.of(context)!.addTag,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               content: Container(
                 width: double.maxFinite,
@@ -105,14 +107,17 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
                   },
                   style: TextButton.styleFrom(
                     textStyle: const TextStyle(fontSize: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                   ),
-                  child: Text(AppLocalizations.of(context)!.close.toUpperCase()),
+                  child:
+                      Text(AppLocalizations.of(context)!.close.toUpperCase()),
                 ),
                 ElevatedButton(
                   onPressed: () async {
                     final l10n = AppLocalizations.of(context)!;
-                    debugPrint('SAVE: pressed, _tagSectionReady=$_tagSectionReady');
+                    debugPrint(
+                        'SAVE: pressed, _tagSectionReady=$_tagSectionReady');
 
                     if (!_tagSectionReady) {
                       debugPrint('SAVE: section not ready');
@@ -137,7 +142,8 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
                   },
                   style: ElevatedButton.styleFrom(
                     textStyle: const TextStyle(fontSize: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                   ),
                   child: Text(AppLocalizations.of(context)!.save.toUpperCase()),
                 ),
@@ -342,7 +348,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
               filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
               child: AlertDialog(
                 title: Text(
-                  AppLocalizations.of(context)!.batchAddTags(selectedFiles.length),
+                  AppLocalizations.of(context)!
+                      .batchAddTags(selectedFiles.length),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -374,7 +381,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
                               labelText: AppLocalizations.of(context)!.tagName,
-                              hintText: AppLocalizations.of(context)!.enterTagName,
+                              hintText:
+                                  AppLocalizations.of(context)!.enterTagName,
                               prefixIcon: const Icon(PhosphorIconsLight.tag),
                               filled: true,
                               fillColor: Theme.of(context).brightness ==
@@ -426,8 +434,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                 final suggestion = tagSuggestions[index];
                                 return ListTile(
                                   dense: true,
-                                  leading:
-                                      const Icon(PhosphorIconsLight.tag, size: 18),
+                                  leading: const Icon(PhosphorIconsLight.tag,
+                                      size: 18),
                                   title: Text(suggestion),
                                   onTap: () {
                                     setState(() {
@@ -463,8 +471,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                         selectedTags.remove(tag);
                                       });
                                     },
-                                    deleteIcon:
-                                        const Icon(PhosphorIconsLight.x, size: 16),
+                                    deleteIcon: const Icon(PhosphorIconsLight.x,
+                                        size: 16),
                                   );
                                 }).toList(),
                               ),
@@ -488,7 +496,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                     ),
-                    child: Text(AppLocalizations.of(context)!.cancel.toUpperCase()),
+                    child: Text(
+                        AppLocalizations.of(context)!.cancel.toUpperCase()),
                   ),
                   ElevatedButton(
                     onPressed: () async {
@@ -496,7 +505,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                         try {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(AppLocalizations.of(context)!.applyingChanges),
+                              content: Text(AppLocalizations.of(context)!
+                                  .applyingChanges),
                               duration: const Duration(seconds: 1),
                             ),
                           );
@@ -557,7 +567,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(AppLocalizations.of(context)!
-                                    .tagsUpdated(selectedFiles.length, tagsAdded, tagsRemoved)),
+                                    .tagsUpdated(selectedFiles.length,
+                                        tagsAdded, tagsRemoved)),
                               ),
                             );
 
@@ -579,7 +590,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                     ),
-                    child: Text(AppLocalizations.of(context)!.save.toUpperCase()),
+                    child:
+                        Text(AppLocalizations.of(context)!.save.toUpperCase()),
                   ),
                 ],
               ),
@@ -766,10 +778,8 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
   @override
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.of(context).size;
-    final double dialogWidth =
-        screenSize.width * 0.5;
-    final double dialogHeight =
-        screenSize.height * 0.6;
+    final double dialogWidth = screenSize.width * 0.5;
+    final double dialogHeight = screenSize.height * 0.6;
 
     return BackdropFilter(
       filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
@@ -928,5 +938,4 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
       ),
     );
   }
-
-} 
+}

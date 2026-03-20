@@ -134,7 +134,3 @@ class ActionBarHelper {
     );
   }
 }
-
-
-
-

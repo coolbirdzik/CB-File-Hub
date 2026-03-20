@@ -1047,7 +1047,8 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
       return Container(
         color: Colors.black12,
         child: const Center(
-          child: Icon(PhosphorIconsLight.videoCamera, size: 36, color: Colors.red),
+          child:
+              Icon(PhosphorIconsLight.videoCamera, size: 36, color: Colors.red),
         ),
       );
     } else if (widget.isImage) {
@@ -1067,7 +1068,3 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
     }
   }
 }
-
-
-
-

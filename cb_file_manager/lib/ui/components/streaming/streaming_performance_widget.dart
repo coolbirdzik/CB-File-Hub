@@ -132,7 +132,8 @@ class _StreamingPerformanceWidgetState
                                 child:
                                     CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Icon(PhosphorIconsLight.speedometer, size: 16),
+                            : const Icon(PhosphorIconsLight.speedometer,
+                                size: 16),
                         label:
                             Text(_isBenchmarking ? 'Testing...' : 'Benchmark'),
                         style: ElevatedButton.styleFrom(
@@ -349,8 +350,3 @@ class _StreamingPerformanceWidgetState
     );
   }
 }
-
-
-
-
-

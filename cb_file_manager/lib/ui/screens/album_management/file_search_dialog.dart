@@ -183,7 +183,8 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               file,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return Icon(PhosphorIconsLight.imageBroken, color: Theme.of(context).colorScheme.onSurfaceVariant);
+                return Icon(PhosphorIconsLight.imageBroken,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant);
               },
             ),
           ),
@@ -309,7 +310,9 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                               Icon(
                                 PhosphorIconsLight.magnifyingGlass,
                                 size: 64,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -318,7 +321,9 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                                     : 'No images found',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                               ),
                               if (_currentSearchQuery?.isNotEmpty == true)
@@ -326,7 +331,9 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                                   'Try a different search term',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                 ),
                             ],
@@ -344,7 +351,8 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                  top: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant),
                 ),
               ),
               child: Row(
@@ -371,6 +379,3 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
     );
   }
 }
-
-
-

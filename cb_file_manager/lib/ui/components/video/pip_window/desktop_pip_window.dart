@@ -502,8 +502,12 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              icon: Icon(_isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
-                  color: Colors.white, size: 18),
+              icon: Icon(
+                  _isPlaying
+                      ? PhosphorIconsLight.pause
+                      : PhosphorIconsLight.play,
+                  color: Colors.white,
+                  size: 18),
               onPressed: () async {
                 if (_player == null) return;
                 if (_player!.state.playing) {
@@ -520,7 +524,8 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              icon: const Icon(PhosphorIconsLight.x, color: Colors.white, size: 18),
+              icon: const Icon(PhosphorIconsLight.x,
+                  color: Colors.white, size: 18),
               onPressed: () async {
                 try {
                   await windowManager.close();
@@ -700,7 +705,8 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
               Text(_formatTime(_duration),
                   style: const TextStyle(color: Colors.white70, fontSize: 12)),
               const SizedBox(width: 8),
-              const Icon(PhosphorIconsLight.speakerHigh, color: Colors.white, size: 18),
+              const Icon(PhosphorIconsLight.speakerHigh,
+                  color: Colors.white, size: 18),
               const SizedBox(width: 4),
               SizedBox(
                 width: 90,
@@ -811,8 +817,3 @@ extension _IpcHelpers on _DesktopPipWindowState {
     } catch (_) {}
   }
 }
-
-
-
-
-

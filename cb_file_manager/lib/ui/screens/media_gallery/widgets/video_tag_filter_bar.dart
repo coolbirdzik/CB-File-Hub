@@ -43,8 +43,7 @@ class _VideoTagFilterBarState extends State<VideoTagFilterBar> {
       tags = await TagManager.getRecentTags(limit: 50);
     } else {
       // Get tags from specific directory
-      tags =
-          (await TagManager.getAllUniqueTags(widget.libraryPath!)).toList();
+      tags = (await TagManager.getAllUniqueTags(widget.libraryPath!)).toList();
     }
 
     if (mounted) {
@@ -160,7 +159,3 @@ class _VideoTagFilterBarState extends State<VideoTagFilterBar> {
     );
   }
 }
-
-
-
-

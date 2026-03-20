@@ -8,7 +8,7 @@ import '../models/objectbox/album_config.dart';
 class AlbumFileScanner {
   static AlbumFileScanner? _instance;
   static AlbumFileScanner get instance => _instance ??= AlbumFileScanner._();
-  
+
   AlbumFileScanner._();
 
   final Map<int, List<FileInfo>> _cachedFiles = {};
@@ -18,7 +18,7 @@ class AlbumFileScanner {
   Future<List<FileInfo>> scanAlbumFiles(Album album, AlbumConfig config) async {
     // Check cache first
     final lastScan = _lastScanTime[album.id];
-    if (lastScan != null && 
+    if (lastScan != null &&
         DateTime.now().difference(lastScan).inMinutes < 5 &&
         _cachedFiles.containsKey(album.id)) {
       return _cachedFiles[album.id]!;
@@ -49,16 +49,17 @@ class AlbumFileScanner {
         followLinks: false,
       )) {
         if (entity is File) {
-          final fileInfo = await _processFile(entity, extensions, excludePatterns);
+          final fileInfo =
+              await _processFile(entity, extensions, excludePatterns);
           if (fileInfo != null) {
             files.add(fileInfo);
-            
+
             // Limit file count
             if (files.length >= config.maxFileCount) break;
           }
         }
       }
-      
+
       if (files.length >= config.maxFileCount) break;
     }
 
@@ -73,9 +74,10 @@ class AlbumFileScanner {
   }
 
   /// Scan files in background isolate (for large albums)
-  Future<List<FileInfo>> _scanInBackground(Album album, AlbumConfig config) async {
+  Future<List<FileInfo>> _scanInBackground(
+      Album album, AlbumConfig config) async {
     final receivePort = ReceivePort();
-    
+
     await Isolate.spawn(
       _backgroundScanner,
       {
@@ -92,15 +94,15 @@ class AlbumFileScanner {
     );
 
     final result = await receivePort.first as Map<String, dynamic>;
-    
+
     if (result['success'] == true) {
       final filesData = result['files'] as List<Map<String, dynamic>>;
       final files = filesData.map((data) => FileInfo.fromMap(data)).toList();
-      
+
       // Cache results
       _cachedFiles[album.id] = files;
       _lastScanTime[album.id] = DateTime.now();
-      
+
       return files;
     } else {
       throw Exception('Background scan failed: ${result['error']}');
@@ -110,7 +112,7 @@ class AlbumFileScanner {
   /// Background isolate scanner
   static void _backgroundScanner(Map<String, dynamic> params) async {
     final sendPort = params['sendPort'] as SendPort;
-    
+
     try {
       final directories = params['directories'] as List<String>;
       final extensions = params['extensions'] as List<String>;
@@ -131,15 +133,16 @@ class AlbumFileScanner {
           followLinks: false,
         )) {
           if (entity is File) {
-            final fileInfo = await _processFileStatic(entity, extensions, excludePatterns);
+            final fileInfo =
+                await _processFileStatic(entity, extensions, excludePatterns);
             if (fileInfo != null) {
               files.add(fileInfo);
-              
+
               if (files.length >= maxFileCount) break;
             }
           }
         }
-        
+
         if (files.length >= maxFileCount) break;
       }
 
@@ -159,12 +162,14 @@ class AlbumFileScanner {
   }
 
   /// Process a single file
-  Future<FileInfo?> _processFile(File file, List<String> extensions, List<String> excludePatterns) async {
+  Future<FileInfo?> _processFile(
+      File file, List<String> extensions, List<String> excludePatterns) async {
     return await _processFileStatic(file, extensions, excludePatterns);
   }
 
   /// Static version for isolate
-  static Future<FileInfo?> _processFileStatic(File file, List<String> extensions, List<String> excludePatterns) async {
+  static Future<FileInfo?> _processFileStatic(
+      File file, List<String> extensions, List<String> excludePatterns) async {
     final fileName = path.basename(file.path);
     final extension = path.extension(file.path).toLowerCase();
 
@@ -208,35 +213,52 @@ class AlbumFileScanner {
   }
 
   /// Static version for isolate
-  static void _sortFilesStatic(List<FileInfo> files, String sortBy, bool ascending) {
+  static void _sortFilesStatic(
+      List<FileInfo> files, String sortBy, bool ascending) {
     switch (sortBy) {
       case 'name':
-        files.sort((a, b) => ascending 
-            ? a.name.compareTo(b.name)
-            : b.name.compareTo(a.name));
+        files.sort((a, b) =>
+            ascending ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
         break;
       case 'date':
-        files.sort((a, b) => ascending 
+        files.sort((a, b) => ascending
             ? a.modifiedTime.compareTo(b.modifiedTime)
             : b.modifiedTime.compareTo(a.modifiedTime));
         break;
       case 'size':
-        files.sort((a, b) => ascending 
-            ? a.size.compareTo(b.size)
-            : b.size.compareTo(a.size));
+        files.sort((a, b) =>
+            ascending ? a.size.compareTo(b.size) : b.size.compareTo(a.size));
         break;
     }
   }
 
   /// Check if file is image
   static bool _isImageFile(String extension) {
-    const imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'};
+    const imageExtensions = {
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.bmp',
+      '.webp',
+      '.tiff',
+      '.tif'
+    };
     return imageExtensions.contains(extension);
   }
 
   /// Check if file is video
   static bool _isVideoFile(String extension) {
-    const videoExtensions = {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v'};
+    const videoExtensions = {
+      '.mp4',
+      '.avi',
+      '.mov',
+      '.wmv',
+      '.flv',
+      '.webm',
+      '.mkv',
+      '.m4v'
+    };
     return videoExtensions.contains(extension);
   }
 

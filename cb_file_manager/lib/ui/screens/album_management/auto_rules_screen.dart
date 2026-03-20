@@ -113,8 +113,8 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.error),
+            style:
+                TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
             child: const Text('Delete'),
           ),
         ],
@@ -1358,6 +1358,3 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
     }
   }
 }
-
-
-

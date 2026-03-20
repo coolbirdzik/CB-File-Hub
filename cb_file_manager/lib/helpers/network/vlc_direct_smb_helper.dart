@@ -135,8 +135,9 @@ class VlcDirectSmbHelper {
     // Base path from service (e.g. smb://host or smb://host/share)
     final basePath = smbService.basePath;
     final baseUri = Uri.tryParse(basePath);
-    final basePathSegments =
-        baseUri != null ? baseUri.pathSegments.where((s) => s.isNotEmpty).toList() : <String>[];
+    final basePathSegments = baseUri != null
+        ? baseUri.pathSegments.where((s) => s.isNotEmpty).toList()
+        : <String>[];
 
     // Normalize: '#network/SMB/<host>/<share>/subdir/file' -> 'share/subdir/file'.
     String normalized = smbPath;
@@ -168,7 +169,9 @@ class VlcDirectSmbHelper {
 
     final needsSlash = !basePath.endsWith('/');
     final prefix = needsSlash ? '$basePath/' : basePath;
-    return encodedPath.isEmpty ? basePath.replaceAll(RegExp(r'/$'), '') : '$prefix$encodedPath';
+    return encodedPath.isEmpty
+        ? basePath.replaceAll(RegExp(r'/$'), '')
+        : '$prefix$encodedPath';
   }
 
   /// Kiểm tra file type có được hỗ trợ không

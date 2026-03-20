@@ -271,7 +271,8 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         icon: PhosphorIconsLight.gear,
                         title: context.tr.settings,
                         onTap: () {
-                          _navigateTo(context, kSettingsPath, context.tr.settings);
+                          _navigateTo(
+                              context, kSettingsPath, context.tr.settings);
                         },
                       ),
                     ],

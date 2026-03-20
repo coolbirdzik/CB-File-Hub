@@ -110,7 +110,8 @@ class StreamingHelper {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
@@ -173,7 +174,8 @@ class StreamingHelper {
         debugPrint(
             'StreamingHelper: Unsupported file type detected, downloading and opening with system app');
         await _downloadAndOpen(context, remotePath);
-        return FileOpenResult(success: true, viewerLaunched: true, fileType: fileType);
+        return FileOpenResult(
+            success: true, viewerLaunched: true, fileType: fileType);
       }
 
       // Handle FTP by downloading to a temp file and opening with system default app
@@ -371,8 +373,8 @@ class StreamingHelper {
       }
 
       // Fallback: Try readFileData only for small non-media files (excluding WebDAV which was already handled)
-       if (service is MobileSMBService &&
-           (fileType != FileCategory.video && fileType != FileCategory.audio)) {
+      if (service is MobileSMBService &&
+          (fileType != FileCategory.video && fileType != FileCategory.audio)) {
         debugPrint(
             'StreamingHelper: openFileStream failed, trying readFileData fallback for non-media file');
 
@@ -416,7 +418,8 @@ class StreamingHelper {
         debugPrint(
             'StreamingHelper: All streaming methods failed for non-media file, downloading and opening with system app');
         await _downloadAndOpen(context, remotePath);
-        return FileOpenResult(success: true, viewerLaunched: true, fileType: fileType);
+        return FileOpenResult(
+            success: true, viewerLaunched: true, fileType: fileType);
       }
 
       // All methods failed
@@ -926,7 +929,3 @@ class StreamingHelper {
         filePath.toLowerCase().endsWith('.pdf');
   }
 }
-
-
-
-

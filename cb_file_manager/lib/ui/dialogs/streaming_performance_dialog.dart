@@ -361,8 +361,3 @@ class _StreamingPerformanceDialogState
     );
   }
 }
-
-
-
-
-

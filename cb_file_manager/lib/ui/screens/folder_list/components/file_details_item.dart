@@ -488,6 +488,3 @@ class _OptimizedFileIconState extends State<_OptimizedFileIcon>
     );
   }
 }
-
-
-

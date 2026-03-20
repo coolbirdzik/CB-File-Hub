@@ -651,6 +651,7 @@ class VietnameseLocalizations implements AppLocalizations {
     if (parts.isNotEmpty) msg += ' (${parts.join(', ')})';
     return msg;
   }
+
   @override
   String get tagSuggestions => 'Gợi ý thẻ';
   @override
@@ -975,8 +976,7 @@ class VietnameseLocalizations implements AppLocalizations {
   String bulkDeleteConfirmationText(int count) =>
       'Bạn có chắc muốn xóa $count thẻ? Hành động này không thể hoàn tác.';
   @override
-  String bulkDeleteSuccess(int count) =>
-      'Đã xóa thành công $count thẻ';
+  String bulkDeleteSuccess(int count) => 'Đã xóa thành công $count thẻ';
 
   // Search errors
   @override

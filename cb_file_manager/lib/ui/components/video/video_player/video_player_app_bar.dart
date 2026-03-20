@@ -61,7 +61,8 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
       title: _buildTitle(),
       leading: _isDesktopPlatform
           ? IconButton(
-              icon: const Icon(PhosphorIconsLight.arrowLeft, color: Colors.white),
+              icon:
+                  const Icon(PhosphorIconsLight.arrowLeft, color: Colors.white),
               onPressed: onClose,
             )
           : null,
@@ -74,7 +75,8 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
   Widget _buildTitle() {
     final content = Row(
       children: [
-        const Icon(PhosphorIconsLight.videoCamera, color: Colors.white70, size: 20),
+        const Icon(PhosphorIconsLight.videoCamera,
+            color: Colors.white70, size: 20),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -116,8 +118,3 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
     return actions;
   }
 }
-
-
-
-
-

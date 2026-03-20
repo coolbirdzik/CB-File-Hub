@@ -226,21 +226,22 @@ class _StreamingSpeedOverlayState extends State<StreamingSpeedOverlay>
                 'Đã tải:', _currentSpeedInfo!.formattedTotalBytes,
                 textColor: textColor),
             const SizedBox(height: 4),
-            VideoPlayerUtils.buildLabelValueRow('Thời gian:',
-                VideoPlayerUtils.formatDurationMmSs(_currentSpeedInfo!.elapsedTime),
+            VideoPlayerUtils.buildLabelValueRow(
+                'Thời gian:',
+                VideoPlayerUtils.formatDurationMmSs(
+                    _currentSpeedInfo!.elapsedTime),
                 textColor: textColor),
           ] else ...[
-            VideoPlayerUtils.buildLabelValueRow(
-                'Trạng thái:', 'Đang tải...', textColor: textColor),
+            VideoPlayerUtils.buildLabelValueRow('Trạng thái:', 'Đang tải...',
+                textColor: textColor),
             const SizedBox(height: 4),
-            VideoPlayerUtils.buildLabelValueRow(
-                'Tốc độ:', 'Chờ dữ liệu...', textColor: textColor),
+            VideoPlayerUtils.buildLabelValueRow('Tốc độ:', 'Chờ dữ liệu...',
+                textColor: textColor),
           ],
         ],
       ),
     );
   }
-
 }
 
 /// Widget button để toggle hiển thị thông tin tốc độ
@@ -277,7 +278,9 @@ class StreamingSpeedToggleButton extends StatelessWidget {
           ),
         ),
         child: Icon(
-          isVisible ? PhosphorIconsLight.speedometer : PhosphorIconsLight.speedometer,
+          isVisible
+              ? PhosphorIconsLight.speedometer
+              : PhosphorIconsLight.speedometer,
           color: iconColor,
           size: 20,
         ),
@@ -285,9 +288,3 @@ class StreamingSpeedToggleButton extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-

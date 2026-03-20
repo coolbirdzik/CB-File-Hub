@@ -263,8 +263,7 @@ void main(List<String> args) async {
     });
 
     PaintingBinding.instance.imageCache.maximumSize = 200;
-    PaintingBinding.instance.imageCache.maximumSizeBytes =
-        100 * 1024 * 1024;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024;
 
     // Initialize Media Kit with proper audio configuration
     MediaKit.ensureInitialized();

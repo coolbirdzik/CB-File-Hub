@@ -270,7 +270,3 @@ class SearchFilterResultsView extends StatelessWidget {
     }
   }
 }
-
-
-
-

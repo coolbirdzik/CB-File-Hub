@@ -139,7 +139,10 @@ class SubtitleDialogContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = <VideoPlayerRadioOption<int>>[
       const VideoPlayerRadioOption<int>(null, 'Off'),
-      ...tracks.asMap().entries.map((e) => VideoPlayerRadioOption<int>(e.key, e.value.language)),
+      ...tracks
+          .asMap()
+          .entries
+          .map((e) => VideoPlayerRadioOption<int>(e.key, e.value.language)),
     ];
     return VideoPlayerRadioListContent<int>(
       options: options,
@@ -164,7 +167,8 @@ class PlaybackSpeedDialogContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = speeds.map((s) => VideoPlayerRadioOption<double>(s, '${s}x')).toList();
+    final options =
+        speeds.map((s) => VideoPlayerRadioOption<double>(s, '${s}x')).toList();
     return VideoPlayerRadioListContent<double>(
       options: options,
       selected: current,
@@ -241,7 +245,8 @@ class SleepTimerDialogContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = <VideoPlayerRadioOption<Duration>>[
       const VideoPlayerRadioOption<Duration>(null, 'Off'),
-      ...durations.map((d) => VideoPlayerRadioOption<Duration>(d, _formatDurationOption(d))),
+      ...durations.map(
+          (d) => VideoPlayerRadioOption<Duration>(d, _formatDurationOption(d))),
     ];
     return VideoPlayerRadioListContent<Duration>(
       options: options,

@@ -112,7 +112,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 child: Text(l10n.delete,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
             ],
           ),
@@ -141,7 +142,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
             final l10n = AppLocalizations.of(context)!;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                  content: Text(l10n.itemPermanentlyDeleted(item.displayNameValue))),
+                  content:
+                      Text(l10n.itemPermanentlyDeleted(item.displayNameValue))),
             );
           }
           // Refresh the trash items
@@ -178,7 +180,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 child: Text(l10n.emptyTrashButton,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
             ],
           ),
@@ -227,7 +230,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
         if (mounted) {
           final l10n = AppLocalizations.of(context)!;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.errorOpeningRecycleBinWithError(e.toString()))),
+            SnackBar(
+                content:
+                    Text(l10n.errorOpeningRecycleBinWithError(e.toString()))),
           );
         }
       }
@@ -303,7 +308,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 child: Text(l10n.delete,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
             ],
           ),
@@ -580,12 +586,12 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                     Row(
                       children: [
                         Text(
-                          l10n.deletedAt(
-                              _formatDate(item.trashedDate),
+                          l10n.deletedAt(_formatDate(item.trashedDate),
                               _formatFileSize(item.size)),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         if (item.isSystemTrashItem) ...[
@@ -594,7 +600,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
                               borderRadius: BorderRadius.circular(16.0),
                             ),
                             child: Text(
@@ -627,7 +635,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: Icon(PhosphorIconsLight.arrowsClockwise, size: 20),
+                            icon: Icon(PhosphorIconsLight.arrowsClockwise,
+                                size: 20),
                             tooltip: l10n.restoreTooltip,
                             onPressed: () => _restoreItem(item),
                           ),
@@ -670,7 +679,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
     if (FileTypeUtils.isVideoFile(fileName)) {
       return CircleAvatar(
         backgroundColor: colorScheme.error,
-        child: Icon(PhosphorIconsLight.videoCamera, color: colorScheme.onPrimary),
+        child:
+            Icon(PhosphorIconsLight.videoCamera, color: colorScheme.onPrimary),
       );
     }
 
@@ -678,7 +688,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
     if (FileTypeUtils.isAudioFile(fileName)) {
       return CircleAvatar(
         backgroundColor: colorScheme.tertiary,
-        child: Icon(PhosphorIconsLight.musicNotes, color: colorScheme.onPrimary),
+        child:
+            Icon(PhosphorIconsLight.musicNotes, color: colorScheme.onPrimary),
       );
     }
 
@@ -699,7 +710,3 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
     );
   }
 }
-
-
-
-

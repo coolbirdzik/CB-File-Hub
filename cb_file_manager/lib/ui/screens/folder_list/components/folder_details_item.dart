@@ -397,6 +397,3 @@ class _FolderInteractionLayerState extends State<_FolderInteractionLayer> {
     );
   }
 }
-
-
-

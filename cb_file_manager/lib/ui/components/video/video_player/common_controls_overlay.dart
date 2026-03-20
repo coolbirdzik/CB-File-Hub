@@ -50,7 +50,7 @@ class CommonVideoControlsOverlay extends StatelessWidget {
           end: Alignment.topCenter,
           colors: [
             Colors.black.withValues(alpha: 0.85),
-                Colors.black.withValues(alpha: 0.5),
+            Colors.black.withValues(alpha: 0.5),
             Colors.transparent,
           ],
         ),
@@ -77,18 +77,30 @@ class CommonVideoControlsOverlay extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                icon: Icon(hasPrev ? PhosphorIconsLight.skipBack : PhosphorIconsLight.skipBack,
-                    color: hasPrev ? Colors.white : Colors.white24, size: 26),
+                icon: Icon(
+                    hasPrev
+                        ? PhosphorIconsLight.skipBack
+                        : PhosphorIconsLight.skipBack,
+                    color: hasPrev ? Colors.white : Colors.white24,
+                    size: 26),
                 onPressed: hasPrev ? onPrev : null,
               ),
               IconButton(
-                icon: Icon(isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
-                    color: Colors.white, size: 32),
+                icon: Icon(
+                    isPlaying
+                        ? PhosphorIconsLight.pause
+                        : PhosphorIconsLight.play,
+                    color: Colors.white,
+                    size: 32),
                 onPressed: onPlayPause,
               ),
               IconButton(
-                icon: Icon(hasNext ? PhosphorIconsLight.skipForward : PhosphorIconsLight.skipForward,
-                    color: hasNext ? Colors.white : Colors.white24, size: 26),
+                icon: Icon(
+                    hasNext
+                        ? PhosphorIconsLight.skipForward
+                        : PhosphorIconsLight.skipForward,
+                    color: hasNext ? Colors.white : Colors.white24,
+                    size: 26),
                 onPressed: hasNext ? onNext : null,
               ),
               const Spacer(),
@@ -101,7 +113,8 @@ class CommonVideoControlsOverlay extends StatelessWidget {
               if (onVolumeChange != null)
                 Row(
                   children: [
-                    const Icon(PhosphorIconsLight.speakerHigh, color: Colors.white, size: 18),
+                    const Icon(PhosphorIconsLight.speakerHigh,
+                        color: Colors.white, size: 18),
                     SizedBox(
                       width: 100,
                       child: Slider(
@@ -128,6 +141,3 @@ class CommonVideoControlsOverlay extends StatelessWidget {
     );
   }
 }
-
-
-

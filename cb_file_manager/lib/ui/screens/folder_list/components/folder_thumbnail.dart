@@ -478,7 +478,3 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
 // Helper function to determine if we're on desktop
 bool get isDesktopPlatform =>
     Platform.isWindows || Platform.isMacOS || Platform.isLinux;
-
-
-
-

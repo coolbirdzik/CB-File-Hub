@@ -51,9 +51,3 @@ class DirectoryCardListWidget extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
