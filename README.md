@@ -4,6 +4,10 @@
 [![Release](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+<p align="center">
+  <img src="cb_file_manager/assets/images/logo_circle.png" alt="CB File Hub logo" width="180" />
+</p>
+
 CB File Hub is a cross-platform file manager focused on large personal media libraries. It is built for the situation where movies, photos, clips, and folders keep growing until finding the right thing to watch feels harder than watching it.
 
 Instead of acting like a generic explorer, the app is designed to reduce browsing fatigue: faster visual scanning, tag-based organization, tabbed navigation on both desktop and mobile, network playback, and albums that can organize themselves with rules.
