@@ -383,7 +383,7 @@ class MobileFileActionsController {
       padding: const EdgeInsets.symmetric(horizontal: 2.0),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
-        boxShadow: [],
+        boxShadow: const [],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -538,7 +538,7 @@ class MobileFileActionsController {
             margin: const EdgeInsets.only(top: 44), // Below action bar
             decoration: BoxDecoration(
               color: theme.scaffoldBackgroundColor,
-              boxShadow: [],
+              boxShadow: const [],
             ),
             child: StatefulBuilder(
               builder: (context, setState) => Column(

@@ -52,6 +52,10 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
       _isSearching = true;
     });
 
+    // Pre-extract context-dependent values before async gap
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     try {
       List<FileSystemEntity> results;
       if (_isGlobalSearch) {
@@ -64,15 +68,19 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
         );
       }
 
-      RouteUtils.safePopDialog(context);
+      try {
+        navigator.pop();
+      } catch (_) {}
       widget.onSearchComplete(results, _tagController.text.trim());
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi tìm kiếm: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      try {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tìm kiếm: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } catch (_) {}
     } finally {
       if (mounted) {
         setState(() {

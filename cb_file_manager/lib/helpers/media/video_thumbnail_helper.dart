@@ -1220,7 +1220,7 @@ class VideoThumbnailHelper {
         // Custom mode: use FFmpeg with user-configured timestamp percentage
         // Using optimized single-pass extraction that gets duration + thumbnail in one file open
         _log(
-            'VideoThumbnail: [Custom Mode] Extracting at ${percentage}% of video for $videoPath');
+            'VideoThumbnail: [Custom Mode] Extracting at $percentage% of video for $videoPath');
 
         // Emit status for custom mode with position info
         try {
@@ -1229,7 +1229,7 @@ class VideoThumbnailHelper {
             isGenerating: true,
             mode: ThumbnailMode.custom,
             positionPercent: percentage,
-            statusMessage: '${percentage}%',
+            statusMessage: '$percentage%',
           ));
         } catch (_) {}
 
@@ -1250,7 +1250,7 @@ class VideoThumbnailHelper {
             final file = File(nativePath);
             if (await file.exists() && await file.length() > 0) {
               _log(
-                  'VideoThumbnail: [Custom Mode] Extraction successful at ${percentage}% for $videoPath');
+                  'VideoThumbnail: [Custom Mode] Extraction successful at $percentage% for $videoPath');
               return nativePath;
             }
           }

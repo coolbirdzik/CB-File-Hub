@@ -678,8 +678,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                               desktopActiveTabColor,
                                           onTabPrimaryClick:
                                               (index, shiftPressed) {
-                                            if (index >= state.tabs.length)
+                                            if (index >= state.tabs.length) {
                                               return;
+                                            }
 
                                             final tabId = state.tabs[index].id;
                                             final bloc =
@@ -1107,6 +1108,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final moveSelection = _resolveTabMoveSelection(dragged.tabId);
     final moveCount = moveSelection.tabIds.length;
 
+    // ignore: use_build_context_synchronously
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return;
 
@@ -1161,7 +1163,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 decoration: BoxDecoration(
                   color: bg,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [],
+                  boxShadow: const [],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1206,6 +1208,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                         final ok = await svc.openNewWindow(tabs: tabs);
                         if (!mounted) return;
                         if (ok) {
+                          // ignore: use_build_context_synchronously
                           final bloc = context.read<TabManagerBloc>();
                           for (final id in moveSelection.tabIds) {
                             bloc.add(CloseTab(id));
@@ -1254,6 +1257,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                               final ok = await svc.sendTabsToWindow(w, tabs);
                               if (!mounted) return;
                               if (ok) {
+                                // ignore: use_build_context_synchronously
                                 final bloc = context.read<TabManagerBloc>();
                                 for (final id in moveSelection.tabIds) {
                                   bloc.add(CloseTab(id));
@@ -1292,6 +1296,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (!mounted) return;
 
     if (result == WindowsNativeTabDragResult.moved) {
+      // ignore: use_build_context_synchronously
       final bloc = context.read<TabManagerBloc>();
       for (final id in moveSelection.tabIds) {
         bloc.add(CloseTab(id));
@@ -1305,13 +1310,16 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (!mounted) return null;
 
     if (others.isEmpty) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
+        // ignore: use_build_context_synchronously
         SnackBar(content: Text(context.tr.noOtherWindows)),
       );
       return null;
     }
 
     return showDialog<DesktopWindowInfo>(
+      // ignore: use_build_context_synchronously
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1353,12 +1361,15 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (!mounted) return;
 
     if (incomingTabs.isEmpty) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
+        // ignore: use_build_context_synchronously
         SnackBar(content: Text(context.tr.noTabsOpen)),
       );
       return;
     }
 
+    // ignore: use_build_context_synchronously
     final bloc = context.read<TabManagerBloc>();
     for (int i = 0; i < incomingTabs.length; i++) {
       final t = incomingTabs[i];
@@ -1425,6 +1436,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
     if (action == null || !mounted) return;
 
+    // ignore: use_build_context_synchronously
     final bloc = context.read<TabManagerBloc>();
     final svc = locator<DesktopWindowingService>();
     final payloads = moveSelection.payloads.isNotEmpty
@@ -1465,19 +1477,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           bloc.add(CloseTab(id));
         }
         return;
-    }
-  }
-
-  /// Helper method to create fallback tab
-  void _createFallbackTab() {
-    if (mounted) {
-      try {
-        context
-            .read<TabManagerBloc>()
-            .add(AddTab(path: '#home', name: context.tr.homeTab));
-      } catch (e) {
-        debugPrint("Failed to create fallback tab: $e");
-      }
     }
   }
 

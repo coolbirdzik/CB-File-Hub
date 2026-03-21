@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as pathlib;
@@ -25,8 +26,9 @@ class VideoPlayerFullScreen extends StatefulWidget {
   })  : assert(file != null || (contentUri != null && contentUri.isNotEmpty)),
         super(key: key);
 
+  // ignore: library_private_types_in_public_api
   @override
-  _VideoPlayerFullScreenState createState() => _VideoPlayerFullScreenState();
+  State<VideoPlayerFullScreen> createState() => _VideoPlayerFullScreenState();
 }
 
 String _shortName(String? contentUri) {
@@ -58,7 +60,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
         SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
       });
       // Ensure Flutter re-applies overlays automatically while this route is on top
-      WidgetsBinding.instance.renderView.automaticSystemUiAdjustment = true;
+      RendererBinding.instance.renderViews.first.automaticSystemUiAdjustment = true;
       // Re-assert overlays for a short period in case platform view toggles them off
       int attempts = 0;
       _uiEnforceTimer?.cancel();
@@ -119,7 +121,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
         overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
     // Keep automatic adjustment enabled for underlying screens
-    WidgetsBinding.instance.renderView.automaticSystemUiAdjustment = true;
+    RendererBinding.instance.renderViews.first.automaticSystemUiAdjustment = true;
     _uiEnforceTimer?.cancel();
     _overlayHideTimer?.cancel();
     super.dispose();
@@ -215,40 +217,44 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     );
   }
 
+  void _onVideoInitialized(Map<String, dynamic> metadata) {
+    setState(() => _videoMetadata = metadata);
+    if (Platform.isAndroid || Platform.isIOS) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    }
+  }
+
+  void _onVideoError(String errorMessage) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Lỗi: $errorMessage')),
+    );
+  }
+
+  void _onFullScreenChanged() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+      _showAppBar = true;
+    });
+    _showOverlaysTemporarily();
+  }
+
+  void _onControlVisibilityChanged() {
+    _showOverlaysTemporarily();
+  }
+
   Widget _buildPlayer(BuildContext context) {
-    final onInit = (Map<String, dynamic> metadata) {
-      setState(() => _videoMetadata = metadata);
-      if (Platform.isAndroid || Platform.isIOS) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
-        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
-      }
-    };
-    final onErr = (String errorMessage) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $errorMessage')),
-      );
-    };
-    final onFs = () {
-      setState(() {
-        _isFullScreen = !_isFullScreen;
-        _showAppBar = true;
-      });
-      _showOverlaysTemporarily();
-    };
-    final onCtrl = () {
-      _showOverlaysTemporarily();
-    };
     if (widget.file != null) {
       return VideoPlayer.file(
         file: widget.file!,
         autoPlay: true,
         showControls: true,
         allowFullScreen: true,
-        onVideoInitialized: onInit,
-        onError: onErr,
-        onFullScreenChanged: onFs,
-        onControlVisibilityChanged: onCtrl,
+        onVideoInitialized: _onVideoInitialized,
+        onError: _onVideoError,
+        onFullScreenChanged: _onFullScreenChanged,
+        onControlVisibilityChanged: _onControlVisibilityChanged,
         onOpenFolder: (folderPath, highlightedFileName) {
           Navigator.of(context).pop({
             'action': 'openFolder',
@@ -264,10 +270,10 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
       autoPlay: true,
       showControls: true,
       allowFullScreen: true,
-      onVideoInitialized: onInit,
-      onError: onErr,
-      onFullScreenChanged: onFs,
-      onControlVisibilityChanged: onCtrl,
+      onVideoInitialized: _onVideoInitialized,
+      onError: _onVideoError,
+      onFullScreenChanged: _onFullScreenChanged,
+      onControlVisibilityChanged: _onControlVisibilityChanged,
     );
   }
 

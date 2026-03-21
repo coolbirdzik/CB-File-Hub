@@ -23,7 +23,8 @@ class PathNavigationBar extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _PathNavigationBarState createState() => _PathNavigationBarState();
+  // ignore: library_private_types_in_public_api
+  State<PathNavigationBar> createState() => _PathNavigationBarState();
 }
 
 class _PathNavigationBarState extends State<PathNavigationBar> {

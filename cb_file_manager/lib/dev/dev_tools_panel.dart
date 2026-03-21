@@ -31,10 +31,7 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
     final surfaceColor = isDark
         ? Colors.white.withValues(alpha: 0.05)
         : Colors.black.withValues(alpha: 0.03);
-    final buttonColor =
-        isDark ? Colors.deepPurple.shade300 : Colors.deepPurple.shade600;
-    final dangerColor = isDark ? Colors.red.shade400 : Colors.red.shade600;
-
+    // Theme colors defined but may be used by future button implementations
     return Material(
       elevation: 8,
       borderRadius: BorderRadius.circular(12),

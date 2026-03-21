@@ -24,7 +24,6 @@ class SelectionSummaryTooltip extends StatefulWidget {
 
 class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
   int _totalSize = 0;
-  bool _calculating = false;
 
   @override
   void initState() {
@@ -48,8 +47,6 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
       return;
     }
 
-    setState(() => _calculating = true);
-
     int size = 0;
 
     // We copy the list to ensure we are working on a stable list even if widget updates
@@ -70,7 +67,6 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
     if (mounted) {
       setState(() {
         _totalSize = size;
-        _calculating = false;
       });
     }
   }

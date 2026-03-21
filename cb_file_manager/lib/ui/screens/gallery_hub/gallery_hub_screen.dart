@@ -486,7 +486,6 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
         // Adjust padding and spacing for smaller screens
         final isMobile = constraints.maxWidth < 200;
         final cardPadding = isMobile ? 12.0 : 20.0;
-        final iconPadding = isMobile ? 10.0 : 12.0;
         final iconSize = isMobile ? 20.0 : 24.0;
         final spacing = isMobile ? 8.0 : 12.0;
 

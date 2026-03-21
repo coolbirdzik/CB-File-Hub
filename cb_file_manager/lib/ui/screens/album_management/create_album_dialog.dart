@@ -217,7 +217,7 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: isSelected
-                      ? Icon(
+                      ? const Icon(
                           PhosphorIconsLight.check,
                           color: Colors.white,
                           size: 20,

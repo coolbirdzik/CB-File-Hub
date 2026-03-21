@@ -358,7 +358,7 @@ class MobileSMBService implements ISmbService {
       final smbPath = _getSmbPathFromTabPath(tabPath);
       debugPrint('MobileSMBService: Converted tabPath to smbPath: $smbPath');
 
-      final Duration timeout = const Duration(seconds: 12);
+      const Duration timeout = Duration(seconds: 12);
       List<SmbFile> smbFiles;
       try {
         smbFiles = await _smbClient.listDirectory(smbPath).timeout(timeout);

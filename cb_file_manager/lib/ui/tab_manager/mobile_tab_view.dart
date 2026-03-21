@@ -645,7 +645,7 @@ class MobileTabView extends StatelessWidget {
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16.0),
           border: Border.all(color: borderColor),
-          boxShadow: [],
+          boxShadow: const [],
         ),
         child: Stack(
           children: [

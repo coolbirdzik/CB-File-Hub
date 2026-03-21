@@ -289,7 +289,7 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
         child: AnimatedBuilder(
           animation: _animation,
           builder: (context, child) {
-            final pulse = Tween<double>(begin: 0.22, end: 0.42)
+            Tween<double>(begin: 0.22, end: 0.42)
                 .transform(_animation.value);
 
             return Stack(
@@ -318,7 +318,7 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
                       borderRadius: BorderRadius.circular(11),
                       color: stripFillColor,
                       border: Border.all(color: stripBorderColor, width: 1.8),
-                      boxShadow: [],
+                      boxShadow: const [],
                     ),
                   ),
                 ),

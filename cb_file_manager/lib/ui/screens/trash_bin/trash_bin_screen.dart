@@ -413,34 +413,34 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
         actions: [
           if (isSelectionMode) ...[
             IconButton(
-              icon: Icon(PhosphorIconsLight.checkSquare),
+              icon: const Icon(PhosphorIconsLight.checkSquare),
               tooltip: l10n.selectAll,
               onPressed: _selectAll,
             ),
             IconButton(
-              icon: Icon(PhosphorIconsLight.arrowsClockwise),
+              icon: const Icon(PhosphorIconsLight.arrowsClockwise),
               tooltip: l10n.restoreSelected,
               onPressed: selectedPaths.isEmpty ? null : _restoreSelectedItems,
             ),
             IconButton(
-              icon: Icon(PhosphorIconsLight.trash),
+              icon: const Icon(PhosphorIconsLight.trash),
               tooltip: l10n.deleteSelected,
               onPressed: selectedPaths.isEmpty ? null : _deleteSelectedItems,
             ),
           ] else ...[
             IconButton(
-              icon: Icon(PhosphorIconsLight.checkSquare),
+              icon: const Icon(PhosphorIconsLight.checkSquare),
               tooltip: l10n.selectItems,
               onPressed: _trashItems.isEmpty ? null : _toggleSelectionMode,
             ),
             if (Platform.isWindows && _showSystemOptions)
               IconButton(
-                icon: Icon(PhosphorIconsLight.arrowSquareOut),
+                icon: const Icon(PhosphorIconsLight.arrowSquareOut),
                 tooltip: l10n.openRecycleBin,
                 onPressed: _openSystemRecycleBin,
               ),
             IconButton(
-              icon: Icon(PhosphorIconsLight.trash),
+              icon: const Icon(PhosphorIconsLight.trash),
               tooltip: l10n.emptyTrashTooltip,
               onPressed: _trashItems.isEmpty ? null : _emptyTrash,
             ),
@@ -508,7 +508,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _loadTrashItems,
-                icon: Icon(PhosphorIconsLight.arrowsClockwise),
+                icon: const Icon(PhosphorIconsLight.arrowsClockwise),
                 label: Text(l10n.tryAgain),
               ),
             ],
@@ -545,7 +545,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadTrashItems,
-              icon: Icon(PhosphorIconsLight.arrowsClockwise),
+              icon: const Icon(PhosphorIconsLight.arrowsClockwise),
               label: Text(l10n.refresh),
             ),
           ],
@@ -635,13 +635,13 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: Icon(PhosphorIconsLight.arrowsClockwise,
+                            icon: const Icon(PhosphorIconsLight.arrowsClockwise,
                                 size: 20),
                             tooltip: l10n.restoreTooltip,
                             onPressed: () => _restoreItem(item),
                           ),
                           IconButton(
-                            icon: Icon(PhosphorIconsLight.trash, size: 20),
+                            icon: const Icon(PhosphorIconsLight.trash, size: 20),
                             tooltip: l10n.deletePermanentlyTooltip,
                             onPressed: () => _deleteItem(item),
                           ),

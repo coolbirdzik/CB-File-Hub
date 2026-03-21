@@ -57,8 +57,8 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
     TagManager.instance.notifyTagChanged("global:tag_updated");
   }
 
-  late TagManagementSection _tagSection;
-  bool _tagSectionReady = false;
+  late TagManagementSection tagSection;
+  bool tagSectionReady = false;
 
   showDialog(
     context: context,
@@ -94,8 +94,8 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
                       setState(() {});
                     },
                     onSectionReady: (section) {
-                      _tagSection = section;
-                      _tagSectionReady = true;
+                      tagSection = section;
+                      tagSectionReady = true;
                     },
                   ),
                 ),
@@ -117,27 +117,36 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
                   onPressed: () async {
                     final l10n = AppLocalizations.of(context)!;
                     debugPrint(
-                        'SAVE: pressed, _tagSectionReady=$_tagSectionReady');
+                        'SAVE: pressed, tagSectionReady=$tagSectionReady');
 
-                    if (!_tagSectionReady) {
+                    if (!tagSectionReady) {
                       debugPrint('SAVE: section not ready');
                       return;
                     }
 
+                    // Pre-extract all context-dependent values before async gap
+                    final navigator = Navigator.of(context, rootNavigator: true);
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
                     try {
                       debugPrint('SAVE: calling saveChanges');
-                      await _tagSection.saveChanges();
+                      await tagSection.saveChanges();
                       debugPrint('SAVE: save done, closing');
+                      // ignore: use_build_context_synchronously
                       refreshParentUI(context, filePath);
-                      Navigator.of(context, rootNavigator: true).pop();
+                      try {
+                        navigator.pop();
+                      } catch (_) {}
                     } catch (e) {
                       debugPrint('SAVE: error=$e');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.errorSavingTags(e.toString())),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      try {
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.errorSavingTags(e.toString())),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } catch (_) {}
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -219,44 +228,45 @@ void showDeleteTagDialog(
                 TextButton(
                   onPressed: () async {
                     if (selectedTag != null) {
+                      // Pre-extract all context-dependent values before async gap
+                      final l10n = AppLocalizations.of(context)!;
+                      final bloc = BlocProvider.of<FolderListBloc>(context, listen: false);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+
                       try {
                         await TagManager.removeTag(filePath, selectedTag!);
                         TagManager.clearCache();
 
-                        if (context.mounted) {
-                          try {
-                            final bloc = BlocProvider.of<FolderListBloc>(
-                                context,
-                                listen: false);
-                            bloc.add(RemoveTagFromFile(filePath, selectedTag!));
-                          } catch (e) {}
+                        try {
+                          bloc.add(RemoveTagFromFile(filePath, selectedTag!));
+                        } catch (_) {}
 
-                          TagManager.instance
-                              .notifyTagChanged("tag_only:$filePath");
+                        TagManager.instance.notifyTagChanged("tag_only:$filePath");
 
-                          ScaffoldMessenger.of(context).showSnackBar(
+                        try {
+                          scaffoldMessenger.showSnackBar(
                             SnackBar(
-                              content: Text(AppLocalizations.of(context)!
-                                  .tagDeleted(selectedTag!)),
+                              content: Text(l10n.tagDeleted(selectedTag!)),
                               duration: const Duration(seconds: 1),
                             ),
                           );
-
-                          RouteUtils.safePopDialog(context);
-                        }
+                          navigator.pop();
+                        } catch (_) {}
                       } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                        try {
+                          scaffoldMessenger.showSnackBar(
                             SnackBar(
-                              content: Text(AppLocalizations.of(context)!
-                                  .errorDeletingTag(e.toString())),
+                              content: Text(l10n.errorDeletingTag(e.toString())),
                               backgroundColor: Colors.red,
                             ),
                           );
-                        }
+                        } catch (_) {}
                       }
                     } else {
-                      RouteUtils.safePopDialog(context);
+                      try {
+                        Navigator.of(context).pop();
+                      } catch (_) {}
                     }
                   },
                   child: Text(
@@ -306,12 +316,12 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     TagManager.clearCache();
 
     try {
-      if (context.mounted && selectedFiles.isNotEmpty) {
+      if (selectedFiles.isNotEmpty) {
         for (final file in selectedFiles) {
           TagManager.instance.notifyTagChanged("preserve_scroll:$file");
         }
       }
-    } catch (e) {}
+    } catch (_) {}
   }
 
   final batchTagManager = BatchTagManager.getInstance();
@@ -501,88 +511,86 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      if (context.mounted) {
+                      // Pre-extract all context-dependent values before async gap
+                      final l10n = AppLocalizations.of(context)!;
+                      final bloc = BlocProvider.of<FolderListBloc>(context, listen: false);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+
+                      try {
                         try {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          scaffoldMessenger.showSnackBar(
                             SnackBar(
-                              content: Text(AppLocalizations.of(context)!
-                                  .applyingChanges),
+                              content: Text(l10n.applyingChanges),
                               duration: const Duration(seconds: 1),
                             ),
                           );
+                        } catch (_) {}
 
-                          TagManager.clearCache();
+                        TagManager.clearCache();
 
-                          final commonTags = await batchTagManager
-                              .findCommonTags(selectedFiles);
+                        final commonTags = await batchTagManager
+                            .findCommonTags(selectedFiles);
 
-                          int tagsAdded = 0;
-                          int tagsRemoved = 0;
+                        int tagsAdded = 0;
+                        int tagsRemoved = 0;
 
-                          for (final filePath in selectedFiles) {
-                            final existingTags =
-                                await TagManager.getTags(filePath);
+                        for (final filePath in selectedFiles) {
+                          final existingTags =
+                              await TagManager.getTags(filePath);
 
-                            final Set<String> originalTagsSet =
-                                Set.from(existingTags);
-                            final Set<String> currentTagsSet =
-                                Set.from(selectedTags);
-                            final Set<String> commonTagsSet =
-                                Set.from(commonTags);
+                          final Set<String> originalTagsSet =
+                              Set.from(existingTags);
+                          final Set<String> currentTagsSet =
+                              Set.from(selectedTags);
+                          final Set<String> commonTagsSet =
+                              Set.from(commonTags);
 
-                            final updatedTags =
-                                Set<String>.from(originalTagsSet);
+                          final updatedTags =
+                              Set<String>.from(originalTagsSet);
 
-                            final commonTagsToRemove =
-                                commonTagsSet.difference(currentTagsSet);
-                            updatedTags.removeAll(commonTagsToRemove);
-                            tagsRemoved += commonTagsToRemove.length;
+                          final commonTagsToRemove =
+                              commonTagsSet.difference(currentTagsSet);
+                          updatedTags.removeAll(commonTagsToRemove);
+                          tagsRemoved += commonTagsToRemove.length;
 
-                            final tagsToAdd =
-                                currentTagsSet.difference(originalTagsSet);
-                            updatedTags.addAll(tagsToAdd);
-                            tagsAdded += tagsToAdd.length;
+                          final tagsToAdd =
+                              currentTagsSet.difference(originalTagsSet);
+                          updatedTags.addAll(tagsToAdd);
+                          tagsAdded += tagsToAdd.length;
 
-                            await TagManager.setTags(
-                                filePath, updatedTags.toList());
+                          await TagManager.setTags(
+                              filePath, updatedTags.toList());
 
-                            try {
-                              if (context.mounted) {
-                                final bloc = BlocProvider.of<FolderListBloc>(
-                                    context,
-                                    listen: false);
-                                for (String tag in commonTagsToRemove) {
-                                  bloc.add(RemoveTagFromFile(filePath, tag));
-                                }
-                                for (String tag in tagsToAdd) {
-                                  bloc.add(AddTagToFile(filePath, tag));
-                                }
-                              }
-                            } catch (e) {}
-                          }
-
-                          refreshParentUIBatch();
-
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(AppLocalizations.of(context)!
-                                    .tagsUpdated(selectedFiles.length,
-                                        tagsAdded, tagsRemoved)),
-                              ),
-                            );
-
-                            RouteUtils.safePopDialog(context);
-                          }
-                        } catch (e) {
-                          debugPrint('Error processing batch tags: $e');
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text('Error processing tags: $e')),
-                            );
-                          }
+                          try {
+                            for (String tag in commonTagsToRemove) {
+                              bloc.add(RemoveTagFromFile(filePath, tag));
+                            }
+                            for (String tag in tagsToAdd) {
+                              bloc.add(AddTagToFile(filePath, tag));
+                            }
+                          } catch (_) {}
                         }
+
+                        refreshParentUIBatch();
+
+                        try {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.tagsUpdated(
+                                  selectedFiles.length, tagsAdded, tagsRemoved)),
+                            ),
+                          );
+                          navigator.pop();
+                        } catch (_) {}
+                      } catch (e) {
+                        debugPrint('Error processing batch tags: $e');
+                        try {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                                content: Text('Error processing tags: $e')),
+                          );
+                        } catch (_) {}
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -626,12 +634,12 @@ void showRemoveTagsDialog(BuildContext context, List<String> filePaths) {
     TagManager.clearCache();
 
     try {
-      if (context.mounted && filePaths.isNotEmpty) {
+      if (filePaths.isNotEmpty) {
         for (final file in filePaths) {
           TagManager.instance.notifyTagChanged("preserve_scroll:$file");
         }
       }
-    } catch (e) {}
+    } catch (_) {}
   }
 
   showDialog(
@@ -713,35 +721,36 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
 
     setState(() => _isRemoving = true);
 
+    // Pre-extract all context-dependent values before async gap
+    final bloc = BlocProvider.of<FolderListBloc>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      try {
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context)!.applyingChanges),
             duration: const Duration(seconds: 1),
           ),
         );
-      }
+      } catch (_) {}
 
       for (final tagToRemove in _selectedTagsToRemove) {
         await BatchTagManager.removeTagFromFilesStatic(
             widget.filePaths, tagToRemove);
 
-        if (mounted) {
-          try {
-            final bloc =
-                BlocProvider.of<FolderListBloc>(context, listen: false);
-            for (final filePath in widget.filePaths) {
-              bloc.add(RemoveTagFromFile(filePath, tagToRemove));
-            }
-          } catch (e) {}
-        }
+        try {
+          for (final filePath in widget.filePaths) {
+            bloc.add(RemoveTagFromFile(filePath, tagToRemove));
+          }
+        } catch (_) {}
       }
 
-      if (mounted) {
-        RouteUtils.safePopDialog(context);
+      try {
+        navigator.pop();
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(
               'Đã xóa ${_selectedTagsToRemove.length} thẻ khỏi ${widget.filePaths.length} tệp',
@@ -756,18 +765,17 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
         }
 
         widget.onTagsRemoved();
-      }
+      } catch (_) {}
     } catch (e) {
       debugPrint('Error removing tags: $e');
-      if (mounted) {
-        setState(() => _isRemoving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+      try {
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('Lỗi khi xóa thẻ: $e'),
             backgroundColor: Colors.red,
           ),
         );
-      }
+      } catch (_) {}
     } finally {
       if (mounted) {
         setState(() => _isRemoving = false);
@@ -807,13 +815,13 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_isLoading)
-                Expanded(
+                const Expanded(
                   child: Center(
                       child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
                       Text("Đang tải thẻ...")
                     ],
                   )),
@@ -855,9 +863,9 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                                 fontWeight: FontWeight.bold,
                               )),
                         ),
-                      Text(
+                      const Text(
                         'Chọn thẻ chung để xóa:',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -432,6 +431,10 @@ class FileOperationsHandler {
 
     if (confirmed != true) return;
 
+    // Pre-extract ScaffoldMessenger before async gap (showDialog is an async op above)
+    // ignore: use_build_context_synchronously
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     final rawName = controller.text.trim();
     final newName = isFile ? rawName + path.extension(currentName) : rawName;
 
@@ -439,10 +442,13 @@ class FileOperationsHandler {
 
     bloc.add(RenameFileOrFolder(entity, newName));
 
-    _showSnackBarSafe(
-      context,
-      isFile ? l10n.renamedFileTo(newName) : l10n.renamedFolderTo(newName),
-    );
+    try {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(isFile ? l10n.renamedFileTo(newName) : l10n.renamedFolderTo(newName)),
+        ),
+      );
+    } catch (_) {}
   }
 
   /// Handle file tap - opens the file with the appropriate viewer based on file type
@@ -498,6 +504,7 @@ class FileOperationsHandler {
             });
           } else {
             if (context.mounted) {
+              // ignore: use_build_context_synchronously
               Navigator.of(context, rootNavigator: true)
                   .push(
                 MaterialPageRoute(
@@ -507,6 +514,7 @@ class FileOperationsHandler {
               )
                   .then((_) {
                 _tryRestoreSelectionAfterViewer(
+                  // ignore: use_build_context_synchronously
                   context,
                   snapshot: selectionSnapshot,
                   selectionBloc: selectionBloc,

@@ -33,6 +33,7 @@ import 'package:cb_file_manager/config/languages/vietnamese_localizations.dart';
 class SearchErrorMessages {
   // Helper methods to get localized messages
   // Currently defaults to English as BLoC doesn't have context
+  // ignore: unused_field
   static final _defaultLocalizations = EnglishLocalizations();
 
   static AppLocalizations _getL10n() => _l10nNoContext();
@@ -1241,6 +1242,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
         ),
       );
       if (opId != null) {
+        // ignore: unnecessary_non_null_assertion
         operation.fail(opId!, detail: l10n.operationFailed);
       }
       // Fallback: refresh the entire folder if something goes wrong.
@@ -1391,6 +1393,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
         error: l10n.errorDeletingItemsWithError(e.toString()),
       ));
       if (opId != null) {
+        // ignore: unnecessary_non_null_assertion
         operation.fail(opId!, detail: l10n.operationFailed);
       }
       // Fallback: refresh the entire folder if something goes wrong

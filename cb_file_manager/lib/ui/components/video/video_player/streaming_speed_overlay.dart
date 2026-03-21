@@ -178,7 +178,7 @@ class _StreamingSpeedOverlayState extends State<StreamingSpeedOverlay>
           color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
-        boxShadow: [],
+        boxShadow: const [],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

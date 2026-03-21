@@ -32,8 +32,11 @@ class VideoPlayerRadioListContent<T> extends StatelessWidget {
           .map((opt) => ListTile(
                 title: Text(opt.label),
                 leading: Radio<T?>(
+                  // ignore: deprecated_member_use
                   value: opt.value,
+                  // ignore: deprecated_member_use
                   groupValue: selected,
+                  // ignore: deprecated_member_use
                   onChanged: (v) {
                     onSelect(v);
                     RouteUtils.safePopDialog(context);

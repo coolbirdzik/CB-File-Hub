@@ -237,9 +237,9 @@ class FileListViewBuilder {
                       return;
                     }
                     if (event is PointerScrollEvent) {
-                      if (RawKeyboard.instance.keysPressed
+                      if (HardwareKeyboard.instance.logicalKeysPressed
                               .contains(LogicalKeyboardKey.controlLeft) ||
-                          RawKeyboard.instance.keysPressed
+                          HardwareKeyboard.instance.logicalKeysPressed
                               .contains(LogicalKeyboardKey.controlRight)) {
                         final direction = event.scrollDelta.dy > 0 ? 1 : -1;
                         onZoomLevelChanged(direction);
@@ -1013,7 +1013,7 @@ class _GridPreviewLayoutState extends State<_GridPreviewLayout> {
                                 Colors.transparent,
                               ],
                             ),
-                            boxShadow: [],
+                            boxShadow: const [],
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -1033,7 +1033,7 @@ class _GridPreviewLayoutState extends State<_GridPreviewLayout> {
                                   .primary
                                   .withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(999),
-                              boxShadow: [],
+                              boxShadow: const [],
                             ),
                           ),
                         ),

@@ -123,6 +123,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _scrollController.addListener(_onScroll);
 
     // Enable hardware acceleration for smoother animations
+    // ignore: deprecated_member_use
     WidgetsBinding.instance.renderView.automaticSystemUiAdjustment = false;
     // Avoid forcing semantics to prevent potential render/semantics assertions
 
@@ -241,6 +242,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     }
 
     // Restore default settings
+    // ignore: deprecated_member_use
     WidgetsBinding.instance.renderView.automaticSystemUiAdjustment = true;
 
     super.dispose();
@@ -321,6 +323,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       final gridZoomLevel = await prefs.getGridZoomLevel();
       final columnVisibility = await prefs.getColumnVisibility();
       final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+        // ignore: use_build_context_synchronously
         context,
         mode: GridSizeMode.columns,
       );
@@ -593,8 +596,13 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             _updatePath(currentTab.path);
           }
         },
-        child: WillPopScope(
-          onWillPop: _handleBackButton,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (!didPop) {
+              await _handleBackButton();
+            }
+          },
           child: Listener(
             onPointerSignal: (PointerSignalEvent event) {
               if (_viewMode != ViewMode.grid) {

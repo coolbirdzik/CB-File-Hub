@@ -119,7 +119,7 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
         fallbackBuilder: () => isVideo
             ? Container(
                 color: Colors.black26,
-                child: Center(
+                child: const Center(
                   child: Icon(
                     PhosphorIconsLight.playCircle,
                     size: 48,

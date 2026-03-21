@@ -656,7 +656,7 @@ class FileOperations {
       final sources = _clipboardItems.map((e) => e.path).toList();
 
       // Use process to call the native method channel
-      final channel = const MethodChannel('cb_file_manager/file_operations');
+      const channel = MethodChannel('cb_file_manager/file_operations');
       final methodName = _isCut ? 'moveItems' : 'copyItems';
 
       final result = await channel.invokeMethod<bool>(

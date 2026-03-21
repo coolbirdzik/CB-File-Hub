@@ -178,12 +178,12 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           File(album.coverImagePath!),
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return Icon(PhosphorIconsLight.imageSquare,
+                            return const Icon(PhosphorIconsLight.imageSquare,
                                 size: 30);
                           },
                         ),
                       )
-                    : Icon(PhosphorIconsLight.imageSquare,
+                    : const Icon(PhosphorIconsLight.imageSquare,
                         size: 30, color: Colors.white),
               ),
               const SizedBox(width: 16),
@@ -277,7 +277,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
           },
         ),
         IconButton(
-          icon: Icon(PhosphorIconsLight.plus),
+          icon: const Icon(PhosphorIconsLight.plus),
           onPressed: _showCreateAlbumDialog,
           tooltip: 'Create Album',
         ),
@@ -290,7 +290,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             }
           },
           itemBuilder: (context) => [
-            PopupMenuItem(
+            const PopupMenuItem(
               value: 'refresh',
               child: Row(
                 children: [
@@ -340,7 +340,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                       const SizedBox(height: 24),
                       ElevatedButton.icon(
                         onPressed: _showCreateAlbumDialog,
-                        icon: Icon(PhosphorIconsLight.plus),
+                        icon: const Icon(PhosphorIconsLight.plus),
                         label: const Text('Create Album'),
                       ),
                     ],
@@ -384,7 +384,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateAlbumDialog,
         tooltip: 'Create Album',
-        child: Icon(PhosphorIconsLight.plus),
+        child: const Icon(PhosphorIconsLight.plus),
       ),
     );
   }
@@ -443,7 +443,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         }
                       },
                       itemBuilder: (context) => [
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'set_cover',
                           child: Row(
                             children: [
@@ -453,7 +453,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                             ],
                           ),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'random_cover',
                           child: Row(
                             children: [
@@ -463,7 +463,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                             ],
                           ),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'delete',
                           child: Row(
                             children: [
@@ -523,7 +523,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
         File(album.coverImagePath!),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) =>
-            Icon(PhosphorIconsLight.imageSquare, size: 30),
+            const Icon(PhosphorIconsLight.imageSquare, size: 30),
       );
     }
 
@@ -559,7 +559,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
           File(path),
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) =>
-              Icon(PhosphorIconsLight.imageSquare, size: 30),
+              const Icon(PhosphorIconsLight.imageSquare, size: 30),
         );
       },
     );
@@ -605,7 +605,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                         File(p),
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
-                            Icon(PhosphorIconsLight.imageBroken),
+                            const Icon(PhosphorIconsLight.imageBroken),
                       ),
                     ),
                   );

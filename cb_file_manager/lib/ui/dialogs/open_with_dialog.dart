@@ -209,32 +209,37 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                             ),
                           ),
                           onTap: () async {
+                            // Pre-extract context-dependent values before async gap
+                            final scaffoldMessenger = ScaffoldMessenger.of(context);
+                            final navigator = Navigator.of(context);
+                            final l10n = AppLocalizations.of(context)!;
+
                             if (Platform.isWindows) {
                               final exe = Platform.resolvedExecutable;
                               final ok =
                                   await WindowsAppIcon.setSelfAsDefaultForVideo(
                                       exe);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                              try {
+                                scaffoldMessenger.showSnackBar(
                                   SnackBar(
                                     content: Text(ok
                                         ? 'CB File Hub is now the default for video files.'
                                         : 'Could not set as default.'),
                                   ),
                                 );
-                                Navigator.pop(context);
-                              }
+                                navigator.pop();
+                              } catch (_) {}
                             } else if (Platform.isAndroid) {
                               await ExternalAppHelper.openDefaultAppSettings();
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                              try {
+                                scaffoldMessenger.showSnackBar(
                                   SnackBar(
-                                    content: Text(AppLocalizations.of(context)!
+                                    content: Text(l10n
                                         .setCoolBirdAsDefaultForVideosAndroidHint),
                                   ),
                                 );
-                                Navigator.pop(context);
-                              }
+                                navigator.pop();
+                              } catch (_) {}
                             }
                           },
                         ),

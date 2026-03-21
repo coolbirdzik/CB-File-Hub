@@ -282,7 +282,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   Timer? _visibilityDebounceTimer;
   String? _networkThumbnailPath; // Store the generated thumbnail path
   bool _isScrollingFast = false; // Track if user is scrolling fast
-  int _thumbnailVersion = 0; // Track thumbnail version to force rebuild
+  final int _thumbnailVersion = 0; // Track thumbnail version to force rebuild
 
   // PERFORMANCE: Increased debounce to reduce lag during fast scrolling
   // Only load thumbnails when item has been visible for a significant time

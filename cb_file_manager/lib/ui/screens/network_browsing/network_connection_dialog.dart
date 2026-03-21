@@ -98,8 +98,10 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
       if (state.lastSuccessfullyConnectedPath != null &&
           widget.onConnectionRequested != null) {
         final connectionPath = state.lastSuccessfullyConnectedPath!;
+        // ignore: use_build_context_synchronously
         final tabName = _getTabNameFromPath(context, connectionPath);
         widget.onConnectionRequested!(connectionPath, tabName);
+        // ignore: use_build_context_synchronously
         RouteUtils.safePopDialog(context);
       }
     });
@@ -512,7 +514,7 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: Icon(
+                                        icon: const Icon(
                                             PhosphorIconsLight.pencilSimple,
                                             size: 16),
                                         onPressed: () {
@@ -644,10 +646,10 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.error.withOpacity(0.1),
+                            color: theme.colorScheme.error.withValues(alpha: 0.1),
                             border: Border.all(
                                 color:
-                                    theme.colorScheme.error.withOpacity(0.3)),
+                                    theme.colorScheme.error.withValues(alpha: 0.3)),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Row(

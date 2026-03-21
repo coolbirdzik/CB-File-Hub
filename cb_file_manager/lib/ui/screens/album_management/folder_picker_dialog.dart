@@ -138,6 +138,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
     // Show loading dialog
     if (context.mounted) {
       showDialog(
+        // ignore: use_build_context_synchronously
         context: context,
         barrierDismissible: false,
         builder: (context) => const AlertDialog(
@@ -206,7 +207,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
             return const Text('Counting...');
           },
         ),
-        trailing: Icon(PhosphorIconsLight.caretRight),
+        trailing: const Icon(PhosphorIconsLight.caretRight),
         onTap: () => _navigateToDirectory(directory.path),
       ),
     );
@@ -241,7 +242,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               ),
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.folderOpen, color: Colors.white),
+                  const Icon(PhosphorIconsLight.folderOpen, color: Colors.white),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -254,7 +255,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.x, color: Colors.white),
+                    icon: const Icon(PhosphorIconsLight.x, color: Colors.white),
                     onPressed: () => RouteUtils.safePopDialog(context),
                   ),
                 ],
@@ -275,7 +276,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                   Row(
                     children: [
                       IconButton(
-                        icon: Icon(PhosphorIconsLight.arrowLeft),
+                        icon: const Icon(PhosphorIconsLight.arrowLeft),
                         onPressed: path.dirname(_currentPath) != _currentPath
                             ? _navigateUp
                             : null,

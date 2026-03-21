@@ -138,7 +138,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
             : 'Auto Album Rules'),
         actions: [
           IconButton(
-            icon: Icon(PhosphorIconsLight.plus),
+            icon: const Icon(PhosphorIconsLight.plus),
             onPressed: _showCreateRuleDialog,
             tooltip: 'Create New Rule',
           ),
@@ -183,7 +183,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: _showCreateRuleDialog,
-            icon: Icon(PhosphorIconsLight.plus),
+            icon: const Icon(PhosphorIconsLight.plus),
             label: const Text('Create Your First Rule'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -324,7 +324,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
+                    const PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
@@ -334,7 +334,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                         ],
                       ),
                     ),
-                    PopupMenuItem(
+                    const PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
@@ -564,7 +564,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(PhosphorIconsLight.x),
+                    icon: const Icon(PhosphorIconsLight.x),
                   ),
                 ],
               ),
@@ -1056,7 +1056,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(PhosphorIconsLight.x),
+                    icon: const Icon(PhosphorIconsLight.x),
                   ),
                 ],
               ),

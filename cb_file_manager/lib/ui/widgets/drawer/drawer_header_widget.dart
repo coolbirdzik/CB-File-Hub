@@ -30,7 +30,7 @@ class DrawerHeaderWidget extends StatelessWidget {
             cs.surfaceContainerHighest.withValues(alpha: 0.75),
           ],
         ),
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           bottomRight: Radius.circular(20),
         ),
       ),

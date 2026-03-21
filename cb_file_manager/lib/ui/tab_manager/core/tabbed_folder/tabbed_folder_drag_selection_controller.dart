@@ -100,19 +100,19 @@ class TabbedFolderDragSelectionController {
   void _selectItemsInRect(Rect selectionRect) {
     if (!isDragging.value) return;
 
-    final RawKeyboard keyboard = RawKeyboard.instance;
+    final keyboard = HardwareKeyboard.instance;
     final bool isCtrlPressed =
-        keyboard.keysPressed.contains(LogicalKeyboardKey.control) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.controlLeft) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.controlRight) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.meta) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.metaLeft) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.metaRight);
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.control) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlLeft) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlRight) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.meta) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaLeft) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaRight);
 
     final bool isShiftPressed =
-        keyboard.keysPressed.contains(LogicalKeyboardKey.shift) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
-            keyboard.keysPressed.contains(LogicalKeyboardKey.shiftRight);
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shift) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
+            keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
 
     final folderPaths = folderListBloc.state.folders
         .whereType<Directory>()

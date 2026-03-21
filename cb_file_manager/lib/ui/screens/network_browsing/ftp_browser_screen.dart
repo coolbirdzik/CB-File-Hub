@@ -174,12 +174,12 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
       showAppBar: true,
       actions: [
         IconButton(
-          icon: Icon(PhosphorIconsLight.arrowsClockwise),
+          icon: const Icon(PhosphorIconsLight.arrowsClockwise),
           onPressed: _refreshData,
           tooltip: context.tr.refreshData,
         ),
         IconButton(
-          icon: Icon(PhosphorIconsLight.plus),
+          icon: const Icon(PhosphorIconsLight.plus),
           onPressed: _connectToFTPServer,
           tooltip: context.tr.addConnection,
         ),

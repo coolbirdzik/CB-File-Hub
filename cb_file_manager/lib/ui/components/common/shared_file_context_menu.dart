@@ -490,36 +490,6 @@ class SharedFileContextMenu extends StatelessWidget {
   String _basename(File file) {
     return file.path.split(Platform.pathSeparator).last;
   }
-
-  Widget _buildToggleSidebarPinTile({
-    required BuildContext context,
-    required ThemeData theme,
-    required String path,
-  }) {
-    return FutureBuilder<bool>(
-      future: _isPathPinnedToSidebar(path),
-      builder: (context, snapshot) {
-        final isPinned = snapshot.data ?? false;
-        final l10n = AppLocalizations.of(context)!;
-        return ListTile(
-          leading: Icon(
-            isPinned
-                ? PhosphorIconsLight.pushPinSlash
-                : PhosphorIconsLight.pushPin,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          title: Text(
-            isPinned ? l10n.unpinFromSidebar : l10n.pinToSidebar,
-            style: TextStyle(color: theme.colorScheme.onSurface),
-          ),
-          onTap: () async {
-            Navigator.pop(context);
-            await _toggleSidebarPinnedPathWithFeedback(context, path);
-          },
-        );
-      },
-    );
-  }
 }
 
 /// A shared context menu for folders

@@ -233,7 +233,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               ),
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.magnifyingGlass, color: Colors.white),
+                  const Icon(PhosphorIconsLight.magnifyingGlass, color: Colors.white),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -246,7 +246,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.x, color: Colors.white),
+                    icon: const Icon(PhosphorIconsLight.x, color: Colors.white),
                     onPressed: () => RouteUtils.safePopDialog(context),
                   ),
                 ],
@@ -259,10 +259,10 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Search for images...',
-                  prefixIcon: Icon(PhosphorIconsLight.magnifyingGlass),
+                  prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(PhosphorIconsLight.x),
+                          icon: const Icon(PhosphorIconsLight.x),
                           onPressed: () {
                             _searchController.clear();
                           },

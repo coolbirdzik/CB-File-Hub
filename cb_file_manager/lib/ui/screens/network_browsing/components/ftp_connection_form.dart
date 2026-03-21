@@ -11,7 +11,8 @@ class FtpConnectionForm extends StatefulWidget {
   const FtpConnectionForm({Key? key}) : super(key: key);
 
   @override
-  _FtpConnectionFormState createState() => _FtpConnectionFormState();
+  // ignore: library_private_types_in_public_api
+  State<FtpConnectionForm> createState() => _FtpConnectionFormState();
 }
 
 class _FtpConnectionFormState extends State<FtpConnectionForm> {
@@ -60,6 +61,9 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
         password: password,
       );
 
+      // Pre-extract all context-dependent values before the entire async chain
+      final bloc = context.read<NetworkBrowsingBloc>();
+
       await ftpClient.connect();
 
       // Set passive mode based on selection
@@ -90,22 +94,22 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
         }
       }
 
-      // Continue with successful connection
-      if (context.mounted) {
-        context.read<NetworkBrowsingBloc>().add(
-              NetworkConnectionRequested(
-                serviceName: 'FTP',
-                host: host,
-                username: username,
-                password: password,
-                port: port,
-                additionalOptions: {
-                  'usePassiveMode': _usePassiveMode,
-                },
-              ),
-            );
-        RouteUtils.safePopDialog(context);
-      }
+      // Continue with successful connection (after all awaits above)
+      // ignore: use_build_context_synchronously
+      bloc.add(
+        NetworkConnectionRequested(
+          serviceName: 'FTP',
+          host: host,
+          username: username,
+          password: password,
+          port: port,
+          additionalOptions: {
+            'usePassiveMode': _usePassiveMode,
+          },
+        ),
+      );
+      // ignore: use_build_context_synchronously
+      RouteUtils.safePopDialog(context);
     } catch (e) {
       setState(() {
         _connectionError =

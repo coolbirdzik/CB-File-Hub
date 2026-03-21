@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 /// Utility class for formatting common data types like file sizes and dates
 class FormatUtils {

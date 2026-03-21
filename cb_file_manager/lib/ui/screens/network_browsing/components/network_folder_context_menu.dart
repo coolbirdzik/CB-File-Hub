@@ -27,7 +27,7 @@ class NetworkFolderContextMenu {
         PopupMenuItem(
           onTap: onRefresh,
           child: ListTile(
-            leading: Icon(PhosphorIconsLight.arrowsClockwise),
+            leading: const Icon(PhosphorIconsLight.arrowsClockwise),
             title: Text(l10n.refresh),
           ),
         ),
@@ -35,14 +35,14 @@ class NetworkFolderContextMenu {
         PopupMenuItem(
           onTap: onCreateFolder,
           child: ListTile(
-            leading: Icon(PhosphorIconsLight.folderPlus),
+            leading: const Icon(PhosphorIconsLight.folderPlus),
             title: Text(l10n.newFolder),
           ),
         ),
         PopupMenuItem(
           onTap: onUploadFile,
           child: ListTile(
-            leading: Icon(PhosphorIconsLight.uploadSimple),
+            leading: const Icon(PhosphorIconsLight.uploadSimple),
             title: Text(l10n.uploadFile),
           ),
         ),

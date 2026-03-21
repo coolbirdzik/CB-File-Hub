@@ -754,7 +754,7 @@ class FtpMeta {
 class Class {
   Class();
 
-  dynamic get FTPConnect => throw Exception(
+  dynamic get ftpConnect => throw Exception(
         'FTP functionality requires the ftpconnect package. '
         'Please ensure it is properly installed and configured in pubspec.yaml.',
       );

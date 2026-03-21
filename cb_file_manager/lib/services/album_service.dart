@@ -265,7 +265,12 @@ class AlbumService {
         final exists = await _isFileInAlbumTxn(txn, albumId, filePath);
         if (exists) continue;
 
-        final stat = await File(filePath).stat().catchError((_) => null);
+        FileStat? stat;
+        try {
+          stat = await File(filePath).stat();
+        } catch (_) {
+          // File may not exist or be inaccessible
+        }
         if (stat == null) continue;
 
         final nextOrderIndex = sqflite.Sqflite.firstIntValue(

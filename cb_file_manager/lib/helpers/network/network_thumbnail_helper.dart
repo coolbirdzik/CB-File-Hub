@@ -5,12 +5,10 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
-import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:cb_file_manager/services/network_browsing/network_service_base.dart';
 import 'package:cb_file_manager/services/network_browsing/network_service_registry.dart';
 import 'package:cb_file_manager/services/network_browsing/smb_service.dart';
 import 'package:cb_file_manager/services/network_browsing/mobile_smb_service.dart';
-import 'package:cb_file_manager/services/streaming/smb_http_proxy_server.dart';
 import 'package:cb_file_manager/ui/state/video_ui_state.dart';
 import 'package:image/image.dart' as img;
 import 'win32_smb_helper.dart';
@@ -784,28 +782,6 @@ class NetworkThumbnailHelper {
     return null;
   }
 
-  Future<Uint8List?> _generateMobileSmbVideoThumbnailBytes({
-    required NetworkServiceBase? service,
-    required String smbTabPath,
-    required int size,
-  }) async {
-    final smbUrl = await _tryResolveSmbUrlForProxy(service, smbTabPath);
-    if (smbUrl == null || smbUrl.isEmpty) {
-      return null;
-    }
-
-    final httpUrl = await SmbHttpProxyServer.instance.urlFor(smbUrl);
-
-    return await VideoThumbnail.thumbnailData(
-      video: httpUrl.toString(),
-      imageFormat: ImageFormat.PNG,
-      maxWidth: size,
-      maxHeight: size,
-      quality: 100,
-      timeMs: 1000,
-    );
-  }
-
   Future<Uint8List?> _generateMobileSmbImageThumbnailBytes({
     required NetworkServiceBase? service,
     required String smbTabPath,
@@ -836,75 +812,6 @@ class NetworkThumbnailHelper {
       'bytes': data,
       'size': size,
     });
-  }
-
-  Future<String?> _tryResolveSmbUrlForProxy(
-    NetworkServiceBase? service,
-    String smbTabPath,
-  ) async {
-    try {
-      if (service is MobileSMBService) {
-        return await service.getSmbDirectLink(smbTabPath);
-      }
-    } catch (_) {}
-
-    // Best-effort fallback: build an unauthenticated SMB URL from the tab path.
-    final parts = smbTabPath.split('/').where((p) => p.isNotEmpty).toList();
-    if (parts.length < 4) return null;
-    final scheme = parts[1].toLowerCase();
-    if (scheme != 'smb') return null;
-
-    final host = Uri.decodeComponent(parts[2]);
-    final share = Uri.decodeComponent(parts[3]);
-    final remaining = parts.length > 4
-        ? parts.sublist(4).map(Uri.decodeComponent).toList()
-        : <String>[];
-    final encodedPath =
-        [share, ...remaining].map(Uri.encodeComponent).join('/');
-    return 'smb://$host/$encodedPath';
-  }
-
-  static int _mobileVideoPrefixLimitBytes(String smbTabPath) {
-    final ext = p.extension(smbTabPath).toLowerCase();
-    if (ext == '.mp4' || ext == '.m4v' || ext == '.mov') {
-      return 12 * 1024 * 1024;
-    }
-    return 6 * 1024 * 1024;
-  }
-
-  static bool _isFastStartMp4Candidate(String smbTabPath) {
-    final ext = p.extension(smbTabPath).toLowerCase();
-    return ext == '.mp4' || ext == '.m4v' || ext == '.mov';
-  }
-
-  static bool _containsMoovAtom(
-    List<int> last3,
-    List<int> chunk, {
-    required void Function(List<int>) outLast3,
-  }) {
-    const moov = [0x6D, 0x6F, 0x6F, 0x76]; // "moov"
-    final combined = <int>[]
-      ..addAll(last3)
-      ..addAll(chunk);
-
-    for (var i = 0; i + 3 < combined.length; i++) {
-      if (combined[i] == moov[0] &&
-          combined[i + 1] == moov[1] &&
-          combined[i + 2] == moov[2] &&
-          combined[i + 3] == moov[3]) {
-        outLast3(_lastN([...last3, ...chunk], 3));
-        return true;
-      }
-    }
-
-    outLast3(_lastN([...last3, ...chunk], 3));
-    return false;
-  }
-
-  static List<int> _lastN(List<int> data, int n) {
-    if (n <= 0) return const <int>[];
-    if (data.length <= n) return List<int>.from(data);
-    return data.sublist(data.length - n);
   }
 
   /// Generate thumbnails using Windows native APIs (much faster)

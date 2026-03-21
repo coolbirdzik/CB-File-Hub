@@ -752,29 +752,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  /// Cancel tag rename
-  void _cancelTagRename() {
-    final oldController = _editingTagController;
-    setState(() {
-      _editingTag = null;
-      _editingTagController = null;
-    });
-    oldController?.dispose();
-  }
-
   // ── Multi-selection methods ──
 
   void _enterMultiSelectMode(String tag) {
     setState(() {
       _isMultiSelectMode = true;
       _selectedTags.add(tag);
-    });
-  }
-
-  void _exitMultiSelectMode() {
-    setState(() {
-      _isMultiSelectMode = false;
-      _selectedTags.clear();
     });
   }
 
@@ -905,109 +888,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
+  // ignore: unused_element
   Widget _buildBulkActionBar() {
-    final theme = Theme.of(context);
-    final localizations = AppLocalizations.of(context)!;
-    final isMobile = !_isDesktop;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: isMobile ? 12 : 8,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: isMobile
-            // Mobile: stack vertically for narrow screens
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    localizations.tagsSelected(_selectedTags.length),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (!_allFilteredSelected)
-                        OutlinedButton.icon(
-                          onPressed: _selectAllFilteredTags,
-                          icon: const Icon(PhosphorIconsLight.checkSquare,
-                              size: 18),
-                          label: Text(localizations.selectAllTags),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: _deselectAllTags,
-                        icon: const Icon(PhosphorIconsLight.x, size: 18),
-                        label: Text(localizations.deselectAllTags),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _confirmBulkDeleteTags,
-                        icon: const Icon(PhosphorIconsLight.trash, size: 18),
-                        label: Text(localizations.deleteSelected),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: theme.colorScheme.error,
-                          foregroundColor: theme.colorScheme.onError,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-            // Desktop: single row
-            : Row(
-                children: [
-                  Text(
-                    localizations.tagsSelected(_selectedTags.length),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!_allFilteredSelected)
-                    TextButton.icon(
-                      onPressed: _selectAllFilteredTags,
-                      icon:
-                          const Icon(PhosphorIconsLight.checkSquare, size: 18),
-                      label: Text(localizations.selectAllTags),
-                    ),
-                  if (!_allFilteredSelected) const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: _deselectAllTags,
-                    icon: const Icon(PhosphorIconsLight.x, size: 18),
-                    label: Text(localizations.deselectAllTags),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _confirmBulkDeleteTags,
-                    icon: const Icon(PhosphorIconsLight.trash, size: 18),
-                    label: Text(localizations.deleteSelected),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.error,
-                      foregroundColor: theme.colorScheme.onError,
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
+    // Reserved for future multi-select bulk action bar UI
+    return const SizedBox.shrink();
   }
 
   /// Show rename dialog for mobile
@@ -1130,17 +1014,24 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                // Pre-extract context-dependent values before async gap
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+
                 await _tagColorManager.setTagColor(tag, currentColor);
                 if (mounted) {
                   setState(() {});
-                  RouteUtils.safePopDialog(context);
-
-                  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                    SnackBar(
-                      content: Text(localizations.tagColorUpdated(tag)),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                  try {
+                    navigator.pop();
+                  } catch (_) {}
+                  try {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text(localizations.tagColorUpdated(tag)),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  } catch (_) {}
                 }
               },
               child: Text(localizations.save),
@@ -3048,10 +2939,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 ),
               );
             }
+          // ignore: empty_catches
           } catch (e) {}
         } else {
           RouteUtils.safePopDialog(context);
         }
+      // ignore: empty_catches
       } catch (e) {}
     } else {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(

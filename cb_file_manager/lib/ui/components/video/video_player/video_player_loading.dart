@@ -222,7 +222,7 @@ class _VideoPlayerLoadingWidgetState extends State<VideoPlayerLoadingWidget> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: primaryColor.withValues(alpha: 0.8),
-                  boxShadow: [],
+                  boxShadow: const [],
                 ),
               ),
             );

@@ -8,11 +8,11 @@ void main() {
       () async {
     final bloc = SelectionBloc();
 
-    final filePaths = LinkedHashSet<String>.from(<String>[
+    final filePaths = LinkedHashSet<String>.of({
       '/a.mp4',
       '/b.mp4',
       '/c.mp4',
-    ]);
+    });
 
     bloc.add(SelectItemsInRect(
       folderPaths: const <String>{},

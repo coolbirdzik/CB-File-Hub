@@ -191,7 +191,7 @@ class _SearchBarState extends State<SearchBar> {
               decoration: BoxDecoration(
                 color: isDark ? Colors.grey[850] : theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [],
+                boxShadow: const [],
                 border: Border.all(
                   color: theme.colorScheme.outline.withValues(alpha: 0.2),
                   width: 1,
@@ -484,7 +484,7 @@ class _SearchBarState extends State<SearchBar> {
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[850] : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [],
+        boxShadow: const [],
         border: Border.all(
           color: _isSearchingTags
               ? theme.colorScheme.primary.withValues(alpha: 0.5)

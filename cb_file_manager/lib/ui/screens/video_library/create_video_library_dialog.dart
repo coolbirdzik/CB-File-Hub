@@ -131,7 +131,7 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                 runSpacing: 8,
                 children: _colorOptions.map((color) {
                   final colorHex =
-                      '#${color.value.toRadixString(16).substring(2)}';
+                      '#${color.toARGB32().toRadixString(16).substring(2)}';
                   final isSelected = _selectedColorTheme == colorHex;
                   return InkWell(
                     onTap: () {

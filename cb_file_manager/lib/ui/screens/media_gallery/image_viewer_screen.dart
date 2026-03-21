@@ -321,6 +321,9 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
   }
 
   void _showImageInfo(BuildContext context, File file) async {
+    // Pre-extract ScaffoldMessenger before async gap
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     try {
       final fileStat = await file.stat();
       final fileSize = _formatFileSize(fileStat.size);
@@ -328,6 +331,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
       if (mounted) {
         showDialog(
+          // ignore: use_build_context_synchronously
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -366,9 +370,11 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     } catch (e) {
       debugPrint('Error showing image info: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to display image information: $e')),
-        );
+        try {
+          scaffoldMessenger.showSnackBar(
+            SnackBar(content: Text('Failed to display image information: $e')),
+          );
+        } catch (_) {}
       }
     }
   }
@@ -538,8 +544,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
   void _shareImage() {
     final file = _allImages[_currentIndex];
-    final XFile xFile = XFile(file.path);
-    Share.shareXFiles([xFile], text: 'Check out this image!');
+    final xFile = XFile(file.path);
+    SharePlus.instance.share(ShareParams(files: [xFile], text: 'Check out this image!'));
   }
 
   // Phương thức để tải và cache ảnh
@@ -694,10 +700,10 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
     // If in normal viewing mode (not editing)
     if (!_isEditMode) {
-      return RawKeyboardListener(
+      return KeyboardListener(
         focusNode: FocusNode()..requestFocus(),
-        onKey: (RawKeyEvent event) {
-          if (event is RawKeyDownEvent) {
+        onKeyEvent: (KeyEvent event) {
+          if (event is KeyDownEvent) {
             // Handle escape key press to exit the image viewer
             if (event.logicalKey == LogicalKeyboardKey.escape) {
               RouteUtils.safePopDialog(context);

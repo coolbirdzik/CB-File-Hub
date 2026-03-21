@@ -943,7 +943,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isDatabaseSectionExpanded = true;
   bool _isDatabaseSectionExpandedCloudSync = false;
-  bool _isDatabaseSectionExpandedTags = false;
 
   Widget _buildDatabaseSection() {
     return Card(
@@ -1052,7 +1051,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         PhosphorIconsLight.checkCircle,
                         size: 16,
                         color: Colors.green,
@@ -1451,9 +1450,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _exportDatabase(BuildContext context) async {
+    // Pre-extract context-dependent values before async gaps
+    final l10n = AppLocalizations.of(context)!;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
     try {
       String? saveLocation = await FilePicker.platform.saveFile(
-        dialogTitle: AppLocalizations.of(context)!.saveDatabaseExport,
+        dialogTitle: l10n.saveDatabaseExport,
         fileName:
             'cb_file_hub_db_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json',
         type: FileType.custom,
@@ -1466,21 +1470,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             await dbManager.exportDatabase(customPath: saveLocation);
         if (filePath != null) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text(
-                    AppLocalizations.of(context)!.exportSuccess + filePath),
+                content: Text(l10n.exportSuccess + filePath),
                 behavior: SnackBarBehavior.floating,
               ),
             );
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text(AppLocalizations.of(context)!.exportFailed),
+                content: Text(l10n.exportFailed),
                 behavior: SnackBarBehavior.floating,
-                backgroundColor: Theme.of(context).colorScheme.error,
+                backgroundColor: colorScheme.error,
               ),
             );
           }
@@ -1488,12 +1491,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.errorExporting + e.toString()),
+            content: Text(l10n.errorExporting + e.toString()),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: colorScheme.error,
           ),
         );
       }
@@ -1501,6 +1503,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _importDatabase(BuildContext context) async {
+    // Pre-extract context-dependent values before async gaps
+    final l10n = AppLocalizations.of(context)!;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -1514,20 +1521,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (!mounted) return;
 
         // Store the navigator key to close dialog later
-        late NavigatorState navigator;
+        late NavigatorState dialogNavigator;
         showDialog(
+          // ignore: use_build_context_synchronously
           context: context,
           barrierDismissible: false,
           builder: (dialogContext) {
-            navigator = Navigator.of(dialogContext);
-            return PopScope(
+            dialogNavigator = Navigator.of(dialogContext);
+            return const PopScope(
               canPop: false,
               child: AlertDialog(
                 content: Row(
                   children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(width: 20),
-                    const Text('Importing database...'),
+                    CircularProgressIndicator(),
+                    SizedBox(width: 20),
+                    Text('Importing database...'),
                   ],
                 ),
               ),
@@ -1547,7 +1555,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Close loading dialog
           if (mounted) {
-            navigator.pop();
+            dialogNavigator.pop();
           }
 
           if (success) {
@@ -1563,20 +1571,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
 
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              scaffoldMessenger.showSnackBar(
                 SnackBar(
-                  content: Text(AppLocalizations.of(context)!.importSuccess),
+                  content: Text(l10n.importSuccess),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             }
           } else {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              scaffoldMessenger.showSnackBar(
                 SnackBar(
-                  content: Text(AppLocalizations.of(context)!.importFailed),
+                  content: Text(l10n.importFailed),
                   behavior: SnackBarBehavior.floating,
-                  backgroundColor: Theme.of(context).colorScheme.error,
+                  backgroundColor: colorScheme.error,
                 ),
               );
             }
@@ -1585,23 +1593,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Close loading dialog on error
           if (mounted) {
             try {
-              navigator.pop();
+              dialogNavigator.pop();
             } catch (_) {}
 
-            ScaffoldMessenger.of(context).showSnackBar(
+            scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text(AppLocalizations.of(context)!.errorImporting +
-                    e.toString()),
+                content: Text(l10n.errorImporting + e.toString()),
                 behavior: SnackBarBehavior.floating,
-                backgroundColor: Theme.of(context).colorScheme.error,
+                backgroundColor: colorScheme.error,
               ),
             );
           }
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.importCancelled),
+            content: Text(l10n.importCancelled),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1609,12 +1616,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       // Handle picker errors
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.errorImporting + e.toString()),
+            content: Text(l10n.errorImporting + e.toString()),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: colorScheme.error,
           ),
         );
       }
@@ -1738,7 +1744,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final currentAccent = themeProvider.currentAccentColor;
         final currentAccentName =
             ThemeConfig.accentNames[currentAccent] ?? currentAccent.name;
-        final showDesktopAcrylicControl =
+        const showDesktopAcrylicControl =
             DesignSystemConfig.enableDesktopAcrylicWindowBackground;
 
         return Theme(
@@ -1777,15 +1783,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ...AppThemeType.values.map((themeType) {
                 final title =
                     ThemeConfig.themeNames[themeType] ?? themeType.name;
+                // ignore: deprecated_member_use
+                // ignore: deprecated_member_use
                 return RadioListTile<AppThemeType>(
                   dense: true,
                   value: themeType,
+                  // ignore: deprecated_member_use
                   groupValue: currentTheme,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                   title: Text(
                     title,
                     style: const TextStyle(fontSize: 13),
                   ),
+                  // ignore: deprecated_member_use
                   onChanged: (value) {
                     if (value == null) return;
                     context.read<ThemeProvider>().setTheme(value);
@@ -2307,127 +2317,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     }
-  }
-
-  Future<void> _exportSettings() async {
-    try {
-      String? saveLocation = await FilePicker.platform.saveFile(
-        dialogTitle: AppLocalizations.of(context)!.saveSettingsExport,
-        fileName:
-            'cb_file_hub_preferences_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-
-      if (saveLocation != null) {
-        final filePath =
-            await _preferences.exportPreferences(customPath: saveLocation);
-        if (filePath != null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    AppLocalizations.of(context)!.exportSuccess + filePath),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppLocalizations.of(context)!.exportFailed),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.errorExporting + e.toString()),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _importSettings() async {
-    try {
-      final success = await _preferences.importPreferences();
-      if (success) {
-        await _loadPreferences();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.importSuccess),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.importFailed),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Theme.of(context).colorScheme.tertiary,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.errorImporting + e.toString()),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showSettingsData() {
-    final settingsData = _preferences.getAllSettings();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.settingsData),
-        content: Container(
-          width: double.maxFinite,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: settingsData.keys.map((setting) {
-                final String value = settingsData[setting].toString();
-                return ListTile(
-                  title: Text(setting),
-                  subtitle: Text(value),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(AppLocalizations.of(context)!.close),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildCacheStatRow({

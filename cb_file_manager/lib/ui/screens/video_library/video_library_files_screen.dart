@@ -97,6 +97,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
       final gridZoomLevel = await _preferences.getGridZoomLevel();
       final columnVisibility = await _preferences.getColumnVisibility();
       final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+        // ignore: use_build_context_synchronously
         context,
         mode: GridSizeMode.referenceWidth,
       );

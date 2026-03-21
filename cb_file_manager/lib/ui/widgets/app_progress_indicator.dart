@@ -52,7 +52,7 @@ class AppProgressIndicator extends StatelessWidget {
                 duration: const Duration(milliseconds: 300),
                 decoration: BoxDecoration(
                   borderRadius: effectiveBorderRadius,
-                  boxShadow: [],
+                  boxShadow: const [],
                 ),
               ),
           ],

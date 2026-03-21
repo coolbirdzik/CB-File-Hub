@@ -44,6 +44,7 @@ class DatabaseManager implements IDatabaseProvider {
     return _initSemaphore.run(() async {
       // Check both flags inside the semaphore to prevent race between
       // concurrent callers who both passed the outer check.
+      // ignore: unnecessary_null_comparison
       if (_isInitialized && _provider != null) {
         return;
       }

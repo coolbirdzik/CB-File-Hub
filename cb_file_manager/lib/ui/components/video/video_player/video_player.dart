@@ -308,11 +308,14 @@ class VideoPlayer extends StatefulWidget {
 class _VideoPlayerState extends _VideoPlayerVolumeHost
     with WidgetsBindingObserver, _VideoPlayerVolumeMixin {
   // Media Kit controllers
+  @override
   Player? _player;
   VideoController? _videoController;
 
   // VLC for mobile/Android
+  @override
   VlcPlayerController? _vlcController;
+  @override
   exo.VideoPlayerController?
       _exoController; // ExoPlayer for Android PiP fallback
   // Fallback timer if VLC fails to start on Android
@@ -336,12 +339,15 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
   @override
   bool _isMuted = false;
   String _errorMessage = '';
+  @override
   double _savedVolume = 70.0;
   bool _showControls = true;
   final bool _showSpeedIndicator = false;
   bool _useFlutterVlc = false;
 
+  @override
   bool get _useVlcControls => _useFlutterVlc && _vlcController != null;
+  @override
   bool get _useExoControls =>
       !_useVlcControls &&
       _exoController != null &&
@@ -423,7 +429,9 @@ class _VideoPlayerState extends _VideoPlayerVolumeHost
   int _vlcRenderFallbackAttempts = 0;
   double _vlcAspectRatio = 16 / 9;
   double _vlcVolume = 70.0;
+  @override
   double _lastVolume = 70.0;
+  @override
   bool _isRestoringVolume = false;
   Map<String, dynamic>?
       _vlcPendingRestore; // {pos: Duration, vol: double0..1or0..100, playing: bool}

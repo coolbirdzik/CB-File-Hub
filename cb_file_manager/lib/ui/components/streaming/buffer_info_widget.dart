@@ -127,7 +127,7 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
               : Colors.grey.withValues(alpha: 0.3),
           width: 1,
         ),
-        boxShadow: [],
+        boxShadow: const [],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

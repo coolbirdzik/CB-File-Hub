@@ -420,12 +420,12 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
       showAppBar: true,
       actions: [
         IconButton(
-          icon: Icon(PhosphorIconsLight.arrowsClockwise),
+          icon: const Icon(PhosphorIconsLight.arrowsClockwise),
           onPressed: _refreshData,
           tooltip: l10n.refresh,
         ),
         IconButton(
-          icon: Icon(PhosphorIconsLight.plus),
+          icon: const Icon(PhosphorIconsLight.plus),
           onPressed: _connectToWebDAVServer,
           tooltip: l10n.addConnection,
         ),
@@ -467,13 +467,13 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
                     children: [
                       ElevatedButton.icon(
                         onPressed: _connectToWebDAVServer,
-                        icon: Icon(PhosphorIconsLight.plus),
+                        icon: const Icon(PhosphorIconsLight.plus),
                         label: Text(l10n.addConnection),
                       ),
                       const SizedBox(width: 16),
                       ElevatedButton.icon(
                         onPressed: _addSampleConnection,
-                        icon: Icon(PhosphorIconsLight.plusCircle),
+                        icon: const Icon(PhosphorIconsLight.plusCircle),
                         label: Text(l10n.addSample),
                       ),
                     ],

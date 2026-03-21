@@ -278,6 +278,10 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
   Future<void> _openWindowsNetworkSettings() async {
     // Mở cài đặt Network Discovery trên Windows
     if (Platform.isWindows) {
+      // Pre-extract context-dependent values before async gaps
+      final l10n = AppLocalizations.of(context)!;
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
       try {
         bool opened = false;
 
@@ -330,8 +334,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
           }
         }
 
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(opened
                 ? l10n.networkSettingsOpened
@@ -341,10 +344,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         );
       } catch (e) {
         debugPrint('Error opening network settings: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
-              content: Text(AppLocalizations.of(context)!
-                  .errorWithMessage(e.toString()))),
+              content: Text(l10n.errorWithMessage(e.toString()))),
         );
       }
     }

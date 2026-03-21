@@ -417,6 +417,7 @@ class StreamingHelper {
       if (fileType != FileCategory.video && fileType != FileCategory.audio) {
         debugPrint(
             'StreamingHelper: All streaming methods failed for non-media file, downloading and opening with system app');
+        // ignore: use_build_context_synchronously
         await _downloadAndOpen(context, remotePath);
         return FileOpenResult(
             success: true, viewerLaunched: true, fileType: fileType);

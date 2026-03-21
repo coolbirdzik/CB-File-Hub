@@ -103,7 +103,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
           : null, // Provide a specific height for the custom title bar on Windows
       decoration: BoxDecoration(
         color: tabBackgroundColor,
-        boxShadow: [],
+        boxShadow: const [],
       ),
       margin: Platform.isWindows
           ? EdgeInsets.zero
@@ -113,8 +113,8 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (Platform.isWindows)
-            DragToMoveArea(
-              child: const SizedBox(
+            const DragToMoveArea(
+              child: SizedBox(
                 width: 12,
                 height: double.infinity,
               ),
@@ -203,8 +203,8 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
             ),
           ),
           if (Platform.isWindows)
-            DragToMoveArea(
-              child: const SizedBox(
+            const DragToMoveArea(
+              child: SizedBox(
                 width: 84,
                 height: double.infinity,
               ),
@@ -549,7 +549,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                     decoration: BoxDecoration(
                       color: widget.theme.colorScheme.primary,
                       borderRadius: BorderRadius.circular(999),
-                      boxShadow: [],
+                      boxShadow: const [],
                     ),
                   ),
                 ),
@@ -779,7 +779,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                                             .withValues(alpha: 0.35),
                                         width: 0.8,
                                       ),
-                                      boxShadow: [],
+                                      boxShadow: const [],
                                     ),
                                     child: Center(
                                       child: DefaultTextStyle.merge(

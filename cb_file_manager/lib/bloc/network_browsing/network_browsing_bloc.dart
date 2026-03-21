@@ -16,8 +16,6 @@ class NetworkBrowsingBloc
     extends Bloc<NetworkBrowsingEvent, NetworkBrowsingState> {
   final NetworkServiceRegistry _registry = NetworkServiceRegistry();
 
-  // Track last requested path to prevent duplicate requests
-  String? _lastRequestedPath;
   int _directoryRequestId = 0;
   int _activeDirectoryRequestId = 0;
 
@@ -134,7 +132,6 @@ class NetworkBrowsingBloc
     NetworkDirectoryRequested event,
     Emitter<NetworkBrowsingState> emit,
   ) async {
-    _lastRequestedPath = event.path;
     final int requestId = ++_directoryRequestId;
     _activeDirectoryRequestId = requestId;
 
@@ -200,7 +197,7 @@ class NetworkBrowsingBloc
             throw e;
           }
         } else {
-          throw e;
+          rethrow;
         }
       }
 

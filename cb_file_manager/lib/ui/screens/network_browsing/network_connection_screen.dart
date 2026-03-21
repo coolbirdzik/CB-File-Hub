@@ -104,7 +104,7 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
         heroTag: null, // Disable hero animation to avoid conflicts
         onPressed: () => _showConnectionDialog(context),
         tooltip: l10n.addConnection,
-        child: Icon(PhosphorIconsLight.plus),
+        child: const Icon(PhosphorIconsLight.plus),
       ),
     );
   }
