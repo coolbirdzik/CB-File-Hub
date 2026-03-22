@@ -6,6 +6,7 @@
   - `guides/01-ai-technical-guide.md`
   - `contributing/01-contribution-guide.md`
   - `contributing/02-coding-standards.md`
+  - `contributing/03-release-guide.md`
   - `quality/01-testing-strategy.md`
 - **Technical**
   - `technical/index.md`

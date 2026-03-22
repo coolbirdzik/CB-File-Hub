@@ -2,7 +2,7 @@
 # Cross-platform build system for Flutter application
 # Works on: Windows (Git Bash/WSL/MinGW), Linux, macOS
 
-.PHONY: help clean deep-clean deps build-windows-portable build-windows-exe build-windows-msi build-android-apk build-android-aab build-linux build-macos build-ios build-all test analyze format doctor release version
+.PHONY: help clean deep-clean deps build-windows-portable build-windows-exe build-windows-msi build-android-apk build-android-aab build-linux build-macos build-ios build-all test analyze format doctor release version version-info bump-build retag retag-one
 
 # Default target
 .DEFAULT_GOAL := help
@@ -13,8 +13,11 @@ FLUTTER := flutter
 BUILD_DIR := $(PROJECT_DIR)/build
 PUBSPEC := $(PROJECT_DIR)/pubspec.yaml
 
-# Get version from pubspec.yaml
-VERSION := $(shell grep "^version:" $(PUBSPEC) | sed 's/version: //' | sed 's/+.*//')
+# Get version name and build number from pubspec.yaml
+# Uses scripts/version.sh — must be run from Git Bash on Windows
+VERSION_FULL := $(shell bash scripts/version.sh full)
+VERSION := $(shell bash scripts/version.sh name)
+BUILD_NUMBER := $(shell bash scripts/version.sh build)
 
 # Colors for output
 BLUE := \033[0;34m
@@ -25,9 +28,9 @@ NC := \033[0m # No Color
 
 # Help target
 help:
-	@echo "$(BLUE)╔════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║     CB File Hub - Build System v$(VERSION)    ║$(NC)"
-	@echo "$(BLUE)╚════════════════════════════════════════════════╝$(NC)"
+	@echo "$(BLUE)╔════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(BLUE)║     CB File Hub - Build System v$(VERSION)+$(BUILD_NUMBER)    ║$(NC)"
+	@echo "$(BLUE)╚════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(GREEN)📦 Build Targets:$(NC)"
 	@echo "  make windows           - Build Windows portable (ZIP)"
@@ -53,7 +56,10 @@ help:
 	@echo "  make release-patch     - Create patch release (x.x.X)"
 	@echo "  make release-minor     - Create minor release (x.X.0)"
 	@echo "  make release-major     - Create major release (X.0.0)"
+	@echo "  make retag-one TAG=v1.2.3 - Retag existing version (for beta)"
 	@echo "  make version           - Show current version"
+	@echo "  make version-info      - Show version + build number separately"
+	@echo "  make bump-build        - Bump build number only (auto in CI)"
 	@echo ""
 	@echo "$(GREEN)💡 Examples:$(NC)"
 	@echo "  make windows           # Build Windows portable"
@@ -277,9 +283,43 @@ macos: build-macos
 ios: build-ios
 all: build-all
 
+# Retag: push existing version tag again to trigger CI rebuild with incremented build number
+# Use for beta/hotfix builds where version stays same but build number must increase
+retag:
+	@CURRENT_VER=$$(make -s next-patch 2>/dev/null || echo ""); \
+	if [ -n "$$CURRENT_VER" ]; then \
+		echo "$(BLUE)Last version: $$CURRENT_VER$(NC)"; \
+	fi; \
+	echo "$(YELLOW)Enter tag to retag (e.g. v1.2.3):$(NC)"; \
+	read -r TAG; \
+	if [ -z "$$TAG" ]; then \
+		echo "$(RED)Tag cannot be empty$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(BLUE)Pushing tag $$TAG to trigger CI rebuild...$(NC)"; \
+	git push origin "$$TAG" --force; \
+	echo "$(GREEN)Done. CI will auto-increment build_number on each build.$(NC)"; \
+	echo "$(YELLOW)Monitor at: https://github.com/<owner>/<repo>/actions$(NC)"
+
+# One-liner version (set TAG=v1.2.3 make retag)
+retag-one:
+	@if [ -z "$(TAG)" ]; then \
+		echo "$(RED)Error: TAG not set$(NC)"; \
+		echo "Usage: make retag-one TAG=v1.2.3"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)Pushing tag $(TAG) to trigger CI rebuild...$(NC)"; \
+	git push origin $(TAG) --force; \
+	echo "$(GREEN)Done. CI will auto-increment build_number on each build.$(NC)"
+
 # Version management
 version:
-	@echo "$(BLUE)Current version: $(GREEN)$(VERSION)$(NC)"
+	@echo "$(BLUE)Current version: $(GREEN)$(VERSION)+$(BUILD_NUMBER)$(NC)"
+
+version-info:
+	@echo "$(BLUE)Version Name : $(GREEN)$(VERSION)$(NC)"
+	@echo "$(BLUE)Build Number : $(GREEN)$(BUILD_NUMBER)$(NC)"
+	@echo "$(BLUE)Full        : $(GREEN)$(VERSION)+$(BUILD_NUMBER)$(NC)"
 
 # Calculate next version
 next-patch:
@@ -291,7 +331,7 @@ next-minor:
 next-major:
 	@echo $(VERSION) | awk -F. '{print $$1+1".0.0"}'
 
-# Update version in pubspec.yaml
+# Update version in pubspec.yaml (keeps current build_number)
 update-version:
 	@if [ -z "$(NEW_VERSION)" ]; then \
 		echo "$(RED)Error: NEW_VERSION not set$(NC)"; \
@@ -299,11 +339,19 @@ update-version:
 		exit 1; \
 	fi
 	@echo "$(BLUE)Updating version to $(NEW_VERSION)...$(NC)"
-	@sed -i.bak 's/^version:.*/version: $(NEW_VERSION)+1/' $(PUBSPEC)
-	@rm -f $(PUBSPEC).bak
-	@echo "$(GREEN)Version updated to $(NEW_VERSION)$(NC)"
+	@bash scripts/version.sh set-version $(NEW_VERSION)
+	@echo "$(GREEN)Version updated to $(NEW_VERSION)+1 (build_number reset)$(NC)"
 
-# Release targets
+# Bump build number only (used by CI, and locally before manual build)
+bump-build:
+	@echo "$(BLUE)Bumping build number...$(NC)"
+	@bash scripts/version.sh bump
+	@git add $(PUBSPEC)
+	@git commit -m "chore: bump build number to $$(bash scripts/version.sh build)" || echo "$(YELLOW)Nothing to commit$(NC)"
+	@echo "$(GREEN)Build number updated$(NC)"
+
+# Release targets — bump version first, then tag
+# Tag push triggers CI which auto-bumps build_number per build
 release-patch:
 	@NEW_VER=$$(make -s next-patch); \
 	echo "$(BLUE)Creating patch release: $$NEW_VER$(NC)"; \
@@ -312,7 +360,8 @@ release-patch:
 	git commit -m "chore: bump version to $$NEW_VER"; \
 	git tag -a "v$$NEW_VER" -m "Release v$$NEW_VER"; \
 	echo "$(GREEN)Created tag v$$NEW_VER$(NC)"; \
-	echo "$(YELLOW)Push with: git push origin main && git push origin v$$NEW_VER$(NC)"
+	echo "$(YELLOW)Push with: git push origin main && git push origin v$$NEW_VER$(NC)"; \
+	echo "$(YELLOW)CI will auto-increment build_number on each build$(NC)"
 
 release-minor:
 	@NEW_VER=$$(make -s next-minor); \
@@ -322,7 +371,8 @@ release-minor:
 	git commit -m "chore: bump version to $$NEW_VER"; \
 	git tag -a "v$$NEW_VER" -m "Release v$$NEW_VER"; \
 	echo "$(GREEN)Created tag v$$NEW_VER$(NC)"; \
-	echo "$(YELLOW)Push with: git push origin main && git push origin v$$NEW_VER$(NC)"
+	echo "$(YELLOW)Push with: git push origin main && git push origin v$$NEW_VER$(NC)"; \
+	echo "$(YELLOW)CI will auto-increment build_number on each build$(NC)"
 
 release-major:
 	@NEW_VER=$$(make -s next-major); \
@@ -332,7 +382,8 @@ release-major:
 	git commit -m "chore: bump version to $$NEW_VER"; \
 	git tag -a "v$$NEW_VER" -m "Release v$$NEW_VER"; \
 	echo "$(GREEN)Created tag v$$NEW_VER$(NC)"; \
-	echo "$(YELLOW)Push with: git push origin main && git push origin v$$NEW_VER$(NC)"
+	echo "$(YELLOW)Push with: git push origin main && git push origin v$$NEW_VER$(NC)"; \
+	echo "$(YELLOW)CI will auto-increment build_number on each build$(NC)"
 
 # Git shortcuts
 git-status:

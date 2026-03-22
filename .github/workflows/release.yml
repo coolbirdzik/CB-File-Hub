@@ -29,38 +29,55 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetch all history for changelog
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get version
+      - name: Get and auto-increment version
         id: version
         run: |
-          VERSION_LINE=$(grep "^version:" "${{ env.PROJECT_DIR }}/pubspec.yaml" | sed 's/version: //')
+          PUBSPEC="${{ env.PROJECT_DIR }}/pubspec.yaml"
+
+          # Đọc version hiện tại từ pubspec.yaml
+          VERSION_LINE=$(grep "^version:" "$PUBSPEC" | sed 's/version: //')
           VERSION_NAME="${VERSION_LINE%%+*}"
           if [[ "$VERSION_LINE" == *"+"* ]]; then
-            VERSION_CODE="${VERSION_LINE##*+}"
+            CURRENT_BUILD="${VERSION_LINE##*+}"
           else
-            VERSION_CODE="0"
+            CURRENT_BUILD="0"
           fi
-          VERSION_TAG="v$VERSION_NAME"
 
+          # Validate tag match với version name
           if [ "${{ github.event_name }}" == "push" ]; then
             TAG_REF="${GITHUB_REF#refs/tags/}"
-            if [ "$TAG_REF" != "$VERSION_TAG" ]; then
-              echo "Tag $TAG_REF does not match pubspec version $VERSION_TAG"
+            if [ "$TAG_REF" != "v$VERSION_NAME" ]; then
+              echo "::error::Tag $TAG_REF does not match pubspec version v$VERSION_NAME"
               exit 1
             fi
           fi
 
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             INPUT_VERSION="${{ github.event.inputs.version }}"
-            if [ -n "$INPUT_VERSION" ] && [ "$INPUT_VERSION" != "$VERSION_TAG" ] && [ "$INPUT_VERSION" != "$VERSION_NAME" ]; then
-              echo "Input version $INPUT_VERSION does not match pubspec version $VERSION_TAG"
+            if [ -n "$INPUT_VERSION" ] && [ "$INPUT_VERSION" != "v$VERSION_NAME" ] && [ "$INPUT_VERSION" != "$VERSION_NAME" ]; then
+              echo "::error::Input version $INPUT_VERSION does not match pubspec version v$VERSION_NAME"
               exit 1
             fi
           fi
 
+          # Tăng build_number lên 1
+          NEW_BUILD=$((CURRENT_BUILD + 1))
+
+          # Ghi lại vào pubspec.yaml
+          sed -i "s/^version:.*/version: $VERSION_NAME+$NEW_BUILD/" "$PUBSPEC"
+
+          # Commit & push để lưu build_number vào repo
+          git config user.email "ci@github.com"
+          git config user.name "GitHub CI"
+          git add "$PUBSPEC"
+          git commit -m "ci: auto bump build number to $NEW_BUILD"
+          git push
+
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "version_code=$NEW_BUILD" >> $GITHUB_OUTPUT
+          echo "version_tag=v$VERSION_NAME" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: notes
