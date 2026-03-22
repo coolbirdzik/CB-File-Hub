@@ -256,11 +256,25 @@ retag:
 		echo "$(BLUE)Last version: $$CURRENT_VER$(NC)"; \
 	fi; \
 	echo "$(YELLOW)Available git remotes:$(NC)"; \
-	git remote; \
-	echo "$(YELLOW)Enter remote to push to (default: origin):$(NC)"; \
-	read -r REMOTE; \
-	if [ -z "$$REMOTE" ]; then \
+	REMOTES=$$(git remote); \
+	if [ -z "$$REMOTES" ]; then \
+		echo "$(RED)No git remotes found. Please add one first.$(NC)"; \
+		exit 1; \
+	fi; \
+	INDEX=1; \
+	for R in $$REMOTES; do echo "  $$INDEX) $$R"; INDEX=$$(($$INDEX + 1)); done; \
+	echo "$(YELLOW)Enter remote number or name to push to (default: origin):$(NC)"; \
+	read -r REMOTE_INPUT; \
+	if [ -z "$$REMOTE_INPUT" ]; then \
 		REMOTE=origin; \
+	elif echo "$$REMOTE_INPUT" | grep -E '^[0-9]+$$' >/dev/null 2>&1; then \
+		REMOTE=$$(git remote | awk "NR==$$REMOTE_INPUT{print; exit}"); \
+		if [ -z "$$REMOTE" ]; then \
+			echo "$(RED)Invalid remote number$(NC)"; \
+			exit 1; \
+		fi; \
+	else \
+		REMOTE=$$REMOTE_INPUT; \
 	fi; \
 	echo "$(YELLOW)Enter tag to retag (e.g. v1.2.3):$(NC)"; \
 	read -r TAG; \
