@@ -36,7 +36,7 @@ jobs:
         run: |
           PUBSPEC="${{ env.PROJECT_DIR }}/pubspec.yaml"
 
-          # Đọc version hiện tại từ pubspec.yaml
+          # Read current version from pubspec.yaml
           VERSION_LINE=$(grep "^version:" "$PUBSPEC" | sed 's/version: //')
           VERSION_NAME="${VERSION_LINE%%+*}"
           if [[ "$VERSION_LINE" == *"+"* ]]; then
@@ -45,7 +45,7 @@ jobs:
             CURRENT_BUILD="0"
           fi
 
-          # Validate tag match với version name
+          # Validate tag matches version name
           if [ "${{ github.event_name }}" == "push" ]; then
             TAG_REF="${GITHUB_REF#refs/tags/}"
             if [ "$TAG_REF" != "v$VERSION_NAME" ]; then
@@ -62,18 +62,19 @@ jobs:
             fi
           fi
 
-          # Tăng build_number lên 1
+          # Increment build number
           NEW_BUILD=$((CURRENT_BUILD + 1))
 
-          # Ghi lại vào pubspec.yaml
+          # Write back to pubspec.yaml
           sed -i "s/^version:.*/version: $VERSION_NAME+$NEW_BUILD/" "$PUBSPEC"
 
-          # Commit & push để lưu build_number vào repo
+          # Commit to persist build_number in repo
+          # Push to main branch (works even from detached HEAD / tag checkout)
           git config user.email "ci@github.com"
           git config user.name "GitHub CI"
           git add "$PUBSPEC"
           git commit -m "ci: auto bump build number to $NEW_BUILD"
-          git push
+          git push origin HEAD:refs/heads/main
 
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$NEW_BUILD" >> $GITHUB_OUTPUT

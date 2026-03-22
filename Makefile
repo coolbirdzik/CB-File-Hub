@@ -344,6 +344,7 @@ update-version:
 	@echo "$(GREEN)Version updated to $(NEW_VERSION)+1 (build_number reset)$(NC)"
 
 # Bump build number only (used by CI, and locally before manual build)
+# Runs verify first to ensure code quality before commit
 bump-build:
 	@make verify
 	@echo "$(BLUE)Bumping build number...$(NC)"
@@ -352,14 +353,24 @@ bump-build:
 	@git commit -m "chore: bump build number to $$(bash scripts/version.sh build)" || echo "$(YELLOW)Nothing to commit$(NC)"
 	@echo "$(GREEN)Build number updated$(NC)"
 
-# Verify code quality (format + analyze) — used by release and bump-build targets
+# Verify code quality (format + analyze) - used by release and bump-build targets
 verify:
 	@echo "$(BLUE)Running code verification...$(NC)"
 	@cd $(PROJECT_DIR) && dart format --output=none --set-exit-if-changed . || (echo "$(RED)Format check failed. Run 'make format' and commit changes.$(NC)"; exit 1)
 	@cd $(PROJECT_DIR) && $(FLUTTER) analyze || (echo "$(RED)Analyze check failed. Fix warnings/errors and commit.$(NC)"; exit 1)
 	@echo "$(GREEN)Code verification passed!$(NC)"
 
-# Release targets — bump version first, then tag
+verify-format:
+	@echo "$(BLUE)Running format check...$(NC)"
+	@cd $(PROJECT_DIR) && dart format --output=none --set-exit-if-changed . || (echo "$(RED)Format check failed. Run 'make format'.$(NC)"; exit 1)
+	@echo "$(GREEN)Format check passed!$(NC)"
+
+verify-analyze:
+	@echo "$(BLUE)Running analyze...$(NC)"
+	@cd $(PROJECT_DIR) && $(FLUTTER) analyze || (echo "$(RED)Analyze check failed.$(NC)"; exit 1)
+	@echo "$(GREEN)Analyze passed!$(NC)"
+
+# Release targets - bump version first, then tag
 # Tag push triggers CI which auto-bumps build_number per build
 release-patch:
 	@make verify
