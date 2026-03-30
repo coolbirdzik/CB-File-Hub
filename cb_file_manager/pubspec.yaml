@@ -151,9 +151,9 @@ flutter:
 
 msix_config:
   display_name: CB File Hub
-  publisher_display_name: COOLBIRDZIK
-  identity_name: COOLBIRDZIK.CBFileHub
-  publisher: CN=COOLBIRDZIK
+  publisher_display_name: CoolBirdZik
+  identity_name: CoolBirdZik.CBFileHub
+  publisher: CN=C193F601-16B4-4BC5-89D3-1AE882F628DE
   logo_path: assets/images/logo_circle.png
   trim_logo: false
   install_certificate: false

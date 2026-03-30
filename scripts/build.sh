@@ -675,6 +675,10 @@ build_windows_msix() {
     local VERSION_MSIX
     local OUTPUT_DIR
     local OUTPUT_DIR_WIN
+    local CERT_PATH="${MSIX_CERT_PATH:-}"
+    local CERT_PATH_FOR_CHECK="${MSIX_CERT_PATH:-}"
+    local CERT_PASSWORD="${MSIX_CERT_PASSWORD:-}"
+    local PUBLISHER="${MSIX_PUBLISHER:-}"
     VERSION_NAME=$(get_version_name)
     VERSION_MSIX=$(get_msix_version)
     OUTPUT_DIR="$BUILD_DIR/windows/msix"
@@ -684,11 +688,51 @@ build_windows_msix() {
 
     if command -v cygpath &> /dev/null; then
         OUTPUT_DIR_WIN=$(cygpath -w "$OUTPUT_DIR")
+        if [ -n "$CERT_PATH_FOR_CHECK" ] && [ ! -f "$CERT_PATH_FOR_CHECK" ]; then
+            CERT_PATH_FOR_CHECK=$(cygpath -u "$CERT_PATH_FOR_CHECK" 2>/dev/null || echo "$CERT_PATH_FOR_CHECK")
+        fi
+        if [ -n "$CERT_PATH" ] && [ -f "$CERT_PATH" ]; then
+            CERT_PATH=$(cygpath -w "$CERT_PATH" 2>/dev/null || echo "$CERT_PATH")
+        fi
+    fi
+
+    if [ "${MSIX_REQUIRE_SIGNING:-false}" = "true" ]; then
+        if [ -z "$CERT_PATH" ] || [ -z "$CERT_PASSWORD" ] || [ -z "$PUBLISHER" ]; then
+            print_error "MSIX signing is required but certificate env vars are missing."
+            print_info "Required: MSIX_CERT_PATH, MSIX_CERT_PASSWORD, MSIX_PUBLISHER"
+            return 1
+        fi
     fi
 
     cd "$PROJECT_DIR"
     print_info "Creating MSIX package..."
-    dart run msix:create --release --version "$VERSION_MSIX" --output-path "$OUTPUT_DIR_WIN" --output-name "CBFileManager-$VERSION_NAME"
+    local msix_cmd=(
+        dart run msix:create
+        --release
+        --install-certificate false
+        --version "$VERSION_MSIX"
+        --output-path "$OUTPUT_DIR_WIN"
+        --output-name "CBFileManager-$VERSION_NAME"
+    )
+
+    if [ -n "$CERT_PATH" ]; then
+        if [ ! -f "$CERT_PATH_FOR_CHECK" ]; then
+            print_error "MSIX certificate file not found: $CERT_PATH"
+            cd ..
+            return 1
+        fi
+        msix_cmd+=(--certificate-path "$CERT_PATH")
+    fi
+
+    if [ -n "$CERT_PASSWORD" ]; then
+        msix_cmd+=(--certificate-password "$CERT_PASSWORD")
+    fi
+
+    if [ -n "$PUBLISHER" ]; then
+        msix_cmd+=(--publisher "$PUBLISHER")
+    fi
+
+    "${msix_cmd[@]}"
 
     if [ $? -eq 0 ]; then
         print_success "Windows MSIX Package created!"

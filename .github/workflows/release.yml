@@ -88,7 +88,7 @@ jobs:
           # Get previous tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
-          echo "# 🎉 CB File Manager $VERSION" > release_notes.md
+          echo "# 🎉 CB File Hub $VERSION" > release_notes.md
           echo "" >> release_notes.md
           echo "## 📝 What's Changed" >> release_notes.md
           echo "" >> release_notes.md
@@ -292,12 +292,35 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
 
+      - name: Restore MSIX signing certificate
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_CERT_BASE64 }}")) {
+            throw "Missing required secret: MSIX_CERT_BASE64"
+          }
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_CERT_PASSWORD }}")) {
+            throw "Missing required secret: MSIX_CERT_PASSWORD"
+          }
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_PUBLISHER }}")) {
+            throw "Missing required secret: MSIX_PUBLISHER"
+          }
+
+          $certPath = Join-Path $env:RUNNER_TEMP "cb-file-hub-signing.pfx"
+          $bytes = [Convert]::FromBase64String("${{ secrets.MSIX_CERT_BASE64 }}")
+          [IO.File]::WriteAllBytes($certPath, $bytes)
+          "MSIX_CERT_PATH=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Ensure build script is executable
         shell: bash
         run: chmod +x scripts/build.sh
 
       - name: Build MSIX
         shell: bash
+        env:
+          MSIX_CERT_PATH: ${{ env.MSIX_CERT_PATH }}
+          MSIX_CERT_PASSWORD: ${{ secrets.MSIX_CERT_PASSWORD }}
+          MSIX_PUBLISHER: ${{ secrets.MSIX_PUBLISHER }}
+          MSIX_REQUIRE_SIGNING: "true"
         run: ./scripts/build.sh windows-msix
 
       - name: Upload MSIX artifact
@@ -424,7 +447,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.generate-release-notes.outputs.version_tag }}
-          name: CB File Manager ${{ needs.generate-release-notes.outputs.version_tag }}
+          name: CB File Hub ${{ needs.generate-release-notes.outputs.version_tag }}
           body: ${{ needs.generate-release-notes.outputs.release_notes }}
           draft: false
           prerelease: false

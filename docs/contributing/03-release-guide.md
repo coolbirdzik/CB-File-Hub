@@ -35,8 +35,12 @@ CI will automatically:
 1. Validate the tag matches `pubspec.yaml` version.
 2. Increment the build number (`+1`, `+2`, ...).
 3. Commit the updated `pubspec.yaml` back to the repo.
-4. Build for all platforms (Windows, Android APK, Android AAB, Linux, macOS).
+4. Build release artifacts (Windows portable ZIP, Windows MSI, Windows MSIX, Android APK, Android AAB).
 5. Create a GitHub Release with changelog and download links.
+
+For Microsoft Store and MSIX signing details, see:
+
+- `docs/guides/02-microsoft-store-submission-guide.md`
 
 ---
 
@@ -139,9 +143,8 @@ This is fully **repo-based** — no dependency on GitHub Run IDs, works with any
 | Android | `CBFileManager-{ver}-{arch}.apk` | arm64-v8a, armeabi-v7a, x86_64 |
 | Android | `CBFileManager-{ver}.aab` | For Google Play |
 | Windows | `CBFileManager-{ver}-windows-portable.zip` | No install needed |
-| Windows | `CBFileManager-Setup-{ver}.msi` | MSI for enterprise |
-| Linux | `CBFileManager-{ver}-linux.tar.gz` | |
-| macOS | `CBFileManager-{ver}-macos.zip` | |
+| Windows | `CBFileManager-Setup-{ver}.msi` | Classic desktop installer |
+| Windows | `CBFileManager-{ver}.msix` | Signed package for Store or enterprise |
 
 ---
 
