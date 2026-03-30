@@ -302,14 +302,29 @@ jobs:
           if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_CERT_PASSWORD }}")) {
             throw "Missing required secret: MSIX_CERT_PASSWORD"
           }
-          if ([string]::IsNullOrWhiteSpace("${{ secrets.MSIX_PUBLISHER }}")) {
-            throw "Missing required secret: MSIX_PUBLISHER"
-          }
 
           $certPath = Join-Path $env:RUNNER_TEMP "cb-file-hub-signing.pfx"
           $bytes = [Convert]::FromBase64String("${{ secrets.MSIX_CERT_BASE64 }}")
           [IO.File]::WriteAllBytes($certPath, $bytes)
+
+          $certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+            $certPath,
+            "${{ secrets.MSIX_CERT_PASSWORD }}"
+          )
+          $actualPublisher = $certificate.Subject
+
+          $publisherLine = Select-String -Path "${{ env.PROJECT_DIR }}/pubspec.yaml" -Pattern "^\s*publisher:\s*(.+)$" | Select-Object -First 1
+          if (-not $publisherLine) {
+            throw "Could not find msix_config publisher in ${{ env.PROJECT_DIR }}/pubspec.yaml"
+          }
+
+          $expectedPublisher = $publisherLine.Matches[0].Groups[1].Value.Trim()
+          if ($expectedPublisher -ne $actualPublisher) {
+            throw "MSIX certificate subject does not match pubspec publisher. Expected '$expectedPublisher' but got '$actualPublisher'."
+          }
+
           "MSIX_CERT_PATH=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MSIX_CERT_SUBJECT=$actualPublisher" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Ensure build script is executable
         shell: bash
@@ -320,7 +335,7 @@ jobs:
         env:
           MSIX_CERT_PATH: ${{ env.MSIX_CERT_PATH }}
           MSIX_CERT_PASSWORD: ${{ secrets.MSIX_CERT_PASSWORD }}
-          MSIX_PUBLISHER: ${{ secrets.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER: ${{ env.MSIX_CERT_SUBJECT }}
           MSIX_REQUIRE_SIGNING: "true"
         run: ./scripts/build.sh windows-msix
 

@@ -697,9 +697,9 @@ build_windows_msix() {
     fi
 
     if [ "${MSIX_REQUIRE_SIGNING:-false}" = "true" ]; then
-        if [ -z "$CERT_PATH" ] || [ -z "$CERT_PASSWORD" ] || [ -z "$PUBLISHER" ]; then
+        if [ -z "$CERT_PATH" ] || [ -z "$CERT_PASSWORD" ]; then
             print_error "MSIX signing is required but certificate env vars are missing."
-            print_info "Required: MSIX_CERT_PATH, MSIX_CERT_PASSWORD, MSIX_PUBLISHER"
+            print_info "Required: MSIX_CERT_PATH, MSIX_CERT_PASSWORD"
             return 1
         fi
     fi
