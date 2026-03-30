@@ -680,7 +680,7 @@ build_windows_msix() {
     local CERT_PASSWORD="${MSIX_CERT_PASSWORD:-}"
     local PUBLISHER="${MSIX_PUBLISHER:-}"
     VERSION_NAME=$(get_version_name)
-    VERSION_MSIX=$(get_msix_version)
+    VERSION_MSIX="${MSIX_VERSION_OVERRIDE:-$(get_msix_version)}"
     OUTPUT_DIR="$BUILD_DIR/windows/msix"
     OUTPUT_DIR_WIN="$OUTPUT_DIR"
 
@@ -712,7 +712,7 @@ build_windows_msix() {
         --install-certificate false
         --version "$VERSION_MSIX"
         --output-path "$OUTPUT_DIR_WIN"
-        --output-name "CBFileManager-$VERSION_NAME"
+        --output-name "CBFileHub-$VERSION_NAME"
     )
 
     if [ -n "$CERT_PATH" ]; then
@@ -736,7 +736,7 @@ build_windows_msix() {
 
     if [ $? -eq 0 ]; then
         print_success "Windows MSIX Package created!"
-        print_info "Output: $OUTPUT_DIR/CBFileManager-$VERSION_NAME.msix"
+        print_info "Output: $OUTPUT_DIR/CBFileHub-$VERSION_NAME.msix"
     else
         print_error "MSIX package creation failed!"
         cd ..

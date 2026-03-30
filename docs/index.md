@@ -5,6 +5,7 @@
 - **Guides**
   - `guides/01-ai-technical-guide.md`
   - `guides/02-microsoft-store-submission-guide.md`
+  - `guides/03-privacy-policy.md`
   - `contributing/01-contribution-guide.md`
   - `contributing/02-coding-standards.md`
   - `contributing/03-release-guide.md`

@@ -122,30 +122,30 @@ jobs:
           echo "Choose the appropriate package for your platform:" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Windows" >> release_notes.md
-          echo "- **Portable**: \`CBFileManager-$VERSION-windows-portable.zip\` - Extract and run, no installation needed" >> release_notes.md
-          echo "- **MSI Installer**: \`CBFileManager-Setup-$VERSION.msi\` - Classic Windows installer" >> release_notes.md
-          echo "- **MSIX Package**: \`CBFileManager-$VERSION.msix\` - Modern Windows package with clean install/uninstall" >> release_notes.md
+          echo "- **Portable**: \`CBFileHub-$VERSION-windows-portable.zip\` - Extract and run, no installation needed" >> release_notes.md
+          echo "- **MSI Installer**: \`CBFileHub-Setup-$VERSION.msi\` - Classic Windows installer" >> release_notes.md
+          echo "- **MSIX Package**: \`CBFileHub-$VERSION.msix\` - Modern Windows package with clean install/uninstall" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android" >> release_notes.md
-          echo "- **APK**: \`CBFileManager-$VERSION-arm64-v8a.apk\` (64-bit)" >> release_notes.md
-          echo "- **APK**: \`CBFileManager-$VERSION-armeabi-v7a.apk\` (32-bit)" >> release_notes.md
-          echo "- **AAB**: \`CBFileManager-$VERSION.aab\` (For Google Play)" >> release_notes.md
+          echo "- **APK**: \`CBFileHub-$VERSION-arm64-v8a.apk\` (64-bit)" >> release_notes.md
+          echo "- **APK**: \`CBFileHub-$VERSION-armeabi-v7a.apk\` (32-bit)" >> release_notes.md
+          echo "- **AAB**: \`CBFileHub-$VERSION.aab\` (For Google Play)" >> release_notes.md
           echo "" >> release_notes.md
           echo "## 🚀 Installation" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Windows" >> release_notes.md
           echo "**Portable (No Installation):**" >> release_notes.md
-          echo "1. Download \`CBFileManager-$VERSION-windows-portable.zip\`" >> release_notes.md
+          echo "1. Download \`CBFileHub-$VERSION-windows-portable.zip\`" >> release_notes.md
           echo "2. Extract to any folder" >> release_notes.md
           echo "3. Run \`cb_file_manager.exe\`" >> release_notes.md
           echo "" >> release_notes.md
           echo "**MSI Installer:**" >> release_notes.md
-          echo "1. Download \`CBFileManager-Setup-$VERSION.msi\`" >> release_notes.md
+          echo "1. Download \`CBFileHub-Setup-$VERSION.msi\`" >> release_notes.md
           echo "2. Run the installer" >> release_notes.md
           echo "3. Follow the setup wizard" >> release_notes.md
           echo "" >> release_notes.md
           echo "**MSIX Package:**" >> release_notes.md
-          echo "1. Download \`CBFileManager-$VERSION.msix\`" >> release_notes.md
+          echo "1. Download \`CBFileHub-$VERSION.msix\`" >> release_notes.md
           echo "2. Open the package in Windows" >> release_notes.md
           echo "3. Approve the installation if Windows prompts for confirmation" >> release_notes.md
           echo "" >> release_notes.md
@@ -193,12 +193,12 @@ jobs:
         run: |
           VERSION="${{ needs.generate-release-notes.outputs.version_name }}"
           OUTPUT_DIR="${{ env.PROJECT_DIR }}/build/windows/portable"
-          TARGET_FILE="$OUTPUT_DIR/CBFileManager-$VERSION-windows-portable.zip"
+          TARGET_FILE="$OUTPUT_DIR/CBFileHub-$VERSION-windows-portable.zip"
           SOURCE_FILE=""
           for candidate in \
             "CBFileHub-Portable.zip" \
             "CoolBirdTagify-Portable.zip" \
-            "CBFileManager-$VERSION-windows-portable.zip"; do
+            "CBFileHub-$VERSION-windows-portable.zip"; do
             if [ -f "$OUTPUT_DIR/$candidate" ]; then
               SOURCE_FILE="$OUTPUT_DIR/$candidate"
               break
@@ -252,12 +252,12 @@ jobs:
         run: |
           VERSION="${{ needs.generate-release-notes.outputs.version_name }}"
           OUTPUT_DIR="${{ env.PROJECT_DIR }}/build/windows/installer"
-          TARGET_FILE="$OUTPUT_DIR/CBFileManager-Setup-$VERSION.msi"
+          TARGET_FILE="$OUTPUT_DIR/CBFileHub-Setup-$VERSION.msi"
           SOURCE_FILE=""
           for candidate in \
             "CBFileHub-Setup.msi" \
             "CoolBirdTagify-Setup.msi" \
-            "CBFileManager-Setup-$VERSION.msi"; do
+            "CBFileHub-Setup-$VERSION.msi"; do
             if [ -f "$OUTPUT_DIR/$candidate" ]; then
               SOURCE_FILE="$OUTPUT_DIR/$candidate"
               break
@@ -382,11 +382,11 @@ jobs:
 
           for file in *.apk; do
             if [[ $file == *"arm64-v8a"* ]]; then
-              mv "$file" "CBFileManager-$VERSION-arm64-v8a.apk"
+              mv "$file" "CBFileHub-$VERSION-arm64-v8a.apk"
             elif [[ $file == *"armeabi-v7a"* ]]; then
-              mv "$file" "CBFileManager-$VERSION-armeabi-v7a.apk"
+              mv "$file" "CBFileHub-$VERSION-armeabi-v7a.apk"
             elif [[ $file == *"x86_64"* ]]; then
-              mv "$file" "CBFileManager-$VERSION-x86_64.apk"
+              mv "$file" "CBFileHub-$VERSION-x86_64.apk"
             fi
           done
 
@@ -430,7 +430,7 @@ jobs:
         run: |
           VERSION="${{ needs.generate-release-notes.outputs.version_name }}"
           cd ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release
-          mv app-release.aab "CBFileManager-$VERSION.aab"
+          mv app-release.aab "CBFileHub-$VERSION.aab"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4

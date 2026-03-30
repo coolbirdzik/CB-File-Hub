@@ -12,7 +12,7 @@ publish_to: none
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+8
+version: 1.0.0+0
 
 environment:
   sdk: ">=2.15.0 <=3.32.1"
@@ -150,7 +150,7 @@ flutter:
   # see https://flutter.dev/custom-fonts/#from-packages
 
 msix_config:
-  display_name: CB File Hub
+  display_name: CB FileHub
   publisher_display_name: CoolBirdZik
   identity_name: CoolBirdZik.CBFileHub
   publisher: CN=C193F601-16B4-4BC5-89D3-1AE882F628DE

@@ -2,7 +2,7 @@
 # Cross-platform build system for Flutter application
 # Works on: Windows (Git Bash/WSL/MinGW), Linux, macOS
 
-.PHONY: help clean deep-clean deps build-windows-portable build-windows-msi build-windows-msix build-android-apk build-android-aab build-linux build-macos build-ios build-all test analyze format doctor release version version-info bump-build retag retag-one verify
+.PHONY: help clean deep-clean deps build-windows-portable build-windows-msi build-windows-msix build-windows-msix-store build-android-apk build-android-aab build-linux build-macos build-ios build-all test analyze format doctor release version version-info bump-build retag retag-one verify
 
 # Default target
 .DEFAULT_GOAL := help
@@ -35,7 +35,8 @@ help:
 	@echo "$(GREEN)📦 Build Targets:$(NC)"
 	@echo "  make windows           - Build Windows portable (ZIP)"
 	@echo "  make windows-msi       - Build Windows MSI installer"
-	@echo "  make windows-msix      - Build Windows MSIX package"
+	@echo "  make windows-msix      - Build signed Windows MSIX package"
+	@echo "  make windows-msix-store - Build signed Store-ready MSIX (x.y.z.0)"
 	@echo "  make android           - Build Android APK"
 	@echo "  make android-aab       - Build Android AAB"
 	@echo "  make linux             - Build Linux"
@@ -170,7 +171,43 @@ build-windows-msi:
 
 # Build Windows MSIX Package
 build-windows-msix:
-	@bash scripts/build.sh windows-msix
+	@echo "$(BLUE)Building Windows MSIX Package...$(NC)"
+	@printf "$(YELLOW)Certificate path: $(NC)"; \
+	read -r CERT_PATH; \
+	if [ -z "$$CERT_PATH" ]; then \
+		echo "$(RED)Certificate path is required$(NC)"; \
+		exit 1; \
+	fi; \
+	printf "$(YELLOW)Certificate password: $(NC)"; \
+	stty -echo; \
+	read -r CERT_PASSWORD; \
+	stty echo; \
+	echo ""; \
+	if [ -z "$$CERT_PASSWORD" ]; then \
+		echo "$(RED)Certificate password is required$(NC)"; \
+		exit 1; \
+	fi; \
+	MSIX_CERT_PATH="$$CERT_PATH" MSIX_CERT_PASSWORD="$$CERT_PASSWORD" MSIX_REQUIRE_SIGNING=true bash scripts/build.sh windows-msix
+
+# Build Store-ready Windows MSIX Package
+build-windows-msix-store:
+	@echo "$(BLUE)Building Store-ready Windows MSIX Package...$(NC)"
+	@printf "$(YELLOW)Certificate path: $(NC)"; \
+	read -r CERT_PATH; \
+	if [ -z "$$CERT_PATH" ]; then \
+		echo "$(RED)Certificate path is required$(NC)"; \
+		exit 1; \
+	fi; \
+	printf "$(YELLOW)Certificate password: $(NC)"; \
+	stty -echo; \
+	read -r CERT_PASSWORD; \
+	stty echo; \
+	echo ""; \
+	if [ -z "$$CERT_PASSWORD" ]; then \
+		echo "$(RED)Certificate password is required$(NC)"; \
+		exit 1; \
+	fi; \
+	MSIX_CERT_PATH="$$CERT_PATH" MSIX_CERT_PASSWORD="$$CERT_PASSWORD" MSIX_REQUIRE_SIGNING=true MSIX_VERSION_OVERRIDE="$(VERSION).0" bash scripts/build.sh windows-msix
 
 # Build Android APK
 build-android-apk: clean deps
@@ -227,7 +264,7 @@ build-all:
 	@echo "$(BLUE)Building for all platforms...$(NC)"
 	@$(MAKE) build-windows-portable || echo "$(YELLOW)Windows Portable build failed$(NC)"
 	@$(MAKE) build-windows-msi || echo "$(YELLOW)Windows MSI build failed$(NC)"
-	@$(MAKE) build-windows-msix || echo "$(YELLOW)Windows MSIX build failed$(NC)"
+	@echo "$(YELLOW)Skipping interactive Windows MSIX target in make all$(NC)"
 	@$(MAKE) build-android-apk || echo "$(YELLOW)Android APK build failed$(NC)"
 	@$(MAKE) build-android-aab || echo "$(YELLOW)Android AAB build failed$(NC)"
 	@$(MAKE) build-linux || echo "$(YELLOW)Linux build failed$(NC)"
@@ -241,6 +278,7 @@ build-all:
 windows: build-windows-portable
 windows-msi: build-windows-msi
 windows-msix: build-windows-msix
+windows-msix-store: build-windows-msix-store
 android: build-android-apk
 android-aab: build-android-aab
 linux: build-linux
