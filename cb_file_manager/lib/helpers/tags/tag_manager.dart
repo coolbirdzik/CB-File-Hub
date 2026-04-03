@@ -597,15 +597,28 @@ class TagManager {
   /// Returns true if successful, false otherwise
   static Future<bool> setTags(String filePath, List<String> tags) async {
     try {
+      AppLogger.info('[TagManager] setTags START',
+          error: 'filePath=$filePath incomingTags=$tags');
+      debugPrint(
+          '[TagManager] setTags START filePath=$filePath incomingTags=$tags');
       await initialize();
 
       // First validate tags (remove empty ones)
       final validTags = tags.where((tag) => tag.trim().isNotEmpty).toList();
+      AppLogger.debug('[TagManager] setTags normalized',
+          error:
+              'filePath=$filePath validTags=$validTags useDatabase=$_useDatabase');
+      debugPrint(
+          '[TagManager] setTags normalized filePath=$filePath validTags=$validTags useDatabase=$_useDatabase');
 
       if (_useDatabase && _databaseManager != null) {
         // Use Database to set tags
         final success =
             await _databaseManager!.setTagsForFile(filePath, validTags);
+        AppLogger.info('[TagManager] setTags database result',
+            error: 'filePath=$filePath success=$success');
+        debugPrint(
+            '[TagManager] setTags database result filePath=$filePath success=$success');
 
         if (success) {
           // Update cache
@@ -634,6 +647,10 @@ class TagManager {
         }
 
         final success = await _saveGlobalTags(tagsData);
+        AppLogger.info('[TagManager] setTags json result',
+            error: 'filePath=$filePath success=$success');
+        debugPrint(
+            '[TagManager] setTags json result filePath=$filePath success=$success');
 
         if (success) {
           // Update cache
@@ -650,7 +667,9 @@ class TagManager {
         return success;
       }
     } catch (e) {
-      debugPrint('Error setting tags for $filePath: $e');
+      AppLogger.error('[TagManager] setTags ERROR',
+          error: 'filePath=$filePath error=$e');
+      debugPrint('[TagManager] setTags ERROR filePath=$filePath error=$e');
       return false;
     }
   }

@@ -38,6 +38,7 @@ import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 // Import extracted foundation components
 import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import 'package:cb_file_manager/ui/controllers/lazy_loading_manager.dart';
+import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:cb_file_manager/ui/menus/folder_background_context_menu.dart';
 import 'package:cb_file_manager/ui/mixins/preferences_manager_mixin.dart';
 import 'package:cb_file_manager/ui/controllers/search_filter_manager.dart';
@@ -1222,6 +1223,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   // Helper methods for dialog calls - now using DialogManager
   void _showAddTagToFileDialog(BuildContext context, String filePath) {
+    AppLogger.info('[ManageTags][TabbedFolder] _showAddTagToFileDialog',
+        error: 'filePath=$filePath');
     DialogManager.showAddTagToFile(context, filePath);
   }
 

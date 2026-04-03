@@ -4,6 +4,51 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/utils/app_logger.dart';
+
+class TagManagementSectionController {
+  _TagManagementSectionState? _state;
+
+  bool get isAttached => _state != null;
+
+  bool get hasPendingChanges => _state?.hasPendingChanges ?? false;
+
+  int get pendingChangesCount => _state?.pendingChangesCount ?? 0;
+
+  Future<void> saveChanges() async {
+    final state = _state;
+    if (state == null) {
+      debugPrint(
+          '[ManageTags][Controller] saveChanges called while controller is detached');
+      throw StateError('TagManagementSectionController is not attached');
+    }
+    debugPrint(
+        '[ManageTags][Controller] saveChanges forwarding to state filePath=${state.widget.filePath}');
+    await state.saveChanges();
+  }
+
+  void discardChanges() {
+    debugPrint(
+        '[ManageTags][Controller] discardChanges invoked attached=$isAttached');
+    _state?.discardChanges();
+  }
+
+  void _attach(_TagManagementSectionState state) {
+    AppLogger.info(
+        '[ManageTags][Controller] Attached to ${state.widget.filePath}');
+    debugPrint(
+        '[ManageTags][Controller] Attached to filePath=${state.widget.filePath}');
+    _state = state;
+  }
+
+  void _detach(_TagManagementSectionState state) {
+    if (identical(_state, state)) {
+      debugPrint(
+          '[ManageTags][Controller] Detached from filePath=${state.widget.filePath}');
+      _state = null;
+    }
+  }
+}
 
 /// A reusable tag management section that can be used in different places
 /// like the file details screen and tag dialogs
@@ -29,6 +74,9 @@ class TagManagementSection extends StatefulWidget {
   /// Callback when pending changes count changes (for badge updates)
   final VoidCallback? onPendingChangesChanged;
 
+  /// Optional controller for imperative access from dialogs or parent widgets.
+  final TagManagementSectionController? controller;
+
   /// Callback when the section's state is ready (after first build)
   final void Function(TagManagementSection section)? onSectionReady;
 
@@ -41,6 +89,7 @@ class TagManagementSection extends StatefulWidget {
     this.showFileTagsHeader = true,
     this.initialTags,
     this.onPendingChangesChanged,
+    this.controller,
     this.onSectionReady,
   }) : super(key: key);
 
@@ -90,9 +139,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   List<String> _tagSuggestions = [];
   List<String> _selectedTags = [];
   List<String> _originalTags = []; // Store original tags to detect changes
+  String _draftTagText = '';
   bool _hasPendingChanges = false;
   int _pendingChangesCount = 0;
-  final FocusNode _tagFocusNode = FocusNode();
 
   /// Public getter: true if there are unsaved changes
   bool get hasPendingChanges => _hasPendingChanges;
@@ -101,12 +150,6 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   int get pendingChangesCount => _pendingChangesCount;
   late final TagColorManager _colorManager = TagColorManager.instance;
 
-  // Thêm key để xác định vị trí của input
-  final GlobalKey _inputKey = GlobalKey();
-
-  // Vị trí và kích thước của input field
-  double _inputYPosition = 0;
-
   /// Compute pending changes count and update flags
   void _updatePendingChanges() {
     final added = _selectedTags.where((t) => !_originalTags.contains(t)).length;
@@ -114,6 +157,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         _originalTags.where((t) => !_selectedTags.contains(t)).length;
     _hasPendingChanges = added > 0 || removed > 0;
     _pendingChangesCount = added + removed;
+    debugPrint(
+        '[ManageTags][Section] Pending changes filePath=${widget.filePath} hasPending=$_hasPendingChanges count=$_pendingChangesCount selected=$_selectedTags original=$_originalTags');
     widget.onPendingChangesChanged?.call();
   }
 
@@ -122,37 +167,31 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     super.initState();
     // Register this state
     _states[widget] = this;
+    widget.controller?._attach(this);
+    AppLogger.info('[ManageTags][Section] initState ${widget.filePath}');
+    debugPrint('[ManageTags][Section] initState filePath=${widget.filePath}');
 
     _loadTagData();
-    // Đăng ký listener để cập nhật khi có thay đổi màu sắc
     _colorManager.addListener(_handleColorChanged);
 
-    // Thêm post-frame callback để đo kích thước input sau khi render
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateInputPosition();
-      // Notify parent when the section is ready
       widget.onSectionReady?.call(widget);
     });
   }
 
-  // Cập nhật vị trí của input field
-  void _updateInputPosition() {
-    if (!mounted) return;
-
-    final RenderBox? renderBox =
-        _inputKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox != null) {
-      final position = renderBox.localToGlobal(Offset.zero);
-      final RenderBox? stackBox = context.findRenderObject() as RenderBox?;
-
-      if (stackBox != null) {
-        final stackPosition = stackBox.localToGlobal(Offset.zero);
-        setState(() {
-          // Tính toán vị trí tương đối so với Stack
-          _inputYPosition =
-              position.dy - stackPosition.dy + renderBox.size.height;
-        });
+  @override
+  void didUpdateWidget(covariant TagManagementSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget, widget)) {
+      debugPrint(
+          '[ManageTags][Section] didUpdateWidget oldFilePath=${oldWidget.filePath} newFilePath=${widget.filePath}');
+      _states.remove(oldWidget);
+      _states[widget] = this;
+      if (!identical(oldWidget.controller, widget.controller)) {
+        oldWidget.controller?._detach(this);
+        widget.controller?._attach(this);
       }
+      widget.onSectionReady?.call(widget);
     }
   }
 
@@ -160,6 +199,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   void dispose() {
     // Unregister this state
     _states.remove(widget);
+    widget.controller?._detach(this);
+    debugPrint('[ManageTags][Section] dispose filePath=${widget.filePath}');
 
     _colorManager.removeListener(_handleColorChanged);
     super.dispose();
@@ -174,9 +215,70 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     }
   }
 
+  bool _containsTag(String tag) {
+    final normalizedTag = tag.trim().toLowerCase();
+    return _selectedTags.any(
+      (selectedTag) => selectedTag.trim().toLowerCase() == normalizedTag,
+    );
+  }
+
+  void _addSelectedTag(
+    String tag, {
+    bool clearSuggestions = false,
+    bool clearDraft = true,
+  }) {
+    final trimmedTag = tag.trim();
+    debugPrint(
+        '[ManageTags][Section] _addSelectedTag requested filePath=${widget.filePath} tag="$trimmedTag" clearSuggestions=$clearSuggestions clearDraft=$clearDraft');
+    if (trimmedTag.isEmpty || _containsTag(trimmedTag)) {
+      debugPrint(
+          '[ManageTags][Section] _addSelectedTag ignored filePath=${widget.filePath} tag="$trimmedTag" duplicateOrEmpty=${trimmedTag.isEmpty || _containsTag(trimmedTag)}');
+      if (_draftTagText.isNotEmpty || (clearSuggestions && _tagSuggestions.isNotEmpty)) {
+        setState(() {
+          if (clearDraft) {
+            _draftTagText = '';
+          }
+          if (clearSuggestions) {
+            _tagSuggestions = [];
+          }
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _selectedTags.add(trimmedTag);
+      if (clearDraft) {
+        _draftTagText = '';
+      }
+      if (clearSuggestions) {
+        _tagSuggestions = [];
+      }
+    });
+    _updatePendingChanges();
+  }
+
+  bool _commitDraftTag([String? rawTag]) {
+    final draftTag = (rawTag ?? _draftTagText).trim();
+    debugPrint(
+        '[ManageTags][Section] _commitDraftTag filePath=${widget.filePath} raw="$rawTag" effective="$draftTag"');
+    if (draftTag.isEmpty) {
+      return false;
+    }
+
+    _addSelectedTag(
+      draftTag,
+      clearSuggestions: true,
+      clearDraft: true,
+    );
+    return true;
+  }
+
   void _loadTagData() async {
     // Use initialTags if provided, otherwise fetch from TagManager
     List<String> currentTags = [];
+    AppLogger.debug('[ManageTags][Section] Loading tags for ${widget.filePath}');
+    debugPrint('[ManageTags][Section] Loading tag data filePath=${widget.filePath}');
 
     if (widget.initialTags != null) {
       currentTags = List.from(widget.initialTags!);
@@ -184,6 +286,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       try {
         currentTags = await TagManager.getTags(widget.filePath);
       } catch (e) {
+        debugPrint(
+            '[ManageTags][Section] Loading tags failed filePath=${widget.filePath} error=$e');
         currentTags = [];
       }
     }
@@ -195,70 +299,90 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         _hasPendingChanges = false;
         _pendingChangesCount = 0;
       });
+      AppLogger.info(
+          '[ManageTags][Section] Loaded ${_selectedTags.length} tags for ${widget.filePath}');
+      debugPrint(
+          '[ManageTags][Section] Loaded tag data filePath=${widget.filePath} tags=$_selectedTags');
     }
   }
 
   // Save all changes to file
   Future<void> saveChanges() async {
-    debugPrint('TagManagementSection.saveChanges() START');
+    AppLogger.info(
+        '[ManageTags][Section] saveChanges START ${widget.filePath} pending=$_pendingChangesCount');
+    debugPrint(
+        '[ManageTags][Section] saveChanges START filePath=${widget.filePath} mounted=$mounted selected=$_selectedTags original=$_originalTags draft="$_draftTagText"');
     if (!mounted) {
-      debugPrint('TagManagementSection.saveChanges() SKIP - not mounted');
+      debugPrint(
+          '[ManageTags][Section] saveChanges SKIP because widget is not mounted');
       return;
     }
 
     try {
-      // Get tags to add (those in _selectedTags but not in _originalTags)
-      List<String> tagsToAdd =
-          _selectedTags.where((tag) => !_originalTags.contains(tag)).toList();
+      _commitDraftTag();
 
-      // Get tags to remove (those in _originalTags but not in _selectedTags)
-      List<String> tagsToRemove =
-          _originalTags.where((tag) => !_selectedTags.contains(tag)).toList();
+      if (!_hasPendingChanges) {
+        AppLogger.warning(
+            '[ManageTags][Section] saveChanges skipped because no pending changes for ${widget.filePath}');
+        debugPrint(
+            '[ManageTags][Section] saveChanges SKIP because there are no pending changes filePath=${widget.filePath}');
+        return;
+      }
 
       debugPrint(
-          'saveChanges: tagsToAdd=$tagsToAdd tagsToRemove=$tagsToRemove');
-
-      // Process removals
-      for (String tag in tagsToRemove) {
-        debugPrint('saveChanges: removing tag "$tag"');
-        await TagManager.removeTag(widget.filePath, tag);
+          '[ManageTags][Section] Persisting tags filePath=${widget.filePath} tags=$_selectedTags');
+      final success = await TagManager.setTags(widget.filePath, _selectedTags);
+      if (!success) {
+        throw Exception('Failed to persist tags for "${widget.filePath}"');
       }
 
-      // Process additions
-      for (String tag in tagsToAdd) {
-        debugPrint('saveChanges: adding tag "$tag"');
-        await TagManager.addTag(widget.filePath, tag.trim());
+      if (!mounted) {
+        return;
       }
 
-      // Force update to original tags to reflect current state
-      _originalTags = List.from(_selectedTags);
+      setState(() {
+        _originalTags = List.from(_selectedTags);
+        _draftTagText = '';
+        _tagSuggestions = [];
+        _hasPendingChanges = false;
+        _pendingChangesCount = 0;
+      });
+      widget.onPendingChangesChanged?.call();
 
-      // Make sure we trigger notifications manually
       TagManager.clearCache();
       TagManager.instance.notifyTagChanged(widget.filePath);
       TagManager.instance.notifyTagChanged("global:tag_updated");
 
-      // Refresh tags if needed
-      _refreshTags();
-      debugPrint('TagManagementSection.saveChanges() DONE');
+      await _refreshTags();
+      AppLogger.info(
+          '[ManageTags][Section] saveChanges DONE ${widget.filePath}');
+      debugPrint(
+          '[ManageTags][Section] saveChanges DONE filePath=${widget.filePath}');
     } catch (e) {
-      debugPrint('TagManagementSection.saveChanges() ERROR: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving tags: $e')),
-        );
-      }
+      AppLogger.error(
+        '[ManageTags][Section] saveChanges ERROR ${widget.filePath}',
+        error: e,
+      );
+      debugPrint(
+          '[ManageTags][Section] saveChanges ERROR filePath=${widget.filePath} error=$e');
+      rethrow;
     }
   }
 
   // Discard changes and restore original tags
   void discardChanges() {
+    debugPrint(
+        '[ManageTags][Section] discardChanges filePath=${widget.filePath}');
     setState(() {
       _selectedTags = List.from(_originalTags);
+      _draftTagText = '';
+      _tagSuggestions = [];
     });
+    _updatePendingChanges();
   }
 
   Future<void> _refreshTags() async {
+    debugPrint('[ManageTags][Section] _refreshTags filePath=${widget.filePath}');
     setState(() {
       _tagSuggestions = [];
     });
@@ -271,6 +395,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   // Keep these methods for manual operations if needed, but not called from UI directly
 
   Future<void> _updateTagSuggestions(String text) async {
+    debugPrint(
+        '[ManageTags][Section] _updateTagSuggestions filePath=${widget.filePath} query="$text"');
     if (text.isEmpty) {
       setState(() {
         _tagSuggestions = [];
@@ -285,9 +411,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         _tagSuggestions =
             suggestions.where((tag) => !_selectedTags.contains(tag)).toList();
       });
-
-      // Cập nhật vị trí của input khi có suggestions
-      _updateInputPosition();
+      debugPrint(
+          '[ManageTags][Section] Suggestions updated filePath=${widget.filePath} suggestions=$_tagSuggestions');
     }
   }
 
@@ -296,222 +421,194 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Stack(
-      clipBehavior:
-          Clip.none, // Cho phép các phần tử con vượt ra ngoài phạm vi của Stack
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Add tag input with ChipsInput
-            const SizedBox(height: 16),
-            Container(
-              key: _inputKey, // Thêm key để xác định vị trí
-              child: Focus(
-                focusNode: _tagFocusNode,
-                child: ChipsInput<String>(
-                  values: _selectedTags,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: Colors.transparent,
-                        width: 0,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: Colors.transparent,
-                        width: 0,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16.0),
-                      borderSide: BorderSide(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                        width: 1,
-                      ),
-                    ),
-                    labelText: AppLocalizations.of(context)!.tagName,
-                    labelStyle: const TextStyle(
-                      fontSize: 18,
-                    ),
-                    hintText: AppLocalizations.of(context)!.enterTagName,
-                    hintStyle: const TextStyle(
-                      fontSize: 18,
-                    ),
-                    prefixIcon: const Icon(PhosphorIconsLight.tag, size: 24),
-                    filled: true,
-                    fillColor: isDarkMode
-                        ? theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.7)
-                        : theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.3),
-                  ),
-                  style: const TextStyle(fontSize: 18),
-                  onChanged: (updatedTags) async {
-                    // Only update the local state, don't modify file yet
-                    setState(() {
-                      _selectedTags = List.from(updatedTags);
-                    });
-                    _updatePendingChanges();
-                  },
-                  onTextChanged: (value) {
-                    _updateTagSuggestions(value);
-                  },
-                  onSubmitted: (value) {
-                    if (value.trim().isNotEmpty) {
-                      // Just add to selected tags, don't save to file yet
-                      setState(() {
-                        if (!_selectedTags.contains(value.trim())) {
-                          _selectedTags.add(value.trim());
-                        }
-                      });
-                      _updatePendingChanges();
-                    }
-                  },
-                  chipBuilder: (context, tag) {
-                    return TagInputChip(
-                      tag: tag,
-                      onDeleted: (removedTag) {
-                        // Just update the local state, don't modify file
-                        setState(() {
-                          _selectedTags.remove(removedTag);
-                        });
-                        _updatePendingChanges();
-                      },
-                      onSelected: (selectedTag) {},
-                    );
-                  },
-                ),
+        const SizedBox(height: 16),
+        ChipsInput<String>(
+          values: _selectedTags,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: Colors.transparent,
+                width: 0,
               ),
             ),
-
-            // Popular tags section
-            _buildPopularTagsSection(),
-
-            // Recent tags section
-            _buildRecentTagsSection(),
-          ],
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(
+                color: Colors.transparent,
+                width: 0,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16.0),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            labelText: AppLocalizations.of(context)!.tagName,
+            labelStyle: const TextStyle(
+              fontSize: 18,
+            ),
+            hintText: AppLocalizations.of(context)!.enterTagName,
+            hintStyle: const TextStyle(
+              fontSize: 18,
+            ),
+            prefixIcon: const Icon(PhosphorIconsLight.tag, size: 24),
+            filled: true,
+            fillColor: isDarkMode
+                ? theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.7)
+                : theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
+          ),
+          style: const TextStyle(fontSize: 18),
+          onChanged: (updatedTags) async {
+            debugPrint(
+                '[ManageTags][Section] ChipsInput.onChanged filePath=${widget.filePath} updatedTags=$updatedTags');
+            setState(() {
+              _selectedTags = List.from(updatedTags);
+            });
+            _updatePendingChanges();
+          },
+          onTextChanged: (value) {
+            debugPrint(
+                '[ManageTags][Section] ChipsInput.onTextChanged filePath=${widget.filePath} value="$value"');
+            _draftTagText = value;
+            _updateTagSuggestions(value);
+          },
+          onSubmitted: (value) {
+            debugPrint(
+                '[ManageTags][Section] ChipsInput.onSubmitted filePath=${widget.filePath} value="$value"');
+            _commitDraftTag(value);
+          },
+          chipBuilder: (context, tag) {
+            return TagInputChip(
+              tag: tag,
+              onDeleted: (removedTag) {
+                setState(() {
+                  _selectedTags.remove(removedTag);
+                });
+                _updatePendingChanges();
+              },
+              onSelected: (selectedTag) {},
+            );
+          },
         ),
+        if (_tagSuggestions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildTagSuggestionsSection(theme, isDarkMode),
+        ],
+        _buildPopularTagsSection(),
+        _buildRecentTagsSection(),
+      ],
+    );
+  }
 
-        // Tag suggestions - displayed as overlay below the input field
-        if (_tagSuggestions.isNotEmpty)
-          Positioned(
-            top: _inputYPosition > 0 ? _inputYPosition : 95,
-            left: 0,
-            right: 0,
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 250),
-              decoration: BoxDecoration(
-                color: isDarkMode
-                    ? const Color(0xFF2D2D2D)
-                    : const Color(0xFFFFFFFF),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+  Widget _buildTagSuggestionsSection(ThemeData theme, bool isDarkMode) {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 250),
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                const Icon(PhosphorIconsLight.magnifyingGlass,
+                    size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  AppLocalizations.of(context)!.tagSuggestions,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.white,
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(16)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(PhosphorIconsLight.magnifyingGlass,
-                            size: 18, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(
-                          AppLocalizations.of(context)!.tagSuggestions,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _tagSuggestions = [];
-                            });
-                          },
-                          child: const Icon(PhosphorIconsLight.x,
-                              size: 20, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      physics: const ClampingScrollPhysics(),
-                      itemCount: _tagSuggestions.length > 6
-                          ? 6
-                          : _tagSuggestions.length,
-                      itemBuilder: (context, index) {
-                        final suggestion = _tagSuggestions[index];
-                        return InkWell(
-                          onTap: () {
-                            if (!_selectedTags.contains(suggestion)) {
-                              setState(() {
-                                _selectedTags.add(suggestion);
-                                _tagSuggestions = [];
-                              });
-                            }
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: isDarkMode
-                                  ? const Color(0xFF2D2D2D)
-                                  : const Color(0xFFFFFFFF),
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: theme.dividerColor,
-                                  width: 0.5,
-                                ),
-                              ),
-                            ),
-                            child: ListTile(
-                              dense: true,
-                              leading: Icon(
-                                PhosphorIconsLight.tag,
-                                size: 20,
-                                color: theme.colorScheme.primary,
-                              ),
-                              title: Text(
-                                suggestion,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _tagSuggestions = [];
+                    });
+                  },
+                  child: const Icon(PhosphorIconsLight.x,
+                      size: 20, color: Colors.white),
+                ),
+              ],
             ),
           ),
-      ],
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
+              itemCount: _tagSuggestions.length > 6 ? 6 : _tagSuggestions.length,
+              itemBuilder: (context, index) {
+                final suggestion = _tagSuggestions[index];
+                return InkWell(
+                  onTap: () {
+                    _addSelectedTag(
+                      suggestion,
+                      clearSuggestions: true,
+                      clearDraft: true,
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDarkMode
+                          ? const Color(0xFF2D2D2D)
+                          : const Color(0xFFFFFFFF),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: theme.dividerColor,
+                          width: 0.5,
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(
+                        PhosphorIconsLight.tag,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                      title: Text(
+                        suggestion,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color:
+                              isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -522,11 +619,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       padding: const EdgeInsets.only(top: 24),
       child: PopularTagsWidget(
         onTagSelected: (tag) {
-          setState(() {
-            if (!_selectedTags.contains(tag)) {
-              _selectedTags.add(tag);
-            }
-          });
+          _addSelectedTag(tag);
         },
       ),
     );
@@ -539,11 +632,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       padding: const EdgeInsets.only(top: 24),
       child: RecentTagsWidget(
         onTagSelected: (tag) {
-          setState(() {
-            if (!_selectedTags.contains(tag)) {
-              _selectedTags.add(tag);
-            }
-          });
+          _addSelectedTag(tag);
         },
       ),
     );
@@ -763,18 +852,11 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
                 ? Colors.blue.withValues(alpha: 0.3)
                 : theme.colorScheme.primary.withValues(alpha: 0.15))
             : (isDark ? Colors.grey[700]! : Colors.grey[200]!));
-
-    final Color textColor = hasCustomColor
-        ? (tagColor)
-        : (_isHovered
-            ? (isDark ? Colors.white : theme.colorScheme.primary)
-            : (isDark ? Colors.grey[200]! : Colors.grey[800]!));
-
-    final Color iconColor = hasCustomColor
-        ? (tagColor)
-        : (_isHovered
-            ? (isDark ? Colors.white : theme.colorScheme.primary)
-            : (isDark ? Colors.grey[400]! : Colors.grey[600]!));
+    final Color effectiveBackground =
+        Color.alphaBlend(backgroundColor, theme.colorScheme.surface);
+    final Color foregroundColor = _bestForegroundColor(effectiveBackground);
+    final Color textColor = foregroundColor;
+    final Color iconColor = foregroundColor.withValues(alpha: 0.92);
 
     final Color borderColor = hasCustomColor
         ? (tagColor.withValues(alpha: _isHovered ? 0.8 : 0.3))
@@ -856,5 +938,21 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         ),
       ),
     );
+  }
+
+  Color _bestForegroundColor(Color background) {
+    const light = Colors.white;
+    const dark = Colors.black;
+    final lightContrast = _contrastRatio(background, light);
+    final darkContrast = _contrastRatio(background, dark);
+    return lightContrast >= darkContrast ? light : dark;
+  }
+
+  double _contrastRatio(Color a, Color b) {
+    final aLuminance = a.computeLuminance();
+    final bLuminance = b.computeLuminance();
+    final lighter = aLuminance > bLuminance ? aLuminance : bLuminance;
+    final darker = aLuminance > bLuminance ? bLuminance : aLuminance;
+    return (lighter + 0.05) / (darker + 0.05);
   }
 }

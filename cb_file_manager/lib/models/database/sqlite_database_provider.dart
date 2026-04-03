@@ -419,10 +419,19 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       }
       uniqueTags[_normalizeTag(trimmed)] = trimmed;
     }
+    debugPrint(
+        '[SQLite] setTagsForFile START filePath=$filePath incomingTags=$tags uniqueTags=${uniqueTags.values.toList()}');
+    AppLogger.info('[SQLite] setTagsForFile START',
+        error:
+            'filePath=$filePath incomingTags=$tags uniqueTags=${uniqueTags.values.toList()}');
 
     try {
       final database = await getDatabase();
       await database.transaction((txn) async {
+        AppLogger.debug('[SQLite] setTagsForFile deleting existing tags',
+            error: 'filePath=$filePath');
+        debugPrint(
+            '[SQLite] setTagsForFile deleting existing tags filePath=$filePath');
         await txn.delete(
           'file_tags',
           where: 'file_path = ?',
@@ -430,6 +439,11 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         );
 
         for (final entry in uniqueTags.entries) {
+          AppLogger.debug('[SQLite] setTagsForFile inserting tag',
+              error:
+                  'filePath=$filePath tag=${entry.value} normalized=${entry.key}');
+          debugPrint(
+              '[SQLite] setTagsForFile inserting filePath=$filePath tag=${entry.value} normalized=${entry.key}');
           await txn.insert(
             'file_tags',
             <String, Object?>{
@@ -441,9 +455,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           );
         }
       });
+      AppLogger.info('[SQLite] setTagsForFile DONE',
+          error: 'filePath=$filePath');
+      debugPrint('[SQLite] setTagsForFile DONE filePath=$filePath');
       return true;
     } catch (error) {
-      debugPrint('Error setting tags for file: $error');
+      AppLogger.error('[SQLite] setTagsForFile ERROR',
+          error: 'filePath=$filePath error=$error');
+      debugPrint(
+          '[SQLite] setTagsForFile ERROR filePath=$filePath error=$error');
       return false;
     }
   }

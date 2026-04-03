@@ -1,6 +1,5 @@
 #include "fc_native_video_thumbnail_plugin.h"
 #include "ffmpeg_thumbnail_helper.h"
-// This must be included before many other Windows headers.
 #include <atlimage.h>
 #include <comdef.h>
 #include <flutter/method_channel.h>
@@ -873,6 +872,9 @@ namespace fc_native_video_thumbnail
       }
     }
 
+    // Initialize FFmpeg thumbnail helper GDI+ singleton (for fast SaveImageFast)
+    FFmpegThumbnailHelper::InitializeGdiPlus();
+
     // Initialize MediaFoundation
     MFStartup(MF_VERSION);
 
@@ -916,6 +918,9 @@ namespace fc_native_video_thumbnail
 
     // Cleanup MediaFoundation
     MFShutdown();
+
+    // Shutdown FFmpeg thumbnail helper GDI+ singleton
+    FFmpegThumbnailHelper::ShutdownGdiPlus();
 
     // Cleanup shared GDI+ resources
     {

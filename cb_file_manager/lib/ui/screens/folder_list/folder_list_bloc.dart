@@ -316,22 +316,27 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
               folderSortOption ?? state.sortOption;
 
           // Stream-based loading with batch emission for lazy loading
-          // OPTIMIZATION: Emit files immediately without sorting during batch
-          // to prioritize UI responsiveness. Sort only at the end.
+          // OPTIMIZATION: Sort DURING loading to ensure thumbnails are generated
+          // in the correct priority order from the start.
           final List<FileSystemEntity> folders = [];
           final List<FileSystemEntity> files = [];
           int batchCount = 0;
-          const int batchSize =
-              50; // Emit partial state every 50 items (increased for less overhead)
-          int lastSortedBatch = 0; // Track when we last sorted
+          const int batchSize = 50; // Emit partial state every 50 items
           int retryCount = 0;
           const maxRetries = 3;
+          // Cache file stats for sorting during loading
+          final Map<String, FileStat> loadingFileStatsCache = {};
 
           stepStopwatch.start();
           while (retryCount < maxRetries) {
             try {
               // Use stream-based loading for progressive display
               await for (final entity in directory.list()) {
+                // Cache stats for sorting
+                try {
+                  loadingFileStatsCache[entity.path] = await entity.stat();
+                } catch (_) {}
+
                 if (entity is Directory) {
                   folders.add(entity);
                 } else if (entity is File) {
@@ -343,41 +348,29 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
                 }
                 batchCount++;
 
-                // Emit partial state every batchSize items for lazy loading effect
-                // OPTIMIZATION: Only sort every 150 items to reduce overhead
-                // For smaller batches, just emit unsorted for faster UI update
+                // Emit partial state every batchSize items
+                // Always sort during loading to maintain correct thumbnail priority
                 if (batchCount % batchSize == 0) {
-                  final shouldSort = (batchCount - lastSortedBatch) >= 150;
-
-                  if (shouldSort && batchCount > 100) {
-                    // Sort only occasionally for large lists
-                    final sortedFoldersBatch =
-                        await FileSystemSorter.sortDirectories(
-                      folders.cast<Directory>(),
-                      sortOptionToUse,
-                    );
-                    final sortedFilesBatch = await FileSystemSorter.sortFiles(
-                      files.cast<File>(),
-                      sortOptionToUse,
-                    );
-                    lastSortedBatch = batchCount;
-                    emit(state.copyWith(
-                      isLoading: true,
-                      folders: sortedFoldersBatch,
-                      files: sortedFilesBatch,
-                      error: null,
-                      sortOption: sortOptionToUse,
-                    ));
-                  } else {
-                    // Quick emit without sorting - prioritize showing files fast
-                    emit(state.copyWith(
-                      isLoading: true,
-                      folders: List.from(folders),
-                      files: List.from(files),
-                      error: null,
-                      sortOption: sortOptionToUse,
-                    ));
-                  }
+                  // Sort during loading for correct thumbnail priority
+                  final sortedFoldersBatch =
+                      await FileSystemSorter.sortDirectories(
+                    folders.cast<Directory>(),
+                    sortOptionToUse,
+                    fileStatsCache: loadingFileStatsCache,
+                  );
+                  final sortedFilesBatch = await FileSystemSorter.sortFiles(
+                    files.cast<File>(),
+                    sortOptionToUse,
+                    fileStatsCache: loadingFileStatsCache,
+                  );
+                  emit(state.copyWith(
+                    isLoading: true,
+                    folders: sortedFoldersBatch,
+                    files: sortedFilesBatch,
+                    error: null,
+                    sortOption: sortOptionToUse,
+                    fileStatsCache: Map.from(loadingFileStatsCache),
+                  ));
                 }
               }
               break; // Success, exit retry loop
@@ -402,15 +395,17 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
           debugPrint(
               'DEBUG: Final result - ${folders.length} folders, ${files.length} files');
 
-          // Final sort for the complete list
+          // Final sort for the complete list (using the stats cache from loading)
           stepStopwatch.start();
           final sortedFolders = await FileSystemSorter.sortDirectories(
             folders.cast<Directory>(),
             sortOptionToUse,
+            fileStatsCache: loadingFileStatsCache,
           );
           final sortedFiles = await FileSystemSorter.sortFiles(
             files.cast<File>(),
             sortOptionToUse,
+            fileStatsCache: loadingFileStatsCache,
           );
           AppLogger.perf(
               '⏱️ [PERF] Final sorting took: ${stepStopwatch.elapsedMilliseconds}ms');
@@ -422,8 +417,8 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
           files.clear();
           files.addAll(sortedFiles);
 
-          // Build file stats cache asynchronously (no need to await)
-          _buildFileStatsCacheAsync(sortedFolders, sortedFiles, emit);
+          // File stats cache is already built during loading
+          // Use the loadingFileStatsCache that was populated during directory listing
 
           final activeFilter = state.currentFilter;
           final List<FileSystemEntity> filteredFiles =
@@ -440,6 +435,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
             currentFilter: activeFilter,
             filteredFiles: filteredFiles,
             fileTags: {}, // Empty tags initially - will be updated async
+            fileStatsCache: Map.from(loadingFileStatsCache),
             error: null,
             sortOption: folderSortOption ?? state.sortOption,
           ));
@@ -543,34 +539,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     }
   }
 
-  /// Helper method to build file stats cache asynchronously
-  /// This runs in background and emits updated state when complete
-  void _buildFileStatsCacheAsync(
-    List<FileSystemEntity> folders,
-    List<FileSystemEntity> files,
-    Emitter<FolderListState> emit,
-  ) {
-    // Run in background without blocking
-    Future(() async {
-      try {
-        Map<String, FileStat> fileStatsCache = {};
-        final allEntities = [...folders, ...files];
-        for (var entity in allEntities) {
-          try {
-            fileStatsCache[entity.path] = await entity.stat();
-          } catch (e) {
-            // Skip entities that can't be stat'd
-            continue;
-          }
-        }
-        if (fileStatsCache.isNotEmpty) {
-          emit(state.copyWith(fileStatsCache: fileStatsCache));
-        }
-      } catch (e) {
-        debugPrint("Error building file stats cache: $e");
-      }
-    });
-  }
+  // Note: _buildFileStatsCacheAsync is no longer needed.
+  // File stats cache is now built during directory listing (loadingFileStatsCache)
+  // to enable sorting during loading and correct thumbnail priority.
 
   void _onFolderListRefresh(
     FolderListRefresh event,

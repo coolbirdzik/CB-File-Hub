@@ -35,6 +35,7 @@ class TagChip extends StatelessWidget {
     final Color displayColor = isDarkMode
         ? Color.alphaBlend(Colors.white.withValues(alpha: 0.3), tagColor)
         : tagColor;
+    final Color foregroundColor = _bestForegroundColor(displayColor);
 
     return InkWell(
       onTap: onTap,
@@ -43,7 +44,7 @@ class TagChip extends StatelessWidget {
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         labelStyle: TextStyle(
           fontSize: isCompact ? 11 : 12,
-          color: theme.colorScheme.onPrimary,
+          color: foregroundColor,
           fontWeight: FontWeight.w500,
         ),
         label: Text(
@@ -54,14 +55,30 @@ class TagChip extends StatelessWidget {
         backgroundColor: displayColor,
         visualDensity: isCompact ? VisualDensity.compact : null,
         padding: isCompact ? const EdgeInsets.all(1) : const EdgeInsets.all(2),
-        deleteIconColor: theme.colorScheme.onPrimary,
+        deleteIconColor: foregroundColor,
         deleteIcon: onDeleted != null
-            ? const Icon(PhosphorIconsLight.x, size: 14)
+            ? Icon(PhosphorIconsLight.x, size: 14, color: foregroundColor)
             : null,
         onDeleted: onDeleted,
         elevation: 0,
         side: BorderSide.none,
       ),
     );
+  }
+
+  static Color _bestForegroundColor(Color background) {
+    const light = Colors.white;
+    const dark = Colors.black;
+    final lightContrast = _contrastRatio(background, light);
+    final darkContrast = _contrastRatio(background, dark);
+    return lightContrast >= darkContrast ? light : dark;
+  }
+
+  static double _contrastRatio(Color a, Color b) {
+    final aLuminance = a.computeLuminance();
+    final bLuminance = b.computeLuminance();
+    final lighter = aLuminance > bLuminance ? aLuminance : bLuminance;
+    final darker = aLuminance > bLuminance ? bLuminance : aLuminance;
+    return (lighter + 0.05) / (darker + 0.05);
   }
 }

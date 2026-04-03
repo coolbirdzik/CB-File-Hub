@@ -43,6 +43,12 @@ namespace fc_native_video_thumbnail
         // Returns -1 on error
         static double GetVideoDuration(const wchar_t *srcFile);
 
+        // Initialize shared GDI+ resources (call once at startup)
+        static void InitializeGdiPlus();
+
+        // Shutdown shared GDI+ resources (call at shutdown)
+        static void ShutdownGdiPlus();
+
     private:
         // Convert UTF-16 to UTF-8
         static std::string WideToUtf8(const wchar_t *wide);
@@ -55,6 +61,25 @@ namespace fc_native_video_thumbnail
             const wchar_t *destFile,
             REFGUID format,
             int quality = 95);
+
+        // Save image using shared GDI+ resources (faster - no init/shutdown)
+        static bool SaveImageFast(
+            AVFrame *frame,
+            int width,
+            int height,
+            const wchar_t *destFile,
+            REFGUID format,
+            int quality = 95);
+
+        // Fast extraction with hardware acceleration and low-res decode
+        static std::string ExtractThumbnailFastInternal(
+            const wchar_t *srcFile,
+            const wchar_t *destFile,
+            int width,
+            REFGUID format,
+            double percentage,
+            int quality,
+            bool useHwAccel);
     };
 
 } // namespace fc_native_video_thumbnail

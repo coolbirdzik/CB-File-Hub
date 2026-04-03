@@ -10,6 +10,8 @@ import 'package:cb_file_manager/helpers/tags/batch_tag_manager.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'dart:ui' as ui; // Import for ImageFilter
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
+import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
+import 'package:cb_file_manager/utils/app_logger.dart';
 import '../../utils/route.dart';
 import '../core/tab_manager.dart';
 import '../core/tab_data.dart';
@@ -44,9 +46,12 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
   final Size screenSize = MediaQuery.of(context).size;
   final double dialogWidth = screenSize.width * 0.5;
   final double dialogHeight = screenSize.height * 0.6;
+  AppLogger.info('[ManageTags][Dialog] Opening dialog for $filePath');
+  debugPrint('[ManageTags][Dialog] Opening dialog for filePath=$filePath');
 
-  void refreshParentUI(BuildContext dialogContext, String filePath,
-      {bool preserveScroll = true}) {
+  void refreshParentUI(String filePath, {bool preserveScroll = true}) {
+    debugPrint(
+        '[ManageTags][Dialog] Refreshing parent UI for filePath=$filePath preserveScroll=$preserveScroll');
     TagManager.clearCache();
     if (preserveScroll) {
       TagManager.instance.notifyTagChanged("preserve_scroll:$filePath");
@@ -57,113 +62,516 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
     TagManager.instance.notifyTagChanged("global:tag_updated");
   }
 
-  late TagManagementSection tagSection;
-  bool tagSectionReady = false;
-
   showDialog(
     context: context,
     builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: AlertDialog(
-              title: Text(
-                AppLocalizations.of(context)!.addTag,
-                style:
-                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-              content: Container(
-                width: double.maxFinite,
-                constraints: BoxConstraints(
-                  maxWidth: dialogWidth,
-                  maxHeight: dialogHeight,
-                  minHeight: dialogHeight * 0.7,
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: SingleChildScrollView(
-                  child: TagManagementSection(
-                    filePath: filePath,
-                    onTagsUpdated: () {
-                      refreshParentUI(context, filePath);
-                    },
-                    onPendingChangesChanged: () {
-                      setState(() {});
-                    },
-                    onSectionReady: (section) {
-                      tagSection = section;
-                      tagSectionReady = true;
-                    },
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context, rootNavigator: true).pop();
-                  },
-                  style: TextButton.styleFrom(
-                    textStyle: const TextStyle(fontSize: 16),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                  ),
-                  child:
-                      Text(AppLocalizations.of(context)!.close.toUpperCase()),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final l10n = AppLocalizations.of(context)!;
-                    debugPrint(
-                        'SAVE: pressed, tagSectionReady=$tagSectionReady');
-
-                    if (!tagSectionReady) {
-                      debugPrint('SAVE: section not ready');
-                      return;
-                    }
-
-                    // Pre-extract all context-dependent values before async gap
-                    final navigator =
-                        Navigator.of(context, rootNavigator: true);
-                    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                    try {
-                      debugPrint('SAVE: calling saveChanges');
-                      await tagSection.saveChanges();
-                      debugPrint('SAVE: save done, closing');
-                      // ignore: use_build_context_synchronously
-                      refreshParentUI(context, filePath);
-                      try {
-                        navigator.pop();
-                      } catch (_) {}
-                    } catch (e) {
-                      debugPrint('SAVE: error=$e');
-                      try {
-                        scaffoldMessenger.showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.errorSavingTags(e.toString())),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      } catch (_) {}
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    textStyle: const TextStyle(fontSize: 16),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                  ),
-                  child: Text(AppLocalizations.of(context)!.save.toUpperCase()),
-                ),
-              ],
-            ),
-          );
-        },
+      AppLogger.debug('[ManageTags][Dialog] showDialog builder for $filePath');
+      return _SingleFileTagDialog(
+        filePath: filePath,
+        dialogWidth: dialogWidth,
+        dialogHeight: dialogHeight,
       );
     },
-  );
+  ).then((result) {
+    if (result == true) {
+      AppLogger.info('[ManageTags][Dialog] Refresh triggered after save',
+          error: 'filePath=$filePath');
+      refreshParentUI(filePath);
+      if (context.mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(l10n.tagsSavedSuccessfully)),
+        );
+      }
+    }
+  });
+}
+
+class _SingleFileTagDialog extends StatefulWidget {
+  final String filePath;
+  final double dialogWidth;
+  final double dialogHeight;
+
+  const _SingleFileTagDialog({
+    required this.filePath,
+    required this.dialogWidth,
+    required this.dialogHeight,
+  });
+
+  @override
+  State<_SingleFileTagDialog> createState() => _SingleFileTagDialogState();
+}
+
+class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
+  List<String> _originalTags = <String>[];
+  List<String> _selectedTags = <String>[];
+  List<String> _tagSuggestions = <String>[];
+  String _draftTagText = '';
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTags();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _loadTags() async {
+    AppLogger.info('[ManageTags][Dialog] Loading tags',
+        error: 'filePath=${widget.filePath}');
+    try {
+      final tags = await TagManager.getTags(widget.filePath);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _originalTags = List<String>.from(tags);
+        _selectedTags = List<String>.from(tags);
+        _isLoading = false;
+      });
+      AppLogger.info('[ManageTags][Dialog] Loaded tags',
+          error: 'filePath=${widget.filePath} tags=$tags');
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        '[ManageTags][Dialog] Failed to load tags',
+        error: 'filePath=${widget.filePath} error=$error',
+        stackTrace: stackTrace,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _updateTagSuggestions(String text) async {
+    final query = text.trim();
+    if (query.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _tagSuggestions = <String>[];
+      });
+      return;
+    }
+
+    final suggestions = await TagManager.instance.searchTags(query);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _tagSuggestions = suggestions
+          .where((tag) => !_containsTag(tag))
+          .take(6)
+          .toList(growable: false);
+    });
+  }
+
+  bool _containsTag(String tag) {
+    final normalizedTag = tag.trim().toLowerCase();
+    return _selectedTags.any((selectedTag) {
+      return selectedTag.trim().toLowerCase() == normalizedTag;
+    });
+  }
+
+  void _addTag(String rawTag) {
+    final tag = rawTag.trim();
+    if (tag.isEmpty || _containsTag(tag)) {
+      _draftTagText = '';
+      return;
+    }
+
+    setState(() {
+      _selectedTags = <String>[..._selectedTags, tag];
+      _draftTagText = '';
+      _tagSuggestions = <String>[];
+    });
+    AppLogger.info('[ManageTags][Dialog] Tag added',
+        error: 'filePath=${widget.filePath} tag=$tag');
+  }
+
+  void _removeTag(String tag) {
+    setState(() {
+      _selectedTags = _selectedTags.where((value) => value != tag).toList();
+    });
+    AppLogger.info('[ManageTags][Dialog] Tag removed',
+        error: 'filePath=${widget.filePath} tag=$tag');
+  }
+
+  void _commitDraftTag() {
+    final draft = _draftTagText.trim();
+    if (draft.isEmpty) {
+      return;
+    }
+    _addTag(draft);
+  }
+
+  bool get _hasChanges {
+    final original = _originalTags.map((tag) => tag.trim()).toSet();
+    final current = _selectedTags.map((tag) => tag.trim()).toSet();
+    return original.length != current.length || !original.containsAll(current);
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) {
+      return;
+    }
+
+    AppLogger.info('[ManageTags][Dialog] Save pressed',
+        error:
+            'filePath=${widget.filePath} selectedTags=$_selectedTags draftTagText=$_draftTagText');
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      _commitDraftTag();
+
+      final tagsToPersist = List<String>.from(_selectedTags);
+      AppLogger.info('[ManageTags][Dialog] Persisting tags',
+          error: 'filePath=${widget.filePath} tags=$tagsToPersist');
+
+      if (_hasChanges || _draftTagText.trim().isNotEmpty) {
+        final success = await TagManager.setTags(widget.filePath, tagsToPersist);
+        if (!success) {
+          throw Exception('Failed to persist tags for "${widget.filePath}"');
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context, rootNavigator: true).pop(true);
+    } catch (error, stackTrace) {
+      final l10n = AppLocalizations.of(context)!;
+      AppLogger.error(
+        '[ManageTags][Dialog] Save failed',
+        error: 'filePath=${widget.filePath} error=$error',
+        stackTrace: stackTrace,
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.errorSavingTags(error.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildSuggestions() {
+    if (_tagSuggestions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return _buildSectionCard(
+      icon: PhosphorIconsLight.magnifyingGlass,
+      title: AppLocalizations.of(context)!.tagSuggestions,
+      subtitle: 'Click to add',
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: _tagSuggestions.map((suggestion) {
+          return TagChip(
+            tag: suggestion,
+            onTap: () => _addTag(suggestion),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTagInputSection(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
+    return _buildSectionCard(
+      icon: PhosphorIconsLight.pencilSimpleLine,
+      title: l10n.addTag,
+      subtitle: 'Type a new tag or pick from the library below',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChipsInput<String>(
+            values: _selectedTags,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(
+                  color: Colors.transparent,
+                  width: 0,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(
+                  color: Colors.transparent,
+                  width: 0,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.45),
+                  width: 1,
+                ),
+              ),
+              labelText: l10n.tagName,
+              hintText: l10n.enterTagName,
+              prefixIcon: const Icon(PhosphorIconsLight.tag),
+              filled: true,
+              fillColor: isDarkMode
+                  ? theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.42)
+                  : theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.2),
+            ),
+            style: const TextStyle(fontSize: 16),
+            onChanged: (updatedTags) {
+              setState(() {
+                _selectedTags = List<String>.from(updatedTags);
+              });
+            },
+            onTextChanged: (value) {
+              _draftTagText = value;
+              _updateTagSuggestions(value);
+            },
+            onSubmitted: _addTag,
+            chipBuilder: (context, tag) {
+              return TagInputChip(
+                tag: tag,
+                onDeleted: _removeTag,
+                onSelected: (_) {},
+              );
+            },
+          ),
+          if (_tagSuggestions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildSuggestions(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    return BackdropFilter(
+      filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: AlertDialog(
+        titlePadding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.manageTags,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color:
+                    theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.file,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.filePath,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.fromLTRB(28, 20, 28, 16),
+        content: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(
+            maxWidth: widget.dialogWidth,
+            maxHeight: widget.dialogHeight,
+            minHeight: widget.dialogHeight * 0.72,
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTagInputSection(l10n),
+                      const SizedBox(height: 18),
+                      _buildSectionCard(
+                        icon: PhosphorIconsLight.sparkle,
+                        title: 'Quick Picks',
+                        subtitle: 'Choose from popular or recently used tags',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            PopularTagsWidget(
+                              onTagSelected: _addTag,
+                            ),
+                            const SizedBox(height: 20),
+                            RecentTagsWidget(
+                              onTagSelected: _addTag,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+        actions: [
+          TextFieldTapRegion(
+            child: TextButton(
+              onPressed: _isSaving
+                  ? null
+                  : () {
+                      AppLogger.info('[ManageTags][Dialog] Close pressed',
+                          error: 'filePath=${widget.filePath}');
+                      Navigator.of(context, rootNavigator: true).pop(false);
+                    },
+              style: TextButton.styleFrom(
+                textStyle: const TextStyle(fontSize: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              child: Text(l10n.close.toUpperCase()),
+            ),
+          ),
+          TextFieldTapRegion(
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _save,
+              style: ElevatedButton.styleFrom(
+                textStyle: const TextStyle(fontSize: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.save.toUpperCase()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Dialog for deleting a tag from a file
@@ -291,10 +699,13 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   final TextEditingController textController = TextEditingController();
   List<String> tagSuggestions = [];
   List<String> selectedTags = [];
+  String draftTagText = '';
 
   final Size screenSize = MediaQuery.of(context).size;
   final double dialogWidth = screenSize.width * 0.5;
   final double dialogHeight = screenSize.height * 0.6;
+  AppLogger.info('[ManageTags][BatchDialog] Opening batch dialog',
+      error: 'selectedFiles=$selectedFiles');
 
   void updateTagSuggestions(String text) async {
     if (text.isEmpty) {
@@ -313,7 +724,18 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     if (!selectedTags.contains(tag.trim())) {
       selectedTags.add(tag.trim());
       textController.clear();
+      draftTagText = '';
     }
+  }
+
+  void commitDraftTag() {
+    final trimmedTag = draftTagText.trim();
+    if (trimmedTag.isEmpty) {
+      return;
+    }
+
+    addTag(trimmedTag);
+    tagSuggestions = [];
   }
 
   void refreshParentUIBatch() {
@@ -333,6 +755,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     if (!context.mounted) return;
 
     selectedTags = commonTags;
+    AppLogger.info('[ManageTags][BatchDialog] Loaded common tags',
+        error: 'selectedFiles=$selectedFiles commonTags=$commonTags');
 
     showDialog(
       context: context,
@@ -340,6 +764,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
         return StatefulBuilder(
           builder: (context, setState) {
             void handleTextChange(String value) {
+              draftTagText = value;
               updateTagSuggestions(value);
               setState(() {});
             }
@@ -350,6 +775,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                   addTag(value);
                   tagSuggestions = [];
                 });
+                AppLogger.info('[ManageTags][BatchDialog] Tag submitted',
+                    error: 'selectedFiles=$selectedFiles tag=$value');
               }
             }
 
@@ -501,111 +928,133 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                   ),
                 ),
                 actions: [
-                  TextButton(
-                    onPressed: () {
-                      RouteUtils.safePopDialog(context);
-                    },
-                    style: TextButton.styleFrom(
-                      textStyle: const TextStyle(fontSize: 16),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                  TextFieldTapRegion(
+                    child: TextButton(
+                      onPressed: () {
+                        RouteUtils.safePopDialog(context);
+                      },
+                      style: TextButton.styleFrom(
+                        textStyle: const TextStyle(fontSize: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                      child: Text(
+                          AppLocalizations.of(context)!.cancel.toUpperCase()),
                     ),
-                    child: Text(
-                        AppLocalizations.of(context)!.cancel.toUpperCase()),
                   ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      // Pre-extract all context-dependent values before async gap
-                      final l10n = AppLocalizations.of(context)!;
-                      final bloc = BlocProvider.of<FolderListBloc>(context,
-                          listen: false);
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
-                      final navigator = Navigator.of(context);
+                  TextFieldTapRegion(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        AppLogger.info('[ManageTags][BatchDialog] Save pressed',
+                            error:
+                                'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText');
+                        final l10n = AppLocalizations.of(context)!;
+                        final bloc = BlocProvider.of<FolderListBloc>(context,
+                            listen: false);
+                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                        final navigator = Navigator.of(context);
 
-                      try {
                         try {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(
-                              content: Text(l10n.applyingChanges),
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        } catch (_) {}
+                          setState(() {
+                            commitDraftTag();
+                          });
+                          try {
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text(l10n.applyingChanges),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          } catch (_) {}
 
-                        TagManager.clearCache();
+                          TagManager.clearCache();
 
-                        final commonTags =
-                            await batchTagManager.findCommonTags(selectedFiles);
+                          final commonTags =
+                              await batchTagManager.findCommonTags(selectedFiles);
 
-                        int tagsAdded = 0;
-                        int tagsRemoved = 0;
+                          int tagsAdded = 0;
+                          int tagsRemoved = 0;
 
-                        for (final filePath in selectedFiles) {
-                          final existingTags =
-                              await TagManager.getTags(filePath);
+                          for (final filePath in selectedFiles) {
+                            AppLogger.info(
+                                '[ManageTags][BatchDialog] Processing file',
+                                error:
+                                    'filePath=$filePath selectedTags=$selectedTags commonTags=$commonTags');
+                            final existingTags =
+                                await TagManager.getTags(filePath);
 
-                          final Set<String> originalTagsSet =
-                              Set.from(existingTags);
-                          final Set<String> currentTagsSet =
-                              Set.from(selectedTags);
-                          final Set<String> commonTagsSet =
-                              Set.from(commonTags);
+                            final Set<String> originalTagsSet =
+                                Set.from(existingTags);
+                            final Set<String> currentTagsSet =
+                                Set.from(selectedTags);
+                            final Set<String> commonTagsSet =
+                                Set.from(commonTags);
 
-                          final updatedTags = Set<String>.from(originalTagsSet);
+                            final updatedTags =
+                                Set<String>.from(originalTagsSet);
 
-                          final commonTagsToRemove =
-                              commonTagsSet.difference(currentTagsSet);
-                          updatedTags.removeAll(commonTagsToRemove);
-                          tagsRemoved += commonTagsToRemove.length;
+                            final commonTagsToRemove =
+                                commonTagsSet.difference(currentTagsSet);
+                            updatedTags.removeAll(commonTagsToRemove);
+                            tagsRemoved += commonTagsToRemove.length;
 
-                          final tagsToAdd =
-                              currentTagsSet.difference(originalTagsSet);
-                          updatedTags.addAll(tagsToAdd);
-                          tagsAdded += tagsToAdd.length;
+                            final tagsToAdd =
+                                currentTagsSet.difference(originalTagsSet);
+                            updatedTags.addAll(tagsToAdd);
+                            tagsAdded += tagsToAdd.length;
 
-                          await TagManager.setTags(
-                              filePath, updatedTags.toList());
+                            await TagManager.setTags(
+                                filePath, updatedTags.toList());
+
+                            try {
+                              for (String tag in commonTagsToRemove) {
+                                bloc.add(RemoveTagFromFile(filePath, tag));
+                              }
+                              for (String tag in tagsToAdd) {
+                                bloc.add(AddTagToFile(filePath, tag));
+                              }
+                            } catch (_) {}
+                          }
+
+                          refreshParentUIBatch();
+                          AppLogger.info(
+                              '[ManageTags][BatchDialog] Save completed',
+                              error:
+                                  'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved');
 
                           try {
-                            for (String tag in commonTagsToRemove) {
-                              bloc.add(RemoveTagFromFile(filePath, tag));
-                            }
-                            for (String tag in tagsToAdd) {
-                              bloc.add(AddTagToFile(filePath, tag));
-                            }
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text(l10n.tagsUpdated(
+                                    selectedFiles.length,
+                                    tagsAdded,
+                                    tagsRemoved)),
+                              ),
+                            );
+                            navigator.pop();
+                          } catch (_) {}
+                        } catch (e) {
+                          AppLogger.error(
+                            '[ManageTags][BatchDialog] Save failed',
+                            error: 'selectedFiles=$selectedFiles error=$e',
+                          );
+                          debugPrint('Error processing batch tags: $e');
+                          try {
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                  content: Text('Error processing tags: $e')),
+                            );
                           } catch (_) {}
                         }
-
-                        refreshParentUIBatch();
-
-                        try {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(
-                              content: Text(l10n.tagsUpdated(
-                                  selectedFiles.length,
-                                  tagsAdded,
-                                  tagsRemoved)),
-                            ),
-                          );
-                          navigator.pop();
-                        } catch (_) {}
-                      } catch (e) {
-                        debugPrint('Error processing batch tags: $e');
-                        try {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(
-                                content: Text('Error processing tags: $e')),
-                          );
-                        } catch (_) {}
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      textStyle: const TextStyle(fontSize: 16),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
+                      },
+                      style: ElevatedButton.styleFrom(
+                        textStyle: const TextStyle(fontSize: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                      child: Text(
+                          AppLocalizations.of(context)!.save.toUpperCase()),
                     ),
-                    child:
-                        Text(AppLocalizations.of(context)!.save.toUpperCase()),
                   ),
                 ],
               ),

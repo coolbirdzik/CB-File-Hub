@@ -30,6 +30,7 @@ import '../../controllers/inline_rename_controller.dart';
 import '../../../core/service_locator.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../utils/entity_open_actions.dart';
+import '../../../utils/app_logger.dart';
 
 /// A shared context menu for files
 ///
@@ -375,10 +376,19 @@ class SharedFileContextMenu extends StatelessWidget {
             style: TextStyle(color: theme.colorScheme.onSurface),
           ),
           onTap: () {
+            AppLogger.info(
+              '[ManageTags][ContextMenu] ListTile manage tags tapped for file ${file.path}',
+            );
             Navigator.pop(context);
             if (showAddTagToFileDialog != null) {
+              AppLogger.info(
+                '[ManageTags][ContextMenu] ListTile using injected callback for file ${file.path}',
+              );
               showAddTagToFileDialog!(context, file.path);
             } else {
+              AppLogger.info(
+                '[ManageTags][ContextMenu] ListTile using internal _showTagManagementDialog for file ${file.path}',
+              );
               _showTagManagementDialog(context);
             }
           },
@@ -424,6 +434,9 @@ class SharedFileContextMenu extends StatelessWidget {
 
   // Show tag management dialog
   void _showTagManagementDialog(BuildContext context) {
+    AppLogger.info(
+      '[ManageTags][ContextMenu] _showTagManagementDialog for file ${file.path}',
+    );
     tag_dialogs.showAddTagToFileDialog(context, file.path);
   }
 
@@ -699,6 +712,9 @@ class SharedFolderContextMenu extends StatelessWidget {
             style: TextStyle(color: theme.colorScheme.onSurface),
           ),
           onTap: () {
+            AppLogger.info(
+              '[ManageTags][ContextMenu] ListTile manage tags tapped for folder ${folder.path}',
+            );
             Navigator.pop(context);
             _showTagManagementDialog(context);
           },
@@ -725,6 +741,9 @@ class SharedFolderContextMenu extends StatelessWidget {
 
   // Show tag management dialog for folders
   void _showTagManagementDialog(BuildContext context) {
+    AppLogger.info(
+      '[ManageTags][ContextMenu] _showTagManagementDialog for folder ${folder.path}',
+    );
     tag_dialogs.showAddTagToFileDialog(context, folder.path);
   }
 
@@ -1027,9 +1046,18 @@ void _showFileContextMenuDesktop({
           await _renameEntity(context: context, entity: file);
           break;
         case 'tags':
+          AppLogger.info(
+            '[ManageTags][ContextMenu] Tags clicked for file ${file.path}',
+          );
           if (showAddTagToFileDialog != null) {
+            AppLogger.info(
+              '[ManageTags][ContextMenu] Using injected showAddTagToFileDialog for file ${file.path}',
+            );
             showAddTagToFileDialog(context, file.path);
           } else {
+            AppLogger.info(
+              '[ManageTags][ContextMenu] Using default tag_dialogs.showAddTagToFileDialog for file ${file.path}',
+            );
             tag_dialogs.showAddTagToFileDialog(context, file.path);
           }
           break;
@@ -1380,9 +1408,18 @@ void _showFolderContextMenuDesktop({
           await _renameEntity(context: context, entity: folder);
           break;
         case 'tags':
+          AppLogger.info(
+            '[ManageTags][ContextMenu] Tags clicked for folder ${folder.path}',
+          );
           if (showAddTagToFileDialog != null) {
+            AppLogger.info(
+              '[ManageTags][ContextMenu] Using injected showAddTagToFileDialog for folder ${folder.path}',
+            );
             showAddTagToFileDialog(context, folder.path);
           } else {
+            AppLogger.info(
+              '[ManageTags][ContextMenu] Using default tag_dialogs.showAddTagToFileDialog for folder ${folder.path}',
+            );
             tag_dialogs.showAddTagToFileDialog(context, folder.path);
           }
           break;
@@ -1673,8 +1710,23 @@ void showMultipleFilesContextMenu({
         );
         break;
       case 'tags':
-        // Show batch tag dialog for all selected items (files and folders)
-        tag_dialogs.showBatchAddTagDialog(context, selectedPaths);
+        AppLogger.info(
+          '[ManageTags][MultiContextMenu] Tags clicked for selected paths',
+          error: 'selectedPaths=$selectedPaths',
+        );
+        if (selectedPaths.length == 1) {
+          AppLogger.info(
+            '[ManageTags][MultiContextMenu] Redirecting single selected path to single-file dialog',
+            error: 'filePath=${selectedPaths.first}',
+          );
+          tag_dialogs.showAddTagToFileDialog(context, selectedPaths.first);
+        } else {
+          AppLogger.info(
+            '[ManageTags][MultiContextMenu] Opening batch tag dialog',
+            error: 'selectedPaths=$selectedPaths',
+          );
+          tag_dialogs.showBatchAddTagDialog(context, selectedPaths);
+        }
         break;
       case 'delete':
         SelectionBloc? selectionBloc;

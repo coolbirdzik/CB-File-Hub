@@ -970,76 +970,106 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  void _showColorPickerDialog(String tag) {
+  Future<void> _showColorPickerDialog(String tag) async {
     final AppLocalizations localizations = AppLocalizations.of(context)!;
     Color currentColor = _tagColorManager.getTagColor(tag);
 
-    showDialog(
+    final Color? selectedColor = await showDialog<Color>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(localizations.chooseTagColor(tag)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: TagChip(
-                    tag: tag,
-                    customColor: currentColor,
-                  ),
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(localizations.chooseTagColor(tag)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: TagChip(
+                        tag: tag,
+                        customColor: currentColor,
+                      ),
+                    ),
+                    ColorPicker(
+                      pickerColor: currentColor,
+                      onColorChanged: (color) {
+                        setDialogState(() {
+                          currentColor = color;
+                        });
+                      },
+                      pickerAreaHeightPercent: 0.8,
+                      enableAlpha: false,
+                      displayThumbColor: true,
+                      labelTypes: const [ColorLabelType.rgb, ColorLabelType.hsv],
+                      pickerAreaBorderRadius:
+                          const BorderRadius.all(Radius.circular(12)),
+                    ),
+                  ],
                 ),
-                ColorPicker(
-                  pickerColor: currentColor,
-                  onColorChanged: (color) {
-                    currentColor = color;
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext, rootNavigator: true).pop();
                   },
-                  pickerAreaHeightPercent: 0.8,
-                  enableAlpha: false,
-                  displayThumbColor: true,
-                  labelTypes: const [ColorLabelType.rgb, ColorLabelType.hsv],
-                  pickerAreaBorderRadius:
-                      const BorderRadius.all(Radius.circular(12)),
+                  child: Text(localizations.cancel),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext, rootNavigator: true)
+                        .pop(currentColor);
+                  },
+                  child: Text(localizations.save),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                RouteUtils.safePopDialog(context);
-              },
-              child: Text(localizations.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                // Pre-extract context-dependent values before async gap
-                final navigator = Navigator.of(context);
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                await _tagColorManager.setTagColor(tag, currentColor);
-                if (mounted) {
-                  setState(() {});
-                  try {
-                    navigator.pop();
-                  } catch (_) {}
-                  try {
-                    scaffoldMessenger.showSnackBar(
-                      SnackBar(
-                        content: Text(localizations.tagColorUpdated(tag)),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  } catch (_) {}
-                }
-              },
-              child: Text(localizations.save),
-            ),
-          ],
+            );
+          },
         );
       },
     );
+
+    if (selectedColor == null || !mounted) {
+      return;
+    }
+
+    await _tagColorManager.setTagColor(tag, selectedColor);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(localizations.tagColorUpdated(tag)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  KeyEventResult _handleInlineRenameKey(
+      FocusNode node, KeyEvent event, String tag) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _commitTagRename(tag);
+      return KeyEventResult.handled;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      setState(() {
+        _editingTag = null;
+        _editingTagController?.dispose();
+        _editingTagController = null;
+      });
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
   }
 
   void _toggleSearch() {
@@ -1867,39 +1897,45 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ],
           ),
           title: isEditing && _editingTagController != null
-              ? TextField(
-                  controller: _editingTagController,
-                  autofocus: true,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface,
+              ? Focus(
+                  onKeyEvent: (node, event) =>
+                      _handleInlineRenameKey(node, event, tag),
+                  child: TextField(
+                    controller: _editingTagController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color: theme.colorScheme.primary, width: 2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color: theme.colorScheme.primary, width: 2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color: theme.colorScheme.primary, width: 2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                    ),
+                    cursorColor: theme.colorScheme.primary,
+                    onEditingComplete: () => _commitTagRename(tag),
+                    onSubmitted: (_) => _commitTagRename(tag),
+                    onTapOutside: (_) => _commitTagRename(tag),
                   ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: theme.colorScheme.primary, width: 2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: theme.colorScheme.primary, width: 2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                          color: theme.colorScheme.primary, width: 2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    filled: true,
-                    fillColor: theme.colorScheme.surface,
-                  ),
-                  cursorColor: theme.colorScheme.primary,
-                  onSubmitted: (_) => _commitTagRename(tag),
-                  onTapOutside: (_) => _commitTagRename(tag),
                 )
               : GestureDetector(
                   onDoubleTap: _isMultiSelectMode ? null : () => _openTag(tag),
@@ -2285,58 +2321,71 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                             ),
                                           ),
                                           Positioned.fill(
-                                            child: TextField(
-                                              controller: _editingTagController,
-                                              autofocus: true,
-                                              style: TextStyle(
-                                                  fontSize: fontSize,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: theme
-                                                      .colorScheme.onSurface),
-                                              textAlign: TextAlign.center,
-                                              maxLines: 2,
-                                              decoration: InputDecoration(
-                                                isDense: true,
-                                                contentPadding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 4,
-                                                        vertical: 2),
-                                                border: OutlineInputBorder(
-                                                  borderSide: BorderSide(
-                                                      color: theme
-                                                          .colorScheme.primary,
-                                                      width: 2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(2),
+                                            child: Focus(
+                                              onKeyEvent: (node, event) =>
+                                                  _handleInlineRenameKey(
+                                                      node, event, tag),
+                                              child: TextField(
+                                                controller:
+                                                    _editingTagController,
+                                                autofocus: true,
+                                                textInputAction:
+                                                    TextInputAction.done,
+                                                style: TextStyle(
+                                                    fontSize: fontSize,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: theme.colorScheme
+                                                        .onSurface),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                decoration: InputDecoration(
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                          horizontal: 4,
+                                                          vertical: 2),
+                                                  border: OutlineInputBorder(
+                                                    borderSide: BorderSide(
+                                                        color: theme.colorScheme
+                                                            .primary,
+                                                        width: 2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            2),
+                                                  ),
+                                                  enabledBorder:
+                                                      OutlineInputBorder(
+                                                    borderSide: BorderSide(
+                                                        color: theme.colorScheme
+                                                            .primary,
+                                                        width: 2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            2),
+                                                  ),
+                                                  focusedBorder:
+                                                      OutlineInputBorder(
+                                                    borderSide: BorderSide(
+                                                        color: theme.colorScheme
+                                                            .primary,
+                                                        width: 2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            2),
+                                                  ),
+                                                  filled: true,
+                                                  fillColor:
+                                                      theme.colorScheme.surface,
                                                 ),
-                                                enabledBorder:
-                                                    OutlineInputBorder(
-                                                  borderSide: BorderSide(
-                                                      color: theme
-                                                          .colorScheme.primary,
-                                                      width: 2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(2),
-                                                ),
-                                                focusedBorder:
-                                                    OutlineInputBorder(
-                                                  borderSide: BorderSide(
-                                                      color: theme
-                                                          .colorScheme.primary,
-                                                      width: 2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(2),
-                                                ),
-                                                filled: true,
-                                                fillColor:
-                                                    theme.colorScheme.surface,
+                                                cursorColor:
+                                                    theme.colorScheme.primary,
+                                                onEditingComplete: () =>
+                                                    _commitTagRename(tag),
+                                                onSubmitted: (_) =>
+                                                    _commitTagRename(tag),
+                                                onTapOutside: (_) =>
+                                                    _commitTagRename(tag),
                                               ),
-                                              cursorColor:
-                                                  theme.colorScheme.primary,
-                                              onSubmitted: (_) =>
-                                                  _commitTagRename(tag),
-                                              onTapOutside: (_) =>
-                                                  _commitTagRename(tag),
                                             ),
                                           ),
                                         ],

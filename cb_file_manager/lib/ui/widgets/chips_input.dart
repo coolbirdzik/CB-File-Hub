@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 
 class ChipsInput<T> extends StatefulWidget {
   const ChipsInput({
@@ -101,7 +102,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
     // Create a decoration that ensures proper padding for chips
     final InputDecoration adjustedDecoration = widget.decoration.copyWith(
-      contentPadding: const EdgeInsets.fromLTRB(12, 18, 12, 14),
+      contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       isDense: false,
     );
 
@@ -113,7 +114,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         textInputAction: TextInputAction.done,
         style: widget.style,
         strutStyle: widget.strutStyle ??
-            const StrutStyle(forceStrutHeight: true, height: 1.8),
+            const StrutStyle(forceStrutHeight: true, height: 1.25),
         controller: controller,
         decoration: adjustedDecoration,
         onChanged: (String value) =>
@@ -185,15 +186,18 @@ class ChipsInputEditingController<T> extends TextEditingController {
         currentLineCount++;
       }
 
-      // Add more padding for chips that aren't on the first line
-      final verticalPadding = currentLineCount > 0 ? 12.0 : 8.0;
+      // Keep chips visually centered inside the text field line box.
+      final verticalPadding = currentLineCount > 0 ? 4.0 : 0.0;
 
       // Add the chip widget
       spans.add(WidgetSpan(
         alignment: PlaceholderAlignment.middle,
         child: Padding(
-          padding: EdgeInsets.only(right: 4, bottom: verticalPadding, top: 4),
-          child: chipBuilder(context, values[i]),
+          padding: EdgeInsets.only(right: 4, bottom: verticalPadding, top: 0),
+          child: Transform.translate(
+            offset: const Offset(0, 2),
+            child: chipBuilder(context, values[i]),
+          ),
         ),
       ));
 
@@ -268,14 +272,15 @@ class _TagInputChipState extends State<TagInputChip>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    // Use theme colors to better match app design
-    final Color tagColor =
-        theme.colorScheme.primary.withValues(alpha: isDark ? 0.7 : 0.8);
-    final Color tagTextColor = theme.colorScheme.onPrimary;
-    final Color iconColor = theme.colorScheme.onPrimary.withValues(alpha: 0.7);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tagColor = TagColorManager.instance.getTagColor(widget.tag);
+    final backgroundColor = tagColor.withValues(alpha: isDark ? 0.22 : 0.16);
+    final foregroundColor = _bestForegroundColor(
+      Color.alphaBlend(backgroundColor, Theme.of(context).colorScheme.surface),
+    );
+    final contentColor =
+        foregroundColor == Colors.white ? Colors.white : tagColor;
+    final borderColor = tagColor.withValues(alpha: isHovered ? 0.75 : 0.35);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -289,55 +294,54 @@ class _TagInputChipState extends State<TagInputChip>
               child: MouseRegion(
                 onEnter: (_) => setState(() => isHovered = true),
                 onExit: (_) => setState(() => isHovered = false),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  decoration: const BoxDecoration(),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InputChip(
-                      key: ObjectKey(widget.tag),
-                      label: Text(
-                        widget.tag,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: tagTextColor,
-                          letterSpacing: 0.2,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: isDeleting ? null : () => widget.onSelected(widget.tag),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: backgroundColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: borderColor,
+                          width: 1,
                         ),
                       ),
-                      avatar: Icon(
-                        PhosphorIconsLight.tag,
-                        size: 14,
-                        color: iconColor,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIconsLight.tag,
+                            size: 14,
+                            color: contentColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              widget.tag,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: contentColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: isDeleting ? null : _handleDelete,
+                            child: Icon(
+                              PhosphorIconsLight.x,
+                              size: 14,
+                              color: contentColor,
+                            ),
+                          ),
+                        ],
                       ),
-                      deleteIconColor: iconColor,
-                      backgroundColor: isHovered && !isDeleting
-                          ? tagColor.withValues(alpha: 0.9)
-                          : tagColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide.none,
-                      ),
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      onDeleted: isDeleting ? null : _handleDelete,
-                      deleteIcon: Icon(
-                        PhosphorIconsLight.x,
-                        size: 16,
-                        color: iconColor,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 3, vertical: 1),
-                      labelPadding: const EdgeInsets.only(left: 1, right: 1),
-                      visualDensity:
-                          const VisualDensity(horizontal: -4, vertical: -4),
-                      onSelected: isDeleting
-                          ? null
-                          : (bool value) => widget.onSelected(widget.tag),
-                      showCheckmark: false,
-                      selected: isHovered,
-                      selectedColor: tagColor.withValues(alpha: 1.0),
                     ),
                   ),
                 ),
@@ -347,5 +351,21 @@ class _TagInputChipState extends State<TagInputChip>
         );
       },
     );
+  }
+
+  Color _bestForegroundColor(Color background) {
+    const light = Colors.white;
+    const dark = Colors.black;
+    final lightContrast = _contrastRatio(background, light);
+    final darkContrast = _contrastRatio(background, dark);
+    return lightContrast >= darkContrast ? light : dark;
+  }
+
+  double _contrastRatio(Color a, Color b) {
+    final aLuminance = a.computeLuminance();
+    final bLuminance = b.computeLuminance();
+    final lighter = aLuminance > bLuminance ? aLuminance : bLuminance;
+    final darker = aLuminance > bLuminance ? bLuminance : aLuminance;
+    return (lighter + 0.05) / (darker + 0.05);
   }
 }

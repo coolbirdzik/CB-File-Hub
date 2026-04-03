@@ -8,6 +8,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
+import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/models/objectbox/video_library.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
@@ -24,6 +25,7 @@ import 'package:cb_file_manager/ui/tab_manager/components/index.dart'
     as tab_components;
 import 'package:cb_file_manager/ui/tab_manager/components/tag_dialogs.dart'
     as tag_dialogs;
+import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class VideoLibraryFilesScreen extends StatefulWidget {
@@ -135,6 +137,11 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
       _isSorting = files.isNotEmpty;
     });
     await _applyFilters();
+    
+    // Start proactive thumbnail generation after loading videos
+    if (files.isNotEmpty) {
+      _startProactiveThumbnailGeneration();
+    }
   }
 
   Future<void> _applyFilters() async {
@@ -167,6 +174,17 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
       _visibleVideos = sorted;
       _isSorting = false;
     });
+  }
+
+  /// Start proactive thumbnail generation for all videos in the library
+  void _startProactiveThumbnailGeneration() {
+    // Only generate for video files
+    if (_allVideos.isEmpty) return;
+    
+    final paths = _allVideos.map((f) => f.path).toList();
+    final libraryPath = '#video-library/${widget.library.id}';
+    VideoThumbnailHelper.setCurrentDirectory(libraryPath);
+    VideoThumbnailHelper.proactiveGenerateAll(paths, directoryPath: libraryPath);
   }
 
   Future<void> _saveViewMode(ViewMode mode) async {
@@ -595,32 +613,30 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
           )
         : _buildFileView();
 
-    if (!hasSearch) {
-      return content;
-    }
-
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: Theme.of(context)
-              .colorScheme
-              .primaryContainer
-              .withValues(alpha: 0.3),
-          child: Row(
-            children: [
-              const Icon(PhosphorIconsLight.magnifyingGlass, size: 18),
-              const SizedBox(width: 8),
-              Expanded(child: Text(l10n.searchingFor(_searchQuery))),
-              IconButton(
-                icon: const Icon(PhosphorIconsLight.x),
-                tooltip: l10n.clearSearch,
-                onPressed: _clearSearch,
-              ),
-            ],
+        // Show search banner if searching
+        if (hasSearch)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Theme.of(context)
+                .colorScheme
+                .primaryContainer
+                .withValues(alpha: 0.3),
+            child: Row(
+              children: [
+                const Icon(PhosphorIconsLight.magnifyingGlass, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(l10n.searchingFor(_searchQuery))),
+                IconButton(
+                  icon: const Icon(PhosphorIconsLight.x),
+                  tooltip: l10n.clearSearch,
+                  onPressed: _clearSearch,
+                ),
+              ],
+            ),
           ),
-        ),
         Expanded(child: content),
       ],
     );
@@ -671,6 +687,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
   }
 
   void _showAddTagToFileDialog(BuildContext context, String filePath) {
+    AppLogger.info('[ManageTags][VideoLibrary] _showAddTagToFileDialog',
+        error: 'filePath=$filePath');
     tag_dialogs.showAddTagToFileDialog(context, filePath);
   }
 

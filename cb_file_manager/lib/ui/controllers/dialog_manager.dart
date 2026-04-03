@@ -8,11 +8,14 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/index.dart'
     as tab_components;
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/utils/app_logger.dart';
 
 /// Manages all dialog operations for file/folder management
 class DialogManager {
   /// Show dialog to add a tag to a specific file
   static void showAddTagToFile(BuildContext context, String filePath) {
+    AppLogger.info('[ManageTags][DialogManager] showAddTagToFile',
+        error: 'filePath=$filePath');
     tab_components.showAddTagToFileDialog(context, filePath);
   }
 
