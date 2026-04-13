@@ -17,6 +17,14 @@ version: 1.0.0+9
 environment:
   sdk: ">=2.15.0 <=3.32.1"
 
+# package:sqlite3 (via sqflite_common_ffi): use OS SQLite on Windows so integration_test
+# does not rely on bundled sqlite3.dll next to the exe (avoids load error 126 on Debug runs).
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+      name_windows: winsqlite3
+
 dependencies:
   flutter:
     sdk: flutter
@@ -96,6 +104,8 @@ dependencies:
   mime: ^1.0.4
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^2.0.0
   build_runner: ^2.4.6

@@ -33,6 +33,7 @@ import 'services/streaming_service_manager.dart';
 import 'ui/utils/safe_navigation_wrapper.dart';
 import 'ui/utils/desktop_acrylic_backdrop.dart';
 import 'core/service_locator.dart';
+import 'e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -117,269 +118,10 @@ Future<bool> _resolveInitialNativeBackdropDarkMode() async {
       Brightness.dark;
 }
 
-void main(List<String> args) async {
+void main(List<String> args) {
   _launchPaths = List.from(args);
   runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    final env = Platform.environment;
-    final isDesktopPlatform =
-        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final isSecondaryWindow =
-        env[WindowStartupPayload.envSecondaryWindowKey] == '1';
-    final startHidden = env[WindowStartupPayload.envStartHiddenKey] == '1';
-    final windowRole =
-        (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
-    final isPip = env['CB_PIP_MODE'] == '1';
-    final windowAcrylicService = WindowAcrylicService();
-    final initialNativeBackdropDarkMode =
-        await _resolveInitialNativeBackdropDarkMode();
-    final List<Future<void> Function()> deferredSecondaryInitializers = [];
-
-    if (isDesktopPlatform) {
-      try {
-        await windowManager.ensureInitialized();
-      } catch (_) {}
-
-      if (!isPip) {
-        final windowOptions = WindowOptions(
-          center: true,
-          backgroundColor: Colors.transparent,
-          titleBarStyle: TitleBarStyle.hidden,
-          windowButtonVisibility: !Platform.isWindows,
-          minimumSize: const Size(800, 600),
-        );
-
-        try {
-          if (isSecondaryWindow) {
-            unawaited(windowManager.waitUntilReadyToShow(windowOptions));
-          } else {
-            await windowManager.waitUntilReadyToShow(windowOptions);
-          }
-        } catch (_) {}
-
-        if (Platform.isWindows) {
-          try {
-            await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
-              false,
-            );
-          } catch (_) {}
-
-          if (isSecondaryWindow) {
-            if (startHidden || windowRole == 'spare') {
-              try {
-                await windowManager.setSkipTaskbar(true);
-                await windowManager.hide();
-              } catch (_) {}
-            } else {
-              try {
-                await windowManager.setSkipTaskbar(false);
-                await windowManager.show();
-                await windowManager.focus();
-                await WindowsNativeTabDragDropService.forceActivateWindow();
-                unawaited(windowManager.center());
-              } catch (_) {}
-            }
-          } else {
-            try {
-              await windowManager.maximize();
-              await windowManager.show();
-              unawaited(windowManager.focus());
-              unawaited(windowManager.setResizable(true));
-              unawaited(windowManager.setPreventClose(false));
-              unawaited(windowManager.setSkipTaskbar(false));
-              await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
-                false,
-              );
-            } catch (_) {}
-          }
-        }
-      }
-
-      if (!isPip) {
-        try {
-          await Future<void>.delayed(const Duration(milliseconds: 120));
-          await windowAcrylicService.applyDesktopAcrylicBackground(
-            isDesktopPlatform: isDesktopPlatform,
-            isPipWindow: isPip,
-            isDarkMode: initialNativeBackdropDarkMode,
-          );
-        } catch (_) {}
-      }
-    }
-
-    // Configure frame timing and rendering for better performance
-    if (isSecondaryWindow && !isPip) {
-      try {
-        await FrameTimingOptimizer().initialize();
-      } catch (_) {}
-    } else {
-      try {
-        await FrameTimingOptimizer().initialize();
-      } catch (_) {}
-    }
-
-    // Platform-specific optimizations
-    if (isDesktopPlatform) {
-      SystemChannels.skia.invokeMethod<void>(
-          'Skia.setResourceCacheMaxBytes', 512 * 1024 * 1024);
-    } else if (Platform.isAndroid || Platform.isIOS) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
-      SystemChrome.setSystemUIChangeCallback((systemOverlaysAreVisible) async {
-        return;
-      });
-    }
-
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      FrameTimingOptimizer().optimizeImageRendering();
-    });
-
-    PaintingBinding.instance.imageCache.maximumSize = 200;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024;
-
-    // Initialize Media Kit with proper audio configuration
-    MediaKit.ensureInitialized();
-
-    // Initialize our audio helper to ensure sound works
-    if (Platform.isWindows) {
-      if (isSecondaryWindow) {
-        deferredSecondaryInitializers.add(() async {
-          debugPrint(
-              'Deferred Windows audio configuration for secondary window');
-          await MediaKitAudioHelper.initialize();
-        });
-      } else {
-        debugPrint('Setting up Windows-specific audio configuration');
-        await MediaKitAudioHelper.initialize();
-      }
-    }
-
-    // Initialize streaming service manager
-    if (isSecondaryWindow) {
-      deferredSecondaryInitializers.add(() async {
-        await StreamingServiceManager.initialize();
-      });
-    } else {
-      await StreamingServiceManager.initialize();
-    }
-
-    await setupServiceLocator();
-    debugPrint('Service locator initialized successfully');
-
-    // Initialize preferences first for theme and language.
-    if (isSecondaryWindow && !isPip) {
-      deferredSecondaryInitializers.add(() async {
-        try {
-          final preferences = locator<UserPreferences>();
-          await preferences.init();
-          debugPrint('Deferred user preferences initialization completed');
-        } catch (e) {
-          debugPrint('Error initializing user preferences: $e');
-        }
-      });
-      deferredSecondaryInitializers.add(() async {
-        await locator<LanguageController>().initialize();
-      });
-    } else {
-      try {
-        final preferences = locator<UserPreferences>();
-        await preferences.init();
-        debugPrint('User preferences initialized successfully');
-      } catch (e) {
-        debugPrint('Error initializing user preferences: $e');
-      }
-
-      await locator<LanguageController>().initialize();
-    }
-
-    Future<void> initializeDataAndTags() async {
-      try {
-        final dbManager = locator<DatabaseManager>();
-        if (!dbManager.isInitialized()) {
-          await dbManager.initialize();
-          debugPrint('Database manager initialized successfully');
-        } else {
-          debugPrint('Database manager already initialized');
-        }
-        final networkCredService = locator<NetworkCredentialsService>();
-        await networkCredService.init();
-
-        await BatchTagManager.initialize();
-        await TagManager.initialize();
-        debugPrint('Data and tag services initialized successfully');
-      } catch (e) {
-        debugPrint('Error during data/tag initialization: $e');
-      }
-    }
-
-    Future<void> initializeHeavyBackgroundServices() async {
-      try {
-        await locator<FolderThumbnailService>().initialize();
-      } catch (e) {
-        debugPrint('Error initializing folder thumbnail service: $e');
-      }
-
-      try {
-        debugPrint('Initializing video thumbnail cache system');
-        await VideoThumbnailHelper.initializeCache();
-        if (kDebugMode) {
-          VideoThumbnailHelper.setVerboseLogging(true);
-        }
-      } catch (e) {
-        debugPrint('Error initializing video thumbnail cache: $e');
-      }
-
-      try {
-        await locator<AlbumService>().initialize();
-      } catch (e) {
-        debugPrint('Error initializing album service: $e');
-      }
-    }
-
-    if (isSecondaryWindow) {
-      deferredSecondaryInitializers.add(initializeDataAndTags);
-      deferredSecondaryInitializers.add(initializeHeavyBackgroundServices);
-    } else {
-      await initializeDataAndTags();
-      await initializeHeavyBackgroundServices();
-    }
-
-    if (env['CB_PIP_MODE'] == '1' &&
-        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-      Map<String, dynamic> args = {};
-      final raw = env['CB_PIP_ARGS'];
-      if (raw != null && raw.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(raw);
-          if (decoded is Map<String, dynamic>) args = decoded;
-        } catch (_) {}
-      }
-      runApp(MaterialApp(
-        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
-        debugShowCheckedModeBanner: false,
-        home: DesktopPipWindow(args: args),
-      ));
-      return;
-    }
-
-    final startupPayload = WindowStartupPayload.fromEnvironment();
-    runApp(
-      ChangeNotifierProvider(
-        create: (context) => locator<ThemeProvider>(),
-        child: CBFileApp(
-          startupPayload: startupPayload,
-          windowAcrylicService: windowAcrylicService,
-        ),
-      ),
-    );
-
-    if (isSecondaryWindow && deferredSecondaryInitializers.isNotEmpty) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        for (final initializer in deferredSecondaryInitializers) {
-          unawaited(initializer());
-        }
-      });
-    }
+    await runCbFileApp();
   }, (error, stackTrace) {
     debugPrint('Error during app initialization: $error');
   }, zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) {
@@ -387,6 +129,305 @@ void main(List<String> args) async {
       parent.print(zone, line);
     }
   }));
+}
+
+/// Shared entry for production [main] and for `integration_test` (with `--dart-define=CB_E2E=true`).
+Future<void> runCbFileApp() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // E2E serialization: block until the previous test's teardown is complete.
+  // This prevents DirectoryWatcherService from racing against _deleteDirectorySafe().
+  if (kCbE2E) {
+    await CbE2EConfig.acquireE2ESemaphore();
+    try {
+      // Reset HardwareKeyboard state between tests.
+      // When test A calls sendKeyUpEvent(ctrlLeft) but ctrlLeft was never pressed
+      // by the current test, HardwareKeyboard throws an assertion:
+      // "A KeyUpEvent is dispatched, but the state shows that the physical key is not pressed."
+      // This can happen when the previous test left key state stale.
+      // ignore: invalid_use_of_visible_for_testing_member — explicitly intended for
+      // test cleanup; prevents stale key state from previous test causing Flutter
+      // assertion failures in the next test.
+      // ignore: invalid_use_of_visible_for_testing_member
+      HardwareKeyboard.instance.clearState(); // NOLINT
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('theme_onboarding_completed_v1', true);
+    } catch (_) {}
+  }
+  final env = Platform.environment;
+  final isDesktopPlatform =
+      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final isSecondaryWindow =
+      env[WindowStartupPayload.envSecondaryWindowKey] == '1';
+  final startHidden = env[WindowStartupPayload.envStartHiddenKey] == '1';
+  final windowRole =
+      (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
+  final isPip = env['CB_PIP_MODE'] == '1';
+  final windowAcrylicService = WindowAcrylicService();
+  final initialNativeBackdropDarkMode =
+      await _resolveInitialNativeBackdropDarkMode();
+  final List<Future<void> Function()> deferredSecondaryInitializers = [];
+
+  if (isDesktopPlatform) {
+    try {
+      await windowManager.ensureInitialized();
+    } catch (_) {}
+
+    if (!isPip) {
+      final windowOptions = WindowOptions(
+        center: true,
+        backgroundColor: Colors.transparent,
+        titleBarStyle: TitleBarStyle.hidden,
+        windowButtonVisibility: !Platform.isWindows,
+        minimumSize: const Size(800, 600),
+      );
+
+      try {
+        if (isSecondaryWindow) {
+          unawaited(windowManager.waitUntilReadyToShow(windowOptions));
+        } else {
+          await windowManager.waitUntilReadyToShow(windowOptions);
+        }
+      } catch (_) {}
+
+      if (Platform.isWindows) {
+        try {
+          await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
+            false,
+          );
+        } catch (_) {}
+
+        if (isSecondaryWindow) {
+          if (startHidden || windowRole == 'spare') {
+            try {
+              await windowManager.setSkipTaskbar(true);
+              await windowManager.hide();
+            } catch (_) {}
+          } else {
+            try {
+              await windowManager.setSkipTaskbar(false);
+              await windowManager.show();
+              await windowManager.focus();
+              await WindowsNativeTabDragDropService.forceActivateWindow();
+              unawaited(windowManager.center());
+            } catch (_) {}
+          }
+        } else {
+          try {
+            if (!kCbE2E) {
+              await windowManager.maximize();
+            }
+            await windowManager.show();
+            unawaited(windowManager.focus());
+            unawaited(windowManager.setResizable(true));
+            unawaited(windowManager.setPreventClose(false));
+            unawaited(windowManager.setSkipTaskbar(false));
+            await WindowsNativeTabDragDropService.setNativeSystemMenuVisible(
+              false,
+            );
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (!isPip && !kCbE2EFast) {
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        await windowAcrylicService.applyDesktopAcrylicBackground(
+          isDesktopPlatform: isDesktopPlatform,
+          isPipWindow: isPip,
+          isDarkMode: initialNativeBackdropDarkMode,
+        );
+      } catch (_) {}
+    }
+  }
+
+  // Configure frame timing and rendering for better performance
+  if (isSecondaryWindow && !isPip) {
+    try {
+      await FrameTimingOptimizer().initialize();
+    } catch (_) {}
+  } else {
+    try {
+      await FrameTimingOptimizer().initialize();
+    } catch (_) {}
+  }
+
+  // Platform-specific optimizations
+  if (isDesktopPlatform) {
+    SystemChannels.skia
+        .invokeMethod<void>('Skia.setResourceCacheMaxBytes', 512 * 1024 * 1024);
+  } else if (Platform.isAndroid || Platform.isIOS) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+    SystemChrome.setSystemUIChangeCallback((systemOverlaysAreVisible) async {
+      return;
+    });
+  }
+
+  SchedulerBinding.instance.addPostFrameCallback((_) {
+    FrameTimingOptimizer().optimizeImageRendering();
+  });
+
+  PaintingBinding.instance.imageCache.maximumSize = 200;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 100 * 1024 * 1024;
+
+  // Initialize Media Kit with proper audio configuration
+  MediaKit.ensureInitialized();
+
+  // Initialize our audio helper to ensure sound works
+  if (Platform.isWindows && !kCbE2EFast) {
+    if (isSecondaryWindow) {
+      deferredSecondaryInitializers.add(() async {
+        debugPrint('Deferred Windows audio configuration for secondary window');
+        await MediaKitAudioHelper.initialize();
+      });
+    } else {
+      debugPrint('Setting up Windows-specific audio configuration');
+      await MediaKitAudioHelper.initialize();
+    }
+  }
+
+  // Initialize streaming service manager
+  if (!kCbE2EFast) {
+    if (isSecondaryWindow) {
+      deferredSecondaryInitializers.add(() async {
+        await StreamingServiceManager.initialize();
+      });
+    } else {
+      await StreamingServiceManager.initialize();
+    }
+  }
+
+  await setupServiceLocator();
+  debugPrint('Service locator initialized successfully');
+
+  // Initialize preferences first for theme and language.
+  if (isSecondaryWindow && !isPip) {
+    deferredSecondaryInitializers.add(() async {
+      try {
+        final preferences = locator<UserPreferences>();
+        await preferences.init();
+        debugPrint('Deferred user preferences initialization completed');
+      } catch (e) {
+        debugPrint('Error initializing user preferences: $e');
+      }
+    });
+    deferredSecondaryInitializers.add(() async {
+      await locator<LanguageController>().initialize();
+    });
+  } else {
+    try {
+      final preferences = locator<UserPreferences>();
+      await preferences.init();
+      debugPrint('User preferences initialized successfully');
+    } catch (e) {
+      debugPrint('Error initializing user preferences: $e');
+    }
+
+    await locator<LanguageController>().initialize();
+    if (kCbE2E) {
+      try {
+        await locator<UserPreferences>().setRememberTabWorkspaceEnabled(false);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> initializeDataAndTags() async {
+    try {
+      final dbManager = locator<DatabaseManager>();
+      if (!dbManager.isInitialized()) {
+        await dbManager.initialize();
+        debugPrint('Database manager initialized successfully');
+      } else {
+        debugPrint('Database manager already initialized');
+      }
+      final networkCredService = locator<NetworkCredentialsService>();
+      await networkCredService.init();
+
+      await BatchTagManager.initialize();
+      await TagManager.initialize();
+      debugPrint('Data and tag services initialized successfully');
+    } catch (e) {
+      debugPrint('Error during data/tag initialization: $e');
+    }
+  }
+
+  Future<void> initializeHeavyBackgroundServices() async {
+    try {
+      await locator<FolderThumbnailService>().initialize();
+    } catch (e) {
+      debugPrint('Error initializing folder thumbnail service: $e');
+    }
+
+    try {
+      debugPrint('Initializing video thumbnail cache system');
+      await VideoThumbnailHelper.initializeCache();
+      if (kDebugMode) {
+        VideoThumbnailHelper.setVerboseLogging(true);
+      }
+    } catch (e) {
+      debugPrint('Error initializing video thumbnail cache: $e');
+    }
+
+    try {
+      await locator<AlbumService>().initialize();
+    } catch (e) {
+      debugPrint('Error initializing album service: $e');
+    }
+  }
+
+  if (isSecondaryWindow) {
+    deferredSecondaryInitializers.add(initializeDataAndTags);
+    if (!kCbE2EFast) {
+      deferredSecondaryInitializers.add(initializeHeavyBackgroundServices);
+    }
+  } else {
+    await initializeDataAndTags();
+    if (!kCbE2EFast) {
+      await initializeHeavyBackgroundServices();
+    }
+  }
+
+  if (env['CB_PIP_MODE'] == '1' &&
+      (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    Map<String, dynamic> args = {};
+    final raw = env['CB_PIP_ARGS'];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) args = decoded;
+      } catch (_) {}
+    }
+    runApp(MaterialApp(
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+      debugShowCheckedModeBanner: false,
+      home: DesktopPipWindow(args: args),
+    ));
+    return;
+  }
+
+  final WindowStartupPayload? startupPayload =
+      kCbE2E && CbE2EConfig.startupPayload != null
+          ? CbE2EConfig.startupPayload
+          : WindowStartupPayload.fromEnvironment();
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => locator<ThemeProvider>(),
+      child: CBFileApp(
+        startupPayload: startupPayload,
+        windowAcrylicService: windowAcrylicService,
+      ),
+    ),
+  );
+
+  if (isSecondaryWindow && deferredSecondaryInitializers.isNotEmpty) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      for (final initializer in deferredSecondaryInitializers) {
+        unawaited(initializer());
+      }
+    });
+  }
 }
 
 // Navigate directly to home screen - updated to use the tabbed interface
@@ -800,12 +841,18 @@ class _CBFileAppState extends State<CBFileApp>
         Locale('en', ''),
       ],
       builder: (context, child) {
+        // FluentApp does not insert [ScaffoldMessenger]; MaterialApp does. Several
+        // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use
+        // [ScaffoldMessenger.of] for snackbars — wrap so those lookups succeed.
+        final shell = ScaffoldMessenger(
+          child: child ?? const SizedBox.shrink(),
+        );
         final brightness = fluent.FluentTheme.of(context).brightness;
         final resolvedTheme = brightness == Brightness.dark
             ? _resolveMaterialDarkTheme(themeProvider)
             : _resolveMaterialLightTheme(themeProvider);
         if (!_useDesktopAcrylicVisuals) {
-          return child ?? const SizedBox.shrink();
+          return shell;
         }
         final materialTheme = _createDesktopAcrylicMaterialBridgeTheme(
           resolvedTheme,
@@ -817,7 +864,7 @@ class _CBFileAppState extends State<CBFileApp>
           data: materialTheme,
           child: DesktopAcrylicBackdrop(
             brightness: brightness,
-            child: child ?? const SizedBox.shrink(),
+            child: shell,
           ),
         );
       },

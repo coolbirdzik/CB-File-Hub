@@ -1769,7 +1769,7 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CopyFiles(entitiesList));
-            ScaffoldMessenger.of(context).showSnackBar(
+            _maybeScaffoldMessenger(context)?.showSnackBar(
               SnackBar(content: Text(l10n.copiedToClipboard('$count items'))),
             );
           },
@@ -1782,7 +1782,7 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CutFiles(entitiesList));
-            ScaffoldMessenger.of(context).showSnackBar(
+            _maybeScaffoldMessenger(context)?.showSnackBar(
               SnackBar(content: Text(l10n.cutToClipboard('$count items'))),
             );
           },

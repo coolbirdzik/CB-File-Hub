@@ -10,6 +10,7 @@
   - `contributing/02-coding-standards.md`
   - `contributing/03-release-guide.md`
   - `quality/01-testing-strategy.md`
+  - `quality/02-e2e-desktop-integration.md` — Desktop E2E (`integration_test`, Makefile, logs, CI)
 - **Technical**
   - `technical/index.md`
 - **Features**

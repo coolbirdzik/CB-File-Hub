@@ -85,7 +85,7 @@ class DirectoryWatcherService {
       return;
     }
 
-    // Stop any existing watcher
+    // Stop any existing watcher FIRST — synchronous, cancels the native handle.
     await stopWatching();
 
     try {
@@ -96,17 +96,20 @@ class DirectoryWatcherService {
         return;
       }
 
+      // Set _currentWatchPath only AFTER the directory is confirmed to exist.
+      // This prevents a stale-path being set when the watch below fails due to
+      // a race with another test's teardown deleting the directory.
       _currentWatchPath = path;
 
-      // Start watching the directory (non-recursive)
-      // This works on all platforms: Windows, macOS, Linux, Android, iOS
-      // Only watches the immediate directory, not subdirectories
+      // Start watching the directory (non-recursive).
+      // On Windows, directory.watch() uses ReadDirectoryChangesW which acquires
+      // a kernel handle immediately. If the directory is deleted concurrently
+      // (e.g. another E2E test's teardown deleting the directory), this throws a
+      // synchronous SocketException. The onError callback handles this silently.
       _watchSubscription = directory.watch(recursive: false).listen(
         _handleFileSystemEvent,
-        onError: (error) {
-          AppLogger.error('DirectoryWatcherService: Error watching $path',
-              error: error);
-          // Try to recover by stopping and allowing restart
+        onError: (Object error) {
+          // Silently absorb — the watcher will recover on the next navigation.
           stopWatching();
         },
         cancelOnError: false,
@@ -192,7 +195,10 @@ class DirectoryWatcherService {
     });
   }
 
-  /// Stop watching the current directory
+  /// Stop watching the current directory.
+  ///
+  /// This is a synchronous cancellation of the native OS handle (ReadDirectoryChangesW
+  /// on Windows). No I/O is performed — the handle is closed immediately.
   Future<void> stopWatching() async {
     _debounceTimer?.cancel();
     _debounceTimer = null;
@@ -200,14 +206,15 @@ class DirectoryWatcherService {
     await _watchSubscription?.cancel();
     _watchSubscription = null;
 
-    if (_currentWatchPath != null) {
-      AppLogger.info(
-          'DirectoryWatcherService: Stopped watching $_currentWatchPath');
-    }
-
+    final previousPath = _currentWatchPath;
     _currentWatchPath = null;
     _pendingEvents.clear();
     _suppressedRefreshUntil.clear();
+
+    if (previousPath != null) {
+      AppLogger.info(
+          'DirectoryWatcherService: Stopped watching $previousPath');
+    }
   }
 
   /// Get the currently watched path

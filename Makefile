@@ -2,7 +2,7 @@
 # Cross-platform build system for Flutter application
 # Works on: Windows (Git Bash/WSL/MinGW), Linux, macOS
 
-.PHONY: help clean deep-clean deps build-windows-portable build-windows-msi build-windows-msix build-windows-msix-store build-android-apk build-android-aab build-linux build-macos build-ios build-all test analyze format doctor release version version-info bump-build retag retag-one verify
+.PHONY: help clean deep-clean deps build-windows-portable build-windows-msi build-windows-msix build-windows-msix-store build-android-apk build-android-aab build-linux build-macos build-ios build-all test dev-test dev-test-e2e-failed kill-e2e-app dev-test-e2e-clean dev-test-e2e-only analyze format doctor release version version-info bump-build retag retag-one verify
 
 # Default target
 .DEFAULT_GOAL := help
@@ -12,6 +12,12 @@ PROJECT_DIR := cb_file_manager
 FLUTTER := flutter
 BUILD_DIR := $(PROJECT_DIR)/build
 PUBSPEC := $(PROJECT_DIR)/pubspec.yaml
+
+# Developer testing: integration_test device (override: make dev-test-e2e E2E_DEVICE=macos)
+E2E_DEVICE ?= windows
+
+# flutter test reporter: expanded (shows each test name line-by-line), compact, github (CI), json (machine-readable)
+TEST_REPORTER ?= expanded
 
 # Get version name and build number from pubspec.yaml
 # Uses scripts/version.sh — must be run from Git Bash on Windows
@@ -48,10 +54,32 @@ help:
 	@echo "  make clean             - Clean build artifacts"
 	@echo "  make deep-clean        - Deep clean (remove all build files)"
 	@echo "  make deps              - Install dependencies"
-	@echo "  make test              - Run tests"
+	@echo "  make test              - Run unit/widget tests (same as dev-test)"
 	@echo "  make analyze           - Analyze code"
 	@echo "  make format            - Format code"
 	@echo "  make doctor            - Run flutter doctor"
+	@echo ""
+	@echo "$(GREEN)🧪 Developer — testing ($(PROJECT_DIR)):$(NC)"
+	@echo "  make dev-test                       - Unit + widget + E2E + Allure report (ALL IN ONE) ← DEFAULT"
+	@echo "  make dev-test mode=unit             - Unit + widget tests only"
+	@echo "  make dev-test mode=e2e              - E2E in PARALLEL + dashboard (default fast path)"
+	@echo "  make dev-test mode=e2e SERIAL=1     - E2E serial runner (debug exact order)"
+	@echo "  make dev-test mode=e2e MAX_PARALLEL=4  - Limit parallel workers"
+	@echo "  make dev-test mode=e2e FULL_STARTUP=1  - Include production-only startup services"
+	@echo "  make dev-test mode=e2e FULL_SCREENSHOTS=1  - Screenshot every action"
+	@echo "  make dev-test mode=e2e RERUN=1      - E2E: skip passed, rerun only FAILED tests"
+	@echo "  make dev-test mode=e2e TEST=Navigation  - Run only Navigation suite"
+	@echo "  make dev-test mode=e2e TEST=\"Video Thumbnails\"  - Run only Video Thumbnails suite"
+	@echo "  make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test  - Run by file name"
+	@echo "  make dev-test-e2e-failed            - Shortcut: rerun only previously-failed tests"
+	@echo "  make dev-test mode=e2e NO_OPEN=1    - E2E without auto-opening browser"
+	@echo "  make dev-test-e2e-only              - E2E plain output (no Allure, useful for debugging)"
+	@echo "  make dev-test-e2e-clean             - flutter clean + pub get + E2E (fix MSB3073 / bad build)"
+	@echo ""
+	@echo "$(GREEN)📊 E2E Dashboard (auto after E2E):$(NC)"
+	@echo "  make dev-test             → generates cb_file_manager/build/e2e_dashboard/index.html (auto-opens)"
+	@echo "  make dev-test RERUN=1    - fix failures faster (skips passed tests)"
+	@echo "  Dashboard link → Screenshot Report → cb_file_manager/build/e2e_report/report.html"
 	@echo ""
 	@echo "$(GREEN)🚀 Release:$(NC)"
 	@echo "  make verify           - Run format + analyze check"
@@ -68,6 +96,14 @@ help:
 	@echo "  make windows           # Build Windows portable"
 	@echo "  make android           # Build Android APK"
 	@echo "  make all               # Build everything"
+	@echo ""
+	@echo "$(GREEN)📋 E2E Dashboard (auto after dev-test mode=e2e or all):$(NC)"
+	@echo "  • Dashboard auto-generated → cb_file_manager/build/e2e_dashboard/index.html"
+	@echo "  • Parallel mode:    make dev-test mode=e2e  (default full E2E run)"
+	@echo "  • Serial mode:      make dev-test mode=e2e SERIAL=1"
+	@echo "  • Rerun only failed: make dev-test mode=e2e RERUN=1  (skips passed tests)"
+	@echo "  • Plain E2E output:  make dev-test-e2e-only"
+	@echo "  • IDE: open integration_test/*.dart and use Run/Debug on testWidgets"
 	@echo ""
 
 # Clean build artifacts
@@ -122,7 +158,108 @@ doctor:
 # Run tests
 test:
 	@echo "$(BLUE)Running tests...$(NC)"
-	cd $(PROJECT_DIR) && $(FLUTTER) test
+	cd $(PROJECT_DIR) && $(FLUTTER) test --reporter $(TEST_REPORTER)
+
+# -----------------------------------------------------------------------------
+# Developer: testing (cb_file_manager)
+# - Unit/widget: test/
+# - E2E: integration_test/ with --dart-define=CB_E2E=true (desktop device required)
+# - Allure HTML report auto-generated after E2E run (build/allure-report/index.html)
+# - RERUN=1 skips passed tests, runs only previously-failed tests
+# - If Windows build fails with MSB3073 / cmake_install / INSTALL.vcxproj: run dev-test-e2e-clean
+#
+# Usage:
+#   make dev-test                        # unit + widget + E2E + Allure report  (ALL IN ONE)
+#   make dev-test mode=unit              # unit + widget only
+#   make dev-test mode=e2e               # E2E only + Allure report (auto-opens browser)
+#   make dev-test mode=e2e RERUN=1       # skip passed, rerun only failed tests
+#   make dev-test mode=e2e TEST=Navigation  # run only a specific suite (--plain-name)
+#   make dev-test mode=e2e NO_OPEN=1     # skip auto-opening browser
+#   make dev-test-e2e-failed             # shortcut: rerun only failed tests
+#   make dev-test-e2e-only               # E2E without Allure (plain flutter output)
+#   make dev-test-e2e-clean              # flutter clean + pub get + E2E
+# -----------------------------------------------------------------------------
+
+# mode: unit | e2e | (default = all)
+TEST_MODE ?= all
+# RERUN=1 skips passed tests, runs only the failed ones from last run
+TEST_RERUN_FAILED := $(if $(filter 1,$(RERUN)),--rerun-failed,)
+# TEST=<suite> runs only tests matching --plain-name (e.g. TEST=Navigation)
+# TEST_FILE=<file> runs a specific test file directly (e.g. TEST_FILE=video_thumbnails_e2e_test)
+# Note: use spaces instead of %20 — Bash/Git Bash normalises them automatically.
+_TEST_FILTER := $(if $(TEST),--plain-name "$(subst %20, ,$(TEST))",)
+_TEST_FILE_FILTER := $(if $(TEST_FILE),--file $(TEST_FILE),)
+TEST_FILTER := $(strip $(_TEST_FILTER) $(_TEST_FILE_FILTER))
+# NO_OPEN=1 skips auto-opening the browser after E2E run
+TEST_NO_OPEN := $(if $(filter 1,$(NO_OPEN)),--no-open,)
+# When TEST_FILE is set, disable parallel to go through e2e_allure.dart directly.
+# Full E2E runs use the parallel runner by default. SERIAL=1 keeps the old
+# single-process runner for debugging exact test order or worker-specific flakes.
+_TEST_FULL_E2E := $(if $(filter e2e all,$(TEST_MODE)),$(if $(RERUN)$(TEST_FILE),,yes),)
+TEST_PARALLEL := $(if $(filter 1,$(SERIAL)),,$(if $(filter 1,$(PARALLEL)),1,$(if $(_TEST_FULL_E2E),1,)))
+# MAX_PARALLEL=N limits the number of parallel workers (runner default: up to 4)
+TEST_MAX_PARALLEL := $(if $(MAX_PARALLEL),--max-parallel $(MAX_PARALLEL),)
+# FULL_STARTUP=1 disables the E2E fast startup skips.
+TEST_FULL_STARTUP := $(if $(filter 1,$(FULL_STARTUP)),--full-startup,)
+# FULL_SCREENSHOTS=1 restores action-by-action screenshot capture.
+TEST_FULL_SCREENSHOTS := $(if $(filter 1,$(FULL_SCREENSHOTS)),--full-screenshots,)
+# Whether E2E will run (used to conditionally print report info)
+TEST_RUNS_E2E := $(if $(filter e2e all,$(TEST_MODE)),yes,)
+
+kill-e2e-app:
+ifeq ($(OS),Windows_NT)
+	@cmd /c "taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0"
+else
+	@:
+endif
+
+# Unified dev-test: runs unit+widget, optionally E2E with Allure report.
+# Default: ALL (unit + widget + E2E Allure)
+# Overrides: mode=unit (skip E2E) | mode=e2e (skip unit/widget)
+dev-test: kill-e2e-app
+ifneq ($(filter unit,$(TEST_MODE)),)
+	@echo "$(BLUE)[dev] Unit + widget tests ($(PROJECT_DIR)/test) ...$(NC)"
+	cd $(PROJECT_DIR) && $(FLUTTER) test --reporter $(TEST_REPORTER)
+endif
+ifneq ($(filter e2e all,$(TEST_MODE)),)
+ifneq ($(RERUN),)
+	@echo "$(BLUE)[dev] E2E: rerunning only failed tests ...$(NC)"
+else ifneq ($(TEST_FILE),)
+	@echo "$(BLUE)[dev] E2E: running test file '$(TEST_FILE)' only ...$(NC)"
+else ifneq ($(TEST),)
+	@echo "$(BLUE)[dev] E2E: running suite '$(TEST)' only ...$(NC)"
+else
+	@echo "$(BLUE)[dev] E2E tests + HTML dashboard ...$(NC)"
+endif
+ifneq ($(TEST_PARALLEL),)
+	@echo "$(GREEN)[dev] Using PARALLEL mode (e2e_parallel.dart) ...$(NC)"
+	cd $(PROJECT_DIR) && dart run tool/e2e_parallel.dart $(TEST_RERUN_FAILED) $(TEST_NO_OPEN) $(TEST_MAX_PARALLEL) $(TEST_FILTER) $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
+else
+	@echo "$(YELLOW)[dev] Using SERIAL mode (e2e_allure.dart) ...$(NC)"
+	cd $(PROJECT_DIR) && dart run tool/e2e_allure.dart $(TEST_RERUN_FAILED) $(TEST_NO_OPEN) $(TEST_FILTER) $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
+endif
+endif  # end: ifneq ($(filter e2e all,$(TEST_MODE)),)
+ifneq ($(TEST_RUNS_E2E),)
+	@echo "$(GREEN)[dev] Done. Open dashboard:$(NC)"
+	@echo "  file://$$(pwd)/$(PROJECT_DIR)/build/e2e_dashboard/index.html"
+endif
+
+# E2E only (no Allure) — plain flutter output, useful for debugging
+dev-test-e2e-only: kill-e2e-app
+	@echo "$(BLUE)[dev] E2E integration tests (plain output) ...$(NC)"
+	cd $(PROJECT_DIR) && dart run tool/run_e2e_with_log.dart $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
+
+# Rerun only the tests that failed in the last run (shortcut for RERUN=1)
+dev-test-e2e-failed: kill-e2e-app
+	@echo "$(BLUE)[dev] E2E: rerunning only previously-failed tests ...$(NC)"
+	cd $(PROJECT_DIR) && dart run tool/e2e_allure.dart --rerun-failed $(TEST_NO_OPEN) $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
+
+# Full clean then E2E — fixes stale CMake/MSBuild output that breaks INSTALL.
+dev-test-e2e-clean: kill-e2e-app
+	@echo "$(BLUE)[dev] flutter clean + pub get + E2E ...$(NC)"
+	cd $(PROJECT_DIR) && $(FLUTTER) clean
+	cd $(PROJECT_DIR) && $(FLUTTER) pub get
+	cd $(PROJECT_DIR) && $(FLUTTER) test integration_test -d $(E2E_DEVICE) --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST=$(if $(filter 1,$(FULL_STARTUP)),false,true) --dart-define=CB_E2E_FULL_SCREENSHOTS=$(if $(filter 1,$(FULL_SCREENSHOTS)),true,false) --reporter $(TEST_REPORTER)
 
 # Analyze code
 analyze:

@@ -44,6 +44,35 @@ jobs:
           cd ${{ env.PROJECT_DIR }}
           flutter test
 
+  # Desktop E2E (integration_test on Windows; requires --dart-define=CB_E2E=true)
+  e2e-windows:
+    name: E2E integration tests (Windows)
+    runs-on: windows-latest
+    needs: analyze
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter pub get
+
+      - name: Stop stray cb_file_hub.exe
+        shell: cmd
+        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+
+      - name: Run integration tests
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter test integration_test -d windows --dart-define=CB_E2E=true
+
   # Build Windows
   build-windows:
     runs-on: windows-latest

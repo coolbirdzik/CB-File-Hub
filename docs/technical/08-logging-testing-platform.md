@@ -19,6 +19,7 @@
 ## Testing & Tooling
 
 - **Test Harness** See `test/` and scripts documented in `docs/quality/01-testing-strategy.md`; infra includes `run_tests.dart`, `stable_tests.dart`, and CI-ready runners.
+- **Desktop E2E** `integration_test/` on Windows (`--dart-define=CB_E2E=true`), Makefile `dev-test-e2e`, reporters, and CI — see `docs/quality/02-e2e-desktop-integration.md`.
 - **Coverage Focus** Navigation flows and core widgets presently covered; expand for new galleries or services when modified.
 - **Diagnostics** Use `AppLogger.debug()` for verbose logging during development; toggle log levels as needed.
 

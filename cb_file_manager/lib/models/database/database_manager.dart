@@ -37,6 +37,11 @@ class DatabaseManager implements IDatabaseProvider {
     return _instance!;
   }
 
+  /// Clears the singleton so a later `integration_test` run can call [initialize] again (E2E only).
+  static void resetSingletonForE2ETest() {
+    _instance = null;
+  }
+
   /// Initialize the database manager
   @override
   Future<void> initialize() async {

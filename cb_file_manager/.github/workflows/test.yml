@@ -72,9 +72,9 @@ jobs:
 
       - name: Run integration tests (driver mode)
         run: |
-          # Integration tests require a device/emulator
-          # This is a placeholder - configure based on your needs
-          echo "Integration tests would run here with an emulator"
+          # Real E2E runs on Windows in repo root: .github/workflows/build-test.yml (job e2e-windows).
+          # Example: flutter test integration_test -d windows --dart-define=CB_E2E=true
+          echo "See root workflow e2e-windows; Linux CI does not run desktop integration_test by default."
         continue-on-error: true
 
   build:

@@ -346,14 +346,12 @@ class FileOperationsHandler {
 
   /// Safely shows a snackbar, falling back to debugPrint if no ScaffoldMessenger is available.
   static void _showSnackBarSafe(BuildContext context, String message) {
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (_) {
-      debugPrint(
-          'FileOperationsHandler: ScaffoldMessenger unavailable — $message');
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      debugPrint('FileOperationsHandler: ScaffoldMessenger unavailable — $message');
+      return;
     }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   static Future<void> showRenameDialog({

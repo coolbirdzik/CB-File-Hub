@@ -1242,7 +1242,18 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
     // If content builder returns a widget (error, empty, or search results), show it
     if (content is! SizedBox) {
-      return content;
+      // For error views, show as-is (context menu is not useful on an error screen).
+      if (state.error != null) return content;
+      // For empty folders and search/filter results the file-list GestureDetector
+      // is not rendered, so right-clicking the background would do nothing.
+      // Wrap with the same background right-click handler so "Paste Here",
+      // "New Folder", etc. remain accessible even in an empty directory.
+      return GestureDetector(
+        onSecondaryTapUp: (details) =>
+            _showContextMenu(context, details.globalPosition),
+        behavior: HitTestBehavior.translucent,
+        child: content,
+      );
     }
 
     // Otherwise, show the normal file list with progressive loading
