@@ -90,9 +90,13 @@ jobs:
         id: notes
         run: |
           VERSION="${{ steps.version.outputs.version_name }}"
+          CURRENT_TAG="v$VERSION"
 
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          # Get previous tag (most recent tag before the current one)
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -n 1)
+
+          echo "Previous tag: ${PREV_TAG:-'(none)'}"
+          echo "Current tag:  $CURRENT_TAG"
 
           echo "# 🎉 CB File Hub $VERSION" > release_notes.md
           echo "" >> release_notes.md
@@ -102,24 +106,54 @@ jobs:
           if [ -z "$PREV_TAG" ]; then
             echo "Initial release" >> release_notes.md
           else
-            # Group commits by type
-            echo "### ✨ Features" >> release_notes.md
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --grep="^feat" >> release_notes.md || echo "- No new features" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "" >> release_notes.md
+            RANGE="$PREV_TAG..$CURRENT_TAG"
 
-            echo "### 🐛 Bug Fixes" >> release_notes.md
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --grep="^fix" >> release_notes.md || echo "- No bug fixes" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "" >> release_notes.md
+            # Patterns to exclude from release notes (ci, build, chore, bump, merge commits)
+            EXCLUDE_PATTERN="^(ci:|build:|chore:|bump |Merge branch|Merge pull request|ci\(.*\):|build\(.*\):|chore\(.*\):)"
 
-            echo "### 📚 Documentation" >> release_notes.md
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --grep="^docs" >> release_notes.md || echo "- No documentation changes" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "" >> release_notes.md
+            # Helper: log commits matching a grep pattern, excluding noise commits
+            log_section() {
+              local grep_pattern="$1"
+              git log "$RANGE" --pretty=format:"- %s (%h)" --grep="$grep_pattern" \
+                | grep -vE "$EXCLUDE_PATTERN" || true
+            }
 
-            echo "### 🔧 Other Changes" >> release_notes.md
-            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --invert-grep --grep="^feat" --grep="^fix" --grep="^docs" >> release_notes.md || echo "- No other changes" >> release_notes.md
+            # Helper: write a section, show "No ..." if empty
+            write_section() {
+              local header="$1"
+              local empty_msg="$2"
+              local content="$3"
+              echo "$header" >> release_notes.md
+              if [ -z "$content" ]; then
+                echo "$empty_msg" >> release_notes.md
+              else
+                echo "$content" >> release_notes.md
+              fi
+              echo "" >> release_notes.md
+              echo "" >> release_notes.md
+            }
+
+            # Features
+            FEAT=$(log_section "^feat")
+            write_section "### ✨ Features" "- No new features" "$FEAT"
+
+            # Bug Fixes
+            FIX=$(log_section "^fix")
+            write_section "### 🐛 Bug Fixes" "- No bug fixes" "$FIX"
+
+            # Documentation
+            DOCS=$(log_section "^docs")
+            write_section "### 📚 Documentation" "- No documentation changes" "$DOCS"
+
+            # Refactoring / Performance
+            REFACTOR=$(log_section "^refactor\|^perf")
+            write_section "### ♻️ Refactoring & Performance" "- No refactoring changes" "$REFACTOR"
+
+            # Other Changes — everything NOT feat/fix/docs/refactor/perf AND NOT excluded
+            OTHER=$(git log "$RANGE" --pretty=format:"- %s (%h)" \
+              --invert-grep --grep="^feat" --grep="^fix" --grep="^docs" --grep="^refactor" --grep="^perf" \
+              | grep -vE "$EXCLUDE_PATTERN" || true)
+            write_section "### 🔧 Other Changes" "- No other changes" "$OTHER"
           fi
 
           echo "" >> release_notes.md
