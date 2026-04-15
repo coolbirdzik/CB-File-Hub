@@ -2,6 +2,15 @@
 # Cross-platform build system for Flutter application
 # Works on: Windows (Git Bash/WSL/MinGW), Linux, macOS
 
+# Force bash shell on all platforms (fixes ANSI color rendering on Windows)
+# On Windows (Git Bash), we point directly to bash.exe so Make doesn't fall back to cmd.exe
+ifeq ($(OS),Windows_NT)
+  SHELL := C:/Program Files/Git/bin/bash.exe
+else
+  SHELL := /bin/bash
+endif
+.SHELLFLAGS := -c
+
 .PHONY: help clean deep-clean deps build-windows-portable build-windows-msi build-windows-msix build-windows-msix-store build-android-apk build-android-aab build-linux build-macos build-ios build-all test dev-test dev-test-e2e-failed kill-e2e-app dev-test-e2e-clean dev-test-e2e-only analyze format doctor release version version-info bump-build retag retag-one verify
 
 # Default target
@@ -20,116 +29,116 @@ E2E_DEVICE ?= windows
 TEST_REPORTER ?= expanded
 
 # Get version name and build number from pubspec.yaml
-# Uses scripts/version.sh — must be run from Git Bash on Windows
+# Uses scripts/version.sh -- must be run from Git Bash on Windows
 VERSION_FULL := $(shell bash scripts/version.sh full)
 VERSION := $(shell bash scripts/version.sh name)
 BUILD_NUMBER := $(shell bash scripts/version.sh build)
 
 # Colors for output
-BLUE := \033[0;34m
-GREEN := \033[0;32m
+BLUE   := \033[0;34m
+GREEN  := \033[0;32m
 YELLOW := \033[1;33m
-RED := \033[0;31m
-NC := \033[0m # No Color
+RED    := \033[0;31m
+NC     := \033[0m
 
 # Help target
 help:
-	@echo "$(BLUE)╔════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(BLUE)║     CB File Hub - Build System v$(VERSION)+$(BUILD_NUMBER)    ║$(NC)"
-	@echo "$(BLUE)╚════════════════════════════════════════════════════╝$(NC)"
-	@echo ""
-	@echo "$(GREEN)📦 Build Targets:$(NC)"
-	@echo "  make windows           - Build Windows portable (ZIP)"
-	@echo "  make windows-msi       - Build Windows MSI installer"
-	@echo "  make windows-msix      - Build signed Windows MSIX package"
-	@echo "  make windows-msix-store - Build signed Store-ready MSIX (x.y.z.0)"
-	@echo "  make android           - Build Android APK"
-	@echo "  make android-aab       - Build Android AAB"
-	@echo "  make linux             - Build Linux"
-	@echo "  make macos             - Build macOS"
-	@echo "  make ios               - Build iOS"
-	@echo "  make all               - Build all platforms"
-	@echo ""
-	@echo "$(GREEN)🔧 Development:$(NC)"
-	@echo "  make clean             - Clean build artifacts"
-	@echo "  make deep-clean        - Deep clean (remove all build files)"
-	@echo "  make deps              - Install dependencies"
-	@echo "  make test              - Run unit/widget tests (same as dev-test)"
-	@echo "  make analyze           - Analyze code"
-	@echo "  make format            - Format code"
-	@echo "  make doctor            - Run flutter doctor"
-	@echo ""
-	@echo "$(GREEN)🧪 Developer — testing ($(PROJECT_DIR)):$(NC)"
-	@echo "  make dev-test                       - Unit + widget + E2E + Allure report (ALL IN ONE) ← DEFAULT"
-	@echo "  make dev-test mode=unit             - Unit + widget tests only"
-	@echo "  make dev-test mode=e2e              - E2E in PARALLEL + dashboard (default fast path)"
-	@echo "  make dev-test mode=e2e SERIAL=1     - E2E serial runner (debug exact order)"
-	@echo "  make dev-test mode=e2e MAX_PARALLEL=4  - Limit parallel workers"
-	@echo "  make dev-test mode=e2e FULL_STARTUP=1  - Include production-only startup services"
-	@echo "  make dev-test mode=e2e FULL_SCREENSHOTS=1  - Screenshot every action"
-	@echo "  make dev-test mode=e2e RERUN=1      - E2E: skip passed, rerun only FAILED tests"
-	@echo "  make dev-test mode=e2e TEST=Navigation  - Run only Navigation suite"
-	@echo "  make dev-test mode=e2e TEST=\"Video Thumbnails\"  - Run only Video Thumbnails suite"
-	@echo "  make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test  - Run by file name"
-	@echo "  make dev-test-e2e-failed            - Shortcut: rerun only previously-failed tests"
-	@echo "  make dev-test mode=e2e NO_OPEN=1    - E2E without auto-opening browser"
-	@echo "  make dev-test-e2e-only              - E2E plain output (no Allure, useful for debugging)"
-	@echo "  make dev-test-e2e-clean             - flutter clean + pub get + E2E (fix MSB3073 / bad build)"
-	@echo ""
-	@echo "$(GREEN)📊 E2E Dashboard (auto after E2E):$(NC)"
-	@echo "  make dev-test             → generates cb_file_manager/build/e2e_dashboard/index.html (auto-opens)"
-	@echo "  make dev-test RERUN=1    - fix failures faster (skips passed tests)"
-	@echo "  Dashboard link → Screenshot Report → cb_file_manager/build/e2e_report/report.html"
-	@echo ""
-	@echo "$(GREEN)🚀 Release:$(NC)"
-	@echo "  make verify           - Run format + analyze check"
-	@echo "  make release-patch     - Create patch release (x.x.X)"
-	@echo "  make release-minor     - Create minor release (x.X.0)"
-	@echo "  make release-major     - Create major release (X.0.0)"
-	@echo "  make retag            - Recreate & retag (interactive)"
-	@echo "  bash scripts/retag.sh v1.2.3  - Retag specific version"
-	@echo "  make version           - Show current version"
-	@echo "  make version-info      - Show version + build number separately"
-	@echo "  make bump-build        - Bump build number only (auto in CI)"
-	@echo ""
-	@echo "$(GREEN)💡 Examples:$(NC)"
-	@echo "  make windows           # Build Windows portable"
-	@echo "  make android           # Build Android APK"
-	@echo "  make all               # Build everything"
-	@echo ""
-	@echo "$(GREEN)📋 E2E Dashboard (auto after dev-test mode=e2e or all):$(NC)"
-	@echo "  • Dashboard auto-generated → cb_file_manager/build/e2e_dashboard/index.html"
-	@echo "  • Parallel mode:    make dev-test mode=e2e  (default full E2E run)"
-	@echo "  • Serial mode:      make dev-test mode=e2e SERIAL=1"
-	@echo "  • Rerun only failed: make dev-test mode=e2e RERUN=1  (skips passed tests)"
-	@echo "  • Plain E2E output:  make dev-test-e2e-only"
-	@echo "  • IDE: open integration_test/*.dart and use Run/Debug on testWidgets"
-	@echo ""
+	@printf "$(BLUE)$(NC)\n"
+	@printf "$(BLUE)     CB File Hub - Build System v$(VERSION)+$(BUILD_NUMBER)    $(NC)\n"
+	@printf "$(BLUE)$(NC)\n"
+	@printf "\n"
+	@printf "$(GREEN) Build Targets:$(NC)\n"
+	@printf "  make windows           - Build Windows portable (ZIP)\n"
+	@printf "  make windows-msi       - Build Windows MSI installer\n"
+	@printf "  make windows-msix      - Build signed Windows MSIX package\n"
+	@printf "  make windows-msix-store - Build signed Store-ready MSIX (x.y.z.0)\n"
+	@printf "  make android           - Build Android APK\n"
+	@printf "  make android-aab       - Build Android AAB\n"
+	@printf "  make linux             - Build Linux\n"
+	@printf "  make macos             - Build macOS\n"
+	@printf "  make ios               - Build iOS\n"
+	@printf "  make all               - Build all platforms\n"
+	@printf "\n"
+	@printf "$(GREEN) Development:$(NC)\n"
+	@printf "  make clean             - Clean build artifacts\n"
+	@printf "  make deep-clean        - Deep clean (remove all build files)\n"
+	@printf "  make deps              - Install dependencies\n"
+	@printf "  make test              - Run unit/widget tests (same as dev-test)\n"
+	@printf "  make analyze           - Analyze code\n"
+	@printf "  make format            - Format code\n"
+	@printf "  make doctor            - Run flutter doctor\n"
+	@printf "\n"
+	@printf "$(GREEN) Developer -- testing ($(PROJECT_DIR)):$(NC)\n"
+	@printf "  make dev-test                       - Unit + widget + E2E + Allure report (ALL IN ONE) <- DEFAULT\n"
+	@printf "  make dev-test mode=unit             - Unit + widget tests only\n"
+	@printf "  make dev-test mode=e2e              - E2E in PARALLEL + dashboard (default fast path)\n"
+	@printf "  make dev-test mode=e2e SERIAL=1     - E2E serial runner (debug exact order)\n"
+	@printf "  make dev-test mode=e2e MAX_PARALLEL=4  - Limit parallel workers\n"
+	@printf "  make dev-test mode=e2e FULL_STARTUP=1  - Include production-only startup services\n"
+	@printf "  make dev-test mode=e2e FULL_SCREENSHOTS=1  - Screenshot every action\n"
+	@printf "  make dev-test mode=e2e RERUN=1      - E2E: skip passed, rerun only FAILED tests\n"
+	@printf "  make dev-test mode=e2e TEST=Navigation  - Run only Navigation suite\n"
+	@printf "  make dev-test mode=e2e TEST=\\n"Video Thumbnails\"  - Run only Video Thumbnails suite"
+	@printf "  make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test  - Run by file name\n"
+	@printf "  make dev-test-e2e-failed            - Shortcut: rerun only previously-failed tests\n"
+	@printf "  make dev-test mode=e2e NO_OPEN=1    - E2E without auto-opening browser\n"
+	@printf "  make dev-test-e2e-only              - E2E plain output (no Allure, useful for debugging)\n"
+	@printf "  make dev-test-e2e-clean             - flutter clean + pub get + E2E (fix MSB3073 / bad build)\n"
+	@printf "\n"
+	@printf "$(GREEN) E2E Dashboard (auto after E2E):$(NC)\n"
+	@printf "  make dev-test             -> generates cb_file_manager/build/e2e_dashboard/index.html (auto-opens)\n"
+	@printf "  make dev-test RERUN=1    - fix failures faster (skips passed tests)\n"
+	@printf "  Dashboard link -> Screenshot Report -> cb_file_manager/build/e2e_report/report.html\n"
+	@printf "\n"
+	@printf "$(GREEN) Release:$(NC)\n"
+	@printf "  make verify           - Run format + analyze check\n"
+	@printf "  make release-patch     - Create patch release (x.x.X)\n"
+	@printf "  make release-minor     - Create minor release (x.X.0)\n"
+	@printf "  make release-major     - Create major release (X.0.0)\n"
+	@printf "  make retag            - Recreate & retag (interactive)\n"
+	@printf "  bash scripts/retag.sh v1.2.3  - Retag specific version\n"
+	@printf "  make version           - Show current version\n"
+	@printf "  make version-info      - Show version + build number separately\n"
+	@printf "  make bump-build        - Bump build number only (auto in CI)\n"
+	@printf "\n"
+	@printf "$(GREEN) Examples:$(NC)\n"
+	@printf "  make windows           # Build Windows portable\n"
+	@printf "  make android           # Build Android APK\n"
+	@printf "  make all               # Build everything\n"
+	@printf "\n"
+	@printf "$(GREEN) E2E Dashboard (auto after dev-test mode=e2e or all):$(NC)\n"
+	@printf "  - Dashboard auto-generated -> cb_file_manager/build/e2e_dashboard/index.html\n"
+	@printf "  - Parallel mode:    make dev-test mode=e2e  (default full E2E run)\n"
+	@printf "  - Serial mode:      make dev-test mode=e2e SERIAL=1\n"
+	@printf "  - Rerun only failed: make dev-test mode=e2e RERUN=1  (skips passed tests)\n"
+	@printf "  - Plain E2E output:  make dev-test-e2e-only\n"
+	@printf "  - IDE: open integration_test/*.dart and use Run/Debug on testWidgets\n"
+	@printf "\n"
 
 # Clean build artifacts
 clean:
-	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
+	@printf "$(BLUE)Cleaning build artifacts...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) clean
-	@echo "$(BLUE)Removing CMake cache...$(NC)"
+	@printf "$(BLUE)Removing CMake cache...$(NC)\n"
 	@rm -rf $(PROJECT_DIR)/build/windows/CMakeCache.txt 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/build/windows/CMakeFiles 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/build/windows/.cmake 2>/dev/null || true
-	@echo "$(BLUE)Removing additional build directories...$(NC)"
+	@printf "$(BLUE)Removing additional build directories...$(NC)\n"
 	@rm -rf $(PROJECT_DIR)/.dart_tool 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/windows/flutter/ephemeral 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/linux/flutter/ephemeral 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/macos/Flutter/ephemeral 2>/dev/null || true
-	@echo "$(GREEN)Clean completed!$(NC)"
+	@printf "$(GREEN)Clean completed!$(NC)\n"
 
 # Deep clean (more thorough)
 deep-clean:
-	@echo "$(BLUE)Performing deep clean...$(NC)"
+	@printf "$(BLUE)Performing deep clean...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) clean
-	@echo "$(BLUE)Removing CMake cache completely...$(NC)"
+	@printf "$(BLUE)Removing CMake cache completely...$(NC)\n"
 	@rm -rf $(PROJECT_DIR)/build/windows 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/build/linux 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/build/macos 2>/dev/null || true
-	@echo "$(BLUE)Removing all build artifacts...$(NC)"
+	@printf "$(BLUE)Removing all build artifacts...$(NC)\n"
 	@rm -rf $(PROJECT_DIR)/.dart_tool 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/.flutter-plugins 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/.flutter-plugins-dependencies 2>/dev/null || true
@@ -140,24 +149,24 @@ deep-clean:
 	@rm -rf $(PROJECT_DIR)/ios/.symlinks 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/ios/Flutter/Flutter.framework 2>/dev/null || true
 	@rm -rf $(PROJECT_DIR)/ios/Flutter/Flutter.podspec 2>/dev/null || true
-	@echo "$(GREEN)Deep clean completed!$(NC)"
-	@echo "$(YELLOW)Some files may be locked by running processes$(NC)"
-	@echo "$(YELLOW)Run 'make deps' before building$(NC)"
+	@printf "$(GREEN)Deep clean completed!$(NC)\n"
+	@printf "$(YELLOW)Some files may be locked by running processes$(NC)\n"
+	@printf "$(YELLOW)Run 'make deps' before building$(NC)\n"
 
 # Install dependencies
 deps:
-	@echo "$(BLUE)Installing dependencies...$(NC)"
+	@printf "$(BLUE)Installing dependencies...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) pub get
-	@echo "$(GREEN)Dependencies installed!$(NC)"
+	@printf "$(GREEN)Dependencies installed!$(NC)\n"
 
 # Run flutter doctor
 doctor:
-	@echo "$(BLUE)Running flutter doctor...$(NC)"
+	@printf "$(BLUE)Running flutter doctor...$(NC)\n"
 	$(FLUTTER) doctor -v
 
 # Run tests
 test:
-	@echo "$(BLUE)Running tests...$(NC)"
+	@printf "$(BLUE)Running tests...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) test --reporter $(TEST_REPORTER)
 
 # -----------------------------------------------------------------------------
@@ -186,7 +195,7 @@ TEST_MODE ?= all
 TEST_RERUN_FAILED := $(if $(filter 1,$(RERUN)),--rerun-failed,)
 # TEST=<suite> runs only tests matching --plain-name (e.g. TEST=Navigation)
 # TEST_FILE=<file> runs a specific test file directly (e.g. TEST_FILE=video_thumbnails_e2e_test)
-# Note: use spaces instead of %20 — Bash/Git Bash normalises them automatically.
+# Note: use spaces instead of %20 -- Bash/Git Bash normalises them automatically.
 _TEST_FILTER := $(if $(TEST),--plain-name "$(subst %20, ,$(TEST))",)
 _TEST_FILE_FILTER := $(if $(TEST_FILE),--file $(TEST_FILE),)
 TEST_FILTER := $(strip $(_TEST_FILTER) $(_TEST_FILE_FILTER))
@@ -218,64 +227,64 @@ endif
 # Overrides: mode=unit (skip E2E) | mode=e2e (skip unit/widget)
 dev-test: kill-e2e-app
 ifneq ($(filter unit,$(TEST_MODE)),)
-	@echo "$(BLUE)[dev] Unit + widget tests ($(PROJECT_DIR)/test) ...$(NC)"
+	@printf "$(BLUE)[dev] Unit + widget tests ($(PROJECT_DIR)/test) ...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) test --reporter $(TEST_REPORTER)
 endif
 ifneq ($(filter e2e all,$(TEST_MODE)),)
 ifneq ($(RERUN),)
-	@echo "$(BLUE)[dev] E2E: rerunning only failed tests ...$(NC)"
+	@printf "$(BLUE)[dev] E2E: rerunning only failed tests ...$(NC)\n"
 else ifneq ($(TEST_FILE),)
-	@echo "$(BLUE)[dev] E2E: running test file '$(TEST_FILE)' only ...$(NC)"
+	@printf "$(BLUE)[dev] E2E: running test file '$(TEST_FILE)' only ...$(NC)\n"
 else ifneq ($(TEST),)
-	@echo "$(BLUE)[dev] E2E: running suite '$(TEST)' only ...$(NC)"
+	@printf "$(BLUE)[dev] E2E: running suite '$(TEST)' only ...$(NC)\n"
 else
-	@echo "$(BLUE)[dev] E2E tests + HTML dashboard ...$(NC)"
+	@printf "$(BLUE)[dev] E2E tests + HTML dashboard ...$(NC)\n"
 endif
 ifneq ($(TEST_PARALLEL),)
-	@echo "$(GREEN)[dev] Using PARALLEL mode (e2e_parallel.dart) ...$(NC)"
+	@printf "$(GREEN)[dev] Using PARALLEL mode (e2e_parallel.dart) ...$(NC)\n"
 	cd $(PROJECT_DIR) && dart run tool/e2e_parallel.dart $(TEST_RERUN_FAILED) $(TEST_NO_OPEN) $(TEST_MAX_PARALLEL) $(TEST_FILTER) $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
 else
-	@echo "$(YELLOW)[dev] Using SERIAL mode (e2e_allure.dart) ...$(NC)"
+	@printf "$(YELLOW)[dev] Using SERIAL mode (e2e_allure.dart) ...$(NC)\n"
 	cd $(PROJECT_DIR) && dart run tool/e2e_allure.dart $(TEST_RERUN_FAILED) $(TEST_NO_OPEN) $(TEST_FILTER) $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
 endif
 endif  # end: ifneq ($(filter e2e all,$(TEST_MODE)),)
 ifneq ($(TEST_RUNS_E2E),)
-	@echo "$(GREEN)[dev] Done. Open dashboard:$(NC)"
-	@echo "  file://$$(pwd)/$(PROJECT_DIR)/build/e2e_dashboard/index.html"
+	@printf "$(GREEN)[dev] Done. Open dashboard:$(NC)\n"
+	@printf "  file://$$(pwd)/$(PROJECT_DIR)/build/e2e_dashboard/index.html\n"
 endif
 
-# E2E only (no Allure) — plain flutter output, useful for debugging
+# E2E only (no Allure) -- plain flutter output, useful for debugging
 dev-test-e2e-only: kill-e2e-app
-	@echo "$(BLUE)[dev] E2E integration tests (plain output) ...$(NC)"
+	@printf "$(BLUE)[dev] E2E integration tests (plain output) ...$(NC)\n"
 	cd $(PROJECT_DIR) && dart run tool/run_e2e_with_log.dart $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
 
 # Rerun only the tests that failed in the last run (shortcut for RERUN=1)
 dev-test-e2e-failed: kill-e2e-app
-	@echo "$(BLUE)[dev] E2E: rerunning only previously-failed tests ...$(NC)"
+	@printf "$(BLUE)[dev] E2E: rerunning only previously-failed tests ...$(NC)\n"
 	cd $(PROJECT_DIR) && dart run tool/e2e_allure.dart --rerun-failed $(TEST_NO_OPEN) $(TEST_FULL_STARTUP) $(TEST_FULL_SCREENSHOTS)
 
-# Full clean then E2E — fixes stale CMake/MSBuild output that breaks INSTALL.
+# Full clean then E2E -- fixes stale CMake/MSBuild output that breaks INSTALL.
 dev-test-e2e-clean: kill-e2e-app
-	@echo "$(BLUE)[dev] flutter clean + pub get + E2E ...$(NC)"
+	@printf "$(BLUE)[dev] flutter clean + pub get + E2E ...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) clean
 	cd $(PROJECT_DIR) && $(FLUTTER) pub get
 	cd $(PROJECT_DIR) && $(FLUTTER) test integration_test -d $(E2E_DEVICE) --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST=$(if $(filter 1,$(FULL_STARTUP)),false,true) --dart-define=CB_E2E_FULL_SCREENSHOTS=$(if $(filter 1,$(FULL_SCREENSHOTS)),true,false) --reporter $(TEST_REPORTER)
 
 # Analyze code
 analyze:
-	@echo "$(BLUE)Analyzing code...$(NC)"
+	@printf "$(BLUE)Analyzing code...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) analyze
 
 # Format code
 format:
-	@echo "$(BLUE)Formatting code...$(NC)"
+	@printf "$(BLUE)Formatting code...$(NC)\n"
 	cd $(PROJECT_DIR) && dart format .
 
 # Build Windows Portable
 build-windows-portable: deps
-	@echo "$(BLUE)Building Windows Portable...$(NC)"
-	@echo "$(YELLOW)Note: Not cleaning before build to avoid first-build failures$(NC)"
-	@echo "$(YELLOW)Run 'make clean' or 'make deep-clean' manually if needed$(NC)"
+	@printf "$(BLUE)Building Windows Portable...$(NC)\n"
+	@printf "$(YELLOW)Note: Not cleaning before build to avoid first-build failures$(NC)\n"
+	@printf "$(YELLOW)Run 'make clean' or 'make deep-clean' manually if needed$(NC)\n"
 	@# Fix pdfx plugin CMake compatibility
 	@if [ -f "$(PROJECT_DIR)/windows/flutter/ephemeral/.plugin_symlinks/pdfx/windows/CMakeLists.txt" ] || [ -f "$(PROJECT_DIR)/windows/flutter/ephemeral/.plugin_symlinks/pdfx/windows/DownloadProject.CMakeLists.cmake.in" ]; then \
 		echo "$(BLUE)Patching pdfx plugin CMake configuration...$(NC)"; \
@@ -288,7 +297,7 @@ build-windows-portable: deps
 	export CMAKE_GENERATOR="Visual Studio 17 2022" && \
 	export CMAKE_GENERATOR_PLATFORM="x64" && \
 	cd $(PROJECT_DIR) && $(FLUTTER) build windows --release
-	@echo "$(BLUE)Creating ZIP package...$(NC)"
+	@printf "$(BLUE)Creating ZIP package...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)/windows/portable
 	@if command -v zip >/dev/null 2>&1; then \
 		cd $(BUILD_DIR)/windows/x64/runner/Release && zip -r ../../portable/CBFileHub-Portable.zip ./*; \
@@ -299,8 +308,8 @@ build-windows-portable: deps
 	else \
 		echo "$(YELLOW)No ZIP tool found. Files available at: $(BUILD_DIR)/windows/x64/runner/Release/$(NC)"; \
 	fi
-	@echo "$(GREEN)Windows Portable build completed!$(NC)"
-	@echo "Output: $(BUILD_DIR)/windows/portable/CBFileHub-Portable.zip"
+	@printf "$(GREEN)Windows Portable build completed!$(NC)\n"
+	@printf "Output: $(BUILD_DIR)/windows/portable/CBFileHub-Portable.zip\n"
 
 # Build Windows MSI Installer
 build-windows-msi:
@@ -308,7 +317,7 @@ build-windows-msi:
 
 # Build Windows MSIX Package
 build-windows-msix:
-	@echo "$(BLUE)Building Windows MSIX Package...$(NC)"
+	@printf "$(BLUE)Building Windows MSIX Package...$(NC)\n"
 	@printf "$(YELLOW)Certificate path: $(NC)"; \
 	read -r CERT_PATH; \
 	if [ -z "$$CERT_PATH" ]; then \
@@ -328,7 +337,7 @@ build-windows-msix:
 
 # Build Store-ready Windows MSIX Package
 build-windows-msix-store:
-	@echo "$(BLUE)Building Store-ready Windows MSIX Package...$(NC)"
+	@printf "$(BLUE)Building Store-ready Windows MSIX Package...$(NC)\n"
 	@printf "$(YELLOW)Certificate path: $(NC)"; \
 	read -r CERT_PATH; \
 	if [ -z "$$CERT_PATH" ]; then \
@@ -348,60 +357,60 @@ build-windows-msix-store:
 
 # Build Android APK
 build-android-apk: clean deps
-	@echo "$(BLUE)Building Android APK...$(NC)"
+	@printf "$(BLUE)Building Android APK...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) build apk --release --split-per-abi
-	@echo "$(GREEN)Android APK build completed!$(NC)"
-	@echo "Output: $(BUILD_DIR)/app/outputs/flutter-apk/"
+	@printf "$(GREEN)Android APK build completed!$(NC)\n"
+	@printf "Output: $(BUILD_DIR)/app/outputs/flutter-apk/\n"
 
 # Build Android AAB
 build-android-aab: clean deps
-	@echo "$(BLUE)Building Android AAB...$(NC)"
+	@printf "$(BLUE)Building Android AAB...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) build appbundle --release
-	@echo "$(GREEN)Android AAB build completed!$(NC)"
-	@echo "Output: $(BUILD_DIR)/app/outputs/bundle/release/"
+	@printf "$(GREEN)Android AAB build completed!$(NC)\n"
+	@printf "Output: $(BUILD_DIR)/app/outputs/bundle/release/\n"
 
 # Build Linux
 build-linux: clean deps
-	@echo "$(BLUE)Building Linux...$(NC)"
+	@printf "$(BLUE)Building Linux...$(NC)\n"
 	cd $(PROJECT_DIR) && $(FLUTTER) build linux --release
-	@echo "$(BLUE)Creating tar.gz package...$(NC)"
+	@printf "$(BLUE)Creating tar.gz package...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)/linux/portable
 	cd $(BUILD_DIR)/linux/x64/release && tar -czf ../portable/CBFileHub-Linux.tar.gz bundle/
-	@echo "$(GREEN)Linux build completed!$(NC)"
-	@echo "Output: $(BUILD_DIR)/linux/portable/CBFileHub-Linux.tar.gz"
+	@printf "$(GREEN)Linux build completed!$(NC)\n"
+	@printf "Output: $(BUILD_DIR)/linux/portable/CBFileHub-Linux.tar.gz\n"
 
 # Build macOS
 build-macos: clean deps
-	@echo "$(BLUE)Building macOS...$(NC)"
+	@printf "$(BLUE)Building macOS...$(NC)\n"
 	@if [ "$$(uname)" != "Darwin" ]; then \
 		echo "$(YELLOW)macOS builds can only be done on macOS!$(NC)"; \
 		exit 1; \
 	fi
 	cd $(PROJECT_DIR) && $(FLUTTER) build macos --release
-	@echo "$(BLUE)Creating ZIP package...$(NC)"
+	@printf "$(BLUE)Creating ZIP package...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)/macos/portable
 	cd $(BUILD_DIR)/macos/Build/Products/Release && zip -r ../../../portable/CBFileHub-macOS.zip cb_file_hub.app
-	@echo "$(GREEN)macOS build completed!$(NC)"
-	@echo "Output: $(BUILD_DIR)/macos/portable/CBFileHub-macOS.zip"
+	@printf "$(GREEN)macOS build completed!$(NC)\n"
+	@printf "Output: $(BUILD_DIR)/macos/portable/CBFileHub-macOS.zip\n"
 
 # Build iOS
 build-ios: clean deps
-	@echo "$(BLUE)Building iOS...$(NC)"
+	@printf "$(BLUE)Building iOS...$(NC)\n"
 	@if [ "$$(uname)" != "Darwin" ]; then \
 		echo "$(YELLOW)iOS builds can only be done on macOS!$(NC)"; \
 		exit 1; \
 	fi
 	cd $(PROJECT_DIR) && $(FLUTTER) build ios --release --no-codesign
-	@echo "$(GREEN)iOS build completed!$(NC)"
-	@echo "Output: $(BUILD_DIR)/ios/iphoneos/"
-	@echo "$(YELLOW)Note: You need to sign the app in Xcode before distribution$(NC)"
+	@printf "$(GREEN)iOS build completed!$(NC)\n"
+	@printf "Output: $(BUILD_DIR)/ios/iphoneos/\n"
+	@printf "$(YELLOW)Note: You need to sign the app in Xcode before distribution$(NC)\n"
 
 # Build all platforms
 build-all:
-	@echo "$(BLUE)Building for all platforms...$(NC)"
+	@printf "$(BLUE)Building for all platforms...$(NC)\n"
 	@$(MAKE) build-windows-portable || echo "$(YELLOW)Windows Portable build failed$(NC)"
 	@$(MAKE) build-windows-msi || echo "$(YELLOW)Windows MSI build failed$(NC)"
-	@echo "$(YELLOW)Skipping interactive Windows MSIX target in make all$(NC)"
+	@printf "$(YELLOW)Skipping interactive Windows MSIX target in make all$(NC)\n"
 	@$(MAKE) build-android-apk || echo "$(YELLOW)Android APK build failed$(NC)"
 	@$(MAKE) build-android-aab || echo "$(YELLOW)Android AAB build failed$(NC)"
 	@$(MAKE) build-linux || echo "$(YELLOW)Linux build failed$(NC)"
@@ -409,7 +418,7 @@ build-all:
 		$(MAKE) build-macos || echo "$(YELLOW)macOS build failed$(NC)"; \
 		$(MAKE) build-ios || echo "$(YELLOW)iOS build failed$(NC)"; \
 	fi
-	@echo "$(GREEN)All builds completed!$(NC)"
+	@printf "$(GREEN)All builds completed!$(NC)\n"
 
 # Quick build shortcuts
 windows: build-windows-portable
@@ -466,16 +475,16 @@ retag:
 # One-liner: retag a specific version tag and force-push
 # Usage: bash scripts/retag.sh v1.2.3
 retag-one:
-	@echo "$(YELLOW)Use: bash scripts/retag.sh v1.2.3$(NC)"
+	@printf "$(YELLOW)Use: bash scripts/retag.sh v1.2.3$(NC)\n"
 
 # Version management
 version:
-	@echo "$(BLUE)Current version: $(GREEN)$(VERSION)+$(BUILD_NUMBER)$(NC)"
+	@printf "$(BLUE)Current version: $(GREEN)$(VERSION)+$(BUILD_NUMBER)$(NC)\n"
 
 version-info:
-	@echo "$(BLUE)Version Name : $(GREEN)$(VERSION)$(NC)"
-	@echo "$(BLUE)Build Number : $(GREEN)$(BUILD_NUMBER)$(NC)"
-	@echo "$(BLUE)Full        : $(GREEN)$(VERSION)+$(BUILD_NUMBER)$(NC)"
+	@printf "$(BLUE)Version Name : $(GREEN)$(VERSION)$(NC)\n"
+	@printf "$(BLUE)Build Number : $(GREEN)$(BUILD_NUMBER)$(NC)\n"
+	@printf "$(BLUE)Full        : $(GREEN)$(VERSION)+$(BUILD_NUMBER)$(NC)\n"
 
 # Calculate next version
 next-patch:
@@ -494,36 +503,36 @@ update-version:
 		echo "Usage: make update-version NEW_VERSION=1.2.3"; \
 		exit 1; \
 	fi
-	@echo "$(BLUE)Updating version to $(NEW_VERSION)...$(NC)"
+	@printf "$(BLUE)Updating version to $(NEW_VERSION)...$(NC)\n"
 	@bash scripts/version.sh set-version $(NEW_VERSION)
-	@echo "$(GREEN)Version updated to $(NEW_VERSION)+1 (build_number reset)$(NC)"
+	@printf "$(GREEN)Version updated to $(NEW_VERSION)+1 (build_number reset)$(NC)\n"
 
 # Bump build number only (used by CI, and locally before manual build)
 # Runs verify first to ensure code quality before commit
 bump-build:
 	@make verify
-	@echo "$(BLUE)Bumping build number...$(NC)"
+	@printf "$(BLUE)Bumping build number...$(NC)\n"
 	@bash scripts/version.sh bump
 	@git add $(PUBSPEC)
 	@git commit -m "chore: bump build number to $$(bash scripts/version.sh build)" || echo "$(YELLOW)Nothing to commit$(NC)"
-	@echo "$(GREEN)Build number updated$(NC)"
+	@printf "$(GREEN)Build number updated$(NC)\n"
 
 # Verify code quality (format + analyze) - used by release and bump-build targets
 verify:
-	@echo "$(BLUE)Running code verification...$(NC)"
+	@printf "$(BLUE)Running code verification...$(NC)\n"
 	@cd $(PROJECT_DIR) && dart format --output=none --set-exit-if-changed . || (echo "$(RED)Format check failed. Run 'make format' and commit changes.$(NC)"; exit 1)
 	@cd $(PROJECT_DIR) && $(FLUTTER) analyze || (echo "$(RED)Analyze check failed. Fix warnings/errors and commit.$(NC)"; exit 1)
-	@echo "$(GREEN)Code verification passed!$(NC)"
+	@printf "$(GREEN)Code verification passed!$(NC)\n"
 
 verify-format:
-	@echo "$(BLUE)Running format check...$(NC)"
+	@printf "$(BLUE)Running format check...$(NC)\n"
 	@cd $(PROJECT_DIR) && dart format --output=none --set-exit-if-changed . || (echo "$(RED)Format check failed. Run 'make format'.$(NC)"; exit 1)
-	@echo "$(GREEN)Format check passed!$(NC)"
+	@printf "$(GREEN)Format check passed!$(NC)\n"
 
 verify-analyze:
-	@echo "$(BLUE)Running analyze...$(NC)"
+	@printf "$(BLUE)Running analyze...$(NC)\n"
 	@cd $(PROJECT_DIR) && $(FLUTTER) analyze || (echo "$(RED)Analyze check failed.$(NC)"; exit 1)
-	@echo "$(GREEN)Analyze passed!$(NC)"
+	@printf "$(GREEN)Analyze passed!$(NC)\n"
 
 # Release targets - bump version first, then tag
 # Tag push triggers CI which auto-bumps build_number per build
@@ -569,8 +578,8 @@ git-status:
 
 git-push:
 	@git push origin $$(git branch --show-current)
-	@echo "$(GREEN)Pushed to origin$(NC)"
+	@printf "$(GREEN)Pushed to origin$(NC)\n"
 
 git-push-tags:
 	@git push --tags
-	@echo "$(GREEN)Pushed tags to origin$(NC)"
+	@printf "$(GREEN)Pushed tags to origin$(NC)\n"
