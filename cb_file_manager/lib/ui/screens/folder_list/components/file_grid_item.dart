@@ -120,12 +120,14 @@ class _FileGridItemState extends State<FileGridItem> {
   void initState() {
     super.initState();
     // Initialize from state if available; will be refreshed from TagManager on first event
-    _fileTags = widget.state?.getTagsForFile(widget.file.path) ?? [];
-    _tagChangeSubscription = TagManager.onTagChanged.listen(_onTagChanged);
-    // Only load from TagManager when tags are actually shown.
-    // Calling getTags() when showFileTags=false was causing 50+ concurrent
-    // TagManager.initialize() calls on every grid render, saturating the DB.
-    if (widget.showFileTags) {
+    final shouldUseTags = widget.showFileTags && widget.state != null;
+    _fileTags = shouldUseTags
+        ? (widget.state?.getTagsForFile(widget.file.path) ?? [])
+        : const [];
+    // Only subscribe/load when tags can actually be displayed. Album grids pass
+    // no FolderListState, so paying per-item DB work/subscriptions is wasted.
+    if (shouldUseTags) {
+      _tagChangeSubscription = TagManager.onTagChanged.listen(_onTagChanged);
       _loadTagsFromTagManager();
     }
   }
@@ -233,97 +235,101 @@ class _FileGridItemState extends State<FileGridItem> {
             children: [
               // Icon/thumbnail area - takes most of the space
               Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Icon rendered at large size (fills available space)
-                    ThumbnailOnly(
-                      key: ValueKey('thumb-only-${widget.file.path}'),
-                      file: widget.file,
-                      iconSize: 48.0,
-                    ),
-                    // Selection/hover overlay (transparent background, colored overlay)
-                    if (overlayColor != Colors.transparent)
-                      IgnorePointer(
-                        child: Container(color: overlayColor),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Icon rendered at large size (fills available space)
+                      ThumbnailOnly(
+                        key: ValueKey('thumb-only-${widget.file.path}'),
+                        file: widget.file,
+                        iconSize: 48.0,
                       ),
-                    // Interaction layer
-                    Positioned.fill(
-                      child: OptimizedInteractionLayer(
-                        onTap: () {
-                          final keyboard = HardwareKeyboard.instance;
-                          final bool isShiftPressed = keyboard.isShiftPressed;
-                          final bool isCtrlPressed =
-                              keyboard.isControlPressed ||
-                                  keyboard.isMetaPressed;
-                          final bool isVideo =
-                              FileTypeUtils.isVideoFile(widget.file.path);
+                      // Selection/hover overlay (transparent background, colored overlay)
+                      if (overlayColor != Colors.transparent)
+                        IgnorePointer(
+                          child: Container(color: overlayColor),
+                        ),
+                      // Interaction layer
+                      Positioned.fill(
+                        child: OptimizedInteractionLayer(
+                          onTap: () {
+                            final keyboard = HardwareKeyboard.instance;
+                            final bool isShiftPressed = keyboard.isShiftPressed;
+                            final bool isCtrlPressed =
+                                keyboard.isControlPressed ||
+                                    keyboard.isMetaPressed;
+                            final bool isVideo =
+                                FileTypeUtils.isVideoFile(widget.file.path);
 
-                          if (widget.isDesktopMode) {
-                            widget.toggleFileSelection(
-                              widget.file.path,
-                              shiftSelect: isShiftPressed,
-                              ctrlSelect: isCtrlPressed,
+                            if (widget.isDesktopMode) {
+                              widget.toggleFileSelection(
+                                widget.file.path,
+                                shiftSelect: isShiftPressed,
+                                ctrlSelect: isCtrlPressed,
+                              );
+                              return;
+                            }
+
+                            if (widget.isSelectionMode) {
+                              widget.toggleFileSelection(
+                                widget.file.path,
+                                shiftSelect: isShiftPressed,
+                                ctrlSelect: isCtrlPressed,
+                              );
+                              return;
+                            }
+
+                            widget.onFileTap
+                                ?.call(widget.file as File, isVideo);
+                          },
+                          onDoubleTap: () {
+                            if (widget.isDesktopMode) {
+                              widget.toggleSelectionMode();
+                            }
+                            widget.onFileTap?.call(
+                              widget.file as File,
+                              FileTypeUtils.isVideoFile(widget.file.path),
                             );
-                            return;
-                          }
-
-                          if (widget.isSelectionMode) {
-                            widget.toggleFileSelection(
-                              widget.file.path,
-                              shiftSelect: isShiftPressed,
-                              ctrlSelect: isCtrlPressed,
-                            );
-                            return;
-                          }
-
-                          widget.onFileTap?.call(widget.file as File, isVideo);
-                        },
-                        onDoubleTap: () {
-                          if (widget.isDesktopMode) {
-                            widget.toggleSelectionMode();
-                          }
-                          widget.onFileTap?.call(
-                            widget.file as File,
-                            FileTypeUtils.isVideoFile(widget.file.path),
-                          );
-                        },
-                        onSecondaryTapUp: (details) {
-                          _showContextMenu(context, details.globalPosition);
-                        },
-                        onLongPress: widget.isDesktopMode
-                            ? () {
-                                HapticFeedback.mediumImpact();
-                                widget.toggleFileSelection(widget.file.path);
-                                if (!widget.isSelectionMode) {
-                                  widget.toggleSelectionMode();
+                          },
+                          onSecondaryTapUp: (details) {
+                            _showContextMenu(context, details.globalPosition);
+                          },
+                          onLongPress: widget.isDesktopMode
+                              ? () {
+                                  HapticFeedback.mediumImpact();
+                                  widget.toggleFileSelection(widget.file.path);
+                                  if (!widget.isSelectionMode) {
+                                    widget.toggleSelectionMode();
+                                  }
                                 }
-                              }
-                            : null,
-                        onLongPressStart: !widget.isDesktopMode
-                            ? (d) {
-                                HapticFeedback.mediumImpact();
-                                _showContextMenu(context, d.globalPosition);
-                              }
-                            : null,
+                              : null,
+                          onLongPressStart: !widget.isDesktopMode
+                              ? (d) {
+                                  HapticFeedback.mediumImpact();
+                                  _showContextMenu(context, d.globalPosition);
+                                }
+                              : null,
+                        ),
                       ),
-                    ),
-                    // Mobile: show checkmark when selected
-                    if (showAsSelected && !widget.isDesktopMode)
-                      IgnorePointer(
-                        child: Align(
-                          alignment: Alignment.topRight,
-                          child: Padding(
-                            padding: const EdgeInsets.all(4.0),
-                            child: Icon(
-                              PhosphorIconsLight.checkCircle,
-                              color: theme.colorScheme.primary,
-                              size: 24,
+                      // Mobile: show checkmark when selected
+                      if (showAsSelected && !widget.isDesktopMode)
+                        IgnorePointer(
+                          child: Align(
+                            alignment: Alignment.topRight,
+                            child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Icon(
+                                PhosphorIconsLight.checkCircle,
+                                color: theme.colorScheme.primary,
+                                size: 24,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               // Filename (and optional tags) below icon - Windows Explorer style

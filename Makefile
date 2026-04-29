@@ -78,7 +78,7 @@ help:
 	@printf "  make dev-test mode=e2e FULL_SCREENSHOTS=1  - Screenshot every action\n"
 	@printf "  make dev-test mode=e2e RERUN=1      - E2E: skip passed, rerun only FAILED tests\n"
 	@printf "  make dev-test mode=e2e TEST=Navigation  - Run only Navigation suite\n"
-	@printf "  make dev-test mode=e2e TEST=\\n"Video Thumbnails\"  - Run only Video Thumbnails suite"
+	@printf "  make dev-test mode=e2e TEST=\"Video Thumbnails\"  - Run only Video Thumbnails suite\n"
 	@printf "  make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test  - Run by file name\n"
 	@printf "  make dev-test-e2e-failed            - Shortcut: rerun only previously-failed tests\n"
 	@printf "  make dev-test mode=e2e NO_OPEN=1    - E2E without auto-opening browser\n"

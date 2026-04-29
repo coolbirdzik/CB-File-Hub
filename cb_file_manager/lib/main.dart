@@ -948,22 +948,30 @@ class _CBFileAppState extends State<CBFileApp>
         final resolvedTheme = brightness == Brightness.dark
             ? _resolveMaterialDarkTheme(themeProvider)
             : _resolveMaterialLightTheme(themeProvider);
-        if (!_useDesktopAcrylicVisuals) {
-          return shell;
-        }
-        final materialTheme = _createDesktopAcrylicMaterialBridgeTheme(
-          resolvedTheme,
-          brightness,
-          themeProvider.desktopAcrylicStrength,
+
+        // Always wrap with Material Theme so ScrollbarThemeData is available
+        // for Material Scrollbar widgets under the Fluent UI shell.
+        final materialTheme = _useDesktopAcrylicVisuals
+            ? _createDesktopAcrylicMaterialBridgeTheme(
+                resolvedTheme,
+                brightness,
+                themeProvider.desktopAcrylicStrength,
+              )
+            : resolvedTheme;
+
+        Widget result = Theme(
+          data: materialTheme,
+          child: shell,
         );
 
-        return Theme(
-          data: materialTheme,
-          child: DesktopAcrylicBackdrop(
+        if (_useDesktopAcrylicVisuals) {
+          result = DesktopAcrylicBackdrop(
             brightness: brightness,
-            child: shell,
-          ),
-        );
+            child: result,
+          );
+        }
+
+        return result;
       },
     );
   }

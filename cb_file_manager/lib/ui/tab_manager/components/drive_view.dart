@@ -351,7 +351,9 @@ class _DriveViewState extends State<DriveView> {
             : null,
         child: InkWell(
           borderRadius: BorderRadius.circular(12.0),
-          onTap: () => _openDrive(context, drive.path),
+          onTap: _isDesktopPlatform ? null : () => _openDrive(context, drive.path),
+          onDoubleTap:
+              _isDesktopPlatform ? () => _openDrive(context, drive.path) : null,
           child: Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:image/image.dart' as img;
 
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'network_service_base.dart';
 import 'i_smb_service.dart';
 import 'smb_native_bindings.dart';
@@ -628,18 +629,7 @@ class SMBService implements ISmbService {
     if (!isAvailable() || !isConnected) return null;
 
     // Check if this is an image file first
-    final ext = p.extension(tabPath).toLowerCase();
-    final supportedExtensions = [
-      '.jpg',
-      '.jpeg',
-      '.png',
-      '.gif',
-      '.bmp',
-      '.webp',
-      '.tiff',
-      '.tif'
-    ];
-    if (!supportedExtensions.contains(ext)) {
+    if (!FileTypeUtils.isImageFile(tabPath)) {
       return null;
     }
 

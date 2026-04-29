@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
@@ -96,14 +97,20 @@ class FileNavigationBloc
 
     emit(state.copyWith(isLoading: true, currentPath: Directory(event.path)));
 
+    // Gate: pause thumbnail generation while we scan/sort the file list.
+    // Thumbnails will start AFTER the listing is emitted to the UI.
+    ThumbnailLoader.setListingReady(false);
+
     if (event.path.isEmpty && Platform.isWindows) {
       emit(state.copyWith(isLoading: false, folders: [], files: []));
+      ThumbnailLoader.setListingReady(true);
       AppLogger.perf('Empty path total=${totalSw.elapsedMilliseconds}ms');
       return;
     }
 
     if (_isDrivesPath(event.path)) {
       emit(state.copyWith(isLoading: false, folders: [], files: []));
+      ThumbnailLoader.setListingReady(true);
       AppLogger.perf('Drives path total=${totalSw.elapsedMilliseconds}ms');
       return;
     }
@@ -176,6 +183,7 @@ class FileNavigationBloc
           ThumbnailLoader.updateDisplayIndexMap(
               sortedFiles.map((f) => f.path).toList());
           ThumbnailLoader.clearFileExistsCache();
+          ThumbnailLoader.setListingReady(true);
           await _directoryWatcher.startWatching(event.path);
           AppLogger.perf(
               'Complete (cached) total=${totalSw.elapsedMilliseconds}ms');
@@ -184,57 +192,35 @@ class FileNavigationBloc
       }
       AppLogger.perf('Dir listing CACHE MISS "$event.path" — scanning disk');
 
-      // Collect entities with streaming + batch emission
-      final List<Directory> folders = [];
-      final List<File> files = [];
-      final Map<String, FileStat> statsCache = {};
-      const batchSize = 50;
+      // ── Offload scan + stat + sort to background isolate ────────────────────
+      // With 5000+ files, stat + sort on the main isolate causes UI jank.
+      // compute() runs the work in a separate Dart isolate (background thread)
+      // so the Flutter UI thread stays completely free.
+      final scanResult = await compute(
+        _scanDirectoryInIsolate,
+        _ScanArgs(event.path, sortOption.name),
+      );
 
-      await for (final entity in directory.list()) {
-        try {
-          statsCache[entity.path] = await entity.stat();
-        } catch (_) {}
+      // Reconstruct typed objects from the isolate's plain path lists.
+      final folders = scanResult.folderPaths.map(Directory.new).toList();
+      final files = scanResult.filePaths.map(File.new).toList();
+      final sortedFolders = folders; // already sorted in isolate
+      final sortedFiles = files;     // already sorted in isolate
 
-        if (entity is Directory) {
-          folders.add(entity);
-        } else if (entity is File) {
-          if (!_isSkippedFile(entity.path)) {
-            files.add(entity);
-          }
-        }
-
-        if ((folders.length + files.length) % batchSize == 0) {
-          final sortedFolders = await FileSystemSorter.sortDirectories(
-            folders,
-            sortOption,
-            fileStatsCache: statsCache,
-          );
-          final sortedFiles = await FileSystemSorter.sortFiles(
-            files,
-            sortOption,
-            fileStatsCache: statsCache,
-          );
-          emit(state.copyWith(
-            isLoading: true,
-            folders: sortedFolders,
-            files: sortedFiles,
-            fileStatsCache: Map.from(statsCache),
-            sortOption: sortOption,
-          ));
-        }
+      // Rebuild FileStat cache from raw stat rows for downstream consumers
+      // (e.g. sort-on-demand, file details panel). We build it on the main
+      // isolate from the already-fetched raw rows — no extra I/O needed.
+      final statsCache = <String, FileStat>{};
+      // FileStat cannot be constructed directly; fetch only for small folders
+      // to populate the cache (large folders skip to avoid blocking).
+      if (scanResult.statRows.length <= 500) {
+        final allPaths = [...scanResult.folderPaths, ...scanResult.filePaths];
+        await Future.wait(allPaths.map((p) async {
+          try {
+            statsCache[p] = await FileStat.stat(p);
+          } catch (_) {}
+        }));
       }
-
-      // Final sort
-      final sortedFolders = await FileSystemSorter.sortDirectories(
-        folders,
-        sortOption,
-        fileStatsCache: statsCache,
-      );
-      final sortedFiles = await FileSystemSorter.sortFiles(
-        files,
-        sortOption,
-        fileStatsCache: statsCache,
-      );
 
       emit(state.copyWith(
         isLoading: false,
@@ -260,6 +246,8 @@ class FileNavigationBloc
       // Clear file-exists cache so stale entries from previous folders don't
       // persist to the new directory.
       ThumbnailLoader.clearFileExistsCache();
+      // Open the gate: file list is ready, thumbnails can start generating.
+      ThumbnailLoader.setListingReady(true);
 
       AppLogger.perf('UI ready total=${totalSw.elapsedMilliseconds}ms');
 
@@ -271,6 +259,7 @@ class FileNavigationBloc
 
       AppLogger.perf('Complete total=${totalSw.elapsedMilliseconds}ms');
     } catch (e) {
+      ThumbnailLoader.setListingReady(true);
       _emitPermissionError(emit, e, event.path);
     }
   }
@@ -302,31 +291,21 @@ class FileNavigationBloc
         return;
       }
 
-      final contents = await directory.list().toList();
       final folderSortManager = FolderSortManager();
       final folderSortOption = await _safeCall(
         () => folderSortManager.getFolderSortOption(event.path),
       );
       final sortOption = folderSortOption ?? state.sortOption;
 
-      final List<FileSystemEntity> folders = [];
-      final List<FileSystemEntity> files = [];
-      for (final entity in contents) {
-        if (entity is Directory) {
-          folders.add(entity);
-        } else if (entity is File && !_isSkippedFile(entity.path)) {
-          files.add(entity);
-        }
-      }
+      // Offload scan + stat + sort to background isolate (same as _onLoad).
+      final scanResult = await compute(
+        _scanDirectoryInIsolate,
+        _ScanArgs(event.path, sortOption.name),
+      );
 
-      final sortedFolders = await FileSystemSorter.sortDirectories(
-        folders.cast<Directory>(),
-        sortOption,
-      );
-      final sortedFiles = await FileSystemSorter.sortFiles(
-        files.cast<File>(),
-        sortOption,
-      );
+      final sortedFolders =
+          scanResult.folderPaths.map(Directory.new).toList();
+      final sortedFiles = scanResult.filePaths.map(File.new).toList();
 
       emit(state.copyWith(
         isRefreshing: false,
@@ -340,8 +319,8 @@ class FileNavigationBloc
       // Re-cache after refresh so navigating back is still instant.
       DirectoryListingCacheService.instance.storeListing(
         path: event.path,
-        files: files.cast<File>(),
-        folders: folders.cast<Directory>(),
+        files: sortedFiles,
+        folders: sortedFolders,
         stats: const {},
       );
 
@@ -640,11 +619,6 @@ class FileNavigationBloc
         path == '#trash';
   }
 
-  bool _isSkippedFile(String path) {
-    return path.endsWith('.tags') ||
-        pathlib.basename(path) == '.cbfile_config.json';
-  }
-
   bool _sortOptionNeedsStats(SortOption sortOption) {
     switch (sortOption) {
       case SortOption.dateAsc:
@@ -835,4 +809,167 @@ class FileNavigationBloc
       return null;
     }
   }
+}
+
+// ── Isolate worker ───────────────────────────────────────────────────────────
+// All scan + stat + sort work is done off the main isolate so the UI thread
+// stays free during large directory listings (5000+ files).
+
+/// Compact stat fields extracted from FileStat for isolate transfer.
+/// FileStat is not sendable across isolates, but its primitive fields are.
+/// Layout: [modified_ms, changed_ms, size, mode, type_index]
+typedef _StatRow = List<dynamic>;
+
+/// Result returned from [_scanDirectoryInIsolate].
+class _ScanResult {
+  final List<String> folderPaths;
+  final List<String> filePaths;
+  /// Maps file/folder path → [modified_ms, changed_ms, size, mode, type_index]
+  final Map<String, _StatRow> statRows;
+
+  const _ScanResult({
+    required this.folderPaths,
+    required this.filePaths,
+    required this.statRows,
+  });
+}
+
+class _ScanArgs {
+  final String path;
+  final String sortOption; // SortOption.name string
+
+  const _ScanArgs(this.path, this.sortOption);
+}
+
+/// Top-level function — runs in a separate isolate.
+/// Scans [args.path], stats all entities in parallel chunks, sorts them
+/// by [args.sortOption] name, and returns already-sorted path lists + raw stats.
+/// Doing all this off the main isolate prevents UI jank on large directories.
+Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
+  const statChunkSize = 64;
+
+  final dir = Directory(args.path);
+  final folderPaths = <String>[];
+  final filePaths = <String>[];
+
+  await for (final entity in dir.list(followLinks: false)) {
+    final p = entity.path;
+    final name = p.contains(Platform.pathSeparator)
+        ? p.substring(p.lastIndexOf(Platform.pathSeparator) + 1)
+        : p;
+    if (entity is Directory) {
+      folderPaths.add(p);
+    } else if (entity is File) {
+      final skip = p.endsWith('.tags') || name == '.cbfile_config.json';
+      if (!skip) filePaths.add(p);
+    }
+  }
+
+  final allPaths = [...folderPaths, ...filePaths];
+  final statRows = <String, _StatRow>{};
+
+  for (var i = 0; i < allPaths.length; i += statChunkSize) {
+    final chunk = allPaths.skip(i).take(statChunkSize).toList();
+    final results = await Future.wait(
+      chunk.map((p) async {
+        try {
+          final s = await FileStat.stat(p);
+          return MapEntry(p, <dynamic>[
+            s.modified.millisecondsSinceEpoch,  // [0] modified
+            s.changed.millisecondsSinceEpoch,   // [1] changed (creation on Win)
+            s.size,                              // [2] size
+            s.mode,                              // [3] mode
+          ]);
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    for (final e in results) {
+      if (e != null) statRows[e.key] = e.value;
+    }
+  }
+
+  // Sort inside the isolate so the main thread just receives ready-to-use lists.
+  int cmpName(String a, String b) {
+    final aName = a.contains(Platform.pathSeparator)
+        ? a.substring(a.lastIndexOf(Platform.pathSeparator) + 1).toLowerCase()
+        : a.toLowerCase();
+    final bName = b.contains(Platform.pathSeparator)
+        ? b.substring(b.lastIndexOf(Platform.pathSeparator) + 1).toLowerCase()
+        : b.toLowerCase();
+    return aName.compareTo(bName);
+  }
+
+  int cmpDate(String a, String b, {bool ascending = true}) {
+    final aMs = (statRows[a]?[0] as int?) ?? 0;
+    final bMs = (statRows[b]?[0] as int?) ?? 0;
+    return ascending ? aMs.compareTo(bMs) : bMs.compareTo(aMs);
+  }
+
+  int cmpSize(String a, String b, {bool ascending = true}) {
+    final aSize = (statRows[a]?[2] as int?) ?? 0;
+    final bSize = (statRows[b]?[2] as int?) ?? 0;
+    return ascending ? aSize.compareTo(bSize) : bSize.compareTo(aSize);
+  }
+
+  int cmpExt(String a, String b, {bool ascending = true}) {
+    String ext(String p) {
+      final dot = p.lastIndexOf('.');
+      return dot >= 0 ? p.substring(dot).toLowerCase() : '';
+    }
+    final cmp = ext(a).compareTo(ext(b));
+    return ascending ? cmp : -cmp;
+  }
+
+  Comparator<String> comparator;
+  switch (args.sortOption) {
+    case 'nameDesc':
+      comparator = (a, b) => -cmpName(a, b);
+      break;
+    case 'dateAsc':
+      comparator = (a, b) => cmpDate(a, b, ascending: true);
+      break;
+    case 'dateDesc':
+      comparator = (a, b) => cmpDate(a, b, ascending: false);
+      break;
+    case 'dateCreatedAsc':
+      comparator = (a, b) {
+        final aMs = (statRows[a]?[1] as int?) ?? 0;
+        final bMs = (statRows[b]?[1] as int?) ?? 0;
+        return aMs.compareTo(bMs);
+      };
+      break;
+    case 'dateCreatedDesc':
+      comparator = (a, b) {
+        final aMs = (statRows[a]?[1] as int?) ?? 0;
+        final bMs = (statRows[b]?[1] as int?) ?? 0;
+        return bMs.compareTo(aMs);
+      };
+      break;
+    case 'sizeAsc':
+      comparator = (a, b) => cmpSize(a, b, ascending: true);
+      break;
+    case 'sizeDesc':
+      comparator = (a, b) => cmpSize(a, b, ascending: false);
+      break;
+    case 'extensionAsc':
+      comparator = (a, b) => cmpExt(a, b, ascending: true);
+      break;
+    case 'extensionDesc':
+      comparator = (a, b) => cmpExt(a, b, ascending: false);
+      break;
+    default: // nameAsc and all others
+      comparator = cmpName;
+      break;
+  }
+
+  folderPaths.sort(comparator);
+  filePaths.sort(comparator);
+
+  return _ScanResult(
+    folderPaths: folderPaths,
+    filePaths: filePaths,
+    statRows: statRows,
+  );
 }

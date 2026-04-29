@@ -1,13 +1,11 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
-import 'package:cb_file_manager/helpers/media/thumbnail_helper.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:flutter/services.dart';
-import '../../components/video/video_player/video_player.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -33,13 +31,20 @@ class FileDetailsScreen extends StatefulWidget {
 
 class _FileDetailsScreenState extends State<FileDetailsScreen> {
   late Future<FileStat> _fileStatFuture;
-  bool _videoPlayerReady = false;
   bool _inAndroidPip = false;
+  bool _showTagSection = false;
 
   @override
   void initState() {
     super.initState();
     _fileStatFuture = widget.file.stat();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _showTagSection = true;
+        });
+      }
+    });
     // Listen PiP changes to hide BaseScreen AppBar when in PiP
     const channel = MethodChannel('cb_file_manager/pip');
     channel.setMethodCallHandler((call) async {
@@ -78,10 +83,11 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context)!;
     final bool isImage = FileTypeUtils.isImageFile(widget.file.path);
-    final bool isVideo = FileTypeUtils.isVideoFile(widget.file.path);
     final bool isAudio = FileTypeUtils.isAudioFile(widget.file.path);
 
     final theme = Theme.of(context);
+    final bool isDesktop =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     final Color bgColor = theme.colorScheme.surface;
     final Color cardColor = theme.cardColor;
     final Color textColor = theme.colorScheme.onSurface;
@@ -114,168 +120,186 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
       // When in PiP, avoid extra paddings/margins that could be captured.
       body: Container(
         color: bgColor,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // File preview section with hero animation
-              if (isImage || isVideo || isAudio)
-                Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                  ),
-                  child: Column(
-                    children: [
-                      if (isImage) _buildImagePreview(),
-                      if (isVideo) _buildVideoPreview(),
-                      if (isAudio) _buildAudioPreview(),
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: 16),
-
-              // Basic file info card
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  elevation: 0,
-                  color: cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: (isDesktop && !_inAndroidPip)
+                ? MediaQuery.of(context).padding.top + kToolbarHeight
+                : 0,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // File preview section with hero animation
+                if (isImage || isAudio)
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.black,
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeaderSection(),
-                        const SizedBox(height: 16),
-                        _buildFileDetails(textColor, secondaryTextColor),
+                        if (isImage) _buildImagePreview(),
+                        if (isAudio) _buildAudioPreview(),
                       ],
                     ),
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Tags section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  elevation: 0,
-                  color: cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                // Basic file info card
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Card(
+                    elevation: 0,
+                    color: cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeaderSection(),
+                          const SizedBox(height: 16),
+                          _buildFileDetails(textColor, secondaryTextColor),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              PhosphorIconsLight.bookmark,
-                              color: textColor,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              localizations.tags,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                ),
+
+                const SizedBox(height: 16),
+
+                // Tags section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Card(
+                    elevation: 0,
+                    color: cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                PhosphorIconsLight.bookmark,
                                 color: textColor,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                localizations.tags,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Use the common tag management component
+                          if (_showTagSection)
+                            TagManagementSection(
+                              filePath: widget.file.path,
+                              showFileTagsHeader: false,
+                              onTagsUpdated: () {
+                                // Optional callback if needed
+                              },
+                            )
+                          else
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Use the common tag management component
-                        TagManagementSection(
-                          filePath: widget.file.path,
-                          showFileTagsHeader: false,
-                          onTagsUpdated: () {
-                            // Optional callback if needed
-                          },
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Actions section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Card(
-                  elevation: 0,
-                  color: cardColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: Icon(PhosphorIconsLight.arrowSquareOut,
-                              color: textColor),
-                          title: Text(localizations.openWith,
-                              style: TextStyle(color: textColor)),
-                          onTap: () => _showOpenWithDialog(),
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: Icon(PhosphorIconsLight.squaresFour,
-                              color: textColor),
-                          title: Text(localizations.chooseDefaultApp,
-                              style: TextStyle(color: textColor)),
-                          onTap: () => _showOpenWithDialog(
-                            saveAsDefaultOnSelect: true,
+                // Actions section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Card(
+                    elevation: 0,
+                    color: cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: Icon(PhosphorIconsLight.arrowSquareOut,
+                                color: textColor),
+                            title: Text(localizations.openWith,
+                                style: TextStyle(color: textColor)),
+                            onTap: () => _showOpenWithDialog(),
                           ),
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: Icon(PhosphorIconsLight.fileText,
-                              color: textColor),
-                          title: Text(localizations.createCopy,
-                              style: TextStyle(color: textColor)),
-                          onTap: () {
-                            // Make a copy functionality
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(localizations.operationFailed)),
-                            );
-                          },
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: Icon(PhosphorIconsLight.trash,
-                              color: theme.colorScheme.error),
-                          title: Text(localizations.deleteFile,
-                              style: TextStyle(color: theme.colorScheme.error)),
-                          onTap: () {
-                            // Delete functionality
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(localizations.operationFailed)),
-                            );
-                          },
-                        ),
-                      ],
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: Icon(PhosphorIconsLight.squaresFour,
+                                color: textColor),
+                            title: Text(localizations.chooseDefaultApp,
+                                style: TextStyle(color: textColor)),
+                            onTap: () => _showOpenWithDialog(
+                              saveAsDefaultOnSelect: true,
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: Icon(PhosphorIconsLight.fileText,
+                                color: textColor),
+                            title: Text(localizations.createCopy,
+                                style: TextStyle(color: textColor)),
+                            onTap: () {
+                              // Make a copy functionality
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(localizations.operationFailed)),
+                              );
+                            },
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: Icon(PhosphorIconsLight.trash,
+                                color: theme.colorScheme.error),
+                            title: Text(localizations.deleteFile,
+                                style: TextStyle(color: theme.colorScheme.error)),
+                            onTap: () {
+                              // Delete functionality
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content: Text(localizations.operationFailed)),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -386,71 +410,6 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
     );
   }
 
-  Widget _buildVideoPreview() {
-    final localizations = AppLocalizations.of(context)!;
-    return Container(
-      width: double.infinity,
-      height: 300,
-      color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Show thumbnail first
-          if (!_videoPlayerReady)
-            Hero(
-              tag: widget.file.path,
-              child: ThumbnailHelper.buildVideoThumbnail(
-                videoPath: widget.file.path,
-                width: double.infinity,
-                height: 300,
-                isVisible: true,
-                onThumbnailGenerated: (_) {},
-                fallbackBuilder: () => Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(PhosphorIconsLight.videoCamera,
-                          size: 64, color: Colors.white54),
-                      const SizedBox(height: 8),
-                      Text(
-                        localizations.loadingVideo,
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // Video player with opacity animation based on ready state
-          AnimatedOpacity(
-            opacity: _videoPlayerReady ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 300),
-            child: VideoPlayer.file(
-              file: widget.file,
-              showControls: true,
-              allowFullScreen: true,
-              allowMuting: true,
-              onInitialized: () {
-                setState(() {
-                  _videoPlayerReady = true;
-                });
-              },
-              onError: (errorMessage) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content:
-                        Text('${localizations.operationFailed}: $errorMessage'),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAudioPreview() {
     final localizations = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
@@ -541,9 +500,22 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
         final stat = snapshot.data!;
         final fileSize = FormatUtils.formatFileSizeExact(stat.size);
         final formattedDate = stat.modified.toString().split('.')[0];
+        final extension = FileTypeUtils.getFileExtension(widget.file.path);
+        final localizedFileType =
+            FileTypeUtils.getFileTypeLabel(context, extension);
+        final extensionLabel = extension.isEmpty
+            ? ''
+            : ' (${extension.substring(1).toUpperCase()})';
 
         return Column(
           children: [
+            _buildDetailRow(localizations.fileName, pathlib.basename(widget.file.path),
+                PhosphorIconsLight.fileText, textColor, secondaryTextColor),
+            const Divider(height: 24),
+            _buildDetailRow(localizations.fileType,
+                '$localizedFileType$extensionLabel', PhosphorIconsLight.tag,
+                textColor, secondaryTextColor),
+            const Divider(height: 24),
             _buildDetailRow(localizations.fileSize, fileSize,
                 PhosphorIconsLight.hardDrives, textColor, secondaryTextColor),
             const Divider(height: 24),

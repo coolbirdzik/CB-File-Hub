@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:path/path.dart' as path;
 import '../models/objectbox/album.dart';
 import '../models/objectbox/album_config.dart';
@@ -234,32 +235,12 @@ class AlbumFileScanner {
 
   /// Check if file is image
   static bool _isImageFile(String extension) {
-    const imageExtensions = {
-      '.jpg',
-      '.jpeg',
-      '.png',
-      '.gif',
-      '.bmp',
-      '.webp',
-      '.tiff',
-      '.tif'
-    };
-    return imageExtensions.contains(extension);
+    return FileTypeRegistry.isCategory(extension, FileCategory.image);
   }
 
   /// Check if file is video
   static bool _isVideoFile(String extension) {
-    const videoExtensions = {
-      '.mp4',
-      '.avi',
-      '.mov',
-      '.wmv',
-      '.flv',
-      '.webm',
-      '.mkv',
-      '.m4v'
-    };
-    return videoExtensions.contains(extension);
+    return FileTypeRegistry.isCategory(extension, FileCategory.video);
   }
 
   /// Clear cache for album

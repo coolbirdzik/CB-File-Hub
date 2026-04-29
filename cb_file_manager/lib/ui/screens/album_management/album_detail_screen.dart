@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:async';
-import 'dart:collection';
 import 'dart:math' show min, max;
 
 import 'package:flutter/material.dart';
@@ -24,20 +23,21 @@ import 'package:cb_file_manager/services/album_auto_rule_service.dart';
 import 'auto_rules_screen.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:cb_file_manager/ui/screens/folder_list/components/file_grid_item.dart';
-import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
-import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
+import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 
 // Selection BLoC + drag-selection
 import 'package:cb_file_manager/bloc/selection/selection_bloc.dart';
 import 'package:cb_file_manager/bloc/selection/selection_event.dart';
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'album_drag_selection_controller.dart';
+import 'album_image_tile.dart';
+import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Album album;
@@ -66,14 +66,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   bool _isShuffled = false;
   late UserPreferences _preferences;
 
-  // ── Scroll-aware preloading ──────────────────────────────
+  // ── Grid scroll state ─────────────────────────────────────────────────────
   final ScrollController _gridScrollController = ScrollController();
-  static const int _preloadBatchSize = 6;
-  static const int _preloadAheadItems = 24;
-  static const int _preloadBehindItems = 8;
-  bool _isPreloading = false;
-  final ListQueue<String> _preloadQueue = ListQueue<String>();
-  final Set<String> _queuedPreloadPaths = <String>{};
 
   // ── Smart album state ──────────────────────────────────────────────────────
   bool _isSmartAlbum = false;
@@ -116,8 +110,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     _preferences = UserPreferences.instance;
     _loadGridPreference();
     _initSmartStateAndLoad();
-    _gridScrollController.addListener(_onGridScroll);
-
     _albumUpdateSub = AlbumService.instance.albumUpdatedStream
         .where((id) => id == widget.album.id)
         .listen((_) => _scheduleAlbumReload());
@@ -131,9 +123,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void dispose() {
     _selectionBloc.close();
     _dragController.dispose();
-    _gridScrollController
-      ..removeListener(_onGridScroll)
-      ..dispose();
+    _gridScrollController.dispose();
     _albumUpdateSub?.cancel();
     _progressSub?.cancel();
     _refreshDebounce?.cancel();
@@ -337,16 +327,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   Future<void> _loadAlbumFiles({bool initial = false}) async {
     if (initial) setState(() => _isLoading = true);
+    // Gate: pause thumbnail work while loading album file list.
+    ThumbnailLoader.setListingReady(false);
     try {
       if (_isSmartAlbum) {
-        // For smart albums, only run a full scan if we don't have cached files yet.
-        // SmartAlbumService.getCachedFiles already returns in-memory cached
-        // results (instant) — no need to scan again on revisit.
         if (_cachedFilesLoaded) {
           if (mounted) setState(() => _isLoading = false);
+          ThumbnailLoader.setListingReady(true);
           return;
         }
         await _scanSmartAlbumImages();
+        // Gate opened at end of _scanSmartAlbumImages.
         return;
       }
       final albumFiles = await _albumService.getAlbumFiles(widget.album.id);
@@ -361,156 +352,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           _applyFiltersAndOrder();
           _isLoading = false;
         });
-        _preloadVideoThumbnails();
-        _preloadPhotoThumbnails();
+        _updateThumbnailPriorityMap();
       }
+      ThumbnailLoader.setListingReady(true);
     } catch (e) {
       debugPrint('Error loading album files: $e');
       if (mounted) setState(() => _isLoading = false);
+      ThumbnailLoader.setListingReady(true);
     }
-  }
-
-  Future<void> _preloadVideoThumbnails() async {
-    try {
-      final videoFiles = _imageFiles.where((file) {
-        final ext = pathlib.extension(file.path).toLowerCase();
-        return FileTypeRegistry.getCategory(ext) == FileCategory.video;
-      }).toList();
-      if (videoFiles.isEmpty) return;
-      const batchSize = 5;
-      for (var i = 0; i < videoFiles.length; i += batchSize) {
-        final batch = videoFiles.skip(i).take(batchSize).toList();
-        await Future.wait(batch.map((file) =>
-            VideoThumbnailHelper.generateThumbnail(file.path, isPriority: false)
-                .catchError((_) => null)));
-        if (i + batchSize < videoFiles.length) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-      }
-    } catch (_) {}
-  }
-
-  /// Pre-warm Flutter’s ImageCache for the first [count] images using the
-  /// native platform JPEG decoder (ResizeImage at 512 px).
-  ///
-  /// [precacheImage] runs the decode in a background isolate and puts the
-  /// result into Flutter’s ImageCache, so when the grid renders those items
-  /// for the first time there is zero decode work on the raster thread.
-  // ── Scroll-aware viewport-priority preloading ───────────────────────
-
-  /// Build an index list in the order the USER is most likely to need:
-  /// 1) currently visible items
-  /// 2) items just below the viewport
-  /// 3) a few items above the viewport (for quick reverse scroll)
-  ///
-  /// This fixes the old behaviour where preloading ran linearly from the file
-  /// list and wasted work on items far away from the current scroll position.
-  List<int> _buildViewportPriorityIndices() {
-    if (_imageFiles.isEmpty) return const [];
-
-    final width = MediaQuery.of(context).size.width;
-    final cols = GridZoomConstraints.columnCountForZoom(_gridZoomLevel, width);
-    const spacing = GridZoomConstraints.fileGridSpacing;
-    final usableWidth = width - (spacing * 2) - (spacing * (cols - 1));
-    final itemExtent = cols > 0 ? (usableWidth / cols) : width;
-    final rowExtent = itemExtent + spacing;
-
-    final viewportHeight = _gridScrollController.hasClients
-        ? _gridScrollController.position.viewportDimension
-        : MediaQuery.of(context).size.height;
-    final scrollOffset =
-        _gridScrollController.hasClients ? _gridScrollController.offset : 0.0;
-
-    final firstVisibleRow =
-        (scrollOffset / rowExtent).floor().clamp(0, 1 << 20);
-    final visibleRows = (viewportHeight / rowExtent).ceil() + 1;
-
-    final visibleStart = (firstVisibleRow * cols).clamp(0, _imageFiles.length);
-    final visibleEnd =
-        ((firstVisibleRow + visibleRows) * cols).clamp(0, _imageFiles.length);
-
-    final aheadEnd =
-        (visibleEnd + _preloadAheadItems).clamp(0, _imageFiles.length);
-    final behindStart =
-        (visibleStart - _preloadBehindItems).clamp(0, _imageFiles.length);
-
-    final ordered = <int>[];
-    // Visible first
-    for (int i = visibleStart; i < visibleEnd; i++) {
-      ordered.add(i);
-    }
-    // Then below viewport
-    for (int i = visibleEnd; i < aheadEnd; i++) {
-      ordered.add(i);
-    }
-    // Then slightly above viewport
-    for (int i = behindStart; i < visibleStart; i++) {
-      ordered.add(i);
-    }
-    return ordered;
-  }
-
-  void _enqueueViewportPreload() {
-    if (!mounted || _imageFiles.isEmpty) return;
-    final ordered = _buildViewportPriorityIndices();
-    for (final index in ordered) {
-      final file = _imageFiles[index];
-      final ext = pathlib.extension(file.path).toLowerCase();
-      if (FileTypeRegistry.getCategory(ext) != FileCategory.image) continue;
-      if (_queuedPreloadPaths.add(file.path)) {
-        _preloadQueue.add(file.path);
-      }
-    }
-    if (!_isPreloading) {
-      unawaited(_drainPreloadQueue());
-    }
-  }
-
-  void _onGridScroll() {
-    // IMPORTANT: do NOT return when _isPreloading=true.
-    // The queue must keep reprioritizing around the USER'S current viewport.
-    if (!mounted) return;
-    _enqueueViewportPreload();
-  }
-
-  Future<void> _drainPreloadQueue() async {
-    if (_isPreloading || !mounted) return;
-    _isPreloading = true;
-    try {
-      while (_preloadQueue.isNotEmpty && mounted) {
-        final batch = <String>[];
-        while (batch.length < _preloadBatchSize && _preloadQueue.isNotEmpty) {
-          batch.add(_preloadQueue.removeFirst());
-        }
-
-        await Future.wait(
-          batch.map(
-            (path) => precacheImage(
-              ResizeImage(
-                FileImage(File(path)),
-                width: 512,
-                allowUpscaling: false,
-                policy: ResizeImagePolicy.fit,
-              ),
-              context,
-            ).catchError((_) {}),
-          ),
-        );
-
-        // Allow the event loop / raster thread to breathe.
-        await Future.delayed(const Duration(milliseconds: 16));
-      }
-    } finally {
-      if (mounted) _isPreloading = false;
-    }
-  }
-
-  /// Public entry-point called after album files are loaded / updated.
-  /// Rebuild the priority queue from the CURRENT viewport.
-  Future<void> _preloadPhotoThumbnails() async {
-    _preloadQueue.clear();
-    _queuedPreloadPaths.clear();
-    _enqueueViewportPreload();
   }
 
   Future<void> _scanSmartAlbumImages() async {
@@ -550,28 +399,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
     int matched = 0;
     int processed = 0;
-    final mediaExts = {
-      '.jpg',
-      '.jpeg',
-      '.png',
-      '.gif',
-      '.bmp',
-      '.webp',
-      '.tif',
-      '.tiff',
-      '.mp4',
-      '.mkv',
-      '.avi',
-      '.mov',
-      '.wmv',
-      '.flv',
-      '.webm',
-      '.m4v',
-      '.3gp',
-      '.ts',
-      '.mts',
-      '.m2ts',
-    };
 
     Future<void> scanDir(Directory dir) async {
       try {
@@ -580,8 +407,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           if (_cancelSmartScan) return;
           if (entity is File) {
             processed++;
-            final ext = pathlib.extension(entity.path).toLowerCase();
-            if (mediaExts.contains(ext)) {
+            if (FileTypeUtils.isMediaFile(entity.path)) {
               final name = pathlib.basename(entity.path);
               if (rules.isEmpty || rules.any((r) => r.matches(name))) {
                 matched++;
@@ -594,9 +420,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       _applyFiltersAndOrder();
                       _progressStatus = 'Scanning... found $matched';
                     });
-                    // Incrementally preload newly discovered images so
-                    // they appear in the grid already decoded.
-                    if (matched % 20 == 0) _preloadPhotoThumbnails();
                   }
                 }
               }
@@ -620,8 +443,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         _isBackgroundProcessing = false;
         _progressStatus = 'Completed! Found $matched files';
       });
-      _preloadVideoThumbnails();
-      _preloadPhotoThumbnails();
+      _updateThumbnailPriorityMap();
+      // Open the gate: scan done, thumbnails can start generating.
+      ThumbnailLoader.setListingReady(true);
     }
 
     try {
@@ -659,8 +483,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             _isLoading = false;
           });
           _cachedFilesLoaded = true;
-          _preloadVideoThumbnails();
-          _preloadPhotoThumbnails();
+          _updateThumbnailPriorityMap();
+          ThumbnailLoader.setListingReady(true);
         }
       }
     } catch (_) {}
@@ -799,8 +623,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     }
     if (_isShuffled) files.shuffle();
     _imageFiles = files;
+    _updateThumbnailPriorityMap();
     // Clear stale item positions whenever the file list changes.
     _dragController.clearItemPositions();
+  }
+
+  void _updateThumbnailPriorityMap() {
+    ThumbnailLoader.updateDisplayIndexMap(
+      _imageFiles.map((file) => file.path).toList(growable: false),
+    );
   }
 
   void _toggleShuffle() {
@@ -1357,7 +1188,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      child: _AlbumStatusBar(),
+                      child: SlimProgressBar(),
                     ),
                 ],
               ),
@@ -1396,10 +1227,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           padding: const EdgeInsets.all(GridZoomConstraints.fileGridSpacing),
           // Match file-browser GridView settings for consistent perf.
           physics: const ClampingScrollPhysics(),
-          cacheExtent: isDesktop ? 600 : 400,
-          // Keep thumbnail item states alive while near the viewport so
-          // scrolling back does not recreate them immediately.
-          addAutomaticKeepAlives: true,
+          cacheExtent: isDesktop ? 300 : 200,
+          // Let off-screen album item states dispose promptly. Thumbnail image
+          // cache already handles reuse; keeping widget states alive adds RAM
+          // and per-item stream/subscription pressure in large albums.
+          addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1437,68 +1269,44 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     } catch (_) {}
                   });
                 }
-                return RepaintBoundary(
-                  child: FileGridItem(
-                    key: ValueKey('album-grid-${file.path}'),
-                    file: file,
-                    isSelected: isSelected,
-                    isSelectionMode: inSel,
-                    isDesktopMode: isDesktop,
-                    toggleFileSelection: (path,
-                        {shiftSelect = false, ctrlSelect = false}) {
-                      _toggleFileSelection(path,
-                          shiftSelect: shiftSelect, ctrlSelect: ctrlSelect);
-                    },
-                    toggleSelectionMode: () {
-                      // FileGridItem calls this from onDoubleTap (desktop)
-                      // immediately before onFileTap. Changing BLoC state here
-                      // would emit a new SelectionState mid-animation and force
-                      // a full BlocBuilder rebuild while the route transition is
-                      // playing — causing visible jank on the way into the viewer
-                      // AND on return. We intentionally do nothing here:
-                      //   • Selection persists while viewing (correct UX for album)
-                      //   • No BLoC emission → no grid rebuild during animation
-                      //   • User exits selection via Escape / Cancel button
-                    },
-                    onFileTap: (file, isVideo) {
-                      // FileGridItem already ensures onFileTap is only called
-                      // at the right time:
-                      //   desktop  → double-click only (single-click = select)
-                      //   mobile   → single-click only when NOT in selection mode
-                      // rootNavigator: true → animation chạy ở ROOT overlay,
-                      // album screen KHÔNG trong animation path → build() không
-                      // bị gọi mỗi frame.
-                      //
-                      // opaque: false → Flutter BẮT BUỘC giữ album screen trong
-                      // compositing chain ngay cả khi bị che → GPU textures của
-                      // thumbnail KHÔNG bị evict → không re-rasterize khi back.
-                      // (ImageViewerScreen có backgroundColor: Colors.black nên
-                      // album screen không nhìn thấy được qua viewer.)
-                      Navigator.of(context, rootNavigator: true).push(
-                        PageRouteBuilder(
-                          opaque: false,
-                          barrierColor: Colors.black,
-                          fullscreenDialog: true,
-                          pageBuilder: (_, __, ___) => ImageViewerScreen(
-                            file: file,
-                            imageFiles: _imageFiles,
-                            initialIndex: index,
-                          ),
-                          transitionsBuilder: (_, animation, __, child) =>
-                              FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: child,
-                          ),
-                          transitionDuration: const Duration(milliseconds: 180),
-                          reverseTransitionDuration:
-                              const Duration(milliseconds: 150),
+                return AlbumImageTile(
+                  key: ValueKey('album-grid-${file.path}'),
+                  file: file,
+                  isSelected: isSelected,
+                  isSelectionMode: inSel,
+                  isDesktopMode: isDesktop,
+                  onSelect: ({shiftSelect = false, ctrlSelect = false}) {
+                    _toggleFileSelection(
+                      file.path,
+                      shiftSelect: shiftSelect,
+                      ctrlSelect: ctrlSelect,
+                    );
+                  },
+                  onOpen: () {
+                    Navigator.of(context, rootNavigator: true).push(
+                      PageRouteBuilder(
+                        opaque: false,
+                        barrierColor: Colors.black,
+                        fullscreenDialog: true,
+                        pageBuilder: (_, __, ___) => ImageViewerScreen(
+                          file: file,
+                          imageFiles: _imageFiles,
+                          initialIndex: index,
                         ),
-                      );
-                    },
-                  ),
+                        transitionsBuilder: (_, animation, __, child) =>
+                            FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        ),
+                        transitionDuration: const Duration(milliseconds: 180),
+                        reverseTransitionDuration:
+                            const Duration(milliseconds: 150),
+                      ),
+                    );
+                  },
                 );
               },
             );
@@ -1552,27 +1360,4 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   }
 }
 
-/// Slim 3px indeterminate progress bar overlaid at the bottom of the screen.
-/// Matches the `_RefreshStatusBar` style used in the main folder list screen
-/// so all loading indicators are visually consistent.
-class _AlbumStatusBar extends StatelessWidget {
-  const _AlbumStatusBar();
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 3,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-      ),
-      child: LinearProgressIndicator(
-        backgroundColor: Colors.transparent,
-        valueColor: AlwaysStoppedAnimation<Color>(
-          colorScheme.primary.withValues(alpha: 0.8),
-        ),
-        minHeight: 3,
-      ),
-    );
-  }
-}

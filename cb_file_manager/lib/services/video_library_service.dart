@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart' as sqflite;
@@ -509,27 +510,9 @@ class VideoLibraryService {
         taggedFiles = allTaggedFiles.toList(growable: false);
       }
 
-      const videoExtensions = <String>{
-        '.mp4',
-        '.avi',
-        '.mov',
-        '.mkv',
-        '.webm',
-        '.wmv',
-        '.flv',
-        '.m4v',
-        '.mpg',
-        '.mpeg',
-        '.3gp',
-        '.ogv',
-      };
-
       return taggedFiles
           .whereType<File>()
-          .where(
-            (file) => videoExtensions
-                .contains(path.extension(file.path).toLowerCase()),
-          )
+          .where((file) => FileTypeUtils.isVideoFile(file.path))
           .map((file) => file.path)
           .toList(growable: false);
     } catch (error) {

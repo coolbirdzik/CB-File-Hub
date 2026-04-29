@@ -18,7 +18,12 @@ import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
 class CacheManagementScreen extends StatefulWidget {
-  const CacheManagementScreen({Key? key}) : super(key: key);
+  const CacheManagementScreen({
+    Key? key,
+    this.embedded = false,
+  }) : super(key: key);
+
+  final bool embedded;
 
   @override
   State<CacheManagementScreen> createState() => _CacheManagementScreenState();
@@ -261,7 +266,51 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final totalBytes = _totalBytes;
+
+    if (widget.embedded) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Cache Management',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                _buildAcrylicIconButton(
+                  theme: theme,
+                  tooltip: AppLocalizations.of(context)?.refreshCacheInfo ??
+                      'Refresh',
+                  onPressed: _isLoading ? null : _load,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(PhosphorIconsLight.arrowsClockwise,
+                          size: 18),
+                ),
+                const SizedBox(width: 8),
+                _buildAcrylicIconButton(
+                  theme: theme,
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(PhosphorIconsLight.x, size: 18),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(child: _buildBody(theme)),
+        ],
+      );
+    }
 
     return BaseScreen(
       title: 'Cache Management',
@@ -278,37 +327,76 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
               : const Icon(PhosphorIconsLight.arrowsClockwise),
         ),
       ],
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildHeroOverview(theme),
-          const SizedBox(height: 16),
-          _buildRootLocationCard(theme),
-          const SizedBox(height: 16),
-          ..._entries.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildEntryCard(theme, e, totalBytes),
-              )),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _isClearingAll ? null : _clearAll,
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.errorContainer,
-              foregroundColor: theme.colorScheme.onErrorContainer,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            icon: _isClearingAll
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(PhosphorIconsLight.trash),
-            label: const Text('Clear all cache'),
+      body: _buildBody(theme),
+    );
+  }
+
+  Widget _buildAcrylicIconButton({
+    required ThemeData theme,
+    required String tooltip,
+    required VoidCallback? onPressed,
+    required Widget icon,
+  }) {
+    final isEnabled = onPressed != null;
+
+    return Tooltip(
+      message: tooltip,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(
+            alpha: isEnabled ? 0.42 : 0.24,
           ),
-          const SizedBox(height: 24),
-        ],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.12),
+          ),
+        ),
+        child: IconButton(
+          onPressed: onPressed,
+          icon: icon,
+          constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+          splashRadius: 18,
+          color: isEnabled
+              ? theme.colorScheme.onSurface
+              : theme.colorScheme.onSurface.withValues(alpha: 0.45),
+        ),
       ),
+    );
+  }
+
+  Widget _buildBody(ThemeData theme) {
+    final totalBytes = _totalBytes;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildHeroOverview(theme),
+        const SizedBox(height: 16),
+        _buildRootLocationCard(theme),
+        const SizedBox(height: 16),
+        ..._entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildEntryCard(theme, e, totalBytes),
+            )),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _isClearingAll ? null : _clearAll,
+          style: FilledButton.styleFrom(
+            backgroundColor: theme.colorScheme.errorContainer,
+            foregroundColor: theme.colorScheme.onErrorContainer,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: _isClearingAll
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(PhosphorIconsLight.trash),
+          label: const Text('Clear all cache'),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 

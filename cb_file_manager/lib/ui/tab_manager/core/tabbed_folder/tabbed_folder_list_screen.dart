@@ -58,6 +58,7 @@ import 'package:cb_file_manager/ui/controllers/dialog_manager.dart';
 import 'package:cb_file_manager/ui/widgets/folder_content_builder.dart';
 import 'package:cb_file_manager/ui/widgets/refreshable_file_list_view.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
 
 part 'tabbed_folder_list_screen.mobile_actions.dart';
 part 'tabbed_folder_list_screen.refresh.dart';
@@ -1155,7 +1156,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               left: 0,
               right: 0,
               bottom: 0,
-              child: _RefreshStatusBar(),
+              child: SlimProgressBar(),
             ),
         ],
       );
@@ -1205,7 +1206,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             left: 0,
             right: 0,
             bottom: 0,
-            child: _RefreshStatusBar(),
+            child: SlimProgressBar(),
           ),
       ],
     );
@@ -1513,26 +1514,4 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 ///
 /// It overlays the file list via a [Positioned] widget inside a [Stack],
 /// so the existing file list layout is never affected.
-class _RefreshStatusBar extends StatelessWidget {
-  const _RefreshStatusBar();
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      height: 3,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-      ),
-      child: LinearProgressIndicator(
-        backgroundColor: Colors.transparent,
-        valueColor: AlwaysStoppedAnimation<Color>(
-          colorScheme.primary.withValues(alpha: 0.8),
-        ),
-        minHeight: 3,
-      ),
-    );
-  }
-}

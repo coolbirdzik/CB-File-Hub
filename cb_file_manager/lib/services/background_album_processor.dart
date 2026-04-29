@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:path/path.dart' as path;
 import 'album_file_scanner.dart';
 import '../utils/app_logger.dart';
@@ -69,26 +70,7 @@ class BackgroundAlbumProcessor {
 
   /// Check if file is a media file
   bool _isMediaFile(String filePath) {
-    final extension = path.extension(filePath).toLowerCase();
-    const mediaExtensions = {
-      '.jpg',
-      '.jpeg',
-      '.png',
-      '.gif',
-      '.bmp',
-      '.webp',
-      '.tiff',
-      '.tif',
-      '.mp4',
-      '.avi',
-      '.mov',
-      '.wmv',
-      '.flv',
-      '.webm',
-      '.mkv',
-      '.m4v'
-    };
-    return mediaExtensions.contains(extension);
+    return FileTypeUtils.isMediaFile(filePath);
   }
 
   /// Process files in background using isolate

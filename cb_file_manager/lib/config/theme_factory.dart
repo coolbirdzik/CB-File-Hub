@@ -230,6 +230,47 @@ class ThemeFactory {
         labelSmall: TextStyle(color: colorScheme.onSurface),
       ),
 
+      // Scrollbar Theme — wider track for easier dragging
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.dragged)) {
+            return 14.0;
+          }
+          return 10.0;
+        }),
+        radius: const Radius.circular(8.0),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.dragged)) {
+            return colorScheme.primary.withValues(alpha: 0.6);
+          }
+          if (states.contains(WidgetState.hovered)) {
+            return colorScheme.primary.withValues(alpha: 0.45);
+          }
+          return isLight
+              ? Colors.black.withValues(alpha: 0.3)
+              : Colors.white.withValues(alpha: 0.3);
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return isLight
+                ? Colors.black.withValues(alpha: 0.05)
+                : Colors.white.withValues(alpha: 0.05);
+          }
+          return Colors.transparent;
+        }),
+        trackBorderColor:
+            WidgetStateProperty.all(Colors.transparent),
+        minThumbLength: 48.0,
+        crossAxisMargin: 2.0,
+        mainAxisMargin: 2.0,
+        interactive: true,
+        thumbVisibility: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) return true;
+          return null; // Use default behavior otherwise
+        }),
+      ),
+
       // Icon Theme
       iconTheme: IconThemeData(
         color: isLight

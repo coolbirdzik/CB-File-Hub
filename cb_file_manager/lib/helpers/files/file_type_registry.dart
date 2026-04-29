@@ -178,6 +178,41 @@ class FileTypeRegistry {
       mimeType: 'video/ogg',
       extensions: ['.ogv'],
     ),
+    '.mpg': const FileTypeInfo(
+      category: FileCategory.video,
+      icon: PhosphorIconsLight.videoCamera,
+      color: Colors.red,
+      mimeType: 'video/mpeg',
+      extensions: ['.mpg', '.mpeg'],
+    ),
+    '.mpeg': const FileTypeInfo(
+      category: FileCategory.video,
+      icon: PhosphorIconsLight.videoCamera,
+      color: Colors.red,
+      mimeType: 'video/mpeg',
+      extensions: ['.mpg', '.mpeg'],
+    ),
+    '.ts': const FileTypeInfo(
+      category: FileCategory.video,
+      icon: PhosphorIconsLight.videoCamera,
+      color: Colors.red,
+      mimeType: 'video/mp2t',
+      extensions: ['.ts', '.mts', '.m2ts'],
+    ),
+    '.mts': const FileTypeInfo(
+      category: FileCategory.video,
+      icon: PhosphorIconsLight.videoCamera,
+      color: Colors.red,
+      mimeType: 'video/mp2t',
+      extensions: ['.ts', '.mts', '.m2ts'],
+    ),
+    '.m2ts': const FileTypeInfo(
+      category: FileCategory.video,
+      icon: PhosphorIconsLight.videoCamera,
+      color: Colors.red,
+      mimeType: 'video/mp2t',
+      extensions: ['.ts', '.mts', '.m2ts'],
+    ),
 
     // Audio files
     '.mp3': const FileTypeInfo(

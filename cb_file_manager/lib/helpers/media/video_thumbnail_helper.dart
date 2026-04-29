@@ -842,6 +842,9 @@ class VideoThumbnailHelper {
   }
 
   /// Process the thumbnail generation queue
+  // Number of thumbnails currently being generated in parallel.
+  static int _activeGenerations = 0;
+
   static Future<void> _processQueue() async {
     if (_isProcessingQueue || _pendingQueue.isEmpty) return;
 
@@ -849,65 +852,79 @@ class VideoThumbnailHelper {
 
     try {
       while (_pendingQueue.isNotEmpty) {
-        // Respect stop flag early
         if (_shouldStopProcessing) {
           _log('VideoThumbnail: Stopping queue processing due to stop flag');
           break;
         }
 
-        // IMPORTANT: Process ONE request at a time to maintain strict
-        // top-to-bottom order based on the user's sort selection.
-        // The queue is priority-sorted (proactiveGenerateAll assigns
-        // decreasing priorities by list position), so processing
-        // sequentially guarantees thumbnails appear in sort order.
-        final request = _pendingQueue.removeAt(0);
+        // Fill up to _maxConcurrency parallel generation slots.
+        // Priority order is maintained: highest-priority items are taken first
+        // from the already-sorted _pendingQueue. Parallelism means the first N
+        // items start simultaneously instead of waiting for each other.
+        final batch = <_ThumbnailRequest>[];
+        while (batch.length < (_maxConcurrency - _activeGenerations) &&
+            _pendingQueue.isNotEmpty) {
+          batch.add(_pendingQueue.removeAt(0));
+        }
 
-        // Track processing request for cancellation awareness
-        _processingQueue.add(request);
+        if (batch.isEmpty) {
+          // All concurrency slots full — wait a bit and retry.
+          await Future.delayed(const Duration(milliseconds: 50));
+          continue;
+        }
 
-        try {
-          final result = await _generateThumbnailInternal(
-            request.videoPath,
-            forceRegenerate: request.forceRegenerate,
-            quality: request.quality,
-            thumbnailSize: request.thumbnailSize,
-          );
+        _activeGenerations += batch.length;
+        for (final request in batch) {
+          _processingQueue.add(request);
+        }
 
-          if (result != null) {
-            _fileCache[request.videoPath] = result;
-            if (!request.completer.isCompleted) {
-              request.completer.complete(result);
+        // Launch all batch items in parallel.
+        await Future.wait(batch.map((request) async {
+          try {
+            final result = await _generateThumbnailInternal(
+              request.videoPath,
+              forceRegenerate: request.forceRegenerate,
+              quality: request.quality,
+              thumbnailSize: request.thumbnailSize,
+            );
+
+            if (result != null) {
+              _fileCache[request.videoPath] = result;
+              if (!request.completer.isCompleted) {
+                request.completer.complete(result);
+              }
+              try {
+                _thumbnailReadyController.add(request.videoPath);
+              } catch (_) {}
+            } else {
+              if (!request.completer.isCompleted) {
+                request.completer.complete(null);
+              }
             }
-            // Always notify listeners so widgets that relied solely on the
-            // stream (e.g. the proactive-queue path in LazyVideoThumbnail)
-            // receive the signal even when _generateThumbnailInternal returned
-            // a cached path without firing the notification itself.
-            try {
-              _thumbnailReadyController.add(request.videoPath);
-            } catch (_) {}
-          } else {
+          } catch (e) {
+            debugPrint(
+              'VideoThumbnail: Error processing request for ${request.videoPath}: $e',
+            );
             if (!request.completer.isCompleted) {
               request.completer.complete(null);
             }
+          } finally {
+            _processingQueue.remove(request);
+            _activeGenerations--;
           }
-        } catch (e) {
-          debugPrint(
-            'VideoThumbnail: Error processing request for ${request.videoPath}: $e',
-          );
-          if (!request.completer.isCompleted) {
-            request.completer.complete(null);
-          }
-        } finally {
-          _processingQueue.remove(request);
-        }
+        }));
 
-        // Yield to event loop between items
+        // Yield to event loop between batches.
         if (_pendingQueue.isNotEmpty) {
           await Future.delayed(Duration.zero);
         }
       }
     } finally {
       _isProcessingQueue = false;
+      // If more items arrived while we were finishing, restart.
+      if (_pendingQueue.isNotEmpty) {
+        Timer.run(_processQueue);
+      }
     }
   }
 
@@ -919,21 +936,6 @@ class VideoThumbnailHelper {
     int? thumbnailSize,
   }) {
     final cacheKey = _cacheKeyForPath(videoPath);
-
-    // Skip if we're no longer in the same directory as when this request was made.
-    // This prevents stale requests from previous directories from filling the queue.
-    if (_currentDirectory.isNotEmpty) {
-      final videoDir = _cacheKeyForPath(videoPath);
-      // The videoDir includes the full path, check if it's in _currentDirectory
-      final dirOfVideo = videoDir.contains(_currentDirectory) ||
-          _currentDirectory.contains(videoDir.split('/').take(3).join('/'));
-      if (!dirOfVideo && !_pendingQueue.any((r) => r.videoPath == cacheKey)) {
-        // Directory changed - skip this stale request
-        _log(
-            'VideoThumbnail: Skipping stale request for $cacheKey (directory changed)');
-        return Future.value(null);
-      }
-    }
 
     // Compute priority from display index (display order, not file system order).
     // Items at the top of the UI (low index) get high priority.

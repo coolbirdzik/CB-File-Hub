@@ -13,6 +13,7 @@ import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/ui/screens/settings/cache_management_screen.dart';
 import 'package:cb_file_manager/ui/screens/settings/database_settings_screen.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
+import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/config/theme_config.dart';
 import 'package:cb_file_manager/config/design_system_config.dart';
 import 'package:cb_file_manager/providers/theme_provider.dart';
@@ -835,10 +836,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Expanded(
                           child: FilledButton.tonalIcon(
                             onPressed: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const CacheManagementScreen(),
-                                ),
+                              await RouteUtils.showAcrylicDialog<void>(
+                                context: context,
+                                builder: (dialogContext) {
+                                  final mediaQuery =
+                                      MediaQuery.of(dialogContext);
+                                  final maxDialogWidth =
+                                      mediaQuery.size.width * 0.88;
+                                  final maxDialogHeight =
+                                      mediaQuery.size.height * 0.82;
+
+                                  return Dialog(
+                                    insetPadding: const EdgeInsets.symmetric(
+                                      horizontal: 28,
+                                      vertical: 24,
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            maxDialogWidth.clamp(560.0, 980.0),
+                                        maxHeight:
+                                            maxDialogHeight.clamp(420.0, 900.0),
+                                      ),
+                                      child: const CacheManagementScreen(
+                                        embedded: true,
+                                      ),
+                                    ),
+                                  );
+                                },
                               );
                               if (mounted) {
                                 await _loadCacheInfo();

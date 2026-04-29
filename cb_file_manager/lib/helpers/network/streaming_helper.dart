@@ -926,7 +926,6 @@ class StreamingHelper {
   bool isDocumentFile(String filePath) {
     return FileTypeUtils.isDocumentFile(filePath) ||
         FileTypeUtils.isSpreadsheetFile(filePath) ||
-        FileTypeUtils.isPresentationFile(filePath) ||
-        filePath.toLowerCase().endsWith('.pdf');
+        FileTypeUtils.isPresentationFile(filePath);
   }
 }

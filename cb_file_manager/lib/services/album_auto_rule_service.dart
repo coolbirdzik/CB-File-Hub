@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:path/path.dart' as path;
 import '../utils/app_logger.dart';
 
@@ -261,9 +262,7 @@ class AlbumAutoRuleService {
 
       await for (final entity in directory.list(recursive: true)) {
         if (entity is File) {
-          final extension = path.extension(entity.path).toLowerCase();
-          if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
-              .contains(extension)) {
+          if (FileTypeUtils.isImageFile(entity.path)) {
             processedFiles++;
             try {
               final wasAdded = await processFile(entity.path);

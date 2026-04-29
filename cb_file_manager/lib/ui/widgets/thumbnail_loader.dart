@@ -250,6 +250,45 @@ class ThumbnailLoader extends StatefulWidget {
   // Get the display index for a path. Returns null if not in map.
   static int? getDisplayIndex(String path) => _displayIndexByPath[path];
 
+  // ── Listing-ready gate ────────────────────────────────────────────────────
+  // When the parent screen is still loading / scanning the file list,
+  // thumbnail generation should be deferred so it doesn't compete for I/O
+  // and CPU with the listing work. Call [setListingReady(true)] after the
+  // file list is fully loaded and sorted, and [setListingReady(false)] when
+  // navigating to a new folder / starting a new scan.
+  static bool _listingReady = true;
+  static final List<VoidCallback> _pendingAfterReady = [];
+
+  /// Whether the file listing is complete and thumbnails can start loading.
+  static bool get isListingReady => _listingReady;
+
+  /// Register a callback to run when the listing becomes ready.
+  /// Used by album tiles that live outside [_ThumbnailLoaderState].
+  static void runAfterReady(VoidCallback callback) {
+    if (_listingReady) {
+      callback();
+    } else {
+      _pendingAfterReady.add(callback);
+    }
+  }
+
+  /// Signal whether the file listing is complete.
+  /// When [ready] becomes true, all deferred thumbnail loads are flushed.
+  static void setListingReady(bool ready) {
+    _listingReady = ready;
+    if (ready && _pendingAfterReady.isNotEmpty) {
+      // Drain the deferred queue on the next microtask so setState from
+      // the BLoC emit has finished first.
+      final callbacks = List<VoidCallback>.from(_pendingAfterReady);
+      _pendingAfterReady.clear();
+      Future.microtask(() {
+        for (final cb in callbacks) {
+          cb();
+        }
+      });
+    }
+  }
+
   // Method to reset pending thumbnail count
   static void resetPendingCount() {
     if (pendingThumbnailCount > 0) {
@@ -632,6 +671,16 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
 
   void _loadThumbnail() async {
     if (!_widgetMounted) return;
+
+    // Wait until the parent file list is fully loaded before starting
+    // thumbnail work. This prevents thumbnail generation from competing
+    // with directory scanning / sorting for I/O and CPU time.
+    if (!ThumbnailLoader._listingReady) {
+      ThumbnailLoader._pendingAfterReady.add(() {
+        if (_widgetMounted && mounted) _loadThumbnail();
+      });
+      return;
+    }
 
     final path = widget.filePath;
     final prevPath = _networkThumbnailPath;

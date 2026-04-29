@@ -4,6 +4,7 @@ import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -183,7 +184,8 @@ class FilePreviewPane extends StatelessWidget {
   }
 
   bool _isPdfFile(String filePath) {
-    return filePath.toLowerCase().endsWith('.pdf');
+    final ext = FileTypeUtils.getFileExtension(filePath);
+    return FileTypeRegistry.isCategory(ext, FileCategory.pdf);
   }
 }
 

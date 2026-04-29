@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:path/path.dart' as path;
@@ -268,9 +269,7 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
   }
 
   bool _isImageFile(String filePath) {
-    final extension = path.extension(filePath).toLowerCase();
-    const imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'};
-    return imageExtensions.contains(extension);
+    return FileTypeUtils.isImageFile(filePath);
   }
 
   @override
