@@ -392,6 +392,12 @@ class MobileFileActionsController {
               onTap: () {
                 Navigator.pop(context);
                 isMasonryLayout = !isMasonryLayout;
+                if (isMasonryLayout &&
+                    currentViewMode != ViewMode.grid &&
+                    currentViewMode != ViewMode.gridPreview) {
+                  currentViewMode = ViewMode.grid;
+                  onViewModeToggled?.call(ViewMode.grid);
+                }
                 onMasonryToggled?.call();
               },
             ),

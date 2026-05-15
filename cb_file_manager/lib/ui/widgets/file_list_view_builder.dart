@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -18,6 +19,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
+import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 
 /// Static factory class for building file list views in different modes
@@ -39,6 +41,17 @@ class FileListViewBuilder {
     final raw =
         ((availableWidth + _gridSpacing) / (itemWidth + _gridSpacing)).floor();
     return math.max(1, raw);
+  }
+
+  static double _masonryHeightFactor(String path) {
+    var hash = 0;
+    for (final codeUnit in path.codeUnits) {
+      hash = 0x1fffffff & (hash + codeUnit);
+      hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+      hash ^= hash >> 6;
+    }
+    const factors = [0.68, 0.86, 1.08, 1.32, 1.58];
+    return factors[hash.abs() % factors.length];
   }
 
   /// Build the appropriate view based on the current view mode
@@ -67,6 +80,8 @@ class FileListViewBuilder {
     required ValueChanged<double> onPreviewPaneWidthChanged,
     required ValueChanged<double> onPreviewPaneWidthCommitted,
     required VoidCallback onPreviewPaneToggled,
+    String? tabId,
+    bool isMasonryLayout = false,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
     List<FileSystemEntity>? searchResults,
   }) {
@@ -86,6 +101,10 @@ class FileListViewBuilder {
     } else {
       displayState = state;
     }
+
+    final effectiveMasonryLayout = isMasonryLayout ||
+        (tabId != null &&
+            MobileFileActionsController.forTab(tabId).isMasonryLayout);
 
     // Use separate builders for each view type to prevent complete tree rebuilds
     if (displayState.viewMode == ViewMode.gridPreview && isDesktopPlatform) {
@@ -130,6 +149,7 @@ class FileListViewBuilder {
         showContextMenu: showContextMenu,
         toggleSelectionMode: toggleSelectionMode,
         onZoomLevelChanged: onZoomLevelChanged,
+        isMasonryLayout: effectiveMasonryLayout,
         onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
       );
     } else if (displayState.viewMode == ViewMode.details) {
@@ -182,6 +202,7 @@ class FileListViewBuilder {
     required Function(BuildContext, Offset) showContextMenu,
     required VoidCallback toggleSelectionMode,
     required ValueChanged<int> onZoomLevelChanged,
+    required bool isMasonryLayout,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
   }) {
     return Stack(
@@ -279,6 +300,135 @@ class FileListViewBuilder {
                             state.files[i].path: i,
                         };
 
+                        final shouldUseMasonry = isMasonryLayout;
+
+                        Widget buildGridItem(BuildContext context, int index) {
+                          final String itemPath = index < state.folders.length
+                              ? state.folders[index].path
+                              : state.files[index - state.folders.length].path;
+                          final String itemKey = index < state.folders.length
+                              ? 'folder-grid-$itemPath'
+                              : 'file-grid-$itemPath';
+
+                          final bool isSelected =
+                              selectionState.isPathSelected(itemPath);
+
+                          return KeyedSubtree(
+                            key: ValueKey(itemKey),
+                            child: LayoutBuilder(
+                              builder: (BuildContext context,
+                                  BoxConstraints constraints) {
+                                if (isDesktopPlatform) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    try {
+                                      final RenderBox? renderBox = context
+                                          .findRenderObject() as RenderBox?;
+                                      if (renderBox != null &&
+                                          renderBox.hasSize &&
+                                          renderBox.attached) {
+                                        final position = renderBox
+                                            .localToGlobal(Offset.zero);
+                                        dragSelectionController
+                                            .registerItemPosition(
+                                                itemPath,
+                                                Rect.fromLTWH(
+                                                    position.dx,
+                                                    position.dy,
+                                                    renderBox.size.width,
+                                                    renderBox.size.height));
+                                      }
+                                    } catch (e) {
+                                      debugPrint(
+                                          'Layout error in grid view: $e');
+                                    }
+                                  });
+                                }
+
+                                if (index < state.folders.length) {
+                                  final folder =
+                                      state.folders[index] as Directory;
+                                  return Align(
+                                    alignment: Alignment.topCenter,
+                                    child: SizedBox(
+                                      width: itemWidth,
+                                      height: itemHeight,
+                                      child: RepaintBoundary(
+                                        child: folder_list_components
+                                            .FolderGridItem(
+                                          key: ValueKey(
+                                              'folder-grid-item-${folder.path}'),
+                                          folder: folder,
+                                          onNavigate: onNavigateToPath,
+                                          isSelected: isSelected,
+                                          toggleFolderSelection:
+                                              toggleFolderSelection,
+                                          isDesktopMode: isDesktopPlatform,
+                                          lastSelectedPath:
+                                              selectionState.lastSelectedPath,
+                                          clearSelectionMode: clearSelection,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  final file =
+                                      state.files[index - state.folders.length]
+                                          as File;
+                                  final masonryHeight = shouldUseMasonry
+                                      ? itemHeight *
+                                          _masonryHeightFactor(file.path)
+                                      : itemHeight;
+                                  return Align(
+                                    alignment: Alignment.topCenter,
+                                    child: SizedBox(
+                                      width: itemWidth,
+                                      height: masonryHeight,
+                                      child: RepaintBoundary(
+                                        child:
+                                            folder_list_components.FileGridItem(
+                                          key: ValueKey(
+                                              'file-grid-item-${file.path}'),
+                                          file: file,
+                                          state: state,
+                                          isSelectionMode:
+                                              selectionState.isSelectionMode,
+                                          isSelected: isSelected,
+                                          toggleFileSelection:
+                                              toggleFileSelection,
+                                          toggleSelectionMode:
+                                              toggleSelectionMode,
+                                          onFileTap: onFileTap,
+                                          isDesktopMode: isDesktopPlatform,
+                                          lastSelectedPath:
+                                              selectionState.lastSelectedPath,
+                                          showFileTags: showFileTags,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        }
+
+                        if (shouldUseMasonry) {
+                          return ScrollVelocityListener(
+                            child: MasonryGridView.count(
+                              padding: const EdgeInsets.all(8.0),
+                              physics: const ClampingScrollPhysics(),
+                              cacheExtent: 400,
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: _gridSpacing,
+                              mainAxisSpacing: _gridSpacing,
+                              itemCount:
+                                  state.folders.length + state.files.length,
+                              itemBuilder: buildGridItem,
+                            ),
+                          );
+                        }
+
                         return ScrollVelocityListener(
                           child: GridView.builder(
                             padding: const EdgeInsets.all(8.0),
@@ -316,116 +466,7 @@ class FileListViewBuilder {
                             ),
                             itemCount:
                                 state.folders.length + state.files.length,
-                            itemBuilder: (context, index) {
-                              final String itemPath =
-                                  index < state.folders.length
-                                      ? state.folders[index].path
-                                      : state
-                                          .files[index - state.folders.length]
-                                          .path;
-                              final String itemKey =
-                                  index < state.folders.length
-                                      ? 'folder-grid-$itemPath'
-                                      : 'file-grid-$itemPath';
-
-                              final bool isSelected =
-                                  selectionState.isPathSelected(itemPath);
-
-                              return KeyedSubtree(
-                                key: ValueKey(itemKey),
-                                child: LayoutBuilder(
-                                  builder: (BuildContext context,
-                                      BoxConstraints constraints) {
-                                    if (isDesktopPlatform) {
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                        try {
-                                          final RenderBox? renderBox = context
-                                              .findRenderObject() as RenderBox?;
-                                          if (renderBox != null &&
-                                              renderBox.hasSize &&
-                                              renderBox.attached) {
-                                            final position = renderBox
-                                                .localToGlobal(Offset.zero);
-                                            dragSelectionController
-                                                .registerItemPosition(
-                                                    itemPath,
-                                                    Rect.fromLTWH(
-                                                        position.dx,
-                                                        position.dy,
-                                                        renderBox.size.width,
-                                                        renderBox.size.height));
-                                          }
-                                        } catch (e) {
-                                          debugPrint(
-                                              'Layout error in grid view: $e');
-                                        }
-                                      });
-                                    }
-
-                                    if (index < state.folders.length) {
-                                      final folder =
-                                          state.folders[index] as Directory;
-                                      return Align(
-                                        alignment: Alignment.topCenter,
-                                        child: SizedBox(
-                                          width: itemWidth,
-                                          height: itemHeight,
-                                          child: RepaintBoundary(
-                                            child: folder_list_components
-                                                .FolderGridItem(
-                                              key: ValueKey(
-                                                  'folder-grid-item-${folder.path}'),
-                                              folder: folder,
-                                              onNavigate: onNavigateToPath,
-                                              isSelected: isSelected,
-                                              toggleFolderSelection:
-                                                  toggleFolderSelection,
-                                              isDesktopMode: isDesktopPlatform,
-                                              lastSelectedPath: selectionState
-                                                  .lastSelectedPath,
-                                              clearSelectionMode:
-                                                  clearSelection,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    } else {
-                                      final file = state.files[
-                                          index - state.folders.length] as File;
-                                      return Align(
-                                        alignment: Alignment.topCenter,
-                                        child: SizedBox(
-                                          width: itemWidth,
-                                          height: itemHeight,
-                                          child: RepaintBoundary(
-                                            child: folder_list_components
-                                                .FileGridItem(
-                                              key: ValueKey(
-                                                  'file-grid-item-${file.path}'),
-                                              file: file,
-                                              state: state,
-                                              isSelectionMode: selectionState
-                                                  .isSelectionMode,
-                                              isSelected: isSelected,
-                                              toggleFileSelection:
-                                                  toggleFileSelection,
-                                              toggleSelectionMode:
-                                                  toggleSelectionMode,
-                                              onFileTap: onFileTap,
-                                              isDesktopMode: isDesktopPlatform,
-                                              lastSelectedPath: selectionState
-                                                  .lastSelectedPath,
-                                              showFileTags: showFileTags,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
-                              );
-                            },
+                            itemBuilder: buildGridItem,
                           ),
                         );
                       },
@@ -777,6 +818,7 @@ class FileListViewBuilder {
             showContextMenu: showContextMenu,
             toggleSelectionMode: toggleSelectionMode,
             onZoomLevelChanged: onZoomLevelChanged,
+            isMasonryLayout: false,
             onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
           );
         }
@@ -805,6 +847,7 @@ class FileListViewBuilder {
             showContextMenu: showContextMenu,
             toggleSelectionMode: toggleSelectionMode,
             onZoomLevelChanged: onZoomLevelChanged,
+            isMasonryLayout: false,
             onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
           );
         }
@@ -824,6 +867,7 @@ class FileListViewBuilder {
           showContextMenu: showContextMenu,
           toggleSelectionMode: toggleSelectionMode,
           onZoomLevelChanged: onZoomLevelChanged,
+          isMasonryLayout: false,
           onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
         );
 
