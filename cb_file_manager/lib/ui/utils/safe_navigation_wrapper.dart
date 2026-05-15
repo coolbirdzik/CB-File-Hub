@@ -28,13 +28,18 @@ class _SafeNavigationWrapperState extends State<SafeNavigationWrapper> {
       final message = details.exceptionAsString();
       // Filter extremely noisy, non-fatal render/semantics assertions
       if (message.contains("semantics.parentDataDirty") ||
-          message.contains("Semantics") &&
-              message.contains("parentDataDirty") ||
+          (message.contains("Semantics") &&
+              message.contains("parentDataDirty")) ||
           message.contains("_debugDoingThisLayout") ||
-          message.contains("layout") ||
-          message.contains("hasSize") ||
           message.contains("RenderBox was not laid out") ||
-          message.contains("NEEDS-COMPOSITING-BITS-UPDATE")) {
+          message.contains("hasSize") ||
+          message.contains("NEEDS-COMPOSITING-BITS-UPDATE") ||
+          // RenderParagraph system-font update called during midFrameMicrotasks.
+          // This is a Flutter framework timing issue triggered by platform font
+          // notifications arriving while a frame is in progress; it is non-fatal.
+          message.contains("_scheduleSystemFontsUpdate") ||
+          message.contains("schedulerPhase == SchedulerPhase.idle") ||
+          message.contains("midFrameMicrotasks")) {
         // Forward to default handler without extra logging to avoid log spam
         if (_previousOnError != null) {
           _previousOnError!(details);

@@ -163,6 +163,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   late final InlineRenameController _inlineRenameController;
   String? _pendingCreatedFilePath;
   bool _allowFileExtensionRename = false;
+  bool _isMasonryLayout = false;
 
   /// Actual grid crossAxisCount from the file list (for arrow up/down in grid).
   int? _gridCrossAxisCount;
@@ -202,6 +203,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   bool _isDrivesMode() => _isDrivesPathValue(_currentPath);
+
+  void _setMasonryLayout(bool enabled) {
+    setState(() {
+      _isMasonryLayout = enabled;
+    });
+  }
 
   Widget _buildAcrylicContentContainer({
     required BuildContext context,
@@ -1332,6 +1339,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 onPreviewPaneWidthChanged: _updatePreviewPaneWidth,
                 onPreviewPaneWidthCommitted: _commitPreviewPaneWidth,
                 onPreviewPaneToggled: _togglePreviewPane,
+                tabId: widget.tabId,
+                isMasonryLayout: _isMasonryLayout,
                 onGridCrossAxisCountChanged: (c) {
                   // Defer setState to after build — this callback runs from LayoutBuilder during build.
                   WidgetsBinding.instance.addPostFrameCallback((_) {

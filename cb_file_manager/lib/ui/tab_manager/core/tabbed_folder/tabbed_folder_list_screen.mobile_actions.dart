@@ -23,6 +23,9 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
           sizeMode: GridSizeMode.referenceWidth,
         );
     controller.onSelectionModeToggled = _toggleSelectionMode;
+    controller.onMasonryToggled = () {
+      _setMasonryLayout(controller.isMasonryLayout);
+    };
     controller.onManageTagsPressed = () {
       tab_components.showManageTagsDialog(
         context,
@@ -35,6 +38,7 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     controller.onAllowFileExtensionRenameChanged = _setAllowFileExtensionRename;
     controller.folderListBloc = _folderListBloc;
     controller.allowFileExtensionRename = _allowFileExtensionRename;
+    controller.isMasonryLayout = _isMasonryLayout;
     // Set initial state
     controller.currentSortOption = _folderListBloc.state.sortOption;
     controller.currentViewMode = _folderListBloc.state.viewMode;

@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
 
 /// A helper class to optimize frame timing and prevent the
 /// "Reported frame time is older than the last one" error
@@ -55,9 +56,10 @@ class FrameTimingOptimizer {
       return;
     }
 
-    // Schedule a microtask to yield to the event loop
-    scheduleMicrotask(() {
-      // Ensure the UI thread stays responsive without infinite loops
+    // Use addPostFrameCallback instead of scheduleMicrotask so that
+    // ensureVisualUpdate() is only called after the current frame has fully
+    // settled, avoiding the SchedulerPhase.midFrameMicrotasks assertion.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
       SchedulerBinding.instance.ensureVisualUpdate();
     });
   }

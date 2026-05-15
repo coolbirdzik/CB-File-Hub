@@ -8,45 +8,54 @@
   <img src="cb_file_manager/assets/images/logo_circle.png" alt="CB File Hub logo" width="180" />
 </p>
 
+<p align="center">
+<a href="https://apps.microsoft.com/detail/9nchpzkc4m5c?referrer=appbadge&mode=full" target="_blank"  rel="noopener noreferrer">
+	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
+</a>
+</p>
+
 CB File Hub is a cross-platform file manager focused on large personal media libraries. It is built for the situation where movies, photos, clips, and folders keep growing until finding the right thing to watch feels harder than watching it.
 
 Instead of acting like a generic explorer, the app is designed to reduce browsing fatigue: faster visual scanning, tag-based organization, tabbed navigation on both desktop and mobile, network playback, and albums that can organize themselves with rules.
 
-## Screenshots
+## Preview
 
 <table>
   <tr>
-    <td><img src="screenshots/window_main_light.png" alt="Windows library view" /></td>
-    <td><img src="screenshots/window_add_tag.png" alt="Windows tag editor" /></td>
+    <td colspan="4">
+      <img src="screenshots/promo/desktop/01_file_browser.jpg" alt="CB File Hub desktop file browser preview" />
+      <p align="center"><sub>Desktop file browsing with tabs, tags, and rich previews</sub></p>
+    </td>
   </tr>
   <tr>
-    <td align="center"><img src="screenshots/android_main.png" alt="Android home screen" width="260" /></td>
-    <td align="center"><img src="screenshots/android_tab.png" alt="Android tabbed browsing" width="260" /></td>
+    <td colspan="4">
+      <img src="screenshots/promo/desktop/04_ai_search.jpg" alt="CB File Hub AI-assisted search preview" />
+      <p align="center"><sub>AI-assisted search beside the file browser</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/promo/mobile/01_mobile_home.jpg" alt="CB File Hub mobile home preview" width="220" />
+      <p align="center"><sub>Mobile home</sub></p>
+    </td>
+    <td align="center">
+      <img src="screenshots/promo/mobile/02_mobile_grid.jpg" alt="CB File Hub mobile file grid preview" width="220" />
+      <p align="center"><sub>File grid</sub></p>
+    </td>
+    <td align="center">
+      <img src="screenshots/promo/mobile/03_mobile_tabs.jpg" alt="CB File Hub mobile tabs preview" width="220" />
+      <p align="center"><sub>Tabs</sub></p>
+    </td>
+    <td align="center">
+      <img src="screenshots/promo/mobile/04_mobile_tags.jpg" alt="CB File Hub mobile tags preview" width="220" />
+      <p align="center"><sub>Tags</sub></p>
+    </td>
   </tr>
 </table>
 
 ### AI Agent
 
 The AI side panel sits beside the file browser. Ask it to find files, clean up duplicates, or organize folders — it shows results inline and asks for approval before making any changes.
-
-<table>
-  <tr>
-    <td>
-      <img src="screenshots/ai_search_results.png" alt="AI agent — file search results" />
-      <p align="center"><sub>Search results with relevance scores and file cards</sub></p>
-    </td>
-    <td>
-      <img src="screenshots/ai_conversation.png" alt="AI agent — multi-turn conversation" />
-      <p align="center"><sub>Multi-turn conversation with context-aware replies</sub></p>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2">
-      <img src="screenshots/ai_approval.png" alt="AI agent — approval card before destructive action" />
-      <p align="center"><sub>Approval card shown before any destructive file operation</sub></p>
-    </td>
-  </tr>
-</table>
 
 ## Why This App Exists
 
@@ -280,6 +289,14 @@ screenshots/auto/android/
 The screenshot scripts use a dedicated showcase E2E flow and export only the final hero frames for each featured scenario, not every intermediate test step.
 
 Android requires a connected device or running emulator visible in `flutter devices`.
+
+Generate promotional artwork from the captured screenshots:
+
+```powershell
+python scripts\make_promo_images.py
+```
+
+The generated artwork is written to `screenshots/promo/desktop/`, `screenshots/promo/mobile/`, `screenshots/promo/vi/desktop/`, and `screenshots/promo/vi/mobile/`.
 
 ## Testing
 
