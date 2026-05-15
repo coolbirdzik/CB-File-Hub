@@ -291,7 +291,11 @@ class _FileGridItemState extends State<FileGridItem> {
                           },
                           onDoubleTap: () {
                             if (widget.isDesktopMode) {
-                              widget.toggleSelectionMode();
+                              widget.toggleFileSelection(
+                                widget.file.path,
+                                shiftSelect: false,
+                                ctrlSelect: false,
+                              );
                             }
                             widget.onFileTap?.call(
                               widget.file as File,

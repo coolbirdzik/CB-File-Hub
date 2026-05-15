@@ -356,6 +356,7 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                   },
                   onDoubleTap: widget.isDesktopMode && widget.onTap != null
                       ? () {
+                          _handleFileSelection();
                           widget.onTap!(widget.file, true);
                         }
                       : null,

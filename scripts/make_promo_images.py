@@ -215,7 +215,7 @@ def create_desktop_promo(source: Path, output: Path, spec: PromoSpec) -> None:
     image = create_background(DESKTOP_SIZE, spec.accent)
     draw_desktop_frame(image, screenshot, spec)
     output.parent.mkdir(parents=True, exist_ok=True)
-    image.convert("RGB").save(output, quality=94, optimize=True)
+    image.convert("RGB").save(output, optimize=True)
 
 
 def create_mobile_promo(source: Path, output: Path, spec: PromoSpec) -> None:
@@ -223,7 +223,7 @@ def create_mobile_promo(source: Path, output: Path, spec: PromoSpec) -> None:
     image = create_background(MOBILE_SIZE, spec.accent)
     draw_mobile_frame(image, screenshot, spec)
     output.parent.mkdir(parents=True, exist_ok=True)
-    image.convert("RGB").save(output, quality=94, optimize=True)
+    image.convert("RGB").save(output, optimize=True)
 
 
 def discover_desktop_sources(path: Path) -> list[Path]:
@@ -265,15 +265,15 @@ def main() -> None:
 
     for index, source in enumerate(desktop_sources):
         spec = DESKTOP_SPECS[index % len(DESKTOP_SPECS)]
-        create_desktop_promo(source, desktop_output / f"{index + 1:02d}_{spec.stem}.jpg", spec)
+        create_desktop_promo(source, desktop_output / f"{index + 1:02d}_{spec.stem}.png", spec)
         vi_spec = DESKTOP_SPECS_VI[index % len(DESKTOP_SPECS_VI)]
-        create_desktop_promo(source, desktop_vi_output / f"{index + 1:02d}_{vi_spec.stem}.jpg", vi_spec)
+        create_desktop_promo(source, desktop_vi_output / f"{index + 1:02d}_{vi_spec.stem}.png", vi_spec)
 
     for index, source in enumerate(mobile_sources):
         spec = MOBILE_SPECS[index % len(MOBILE_SPECS)]
-        create_mobile_promo(source, mobile_output / f"{index + 1:02d}_{spec.stem}.jpg", spec)
+        create_mobile_promo(source, mobile_output / f"{index + 1:02d}_{spec.stem}.png", spec)
         vi_spec = MOBILE_SPECS_VI[index % len(MOBILE_SPECS_VI)]
-        create_mobile_promo(source, mobile_vi_output / f"{index + 1:02d}_{vi_spec.stem}.jpg", vi_spec)
+        create_mobile_promo(source, mobile_vi_output / f"{index + 1:02d}_{vi_spec.stem}.png", vi_spec)
 
     print(f"Created {len(desktop_sources)} desktop promo images in {desktop_output}")
     print(f"Created {len(mobile_sources)} mobile promo images in {mobile_output}")

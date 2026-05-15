@@ -23,31 +23,31 @@ Instead of acting like a generic explorer, the app is designed to reduce browsin
 <table>
   <tr>
     <td colspan="4">
-      <img src="screenshots/promo/desktop/01_file_browser.jpg" alt="CB File Hub desktop file browser preview" />
+      <img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file browser preview" />
       <p align="center"><sub>Desktop file browsing with tabs, tags, and rich previews</sub></p>
     </td>
   </tr>
   <tr>
     <td colspan="4">
-      <img src="screenshots/promo/desktop/04_ai_search.jpg" alt="CB File Hub AI-assisted search preview" />
+      <img src="screenshots/promo/desktop/04_ai_search.png" alt="CB File Hub AI-assisted search preview" />
       <p align="center"><sub>AI-assisted search beside the file browser</sub></p>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/promo/mobile/01_mobile_home.jpg" alt="CB File Hub mobile home preview" width="220" />
+      <img src="screenshots/promo/mobile/01_mobile_home.png" alt="CB File Hub mobile home preview" width="220" />
       <p align="center"><sub>Mobile home</sub></p>
     </td>
     <td align="center">
-      <img src="screenshots/promo/mobile/02_mobile_grid.jpg" alt="CB File Hub mobile file grid preview" width="220" />
+      <img src="screenshots/promo/mobile/02_mobile_grid.png" alt="CB File Hub mobile file grid preview" width="220" />
       <p align="center"><sub>File grid</sub></p>
     </td>
     <td align="center">
-      <img src="screenshots/promo/mobile/03_mobile_tabs.jpg" alt="CB File Hub mobile tabs preview" width="220" />
+      <img src="screenshots/promo/mobile/03_mobile_tabs.png" alt="CB File Hub mobile tabs preview" width="220" />
       <p align="center"><sub>Tabs</sub></p>
     </td>
     <td align="center">
-      <img src="screenshots/promo/mobile/04_mobile_tags.jpg" alt="CB File Hub mobile tags preview" width="220" />
+      <img src="screenshots/promo/mobile/04_mobile_tags.png" alt="CB File Hub mobile tags preview" width="220" />
       <p align="center"><sub>Tags</sub></p>
     </td>
   </tr>

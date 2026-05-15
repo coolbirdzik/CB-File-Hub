@@ -465,7 +465,10 @@ class _FileItemState extends State<FileItem> {
                                 _openFile(isVideo, isImage);
                               },
                               onDoubleTap: widget.isDesktopMode
-                                  ? () => _openFile(isVideo, isImage)
+                                  ? () {
+                                      _handleSelection();
+                                      _openFile(isVideo, isImage);
+                                    }
                                   : null,
                               onSecondaryTapUp: (details) {
                                 _showContextMenu(

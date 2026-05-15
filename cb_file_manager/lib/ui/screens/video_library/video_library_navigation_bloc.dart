@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:path/path.dart' as path;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
@@ -11,6 +12,7 @@ import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_state.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 
 /// A specialized FileNavigationBloc for video libraries.
 /// Uses VideoLibraryService instead of Directory.list() to load files,
@@ -134,10 +136,11 @@ class VideoLibraryNavigationBloc
 
     try {
       // Stream files so UI updates progressively as each directory is scanned.
-      // This mirrors FileNavigationBloc's await-for directory listing pattern.
       //
-      // Adaptive batch sizing: emit early for responsiveness, then back off
-      // to reduce sort overhead as the list grows.
+      // Optimization: skip per-batch stat/cache rebuild for progressive
+      // emissions. Cache miss → full scan only triggers stat for sort options
+      // that need it (date, size, attributes). All other sort options use
+      // fast in-memory sort that doesn't need filesystem I/O.
       final List<File> files = [];
       int nextEmitAt = 50; // first batch at 50 for quick initial display
 
@@ -146,12 +149,17 @@ class VideoLibraryNavigationBloc
 
         files.add(File(path));
 
-        // Emit progressive state at adaptive intervals
+        // Emit progressive state at adaptive intervals.
+        // Use _needsStatsForSortOption to avoid expensive stat() calls on
+        // every batch emission when the sort option doesn't require file stats.
         if (files.length >= nextEmitAt) {
-          final sorted = await FileSystemSorter.sortFiles(
-            List<File>.from(files),
-            state.sortOption,
-          );
+          final needsStats = _needsStatsForSortOption(state.sortOption);
+          final sorted = needsStats
+              ? await FileSystemSorter.sortFiles(
+                  List<File>.from(files),
+                  state.sortOption,
+                )
+              : _fastSortFiles(files, state.sortOption);
 
           emit(state.copyWith(
             isLoading: true,
@@ -170,7 +178,7 @@ class VideoLibraryNavigationBloc
         }
       }
 
-      // Final sort
+      // Final full sort (always needs stats for correctness)
       final sortedFiles = await FileSystemSorter.sortFiles(
         files,
         state.sortOption,
@@ -223,12 +231,16 @@ class VideoLibraryNavigationBloc
 
         files.add(File(path));
 
-        // Emit progressive state at adaptive intervals
+        // Emit progressive state at adaptive intervals.
+        // Skip expensive stat() calls when sort option doesn't need them.
         if (files.length >= nextEmitAt) {
-          final sorted = await FileSystemSorter.sortFiles(
-            List<File>.from(files),
-            state.sortOption,
-          );
+          final needsStats = _needsStatsForSortOption(state.sortOption);
+          final sorted = needsStats
+              ? await FileSystemSorter.sortFiles(
+                  List<File>.from(files),
+                  state.sortOption,
+                )
+              : _fastSortFiles(files, state.sortOption);
 
           emit(state.copyWith(
             isLoading: true,
@@ -359,5 +371,62 @@ class VideoLibraryNavigationBloc
     VideoThumbnailHelper.setCurrentDirectory(dirPath);
     VideoThumbnailHelper.proactiveGenerateAll(videoPaths,
         directoryPath: dirPath);
+  }
+
+  /// Returns true if the given sort option requires calling stat() on files.
+  /// Used to skip expensive per-batch filesystem I/O when not needed.
+  static bool _needsStatsForSortOption(SortOption option) {
+    switch (option) {
+      case SortOption.dateAsc:
+      case SortOption.dateDesc:
+      case SortOption.sizeAsc:
+      case SortOption.sizeDesc:
+      case SortOption.dateCreatedAsc:
+      case SortOption.dateCreatedDesc:
+      case SortOption.attributesAsc:
+      case SortOption.attributesDesc:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// Fast in-memory file sort that doesn't need filesystem I/O.
+  /// Only handles sort options that don't require stat() — for all others,
+  /// use FileSystemSorter.sortFiles() which is async and builds a stats cache.
+  static List<File> _fastSortFiles(List<File> files, SortOption sortOption) {
+    final sorted = List<File>.from(files);
+    switch (sortOption) {
+      case SortOption.nameAsc:
+        sorted.sort(
+            (a, b) => path.basename(a.path).compareTo(path.basename(b.path)));
+        break;
+      case SortOption.nameDesc:
+        sorted.sort(
+            (a, b) => path.basename(b.path).compareTo(path.basename(a.path)));
+        break;
+      case SortOption.typeAsc:
+        sorted.sort((a, b) =>
+            path.extension(a.path).compareTo(path.extension(b.path)));
+        break;
+      case SortOption.typeDesc:
+        sorted.sort((a, b) =>
+            path.extension(b.path).compareTo(path.extension(a.path)));
+        break;
+      case SortOption.extensionAsc:
+        sorted.sort((a, b) =>
+            path.extension(a.path).compareTo(path.extension(b.path)));
+        break;
+      case SortOption.extensionDesc:
+        sorted.sort((a, b) =>
+            path.extension(b.path).compareTo(path.extension(a.path)));
+        break;
+      default:
+        // Fallback: sort by name ascending for unknown/default options
+        sorted.sort(
+            (a, b) => path.basename(a.path).compareTo(path.basename(b.path)));
+        break;
+    }
+    return sorted;
   }
 }

@@ -779,11 +779,15 @@ class _AiChatBodyState extends State<_AiChatBody> {
   void _openFileExternal(BuildContext context, String filePath) {
     try {
       if (Platform.isWindows) {
-        Process.run('cmd', ['/c', 'start', '', filePath]);
+        Process.start(
+          'explorer',
+          [filePath],
+          mode: ProcessStartMode.detached,
+        );
       } else if (Platform.isMacOS) {
-        Process.run('open', [filePath]);
+        Process.start('open', [filePath], mode: ProcessStartMode.detached);
       } else if (Platform.isLinux) {
-        Process.run('xdg-open', [filePath]);
+        Process.start('xdg-open', [filePath], mode: ProcessStartMode.detached);
       }
     } catch (e) {
       debugPrint('Failed to open file: $e');

@@ -231,17 +231,30 @@ class FileSystemSorter {
   /// Builds a cache of file stats for the given entities.
   ///
   /// This improves performance when sorting by date, size, or attributes.
+  /// Uses parallel stat() calls (batches of 50) to avoid blocking the isolate.
   static Future<Map<String, FileStat>> _buildStatsCache(
     List<FileSystemEntity> entities,
   ) async {
-    final cache = <String, FileStat>{};
+    if (entities.isEmpty) return {};
 
-    for (final entity in entities) {
-      try {
-        cache[entity.path] = await entity.stat();
-      } catch (e) {
-        // If we can't stat the file, skip it
-        continue;
+    final cache = <String, FileStat>{};
+    const batchSize = 50;
+
+    for (int i = 0; i < entities.length; i += batchSize) {
+      final batch = entities.skip(i).take(batchSize);
+      final results = await Future.wait(
+        batch.map((entity) async {
+          try {
+            return MapEntry(entity.path, await entity.stat());
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      for (final entry in results) {
+        if (entry != null) {
+          cache[entry.key] = entry.value;
+        }
       }
     }
 
