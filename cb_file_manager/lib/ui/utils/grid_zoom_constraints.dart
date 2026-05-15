@@ -22,6 +22,20 @@ class GridZoomConstraints {
   static const double fileGridReferenceWidth = 960.0;
   static const double fileGridMinItemWidth = 56.0;
 
+  // ── Grid item name area ──────────────────────────────────────────────────
+  // Fixed height reserved for the filename label below the thumbnail.
+  // Using a fixed height ensures all thumbnails are the same size regardless
+  // of whether the filename wraps to 1 or 2 lines.
+  //
+  // Breakdown: top padding (4) + 2 lines × lineHeight (~16px) = 36px → 40px
+  // With tags:  + tag row height (~18px) = ~54px → 58px
+  static const double gridItemNameAreaHeight = 40.0;
+  static const double gridItemNameAreaHeightWithTags = 58.0;
+
+  // Font size used for grid item filenames (kept here so label height above
+  // stays consistent if the font size ever changes).
+  static const double gridItemFilenameFontSize = 12.0;
+
   /// Returns the ideal item width for [zoomLevel] using the canonical
   /// file-browser formula.  Same calculation as
   /// [FileListViewBuilder._gridItemWidthForZoom].

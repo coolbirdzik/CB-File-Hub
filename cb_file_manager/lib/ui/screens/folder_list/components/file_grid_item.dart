@@ -8,6 +8,7 @@ import 'package:path/path.dart' as path;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
@@ -215,6 +216,10 @@ class _FileGridItemState extends State<FileGridItem> {
     );
 
     // Windows Explorer style: transparent background, icon + name layout
+    final double nameAreaHeight = (widget.showFileTags && widget.state != null)
+        ? GridZoomConstraints.gridItemNameAreaHeightWithTags
+        : GridZoomConstraints.gridItemNameAreaHeight;
+
     return RepaintBoundary(
       child: Opacity(
         opacity: isBeingCut ? ItemInteractionStyle.cutOpacity : 1.0,
@@ -231,9 +236,9 @@ class _FileGridItemState extends State<FileGridItem> {
           },
           cursor: SystemMouseCursors.click,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
-              // Icon/thumbnail area - takes most of the space
+              // Icon/thumbnail area - takes all remaining space after fixed name area
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8.0),
@@ -332,24 +337,28 @@ class _FileGridItemState extends State<FileGridItem> {
                   ),
                 ),
               ),
-              // Filename (and optional tags) below icon - Windows Explorer style
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildNameWidget(
-                      context,
-                      theme,
-                      fileName,
-                      isBeingRenamed,
-                      renameController,
-                    ),
-                    if (widget.showFileTags && widget.state != null) ...[
-                      const SizedBox(height: 2),
-                      _buildTagsDisplay(context),
+              // Filename (and optional tags) below icon - fixed height so thumbnail is always the same size
+              SizedBox(
+                height: nameAreaHeight,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildNameWidget(
+                        context,
+                        theme,
+                        fileName,
+                        isBeingRenamed,
+                        renameController,
+                      ),
+                      if (widget.showFileTags && widget.state != null) ...[
+                        const SizedBox(height: 2),
+                        _buildTagsDisplay(context),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -368,7 +377,8 @@ class _FileGridItemState extends State<FileGridItem> {
   ) {
     final textWidget = Text(
       fileName,
-      style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+      style: theme.textTheme.bodySmall
+          ?.copyWith(fontSize: GridZoomConstraints.gridItemFilenameFontSize),
       textAlign: TextAlign.center,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
+import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../components/common/shared_file_context_menu.dart';
@@ -110,6 +111,10 @@ class _FolderGridItemState extends State<FolderGridItem> {
     const double bodyRadius = 6.0;
     const double tabRadius = 5.0;
 
+    // Fixed height for name area — ensures the folder shape (thumbnail) is
+    // always the same height regardless of whether the name is 1 or 2 lines.
+    const double nameAreaHeight = GridZoomConstraints.gridItemNameAreaHeight;
+
     if (!widget.isDesktopMode) {
       return Opacity(
         opacity: isBeingCut ? ItemInteractionStyle.cutOpacity : 1.0,
@@ -117,7 +122,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
           onSecondaryTapDown: (details) =>
               _showFolderContextMenu(context, details.globalPosition),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
               Expanded(
                 child: _buildFolderShape(
@@ -159,18 +164,22 @@ class _FolderGridItemState extends State<FolderGridItem> {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-                child: Text(
-                  widget.folder.basename(),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.0,
-                    color: theme.colorScheme.onSurface,
-                    fontWeight:
-                        _visuallySelected ? FontWeight.bold : FontWeight.w500,
+              SizedBox(
+                height: nameAreaHeight,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                  child: Text(
+                    widget.folder.basename(),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: GridZoomConstraints.gridItemFilenameFontSize,
+                      color: theme.colorScheme.onSurface,
+                      fontWeight:
+                          _visuallySelected ? FontWeight.bold : FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
@@ -191,7 +200,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
           onExit: (_) => setState(() => _isHovering = false),
           cursor: SystemMouseCursors.click,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
               Expanded(
                 child: _buildFolderShape(
@@ -238,9 +247,13 @@ class _FolderGridItemState extends State<FolderGridItem> {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-                child: _buildNameWidget(context),
+              SizedBox(
+                height: nameAreaHeight,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                  child: _buildNameWidget(context),
+                ),
               ),
             ],
           ),
@@ -364,7 +377,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontSize: 12.0,
+        fontSize: GridZoomConstraints.gridItemFilenameFontSize,
         color: Theme.of(context).colorScheme.onSurface,
         fontWeight: _visuallySelected ? FontWeight.bold : FontWeight.w500,
       ),
@@ -379,7 +392,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
               onCommit: () => renameController.commitRename(context),
               onCancel: () => renameController.cancelRename(),
               textStyle: TextStyle(
-                fontSize: 12.0,
+                fontSize: GridZoomConstraints.gridItemFilenameFontSize,
                 color: Theme.of(context).colorScheme.onSurface,
                 fontWeight:
                     _visuallySelected ? FontWeight.bold : FontWeight.w500,

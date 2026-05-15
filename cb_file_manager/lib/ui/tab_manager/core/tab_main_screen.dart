@@ -78,7 +78,7 @@ class _TabMainScreenState extends State<TabMainScreen> {
       _handleNativeDropHoverChanged();
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
       final payload = widget.startupPayload;
@@ -96,6 +96,8 @@ class _TabMainScreenState extends State<TabMainScreen> {
         }
       }
 
+      // Insert the overlay synchronously within the postFrameCallback so it
+      // happens at a safe frame boundary and never after an await point.
       if (_operationProgressOverlayEntry == null) {
         final overlay = Overlay.maybeOf(context, rootOverlay: true);
         if (overlay != null) {
@@ -105,9 +107,14 @@ class _TabMainScreenState extends State<TabMainScreen> {
           overlay.insert(_operationProgressOverlayEntry!);
         }
       }
-      if (_checkedPerms) return;
-      _checkedPerms = true;
-      await _runStartupOnboardingAndPermissionFlow();
+
+      // Run the async onboarding/permission flow as a separate unawaited
+      // Future so it does not turn this postFrameCallback into an async
+      // function (which would resume after awaits mid-frame).
+      if (!_checkedPerms) {
+        _checkedPerms = true;
+        unawaited(_runStartupOnboardingAndPermissionFlow());
+      }
     });
   }
 

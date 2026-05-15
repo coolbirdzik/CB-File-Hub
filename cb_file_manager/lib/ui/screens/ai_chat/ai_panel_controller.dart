@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -163,7 +162,10 @@ class AiPanelController extends ChangeNotifier {
   void _schedulePanelWidthNotify() {
     if (_panelWidthNotifyScheduled) return;
     _panelWidthNotifyScheduled = true;
-    SchedulerBinding.instance.scheduleFrameCallback((_) {
+    // Use addPostFrameCallback (runs after the frame is fully built) instead of
+    // scheduleFrameCallback (runs during the animation/begin phase) to avoid
+    // triggering notifyListeners() while the frame pipeline is still active.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isDisposed) return;
       _panelWidthNotifyScheduled = false;
       notifyListeners();
