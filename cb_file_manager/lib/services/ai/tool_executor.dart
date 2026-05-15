@@ -844,7 +844,8 @@ class ToolExecutor {
     final pathArg = args['path'];
     final pathsArg = args['paths'];
     if (pathsArg is List) {
-      paths = pathsArg.map((e) => e.toString()).where((p) => p.isNotEmpty).toList();
+      paths =
+          pathsArg.map((e) => e.toString()).where((p) => p.isNotEmpty).toList();
     } else if (pathArg is String && pathArg.isNotEmpty) {
       paths = [pathArg];
     } else {
@@ -972,7 +973,8 @@ class ToolExecutor {
       if (files.isEmpty) {
         return ToolResult(
           toolName: 'get_video_library_files',
-          output: 'Video library "${library.name}" (ID: $libraryId) contains no files.',
+          output:
+              'Video library "${library.name}" (ID: $libraryId) contains no files.',
         );
       }
 

@@ -1359,5 +1359,3 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     );
   }
 }
-
-

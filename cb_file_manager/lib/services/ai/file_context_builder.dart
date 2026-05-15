@@ -81,12 +81,11 @@ class FileContextBuilder {
     bool includeContent = true,
   }) async {
     // If path is empty and scope is currentDirectory/recursive, auto-switch to allDrives
-    final effectiveScope =
-        (directoryPath.isEmpty &&
-                (scope == SearchScope.currentDirectory ||
-                    scope == SearchScope.recursive))
-            ? SearchScope.allDrives
-            : scope;
+    final effectiveScope = (directoryPath.isEmpty &&
+            (scope == SearchScope.currentDirectory ||
+                scope == SearchScope.recursive))
+        ? SearchScope.allDrives
+        : scope;
 
     List<_FileContext> fileContexts;
 
@@ -342,9 +341,44 @@ class FileContextBuilder {
   }
 
   String _categorize(String ext) {
-    const imageExts = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico', '.tiff', '.tif', '.heic', '.heif'};
-    const videoExts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts', '.mpg', '.mpeg', '.3gp'};
-    const audioExts = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus'};
+    const imageExts = {
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.bmp',
+      '.webp',
+      '.svg',
+      '.ico',
+      '.tiff',
+      '.tif',
+      '.heic',
+      '.heif'
+    };
+    const videoExts = {
+      '.mp4',
+      '.avi',
+      '.mkv',
+      '.mov',
+      '.wmv',
+      '.flv',
+      '.webm',
+      '.m4v',
+      '.ts',
+      '.mpg',
+      '.mpeg',
+      '.3gp'
+    };
+    const audioExts = {
+      '.mp3',
+      '.wav',
+      '.flac',
+      '.aac',
+      '.ogg',
+      '.wma',
+      '.m4a',
+      '.opus'
+    };
     const documentExts = {'.doc', '.docx', '.odt', '.rtf', '.pdf'};
     const spreadsheetExts = {'.xls', '.xlsx', '.ods', '.csv'};
     const presentationExts = {'.ppt', '.pptx', '.odp'};

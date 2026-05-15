@@ -401,10 +401,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             required List<Widget> children,
                           }) =>
                               _buildSectionCard(
-                                title: title,
-                                icon: icon,
-                                children: children,
-                              ),
+                            title: title,
+                            icon: icon,
+                            children: children,
+                          ),
                           buildCompactSettingTile: ({
                             required String title,
                             required String subtitle,
@@ -413,12 +413,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             VoidCallback? onTap,
                           }) =>
                               _buildCompactSettingTile(
-                                title: title,
-                                subtitle: subtitle,
-                                icon: icon,
-                                trailing: trailing,
-                                onTap: onTap,
-                              ),
+                            title: title,
+                            subtitle: subtitle,
+                            icon: icon,
+                            trailing: trailing,
+                            onTap: onTap,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         _buildDatabaseSection(),

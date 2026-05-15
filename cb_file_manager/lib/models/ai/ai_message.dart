@@ -120,8 +120,7 @@ class AiMessage extends Equatable {
         'timestamp': timestamp.toIso8601String(),
         'searchResults': searchResults?.map((r) => r.toJson()).toList(),
         'toolCalls': toolCalls?.map((c) => c.toJson()).toList(),
-        'referencedFiles':
-            referencedFiles?.map((f) => f.toJson()).toList(),
+        'referencedFiles': referencedFiles?.map((f) => f.toJson()).toList(),
       };
 
   factory AiMessage.fromJson(Map<String, dynamic> json) {

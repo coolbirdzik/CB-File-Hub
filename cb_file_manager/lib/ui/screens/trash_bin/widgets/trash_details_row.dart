@@ -65,7 +65,10 @@ class TrashDetailsRow extends StatelessWidget {
             flex: 3,
             child: Row(
               children: [
-                TrashItemIcon(originalPath: item.originalPath, size: 24, isFolder: item.isFolder),
+                TrashItemIcon(
+                    originalPath: item.originalPath,
+                    size: 24,
+                    isFolder: item.isFolder),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

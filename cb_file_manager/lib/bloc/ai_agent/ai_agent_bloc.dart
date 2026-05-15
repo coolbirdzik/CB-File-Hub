@@ -113,11 +113,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final normalizedWorkspacePath =
         AiChatHistoryService.normalizeWorkspacePath(event.workspacePath);
     if (normalizedWorkspacePath.isNotEmpty) {
-      final matchingSummary =
-          await _historyService?.findLatestSummaryForPath(normalizedWorkspacePath);
+      final matchingSummary = await _historyService
+          ?.findLatestSummaryForPath(normalizedWorkspacePath);
       if (matchingSummary != null) {
         conversationId = matchingSummary.id;
-        messages = await _historyService?.loadConversation(conversationId) ?? [];
+        messages =
+            await _historyService?.loadConversation(conversationId) ?? [];
       } else {
         // Path has no prior conversation — start fresh but keep showing
         // the conversation list so the user can switch to other paths.
@@ -1318,35 +1319,40 @@ Do NOT include the JSON block if no files match.
   String _buildPlatformPathsInfo() {
     final buffer = StringBuffer();
     buffer.writeln('CB FILE HUB SYSTEM PATHS:');
-    buffer.writeln('The CB File Hub application stores its internal data in the following locations:');
+    buffer.writeln(
+        'The CB File Hub application stores its internal data in the following locations:');
     buffer.writeln();
-    
+
     // App cache root directory
     buffer.writeln('1. APP CACHE ROOT:');
     if (Platform.isWindows) {
       buffer.writeln('   - Location: %TEMP%\\cb_file_hub\\');
-      buffer.writeln('   - Example: C:\\Users\\<username>\\AppData\\Local\\Temp\\cb_file_hub\\');
+      buffer.writeln(
+          '   - Example: C:\\Users\\<username>\\AppData\\Local\\Temp\\cb_file_hub\\');
     } else if (Platform.isMacOS) {
       buffer.writeln('   - Location: /var/folders/.../T/cb_file_hub/');
       buffer.writeln('   - Example: /var/folders/xx/xxxxxxxxxx/T/cb_file_hub/');
     } else if (Platform.isLinux) {
       buffer.writeln('   - Location: /tmp/cb_file_hub/');
     } else if (Platform.isAndroid) {
-      buffer.writeln('   - Location: /data/data/com.coolbird.cbfilehub/cache/cb_file_hub/');
+      buffer.writeln(
+          '   - Location: /data/data/com.coolbird.cbfilehub/cache/cb_file_hub/');
     } else if (Platform.isIOS) {
       buffer.writeln('   - Location: <app_container>/tmp/cb_file_hub/');
     }
-    buffer.writeln('   - Purpose: Root directory for all app cache and temporary files');
+    buffer.writeln(
+        '   - Purpose: Root directory for all app cache and temporary files');
     buffer.writeln();
-    
+
     // Subdirectories
     buffer.writeln('2. CACHE SUBDIRECTORIES (under cb_file_hub):');
     buffer.writeln('   - video_thumbnails/: Video thumbnail cache');
     buffer.writeln('   - photo_thumbnails/: Photo thumbnail cache');
-    buffer.writeln('   - network_thumbnails/: Network file (SMB/FTP/WebDAV) thumbnail cache');
+    buffer.writeln(
+        '   - network_thumbnails/: Network file (SMB/FTP/WebDAV) thumbnail cache');
     buffer.writeln('   - temp_files/: Temporary downloads and SMB file cache');
     buffer.writeln();
-    
+
     // Database location
     buffer.writeln('3. DATABASE AND PERSISTENT DATA:');
     if (Platform.isWindows) {
@@ -1357,19 +1363,22 @@ Do NOT include the JSON block if no files match.
     } else if (Platform.isLinux) {
       buffer.writeln('   - Location: ~/Documents/');
     } else if (Platform.isAndroid) {
-      buffer.writeln('   - Location: /data/data/com.coolbird.cbfilehub/app_flutter/');
+      buffer.writeln(
+          '   - Location: /data/data/com.coolbird.cbfilehub/app_flutter/');
     } else if (Platform.isIOS) {
       buffer.writeln('   - Location: <app_container>/Documents/');
     }
     buffer.writeln('   - Files stored here:');
-    buffer.writeln('     * cb_file_hub.db: Main SQLite database (file metadata, tags, albums, settings)');
+    buffer.writeln(
+        '     * cb_file_hub.db: Main SQLite database (file metadata, tags, albums, settings)');
     buffer.writeln('     * tag_colors.json: Tag color configuration');
     buffer.writeln('     * album_auto_rules.json: Smart album rules');
     buffer.writeln('     * featured_albums.json: Featured album configuration');
     buffer.writeln('     * smart_albums.json: Smart album definitions');
-    buffer.writeln('     * video_library_cache.json: Video library metadata cache');
+    buffer.writeln(
+        '     * video_library_cache.json: Video library metadata cache');
     buffer.writeln();
-    
+
     // Platform-specific user directories
     buffer.writeln('4. PLATFORM-SPECIFIC USER DIRECTORIES:');
     if (Platform.isWindows) {
@@ -1391,13 +1400,15 @@ Do NOT include the JSON block if no files match.
       buffer.writeln('   - All Images: /storage/emulated/0/');
     } else if (Platform.isIOS) {
       buffer.writeln('   - All media: <app_container>/Documents/');
-      buffer.writeln('   - Note: iOS uses app sandbox, no direct access to system directories');
+      buffer.writeln(
+          '   - Note: iOS uses app sandbox, no direct access to system directories');
     }
     buffer.writeln();
-    
+
     // System screens
     buffer.writeln('5. SYSTEM SCREENS (Virtual Navigation Paths):');
-    buffer.writeln('CB File Hub uses special paths starting with # for system screens. These are NOT file system paths.');
+    buffer.writeln(
+        'CB File Hub uses special paths starting with # for system screens. These are NOT file system paths.');
     buffer.writeln();
     buffer.writeln('STATIC SYSTEM SCREENS:');
     buffer.writeln('   - #home: Home screen with quick access and favorites');
@@ -1415,15 +1426,21 @@ Do NOT include the JSON block if no files match.
     buffer.writeln('   - #ai-chat: AI chat screen (this screen you are in)');
     buffer.writeln();
     buffer.writeln('DYNAMIC SYSTEM SCREENS (with parameters):');
-    buffer.writeln('   - #video-library/{id}: Video library files screen for a specific library');
-    buffer.writeln('     Example: #video-library/1 opens video library with ID 1');
-    buffer.writeln('   - #album/{id}: Album detail screen for a specific album');
+    buffer.writeln(
+        '   - #video-library/{id}: Video library files screen for a specific library');
+    buffer.writeln(
+        '     Example: #video-library/1 opens video library with ID 1');
+    buffer
+        .writeln('   - #album/{id}: Album detail screen for a specific album');
     buffer.writeln('     Example: #album/5 opens album with ID 5');
-    buffer.writeln('   - #image?path=...: Image viewer for a specific image file');
+    buffer.writeln(
+        '   - #image?path=...: Image viewer for a specific image file');
     buffer.writeln('     Example: #image?path=C:\\Pictures\\photo.jpg');
     buffer.writeln('   - #search?tag=...: Tag search results screen');
-    buffer.writeln('     Example: #search?tag=vacation shows all files tagged "vacation"');
-    buffer.writeln('   - #ai-chat?workspace=...: AI chat with specific workspace path');
+    buffer.writeln(
+        '     Example: #search?tag=vacation shows all files tagged "vacation"');
+    buffer.writeln(
+        '   - #ai-chat?workspace=...: AI chat with specific workspace path');
     buffer.writeln('     Example: #ai-chat?workspace=C:\\Projects');
     buffer.writeln();
     buffer.writeln('NETWORK PATHS:');
@@ -1432,19 +1449,25 @@ Do NOT include the JSON block if no files match.
     buffer.writeln('   - webdav://server/path: WebDAV network paths');
     buffer.writeln('   - #network/...: Internal network path routing');
     buffer.writeln();
-    
+
     // Important notes
     buffer.writeln('IMPORTANT NOTES:');
-    buffer.writeln('- When users ask about "app data", "cache", or "thumbnails", they are referring to the cb_file_hub directory');
-    buffer.writeln('- When users ask about "database" or "tags", they are referring to files in the Documents directory');
-    buffer.writeln('- When users mention screens like "video library", "gallery", "albums", they are referring to system screens (# paths)');
-    buffer.writeln('- System screens (# paths) are virtual navigation paths, NOT file system directories');
-    buffer.writeln('- You CANNOT use file tools (list_directory, search_files, etc.) on system screen paths');
+    buffer.writeln(
+        '- When users ask about "app data", "cache", or "thumbnails", they are referring to the cb_file_hub directory');
+    buffer.writeln(
+        '- When users ask about "database" or "tags", they are referring to files in the Documents directory');
+    buffer.writeln(
+        '- When users mention screens like "video library", "gallery", "albums", they are referring to system screens (# paths)');
+    buffer.writeln(
+        '- System screens (# paths) are virtual navigation paths, NOT file system directories');
+    buffer.writeln(
+        '- You CANNOT use file tools (list_directory, search_files, etc.) on system screen paths');
     buffer.writeln('- Thumbnail caches can be safely cleared to free up space');
-    buffer.writeln('- The database file (cb_file_hub.db) should NOT be deleted as it contains all user data');
+    buffer.writeln(
+        '- The database file (cb_file_hub.db) should NOT be deleted as it contains all user data');
     buffer.writeln('- Use get_file_info tool to check actual paths and sizes');
     buffer.writeln();
-    
+
     return buffer.toString();
   }
 
@@ -1590,7 +1613,8 @@ Do NOT include the JSON block if no files match.
     final targetLimit =
         aggressive ? _hardContextCharLimit : _softContextCharLimit;
     final totalChars = _estimateContextChars(messages, systemPrompt);
-    if (totalChars <= targetLimit || messages.length <= _minRecentMessagesToKeep) {
+    if (totalChars <= targetLimit ||
+        messages.length <= _minRecentMessagesToKeep) {
       return _PreparedContext(
         messages: messages,
         systemPrompt: systemPrompt,

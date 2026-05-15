@@ -103,7 +103,10 @@ class TrashListItem extends StatelessWidget {
           SizedBox(
             width: 48,
             height: 48,
-            child: TrashItemIcon(originalPath: item.originalPath, size: 48, isFolder: item.isFolder),
+            child: TrashItemIcon(
+                originalPath: item.originalPath,
+                size: 48,
+                isFolder: item.isFolder),
           ),
           const SizedBox(width: 16),
           // Text content

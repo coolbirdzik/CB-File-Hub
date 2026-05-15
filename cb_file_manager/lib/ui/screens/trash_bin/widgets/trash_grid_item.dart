@@ -47,7 +47,10 @@ class TrashGridItem extends StatelessWidget {
           // Thumbnail area — Windows Explorer style: fills available space
           Expanded(
             child: Center(
-              child: TrashItemIcon(originalPath: item.originalPath, size: 56, isFolder: item.isFolder),
+              child: TrashItemIcon(
+                  originalPath: item.originalPath,
+                  size: 56,
+                  isFolder: item.isFolder),
             ),
           ),
           // Filename below icon

@@ -205,7 +205,7 @@ class FileNavigationBloc
       final folders = scanResult.folderPaths.map(Directory.new).toList();
       final files = scanResult.filePaths.map(File.new).toList();
       final sortedFolders = folders; // already sorted in isolate
-      final sortedFiles = files;     // already sorted in isolate
+      final sortedFiles = files; // already sorted in isolate
 
       // Rebuild FileStat cache from raw stat rows for downstream consumers
       // (e.g. sort-on-demand, file details panel). We build it on the main
@@ -303,8 +303,7 @@ class FileNavigationBloc
         _ScanArgs(event.path, sortOption.name),
       );
 
-      final sortedFolders =
-          scanResult.folderPaths.map(Directory.new).toList();
+      final sortedFolders = scanResult.folderPaths.map(Directory.new).toList();
       final sortedFiles = scanResult.filePaths.map(File.new).toList();
 
       emit(state.copyWith(
@@ -824,6 +823,7 @@ typedef _StatRow = List<dynamic>;
 class _ScanResult {
   final List<String> folderPaths;
   final List<String> filePaths;
+
   /// Maps file/folder path → [modified_ms, changed_ms, size, mode, type_index]
   final Map<String, _StatRow> statRows;
 
@@ -875,10 +875,10 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
         try {
           final s = await FileStat.stat(p);
           return MapEntry(p, <dynamic>[
-            s.modified.millisecondsSinceEpoch,  // [0] modified
-            s.changed.millisecondsSinceEpoch,   // [1] changed (creation on Win)
-            s.size,                              // [2] size
-            s.mode,                              // [3] mode
+            s.modified.millisecondsSinceEpoch, // [0] modified
+            s.changed.millisecondsSinceEpoch, // [1] changed (creation on Win)
+            s.size, // [2] size
+            s.mode, // [3] mode
           ]);
         } catch (_) {
           return null;
@@ -918,6 +918,7 @@ Future<_ScanResult> _scanDirectoryInIsolate(_ScanArgs args) async {
       final dot = p.lastIndexOf('.');
       return dot >= 0 ? p.substring(dot).toLowerCase() : '';
     }
+
     final cmp = ext(a).compareTo(ext(b));
     return ascending ? cmp : -cmp;
   }

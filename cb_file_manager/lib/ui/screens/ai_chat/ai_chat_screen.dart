@@ -1015,8 +1015,7 @@ class _ContextSizeIndicator extends StatelessWidget {
     }
 
     return Tooltip(
-      message:
-          '${contextInfo.messageCount} messages · $chars chars\n'
+      message: '${contextInfo.messageCount} messages · $chars chars\n'
           'Context trimming starts at ~24K chars',
       child: Row(
         mainAxisSize: MainAxisSize.min,

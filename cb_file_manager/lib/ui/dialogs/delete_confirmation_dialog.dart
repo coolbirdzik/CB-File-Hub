@@ -175,7 +175,8 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                                   ? Colors.red.withValues(alpha: 0.1)
                                   : null,
                               side: isFocused
-                                  ? const BorderSide(color: Colors.red, width: 2)
+                                  ? const BorderSide(
+                                      color: Colors.red, width: 2)
                                   : null,
                             ),
                             child: Text(

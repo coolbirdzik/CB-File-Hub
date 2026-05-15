@@ -1,10 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 /// The type of AI API to use for communication.
-enum AiApiType {
-  openaiCompatible,
-  anthropic
-}
+enum AiApiType { openaiCompatible, anthropic }
 
 /// Authentication mode for an AI provider configuration.
 enum AiProviderAuthMode {
@@ -116,8 +113,7 @@ class AiProviderConfig extends Equatable {
       id: map['id'] as String,
       name: map['name'] as String,
       apiType: aiApiTypeFromDbString(map['api_type'] as String),
-      authMode:
-          aiProviderAuthModeFromDbString(map['auth_mode'] as String?),
+      authMode: aiProviderAuthModeFromDbString(map['auth_mode'] as String?),
       apiKey: map['api_key'] as String,
       endpoint: map['endpoint'] as String,
       modelName: map['model_name'] as String,

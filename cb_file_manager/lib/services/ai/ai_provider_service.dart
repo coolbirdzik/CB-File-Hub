@@ -329,7 +329,8 @@ class AiProviderService {
           config,
           modelNameOverride: effectiveModelName,
         );
-        final useTemporaryProvider = requestConfig.modelName != config.modelName;
+        final useTemporaryProvider =
+            requestConfig.modelName != config.modelName;
         final provider = useTemporaryProvider
             ? _createProvider(requestConfig)
             : _getOrCreateProvider(config);
@@ -400,7 +401,8 @@ class AiProviderService {
           config,
           modelNameOverride: effectiveModelName,
         );
-        final useTemporaryProvider = requestConfig.modelName != config.modelName;
+        final useTemporaryProvider =
+            requestConfig.modelName != config.modelName;
         final provider = useTemporaryProvider
             ? _createProvider(requestConfig)
             : _getOrCreateProvider(config);
@@ -540,7 +542,8 @@ class AiProviderService {
       return providers;
     }
 
-    final selected = providers.where((p) => p.id == preferredProviderId).toList();
+    final selected =
+        providers.where((p) => p.id == preferredProviderId).toList();
     return selected;
   }
 

@@ -112,8 +112,9 @@ class AiAgentState extends Equatable {
       selectedProviderId: clearSelectedProvider
           ? null
           : (selectedProviderId ?? this.selectedProviderId),
-      selectedModelName:
-          clearSelectedModel ? null : (selectedModelName ?? this.selectedModelName),
+      selectedModelName: clearSelectedModel
+          ? null
+          : (selectedModelName ?? this.selectedModelName),
       isProviderConfigured: isProviderConfigured ?? this.isProviderConfigured,
       currentPath: currentPath ?? this.currentPath,
       thinkingText: clearThinking ? null : (thinkingText ?? this.thinkingText),

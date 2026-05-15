@@ -351,15 +351,15 @@ class _TitleBarBtn extends StatelessWidget {
 
     return Tooltip(
       message: tooltip,
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: Icon(icon, size: 14, color: color),
-          ),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Icon(icon, size: 14, color: color),
         ),
-      );
+      ),
+    );
   }
 }

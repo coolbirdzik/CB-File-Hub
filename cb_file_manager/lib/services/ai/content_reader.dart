@@ -15,7 +15,8 @@ class FileContent {
     required this.isTruncated,
   });
 
-  static const empty = FileContent(text: '', totalLength: 0, isTruncated: false);
+  static const empty =
+      FileContent(text: '', totalLength: 0, isTruncated: false);
 }
 
 /// Reads text file content with size limits, encoding fallback, and LRU caching.
@@ -36,13 +37,54 @@ class ContentReader {
 
   /// File extensions considered as text files.
   static const Set<String> textExtensions = {
-    '.txt', '.md', '.json', '.xml', '.yaml', '.yml', '.csv', '.log',
-    '.ini', '.cfg', '.conf', '.toml', '.html', '.htm', '.css', '.js',
-    '.ts', '.dart', '.py', '.java', '.kt', '.swift', '.c', '.cpp',
-    '.h', '.rs', '.go', '.rb', '.php', '.sh', '.bat', '.ps1', '.sql',
-    '.jsx', '.tsx', '.vue', '.svelte', '.scss', '.sass', '.less',
-    '.env', '.gitignore', '.dockerignore', '.editorconfig',
-    '.properties', '.gradle', '.cmake', '.makefile',
+    '.txt',
+    '.md',
+    '.json',
+    '.xml',
+    '.yaml',
+    '.yml',
+    '.csv',
+    '.log',
+    '.ini',
+    '.cfg',
+    '.conf',
+    '.toml',
+    '.html',
+    '.htm',
+    '.css',
+    '.js',
+    '.ts',
+    '.dart',
+    '.py',
+    '.java',
+    '.kt',
+    '.swift',
+    '.c',
+    '.cpp',
+    '.h',
+    '.rs',
+    '.go',
+    '.rb',
+    '.php',
+    '.sh',
+    '.bat',
+    '.ps1',
+    '.sql',
+    '.jsx',
+    '.tsx',
+    '.vue',
+    '.svelte',
+    '.scss',
+    '.sass',
+    '.less',
+    '.env',
+    '.gitignore',
+    '.dockerignore',
+    '.editorconfig',
+    '.properties',
+    '.gradle',
+    '.cmake',
+    '.makefile',
   };
 
   /// LRU cache: path → FileContent. Ordered by most-recently-used last.

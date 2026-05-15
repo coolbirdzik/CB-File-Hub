@@ -153,8 +153,7 @@ void main() {
         userQuery: 'Delete all duplicate files in Photos',
         actionType: 'deleteFile',
         title: 'Confirm: Delete 3 files',
-        description:
-            'The following files will be permanently deleted:\n'
+        description: 'The following files will be permanently deleted:\n'
             '• Photos/vacation_01.jpg\n'
             '• Photos/vacation_02.jpg',
       );
@@ -185,8 +184,7 @@ void main() {
     // -------------------------------------------------------------------------
     testWidgets('AI side panel — conversation', (WidgetTester tester) async {
       final et = E2ETester(tester);
-      final dir =
-          await Directory.systemTemp.createTemp('cb_showcase_ai_conv_');
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_ai_conv_');
       await seedShowcaseLibrary(dir);
       await seedWallpaperBackdrop(dir);
       await seedAiMultiTurnConversation(workspacePath: dir.path);
@@ -217,8 +215,7 @@ void main() {
     // -------------------------------------------------------------------------
     testWidgets('tag management list', (WidgetTester tester) async {
       final et = E2ETester(tester);
-      final dir =
-          await Directory.systemTemp.createTemp('cb_showcase_tags_');
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_tags_');
       final media = await seedShowcaseLibrary(dir);
       await seedWallpaperBackdrop(dir);
       await seedTags(media.images);
@@ -244,8 +241,7 @@ void main() {
     // -------------------------------------------------------------------------
     testWidgets('tag management tagged files', (WidgetTester tester) async {
       final et = E2ETester(tester);
-      final dir =
-          await Directory.systemTemp.createTemp('cb_showcase_tagged_');
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_tagged_');
       final media = await seedShowcaseLibrary(dir);
       await seedWallpaperBackdrop(dir);
       await seedTags(media.images);
@@ -410,8 +406,7 @@ Future<void> seedAiConversationWithResults({
       {
         'id': '2',
         'role': 'assistant',
-        'content':
-            'I found several files matching your query. '
+        'content': 'I found several files matching your query. '
             'Here are the most relevant results:',
         'isLoading': false,
       },
@@ -477,8 +472,7 @@ Future<void> seedAiMultiTurnConversation({
       {
         'id': 'm2',
         'role': 'assistant',
-        'content':
-            'I found **2 potential duplicate videos** in your library. '
+        'content': 'I found **2 potential duplicate videos** in your library. '
             'Both have similar resolution and duration. '
             'Would you like me to highlight them so you can decide?',
         'isLoading': false,
@@ -494,8 +488,8 @@ Future<void> seedAiMultiTurnConversation({
         'role': 'assistant',
         'content':
             'Done! I\'ve highlighted the two duplicate files in your Photos folder. '
-            'They appear to be the same recording saved at different times. '
-            'Would you like me to suggest a cleanup strategy?',
+                'They appear to be the same recording saved at different times. '
+                'Would you like me to suggest a cleanup strategy?',
         'isLoading': false,
       },
     ],

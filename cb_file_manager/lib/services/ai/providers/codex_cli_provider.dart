@@ -323,7 +323,8 @@ class CodexCliProvider extends AiProvider {
     if (lower.contains('login') ||
         lower.contains('auth') ||
         lower.contains('chatgpt account') ||
-        lower.contains('not supported when using codex with a chatgpt account')) {
+        lower.contains(
+            'not supported when using codex with a chatgpt account')) {
       return AiProviderErrorType.auth;
     }
     if (lower.contains('timed out')) {

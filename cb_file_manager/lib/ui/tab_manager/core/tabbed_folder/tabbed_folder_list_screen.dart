@@ -1514,4 +1514,3 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 ///
 /// It overlays the file list via a [Positioned] widget inside a [Stack],
 /// so the existing file list layout is never affected.
-

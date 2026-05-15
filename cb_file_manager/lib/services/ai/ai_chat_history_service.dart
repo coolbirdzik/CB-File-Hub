@@ -110,8 +110,9 @@ class AiChatHistoryService {
         summaries[idx] = summaries[idx].copyWith(
           title: title,
           updatedAt: now,
-          initialPath:
-              normalizedPath.isNotEmpty ? normalizedPath : summaries[idx].initialPath,
+          initialPath: normalizedPath.isNotEmpty
+              ? normalizedPath
+              : summaries[idx].initialPath,
         );
       } else {
         summaries.insert(
@@ -219,10 +220,10 @@ class AiChatHistoryService {
       normalized = normalized.replaceAll('\\', Platform.pathSeparator);
     }
 
-    while (normalized.length > 1 &&
-        normalized.endsWith(Platform.pathSeparator)) {
-      normalized =
-          normalized.substring(0, normalized.length - Platform.pathSeparator.length);
+    while (
+        normalized.length > 1 && normalized.endsWith(Platform.pathSeparator)) {
+      normalized = normalized.substring(
+          0, normalized.length - Platform.pathSeparator.length);
     }
 
     if (Platform.isWindows) {

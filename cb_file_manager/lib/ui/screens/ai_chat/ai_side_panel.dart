@@ -205,7 +205,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
                         prev.messages.length != curr.messages.length ||
                         prev.pendingApproval != curr.pendingApproval,
                     listener: (context, state) {
-                      final animate = _lastConversationId == state.conversationId;
+                      final animate =
+                          _lastConversationId == state.conversationId;
                       _lastConversationId = state.conversationId;
                       _scrollToBottom(animated: animate);
                     },
@@ -339,8 +340,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
     );
   }
 
-  Widget _buildContextBadge(
-      ThemeData theme, int totalChars, int messageCount) {
+  Widget _buildContextBadge(ThemeData theme, int totalChars, int messageCount) {
     final label = totalChars >= 1000
         ? '${(totalChars / 1000).toStringAsFixed(1)}K'
         : '$totalChars';
@@ -356,8 +356,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
     }
 
     return Tooltip(
-      message:
-          '$messageCount messages · $totalChars chars\n'
+      message: '$messageCount messages · $totalChars chars\n'
           'Context trimming starts at ~24K chars',
       child: Row(
         mainAxisSize: MainAxisSize.min,

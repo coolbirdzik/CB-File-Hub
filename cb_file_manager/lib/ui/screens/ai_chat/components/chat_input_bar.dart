@@ -8,7 +8,8 @@ import '../../../../config/languages/app_localizations.dart';
 
 /// Callback when sending a message. [text] is the user input, [referencedFiles]
 /// are the paths of files dropped into the chat.
-typedef OnSendMessage = void Function(String text, List<String> referencedFiles);
+typedef OnSendMessage = void Function(
+    String text, List<String> referencedFiles);
 
 /// Input bar for the AI chat interface with send button, suggestion chips,
 /// workspace indicator, and OS-level file drag-and-drop support.

@@ -187,13 +187,28 @@ class FileResultCard extends StatelessWidget {
   IconData _iconForExtension(String ext) {
     ext = ext.toLowerCase();
     const imageExts = {
-      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.heic'
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.bmp',
+      '.webp',
+      '.svg',
+      '.heic'
     };
     const videoExts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.webm'};
     const audioExts = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'};
     const docExts = {'.doc', '.docx', '.pdf', '.txt', '.rtf'};
     const codeExts = {
-      '.dart', '.js', '.ts', '.py', '.java', '.c', '.cpp', '.go', '.rs'
+      '.dart',
+      '.js',
+      '.ts',
+      '.py',
+      '.java',
+      '.c',
+      '.cpp',
+      '.go',
+      '.rs'
     };
     const archiveExts = {'.zip', '.rar', '.7z', '.tar', '.gz'};
 

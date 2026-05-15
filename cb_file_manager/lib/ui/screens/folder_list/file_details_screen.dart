@@ -221,7 +221,8 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               ),
                             ),
@@ -273,7 +274,8 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                               // Make a copy functionality
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                    content: Text(localizations.operationFailed)),
+                                    content:
+                                        Text(localizations.operationFailed)),
                               );
                             },
                           ),
@@ -282,12 +284,14 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                             leading: Icon(PhosphorIconsLight.trash,
                                 color: theme.colorScheme.error),
                             title: Text(localizations.deleteFile,
-                                style: TextStyle(color: theme.colorScheme.error)),
+                                style:
+                                    TextStyle(color: theme.colorScheme.error)),
                             onTap: () {
                               // Delete functionality
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                    content: Text(localizations.operationFailed)),
+                                    content:
+                                        Text(localizations.operationFailed)),
                               );
                             },
                           ),
@@ -509,12 +513,19 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
 
         return Column(
           children: [
-            _buildDetailRow(localizations.fileName, pathlib.basename(widget.file.path),
-                PhosphorIconsLight.fileText, textColor, secondaryTextColor),
+            _buildDetailRow(
+                localizations.fileName,
+                pathlib.basename(widget.file.path),
+                PhosphorIconsLight.fileText,
+                textColor,
+                secondaryTextColor),
             const Divider(height: 24),
-            _buildDetailRow(localizations.fileType,
-                '$localizedFileType$extensionLabel', PhosphorIconsLight.tag,
-                textColor, secondaryTextColor),
+            _buildDetailRow(
+                localizations.fileType,
+                '$localizedFileType$extensionLabel',
+                PhosphorIconsLight.tag,
+                textColor,
+                secondaryTextColor),
             const Divider(height: 24),
             _buildDetailRow(localizations.fileSize, fileSize,
                 PhosphorIconsLight.hardDrives, textColor, secondaryTextColor),

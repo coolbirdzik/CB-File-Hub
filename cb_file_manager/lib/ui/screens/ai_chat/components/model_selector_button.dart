@@ -184,8 +184,9 @@ class ModelSelectorButton extends StatelessWidget {
   String _buildSelectedLabel(AiProviderModelCatalog? selectedCatalog) {
     if (isLoading) return loadingLabel;
     if (selectedCatalog == null) return emptyLabel;
-    final model =
-        selectedModelName?.trim().isNotEmpty == true ? selectedModelName! : null;
+    final model = selectedModelName?.trim().isNotEmpty == true
+        ? selectedModelName!
+        : null;
     final effectiveModel = model ??
         (selectedCatalog.defaultModelName.trim().isNotEmpty
             ? selectedCatalog.defaultModelName.trim()

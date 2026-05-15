@@ -321,8 +321,7 @@ class AnthropicProvider extends AiProvider {
 
     // Anthropic returns content as an array of blocks
     final textBlocks = content
-        .where(
-            (block) => (block as Map<String, dynamic>)['type'] == 'text')
+        .where((block) => (block as Map<String, dynamic>)['type'] == 'text')
         .map((block) => (block as Map<String, dynamic>)['text'] as String)
         .join('\n');
 
