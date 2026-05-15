@@ -22,6 +22,7 @@ import 'package:cb_file_manager/services/video_library_cache_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -392,6 +393,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildMediaSettingsSection(),
                         const SizedBox(height: 24),
                         _buildCacheManagementSection(),
+                        const SizedBox(height: 24),
+                        AiSettingsSection(
+                          buildSectionCard: ({
+                            required String title,
+                            required IconData icon,
+                            required List<Widget> children,
+                          }) =>
+                              _buildSectionCard(
+                                title: title,
+                                icon: icon,
+                                children: children,
+                              ),
+                          buildCompactSettingTile: ({
+                            required String title,
+                            required String subtitle,
+                            required IconData icon,
+                            Widget? trailing,
+                            VoidCallback? onTap,
+                          }) =>
+                              _buildCompactSettingTile(
+                                title: title,
+                                subtitle: subtitle,
+                                icon: icon,
+                                trailing: trailing,
+                                onTap: onTap,
+                              ),
+                        ),
                         const SizedBox(height: 24),
                         _buildDatabaseSection(),
                       ],

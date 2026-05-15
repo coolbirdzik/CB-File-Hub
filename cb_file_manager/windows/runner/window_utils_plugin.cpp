@@ -95,9 +95,19 @@ namespace
   constexpr DWORD kWindowAttributeUseImmersiveDarkMode = 20;
   constexpr DWORD kWindowAttributeCaptionColor = 35;
   constexpr DWORD kWindowAttributeMicaEffect = 1029;
+  constexpr DWORD kDwmwaRedirectionBitmapAlpha = 39;
+
+  static bool g_backdrop_enabled = false;
+  static bool g_backdrop_prefer_acrylic = true;
+  static bool g_backdrop_dark_mode = false;
 
   static HMODULE g_user32_module = nullptr;
   static SetWindowCompositionAttribute g_set_window_composition_attribute = nullptr;
+
+  bool SetNativeSystemBackdrop(
+      HWND hwnd, bool enabled, bool prefer_acrylic, bool is_dark_mode);
+  HWND GetMainWindow(flutter::PluginRegistrarWindows *registrar);
+  HWND GetTopLevelWindow(flutter::PluginRegistrarWindows *registrar);
 
   RTL_OSVERSIONINFOW GetWindowsVersionInfo()
   {
@@ -156,6 +166,75 @@ namespace
     return g_set_window_composition_attribute(hwnd, &data) != FALSE;
   }
 
+  void SetRedirectionBitmapAlpha(HWND hwnd, DWORD build_number, bool enabled)
+  {
+    if (!hwnd || build_number < 26100)
+      return;
+
+    const BOOL enable_alpha = enabled ? TRUE : FALSE;
+    ::DwmSetWindowAttribute(
+        hwnd, kDwmwaRedirectionBitmapAlpha, &enable_alpha,
+        sizeof(enable_alpha));
+  }
+
+  void SetFlutterChildBackdropTransparency(HWND hwnd, DWORD build_number, bool enabled)
+  {
+    if (!hwnd)
+      return;
+
+    SetRedirectionBitmapAlpha(hwnd, build_number, enabled);
+    ApplyAccentPolicy(hwnd, enabled ? ACCENT_ENABLE_TRANSPARENTGRADIENT
+                                    : ACCENT_DISABLED);
+    ::RedrawWindow(
+        hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
+  }
+
+  void ReapplyBackdropForPluginInstance(
+      flutter::PluginRegistrarWindows *registrar,
+      HWND hwnd,
+      bool active,
+      bool prefer_acrylic,
+      bool dark_mode)
+  {
+    if (!registrar || !active)
+      return;
+
+    HWND root = hwnd ? ::GetAncestor(hwnd, GA_ROOT) : nullptr;
+    HWND target = root ? root : hwnd;
+    if (!target)
+      target = GetTopLevelWindow(registrar);
+    if (!target)
+      return;
+
+    SetNativeSystemBackdrop(target, active, prefer_acrylic, dark_mode);
+
+    HWND flutter_view = GetMainWindow(registrar);
+    if (flutter_view && flutter_view != target)
+    {
+      SetFlutterChildBackdropTransparency(
+          flutter_view, GetWindowsVersionInfo().dwBuildNumber,
+          active && prefer_acrylic);
+    }
+  }
+
+  void ScheduleBackdropReapplyForPluginInstance(
+      flutter::PluginRegistrarWindows *registrar,
+      HWND hwnd,
+      bool active,
+      bool prefer_acrylic,
+      bool dark_mode)
+  {
+    if (!active)
+      return;
+
+    ReapplyBackdropForPluginInstance(
+        registrar, hwnd, active, prefer_acrylic, dark_mode);
+
+    ::SetTimer(hwnd, 0xCBA1, 80, nullptr);
+    ::SetTimer(hwnd, 0xCBA2, 240, nullptr);
+    ::SetTimer(hwnd, 0xCBA3, 520, nullptr);
+  }
+
   bool SetLegacyBlurBehind(HWND hwnd, bool enabled)
   {
     if (!hwnd)
@@ -175,6 +254,11 @@ namespace
   {
     if (!hwnd)
       return false;
+
+    // Persist for the window proc delegate to re-apply on WM_ACTIVATE etc.
+    g_backdrop_enabled = enabled;
+    g_backdrop_prefer_acrylic = prefer_acrylic;
+    g_backdrop_dark_mode = is_dark_mode;
 
     const RTL_OSVERSIONINFOW version = GetWindowsVersionInfo();
     const DWORD build_number = version.dwBuildNumber;
@@ -200,6 +284,7 @@ namespace
       ::DwmSetWindowAttribute(
           hwnd, kWindowAttributeMicaEffect, &disable, sizeof(disable));
 
+      SetRedirectionBitmapAlpha(hwnd, build_number, false);
       SetLegacyBlurBehind(hwnd, false);
       ::RedrawWindow(
           hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME);
@@ -233,8 +318,13 @@ namespace
           hwnd, kDwmwaSystemBackdropType, &backdrop_type, sizeof(backdrop_type));
 
       applied = SUCCEEDED(host_hr) || SUCCEEDED(backdrop_hr);
+
+      if (applied)
+      {
+        SetRedirectionBitmapAlpha(hwnd, build_number, true);
+      }
     }
-    else if (build_number >= 22000 && !prefer_acrylic)
+    else if (!applied && build_number >= 22000 && !prefer_acrylic)
     {
       // Windows 11 21H2 Mica fallback.
       const BOOL enable_dark_mode = is_dark_mode ? TRUE : FALSE;
@@ -247,15 +337,22 @@ namespace
       const HRESULT mica_hr = ::DwmSetWindowAttribute(
           hwnd, kWindowAttributeMicaEffect, &enable_mica, sizeof(enable_mica));
       applied = SUCCEEDED(dark_hr) || SUCCEEDED(mica_hr);
+
+      if (applied)
+      {
+        SetRedirectionBitmapAlpha(hwnd, build_number, true);
+      }
     }
 
     if (!applied)
     {
       // Legacy approach from flutter_acrylic for pre-Windows 11 systems.
+      // Here ACCENT_DISABLED was already called above to clear stale state.
       if (prefer_acrylic)
       {
-        // ARGB format (AABBGGRR). Slightly dark tint keeps text readable.
-        constexpr DWORD kLegacyAcrylicTint = 0xCC222222;
+        // ARGB format (AABBGGRR). Fallback for Windows 10 / early Windows 11.
+        const DWORD kLegacyAcrylicTint =
+            is_dark_mode ? 0x99222222 : 0x99FFFFFF;
         applied = ApplyAccentPolicy(
             hwnd, ACCENT_ENABLE_ACRYLICBLURBEHIND, kLegacyAcrylicTint);
       }
@@ -796,6 +893,7 @@ void WindowUtilsPlugin::RegisterWithRegistrar(
 
   plugin->channel_ = std::move(channel);
   plugin->EnsureDropTargetRegistered();
+  plugin->EnsureWindowProcDelegateRegistered();
 
   plugin->channel_->SetMethodCallHandler(
       [plugin_pointer = plugin.get()](const auto &call, auto result)
@@ -811,6 +909,11 @@ WindowUtilsPlugin::WindowUtilsPlugin(flutter::PluginRegistrarWindows *registrar)
 
 WindowUtilsPlugin::~WindowUtilsPlugin()
 {
+  if (window_proc_delegate_id_ >= 0 && registrar_)
+  {
+    registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_delegate_id_);
+    window_proc_delegate_id_ = -1;
+  }
   if (drop_target_hwnd_)
   {
     ::RevokeDragDrop(drop_target_hwnd_);
@@ -868,6 +971,109 @@ void WindowUtilsPlugin::EnsureDropTargetRegistered()
     drop_target_ = nullptr;
     drop_target_hwnd_ = nullptr;
   }
+}
+
+void WindowUtilsPlugin::EnsureWindowProcDelegateRegistered()
+{
+  if (!registrar_ || window_proc_delegate_id_ >= 0)
+    return;
+
+  window_proc_delegate_id_ = registrar_->RegisterTopLevelWindowProcDelegate(
+      // Capture `this` so each plugin instance tracks its OWN window's
+      // backdrop state. Using shared anonymous-namespace globals caused
+      // cross-window pollution: a secondary window (e.g. progress/PiP)
+      // calling setWindowsSystemBackdrop(enabled:false) would set the
+      // global to false, making the main window's delegate skip re-apply.
+      [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+          -> std::optional<LRESULT>
+      {
+        if (!this->backdrop_active_)
+          return std::nullopt;
+
+        switch (message)
+        {
+        case WM_ACTIVATE:
+          // Re-apply the transparent-gradient accent when the window becomes
+          // active. Windows resets WCA_ACCENT_POLICY on every WM_ACTIVATE.
+          if (LOWORD(wparam) != WA_INACTIVE)
+          {
+            HWND root = ::GetAncestor(hwnd, GA_ROOT);
+            HWND target = root ? root : hwnd;
+            if (this->backdrop_prefer_acrylic_)
+            {
+              ScheduleBackdropReapplyForPluginInstance(
+                  this->registrar_, target, this->backdrop_active_,
+                  this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+            }
+            else
+            {
+              ScheduleBackdropReapplyForPluginInstance(
+                  this->registrar_, target, this->backdrop_active_,
+                  this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+            }
+          }
+          break;
+
+        case WM_NCACTIVATE:
+          // Non-client area activation also triggers a DWM accent reset.
+          if (wparam != FALSE)
+          {
+            HWND root = ::GetAncestor(hwnd, GA_ROOT);
+            HWND target = root ? root : hwnd;
+            if (this->backdrop_prefer_acrylic_)
+            {
+              ScheduleBackdropReapplyForPluginInstance(
+                  this->registrar_, target, this->backdrop_active_,
+                  this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+            }
+            else
+            {
+              ScheduleBackdropReapplyForPluginInstance(
+                  this->registrar_, target, this->backdrop_active_,
+                  this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+            }
+          }
+          break;
+
+        case WM_SIZE:
+          if (wparam == SIZE_RESTORED || wparam == SIZE_MAXIMIZED)
+          {
+            ScheduleBackdropReapplyForPluginInstance(
+                this->registrar_, hwnd, this->backdrop_active_,
+                this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+          }
+          break;
+
+        case WM_EXITSIZEMOVE:
+        case WM_SHOWWINDOW:
+          ScheduleBackdropReapplyForPluginInstance(
+              this->registrar_, hwnd, this->backdrop_active_,
+              this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+          break;
+
+        case WM_TIMER:
+          if (wparam == 0xCBA1 || wparam == 0xCBA2 || wparam == 0xCBA3)
+          {
+            ::KillTimer(hwnd, static_cast<UINT_PTR>(wparam));
+            ReapplyBackdropForPluginInstance(
+                this->registrar_, hwnd, this->backdrop_active_,
+                this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+          }
+          break;
+
+        case WM_THEMECHANGED:
+        case WM_DWMCOMPOSITIONCHANGED:
+        {
+          // Full re-apply on DWM composition/theme change events.
+          ScheduleBackdropReapplyForPluginInstance(
+              this->registrar_, hwnd, this->backdrop_active_,
+              this->backdrop_prefer_acrylic_, this->backdrop_dark_mode_);
+          break;
+        }
+        }
+        // Never consume the message — let Flutter and DefWindowProc handle it.
+        return std::nullopt;
+      });
 }
 
 void WindowUtilsPlugin::HandleMethodCall(
@@ -1169,8 +1375,20 @@ void WindowUtilsPlugin::HandleMethodCall(
       return;
     }
 
+    HWND flutter_view_hwnd = GetMainWindow(registrar_);
+    const RTL_OSVERSIONINFOW version = GetWindowsVersionInfo();
     const bool ok =
         SetNativeSystemBackdrop(hwnd, enabled, prefer_acrylic, is_dark_mode);
+    if (flutter_view_hwnd && flutter_view_hwnd != hwnd)
+    {
+      SetFlutterChildBackdropTransparency(
+          flutter_view_hwnd, version.dwBuildNumber, enabled && prefer_acrylic);
+    }
+    // Keep per-instance state in sync so the window proc delegate uses the
+    // correct values for THIS window, not a shared/polluted global.
+    backdrop_active_ = enabled;
+    backdrop_prefer_acrylic_ = prefer_acrylic;
+    backdrop_dark_mode_ = is_dark_mode;
     result->Success(flutter::EncodableValue(ok));
     return;
   }

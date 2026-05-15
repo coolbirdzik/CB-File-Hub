@@ -25,6 +25,29 @@ Instead of acting like a generic explorer, the app is designed to reduce browsin
   </tr>
 </table>
 
+### AI Agent
+
+The AI side panel sits beside the file browser. Ask it to find files, clean up duplicates, or organize folders — it shows results inline and asks for approval before making any changes.
+
+<table>
+  <tr>
+    <td>
+      <img src="screenshots/ai_search_results.png" alt="AI agent — file search results" />
+      <p align="center"><sub>Search results with relevance scores and file cards</sub></p>
+    </td>
+    <td>
+      <img src="screenshots/ai_conversation.png" alt="AI agent — multi-turn conversation" />
+      <p align="center"><sub>Multi-turn conversation with context-aware replies</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <img src="screenshots/ai_approval.png" alt="AI agent — approval card before destructive action" />
+      <p align="center"><sub>Approval card shown before any destructive file operation</sub></p>
+    </td>
+  </tr>
+</table>
+
 ## Why This App Exists
 
 This project started from a very personal problem: a movie and photo collection that became too large to browse comfortably. File names were not enough, folder trees became noisy, and searching for something to watch or review took too much effort.
@@ -34,6 +57,7 @@ CB File Hub focuses on solving that workflow with a media-first file manager tha
 ## Highlights
 
 - **Media-first file management**: Browse local folders with layouts that work better for photos, videos, and mixed libraries than a plain file list.
+- **AI file agent**: Let an AI agent help search files, create files and folders, manage moves and cleanup, find suspicious or problematic files, organize messy folders, and automate more library work.
 - **Tabbed browsing on desktop and mobile**: Open multiple locations at once, switch contexts quickly, and keep parallel browsing flows alive on both Windows and Android.
 - **Tag files and search by tags**: Add tags to files, reuse popular tags, and search with single or multiple tags to narrow a large library fast.
 - **Smart albums with dynamic rules**: Build albums that automatically collect matching files from selected source folders using filename-based rules.
@@ -53,6 +77,30 @@ CB File Hub focuses on solving that workflow with a media-first file manager tha
 - Use the same tab-oriented workflow across desktop and mobile.
 - Pin folders, drives, or favorite locations to the sidebar.
 - Restore the last opened tab workspace when returning to the app.
+
+### AI file agent
+
+- Search across folders with natural-language requests instead of exact file names.
+- Create files and folders from user intent when routine setup work gets repetitive.
+- Manage files with guided actions such as rename, move, copy, delete, and batch organization.
+- Find files that may need attention, including broken media, missing thumbnails, duplicates, odd names, or misplaced items.
+- Sort messy downloads, recordings, photos, and videos into clearer folder structures.
+- Assist with larger cleanup workflows while keeping file operations visible and controllable.
+
+## AI Agent Workflow
+
+CB File Hub is designed to be a strong base for an AI-assisted file workflow, especially when a library becomes too large to manage manually.
+
+The AI agent can be introduced in the product and project documentation as a practical file operations assistant that helps users:
+
+- Search for files and folders with natural-language requests.
+- Create files or folders for repetitive setup tasks.
+- Manage file operations such as rename, move, copy, delete, and batch cleanup.
+- Detect files that may have issues, such as broken media, missing thumbnails, duplicates, unexpected names, or misplaced content.
+- Sort and reorganize cluttered folders into cleaner structures.
+- Assist with broader maintenance workflows across large personal media libraries.
+
+This positioning keeps the AI feature grounded in real file-management jobs instead of vague chatbot behavior.
 
 ### Tagging and discovery
 
@@ -193,6 +241,45 @@ make android
 make linux
 make all
 ```
+
+### Screenshot automation
+
+Generate lightweight showcase screenshots for the main app features on desktop and Android:
+
+```bash
+# Windows desktop screenshots
+./scripts/capture_screenshots.sh desktop
+
+# Android screenshots, using first connected Android device or emulator
+./scripts/capture_screenshots.sh android
+
+# Both targets
+./scripts/capture_screenshots.sh all
+```
+
+On Windows PowerShell, use the native script instead of the Bash wrapper:
+
+```powershell
+# Windows desktop screenshots
+./scripts/capture_screenshots.ps1 desktop
+
+# Android screenshots, using the first connected Android device or emulator
+./scripts/capture_screenshots.ps1 android
+
+# Both targets
+./scripts/capture_screenshots.ps1 all
+```
+
+Output files are copied to:
+
+```text
+screenshots/auto/desktop/
+screenshots/auto/android/
+```
+
+The screenshot scripts use a dedicated showcase E2E flow and export only the final hero frames for each featured scenario, not every intermediate test step.
+
+Android requires a connected device or running emulator visible in `flutter devices`.
 
 ## Testing
 

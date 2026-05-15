@@ -43,6 +43,7 @@ class ThemeProvider extends ChangeNotifier {
         _currentTheme,
         accentColor: _currentAccentColor,
         acrylicStrength: _desktopAcrylicStrength,
+        preferTransparentBackdrop: _backdropMode == AcrylicBackdropMode.dynamic,
       );
 
   // For backward compatibility

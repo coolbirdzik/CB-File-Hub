@@ -256,6 +256,12 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             context, '#network', context.tr.networkTab),
                       ),
 
+                      DrawerNavigationItem(
+                        icon: PhosphorIconsLight.sparkle,
+                        title: context.tr.aiChat,
+                        onTap: () => _navigateToAiChat(context),
+                      ),
+
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         child: Divider(
@@ -328,6 +334,16 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       // Create new tab for others
       tabBloc.add(AddTab(path: path, name: name, switchToTab: true));
     }
+  }
+
+  void _navigateToAiChat(BuildContext context) {
+    final tabBloc = BlocProvider.of<TabManagerBloc>(context);
+    final activePath = tabBloc.state.activeTab?.path ?? '';
+    final hasWorkspace = activePath.isNotEmpty && !activePath.startsWith('#');
+    final path = hasWorkspace
+        ? '#ai-chat?workspace=${Uri.encodeComponent(activePath)}'
+        : '#ai-chat';
+    _navigateTo(context, path, context.tr.aiChatTab);
   }
 
   void _openInCurrentTab(BuildContext context, String path, String name) {

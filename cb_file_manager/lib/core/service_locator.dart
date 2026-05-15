@@ -11,6 +11,8 @@ import '../helpers/media/folder_thumbnail_service.dart';
 import '../config/language_controller.dart';
 import '../ui/controllers/operation_progress_controller.dart';
 import '../services/windowing/desktop_windowing_service.dart';
+import '../services/ai/ai_provider_service.dart';
+import '../services/ai/ai_chat_history_service.dart';
 
 /// Global service locator instance
 final GetIt locator = GetIt.instance;
@@ -91,6 +93,18 @@ Future<void> setupServiceLocator() async {
   // Register DesktopWindowingService (desktop-only; no-op on mobile).
   locator.registerLazySingleton<DesktopWindowingService>(
     () => DesktopWindowingService(),
+  );
+
+  // AI services
+
+  // Register AiProviderService for AI provider management and chat
+  locator.registerLazySingleton<AiProviderService>(
+    () => AiProviderService(),
+  );
+
+  // Register AiChatHistoryService for persisting conversation history
+  locator.registerLazySingleton<AiChatHistoryService>(
+    () => AiChatHistoryService(),
   );
 
   // Note: Services are registered but not initialized here.

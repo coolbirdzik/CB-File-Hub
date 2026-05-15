@@ -293,12 +293,11 @@ Win32Window::MessageHandler(HWND hwnd,
     // Paint background to avoid white flash before Flutter draws.
     // For progress windows, use the exact Flutter theme color to ensure
     // zero visible transition when Flutter renders on top.
-    HDC hdc = reinterpret_cast<HDC>(wparam);
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-    HBRUSH brush;
     if (is_progress_window_)
     {
+      HDC hdc = reinterpret_cast<HDC>(wparam);
+      RECT rc;
+      GetClientRect(hwnd, &rc);
       // Match the Dart-side solidBg: dark=0xFF1E1E1E, light=0xFFF5F5F5
       // Check Windows app theme to decide.
       DWORD light_mode = 1;
@@ -309,16 +308,16 @@ Win32Window::MessageHandler(HWND hwnd,
                   RRF_RT_REG_DWORD, nullptr, &light_mode, &light_mode_size);
       // dark: RGB(30,30,30) = 0x1E1E1E, light: RGB(245,245,245) = 0xF5F5F5
       COLORREF bg = (light_mode == 0) ? RGB(30, 30, 30) : RGB(245, 245, 245);
-      brush = CreateSolidBrush(bg);
+      HBRUSH brush = CreateSolidBrush(bg);
       FillRect(hdc, &rc, brush);
       DeleteObject(brush);
+      return 1; // Non-zero to indicate background erased.
     }
-    else
-    {
-      brush = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
-      FillRect(hdc, &rc, brush);
-    }
-    return 1; // Non-zero to indicate background erased.
+
+    // Main windows need to remain unpainted here so transparent Flutter pixels
+    // reveal the DWM acrylic/mica backdrop instead of a runner-painted black
+    // client background.
+    return 1;
   }
 
   case WM_DESTROY:

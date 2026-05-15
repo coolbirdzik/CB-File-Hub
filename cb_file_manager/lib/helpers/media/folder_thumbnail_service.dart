@@ -32,6 +32,9 @@ class FolderThumbnailService {
   final Map<String, Map<String, dynamic>> _folderConfigCache = {};
   final Map<String, Map<String, dynamic>> _systemPathConfigs = {};
 
+  // Track failed video paths to prevent infinite reload loops
+  final Set<String> _failedVideoPathsCache = {};
+
   // Last cache cleanup timestamp
   DateTime _lastCacheCleanup = DateTime.now();
 
@@ -88,6 +91,21 @@ class FolderThumbnailService {
   }
 
   Stream<String> get onThumbnailChanged => _thumbnailChangedController.stream;
+
+  /// Check if a video path has previously failed to load
+  bool isVideoPathFailed(String videoPath) {
+    return _failedVideoPathsCache.contains(videoPath);
+  }
+
+  /// Mark a video path as failed to prevent reload loops
+  void markVideoPathAsFailed(String videoPath) {
+    _failedVideoPathsCache.add(videoPath);
+  }
+
+  /// Clear failed video paths cache (useful for retry scenarios)
+  void clearFailedVideoPaths() {
+    _failedVideoPathsCache.clear();
+  }
 
   bool _isSystemPath(String folderPath) {
     return folderPath.startsWith('#');
@@ -481,6 +499,7 @@ class FolderThumbnailService {
     _thumbnailCache.clear();
     _cacheAccessOrder.clear();
     _folderConfigCache.clear();
+    _failedVideoPathsCache.clear();
     debugPrint('FolderThumbnailService: Cache cleared');
 
     // Also clear the VideoThumbnailHelper cache

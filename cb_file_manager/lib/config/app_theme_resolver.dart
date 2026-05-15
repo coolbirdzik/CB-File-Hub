@@ -128,15 +128,14 @@ class AppThemeResolver {
     final cardColor = lightContainerBase.withValues(alpha: containerOpacity());
     // Dialog: always solid for readability
     final dialogColor = lightContainerBase;
-    // Menu: acrylic style using theme surface colors + slight transparency
-    final Color menuColor =
-        lightContainerBase.withValues(alpha: isLight ? 0.97 : 0.94);
+    // Menus and dropdown overlays stay solid even when page chrome uses acrylic.
+    final Color menuColor = lightContainerBase;
 
     return baseTheme.copyWith(
       colorScheme: bridged,
       scaffoldBackgroundColor: baseTheme.scaffoldBackgroundColor
           .withValues(alpha: scaffoldOpacity()),
-      canvasColor: baseTheme.canvasColor.withValues(alpha: scaffoldOpacity()),
+      canvasColor: menuColor,
       cardColor: cardColor,
       cardTheme: baseTheme.cardTheme.copyWith(color: cardColor),
       dialogTheme: baseTheme.dialogTheme.copyWith(backgroundColor: dialogColor),
@@ -153,6 +152,13 @@ class AppThemeResolver {
                 : Colors.white.withValues(alpha: 0.08),
             width: 1,
           ),
+        ),
+      ),
+      dropdownMenuTheme: baseTheme.dropdownMenuTheme.copyWith(
+        menuStyle: (baseTheme.dropdownMenuTheme.menuStyle ?? const MenuStyle())
+            .copyWith(
+          backgroundColor: WidgetStatePropertyAll(menuColor),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         ),
       ),
       bottomSheetTheme: baseTheme.bottomSheetTheme.copyWith(

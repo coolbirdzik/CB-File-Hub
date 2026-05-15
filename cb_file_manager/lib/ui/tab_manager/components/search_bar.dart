@@ -14,6 +14,17 @@ class SearchBar extends StatefulWidget {
   final String currentPath;
   final VoidCallback onCloseSearch;
   final String tabId; // Add tabId property
+  final String? initialQuery;
+  final ValueChanged<String>? onSearch;
+  final void Function(String query, bool useRegex)? onSearchWithOptions;
+  final ValueChanged<String>? onQueryChanged;
+  final VoidCallback? onClearSearch;
+  final String? hintText;
+  final bool showTipsButton;
+  final bool showTagSearch;
+  final bool showGlobalSearchToggle;
+  final bool showRegexToggle;
+  final bool showClearButton;
 
   /// Optional: provide the [FolderListBloc] directly so the widget works
   /// even when rendered outside its normal [BlocProvider] subtree
@@ -26,6 +37,17 @@ class SearchBar extends StatefulWidget {
     required this.onCloseSearch,
     required this.tabId, // Include tabId in constructor
     this.folderListBloc,
+    this.initialQuery,
+    this.onSearch,
+    this.onSearchWithOptions,
+    this.onQueryChanged,
+    this.onClearSearch,
+    this.hintText,
+    this.showTipsButton = true,
+    this.showTagSearch = true,
+    this.showGlobalSearchToggle = true,
+    this.showRegexToggle = true,
+    this.showClearButton = false,
   }) : super(key: key);
 
   @override
@@ -52,6 +74,7 @@ class _SearchBarState extends State<SearchBar> {
   @override
   void initState() {
     super.initState();
+    _searchController.text = widget.initialQuery ?? '';
     // Tự động focus vào trường tìm kiếm khi hiển thị
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.requestFocus();
@@ -61,6 +84,19 @@ class _SearchBarState extends State<SearchBar> {
 
     // Tải các tag phổ biến
     _loadPopularTags();
+  }
+
+  @override
+  void didUpdateWidget(SearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialQuery != widget.initialQuery &&
+        widget.initialQuery != _searchController.text) {
+      final query = widget.initialQuery ?? '';
+      _searchController.text = query;
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: query.length),
+      );
+    }
   }
 
   Future<void> _loadPopularTags() async {
@@ -91,6 +127,15 @@ class _SearchBarState extends State<SearchBar> {
 
   void _onSearchChanged() {
     final query = _searchController.text.toLowerCase();
+    widget.onQueryChanged?.call(_searchController.text);
+
+    if (!widget.showTagSearch) {
+      setState(() {
+        _isSearchingTags = false;
+      });
+      _removeOverlay();
+      return;
+    }
 
     // Kiểm tra xem có đang tìm kiếm theo tag không
     if (query.contains('#')) {
@@ -384,6 +429,16 @@ class _SearchBarState extends State<SearchBar> {
       return;
     }
 
+    if (widget.onSearchWithOptions != null) {
+      widget.onSearchWithOptions!(_searchController.text, _useRegex);
+      return;
+    }
+
+    if (widget.onSearch != null) {
+      widget.onSearch!(_searchController.text);
+      return;
+    }
+
     // Get the current path before performing search
     final currentPath = widget.currentPath;
 
@@ -583,7 +638,7 @@ class _SearchBarState extends State<SearchBar> {
                 decoration: InputDecoration(
                   hintText: _isSearchingTags
                       ? localizations.searchHintTextTags
-                      : localizations.searchHintText,
+                      : widget.hintText ?? localizations.searchHintText,
                   hintStyle: TextStyle(
                     color: theme.colorScheme.onSurfaceVariant
                         .withValues(alpha: 0.7),
@@ -599,27 +654,28 @@ class _SearchBarState extends State<SearchBar> {
             ),
           ),
           // Tips button
-          Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
+          if (widget.showTipsButton)
+            Material(
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(20),
-              onTap: () => _showSearchTipsDialog(context),
-              child: Tooltip(
-                message: AppLocalizations.of(context)!.searchTips,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Icon(
-                    PhosphorIconsLight.info,
-                    color: theme.colorScheme.onSurfaceVariant,
-                    size: 20,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _showSearchTipsDialog(context),
+                child: Tooltip(
+                  message: AppLocalizations.of(context)!.searchTips,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      PhosphorIconsLight.info,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           // Tag suggestion button - Only show when in tag search mode
-          if (_isSearchingTags)
+          if (widget.showTagSearch && _isSearchingTags)
             Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(20),
@@ -647,59 +703,62 @@ class _SearchBarState extends State<SearchBar> {
               ),
             ),
           // Global search toggle button
-          Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
+          if (widget.showGlobalSearchToggle)
+            Material(
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                setState(() {
-                  _isGlobalSearch = !_isGlobalSearch;
-                });
-                // Hiển thị snackbar ngắn khi chuyển chế độ
-                final messenger = ScaffoldMessenger.maybeOf(context);
-                messenger?.showSnackBar(
-                  SnackBar(
-                    content: Text(_isGlobalSearch
-                        ? AppLocalizations.of(context)!.globalSearchModeEnabled
-                        : AppLocalizations.of(context)!.localSearchModeEnabled),
-                    duration: const Duration(milliseconds: 1000),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16.0),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  setState(() {
+                    _isGlobalSearch = !_isGlobalSearch;
+                  });
+                  // Hiển thị snackbar ngắn khi chuyển chế độ
+                  final messenger = ScaffoldMessenger.maybeOf(context);
+                  messenger?.showSnackBar(
+                    SnackBar(
+                      content: Text(_isGlobalSearch
+                          ? AppLocalizations.of(context)!
+                              .globalSearchModeEnabled
+                          : AppLocalizations.of(context)!
+                              .localSearchModeEnabled),
+                      duration: const Duration(milliseconds: 1000),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16.0),
+                      ),
+                      margin: const EdgeInsets.all(8),
                     ),
-                    margin: const EdgeInsets.all(8),
-                  ),
-                );
-              },
-              child: Tooltip(
-                message: _isGlobalSearch
-                    ? AppLocalizations.of(context)!.globalSearchMode
-                    : AppLocalizations.of(context)!.localSearchMode,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: _isGlobalSearch
-                        ? Icon(
-                            PhosphorIconsLight.globe,
-                            key: const ValueKey('globalIcon'),
-                            color: theme.colorScheme.primary,
-                            size: 20,
-                          )
-                        : Icon(
-                            PhosphorIconsLight.folder,
-                            key: const ValueKey('folderIcon'),
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                  );
+                },
+                child: Tooltip(
+                  message: _isGlobalSearch
+                      ? AppLocalizations.of(context)!.globalSearchMode
+                      : AppLocalizations.of(context)!.localSearchMode,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _isGlobalSearch
+                          ? Icon(
+                              PhosphorIconsLight.globe,
+                              key: const ValueKey('globalIcon'),
+                              color: theme.colorScheme.primary,
+                              size: 20,
+                            )
+                          : Icon(
+                              PhosphorIconsLight.folder,
+                              key: const ValueKey('folderIcon'),
+                              size: 20,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           // Regex toggle button - only for filename search
-          if (!_isSearchingTags)
+          if (widget.showRegexToggle && !_isSearchingTags)
             Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(20),
@@ -756,6 +815,29 @@ class _SearchBarState extends State<SearchBar> {
               ),
             ),
           ),
+          if (widget.showClearButton && _searchController.text.isNotEmpty)
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  _searchController.clear();
+                  widget.onClearSearch?.call();
+                },
+                child: Tooltip(
+                  message: AppLocalizations.of(context)!.clearSearch,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      PhosphorIconsLight.x,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Close button
           Material(
             color: Colors.transparent,

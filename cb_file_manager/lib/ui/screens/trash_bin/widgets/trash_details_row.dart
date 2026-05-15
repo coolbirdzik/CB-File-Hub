@@ -25,6 +25,8 @@ class TrashDetailsRow extends StatelessWidget {
   final String Function(DateTime) formatDate;
   final String Function(int) formatSize;
   final AppLocalizations l10n;
+  final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
 
   const TrashDetailsRow({
     Key? key,
@@ -38,6 +40,8 @@ class TrashDetailsRow extends StatelessWidget {
     required this.formatDate,
     required this.formatSize,
     required this.l10n,
+    this.onTap,
+    this.onDoubleTap,
   }) : super(key: key);
 
   @override
@@ -48,6 +52,8 @@ class TrashDetailsRow extends StatelessWidget {
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       isDesktopMode: isDesktop,
+      onTap: onTap,
+      onDoubleTap: onDoubleTap,
       onToggleSelection: onToggleSelection,
       onEnterSelectionMode: onEnterSelectionMode,
       onSecondaryTapUp: (d) => onContextMenu(d.globalPosition),
@@ -59,7 +65,7 @@ class TrashDetailsRow extends StatelessWidget {
             flex: 3,
             child: Row(
               children: [
-                TrashItemIcon(originalPath: item.originalPath, size: 24),
+                TrashItemIcon(originalPath: item.originalPath, size: 24, isFolder: item.isFolder),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

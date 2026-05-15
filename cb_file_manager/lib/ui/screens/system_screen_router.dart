@@ -29,6 +29,7 @@ import 'package:cb_file_manager/config/translation_helper.dart';
 import '../utils/route.dart';
 import 'trash_bin/trash_bin_screen.dart';
 import 'settings/settings_screen.dart';
+import 'ai_chat/ai_chat_screen.dart';
 import 'package:path/path.dart' as pathlib;
 
 /// A router that handles system screens and special paths
@@ -102,7 +103,9 @@ class SystemScreenRouter {
     }
 
     // 2. Handle dynamic paths
-    if (path.startsWith('#album/')) {
+    if (path.startsWith('#ai-chat')) {
+      return _handleAiChatRoute(path, tabId);
+    } else if (path.startsWith('#album/')) {
       return _handleAlbumRoute(path);
     } else if (path.startsWith('#video-library/')) {
       return _handleVideoLibraryRoute(path, tabId);
@@ -163,6 +166,24 @@ class SystemScreenRouter {
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
     tabBloc.add(UpdateTabName(tabId, pathlib.basename(filePath)));
     return ImageViewerScreen(file: File(filePath));
+  }
+
+  static Widget _handleAiChatRoute(String path, String tabId) {
+    String workspacePath = '';
+    final queryIndex = path.indexOf('?');
+    if (queryIndex != -1 && queryIndex < path.length - 1) {
+      final query = path.substring(queryIndex + 1);
+      try {
+        final params = Uri.splitQueryString(query);
+        if (params.containsKey('workspace')) {
+          workspacePath =
+              UriUtils.safeDecodeComponent(params['workspace'] ?? '');
+        }
+      } catch (_) {
+        workspacePath = '';
+      }
+    }
+    return AiChatScreen(tabId: tabId, initialPath: workspacePath);
   }
 
   static Widget _handleVideoLibraryRoute(String path, String tabId) {

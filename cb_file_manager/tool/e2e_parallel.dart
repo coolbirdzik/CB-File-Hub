@@ -60,7 +60,7 @@ Future<void> main(List<String> args) async {
   final fullScreenshots = args.contains('--full-screenshots');
 
   int maxParallel =
-      Platform.numberOfProcessors < 4 ? Platform.numberOfProcessors : 4;
+      Platform.numberOfProcessors < 2 ? Platform.numberOfProcessors : 2;
   final mpIdx = args.indexOf('--max-parallel');
   if (mpIdx >= 0 && mpIdx + 1 < args.length) {
     maxParallel = int.tryParse(args[mpIdx + 1]) ?? maxParallel;

@@ -8,6 +8,8 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
+    as tab_components;
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/models/objectbox/video_library.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
@@ -53,20 +55,17 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
   final VideoLibraryService _service = VideoLibraryService();
   final UserPreferences _preferences = UserPreferences.instance;
   late final VideoLibraryNavigationBloc _bloc;
-  late final TextEditingController _searchController;
-  late final FocusNode _searchFocusNode;
 
   bool _isInitialized = false;
   String _searchQuery = '';
   bool _showSearchBar = false;
+  bool _useRegexSearch = false;
   ColumnVisibility _columnVisibility = const ColumnVisibility();
   int _filterToken = 0;
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: _searchQuery);
-    _searchFocusNode = FocusNode();
     _bloc = VideoLibraryNavigationBloc(libraryId: widget.library.id);
     _bloc.loadLibrary(); // Kick off initial load
   }
@@ -84,8 +83,6 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     _bloc.close();
     super.dispose();
   }
@@ -245,21 +242,22 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
     );
   }
 
-  void _applySearch(String value) {
+  void _applySearchWithOptions(String value, bool useRegex) {
     final trimmed = value.trim();
-    if (_searchQuery == trimmed) return;
+    if (_searchQuery == trimmed && _useRegexSearch == useRegex) return;
     setState(() {
       _searchQuery = trimmed;
+      _useRegexSearch = useRegex;
     });
     _applyFilters();
   }
 
   void _clearSearch() {
-    if (_searchQuery.isEmpty) return;
+    if (_searchQuery.isEmpty && !_useRegexSearch) return;
     setState(() {
       _searchQuery = '';
+      _useRegexSearch = false;
     });
-    _searchController.clear();
     _applyFilters();
   }
 
@@ -267,21 +265,12 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
     setState(() {
       _showSearchBar = true;
     });
-    _searchController.text = _searchQuery;
-    _searchController.selection = TextSelection.fromPosition(
-      TextPosition(offset: _searchController.text.length),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _searchFocusNode.requestFocus();
-    });
   }
 
   void _closeSearchBar() {
     setState(() {
       _showSearchBar = false;
     });
-    _searchFocusNode.unfocus();
   }
 
   SelectionState _buildSelectionState() {
@@ -306,76 +295,20 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
     );
   }
 
-  Widget _buildSearchBar(AppLocalizations l10n) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: double.infinity,
-      height: 48,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: isDark
-            ? theme.colorScheme.surfaceContainerHighest
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 4),
-          Icon(
-            PhosphorIconsLight.magnifyingGlass,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              style: TextStyle(
-                fontSize: 15,
-                color: theme.colorScheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                hintText: l10n.searchByFilename,
-                hintStyle: TextStyle(
-                  color:
-                      theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                  fontSize: 14,
-                ),
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                isDense: true,
-              ),
-              onSubmitted: _applySearch,
-            ),
-          ),
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(PhosphorIconsLight.x, size: 18),
-              tooltip: l10n.clearSearch,
-              onPressed: _clearSearch,
-            ),
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.magnifyingGlass, size: 18),
-            tooltip: l10n.search,
-            onPressed: () => _applySearch(_searchController.text),
-          ),
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.x, size: 18),
-            tooltip: l10n.close,
-            onPressed: _closeSearchBar,
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-    );
-  }
+  Widget _buildSearchBar(AppLocalizations l10n) => tab_components.SearchBar(
+        currentPath: '#video-library/${widget.library.id}',
+        tabId: widget.tabId ?? '#video-library/${widget.library.id}',
+        initialQuery: _searchQuery,
+        hintText: l10n.searchByFilename,
+        onSearchWithOptions: _applySearchWithOptions,
+        onClearSearch: _clearSearch,
+        onCloseSearch: _closeSearchBar,
+        showClearButton: _searchQuery.isNotEmpty,
+        showTipsButton: true,
+        showTagSearch: false,
+        showGlobalSearchToggle: false,
+        showRegexToggle: true,
+      );
 
   void _clearSelection() {
     exitSelectionMode();
@@ -565,14 +498,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
     }
 
     // Apply local search filter
-    final visibleFiles = _searchQuery.trim().isEmpty
+    final trimmedQuery = _searchQuery.trim();
+    final visibleFiles = trimmedQuery.isEmpty
         ? state.files
-        : state.files
-            .where((file) => path
-                .basename(file.path)
-                .toLowerCase()
-                .contains(_searchQuery.trim().toLowerCase()))
-            .toList();
+        : _filterFilesBySearch(state.files, trimmedQuery);
 
     if (state.files.isEmpty) {
       return Center(
@@ -660,6 +589,30 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen>
       columnVisibility: _columnVisibility,
       showFileTags: false,
     );
+  }
+
+  List<FileSystemEntity> _filterFilesBySearch(
+    List<FileSystemEntity> files,
+    String query,
+  ) {
+    if (!_useRegexSearch) {
+      final normalizedQuery = query.toLowerCase();
+      return files
+          .where((file) =>
+              path.basename(file.path).toLowerCase().contains(normalizedQuery))
+          .toList();
+    }
+
+    RegExp pattern;
+    try {
+      pattern = RegExp(query, caseSensitive: false);
+    } catch (_) {
+      return files;
+    }
+
+    return files
+        .where((file) => pattern.hasMatch(path.basename(file.path)))
+        .toList();
   }
 
   void _toggleFileSelection(String filePath,

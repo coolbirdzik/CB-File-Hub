@@ -283,8 +283,12 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
     try {
       if (isVideo) {
         if (!File(videoPath).existsSync()) {
-          debugPrint('Video file does not exist: $videoPath');
-          _reloadThumbnailAfterInvalidCache();
+          // Check if we've already tried and failed with this path
+          if (!_thumbnailService.isVideoPathFailed(videoPath)) {
+            debugPrint('Video file does not exist: $videoPath');
+            _thumbnailService.markVideoPathAsFailed(videoPath);
+            _reloadThumbnailAfterInvalidCache();
+          }
           return _buildFolderIcon(context);
         }
 

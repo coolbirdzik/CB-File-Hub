@@ -2498,4 +2498,186 @@ class EnglishLocalizations implements AppLocalizations {
   String get fileNameLabel => 'File Name';
   @override
   String errorCreatingFile(String error) => 'Error creating file: $error';
+
+  // AI Agent
+  @override
+  String get aiSearchAgent => 'AI Search Agent';
+  @override
+  String get aiSearchAgentDescription =>
+      'Configure AI providers for intelligent file search';
+  @override
+  String get aiProvider => 'AI Provider';
+  @override
+  String get aiProviders => 'AI Providers';
+  @override
+  String get addProvider => 'Add Provider';
+  @override
+  String get editProvider => 'Edit Provider';
+  @override
+  String get deleteProvider => 'Delete Provider';
+  @override
+  String get providerPreset => 'Provider Preset';
+  @override
+  String get selectProviderPreset => 'Select a provider preset';
+  @override
+  String get providerName => 'Provider Name';
+  @override
+  String get apiType => 'API Type';
+  @override
+  String get authMode => 'Authentication';
+  @override
+  String get defaultModel => 'Default Model';
+  @override
+  String get apiKey => 'API Key';
+  @override
+  String get codexOauth => 'Codex OAuth';
+  @override
+  String get endpointUrl => 'Endpoint URL';
+  @override
+  String get modelName => 'Model Name';
+  @override
+  String get openAiCompatible => 'OpenAI Compatible';
+  @override
+  String get anthropic => 'Anthropic';
+  @override
+  String get temperature => 'Temperature';
+  @override
+  String get maxTokens => 'Max Tokens';
+  @override
+  String get systemPrompt => 'System Prompt';
+  @override
+  String get timeout => 'Timeout (seconds)';
+  @override
+  String get maxRetries => 'Max Retries';
+  @override
+  String get testConnection => 'Test Connection';
+  @override
+  String get connectionSuccess => 'Connection successful';
+  @override
+  String get aiConnectionFailed => 'Connection failed';
+  @override
+  String get enableAiSearch => 'Enable AI Search';
+  @override
+  String get defaultSearchScope => 'Default Search Scope';
+  @override
+  String get maxContentReadSize => 'Max Content Read Size';
+  @override
+  String get providerEnabled => 'Provider enabled';
+  @override
+  String get providerDisabled => 'Provider disabled';
+  @override
+  String get providerPriority => 'Priority';
+  @override
+  String get advancedSettings => 'Advanced Settings';
+  @override
+  String get testingConnection => 'Testing connection...';
+  @override
+  String get codexOauthDescription =>
+      'Use the local Codex/ChatGPT sign-in instead of a raw API key.';
+  @override
+  String get codexCredentialUnavailable =>
+      'Codex credential path is not available on this device.';
+  @override
+  String get codexCredentialMissing =>
+      'Codex OAuth credentials were not found. Run codex login first.';
+  @override
+  String get launchCodexLogin => 'Launch Codex Login';
+  @override
+  String get codexLoginLaunched =>
+      'Codex login was launched in a separate terminal window.';
+  @override
+  String get checkCredentials => 'Check Credentials';
+  @override
+  String deleteProviderConfirmation(String name) =>
+      'Are you sure you want to delete the provider "$name"?';
+  @override
+  String get noProviders => 'No AI providers configured';
+
+  // AI Chat
+  @override
+  String get aiChat => 'AI Chat';
+  @override
+  String get askAiToFindFiles => 'Ask AI to find files...';
+  @override
+  String get sendMessage => 'Send';
+  @override
+  String get clearChat => 'Clear Chat';
+  @override
+  String get searchScope => 'Search Scope';
+  @override
+  String get currentFolder => 'Current Folder';
+  @override
+  String get recursiveSearch => 'Recursive Search';
+  @override
+  String get aiTaggedFiles => 'Tagged Files';
+  @override
+  String get allDrives => 'All Drives';
+  @override
+  String get findingFiles => 'Finding files...';
+  @override
+  String get noResultsFound => 'No results found';
+  @override
+  String get aiSearchResults => 'AI Search Results';
+  @override
+  String get retryMessage => 'Retry';
+  @override
+  String get providerFallback => 'Trying next provider...';
+  @override
+  String get allProvidersFailed => 'All AI providers failed';
+  @override
+  String get setupAiProvider => 'Set up an AI provider in Settings';
+  @override
+  String get noProviderConfigured => 'No AI provider configured';
+  @override
+  String get relevanceScore => 'Relevance';
+  @override
+  String get aiExplanation => 'AI Explanation';
+  @override
+  String get aiSearchMode => 'AI Search';
+  @override
+  String get switchToAiSearch => 'Switch to AI search';
+  @override
+  String get switchToNormalSearch => 'Switch to normal search';
+  @override
+  String get aiChatTab => 'AI Chat';
+  @override
+  String get suggestRecentPhotos => 'Find recent photos';
+  @override
+  String get suggestLargeVideos => 'Show large videos';
+  @override
+  String get suggestTaggedFiles => 'Files tagged as...';
+  @override
+  String get fetchModels => 'Fetch Models';
+  @override
+  String get fetchingModels => 'Fetching models...';
+  @override
+  String get loadingModels => 'Loading models...';
+  @override
+  String get noModelsFound => 'No models found';
+  @override
+  String get noModelConfigured => 'No model';
+  @override
+  String get selectModel => 'Select a model';
+  @override
+  String fetchModelsError(String error) => 'Failed to fetch models: $error';
+  @override
+  String get newConversation => 'New Chat';
+  @override
+  String get conversations => 'Conversations';
+  @override
+  String get deleteConversation => 'Delete conversation';
+  @override
+  String get noConversations => 'No conversations yet';
+  @override
+  String get aiThinking0 => 'Thinking...';
+  @override
+  String get aiThinking1 => 'Analyzing...';
+  @override
+  String get aiThinking2 => 'Searching...';
+  @override
+  String get aiThinking3 => 'Generating response...';
+  @override
+  String get aiWaitingApproval => 'Waiting for your approval...';
+  @override
+  String aiRunningTool(String toolName) => 'Running $toolName...';
 }

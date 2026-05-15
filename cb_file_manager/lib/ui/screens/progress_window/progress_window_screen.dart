@@ -233,7 +233,7 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
           GestureDetector(
             onPanStart: (_) => windowManager.startDragging(),
             child: Container(
-              height: 26,
+              height: 32,
               color: titleBarColor,
               child: Row(
                 children: [
@@ -271,7 +271,7 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
           ),
           // Content
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,12 +309,12 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(99),
                   child: LinearProgressIndicator(
                     value: _progressFraction,
-                    minHeight: 6,
+                    minHeight: 7,
                     backgroundColor: isDark ? Colors.white12 : Colors.black12,
                     valueColor: AlwaysStoppedAnimation<Color>(accent),
                   ),
@@ -351,15 +351,15 @@ class _TitleBarBtn extends StatelessWidget {
 
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          width: 34,
-          height: 34,
-          child: Icon(icon, size: 15, color: color),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: Icon(icon, size: 14, color: color),
+          ),
         ),
-      ),
-    );
+      );
   }
 }

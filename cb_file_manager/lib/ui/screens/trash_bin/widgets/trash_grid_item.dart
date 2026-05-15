@@ -12,6 +12,8 @@ class TrashGridItem extends StatelessWidget {
   final VoidCallback onToggleSelection;
   final VoidCallback onEnterSelectionMode;
   final void Function(Offset) onContextMenu;
+  final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
 
   const TrashGridItem({
     Key? key,
@@ -22,6 +24,8 @@ class TrashGridItem extends StatelessWidget {
     required this.onToggleSelection,
     required this.onEnterSelectionMode,
     required this.onContextMenu,
+    this.onTap,
+    this.onDoubleTap,
   }) : super(key: key);
 
   @override
@@ -32,6 +36,8 @@ class TrashGridItem extends StatelessWidget {
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       isDesktopMode: isDesktop,
+      onTap: onTap,
+      onDoubleTap: onDoubleTap,
       onToggleSelection: onToggleSelection,
       onEnterSelectionMode: onEnterSelectionMode,
       onSecondaryTapUp: (d) => onContextMenu(d.globalPosition),
@@ -41,7 +47,7 @@ class TrashGridItem extends StatelessWidget {
           // Thumbnail area — Windows Explorer style: fills available space
           Expanded(
             child: Center(
-              child: TrashItemIcon(originalPath: item.originalPath, size: 56),
+              child: TrashItemIcon(originalPath: item.originalPath, size: 56, isFolder: item.isFolder),
             ),
           ),
           // Filename below icon

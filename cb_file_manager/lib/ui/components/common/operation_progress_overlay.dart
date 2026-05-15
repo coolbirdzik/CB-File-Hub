@@ -3,8 +3,6 @@ import 'dart:io' show Platform;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
-import 'package:cb_file_manager/services/windowing/desktop_window_process_launcher.dart';
-import 'package:cb_file_manager/services/windowing/progress_window_ipc_server.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -25,11 +23,6 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
       locator<OperationProgressController>();
 
   Timer? _autoDismissTimer;
-  bool _isShowingDialog = false;
-
-  // IPC infrastructure for the detached progress process
-  ProgressWindowIpcServer? _ipcServer;
-  StreamSubscription<void>? _controllerSub;
 
   @override
   void initState() {
@@ -40,9 +33,6 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
   @override
   void dispose() {
     _autoDismissTimer?.cancel();
-    _controllerSub?.cancel();
-    _ipcServer?.stop();
-    _ipcServer = null;
     _controller.removeListener(_onChanged);
     super.dispose();
   }
@@ -51,27 +41,16 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
     final active = _controller.active;
     _autoDismissTimer?.cancel();
 
-    // Reset the dialog flag synchronously when the entry is dismissed.
     if (active == null) {
-      _isShowingDialog = false;
-      _stopIpcServer();
       if (mounted) setState(() {});
       return;
     }
 
-    // Show as a process window when explicitly requested.
-    if (!active.isMinimized && active.isRunning && !_isShowingDialog) {
-      if (OperationProgressOverlay._isDesktop) {
-        _showDesktopWindow(active);
-      } else {
-        _showMobileDialog();
-      }
+    if (!OperationProgressOverlay._isDesktop &&
+        !active.isMinimized &&
+        active.isRunning) {
+      _showMobileDialog();
       return;
-    }
-
-    // Forward updates to progress window process via IPC.
-    if (OperationProgressOverlay._isDesktop && _ipcServer != null) {
-      _ipcServer!.sendUpdate(active);
     }
 
     // Auto-dismiss for minimized status-bar entries on mobile.
@@ -92,60 +71,9 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
     if (mounted) setState(() {});
   }
 
-  /// Spawn process con với cửa sổ progress riêng biệt.
-  void _showDesktopWindow(OperationProgressEntry entry) {
-    if (_isShowingDialog) return;
-    _isShowingDialog = true;
-
-    // Start IPC server trước, rồi spawn process sau khi có port.
-    _startIpcAndSpawn(entry);
-  }
-
-  Future<void> _startIpcAndSpawn(OperationProgressEntry entry) async {
-    try {
-      _ipcServer ??= ProgressWindowIpcServer();
-      final port = await _ipcServer!.start();
-      if (port == null) {
-        _isShowingDialog = false;
-        return;
-      }
-
-      // Gửi state hiện tại lên server ngay (set _lastUpdate) trước khi spawn process.
-      // Khi child connect, server sẽ replay state này cho client.
-      _ipcServer!.sendUpdate(entry);
-
-      await DesktopWindowProcessLauncher.openProgressWindow(
-        ipcPort: port,
-        title: entry.title,
-        total: entry.total,
-        isIndeterminate: entry.isIndeterminate,
-      );
-
-      // Forward current controller state nếu đã cập nhật trong khi spawn
-      final current = _controller.active;
-      if (current != null) {
-        _ipcServer!.sendUpdate(current);
-      }
-    } catch (e) {
-      _isShowingDialog = false;
-    }
-  }
-
-  void _stopIpcServer() {
-    _ipcServer?.stop();
-    _ipcServer = null;
-    _isShowingDialog = false;
-  }
-
   void _showMobileDialog() {
-    if (_isShowingDialog) return;
-    _isShowingDialog = true;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        _isShowingDialog = false;
-        return;
-      }
+      if (!mounted) return;
 
       showDialog(
         context: context,
@@ -153,9 +81,7 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
         builder: (context) => _MobileProgressDialog(
           controller: _controller,
         ),
-      ).then((_) {
-        _isShowingDialog = false;
-      });
+      );
     });
   }
 
@@ -163,9 +89,23 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
   Widget build(BuildContext context) {
     final active = _controller.active;
 
-    // On desktop, progress UI is in a separate process — nothing to render here.
     if (OperationProgressOverlay._isDesktop) {
-      return const SizedBox.shrink();
+      if (active == null || active.isMinimized) {
+        return const SizedBox.shrink();
+      }
+
+      return Positioned(
+        right: 20,
+        bottom: 20,
+        child: SafeArea(
+          top: false,
+          left: false,
+          child: _DesktopProgressWindow(
+            controller: _controller,
+            onClose: _controller.dismiss,
+          ),
+        ),
+      );
     }
 
     // On mobile, show the bottom status bar overlay
@@ -449,12 +389,13 @@ class _DesktopProgressWindowState extends State<_DesktopProgressWindow> {
   @override
   Widget build(BuildContext context) {
     final active = widget.controller.active;
+    final theme = Theme.of(context);
     if (active == null) {
       return const SizedBox.shrink();
     }
 
     return Material(
-      color: Colors.transparent,
+      color: theme.colorScheme.surfaceContainer,
       child: _ProgressWindowContent(
         entry: active,
         onMinimize: widget.controller.minimize,
@@ -483,6 +424,12 @@ class _ProgressWindowContent extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final panelColor = _opaqueColor(
+      isDark
+          ? theme.colorScheme.surfaceContainerHighest
+          : theme.colorScheme.surfaceContainerHigh,
+    );
+    final panelBorderColor = _opaqueColor(theme.colorScheme.outlineVariant);
 
     final Color accent;
     switch (entry.status) {
@@ -519,8 +466,8 @@ class _ProgressWindowContent extends StatelessWidget {
     }
 
     return Material(
-      elevation: 0,
-      color: Colors.transparent,
+      elevation: 6,
+      color: panelColor,
       shadowColor: theme.shadowColor.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -530,10 +477,12 @@ class _ProgressWindowContent extends StatelessWidget {
           maxHeight: 180,
         ),
         decoration: BoxDecoration(
-          color: isDark
-              ? theme.colorScheme.surfaceContainerHigh
-              : theme.colorScheme.surface,
+          color: panelColor,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: panelBorderColor,
+            width: 1,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -631,13 +580,16 @@ class _WindowTitleBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final titleBarColor = _opaqueColor(
+      isDark
+          ? theme.colorScheme.surfaceContainerHighest
+          : theme.colorScheme.surfaceContainerLow,
+    );
 
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: isDark
-            ? theme.colorScheme.surfaceContainerHighest
-            : theme.colorScheme.surfaceContainerLow,
+        color: titleBarColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
@@ -710,4 +662,8 @@ class _TitleBarButton extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _opaqueColor(Color color) {
+  return color.withAlpha(255);
 }

@@ -2496,4 +2496,187 @@ class VietnameseLocalizations implements AppLocalizations {
   String get fileNameLabel => 'Tên tệp';
   @override
   String errorCreatingFile(String error) => 'Lỗi tạo tệp: $error';
+
+  // AI Agent
+  @override
+  String get aiSearchAgent => 'Trợ lý AI tìm kiếm';
+  @override
+  String get aiSearchAgentDescription =>
+      'Cấu hình nhà cung cấp AI để tìm kiếm tệp thông minh';
+  @override
+  String get aiProvider => 'Nhà cung cấp AI';
+  @override
+  String get aiProviders => 'Nhà cung cấp AI';
+  @override
+  String get addProvider => 'Thêm nhà cung cấp';
+  @override
+  String get editProvider => 'Sửa nhà cung cấp';
+  @override
+  String get deleteProvider => 'Xóa nhà cung cấp';
+  @override
+  String get providerPreset => 'Mẫu nhà cung cấp';
+  @override
+  String get selectProviderPreset => 'Chọn mẫu nhà cung cấp';
+  @override
+  String get providerName => 'Tên nhà cung cấp';
+  @override
+  String get apiType => 'Loại API';
+  @override
+  String get authMode => 'Xác thực';
+  @override
+  String get defaultModel => 'Mô hình mặc định';
+  @override
+  String get apiKey => 'Khóa API';
+  @override
+  String get codexOauth => 'Codex OAuth';
+  @override
+  String get endpointUrl => 'URL Endpoint';
+  @override
+  String get modelName => 'Tên mô hình';
+  @override
+  String get openAiCompatible => 'Tương thích OpenAI';
+  @override
+  String get anthropic => 'Anthropic';
+  @override
+  String get temperature => 'Nhiệt độ';
+  @override
+  String get maxTokens => 'Token tối đa';
+  @override
+  String get systemPrompt => 'Prompt hệ thống';
+  @override
+  String get timeout => 'Thời gian chờ (giây)';
+  @override
+  String get maxRetries => 'Số lần thử lại tối đa';
+  @override
+  String get testConnection => 'Kiểm tra kết nối';
+  @override
+  String get connectionSuccess => 'Kết nối thành công';
+  @override
+  String get aiConnectionFailed => 'Kết nối thất bại';
+  @override
+  String get enableAiSearch => 'Bật tìm kiếm AI';
+  @override
+  String get defaultSearchScope => 'Phạm vi tìm kiếm mặc định';
+  @override
+  String get maxContentReadSize => 'Kích thước đọc nội dung tối đa';
+  @override
+  String get providerEnabled => 'Nhà cung cấp đã bật';
+  @override
+  String get providerDisabled => 'Nhà cung cấp đã tắt';
+  @override
+  String get providerPriority => 'Độ ưu tiên';
+  @override
+  String get advancedSettings => 'Cài đặt nâng cao';
+  @override
+  String get testingConnection => 'Đang kiểm tra kết nối...';
+  @override
+  String get codexOauthDescription =>
+      'Dùng phiên đăng nhập Codex/ChatGPT trên máy thay vì khóa API thô.';
+  @override
+  String get codexCredentialUnavailable =>
+      'Không tìm thấy đường dẫn credential Codex trên thiết bị này.';
+  @override
+  String get codexCredentialMissing =>
+      'Không tìm thấy credential Codex OAuth. Hãy chạy codex login trước.';
+  @override
+  String get launchCodexLogin => 'Mở Codex Login';
+  @override
+  String get codexLoginLaunched =>
+      'Đã mở Codex login trong một cửa sổ terminal riêng.';
+  @override
+  String get checkCredentials => 'Kiểm tra credential';
+  @override
+  String deleteProviderConfirmation(String name) =>
+      'Bạn có chắc muốn xóa nhà cung cấp "$name"?';
+  @override
+  String get noProviders => 'Chưa cấu hình nhà cung cấp AI';
+
+  // AI Chat
+  @override
+  String get aiChat => 'AI Chat';
+  @override
+  String get askAiToFindFiles => 'Hỏi AI để tìm tệp...';
+  @override
+  String get sendMessage => 'Gửi';
+  @override
+  String get clearChat => 'Xóa cuộc trò chuyện';
+  @override
+  String get searchScope => 'Phạm vi tìm kiếm';
+  @override
+  String get currentFolder => 'Thư mục hiện tại';
+  @override
+  String get recursiveSearch => 'Tìm kiếm đệ quy';
+  @override
+  String get aiTaggedFiles => 'Tệp có nhãn';
+  @override
+  String get allDrives => 'Tất cả ổ đĩa';
+  @override
+  String get findingFiles => 'Đang tìm tệp...';
+  @override
+  String get noResultsFound => 'Không tìm thấy kết quả';
+  @override
+  String get aiSearchResults => 'Kết quả tìm kiếm AI';
+  @override
+  String get retryMessage => 'Thử lại';
+  @override
+  String get providerFallback => 'Đang thử nhà cung cấp tiếp theo...';
+  @override
+  String get allProvidersFailed => 'Tất cả nhà cung cấp AI đều thất bại';
+  @override
+  String get setupAiProvider => 'Cài đặt nhà cung cấp AI trong Cài đặt';
+  @override
+  String get noProviderConfigured => 'Chưa cấu hình nhà cung cấp AI';
+  @override
+  String get relevanceScore => 'Độ phù hợp';
+  @override
+  String get aiExplanation => 'Giải thích AI';
+  @override
+  String get aiSearchMode => 'Tìm kiếm AI';
+  @override
+  String get switchToAiSearch => 'Chuyển sang tìm kiếm AI';
+  @override
+  String get switchToNormalSearch => 'Chuyển sang tìm kiếm thường';
+  @override
+  String get aiChatTab => 'AI Chat';
+  @override
+  String get suggestRecentPhotos => 'Tìm ảnh gần đây';
+  @override
+  String get suggestLargeVideos => 'Hiện video lớn';
+  @override
+  String get suggestTaggedFiles => 'Tệp có nhãn là...';
+  @override
+  String get fetchModels => 'Lấy danh sách mô hình';
+  @override
+  String get fetchingModels => 'Đang lấy danh sách mô hình...';
+  @override
+  String get loadingModels => 'Đang tải mô hình...';
+  @override
+  String get noModelsFound => 'Không tìm thấy mô hình nào';
+  @override
+  String get noModelConfigured => 'Chưa có mô hình';
+  @override
+  String get selectModel => 'Chọn mô hình';
+  @override
+  String fetchModelsError(String error) =>
+      'Không thể lấy danh sách mô hình: $error';
+  @override
+  String get newConversation => 'Cuộc trò chuyện mới';
+  @override
+  String get conversations => 'Cuộc trò chuyện';
+  @override
+  String get deleteConversation => 'Xóa cuộc trò chuyện';
+  @override
+  String get noConversations => 'Chưa có cuộc trò chuyện nào';
+  @override
+  String get aiThinking0 => 'Đang suy nghĩ...';
+  @override
+  String get aiThinking1 => 'Đang phân tích...';
+  @override
+  String get aiThinking2 => 'Đang tìm kiếm...';
+  @override
+  String get aiThinking3 => 'Đang tạo phản hồi...';
+  @override
+  String get aiWaitingApproval => 'Đang chờ bạn phê duyệt...';
+  @override
+  String aiRunningTool(String toolName) => 'Đang chạy $toolName...';
 }

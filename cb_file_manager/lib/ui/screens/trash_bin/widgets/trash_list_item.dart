@@ -9,18 +9,29 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 
 /// File icon for trash items - based on the original file path extension
+/// Shows a folder icon when the item is a directory.
 class TrashItemIcon extends StatelessWidget {
   final String originalPath;
   final double size;
+  final bool isFolder;
 
   const TrashItemIcon({
     Key? key,
     required this.originalPath,
     this.size = 48,
+    this.isFolder = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    if (isFolder) {
+      return Icon(
+        PhosphorIconsFill.folderSimple,
+        size: size,
+        color: const Color(0xFFFFB74D), // amber/orange folder color
+      );
+    }
+
     final String ext = originalPath.contains('.')
         ? originalPath.split('.').last.toLowerCase()
         : '';
@@ -53,6 +64,8 @@ class TrashListItem extends StatelessWidget {
   final String Function(DateTime) formatDate;
   final String Function(int) formatSize;
   final AppLocalizations l10n;
+  final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
 
   const TrashListItem({
     Key? key,
@@ -66,6 +79,8 @@ class TrashListItem extends StatelessWidget {
     required this.formatDate,
     required this.formatSize,
     required this.l10n,
+    this.onTap,
+    this.onDoubleTap,
   }) : super(key: key);
 
   @override
@@ -76,6 +91,8 @@ class TrashListItem extends StatelessWidget {
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       isDesktopMode: isDesktop,
+      onTap: onTap,
+      onDoubleTap: onDoubleTap,
       onToggleSelection: onToggleSelection,
       onEnterSelectionMode: onEnterSelectionMode,
       onSecondaryTapUp: (d) => onContextMenu(d.globalPosition),
@@ -86,7 +103,7 @@ class TrashListItem extends StatelessWidget {
           SizedBox(
             width: 48,
             height: 48,
-            child: TrashItemIcon(originalPath: item.originalPath, size: 48),
+            child: TrashItemIcon(originalPath: item.originalPath, size: 48, isFolder: item.isFolder),
           ),
           const SizedBox(width: 16),
           // Text content

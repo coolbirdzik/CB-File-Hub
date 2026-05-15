@@ -9,6 +9,7 @@ import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import '../mixins/selection_mixin.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
@@ -209,6 +210,29 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
         });
       }
     }
+  }
+
+  /// Open a folder item from the trash bin by navigating the current tab
+  /// to its actual path (where the data still exists on disk).
+  void _openFolder(TrashItem item) {
+    if (!item.isFolder) return;
+
+    // For system trash items, the trashFileName is the recycleBinPath
+    // which is the actual path where the folder data resides.
+    // For internal trash items, the folder is in our internal trash directory.
+    final String folderPath = item.trashFileName;
+
+    // Verify the folder actually exists before navigating
+    final dir = Directory(folderPath);
+    if (!dir.existsSync()) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.folderNotFound)),
+      );
+      return;
+    }
+
+    TabNavigator.updateTabPath(context, widget.tabId, folderPath);
   }
 
   Future<void> _emptyTrash() async {
@@ -826,6 +850,12 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                       isSelected: selectedPaths.contains(item.trashFileName),
                       isSelectionMode: isSelectionMode,
                       isDesktop: _isDesktop,
+                      onTap: item.isFolder && !_isDesktop
+                          ? () => _openFolder(item)
+                          : null,
+                      onDoubleTap: item.isFolder && _isDesktop
+                          ? () => _openFolder(item)
+                          : null,
                       onToggleSelection: () =>
                           _toggleItemSelection(item.trashFileName),
                       onEnterSelectionMode:
@@ -913,6 +943,12 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                       isSelected: selectedPaths.contains(item.trashFileName),
                       isSelectionMode: isSelectionMode,
                       isDesktop: _isDesktop,
+                      onTap: item.isFolder && !_isDesktop
+                          ? () => _openFolder(item)
+                          : null,
+                      onDoubleTap: item.isFolder && _isDesktop
+                          ? () => _openFolder(item)
+                          : null,
                       onToggleSelection: () =>
                           _toggleItemSelection(item.trashFileName),
                       onEnterSelectionMode:
@@ -1031,6 +1067,12 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
                                 selectedPaths.contains(item.trashFileName),
                             isSelectionMode: isSelectionMode,
                             isDesktop: _isDesktop,
+                            onTap: item.isFolder && !_isDesktop
+                                ? () => _openFolder(item)
+                                : null,
+                            onDoubleTap: item.isFolder && _isDesktop
+                                ? () => _openFolder(item)
+                                : null,
                             onToggleSelection: () =>
                                 _toggleItemSelection(item.trashFileName),
                             onEnterSelectionMode:
@@ -1117,6 +1159,17 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
       position: RelativeRect.fromLTRB(
           position.dx, position.dy, position.dx + 1, position.dy + 1),
       items: [
+        if (item.isFolder)
+          PopupMenuItem<String>(
+            value: 'open',
+            child: Row(
+              children: [
+                const Icon(PhosphorIconsLight.folderOpen, size: 20),
+                const SizedBox(width: 10),
+                Text(l10n.openFolder),
+              ],
+            ),
+          ),
         PopupMenuItem<String>(
           value: 'restore',
           child: Row(
@@ -1143,7 +1196,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> with SelectionMixin {
         ),
       ],
     ).then((value) {
-      if (value == 'restore') {
+      if (value == 'open') {
+        _openFolder(item);
+      } else if (value == 'restore') {
         _restoreItem(item);
       } else if (value == 'delete') {
         _deleteItem(item);

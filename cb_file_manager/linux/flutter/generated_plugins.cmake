@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  desktop_drop
   media_kit_video
   mobile_smb_native
   screen_retriever_linux

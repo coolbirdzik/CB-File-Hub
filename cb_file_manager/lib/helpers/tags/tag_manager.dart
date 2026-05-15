@@ -64,6 +64,31 @@ class TagManager {
     // No-op: static controller is shared and closed by the framework
   }
 
+  /// Resets the TagManager singleton between E2E tests.
+  ///
+  /// - Closes the broadcast stream controller (stops orphaned subscriptions
+  ///   firing events into disposed BLoCs).
+  /// - Resets all static caches and state.
+  /// - MUST be called BEFORE `locator.reset()` in E2E teardown so no
+  ///   lingering subscriptions try to `add()` after blocs are disposed.
+  static void resetForE2E() {
+    if (!_initialized) return;
+
+    try {
+      _tagChangeController.close();
+    } catch (_) {}
+
+    _initialized = false;
+    _initializing = false;
+    _initCompleter.complete(Future<void>.delayed(Duration.zero));
+    _instance = null;
+    _globalTagsPath = null;
+    _useDatabase = false;
+    _databaseManager = null;
+    _tagsCache.clear();
+    _tagCache.clear();
+  }
+
   // Private singleton constructor
   TagManager._();
 

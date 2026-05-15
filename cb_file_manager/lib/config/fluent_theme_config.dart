@@ -11,6 +11,7 @@ class FluentThemeConfig {
     AppThemeType themeType, {
     AppAccentColor accentColor = ThemeConfig.defaultAccentColor,
     double acrylicStrength = 1.00,
+    bool preferTransparentBackdrop = false,
   }) {
     final materialTheme = ThemeConfig.getTheme(
       themeType,
@@ -39,18 +40,36 @@ class FluentThemeConfig {
 
     final scaffoldColor = scaffoldBase.withValues(
       alpha: isDark
-          ? opacityByStrength(solidAtMin: 0.90, glassAtMax: 0.16)
-          : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.92),
+          ? opacityByStrength(
+              solidAtMin: 0.90,
+              glassAtMax: preferTransparentBackdrop ? 0.12 : 0.16,
+            )
+          : opacityByStrength(
+              solidAtMin: 0.99,
+              glassAtMax: preferTransparentBackdrop ? 0.62 : 0.92,
+            ),
     );
     final cardColor = cardBase.withValues(
       alpha: isDark
-          ? opacityByStrength(solidAtMin: 0.96, glassAtMax: 0.56)
-          : opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.90),
+          ? opacityByStrength(
+              solidAtMin: 0.96,
+              glassAtMax: preferTransparentBackdrop ? 0.46 : 0.56,
+            )
+          : opacityByStrength(
+              solidAtMin: 0.98,
+              glassAtMax: preferTransparentBackdrop ? 0.76 : 0.90,
+            ),
     );
     final menuColor = menuBase.withValues(
       alpha: isDark
-          ? opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.68)
-          : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.92),
+          ? opacityByStrength(
+              solidAtMin: 0.98,
+              glassAtMax: preferTransparentBackdrop ? 0.58 : 0.68,
+            )
+          : opacityByStrength(
+              solidAtMin: 0.99,
+              glassAtMax: preferTransparentBackdrop ? 0.82 : 0.92,
+            ),
     );
 
     return fluent.FluentThemeData(
@@ -59,13 +78,25 @@ class FluentThemeConfig {
       scaffoldBackgroundColor: scaffoldColor,
       acrylicBackgroundColor: scaffoldBase.withValues(
         alpha: isDark
-            ? opacityByStrength(solidAtMin: 0.95, glassAtMax: 0.62)
-            : opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.90),
+            ? opacityByStrength(
+                solidAtMin: 0.95,
+                glassAtMax: preferTransparentBackdrop ? 0.50 : 0.62,
+              )
+            : opacityByStrength(
+                solidAtMin: 0.98,
+                glassAtMax: preferTransparentBackdrop ? 0.72 : 0.90,
+              ),
       ),
       micaBackgroundColor: scaffoldBase.withValues(
         alpha: isDark
-            ? opacityByStrength(solidAtMin: 0.90, glassAtMax: 0.42)
-            : opacityByStrength(solidAtMin: 0.97, glassAtMax: 0.88),
+            ? opacityByStrength(
+                solidAtMin: 0.90,
+                glassAtMax: preferTransparentBackdrop ? 0.32 : 0.42,
+              )
+            : opacityByStrength(
+                solidAtMin: 0.97,
+                glassAtMax: preferTransparentBackdrop ? 0.68 : 0.88,
+              ),
       ),
       menuColor: menuColor,
       cardColor: cardColor,

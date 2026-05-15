@@ -18,6 +18,7 @@
   - `features/02-keyboard-shortcuts.md` - Keyboard shortcuts guide
   - `features/03-sidebar-pinning-and-workspace.md` - Sidebar pinning and workspace restore
   - `features/04-split-pane-view.md`
+  - `features/05-ai-agent.md` - AI Agent chat, providers, tools, approval, and side panel
   - `features/06-tag-management.md`
 - **UI Patterns**
   - `ui-patterns/01-operation-progress.md`

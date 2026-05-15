@@ -164,6 +164,90 @@ Future<void> runCbFileApp() async {
   final windowRole =
       (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
   final isPip = env['CB_PIP_MODE'] == '1';
+  final isProgressWindow = windowRole == 'progress' && isDesktopPlatform;
+
+  // Progress window must boot on a very short path to avoid waiting for
+  // the main app's expensive startup work.
+  if (isProgressWindow) {
+    final ipcPort =
+        int.tryParse(env[WindowStartupPayload.envProgressIpcPortKey] ?? '') ??
+            0;
+    final progressTitle =
+        env[WindowStartupPayload.envProgressTitleKey] ?? 'Operation';
+    final progressTotal =
+        int.tryParse(env[WindowStartupPayload.envProgressTotalKey] ?? '') ?? 0;
+    final progressIndeterminate =
+        env[WindowStartupPayload.envProgressIndeterminateKey] == '1';
+
+    try {
+      await windowManager.ensureInitialized();
+    } catch (_) {}
+
+    final platformBrightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final isDark = platformBrightness == Brightness.dark;
+    final solidBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5);
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final progressColor =
+        isDark ? const Color(0xFF90CAF9) : const Color(0xFF1565C0);
+
+    try {
+      final progressWindowOptions = WindowOptions(
+        size: const Size(360, 94),
+        minimumSize: const Size(360, 94),
+        maximumSize: const Size(360, 94),
+        center: true,
+        backgroundColor: solidBg,
+        titleBarStyle: TitleBarStyle.hidden,
+        windowButtonVisibility: false,
+        skipTaskbar: false,
+        alwaysOnTop: false,
+      );
+      await windowManager.waitUntilReadyToShow(progressWindowOptions, () async {
+        try {
+          await windowManager.setAsFrameless();
+        } catch (_) {}
+        await windowManager.setResizable(false);
+        await windowManager.setPreventClose(false);
+        try {
+          await windowManager.setOpacity(1.0);
+        } catch (_) {}
+        await windowManager.show();
+        await windowManager.focus();
+      });
+    } catch (_) {}
+
+    runApp(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: isDark ? Brightness.dark : Brightness.light,
+        scaffoldBackgroundColor: solidBg,
+        colorScheme: isDark
+            ? ColorScheme.dark(
+                primary: progressColor,
+                surface: solidBg,
+              )
+            : ColorScheme.light(
+                primary: progressColor,
+                surface: solidBg,
+              ),
+        textTheme: TextTheme(
+          titleSmall: TextStyle(color: textColor),
+          titleMedium: TextStyle(color: textColor),
+          bodySmall: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+        ),
+        useMaterial3: true,
+      ),
+      home: ProgressWindowScreen(
+        ipcPort: ipcPort,
+        initialTitle: progressTitle,
+        initialTotal: progressTotal,
+        initialIndeterminate: progressIndeterminate,
+      ),
+    ));
+    return;
+  }
+
   final windowAcrylicService = WindowAcrylicService();
   final initialNativeBackdropDarkMode =
       await _resolveInitialNativeBackdropDarkMode();
@@ -174,7 +258,7 @@ Future<void> runCbFileApp() async {
       await windowManager.ensureInitialized();
     } catch (_) {}
 
-    if (!isPip) {
+    if (!isPip && !isProgressWindow) {
       final windowOptions = WindowOptions(
         center: true,
         backgroundColor: Colors.transparent,
@@ -378,7 +462,7 @@ Future<void> runCbFileApp() async {
     }
   }
 
-  if (isSecondaryWindow) {
+  if (isSecondaryWindow && !isProgressWindow) {
     deferredSecondaryInitializers.add(initializeDataAndTags);
     if (!kCbE2EFast) {
       deferredSecondaryInitializers.add(initializeHeavyBackgroundServices);
@@ -408,89 +492,6 @@ Future<void> runCbFileApp() async {
     return;
   }
 
-  // Progress window — process riêng biệt, không cần full app init
-  if (windowRole == 'progress' && isDesktopPlatform) {
-    final ipcPort =
-        int.tryParse(env[WindowStartupPayload.envProgressIpcPortKey] ?? '') ??
-            0;
-    final progressTitle =
-        env[WindowStartupPayload.envProgressTitleKey] ?? 'Operation';
-    final progressTotal =
-        int.tryParse(env[WindowStartupPayload.envProgressTotalKey] ?? '') ?? 0;
-    final progressIndeterminate =
-        env[WindowStartupPayload.envProgressIndeterminateKey] == '1';
-
-    // Resolve màu trước khi setup window để backgroundColor khớp Flutter theme
-    final platformBrightness =
-        WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    final isDark = platformBrightness == Brightness.dark;
-    final solidBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5);
-    final textColor = isDark ? Colors.white : Colors.black87;
-    final progressColor =
-        isDark ? const Color(0xFF90CAF9) : const Color(0xFF1565C0);
-
-    // Setup window: alpha=0 đã được set ở tầng C++ (WS_EX_LAYERED),
-    // nên window hoàn toàn transparent ngay từ đầu.
-    // waitUntilReadyToShow fires SAU KHI Flutter render xong frame đầu,
-    // nên ta restore opacity=1 rồi mới show → không có flash nào.
-    try {
-      final progressWindowOptions = WindowOptions(
-        size: const Size(420, 88),
-        minimumSize: const Size(420, 88),
-        maximumSize: const Size(420, 88),
-        center: true,
-        backgroundColor: solidBg,
-        titleBarStyle: TitleBarStyle.hidden,
-        windowButtonVisibility: false,
-        skipTaskbar: false,
-        alwaysOnTop: false,
-      );
-      await windowManager.waitUntilReadyToShow(progressWindowOptions, () async {
-        try {
-          await windowManager.setAsFrameless();
-        } catch (_) {}
-        await windowManager.setResizable(false);
-        await windowManager.setPreventClose(false);
-        // Restore opacity rồi mới show — Flutter đã render xong ở đây
-        try {
-          await windowManager.setOpacity(1.0);
-        } catch (_) {}
-        await windowManager.show();
-        await windowManager.focus();
-      });
-    } catch (_) {}
-
-    runApp(MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: isDark ? Brightness.dark : Brightness.light,
-        scaffoldBackgroundColor: solidBg,
-        colorScheme: isDark
-            ? ColorScheme.dark(
-                primary: progressColor,
-                surface: solidBg,
-              )
-            : ColorScheme.light(
-                primary: progressColor,
-                surface: solidBg,
-              ),
-        textTheme: TextTheme(
-          titleSmall: TextStyle(color: textColor),
-          titleMedium: TextStyle(color: textColor),
-          bodySmall: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
-        ),
-        useMaterial3: true,
-      ),
-      home: ProgressWindowScreen(
-        ipcPort: ipcPort,
-        initialTitle: progressTitle,
-        initialTotal: progressTotal,
-        initialIndeterminate: progressIndeterminate,
-      ),
-    ));
-    return;
-  }
-
   final WindowStartupPayload? startupPayload =
       kCbE2E && CbE2EConfig.startupPayload != null
           ? CbE2EConfig.startupPayload
@@ -505,7 +506,9 @@ Future<void> runCbFileApp() async {
     ),
   );
 
-  if (isSecondaryWindow && deferredSecondaryInitializers.isNotEmpty) {
+  if (isSecondaryWindow &&
+      !isProgressWindow &&
+      deferredSecondaryInitializers.isNotEmpty) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       for (final initializer in deferredSecondaryInitializers) {
         unawaited(initializer());
@@ -553,6 +556,7 @@ class _CBFileAppState extends State<CBFileApp>
     with WidgetsBindingObserver, WindowListener {
   final LanguageController _languageController = locator<LanguageController>();
   int _acrylicSyncGeneration = 0;
+  int _windowMutationAcrylicGeneration = 0;
   bool? _lastAppliedNativeBackdropDarkMode;
   AcrylicBackdropMode? _lastBackdropMode;
   ValueNotifier<Locale>? _localeNotifier;
@@ -616,31 +620,99 @@ class _CBFileAppState extends State<CBFileApp>
   @override
   void onWindowMaximize() {
     if (!mounted) return;
-    _triggerAcrylicReapplyBurst(
-      includeImmediate: true,
-      forcedIsDarkMode:
-          _resolveNativeBackdropDarkMode(context.read<ThemeProvider>()),
-    );
+    _scheduleAcrylicReapplyAfterWindowMutation();
   }
 
   @override
   void onWindowUnmaximize() {
     if (!mounted) return;
-    _triggerAcrylicReapplyBurst(
-      includeImmediate: true,
-      forcedIsDarkMode:
-          _resolveNativeBackdropDarkMode(context.read<ThemeProvider>()),
-    );
+    _scheduleAcrylicReapplyAfterWindowMutation();
   }
 
   @override
   void onWindowRestore() {
     if (!mounted) return;
-    _triggerAcrylicReapplyBurst(
-      includeImmediate: true,
-      forcedIsDarkMode:
-          _resolveNativeBackdropDarkMode(context.read<ThemeProvider>()),
-    );
+    _scheduleAcrylicReapplyAfterWindowMutation();
+  }
+
+  @override
+  void onWindowMinimize() {
+    if (!mounted) return;
+    _scheduleAcrylicReapplyAfterWindowMutation();
+  }
+
+  @override
+  void onWindowResize() {
+    if (!mounted) return;
+    _scheduleAcrylicReapplyAfterWindowMutation();
+  }
+
+  @override
+  void onWindowResized() {
+    if (!mounted) return;
+    _scheduleAcrylicReapplyAfterWindowMutation();
+  }
+
+  @override
+  void onWindowMove() {
+    if (!mounted) return;
+    _scheduleAcrylicReapplyAfterWindowMutation();
+  }
+
+  @override
+  void onWindowMoved() {
+    if (!mounted) return;
+    _scheduleAcrylicReapplyAfterWindowMutation();
+  }
+
+  @override
+  void onWindowEvent(String eventName) {
+    if (!mounted) return;
+    const acrylicSensitiveEvents = <String>{
+      'maximize',
+      'unmaximize',
+      'minimize',
+      'restore',
+      'resize',
+      'resized',
+      'move',
+      'moved',
+      'focus',
+      'blur',
+    };
+    if (acrylicSensitiveEvents.contains(eventName)) {
+      _scheduleAcrylicReapplyAfterWindowMutation();
+    }
+  }
+
+  void _scheduleAcrylicReapplyAfterWindowMutation() {
+    if (!Platform.isWindows || !_useDesktopAcrylicVisuals) return;
+    final themeProvider = context.read<ThemeProvider>();
+    if (themeProvider.isWallpaperMode) {
+      _disableNativeBackdrop();
+      return;
+    }
+
+    final int generation = ++_windowMutationAcrylicGeneration;
+    final bool isDarkMode = _resolveNativeBackdropDarkMode(themeProvider);
+    const delaysMs = <int>[0, 40, 100, 180, 320, 560, 900, 1400];
+
+    for (final delayMs in delaysMs) {
+      unawaited(
+        Future<void>.delayed(Duration(milliseconds: delayMs), () async {
+          if (!mounted || generation != _windowMutationAcrylicGeneration) {
+            return;
+          }
+          try {
+            await windowManager.setBackgroundColor(Colors.transparent);
+          } catch (_) {}
+          _triggerAcrylicReapplyBurst(
+            includeImmediate: true,
+            forcedIsDarkMode: isDarkMode,
+          );
+        }),
+      );
+    }
   }
 
   bool get _useDesktopFluentShell =>
@@ -673,6 +745,8 @@ class _CBFileAppState extends State<CBFileApp>
             AppThemeType.light,
             accentColor: provider.currentAccentColor,
             acrylicStrength: provider.desktopAcrylicStrength,
+            preferTransparentBackdrop:
+                provider.backdropMode == AcrylicBackdropMode.dynamic,
           )
         : provider.fluentThemeData;
   }
@@ -685,6 +759,8 @@ class _CBFileAppState extends State<CBFileApp>
             AppThemeType.dark,
             accentColor: provider.currentAccentColor,
             acrylicStrength: provider.desktopAcrylicStrength,
+            preferTransparentBackdrop:
+                provider.backdropMode == AcrylicBackdropMode.dynamic,
           );
   }
 
@@ -692,6 +768,7 @@ class _CBFileAppState extends State<CBFileApp>
     ThemeData baseTheme,
     Brightness brightness,
     double strength,
+    bool preferTransparentBackdrop,
   ) {
     final double normalizedStrength = strength.clamp(0.0, 2.0).toDouble();
     final bool isLightMode = brightness == Brightness.light;
@@ -706,23 +783,59 @@ class _CBFileAppState extends State<CBFileApp>
     }
 
     final scaffoldOpacity = brightness == Brightness.dark
-        ? opacityByStrength(solidAtMin: 0.90, glassAtMax: 0.34)
-        : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.92);
+        ? opacityByStrength(
+            solidAtMin: 0.90,
+            glassAtMax: preferTransparentBackdrop ? 0.24 : 0.34,
+          )
+        : opacityByStrength(
+            solidAtMin: 0.99,
+            glassAtMax: preferTransparentBackdrop ? 0.62 : 0.92,
+          );
     final appBarOpacity = brightness == Brightness.dark
-        ? opacityByStrength(solidAtMin: 0.94, glassAtMax: 0.46)
-        : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.93);
+        ? opacityByStrength(
+            solidAtMin: 0.94,
+            glassAtMax: preferTransparentBackdrop ? 0.36 : 0.46,
+          )
+        : opacityByStrength(
+            solidAtMin: 0.99,
+            glassAtMax: preferTransparentBackdrop ? 0.70 : 0.93,
+          );
     final surfaceOpacity = brightness == Brightness.dark
-        ? opacityByStrength(solidAtMin: 0.88, glassAtMax: 0.40)
-        : opacityByStrength(solidAtMin: 0.99, glassAtMax: 0.90);
+        ? opacityByStrength(
+            solidAtMin: 0.88,
+            glassAtMax: preferTransparentBackdrop ? 0.30 : 0.40,
+          )
+        : opacityByStrength(
+            solidAtMin: 0.99,
+            glassAtMax: preferTransparentBackdrop ? 0.72 : 0.90,
+          );
     final containerOpacity = brightness == Brightness.dark
-        ? opacityByStrength(solidAtMin: 0.84, glassAtMax: 0.36)
-        : opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.88);
+        ? opacityByStrength(
+            solidAtMin: 0.84,
+            glassAtMax: preferTransparentBackdrop ? 0.28 : 0.36,
+          )
+        : opacityByStrength(
+            solidAtMin: 0.98,
+            glassAtMax: preferTransparentBackdrop ? 0.68 : 0.88,
+          );
     final lowContainerOpacity = brightness == Brightness.dark
-        ? opacityByStrength(solidAtMin: 0.80, glassAtMax: 0.32)
-        : opacityByStrength(solidAtMin: 0.98, glassAtMax: 0.86);
+        ? opacityByStrength(
+            solidAtMin: 0.80,
+            glassAtMax: preferTransparentBackdrop ? 0.24 : 0.32,
+          )
+        : opacityByStrength(
+            solidAtMin: 0.98,
+            glassAtMax: preferTransparentBackdrop ? 0.62 : 0.86,
+          );
     final lowestContainerOpacity = brightness == Brightness.dark
-        ? opacityByStrength(solidAtMin: 0.76, glassAtMax: 0.28)
-        : opacityByStrength(solidAtMin: 0.97, glassAtMax: 0.84);
+        ? opacityByStrength(
+            solidAtMin: 0.76,
+            glassAtMax: preferTransparentBackdrop ? 0.20 : 0.28,
+          )
+        : opacityByStrength(
+            solidAtMin: 0.97,
+            glassAtMax: preferTransparentBackdrop ? 0.56 : 0.84,
+          );
 
     final colorScheme = baseTheme.colorScheme;
     const Color lightSurfaceBase = fluentLightBackground3;
@@ -757,15 +870,14 @@ class _CBFileAppState extends State<CBFileApp>
     final cardColor =
         effectiveContainerBase.withValues(alpha: containerOpacity);
     final dialogColor = effectiveContainerBase;
-    // Menu: acrylic style using theme surface colors + slight transparency
-    final Color menuColor =
-        effectiveContainerBase.withValues(alpha: isLightMode ? 0.97 : 0.94);
+    // Menus and dropdown overlays stay solid even when page chrome uses acrylic.
+    final Color menuColor = effectiveContainerBase;
 
     return baseTheme.copyWith(
       colorScheme: bridgedColorScheme,
       scaffoldBackgroundColor:
           baseTheme.scaffoldBackgroundColor.withValues(alpha: scaffoldOpacity),
-      canvasColor: baseTheme.canvasColor.withValues(alpha: scaffoldOpacity),
+      canvasColor: menuColor,
       cardColor: cardColor,
       cardTheme: baseTheme.cardTheme.copyWith(
         color: cardColor,
@@ -786,6 +898,13 @@ class _CBFileAppState extends State<CBFileApp>
                 : Colors.white.withValues(alpha: 0.08),
             width: 1,
           ),
+        ),
+      ),
+      dropdownMenuTheme: baseTheme.dropdownMenuTheme.copyWith(
+        menuStyle: (baseTheme.dropdownMenuTheme.menuStyle ?? const MenuStyle())
+            .copyWith(
+          backgroundColor: WidgetStatePropertyAll(menuColor),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         ),
       ),
       bottomSheetTheme: baseTheme.bottomSheetTheme.copyWith(
@@ -876,6 +995,7 @@ class _CBFileAppState extends State<CBFileApp>
             lightTheme,
             Brightness.light,
             acrylicStrength,
+            themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
           )
         : lightTheme;
     final resolvedDarkTheme = _useDesktopAcrylicVisuals
@@ -883,6 +1003,7 @@ class _CBFileAppState extends State<CBFileApp>
             darkTheme,
             Brightness.dark,
             acrylicStrength,
+            themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
           )
         : darkTheme;
 
@@ -956,6 +1077,7 @@ class _CBFileAppState extends State<CBFileApp>
                 resolvedTheme,
                 brightness,
                 themeProvider.desktopAcrylicStrength,
+                themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
               )
             : resolvedTheme;
 

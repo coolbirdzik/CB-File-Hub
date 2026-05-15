@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../core/service_locator.dart';
+import '../helpers/tags/tag_manager.dart';
 import '../models/database/database_manager.dart';
 import '../services/directory_watcher_service.dart';
 import '../services/windowing/window_startup_payload.dart';
@@ -103,11 +104,29 @@ Future<void> tearDownCbFileAppForNextE2ETest() async {
   //    but the OS handle release is not guaranteed to be instantaneous.
   await Future<void>.delayed(const Duration(milliseconds: 100));
 
+  // 3. Close TagManager's broadcast stream — prevents any pending async
+  //    tag-change events from dispatching into blocs that are about to be
+  //    disposed by locator.reset() below.
+  _teardownTagManager();
+
+  // 4. Brief pause so any in-flight stream events drain harmlessly into a
+  //    closed controller before we touch the blocs.
+  await Future<void>.delayed(const Duration(milliseconds: 50));
+
+  // 5. Reset service locator (disposes all blocs and services).
   DatabaseManager.resetSingletonForE2ETest();
   try {
     await locator.reset(dispose: true);
   } catch (_) {}
 
-  // 3. Release the E2E serialization semaphore — allows the next test to proceed.
+  // 6. Release the E2E serialization semaphore — allows the next test to proceed.
   CbE2EConfig.releaseE2ESemaphore();
+}
+
+/// Clears TagManager singleton state to prevent streams firing into
+/// disposed BLoCs on subsequent tests.
+void _teardownTagManager() {
+  try {
+    TagManager.resetForE2E();
+  } catch (_) {}
 }

@@ -44,6 +44,7 @@ class ThemeFactory {
     final Color inputFillColor = isLight
         ? _blend(colorScheme.surface, Colors.black, 0.035)
         : colorScheme.surface;
+    final Color menuColor = colorScheme.surfaceContainerHigh;
     final Color lightBorder = Colors.black.withValues(alpha: 0.08);
 
     return ThemeData(
@@ -51,6 +52,7 @@ class ThemeFactory {
       brightness: brightness,
       primaryColor: colorScheme.primary,
       scaffoldBackgroundColor: scaffoldColor,
+      canvasColor: menuColor,
       colorScheme: colorScheme,
 
       // AppBar Theme
@@ -132,12 +134,23 @@ class ThemeFactory {
 
       // PopupMenu Theme
       popupMenuTheme: PopupMenuThemeData(
-        color: isLight
-            ? colorScheme.surfaceContainerHigh
-            : colorScheme.surfaceContainerHigh,
+        color: menuColor,
         elevation: 8,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(menuColor),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(8),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
         ),
       ),
 
@@ -259,8 +272,7 @@ class ThemeFactory {
           }
           return Colors.transparent;
         }),
-        trackBorderColor:
-            WidgetStateProperty.all(Colors.transparent),
+        trackBorderColor: WidgetStateProperty.all(Colors.transparent),
         minThumbLength: 48.0,
         crossAxisMargin: 2.0,
         mainAxisMargin: 2.0,

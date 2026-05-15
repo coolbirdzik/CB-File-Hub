@@ -8,6 +8,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
+import 'package:cb_file_manager/helpers/media/folder_thumbnail_service.dart';
 import 'package:cb_file_manager/helpers/media/photo_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
@@ -180,6 +181,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
           break;
         case 'video':
           await VideoThumbnailHelper.clearCache();
+          FolderThumbnailService().clearCache();
           break;
         case 'network':
           await NetworkThumbnailHelper().clearCache();
@@ -213,6 +215,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       await _clearDirectory(await AppPathHelper.getPhotoCacheDir());
       PhotoThumbnailHelper.clearMemoryCache();
       await VideoThumbnailHelper.clearCache();
+      FolderThumbnailService().clearCache();
       await NetworkThumbnailHelper().clearCache();
       await VideoLibraryCacheService.instance.clearAll();
       await Win32SmbHelper().clearTempFileCache();

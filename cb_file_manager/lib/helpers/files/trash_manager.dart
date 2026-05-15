@@ -118,6 +118,7 @@ class TrashManager {
                 Size = \$size
                 OriginalPath = \$originalPath
                 DeletedDate = \$deletedDate
+                IsFolder = \$item.IsFolder
             }
         }
         
@@ -180,7 +181,8 @@ class TrashManager {
               originalPath: item['OriginalPath'] ?? 'Unknown',
               size: size,
               trashedDate: deletedDate ?? DateTime.now(),
-              isSystemItem: true));
+              isSystemItem: true,
+              isFolder: item['IsFolder'] == true));
         }
       }
     } catch (e) {
@@ -272,7 +274,7 @@ class TrashManager {
         
         foreach (\$item in \$recycleBin.Items()) {
             if (\$item.Path -eq '$recycleBinPath') {
-                Remove-Item -Path "\$(\$item.Path)" -Force
+                Remove-Item -Path "\$(\$item.Path)" -Recurse -Force
                 Write-Output "Deleted"
                 exit 0
             }
@@ -407,10 +409,9 @@ class TrashManager {
     return false;
   }
 
-  /// Move a file to our internal trash directory (fallback implementation)
+  /// Move a file or directory to our internal trash directory (fallback implementation)
   Future<bool> _moveToInternalTrash(String filePath) async {
     try {
-      final file = File(filePath);
       final trashDir = await getTrashDirectory();
 
       // Generate a unique name to avoid conflicts in trash
@@ -419,20 +420,46 @@ class TrashManager {
       final trashFileName = '${timestamp}_$fileName';
       final trashFilePath = pathlib.join(trashDir.path, trashFileName);
 
-      // Move the file to trash
-      await file.copy(trashFilePath);
-      await file.delete();
+      final dir = Directory(filePath);
+      if (await dir.exists()) {
+        // Move directory: rename (same filesystem) or copy+delete
+        try {
+          await dir.rename(trashFilePath);
+        } catch (_) {
+          await _copyDirectory(dir, Directory(trashFilePath));
+          await dir.delete(recursive: true);
+        }
+      } else {
+        final file = File(filePath);
+        // Move file to trash
+        await file.copy(trashFilePath);
+        await file.delete();
+      }
 
       // Update metadata
       final metadata = await loadMetadata();
       metadata[trashFileName] = filePath;
       await saveMetadata(metadata);
 
-      debugPrint('File moved to internal trash: $filePath');
+      debugPrint('Item moved to internal trash: $filePath');
       return true;
     } catch (e) {
-      debugPrint('Error moving file to internal trash: $e');
+      debugPrint('Error moving item to internal trash: $e');
       return false;
+    }
+  }
+
+  /// Recursively copy a directory and its contents.
+  Future<void> _copyDirectory(Directory source, Directory destination) async {
+    await destination.create(recursive: true);
+    await for (final entity in source.list(recursive: false)) {
+      final newPath =
+          pathlib.join(destination.path, pathlib.basename(entity.path));
+      if (entity is File) {
+        await entity.copy(newPath);
+      } else if (entity is Directory) {
+        await _copyDirectory(entity, Directory(newPath));
+      }
     }
   }
 
@@ -464,9 +491,12 @@ class TrashManager {
       final trashDir = await getTrashDirectory();
       final trashFilePath = pathlib.join(trashDir.path, trashFileName);
       final trashFile = File(trashFilePath);
+      final trashDirectory = Directory(trashFilePath);
+      final bool isDir = await trashDirectory.exists();
+      final bool isFile = await trashFile.exists();
 
-      if (!await trashFile.exists()) {
-        debugPrint('File not found in trash: $trashFileName');
+      if (!isDir && !isFile) {
+        debugPrint('Item not found in trash: $trashFileName');
 
         // Clean up metadata anyway
         metadata.remove(trashFileName);
@@ -481,23 +511,37 @@ class TrashManager {
         await destDir.create(recursive: true);
       }
 
-      // Check if the original file already exists (avoid accidental overwrite)
-      final originalFile = File(originalPath);
+      // Check if the original item already exists (avoid accidental overwrite)
       String targetPath = originalPath;
 
-      if (await originalFile.exists()) {
-        // Generate a new name with (recovered) suffix
-        final extension = pathlib.extension(originalPath);
-        final nameWithoutExtension =
-            pathlib.basenameWithoutExtension(originalPath);
-        final directory = pathlib.dirname(originalPath);
-        targetPath = pathlib.join(
-            directory, '$nameWithoutExtension (recovered)$extension');
+      if (isDir) {
+        if (await Directory(originalPath).exists()) {
+          final baseName = pathlib.basename(originalPath);
+          final parentDir = pathlib.dirname(originalPath);
+          targetPath = pathlib.join(parentDir, '$baseName (recovered)');
+        }
+        // Restore the directory
+        try {
+          await trashDirectory.rename(targetPath);
+        } catch (_) {
+          await _copyDirectory(trashDirectory, Directory(targetPath));
+          await trashDirectory.delete(recursive: true);
+        }
+      } else {
+        final originalFile = File(originalPath);
+        if (await originalFile.exists()) {
+          // Generate a new name with (recovered) suffix
+          final extension = pathlib.extension(originalPath);
+          final nameWithoutExtension =
+              pathlib.basenameWithoutExtension(originalPath);
+          final directory = pathlib.dirname(originalPath);
+          targetPath = pathlib.join(
+              directory, '$nameWithoutExtension (recovered)$extension');
+        }
+        // Restore the file
+        await trashFile.copy(targetPath);
+        await trashFile.delete();
       }
-
-      // Restore the file
-      await trashFile.copy(targetPath);
-      await trashFile.delete();
 
       // Update metadata
       metadata.remove(trashFileName);
@@ -523,8 +567,11 @@ class TrashManager {
       final trashDir = await getTrashDirectory();
       final trashFilePath = pathlib.join(trashDir.path, trashFileName);
       final trashFile = File(trashFilePath);
+      final trashDirectory = Directory(trashFilePath);
 
-      if (await trashFile.exists()) {
+      if (await trashDirectory.exists()) {
+        await trashDirectory.delete(recursive: true);
+      } else if (await trashFile.exists()) {
         await trashFile.delete();
       }
 
@@ -535,7 +582,7 @@ class TrashManager {
 
       return true;
     } catch (e) {
-      debugPrint('Error deleting file from trash: $e');
+      debugPrint('Error deleting item from trash: $e');
       return false;
     }
   }
@@ -592,21 +639,25 @@ class TrashManager {
       final entities = await trashDir.list().toList();
 
       for (final entity in entities) {
-        if (entity is File &&
-            pathlib.basename(entity.path) != metadataFileName) {
-          final fileName = pathlib.basename(entity.path);
-          final originalPath = metadata[fileName] ?? 'Unknown';
-          final fileStat = await entity.stat();
+        final fileName = pathlib.basename(entity.path);
+        if (fileName == metadataFileName) continue;
 
-          allTrashItems.add(TrashItem(
-            trashFileName: fileName,
-            originalPath: originalPath,
-            size: fileStat.size,
-            trashedDate: DateTime.fromMillisecondsSinceEpoch(
-                int.tryParse(fileName.split('_').first) ?? 0),
-            isSystemTrashItem: false,
-          ));
-        }
+        final bool isDir = entity is Directory;
+        final bool isFile = entity is File;
+        if (!isDir && !isFile) continue;
+
+        final originalPath = metadata[fileName] ?? 'Unknown';
+        final fileStat = await entity.stat();
+
+        allTrashItems.add(TrashItem(
+          trashFileName: fileName,
+          originalPath: originalPath,
+          size: fileStat.size,
+          trashedDate: DateTime.fromMillisecondsSinceEpoch(
+              int.tryParse(fileName.split('_').first) ?? 0),
+          isSystemTrashItem: false,
+          isFolder: isDir,
+        ));
       }
     } catch (e) {
       debugPrint('Error getting internal trash items: $e');
@@ -627,6 +678,7 @@ class TrashManager {
             trashedDate: item.trashedDate,
             isSystemTrashItem: true,
             displayName: item.name,
+            isFolder: item.isFolder,
           ));
         }
       } catch (e) {
@@ -663,6 +715,7 @@ class TrashItem {
   final bool isSystemTrashItem; // Whether this item is from the system trash
   final String?
       displayName; // Optional display name, used for system trash items
+  final bool isFolder; // Whether this item is a folder/directory
 
   TrashItem({
     required this.trashFileName,
@@ -671,6 +724,7 @@ class TrashItem {
     required this.trashedDate,
     this.isSystemTrashItem = false,
     this.displayName,
+    this.isFolder = false,
   });
 
   String get displayNameValue =>
@@ -688,6 +742,7 @@ class SystemTrashItem {
   final int size;
   final DateTime trashedDate;
   final bool isSystemItem;
+  final bool isFolder; // Whether this item is a folder/directory
 
   SystemTrashItem({
     required this.name,
@@ -696,5 +751,6 @@ class SystemTrashItem {
     required this.size,
     required this.trashedDate,
     this.isSystemItem = true,
+    this.isFolder = false,
   });
 }

@@ -293,6 +293,26 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       CREATE INDEX IF NOT EXISTS idx_network_credentials_lookup
       ON network_credentials(service_type, normalized_host)
     ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ai_providers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        api_type TEXT NOT NULL,
+        api_key TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        model_name TEXT NOT NULL,
+        temperature REAL DEFAULT 0.3,
+        max_tokens INTEGER DEFAULT 4096,
+        system_prompt TEXT,
+        timeout_seconds INTEGER DEFAULT 30,
+        max_retries INTEGER DEFAULT 2,
+        is_enabled INTEGER DEFAULT 1,
+        priority INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   int _now() => DateTime.now().millisecondsSinceEpoch;
