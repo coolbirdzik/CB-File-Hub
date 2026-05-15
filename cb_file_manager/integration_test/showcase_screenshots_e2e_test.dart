@@ -222,7 +222,7 @@ void main() {
 
       // Open tags screen via system path
       CbE2EConfig.startupPayload = const WindowStartupPayload(
-        tabs: [const WindowTabPayload(path: '#tags')],
+        tabs: [WindowTabPayload(path: '#tags')],
       );
 
       try {
@@ -246,8 +246,8 @@ void main() {
       await seedWallpaperBackdrop(dir);
       await seedTags(media.images);
 
-      CbE2EConfig.startupPayload = WindowStartupPayload(
-        tabs: [const WindowTabPayload(path: '#tags')],
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: [WindowTabPayload(path: '#tags')],
       );
 
       try {
