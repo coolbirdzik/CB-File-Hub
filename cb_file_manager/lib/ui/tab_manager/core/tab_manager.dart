@@ -196,6 +196,8 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     final newTabId =
         'tab_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(10000)}';
 
+    debugPrint(
+        'TabManagerBloc._onAddTab: path=${event.path}, highlightedFileName=${event.highlightedFileName}');
     final newTab = TabData(
       id: newTabId,
       name: event.name ?? _extractNameFromPath(event.path),

@@ -642,6 +642,8 @@ class SharedFileContextMenu extends StatelessWidget {
   final FolderListBloc? folderListBloc;
   final BuildContext? actionContext;
   final Function(BuildContext, String)? showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final bool showOpenFileLocation;
 
   const SharedFileContextMenu({
     Key? key,
@@ -652,6 +654,8 @@ class SharedFileContextMenu extends StatelessWidget {
     this.folderListBloc,
     this.actionContext,
     this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.showOpenFileLocation = false,
   }) : super(key: key);
 
   @override
@@ -757,6 +761,8 @@ class SharedFileContextMenu extends StatelessWidget {
         isVideo: isVideo,
         isImage: isImage,
         showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        showOpenFileLocation: showOpenFileLocation,
         remotePath: remotePath,
         remoteFileName: remoteFileName,
       ),
@@ -828,6 +834,8 @@ List<ContextMenuSection> _buildFileContextMenuSections({
   required bool isVideo,
   required bool isImage,
   Function(BuildContext, String)? showAddTagToFileDialog,
+  Future<void> Function(BuildContext, File)? onDeleteFile,
+  bool showOpenFileLocation = false,
   String? remotePath,
   String? remoteFileName,
   Offset? globalPosition,
@@ -874,6 +882,17 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           onSelected: (_) =>
               ExternalAppHelper.openFileWithApp(file.path, 'shell_open'),
         ),
+        if (showOpenFileLocation && isDesktopPlatform)
+          ContextMenuAction(
+            id: 'open_file_location',
+            label: 'Open file location',
+            icon: PhosphorIconsLight.folderOpen,
+            onSelected: (_) => EntityOpenActions.openInNewTab(
+              context,
+              sourcePath: file.path,
+              preferredTabName: pathlib.basename(file.parent.path),
+            ),
+          ),
         if (isDesktopPlatform)
           ContextMenuAction(
             id: 'open_in_new_tab',
@@ -997,21 +1016,25 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           label: l10n.moveToTrash,
           icon: PhosphorIconsLight.trash,
           isDestructive: true,
-          onSelected: (_) {
+          onSelected: (actionContext) async {
+            if (onDeleteFile != null) {
+              await onDeleteFile(actionContext, file);
+              return;
+            }
             final isDir = FileSystemEntity.isDirectorySync(file.path);
             SelectionBloc? selBloc;
             try {
-              selBloc = context.read<SelectionBloc>();
+              selBloc = actionContext.read<SelectionBloc>();
             } catch (_) {
               selBloc = null;
             }
             final targetFolderListBloc =
-                folderListBloc ?? _maybeFolderListBloc(context);
+                folderListBloc ?? _maybeFolderListBloc(actionContext);
             if (targetFolderListBloc == null) {
               return;
             }
             FileOperationsHandler.handleDelete(
-              context: context,
+              context: actionContext,
               folderListBloc: targetFolderListBloc,
               selectedFiles: isDir ? [] : [file.path],
               selectedFolders: isDir ? [file.path] : [],
@@ -1082,6 +1105,8 @@ void showFileContextMenu({
   required bool isVideo,
   required bool isImage,
   Function(BuildContext, String)? showAddTagToFileDialog,
+  Future<void> Function(BuildContext, File)? onDeleteFile,
+  bool showOpenFileLocation = false,
   Offset? globalPosition,
 }) {
   final folderListBloc = _maybeFolderListBloc(context);
@@ -1101,6 +1126,8 @@ void showFileContextMenu({
             folderListBloc: folderListBloc,
             actionContext: context,
             showAddTagToFileDialog: showAddTagToFileDialog,
+            onDeleteFile: onDeleteFile,
+            showOpenFileLocation: showOpenFileLocation,
           ),
         ),
       ),
@@ -1132,6 +1159,8 @@ void showFileContextMenu({
     isVideo: isVideo,
     isImage: isImage,
     showAddTagToFileDialog: showAddTagToFileDialog,
+    onDeleteFile: onDeleteFile,
+    showOpenFileLocation: showOpenFileLocation,
     remotePath: remotePath,
     remoteFileName: remoteFileName,
     globalPosition: effectivePosition,
@@ -1694,6 +1723,7 @@ void showMultipleFilesContextMenu({
   required List<String> selectedPaths,
   Offset? globalPosition,
   required VoidCallback onClearSelection,
+  Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
 }) {
   final screenSize = MediaQuery.of(context).size;
   final effectivePosition =
@@ -1703,6 +1733,7 @@ void showMultipleFilesContextMenu({
     folderListBloc: _maybeFolderListBloc(context),
     selectedPaths: selectedPaths,
     onClearSelection: onClearSelection,
+    onDeleteFiles: onDeleteFiles,
     globalPosition: effectivePosition,
   );
 
@@ -1733,6 +1764,7 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
   FolderListBloc? folderListBloc,
   required List<String> selectedPaths,
   required VoidCallback onClearSelection,
+  Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
   Offset? globalPosition,
 }) {
   final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
@@ -1817,8 +1849,12 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           label: l10n.deleteTitle,
           icon: PhosphorIconsLight.trash,
           isDestructive: true,
-          isEnabled: bloc != null,
-          onSelected: (_) {
+          isEnabled: onDeleteFiles != null || bloc != null,
+          onSelected: (actionContext) async {
+            if (onDeleteFiles != null) {
+              await onDeleteFiles(actionContext, selectedPaths);
+              return;
+            }
             if (bloc == null) return;
             SelectionBloc? selectionBloc;
             try {

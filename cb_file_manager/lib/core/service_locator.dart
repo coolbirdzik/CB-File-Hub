@@ -11,6 +11,7 @@ import '../helpers/media/folder_thumbnail_service.dart';
 import '../config/language_controller.dart';
 import '../ui/controllers/operation_progress_controller.dart';
 import '../services/windowing/desktop_windowing_service.dart';
+import '../services/progress/desktop_app_icon_progress_service.dart';
 import '../services/ai/ai_provider_service.dart';
 import '../services/ai/ai_chat_history_service.dart';
 
@@ -88,6 +89,10 @@ Future<void> setupServiceLocator() async {
   // Register OperationProgressController (global operation progress UI)
   locator.registerLazySingleton<OperationProgressController>(
     () => OperationProgressController(),
+  );
+
+  locator.registerLazySingleton<DesktopAppIconProgressService>(
+    () => DesktopAppIconProgressService(),
   );
 
   // Register DesktopWindowingService (desktop-only; no-op on mobile).

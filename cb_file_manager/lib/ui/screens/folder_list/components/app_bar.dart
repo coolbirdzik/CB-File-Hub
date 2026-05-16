@@ -120,6 +120,7 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                     : l10n.moveItemsToTrashConfirmation(totalCount, l10n.items),
                 confirmText: l10n.deleteTitle,
                 cancelText: l10n.cancel,
+                previewPaths: selectedFiles.take(4).toList(),
               ),
             );
 

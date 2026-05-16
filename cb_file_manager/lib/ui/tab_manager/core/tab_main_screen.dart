@@ -14,6 +14,8 @@ import '../../../bloc/network_browsing/network_browsing_bloc.dart';
 import '../../components/common/operation_progress_overlay.dart';
 import '../../../core/service_locator.dart';
 import '../../../services/windowing/desktop_windowing_service.dart';
+import '../../../services/progress/desktop_app_icon_progress_service.dart';
+import '../../controllers/operation_progress_controller.dart';
 import '../../../services/windowing/window_startup_payload.dart';
 import '../../../services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'tab_manager.dart';
@@ -71,6 +73,9 @@ class _TabMainScreenState extends State<TabMainScreen> {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       _desktopWindowing = locator<DesktopWindowingService>();
       unawaited(_desktopWindowing!.attachTabBloc(_tabManagerBloc));
+      locator<DesktopAppIconProgressService>().start(
+        locator<OperationProgressController>(),
+      );
     }
     if (Platform.isWindows) {
       WindowsNativeTabDragDropService.isDragHoveringWindow
@@ -240,6 +245,9 @@ class _TabMainScreenState extends State<TabMainScreen> {
     _operationProgressOverlayEntry?.remove();
     _operationProgressOverlayEntry = null;
     unawaited(_desktopWindowing?.dispose());
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      unawaited(locator<DesktopAppIconProgressService>().stop());
+    }
     _tabManagerBloc.close();
     _networkBrowsingBloc.close();
     super.dispose();

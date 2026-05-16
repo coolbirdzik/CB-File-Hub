@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/ui/components/common/optimized_interaction_handler.dart';
 import 'package:cb_file_manager/ui/utils/item_interaction_style.dart';
 
 /// A reusable shell widget that provides common hover, selection, and gesture handling
@@ -93,12 +94,11 @@ class _ItemShellState extends State<ItemShell> {
         setState(() => _isHovering = false);
       },
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: OptimizedInteractionLayer(
         onTap: _handleTap,
-        onDoubleTap: _handleDoubleTap,
+        onDoubleTap: widget.onDoubleTap == null ? null : _handleDoubleTap,
         onLongPress: _handleLongPress,
         onSecondaryTapUp: widget.onSecondaryTapUp,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           color: showHighlight ? backgroundColor : Colors.transparent,
           child: widget.child,
@@ -187,12 +187,11 @@ class _ListItemShellState extends State<ListItemShell> {
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: OptimizedInteractionLayer(
         onTap: _handleTap,
-        onDoubleTap: _handleDoubleTap,
+        onDoubleTap: widget.onDoubleTap == null ? null : _handleDoubleTap,
         onLongPress: _handleLongPress,
         onSecondaryTapUp: widget.onSecondaryTapUp,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           decoration: decoration,
           padding: widget.padding,
@@ -271,12 +270,11 @@ class _GridItemShellState extends State<GridItemShell> {
       onEnter: (_) => setState(() => _isHovering = true),
       onExit: (_) => setState(() => _isHovering = false),
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
+      child: OptimizedInteractionLayer(
         onTap: _handleTap,
-        onDoubleTap: _handleDoubleTap,
+        onDoubleTap: widget.onDoubleTap == null ? null : _handleDoubleTap,
         onLongPress: _handleLongPress,
         onSecondaryTapUp: widget.onSecondaryTapUp,
-        behavior: HitTestBehavior.opaque,
         child: Stack(
           fit: StackFit.expand,
           children: [

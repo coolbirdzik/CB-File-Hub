@@ -17,6 +17,7 @@ import 'create_album_dialog.dart';
 import 'batch_add_dialog.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
 import 'package:cb_file_manager/services/album_auto_rule_service.dart';
@@ -195,12 +196,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (selectedPaths.isEmpty || !mounted) return;
 
     final count = selectedPaths.length;
-    final confirmed = await RouteUtils.showAcrylicDialog<bool>(
+    final confirmed = await BrowserLikeActionHandlers.showConfirmationDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      showDialogWithWidget: (dialogContext, dialog) =>
+          RouteUtils.showAcrylicDialog<bool>(
+        context: dialogContext,
+        builder: (_) => dialog,
+      ),
+      dialog: AlertDialog(
         title: Text('Remove $count ${count == 1 ? 'image' : 'images'}?'),
         content: const Text(
-            'Remove selected images from this album? The original files will not be deleted.'),
+          'Remove selected images from this album? The original files will not be deleted.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -216,24 +223,45 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      int successCount = 0;
-      for (final filePath in selectedPaths) {
-        if (await _albumService.removeFileFromAlbum(
-            widget.album.id, filePath)) {
-          successCount++;
-        }
-      }
+    if (confirmed) {
+      final successCount =
+          await BrowserLikeActionHandlers.runBatchOperation<String>(
+        items: selectedPaths,
+        operation: (filePath) =>
+            _albumService.removeFileFromAlbum(widget.album.id, filePath),
+      );
       _clearSelection();
       await _loadAlbumFiles();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              'Removed $successCount ${successCount == 1 ? 'image' : 'images'} from album'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Removed $successCount ${successCount == 1 ? 'image' : 'images'} from album',
+            ),
+          ),
+        );
       }
     }
+  }
+
+  Future<void> _deleteSelectedFilesFromDisk(Set<String> selectedPaths) async {
+    if (selectedPaths.isEmpty || !mounted) return;
+    await BrowserLikeActionHandlers.confirmAndMoveFilesToTrash(
+      context: context,
+      filePaths: selectedPaths.toList(),
+      showDialogWithWidget: (dialogContext, dialog) =>
+          RouteUtils.showAcrylicDialog<bool>(
+        context: dialogContext,
+        builder: (_) => dialog,
+      ),
+      onMoved: (filePath) =>
+          _albumService.removeFileFromAlbum(widget.album.id, filePath),
+      onAfterSuccess: (_) async {
+        _clearSelection();
+        await _loadAlbumFiles();
+      },
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -763,6 +791,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           tooltip: 'Remove from album',
           onPressed: () => _removeSelectedFiles(sel.selectedFilePaths),
         ),
+      if (isDesktop && hasSelection)
+        IconButton(
+          icon: const Icon(PhosphorIconsLight.trash),
+          tooltip: 'Move selected files to Trash Bin',
+          onPressed: () => _deleteSelectedFilesFromDisk(sel.selectedFilePaths),
+        ),
 
       // ── Standard album actions ────────────────────────────────────────────
       IconButton(
@@ -913,6 +947,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             : () => _removeSelectedFiles(sel.selectedFilePaths),
       ),
       IconButton(
+        icon: const Icon(PhosphorIconsLight.trash),
+        tooltip: 'Move selected files to Trash Bin',
+        onPressed: count == 0
+            ? null
+            : () => _deleteSelectedFilesFromDisk(sel.selectedFilePaths),
+      ),
+      IconButton(
         icon: const Icon(PhosphorIconsLight.checkSquare),
         tooltip: count == total ? 'Deselect all' : 'Select all',
         onPressed: () {
@@ -1054,41 +1095,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                 label: const Text('Rules'),
                               ),
                             ],
-                          ),
-                        ),
-
-                      // Search chip
-                      if (_searchQuery != null && _searchQuery!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 8, horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(PhosphorIconsLight.magnifyingGlass,
-                                    size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                    child: Text('Search: "$_searchQuery"')),
-                                IconButton(
-                                  icon: const Icon(PhosphorIconsLight.x,
-                                      size: 18),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => setState(() {
-                                    _searchQuery = null;
-                                    _applyFiltersAndOrder();
-                                  }),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
 

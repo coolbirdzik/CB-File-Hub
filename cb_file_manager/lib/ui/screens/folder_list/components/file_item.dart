@@ -83,6 +83,8 @@ class FileItem extends StatefulWidget {
       toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final Function(File, bool)? onFileTap;
   final bool isDesktopMode;
   final String?
@@ -98,6 +100,8 @@ class FileItem extends StatefulWidget {
     required this.toggleFileSelection,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.onFileTap,
     this.isDesktopMode = false,
     this.lastSelectedPath,
@@ -311,8 +315,9 @@ class _FileItemState extends State<FileItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    // Trong mobile mode, luôn sử dụng ctrlSelect để add to selection
-    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode
+        ? isCtrlPressed || (widget.isSelectionMode && !isShiftPressed)
+        : true;
 
     widget.toggleFileSelection(widget.file.path,
         shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
@@ -331,6 +336,7 @@ class _FileItemState extends State<FileItem> {
             context: context,
             selectedPaths: selectionState.allSelectedPaths,
             globalPosition: globalPosition,
+            onDeleteFiles: widget.onDeleteFiles,
             onClearSelection: () {
               selectionBloc.add(ClearSelection());
             },
@@ -351,6 +357,8 @@ class _FileItemState extends State<FileItem> {
         isVideo: isVideo,
         isImage: isImage,
         showAddTagToFileDialog: widget.showAddTagToFileDialog,
+        onDeleteFile: widget.onDeleteFile,
+        showOpenFileLocation: widget.state.isSearchActive,
         globalPosition: globalPosition,
       );
     } catch (e) {
@@ -364,6 +372,8 @@ class _FileItemState extends State<FileItem> {
           isVideo: false,
           isImage: false,
           showAddTagToFileDialog: widget.showAddTagToFileDialog,
+          onDeleteFile: widget.onDeleteFile,
+          showOpenFileLocation: widget.state.isSearchActive,
           globalPosition: globalPosition,
         );
       } catch (e2) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
@@ -49,6 +50,7 @@ class FileNavigationBloc
     on<FileNavigationSearchByFileName>(_onSearchByFileName);
     on<FileNavigationClearSearchAndFilters>(_onClearSearchAndFilters);
     on<FileNavigationLoadMoreSearchResults>(_onLoadMoreSearchResults);
+    on<FileNavigationRemovePaths>(_onRemovePaths);
 
     // ── Directory watching ─────────────────────────────────────
     _directoryWatcherSubscription = _directoryWatcher.onDirectoryRefresh.listen(
@@ -61,6 +63,39 @@ class FileNavigationBloc
         }
       },
     );
+  }
+
+  void _onRemovePaths(
+    FileNavigationRemovePaths event,
+    Emitter<FileNavigationState> emit,
+  ) {
+    if (event.paths.isEmpty) return;
+    final removed = event.paths;
+    final searchBefore = state.searchResults.length;
+    _pendingSearchResults = _pendingSearchResults
+        .where((entity) => !removed.contains(entity.path))
+        .toList();
+    final filteredSearchResults = state.searchResults
+        .where((entity) => !removed.contains(entity.path))
+        .toList();
+    final removedFromSearch = searchBefore - filteredSearchResults.length;
+    final currentTotal = state.searchResultsTotal;
+
+    emit(state.copyWith(
+      folders: state.folders
+          .where((entity) => !removed.contains(entity.path))
+          .toList(),
+      files: state.files
+          .where((entity) => !removed.contains(entity.path))
+          .toList(),
+      filteredFiles: state.filteredFiles
+          .where((entity) => !removed.contains(entity.path))
+          .toList(),
+      searchResults: filteredSearchResults,
+      searchResultsTotal: currentTotal == null
+          ? null
+          : math.max(0, currentTotal - removedFromSearch),
+    ));
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
@@ -307,6 +308,8 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onNavStateChanged(FileNavigationState navState) {
     if (isClosed) return;
+    final hasActiveTagSearch = state.currentSearchTag != null;
+
     // ignore: invalid_use_of_visible_for_testing_member
     emit(state.copyWith(
       isLoading: navState.isLoading,
@@ -315,18 +318,28 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       currentPath: navState.currentPath,
       folders: navState.folders,
       files: navState.files,
-      searchResults: navState.searchResults,
-      hasMoreSearchResults: navState.hasMoreSearchResults,
-      isLoadingMoreSearchResults: navState.isLoadingMoreSearchResults,
-      searchResultsTotal: navState.searchResultsTotal,
+      searchResults:
+          hasActiveTagSearch ? state.searchResults : navState.searchResults,
+      hasMoreSearchResults: hasActiveTagSearch
+          ? state.hasMoreSearchResults
+          : navState.hasMoreSearchResults,
+      isLoadingMoreSearchResults: hasActiveTagSearch
+          ? state.isLoadingMoreSearchResults
+          : navState.isLoadingMoreSearchResults,
+      searchResultsTotal: hasActiveTagSearch
+          ? state.searchResultsTotal
+          : navState.searchResultsTotal,
       filteredFiles: navState.filteredFiles,
       currentFilter: navState.currentFilter,
-      currentSearchQuery: navState.currentSearchQuery,
+      currentSearchQuery: hasActiveTagSearch
+          ? state.currentSearchQuery
+          : navState.currentSearchQuery,
       viewMode: navState.viewMode,
       sortOption: navState.sortOption,
       gridZoomLevel: navState.gridZoomLevel,
       fileStatsCache: navState.fileStatsCache,
-      isSearchByName: navState.isSearchByName,
+      isSearchByName:
+          hasActiveTagSearch ? state.isSearchByName : navState.isSearchByName,
       searchRecursive: navState.searchRecursive,
     ));
   }
@@ -342,8 +355,18 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onTagStateChanged(TagSearchState tagState) {
     if (isClosed) return;
+    final searchResults = tagState.searchResultPaths
+        .map<FileSystemEntity>((path) => File(path))
+        .toList(growable: false);
+
     // ignore: invalid_use_of_visible_for_testing_member
     emit(state.copyWith(
+      isLoading: tagState.isLoading,
+      error: tagState.error,
+      searchResults: searchResults,
+      searchResultsTotal: tagState.searchResultsTotal,
+      currentSearchTag: tagState.currentSearchTag,
+      isGlobalSearch: tagState.isGlobalSearch,
       fileTags: tagState.fileTags,
       allUniqueTags: tagState.allUniqueTags,
     ));

@@ -100,8 +100,9 @@ class _FolderItemState extends State<FolderItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    // Trong mobile mode, luôn sử dụng ctrlSelect để add to selection
-    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode
+        ? isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed)
+        : true;
 
     // Call toggleFolderSelection with appropriate parameters
     widget.toggleFolderSelection!(widget.folder.path,

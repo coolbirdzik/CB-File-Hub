@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:cb_file_manager/bloc/selection/selection_bloc.dart';
+import 'package:cb_file_manager/bloc/selection/selection_event.dart';
 import '../../../components/common/shared_file_context_menu.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -25,6 +28,8 @@ class FileDetailsItem extends StatefulWidget {
       toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final bool showFileTags; // Add parameter to control tag display
@@ -39,6 +44,8 @@ class FileDetailsItem extends StatefulWidget {
     required this.toggleFileSelection,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
@@ -127,15 +134,39 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
       });
     }
 
+    final bool shouldCtrlSelect =
+        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
+
     // Call toggleFileSelection with appropriate parameters
     widget.toggleFileSelection(
       widget.file.path,
       shiftSelect: isShiftPressed,
-      ctrlSelect: isCtrlPressed,
+      ctrlSelect: shouldCtrlSelect,
     );
   }
 
   void _showFileContextMenu(BuildContext context, Offset globalPosition) {
+    try {
+      final selectionBloc = context.read<SelectionBloc>();
+      final selectionState = selectionBloc.state;
+
+      if (selectionState.allSelectedPaths.length > 1 &&
+          selectionState.allSelectedPaths.contains(widget.file.path)) {
+        showMultipleFilesContextMenu(
+          context: context,
+          selectedPaths: selectionState.allSelectedPaths,
+          globalPosition: globalPosition,
+          onDeleteFiles: widget.onDeleteFiles,
+          onClearSelection: () {
+            selectionBloc.add(ClearSelection());
+          },
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error checking selection state: $e');
+    }
+
     showFileContextMenu(
       context: context,
       file: widget.file,
@@ -143,6 +174,8 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
       isVideo: isVideo,
       isImage: isImage,
       showAddTagToFileDialog: widget.showAddTagToFileDialog,
+      onDeleteFile: widget.onDeleteFile,
+      showOpenFileLocation: widget.state.isSearchActive,
       globalPosition: globalPosition,
     );
   }

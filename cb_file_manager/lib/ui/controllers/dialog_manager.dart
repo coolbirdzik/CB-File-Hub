@@ -89,6 +89,10 @@ class DialogManager {
             : l10n.moveItemsToTrashConfirmation(totalCount, itemType),
         confirmText: l10n.deleteTitle,
         cancelText: l10n.cancel,
+        previewPaths: <String>[
+          ...selectedFilePaths.take(4),
+          ...selectedFolderPaths.take(4),
+        ].take(4).toList(),
       ),
     );
 

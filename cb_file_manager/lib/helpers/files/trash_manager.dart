@@ -628,61 +628,33 @@ class TrashManager {
   /// Get the list of files in trash with their metadata
   /// Combines both internal trash items and system trash items on Windows
   Future<List<TrashItem>> getTrashItems() async {
-    List<TrashItem> allTrashItems = [];
+    // Run internal trash and Windows Recycle Bin queries in parallel
+    final results = await Future.wait([
+      _getInternalTrashItems(),
+      if (Platform.isWindows)
+        getWindowsRecycleBinItems()
+      else
+        Future.value(<SystemTrashItem>[]),
+    ]);
 
-    // First get files from our internal trash
-    try {
-      final trashDir = await getTrashDirectory();
-      final metadata = await loadMetadata();
+    final List<TrashItem> allTrashItems =
+        List.from(results[0] as List<TrashItem>);
 
-      // List all files in the trash directory
-      final entities = await trashDir.list().toList();
-
-      for (final entity in entities) {
-        final fileName = pathlib.basename(entity.path);
-        if (fileName == metadataFileName) continue;
-
-        final bool isDir = entity is Directory;
-        final bool isFile = entity is File;
-        if (!isDir && !isFile) continue;
-
-        final originalPath = metadata[fileName] ?? 'Unknown';
-        final fileStat = await entity.stat();
-
-        allTrashItems.add(TrashItem(
-          trashFileName: fileName,
-          originalPath: originalPath,
-          size: fileStat.size,
-          trashedDate: DateTime.fromMillisecondsSinceEpoch(
-              int.tryParse(fileName.split('_').first) ?? 0),
-          isSystemTrashItem: false,
-          isFolder: isDir,
-        ));
-      }
-    } catch (e) {
-      debugPrint('Error getting internal trash items: $e');
-    }
-
-    // On Windows, also get items from Recycle Bin
+    // Convert SystemTrashItems to TrashItems
     if (Platform.isWindows) {
-      try {
-        final recycleBinItems = await getWindowsRecycleBinItems();
-
-        // Convert SystemTrashItems to TrashItems
-        for (final item in recycleBinItems) {
-          allTrashItems.add(TrashItem(
-            trashFileName: item
-                .recycleBinPath, // For system items, use the full path as identifier
-            originalPath: item.originalPath,
-            size: item.size,
-            trashedDate: item.trashedDate,
-            isSystemTrashItem: true,
-            displayName: item.name,
-            isFolder: item.isFolder,
-          ));
-        }
-      } catch (e) {
-        debugPrint('Error getting Windows Recycle Bin items: $e');
+      final recycleBinItems = results[1] as List<SystemTrashItem>;
+      for (final item in recycleBinItems) {
+        allTrashItems.add(TrashItem(
+          trashFileName: item.recycleBinPath,
+          originalPath: item.originalPath,
+          actualFilePath:
+              item.recycleBinPath, // For system trash, use the recycle bin path
+          size: item.size,
+          trashedDate: item.trashedDate,
+          isSystemTrashItem: true,
+          displayName: item.name,
+          isFolder: item.isFolder,
+        ));
       }
     }
 
@@ -690,6 +662,53 @@ class TrashManager {
     allTrashItems.sort((a, b) => b.trashedDate.compareTo(a.trashedDate));
 
     return allTrashItems;
+  }
+
+  /// Get items from internal trash directory with parallel stat operations
+  Future<List<TrashItem>> _getInternalTrashItems() async {
+    try {
+      final trashDir = await getTrashDirectory();
+      final metadata = await loadMetadata();
+
+      // List all files in the trash directory
+      final entities = await trashDir.list().toList();
+
+      // Filter valid entities first
+      final validEntities = entities.where((entity) {
+        final fileName = pathlib.basename(entity.path);
+        if (fileName == metadataFileName) return false;
+        return entity is Directory || entity is File;
+      }).toList();
+
+      // Retrieve all file stats in parallel
+      final statFutures = validEntities.map((entity) => entity.stat()).toList();
+      final stats = await Future.wait(statFutures);
+
+      // Build TrashItem list
+      final List<TrashItem> items = [];
+      for (int i = 0; i < validEntities.length; i++) {
+        final entity = validEntities[i];
+        final fileStat = stats[i];
+        final fileName = pathlib.basename(entity.path);
+        final originalPath = metadata[fileName] ?? 'Unknown';
+
+        items.add(TrashItem(
+          trashFileName: fileName,
+          originalPath: originalPath,
+          actualFilePath: entity.path, // The actual path in trash directory
+          size: fileStat.size,
+          trashedDate: DateTime.fromMillisecondsSinceEpoch(
+              int.tryParse(fileName.split('_').first) ?? 0),
+          isSystemTrashItem: false,
+          isFolder: entity is Directory,
+        ));
+      }
+
+      return items;
+    } catch (e) {
+      debugPrint('Error getting internal trash items: $e');
+      return [];
+    }
   }
 
   /// Check if trash is empty
@@ -710,6 +729,8 @@ class TrashItem {
   final String
       trashFileName; // Identifier for the file (filename for internal, full path for system)
   final String originalPath;
+  final String
+      actualFilePath; // The actual path to the file in trash (for thumbnail generation)
   final int size;
   final DateTime trashedDate;
   final bool isSystemTrashItem; // Whether this item is from the system trash
@@ -720,6 +741,7 @@ class TrashItem {
   TrashItem({
     required this.trashFileName,
     required this.originalPath,
+    required this.actualFilePath,
     required this.size,
     required this.trashedDate,
     this.isSystemTrashItem = false,

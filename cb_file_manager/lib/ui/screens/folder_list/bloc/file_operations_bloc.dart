@@ -8,6 +8,7 @@ import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dar
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
+import 'package:path/path.dart' as path;
 
 import 'file_operations_event.dart';
 
@@ -103,11 +104,27 @@ class FileOperationsBloc
 
     final isCut = FileOperations().isCutOperation;
     final itemCount = FileOperations().clipboardItemCount;
+    final clipboardItems = FileOperations().clipboardItems;
     final opType = isCut ? 'Moving' : 'Copying';
+    final firstItemPath =
+        clipboardItems.isNotEmpty ? clipboardItems.first.path : null;
+    final firstItemName =
+        firstItemPath == null ? null : path.basename(firstItemPath);
 
     final progressId = _progressController.begin(
-      title: '$opType $itemCount item${itemCount > 1 ? 's' : ''}...',
+      title: itemCount == 1 && firstItemName != null
+          ? '$opType "$firstItemName"'
+          : '$opType $itemCount items',
       total: itemCount,
+      detail: _pasteDetail(
+        action: opType,
+        sourcePath: firstItemPath,
+        destinationPath: event.destinationPath,
+        itemCount: itemCount,
+      ),
+      kind: isCut ? OperationProgressKind.move : OperationProgressKind.copy,
+      sourcePath: firstItemPath,
+      destinationPath: event.destinationPath,
     );
 
     try {
@@ -117,7 +134,8 @@ class FileOperationsBloc
           _progressController.update(
             progressId,
             completed: completed,
-            detail: '$opType file $completed of $total',
+            detail:
+                '$opType item $completed of $total to ${event.destinationPath}',
           );
         },
       );
@@ -125,7 +143,7 @@ class FileOperationsBloc
       _progressController.succeed(
         progressId,
         detail:
-            '${isCut ? 'Moved' : 'Copied'} $itemCount item${itemCount > 1 ? 's' : ''}',
+            '${isCut ? 'Moved' : 'Copied'} $itemCount item${itemCount > 1 ? 's' : ''} to ${event.destinationPath}',
       );
 
       emit(state.copyWith(
@@ -153,12 +171,22 @@ class FileOperationsBloc
   ) async {
     final targetPaths = event.filePaths.toSet();
     if (targetPaths.isEmpty) return;
+    final firstPath = event.filePaths.first;
+    final destinationLabel = event.permanent ? 'permanently' : 'to Trash Bin';
 
     final progressId = _progressController.begin(
-      title:
-          'Deleting ${event.filePaths.length} file${event.filePaths.length > 1 ? 's' : ''}',
+      title: event.filePaths.length == 1
+          ? 'Deleting "${path.basename(firstPath)}" $destinationLabel'
+          : 'Deleting ${event.filePaths.length} files $destinationLabel',
       total: event.filePaths.length,
+      detail: _deleteDetail(
+        action: event.permanent ? 'Permanent delete' : 'Move to Trash Bin',
+        firstPath: firstPath,
+        itemCount: event.filePaths.length,
+      ),
       showModal: true,
+      kind: OperationProgressKind.delete,
+      sourcePath: firstPath,
     );
 
     final trashManager = TrashManager();
@@ -176,7 +204,12 @@ class FileOperationsBloc
           }
         }
         completed++;
-        _progressController.update(progressId, completed: completed);
+        _progressController.update(
+          progressId,
+          completed: completed,
+          detail:
+              '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'}: $filePath',
+        );
       } catch (e) {
         failed.add(filePath);
         AppLogger.warning('Delete failed for $filePath: $e');
@@ -194,7 +227,11 @@ class FileOperationsBloc
             'Failed to delete ${failed.length} item${failed.length > 1 ? 's' : ''}',
       ));
     } else {
-      _progressController.succeed(progressId, detail: 'Done');
+      _progressController.succeed(
+        progressId,
+        detail:
+            '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} ${event.filePaths.length} file${event.filePaths.length > 1 ? 's' : ''}',
+      );
       emit(state.copyWith(error: null));
     }
 
@@ -211,14 +248,27 @@ class FileOperationsBloc
     if (targets.isEmpty) return;
 
     final total = event.filePaths.length + event.folderPaths.length;
+    final orderedTargets = <String>[...event.filePaths, ...event.folderPaths];
+    final firstPath = orderedTargets.first;
     final title = event.permanent
-        ? 'Deleting $total items'
-        : 'Moving $total items to trash';
+        ? (total == 1
+            ? 'Deleting "${path.basename(firstPath)}" permanently'
+            : 'Deleting $total items permanently')
+        : (total == 1
+            ? 'Moving "${path.basename(firstPath)}" to Trash Bin'
+            : 'Moving $total items to Trash Bin');
 
     final progressId = _progressController.begin(
       title: title,
       total: total,
+      detail: _deleteDetail(
+        action: event.permanent ? 'Permanent delete' : 'Move to Trash Bin',
+        firstPath: firstPath,
+        itemCount: total,
+      ),
       showModal: true,
+      kind: OperationProgressKind.delete,
+      sourcePath: firstPath,
     );
 
     final trashManager = TrashManager();
@@ -236,7 +286,12 @@ class FileOperationsBloc
           }
         }
         completed++;
-        _progressController.update(progressId, completed: completed);
+        _progressController.update(
+          progressId,
+          completed: completed,
+          detail:
+              '${event.permanent ? 'Permanently deleting' : 'Moving to Trash Bin'} file $completed of $total: $path',
+        );
       } catch (e) {
         failed.add(path);
         AppLogger.warning('Delete failed for $path: $e');
@@ -254,11 +309,21 @@ class FileOperationsBloc
           }
         }
         completed++;
-        _progressController.update(progressId, completed: completed);
+        _progressController.update(
+          progressId,
+          completed: completed,
+          detail:
+              '${event.permanent ? 'Permanently deleting' : 'Moving to Trash Bin'} folder $completed of $total: $path',
+        );
       } catch (e) {
         failed.add(path);
         AppLogger.warning('Delete failed for $path: $e');
       }
+    }
+
+    final successfulDeletes = targets.difference(failed.toSet());
+    if (successfulDeletes.isNotEmpty) {
+      navigationBloc.add(FileNavigationRemovePaths(successfulDeletes));
     }
 
     if (failed.isNotEmpty) {
@@ -272,7 +337,11 @@ class FileOperationsBloc
             'Failed to delete ${failed.length} item${failed.length > 1 ? 's' : ''}',
       ));
     } else {
-      _progressController.succeed(progressId, detail: 'Done');
+      _progressController.succeed(
+        progressId,
+        detail:
+            '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} $total item${total > 1 ? 's' : ''}',
+      );
       emit(state.copyWith(error: null));
     }
 
@@ -302,5 +371,32 @@ class FileOperationsBloc
   ) {
     FileOperations().clearClipboard();
     emit(state.copyWith(clipboardRevision: state.clipboardRevision + 1));
+  }
+
+  String _deleteDetail({
+    required String action,
+    required String firstPath,
+    required int itemCount,
+  }) {
+    final parent = path.dirname(firstPath);
+    final itemLabel = itemCount == 1
+        ? path.basename(firstPath)
+        : '${path.basename(firstPath)} and ${itemCount - 1} more';
+    return '$action: $itemLabel from $parent';
+  }
+
+  String _pasteDetail({
+    required String action,
+    required String? sourcePath,
+    required String destinationPath,
+    required int itemCount,
+  }) {
+    if (sourcePath == null) {
+      return '$action $itemCount item${itemCount > 1 ? 's' : ''} to $destinationPath';
+    }
+    final sourceLabel = itemCount == 1
+        ? path.basename(sourcePath)
+        : '${path.basename(sourcePath)} and ${itemCount - 1} more';
+    return '$action $sourceLabel from ${path.dirname(sourcePath)} to $destinationPath';
   }
 }

@@ -102,11 +102,14 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
       });
     }
 
+    final bool shouldCtrlSelect =
+        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
+
     // Call toggleFolderSelection with appropriate parameters
     widget.toggleFolderSelection!(
       widget.folder.path,
       shiftSelect: isShiftPressed,
-      ctrlSelect: isCtrlPressed,
+      ctrlSelect: shouldCtrlSelect,
     );
   }
 

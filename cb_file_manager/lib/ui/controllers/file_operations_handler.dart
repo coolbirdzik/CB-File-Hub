@@ -155,6 +155,8 @@ class FileOperationsHandler {
     String? focusedPath,
     required bool permanent,
     required VoidCallback onClearSelection,
+    void Function(Set<String> deletedPaths, String? nextFocusPath)?
+        onDeleteConfirmed,
   }) async {
     // Clone lists to avoid modifying the original lists from state
     final filesToDelete = List<String>.from(selectedFiles);
@@ -165,7 +167,7 @@ class FileOperationsHandler {
         foldersToDelete.isEmpty &&
         focusedPath != null) {
       final focusedType =
-          FileSystemEntity.typeSync(focusedPath, followLinks: false);
+          await FileSystemEntity.type(focusedPath, followLinks: false);
       if (focusedType == FileSystemEntityType.directory) {
         foldersToDelete.add(focusedPath);
       } else {
@@ -177,6 +179,7 @@ class FileOperationsHandler {
       return;
     }
 
+    if (!context.mounted) return;
     final localizations = AppLocalizations.of(context);
     if (localizations == null) {
       return;
@@ -197,8 +200,15 @@ class FileOperationsHandler {
         ? path.basename(filesToDelete.first)
         : path.basename(foldersToDelete.first);
 
+    // Build preview paths: up to 4 items, files first then folders
+    final previewPaths = <String>[
+      ...filesToDelete.take(4),
+      ...foldersToDelete.take(4),
+    ].take(4).toList();
+
     if (permanent) {
       // Show permanent delete dialog with keyboard support
+      if (!context.mounted) return;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => DeleteConfirmationDialog(
@@ -208,6 +218,7 @@ class FileOperationsHandler {
               : localizations.confirmDeletePermanentMultiple(totalCount),
           confirmText: localizations.deleteTitle,
           cancelText: localizations.cancel,
+          previewPaths: previewPaths,
         ),
       );
 
@@ -217,28 +228,16 @@ class FileOperationsHandler {
           folderPaths: foldersToDelete,
           permanent: true,
         ));
-        onClearSelection();
-        if (selectionBloc != null && nextFocusPath != null) {
-          final nextType =
-              FileSystemEntity.typeSync(nextFocusPath, followLinks: false);
-          if (nextType == FileSystemEntityType.directory) {
-            selectionBloc.add(ToggleFolderSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          } else {
-            selectionBloc.add(ToggleFileSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          }
+        if (onDeleteConfirmed != null) {
+          onDeleteConfirmed(pathsToDelete, nextFocusPath);
+        } else {
+          onClearSelection();
         }
       }
     } else {
       // Show trash delete dialog with keyboard support
       debugPrint('Showing trash delete dialog');
+      if (!context.mounted) return;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => DeleteConfirmationDialog(
@@ -249,6 +248,7 @@ class FileOperationsHandler {
                   totalCount, localizations.items),
           confirmText: localizations.deleteTitle,
           cancelText: localizations.cancel,
+          previewPaths: previewPaths,
         ),
       );
 
@@ -258,23 +258,10 @@ class FileOperationsHandler {
           folderPaths: foldersToDelete,
           permanent: false,
         ));
-        onClearSelection();
-        if (selectionBloc != null && nextFocusPath != null) {
-          final nextType =
-              FileSystemEntity.typeSync(nextFocusPath, followLinks: false);
-          if (nextType == FileSystemEntityType.directory) {
-            selectionBloc.add(ToggleFolderSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          } else {
-            selectionBloc.add(ToggleFileSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          }
+        if (onDeleteConfirmed != null) {
+          onDeleteConfirmed(pathsToDelete, nextFocusPath);
+        } else {
+          onClearSelection();
         }
       }
     }

@@ -45,9 +45,13 @@ class FileView extends StatelessWidget {
   final List<String> selectedFiles;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
       toggleFileSelection;
+  final Function(String, {bool shiftSelect, bool ctrlSelect})?
+      toggleFolderSelection;
   final Function() toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final Function(String)? onFolderTap;
   final Function(File, bool)? onFileTap;
   final Function()? onThumbnailGenerated;
@@ -58,6 +62,8 @@ class FileView extends StatelessWidget {
   final Function()?
       clearSelectionMode; // Add new callback for clearing selection mode
   final bool showFileTags; // Add parameter to control tag display
+  final ScrollController? scrollController;
+  final GlobalKey Function(String path)? itemKeyForPath;
 
   const FileView({
     Key? key,
@@ -68,9 +74,12 @@ class FileView extends StatelessWidget {
     required this.isGridView,
     required this.selectedFiles,
     required this.toggleFileSelection,
+    this.toggleFolderSelection,
     required this.toggleSelectionMode,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.onFolderTap,
     this.onFileTap,
     this.onThumbnailGenerated,
@@ -80,7 +89,13 @@ class FileView extends StatelessWidget {
     this.columnVisibility = const ColumnVisibility(),
     this.clearSelectionMode, // Add new parameter
     this.showFileTags = true, // Default to showing tags
+    this.scrollController,
+    this.itemKeyForPath,
   }) : super(key: key);
+
+  Function(String, {bool shiftSelect, bool ctrlSelect})
+      get _folderSelectionHandler =>
+          toggleFolderSelection ?? toggleFileSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +123,7 @@ class FileView extends StatelessWidget {
     final bool actualIsDesktop = isDesktop;
 
     return ListView.builder(
+      controller: scrollController,
       // Optimized physics for desktop smooth scrolling
       physics: isDesktop
           ? const ClampingScrollPhysics(
@@ -126,14 +142,11 @@ class FileView extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       itemCount: folders.length + files.length,
       itemBuilder: (context, index) {
-        // Generate a stable key for item identity
-        final String itemKey = index < folders.length
-            ? 'folder-${folders[index].path}'
-            : 'file-${files[index - folders.length].path}';
-
         // Use RepaintBoundary to reduce rendering load during scrolling
-        return KeyedSubtree(
-          key: ValueKey(itemKey),
+        return Container(
+          key: itemKeyForPath?.call(index < folders.length
+              ? folders[index].path
+              : files[index - folders.length].path),
           child: RepaintBoundary(
             child: index < folders.length
                 ? FolderItem(
@@ -141,7 +154,7 @@ class FileView extends StatelessWidget {
                     folder: folders[index],
                     onTap: onFolderTap,
                     isSelected: selectedFiles.contains(folders[index].path),
-                    toggleFolderSelection: toggleFileSelection,
+                    toggleFolderSelection: _folderSelectionHandler,
                     isDesktopMode: actualIsDesktop,
                     lastSelectedPath: lastSelectedPath,
                     clearSelectionMode: clearSelectionMode,
@@ -157,6 +170,8 @@ class FileView extends StatelessWidget {
                     toggleFileSelection: toggleFileSelection,
                     showDeleteTagDialog: showDeleteTagDialog,
                     showAddTagToFileDialog: showAddTagToFileDialog,
+                    onDeleteFile: onDeleteFile,
+                    onDeleteFiles: onDeleteFiles,
                     onFileTap: onFileTap,
                     isDesktopMode: actualIsDesktop,
                     lastSelectedPath: lastSelectedPath,
@@ -311,6 +326,7 @@ class FileView extends StatelessWidget {
         // List of files and folders
         Expanded(
           child: ListView.builder(
+            controller: scrollController,
             physics: isDesktop
                 ? const ClampingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
@@ -334,11 +350,6 @@ class FileView extends StatelessWidget {
                   ? Colors.transparent
                   : const Color.fromRGBO(128, 128, 128, 0.03);
 
-              // Generate a stable key to help Flutter reuse widgets
-              final String itemKey = index < folders.length
-                  ? 'folder-${folders[index].path}'
-                  : 'file-${files[index - folders.length].path}';
-
               return Container(
                 padding:
                     const EdgeInsets.symmetric(vertical: 2.0, horizontal: 12.0),
@@ -346,8 +357,10 @@ class FileView extends StatelessWidget {
                   color: rowColor,
                 ),
                 // Use KeyedSubtree with a stable key to prevent unnecessary rebuilds
-                child: KeyedSubtree(
-                  key: ValueKey(itemKey),
+                child: Container(
+                  key: itemKeyForPath?.call(index < folders.length
+                      ? folders[index].path
+                      : files[index - folders.length].path),
                   child: RepaintBoundary(
                     child: index < folders.length
                         ? _FolderDetailsItemWrapper(
@@ -358,7 +371,7 @@ class FileView extends StatelessWidget {
                             isSelected:
                                 selectedFiles.contains(folders[index].path),
                             columnVisibility: columnVisibility,
-                            toggleFolderSelection: toggleFileSelection,
+                            toggleFolderSelection: _folderSelectionHandler,
                             isDesktopMode: isDesktopMode,
                             lastSelectedPath: lastSelectedPath,
                             clearSelectionMode: clearSelectionMode,
@@ -374,6 +387,8 @@ class FileView extends StatelessWidget {
                             toggleFileSelection: toggleFileSelection,
                             showDeleteTagDialog: showDeleteTagDialog,
                             showAddTagToFileDialog: showAddTagToFileDialog,
+                            onDeleteFile: onDeleteFile,
+                            onDeleteFiles: onDeleteFiles,
                             onTap: onFileTap,
                             isDesktopMode: isDesktopMode,
                             lastSelectedPath: lastSelectedPath,
@@ -487,7 +502,7 @@ class FileView extends StatelessWidget {
                                 onNavigate: onFolderTap ?? (_) {},
                                 isSelected:
                                     selectedFiles.contains(folders[index].path),
-                                toggleFolderSelection: toggleFileSelection,
+                                toggleFolderSelection: _folderSelectionHandler,
                                 isDesktopMode: isDesktopMode,
                                 lastSelectedPath: lastSelectedPath,
                                 clearSelectionMode: clearSelectionMode,
@@ -508,6 +523,8 @@ class FileView extends StatelessWidget {
                                 onThumbnailGenerated: onThumbnailGenerated,
                                 showDeleteTagDialog: showDeleteTagDialog,
                                 showAddTagToFileDialog: showAddTagToFileDialog,
+                                onDeleteFile: onDeleteFile,
+                                onDeleteFiles: onDeleteFiles,
                                 showFileTags: showFileTags,
                               ),
                       ),
@@ -534,6 +551,8 @@ class _FileDetailsItemWrapper extends StatelessWidget {
       toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final Function(File, bool)? onTap;
   final bool isDesktopMode;
   final String? lastSelectedPath;
@@ -548,6 +567,8 @@ class _FileDetailsItemWrapper extends StatelessWidget {
     required this.toggleFileSelection,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.onTap,
     this.isDesktopMode = false,
     this.lastSelectedPath,
@@ -566,6 +587,8 @@ class _FileDetailsItemWrapper extends StatelessWidget {
       toggleFileSelection: toggleFileSelection,
       showDeleteTagDialog: showDeleteTagDialog,
       showAddTagToFileDialog: showAddTagToFileDialog,
+      onDeleteFile: onDeleteFile,
+      onDeleteFiles: onDeleteFiles,
       onTap: onTap,
       isDesktopMode: isDesktopMode,
       lastSelectedPath: lastSelectedPath,

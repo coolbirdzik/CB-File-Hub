@@ -30,6 +30,7 @@ import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
 import '../../screens/ai_chat/ai_side_panel.dart';
+import '../../components/common/operation_progress_overlay.dart';
 
 // Create a custom scroll behavior that supports mouse wheel scrolling
 class TabBarMouseScrollBehavior extends MaterialScrollBehavior {
@@ -811,6 +812,70 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             },
                                             // Keep the add tab button functionality
                                             onAddTabPressed: _handleAddNewTab,
+                                            leadingCaptionActions: [
+                                              const StatusCenterToolbarButton(),
+                                              if (!isAiChatPath(
+                                                  state.activeTab?.path ?? ''))
+                                                ListenableBuilder(
+                                                  listenable:
+                                                      _aiPanelController,
+                                                  builder: (context, _) {
+                                                    final isOpen =
+                                                        _aiPanelController
+                                                            .isOpen;
+                                                    return Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              right: 4.0),
+                                                      child: IconButton(
+                                                        tooltip:
+                                                            context.tr.aiChat,
+                                                        icon: Icon(
+                                                          PhosphorIconsLight
+                                                              .sparkle,
+                                                          color: isOpen
+                                                              ? theme
+                                                                  .colorScheme
+                                                                  .primary
+                                                              : theme
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                          size: 20,
+                                                        ),
+                                                        style: IconButton
+                                                            .styleFrom(
+                                                          shape:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        16.0),
+                                                          ),
+                                                          backgroundColor: isOpen
+                                                              ? theme
+                                                                  .colorScheme
+                                                                  .primary
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.12)
+                                                              : Colors
+                                                                  .transparent,
+                                                        ),
+                                                        onPressed: () {
+                                                          _aiPanelController
+                                                              .toggle(
+                                                            path: state
+                                                                .activeTab
+                                                                ?.path,
+                                                            tabId: state
+                                                                .activeTabId,
+                                                          );
+                                                        },
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                            ],
                                             tabs: [
                                               // Generate modern-style tabs from state.tabs
                                               ...state.tabs.map((tab) {
@@ -865,55 +930,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                         ),
                                       ),
                                       actions: [
-                                        // AI Assistant button
-                                        if (!isAiChatPath(
-                                            state.activeTab?.path ?? ''))
-                                          ListenableBuilder(
-                                            listenable: _aiPanelController,
-                                            builder: (context, _) {
-                                              final isOpen =
-                                                  _aiPanelController.isOpen;
-                                              return Padding(
-                                                padding: const EdgeInsets.only(
-                                                    right: 4.0),
-                                                child: IconButton(
-                                                  tooltip: isOpen
-                                                      ? context.tr.aiChat
-                                                      : context.tr.aiChat,
-                                                  icon: Icon(
-                                                    PhosphorIconsLight.sparkle,
-                                                    color: isOpen
-                                                        ? theme
-                                                            .colorScheme.primary
-                                                        : theme.colorScheme
-                                                            .onSurfaceVariant,
-                                                    size: 20,
-                                                  ),
-                                                  style: IconButton.styleFrom(
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              16.0),
-                                                    ),
-                                                    backgroundColor: isOpen
-                                                        ? theme
-                                                            .colorScheme.primary
-                                                            .withValues(
-                                                                alpha: 0.12)
-                                                        : Colors.transparent,
-                                                  ),
-                                                  onPressed: () {
-                                                    _aiPanelController.toggle(
-                                                      path:
-                                                          state.activeTab?.path,
-                                                      tabId: state.activeTabId,
-                                                    );
-                                                  },
-                                                ),
-                                              );
-                                            },
-                                          ),
                                         // Modern menu button
                                         Padding(
                                           padding:
@@ -1057,13 +1073,18 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final cached = _tabContentCache[tab.id];
     if (cached != null &&
         cached.path == tab.path &&
-        cached.splitPanePath == tab.splitPanePath) {
+        cached.splitPanePath == tab.splitPanePath &&
+        cached.highlightedFileName == tab.highlightedFileName) {
       return cached.widget;
     }
 
     final widget = _createTabContent(tab);
     _tabContentCache[tab.id] = _CachedTabContent(
-        path: tab.path, splitPanePath: tab.splitPanePath, widget: widget);
+      path: tab.path,
+      splitPanePath: tab.splitPanePath,
+      highlightedFileName: tab.highlightedFileName,
+      widget: widget,
+    );
     return widget;
   }
 
@@ -1079,12 +1100,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         tabId: tab.id,
         leftPath: tab.path,
         rightPath: tab.splitPanePath!,
+        highlightedFileName: tab.highlightedFileName,
       );
     } else {
       content = TabbedFolderListScreen(
         key: ValueKey(tab.id),
         path: tab.path,
         tabId: tab.id,
+        highlightedFileName: tab.highlightedFileName,
       );
     }
 
@@ -1862,12 +1885,14 @@ enum _DesktopTabAction {
 class _CachedTabContent {
   final String path;
   final String? splitPanePath;
+  final String? highlightedFileName;
   final Widget widget;
 
   const _CachedTabContent({
     required this.path,
     required this.widget,
     this.splitPanePath,
+    this.highlightedFileName,
   });
 }
 

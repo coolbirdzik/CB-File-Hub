@@ -172,6 +172,7 @@ class TabView extends StatelessWidget {
           builder: (context) => TabbedFolderListScreen(
             path: activeTab.path,
             tabId: activeTab.id,
+            highlightedFileName: activeTab.highlightedFileName,
           ),
         );
       },

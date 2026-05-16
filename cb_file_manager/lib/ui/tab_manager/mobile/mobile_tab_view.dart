@@ -774,6 +774,7 @@ class MobileTabView extends StatelessWidget {
               builder: (context) => TabContentScreen(
                 path: activeTab.path,
                 tabId: activeTab.id,
+                highlightedFileName: activeTab.highlightedFileName,
               ),
             );
           },
@@ -1165,11 +1166,13 @@ extension MobileTabViewDynamicMenu on MobileTabView {
 class TabContentScreen extends StatelessWidget {
   final String path;
   final String tabId;
+  final String? highlightedFileName;
 
   const TabContentScreen({
     Key? key,
     required this.path,
     required this.tabId,
+    this.highlightedFileName,
   }) : super(key: key);
 
   @override
@@ -1184,6 +1187,7 @@ class TabContentScreen extends StatelessWidget {
         path: path,
         tabId: tabId,
         showAppBar: false, // Keep app bar hidden, tools will be in Chrome bar
+        highlightedFileName: highlightedFileName,
       ),
     );
   }

@@ -406,20 +406,20 @@ class VideoLibraryNavigationBloc
             (a, b) => path.basename(b.path).compareTo(path.basename(a.path)));
         break;
       case SortOption.typeAsc:
-        sorted.sort((a, b) =>
-            path.extension(a.path).compareTo(path.extension(b.path)));
+        sorted.sort(
+            (a, b) => path.extension(a.path).compareTo(path.extension(b.path)));
         break;
       case SortOption.typeDesc:
-        sorted.sort((a, b) =>
-            path.extension(b.path).compareTo(path.extension(a.path)));
+        sorted.sort(
+            (a, b) => path.extension(b.path).compareTo(path.extension(a.path)));
         break;
       case SortOption.extensionAsc:
-        sorted.sort((a, b) =>
-            path.extension(a.path).compareTo(path.extension(b.path)));
+        sorted.sort(
+            (a, b) => path.extension(a.path).compareTo(path.extension(b.path)));
         break;
       case SortOption.extensionDesc:
-        sorted.sort((a, b) =>
-            path.extension(b.path).compareTo(path.extension(a.path)));
+        sorted.sort(
+            (a, b) => path.extension(b.path).compareTo(path.extension(a.path)));
         break;
       default:
         // Fallback: sort by name ascending for unknown/default options

@@ -55,7 +55,8 @@ class SearchFilterManager {
     return tab_components.SearchResultsView(
       state: state,
       isSelectionMode: selectionState.isSelectionMode,
-      selectedFiles: selectionState.selectedFilePaths.toList(),
+      selectedFiles: selectionState.allSelectedPaths,
+      lastSelectedPath: selectionState.lastSelectedPath,
       toggleFileSelection: toggleFileSelection,
       toggleSelectionMode: toggleSelectionMode,
       showDeleteTagDialog: showDeleteTagDialog,

@@ -413,7 +413,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 
-Widget _buildLibraryCard(
+  Widget _buildLibraryCard(
     ThemeData theme,
     AppLocalizations localizations,
     VideoLibrary library,
@@ -622,8 +622,8 @@ class _LibraryCardContent extends StatelessWidget {
                       Text(
                         library.name,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                              fontWeight: FontWeight.bold,
+                            ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -668,10 +668,10 @@ class _LibraryCardContent extends StatelessWidget {
                       Text(
                         '$videoCount ${localizations.videos.toLowerCase()}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                        ),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                       ),
                   ],
                 ),

@@ -28,4 +28,24 @@ void main() {
 
     await bloc.close();
   });
+
+  test('SelectItemsInRect (shift) can use an explicit lastSelectedPath',
+      () async {
+    final bloc = SelectionBloc();
+
+    bloc.add(const SelectItemsInRect(
+      folderPaths: <String>{'/folder'},
+      filePaths: <String>{'/a.mp4', '/b.mp4'},
+      isShiftPressed: true,
+      isCtrlPressed: false,
+      lastSelectedPath: '/folder',
+    ));
+
+    final next = await bloc.stream.first;
+    expect(next.selectedFilePaths, containsAll(<String>['/a.mp4', '/b.mp4']));
+    expect(next.selectedFolderPaths, contains('/folder'));
+    expect(next.lastSelectedPath, equals('/folder'));
+
+    await bloc.close();
+  });
 }

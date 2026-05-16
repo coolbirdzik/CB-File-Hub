@@ -37,6 +37,7 @@ class ScrollableTabBar extends StatefulWidget {
       onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
+  final List<Widget> leadingCaptionActions;
 
   const ScrollableTabBar({
     Key? key,
@@ -64,6 +65,7 @@ class ScrollableTabBar extends StatefulWidget {
     this.onNativeTabDragRequested,
     this.onTabReorder,
     this.onTabPrimaryClick,
+    this.leadingCaptionActions = const <Widget>[],
   }) : super(key: key);
 
   @override
@@ -202,12 +204,24 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
               },
             ),
           ),
-          if (Platform.isWindows)
+          if (Platform.isWindows && widget.leadingCaptionActions.isEmpty)
             const DragToMoveArea(
               child: SizedBox(
                 width: 84,
                 height: double.infinity,
               ),
+            ),
+          if (Platform.isWindows && widget.leadingCaptionActions.isNotEmpty)
+            const DragToMoveArea(
+              child: SizedBox(
+                width: 24,
+                height: double.infinity,
+              ),
+            ),
+          if (Platform.isWindows && widget.leadingCaptionActions.isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: widget.leadingCaptionActions,
             ),
           // Window caption buttons.
           windowCaptionButtons,

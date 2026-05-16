@@ -8,6 +8,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 /// A reusable widget for optimized touch/mouse interactions
 /// that handles tap, double-tap, long-press and secondary tap events without delay
 class OptimizedInteractionLayer extends StatefulWidget {
+  final Widget? child;
   final VoidCallback onTap;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onLongPress;
@@ -18,6 +19,7 @@ class OptimizedInteractionLayer extends StatefulWidget {
 
   const OptimizedInteractionLayer({
     Key? key,
+    this.child,
     required this.onTap,
     this.onDoubleTap,
     this.onLongPress,
@@ -107,6 +109,7 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
       onSecondaryTap: widget.onSecondaryTap,
       onSecondaryTapUp: widget.onSecondaryTapUp,
       onTertiaryTapUp: widget.onTertiaryTapUp,
+      child: widget.child,
     );
   }
 }

@@ -118,3 +118,12 @@ class FileNavigationClearSearchAndFilters extends FileNavigationEvent {
 class FileNavigationLoadMoreSearchResults extends FileNavigationEvent {
   const FileNavigationLoadMoreSearchResults();
 }
+
+class FileNavigationRemovePaths extends FileNavigationEvent {
+  final Set<String> paths;
+
+  const FileNavigationRemovePaths(this.paths);
+
+  @override
+  List<Object> get props => [paths];
+}

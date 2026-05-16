@@ -35,6 +35,8 @@ class FileGridItem extends StatefulWidget {
   final Function()? onThumbnailGenerated;
   final Function(BuildContext, String, List<String>)? showDeleteTagDialog;
   final Function(BuildContext, String)? showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final bool showFileTags;
 
   const FileGridItem({
@@ -51,6 +53,8 @@ class FileGridItem extends StatefulWidget {
     this.onThumbnailGenerated,
     this.showDeleteTagDialog,
     this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.showFileTags = true,
   }) : super(key: key);
 
@@ -75,6 +79,7 @@ class _FileGridItemState extends State<FileGridItem> {
             context: context,
             selectedPaths: selectionState.allSelectedPaths,
             globalPosition: globalPosition,
+            onDeleteFiles: widget.onDeleteFiles,
             onClearSelection: () {
               selectionBloc.add(ClearSelection());
             },
@@ -97,6 +102,8 @@ class _FileGridItemState extends State<FileGridItem> {
         isVideo: isVideo,
         isImage: isImage,
         showAddTagToFileDialog: widget.showAddTagToFileDialog,
+        onDeleteFile: widget.onDeleteFile,
+        showOpenFileLocation: widget.state?.isSearchActive ?? false,
         globalPosition: globalPosition,
       );
     } catch (e) {
@@ -109,6 +116,8 @@ class _FileGridItemState extends State<FileGridItem> {
           isVideo: false,
           isImage: false,
           showAddTagToFileDialog: widget.showAddTagToFileDialog,
+          onDeleteFile: widget.onDeleteFile,
+          showOpenFileLocation: widget.state?.isSearchActive ?? false,
           globalPosition: globalPosition,
         );
       } catch (e2) {
@@ -265,6 +274,8 @@ class _FileGridItemState extends State<FileGridItem> {
                             final bool isCtrlPressed =
                                 keyboard.isControlPressed ||
                                     keyboard.isMetaPressed;
+                            final bool shouldToggleSelection = isCtrlPressed ||
+                                (widget.isSelectionMode && !isShiftPressed);
                             final bool isVideo =
                                 FileTypeUtils.isVideoFile(widget.file.path);
 
@@ -272,7 +283,7 @@ class _FileGridItemState extends State<FileGridItem> {
                               widget.toggleFileSelection(
                                 widget.file.path,
                                 shiftSelect: isShiftPressed,
-                                ctrlSelect: isCtrlPressed,
+                                ctrlSelect: shouldToggleSelection,
                               );
                               return;
                             }
@@ -281,7 +292,7 @@ class _FileGridItemState extends State<FileGridItem> {
                               widget.toggleFileSelection(
                                 widget.file.path,
                                 shiftSelect: isShiftPressed,
-                                ctrlSelect: isCtrlPressed,
+                                ctrlSelect: shouldToggleSelection,
                               );
                               return;
                             }
