@@ -450,6 +450,10 @@ class VietnameseLocalizations implements AppLocalizations {
   String get folderDeleteSuccess => 'Đã xóa thư mục thành công';
   @override
   String get operationFailed => 'Thao tác không thành công';
+  @override
+  String get failedToCreateAlbum => 'Không thể tạo album';
+  @override
+  String get failedToUpdateAlbum => 'Không thể cập nhật album';
 
   // Tags
   @override
@@ -607,6 +611,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get selectTagToRemove => 'Vui lòng chọn thẻ để xóa:';
   @override
+  String get selectFilesToRemoveTags => 'Vui lòng chọn tệp để xóa thẻ';
+  @override
   String get doubleClickToRename => 'Nhấn đúp để đổi tên';
   @override
   String get openingFolder => 'Opening folder: ';
@@ -616,6 +622,31 @@ class VietnameseLocalizations implements AppLocalizations {
   String get refreshTags => 'Làm mới tags';
   @override
   String tagsRefreshed(int count) => 'Đã làm mới tags - $count tags đã tải';
+  @override
+  String get tagManagementInfoTitle => 'Thông tin quản lý thẻ';
+  @override
+  String get tagManagementInfoDescription =>
+      'Màn hình này cho phép bạn quản lý các thẻ cho tệp và thư mục.\n\n'
+      '• Xem tất cả thẻ\n'
+      '• Tìm kiếm thẻ\n'
+      '• Sắp xếp thẻ theo tên hoặc độ phổ biến\n'
+      '• Xem các tệp được gắn thẻ';
+  @override
+  String removeTagsFromFilesTitle(int count) => 'Xóa thẻ khỏi $count tệp';
+  @override
+  String get loadingTags => 'Đang tải thẻ...';
+  @override
+  String get noCommonTagsAcrossSelectedFiles =>
+      'Không có thẻ chung nào giữa các tệp đã chọn';
+  @override
+  String removeTagsSuccess(int removedTagCount, int fileCount) =>
+      'Đã xóa $removedTagCount thẻ khỏi $fileCount tệp';
+  @override
+  String removeTagsError(String error) => 'Lỗi khi xóa thẻ: $error';
+  @override
+  String batchTagProcessingError(String error) => 'Lỗi khi xử lý thẻ: $error';
+  @override
+  String searchError(String error) => 'Lỗi tìm kiếm: $error';
 
   // Gallery
   @override
@@ -685,6 +716,14 @@ class VietnameseLocalizations implements AppLocalizations {
   String get cloudSyncEnabled => 'Thẻ và tùy chọn sẽ được đồng bộ lên đám mây';
   @override
   String get cloudSyncDisabled => 'Đồng bộ hóa đám mây đang tắt';
+  @override
+  String get syncToCloudSuccess => 'Đã đồng bộ lên đám mây thành công';
+  @override
+  String get syncToCloudFailed => 'Không thể đồng bộ lên đám mây';
+  @override
+  String get syncFromCloudSuccess => 'Đã đồng bộ từ đám mây thành công';
+  @override
+  String get syncFromCloudFailed => 'Không thể đồng bộ từ đám mây';
   @override
   String get enableDatabaseForCloud =>
       'Bật cơ sở dữ liệu SQLite để sử dụng đồng bộ đám mây';
@@ -1095,6 +1134,11 @@ class VietnameseLocalizations implements AppLocalizations {
   String get sortBySize => 'Sắp xếp theo kích thước';
   @override
   String get sortByDate => 'Sắp xếp theo ngày';
+  @override
+  String get viewModeFeatureComingSoon =>
+      'Chức năng chuyển chế độ xem sẽ được thêm sau';
+  @override
+  String get cannotCreateFileInThisLocation => 'Không thể tạo tệp ở vị trí này';
 
   // Bulk Selection
   @override
@@ -1758,6 +1802,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String itemsSelected(int count) => '$count đã được chọn';
   @override
+  String itemsCount(int count) => '$count mục';
+  @override
   String get noActiveTab => 'Không có tab hoạt động';
   @override
   String get masonryLayoutName => 'Bố cục Masonry (Pinterest)';
@@ -1765,6 +1811,39 @@ class VietnameseLocalizations implements AppLocalizations {
   String get undo => 'Hoàn tác';
   @override
   String errorWithMessage(String message) => 'Lỗi: $message';
+  @override
+  String get referencedFile => 'Tệp được tham chiếu';
+  @override
+  String referencedFiles(int count) => '$count tệp được tham chiếu';
+  @override
+  String pathsCopied(int count) => 'Đã sao chép $count đường dẫn';
+  @override
+  String get moveToTrashTitle => 'Chuyển vào thùng rác';
+  @override
+  String get imageMovedToTrash => 'Đã chuyển ảnh vào thùng rác';
+  @override
+  String get failedToMoveImageToTrash => 'Không thể chuyển ảnh vào thùng rác';
+  @override
+  String failedToMoveImageToTrashWithError(String error) =>
+      'Không thể chuyển ảnh vào thùng rác: $error';
+  @override
+  String get copiedPathToClipboard => 'Đã sao chép đường dẫn';
+  @override
+  String get unableToOpenWithExternalApp =>
+      'Không thể mở bằng ứng dụng bên ngoài';
+  @override
+  String failedToDisplayImageInformation(String error) =>
+      'Không thể hiển thị thông tin ảnh: $error';
+  @override
+  String removedFromAlbum(int count) =>
+      'Đã gỡ $count ${count == 1 ? 'ảnh' : 'ảnh'} khỏi album';
+  @override
+  String get addingFilesInBackground => 'Đang thêm tệp ở nền...';
+  @override
+  String addedFilesProgress(int added, int total) =>
+      'Đã thêm $added trên tổng $total tệp';
+  @override
+  String get filesAddedSuccessfully => 'Đã thêm tệp thành công';
 
   @override
   String get processing => 'Đang xử lý...';
@@ -2357,6 +2436,24 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get closeAction => 'Đóng';
 
+  @override
+  String get pipOverlayEnabled => 'Đã bật PiP overlay trong ứng dụng';
+
+  @override
+  String get pipAndroidEnableFailed => 'Không thể bật PiP trên Android';
+
+  @override
+  String pipError(String error) => 'Lỗi PiP: $error';
+
+  @override
+  String get pipNoSource => 'Không có nguồn video để mở PiP';
+
+  @override
+  String get pipOpenedInSeparateWindow => 'Đã mở PiP ở cửa sổ riêng';
+
+  @override
+  String get pipNotSupportedOnPlatform => 'PiP chưa hỗ trợ trên nền tảng này';
+
   // Video library
   @override
   String get videoLibrary => 'Thư Viện Video';
@@ -2496,6 +2593,43 @@ class VietnameseLocalizations implements AppLocalizations {
   String get fileNameLabel => 'Tên tệp';
   @override
   String errorCreatingFile(String error) => 'Lỗi tạo tệp: $error';
+  @override
+  String get noFileSelectedForBenchmarking => 'Chưa chọn tệp để đo hiệu năng';
+  @override
+  String benchmarkError(String error) => 'Lỗi benchmark: $error';
+  @override
+  String benchmarkFailed(String error) => 'Benchmark thất bại: $error';
+  @override
+  String get saveTagToLocalDatabaseFailed =>
+      'Không thể lưu thẻ vào cơ sở dữ liệu cục bộ';
+  @override
+  String saveTagFailed(String error) => 'Không thể lưu thẻ: $error';
+  @override
+  String debugTagsSeeded(int savedCount, int requestedCount) =>
+      'Đã tạo dữ liệu mẫu $savedCount/$requestedCount thẻ';
+  @override
+  String debugTagsSeedFailed(String error) => 'Lỗi tạo dữ liệu thẻ: $error';
+  @override
+  String get debugTagsCleared => 'Đã xóa toàn bộ thẻ';
+  @override
+  String debugTagsClearFailed(String error) => 'Lỗi xóa toàn bộ thẻ: $error';
+  @override
+  String addFolderToAlbumFailed(String error) => 'Lỗi thêm thư mục: $error';
+  @override
+  String addFilesToAlbumFailed(String error) => 'Lỗi thêm tệp: $error';
+  @override
+  String loadRulesFailed(String error) => 'Lỗi tải rule: $error';
+  @override
+  String openTerminalFailed(String error) => 'Không thể mở terminal: $error';
+  @override
+  String startCleanupFailed(String error) =>
+      'Không thể khởi động dọn dẹp: $error';
+  @override
+  String startFormatFailed(String error) =>
+      'Không thể khởi động định dạng ổ đĩa: $error';
+  @override
+  String foundResultsWithTag(int count, String tag) =>
+      'Đã tìm thấy $count kết quả với tag "$tag"';
 
   // AI Agent
   @override

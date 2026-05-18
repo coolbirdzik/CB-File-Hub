@@ -597,6 +597,17 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     });
   }
 
+  void _toggleSearchBar(BuildContext context) {
+    if (_showSearchBar) {
+      setState(() {
+        _showSearchBar = false;
+      });
+      return;
+    }
+
+    _showSearchTip(context);
+  }
+
   void _navigateToPath(String path) {
     // Cancel any SMB thumbnail work from the previous folder to avoid
     // background SMB operations interfering with the next directory listing.
@@ -763,7 +774,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       if (!visualSelectionMode) {
         actions.addAll(SharedActionBar.buildCommonActions(
           context: context,
-          onSearchPressed: () => _showSearchTip(context),
+          onSearchPressed: () => _toggleSearchBar(context),
+          isSearchActive: _showSearchBar,
           onSortOptionSelected: (SortOption option) {
             setState(() {
               _sortOption = option;
@@ -854,15 +866,17 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
             prefixIcon:
                 const Icon(PhosphorIconsLight.magnifyingGlass, size: 20),
-            suffixIcon: IconButton(
-              icon: const Icon(PhosphorIconsLight.x),
-              onPressed: () {
-                setState(() {
-                  _showSearchBar = false;
-                  _searchController.clear();
-                });
-              },
-            ),
+            suffixIcon: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(PhosphorIconsLight.broom),
+                    tooltip: AppLocalizations.of(context)!.clearSearch,
+                    onPressed: () {
+                      setState(() {
+                        _searchController.clear();
+                      });
+                    },
+                  ),
           ),
         ),
       );

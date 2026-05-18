@@ -6,6 +6,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
@@ -589,6 +590,7 @@ class _DriveViewState extends State<DriveView> {
 
   Future<void> _openDriveInTerminal(
       BuildContext context, String drivePath) async {
+    final toast = AppToast.capture(context);
     try {
       await Process.start(
         'wt.exe',
@@ -608,17 +610,14 @@ class _DriveViewState extends State<DriveView> {
         );
       } catch (e) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unable to open terminal: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        toast.error(l10n.openTerminalFailed(e.toString()));
       }
     }
   }
 
   Future<void> _runDriveCleanup(BuildContext context, String drivePath) async {
+    final toast = AppToast.capture(context);
     try {
       final driveLetter = drivePath.replaceAll('\\', '');
       await Process.start(
@@ -628,16 +627,13 @@ class _DriveViewState extends State<DriveView> {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to start cleanup: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      toast.error(l10n.startCleanupFailed(e.toString()));
     }
   }
 
   Future<void> _formatDrive(BuildContext context, String drivePath) async {
+    final toast = AppToast.capture(context);
     if (!Platform.isWindows) return;
     final driveLetter = _normalizeDriveLetter(drivePath);
     if (driveLetter == null) return;
@@ -662,16 +658,13 @@ class _DriveViewState extends State<DriveView> {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to start format: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      toast.error(l10n.startFormatFailed(e.toString()));
     }
   }
 
   Future<void> _openBitLocker(BuildContext context, String drivePath) async {
+    final toast = AppToast.capture(context);
     if (!Platform.isWindows) return;
 
     Future<bool> tryStart(
@@ -739,17 +732,14 @@ class _DriveViewState extends State<DriveView> {
     }
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Unable to open BitLocker. Please open Control Panel > BitLocker Drive Encryption manually.',
-        ),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
+    toast.error(
+      'Unable to open BitLocker. Please open Control Panel > BitLocker Drive Encryption manually.',
     );
   }
 
   Future<void> _togglePinSidebar(BuildContext context, String path) async {
+    final l10n = AppLocalizations.of(context)!;
+    final toast = AppToast.capture(context);
     final prefs = UserPreferences.instance;
     await prefs.init();
     final isPinned = await prefs.isPathPinnedToSidebar(path);
@@ -759,11 +749,8 @@ class _DriveViewState extends State<DriveView> {
       await prefs.addSidebarPinnedPath(path);
     }
     if (!context.mounted) return;
-    final l10n = AppLocalizations.of(context)!;
     final message = isPinned ? l10n.removedFromSidebar : l10n.pinnedToSidebar;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    toast.info(message);
   }
 
   String? _normalizeDriveLetter(String drivePath) {

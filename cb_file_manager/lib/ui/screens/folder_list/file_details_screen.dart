@@ -10,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/route.dart';
 
@@ -109,11 +110,7 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
           IconButton(
             icon: const Icon(PhosphorIconsLight.shareFat),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(localizations.operationFailed),
-                ),
-              );
+              AppToast.error(context, localizations.operationFailed);
             },
           ),
       ],
@@ -272,11 +269,8 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                                 style: TextStyle(color: textColor)),
                             onTap: () {
                               // Make a copy functionality
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content:
-                                        Text(localizations.operationFailed)),
-                              );
+                              AppToast.error(
+                                  context, localizations.operationFailed);
                             },
                           ),
                           const Divider(height: 1),
@@ -288,11 +282,8 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                                     TextStyle(color: theme.colorScheme.error)),
                             onTap: () {
                               // Delete functionality
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content:
-                                        Text(localizations.operationFailed)),
-                              );
+                              AppToast.error(
+                                  context, localizations.operationFailed);
                             },
                           ),
                         ],
@@ -451,11 +442,7 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
               const SizedBox(width: 16),
               ElevatedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(localizations.operationFailed),
-                    ),
-                  );
+                  AppToast.error(context, localizations.operationFailed);
                 },
                 style: ElevatedButton.styleFrom(
                   shape: const CircleBorder(),

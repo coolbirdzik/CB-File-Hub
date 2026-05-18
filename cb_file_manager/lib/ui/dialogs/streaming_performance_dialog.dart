@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/network_browsing/optimized_smb_service.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../components/streaming/stream_speed_indicator.dart';
 import '../utils/route.dart';
 
@@ -46,10 +48,9 @@ class _StreamingPerformanceDialogState
   }
 
   Future<void> _runBenchmark() async {
+    final l10n = AppLocalizations.of(context)!;
     if (widget.currentFilePath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No file selected for benchmarking')),
-      );
+      AppToast.warning(context, l10n.noFileSelectedForBenchmarking);
       return;
     }
 
@@ -67,9 +68,8 @@ class _StreamingPerformanceDialogState
         });
 
         if (results['error'] != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Benchmark error: ${results['error']}')),
-          );
+          AppToast.error(
+              context, l10n.benchmarkError(results['error'].toString()));
         }
       }
     } catch (e) {
@@ -77,9 +77,7 @@ class _StreamingPerformanceDialogState
         setState(() {
           _isBenchmarking = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Benchmark failed: $e')),
-        );
+        AppToast.error(context, l10n.benchmarkFailed(e.toString()));
       }
     }
   }

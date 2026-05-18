@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/theme_provider.dart';
@@ -34,19 +35,14 @@ class TabMainScreen extends StatefulWidget {
 
   /// Static method to open the default path (e.g., documents directory)
   static Future<void> openDefaultPath(BuildContext context) async {
+    final tabBloc = context.read<TabManagerBloc>();
+    final l10n = AppLocalizations.of(context)!;
+    final toast = AppToast.capture(context);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      if (context.mounted) {
-        openPath(context, directory.path);
-      }
+      tabBloc.add(AddTab(path: directory.path));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  '${AppLocalizations.of(context)!.errorAccessingDirectory}$e')),
-        );
-      }
+      toast.error('${l10n.errorAccessingDirectory}$e');
     }
   }
 

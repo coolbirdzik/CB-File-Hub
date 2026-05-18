@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/album_auto_rule_service.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 
@@ -42,9 +44,8 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading rules: $e')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, l10n.loadRulesFailed(e.toString()));
       }
     }
   }

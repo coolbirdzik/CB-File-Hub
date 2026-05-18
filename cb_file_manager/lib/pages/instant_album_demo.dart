@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -229,9 +231,8 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
       },
       onError: (error) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi: $error')),
-          );
+          final l10n = AppLocalizations.of(context)!;
+          AppToast.error(context, l10n.errorWithMessage(error.toString()));
         }
       },
     );

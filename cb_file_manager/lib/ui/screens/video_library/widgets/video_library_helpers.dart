@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 
 /// Helper class for common video library operations
 class VideoLibraryHelpers {
@@ -13,18 +14,14 @@ class VideoLibraryHelpers {
     }
   }
 
-  /// Show a success SnackBar message
+  /// Show a success toast message.
   static void showSuccessMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppToast.success(context, message);
   }
 
-  /// Show an error SnackBar message
+  /// Show an error toast message.
   static void showErrorMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppToast.error(context, message);
   }
 
   /// Parse color from hex string (e.g., "#FF0000" or "#FF0000FF")

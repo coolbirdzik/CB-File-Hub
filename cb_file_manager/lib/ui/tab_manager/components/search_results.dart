@@ -96,12 +96,6 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       },
       child: Column(
         children: [
-          // Top progress bar when searching
-          if (widget.state.isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: LinearProgressIndicator(),
-            ),
           // Search results header with clear search button
           Container(
             padding:
@@ -272,18 +266,16 @@ class _SearchResultsViewState extends State<SearchResultsView> {
             scrollController: _scrollController,
           ),
         ),
-        if (state.hasMoreSearchResults)
+        if (state.hasMoreSearchResults && !state.isLoadingMoreSearchResults)
           Positioned(
             left: 0,
             right: 0,
             bottom: 8,
             child: Center(
-              child: state.isLoadingMoreSearchResults
-                  ? const CircularProgressIndicator()
-                  : TextButton(
-                      onPressed: widget.onLoadMore,
-                      child: Text(AppLocalizations.of(context)!.nextPage),
-                    ),
+              child: TextButton(
+                onPressed: widget.onLoadMore,
+                child: Text(AppLocalizations.of(context)!.nextPage),
+              ),
             ),
           ),
       ],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../../../models/ai/referenced_file.dart';
 
 /// A card displayed in the chat showing a file referenced (dropped) by the user.
@@ -17,6 +19,7 @@ class ReferencedFileCard extends StatelessWidget {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       margin: const EdgeInsets.only(top: 6, bottom: 4),
@@ -47,8 +50,8 @@ class ReferencedFileCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   files.length == 1
-                      ? 'Referenced file'
-                      : '${files.length} referenced files',
+                      ? l10n.referencedFile
+                      : l10n.referencedFiles(files.length),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -60,13 +63,7 @@ class ReferencedFileCard extends StatelessWidget {
                   onTap: () {
                     final paths = files.map((f) => f.path).join('\n');
                     Clipboard.setData(ClipboardData(text: paths));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${files.length} path(s) copied'),
-                        duration: const Duration(seconds: 2),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    AppToast.info(context, l10n.pathsCopied(files.length));
                   },
                   child: Icon(
                     PhosphorIconsLight.copy,

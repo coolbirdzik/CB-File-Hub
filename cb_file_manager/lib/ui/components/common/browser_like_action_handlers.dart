@@ -9,6 +9,7 @@ import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 
@@ -242,11 +243,8 @@ class BrowserLikeActionHandlers {
     }
 
     if (deletedPaths.isEmpty) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(l10n.failedToDelete(path.basename(filePaths.first))),
-        ),
-      );
+      AppToast.error(
+          context, l10n.failedToDelete(path.basename(filePaths.first)));
       return deletedPaths;
     }
 
@@ -261,9 +259,7 @@ class BrowserLikeActionHandlers {
     final message = deletedPaths.length == 1
         ? l10n.movedToTrash(path.basename(deletedPaths.first))
         : l10n.movedToTrash('${deletedPaths.length} ${l10n.items}');
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppToast.success(context, message);
 
     return deletedPaths;
   }

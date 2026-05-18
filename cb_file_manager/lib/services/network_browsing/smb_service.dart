@@ -628,8 +628,9 @@ class SMBService implements ISmbService {
   Future<Uint8List?> getThumbnail(String tabPath, int size) async {
     if (!isAvailable() || !isConnected) return null;
 
-    // Check if this is an image file first
-    if (!FileTypeUtils.isImageFile(tabPath)) {
+    // Support both image and video files
+    if (!FileTypeUtils.isImageFile(tabPath) &&
+        !FileTypeUtils.isVideoFile(tabPath)) {
       return null;
     }
 
@@ -653,10 +654,25 @@ class SMBService implements ISmbService {
     final completer = Completer<void>();
     _concurrentOperations[tabPath] = completer;
 
+    final isVideo = FileTypeUtils.isVideoFile(tabPath);
+
     try {
       final uncPath = _getUncPathFromTabPath(tabPath);
 
-      // First try native thumbnail
+      // For videos, use native thumbnail directly if available
+      if (isVideo) {
+        final nativeThumbnail = await _getNativeThumbnail(uncPath, size)
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+
+        if (nativeThumbnail != null) {
+          _thumbnailCache[cacheKey] = nativeThumbnail;
+          return nativeThumbnail;
+        }
+        // Videos: no fallback (streaming full video is too slow)
+        return null;
+      }
+
+      // For images: try native thumbnail first, then fallback
       final nativeThumbnail = await _getNativeThumbnail(uncPath, size)
           .timeout(const Duration(seconds: 3), onTimeout: () => null);
 

@@ -451,7 +451,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   }
 
   // Background processing limits
-  static const int maxConcurrentLoads = 3;
+  static const int maxConcurrentLoads = 5; // Tăng từ 3 để SMB thumbnails load nhanh hơn
   static int _currentLoads = 0;
 
   // Track failed attempts with retry limits and backoff
@@ -461,12 +461,11 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   static const Duration _retryBackoff = Duration(seconds: 2);
 
   // Limit how many thumbnails can be loaded at once per screen.
-  // Kept deliberately low: each concurrent Image.file decode that falls
-  // back to the original file runs on the raster thread and competes with
-  // the compositor.  2 concurrent loads keeps the UI fluid even on
-  // machines with fewer cores.
+  // Increased for SMB: thumbnails are fetched over the network (not local disk)
+  // so the raster thread is the only real bottleneck. 4 allows noticeably
+  // faster thumbnail grid population without causing visible jank.
   static int _activeLoaders = 0;
-  static const int _maxActiveLoaders = 2;
+  static const int _maxActiveLoaders = 4;
 
   @override
   bool get wantKeepAlive =>

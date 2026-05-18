@@ -421,6 +421,7 @@ class SharedActionBar {
   static List<Widget> buildCommonActions({
     required BuildContext context,
     required VoidCallback onSearchPressed,
+    bool isSearchActive = false,
     required Function(SortOption) onSortOptionSelected,
     required SortOption currentSortOption,
     required ViewMode viewMode,
@@ -452,8 +453,12 @@ class SharedActionBar {
     // Add search button
     actions.add(
       IconButton(
-        icon: const Icon(PhosphorIconsLight.magnifyingGlass),
-        tooltip: l10n.searchTooltip,
+        icon: Icon(
+          isSearchActive
+              ? PhosphorIconsLight.x
+              : PhosphorIconsLight.magnifyingGlass,
+        ),
+        tooltip: isSearchActive ? l10n.close : l10n.searchTooltip,
         onPressed: onSearchPressed,
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../controllers/file_operations_handler.dart';
 import '../../screens/folder_list/file_details_screen.dart';
 import '../../screens/media_gallery/image_viewer_screen.dart';
@@ -1063,14 +1064,6 @@ List<ContextMenuSection> _buildFileContextMenuSections({
   ];
 }
 
-ScaffoldMessengerState? _maybeScaffoldMessenger(BuildContext context) {
-  try {
-    return ScaffoldMessenger.maybeOf(context);
-  } catch (_) {
-    return null;
-  }
-}
-
 FolderListBloc? _maybeFolderListBloc(BuildContext context) {
   try {
     return context.read<FolderListBloc>();
@@ -1179,6 +1172,8 @@ Future<void> _downloadRemoteFile({
   required File file,
   String? remoteFileName,
 }) async {
+  final l10n = AppLocalizations.of(context)!;
+  final toast = AppToast.capture(context);
   try {
     final fileName = remoteFileName ?? pathlib.basename(file.path);
     final String? saveLocation = await FilePicker.platform.saveFile(
@@ -1189,25 +1184,9 @@ Future<void> _downloadRemoteFile({
       return;
     }
     await StreamingHelper.instance.downloadFile(file.path, saveLocation);
-    if (!context.mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.downloadedTo(saveLocation)),
-      ),
-    );
+    toast.success(l10n.downloadedTo(saveLocation));
   } catch (error) {
-    if (!context.mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            AppLocalizations.of(context)!.downloadFailed(error.toString())),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+    toast.error(l10n.downloadFailed(error.toString()));
   }
 }
 
@@ -1221,6 +1200,8 @@ Future<void> _toggleSidebarPinnedPathWithFeedback(
   BuildContext context,
   String path,
 ) async {
+  final l10n = AppLocalizations.of(context)!;
+  final toast = AppToast.capture(context);
   final prefs = UserPreferences.instance;
   await prefs.init();
 
@@ -1231,13 +1212,8 @@ Future<void> _toggleSidebarPinnedPathWithFeedback(
     await prefs.addSidebarPinnedPath(path);
   }
 
-  if (!context.mounted) return;
-
-  final l10n = AppLocalizations.of(context)!;
   final message = isPinned ? l10n.removedFromSidebar : l10n.pinnedToSidebar;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  toast.info(message);
 }
 
 String _openInNewWindowLabel(BuildContext context) {
@@ -1548,7 +1524,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
   final folderName = folder.path.split(Platform.pathSeparator).last;
   final l10n = AppLocalizations.of(context)!;
   final thumbnailService = FolderThumbnailService();
-  final scaffoldMessenger = _maybeScaffoldMessenger(context);
+  final toast = AppToast.capture(context);
   Future<String?> customThumbnailFuture =
       thumbnailService.getCustomThumbnailPath(folder.path);
 
@@ -1619,12 +1595,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
                             VideoThumbnailHelper.isSupportedVideoFormat(
                                 selectedPath);
                         if (!isImage && !isVideo) {
-                          if (context.mounted && scaffoldMessenger != null) {
-                            scaffoldMessenger.showSnackBar(
-                              SnackBar(
-                                  content: Text(l10n.invalidThumbnailFile)),
-                            );
-                          }
+                          toast.warning(l10n.invalidThumbnailFile);
                           return;
                         }
 
@@ -1640,11 +1611,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
                                 : selectedPath);
                           });
                         }
-                        if (context.mounted && scaffoldMessenger != null) {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(content: Text(l10n.folderThumbnailSet)),
-                          );
-                        }
+                        toast.success(l10n.folderThumbnailSet);
                       },
                       child: Text(l10n.chooseThumbnail.toUpperCase()),
                     ),
@@ -1657,12 +1624,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
                             customThumbnailFuture = Future.value(null);
                           });
                         }
-                        if (context.mounted && scaffoldMessenger != null) {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(
-                                content: Text(l10n.folderThumbnailCleared)),
-                          );
-                        }
+                        toast.success(l10n.folderThumbnailCleared);
                       },
                       child: Text(l10n.clearThumbnail.toUpperCase()),
                     ),
@@ -1681,11 +1643,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
       ),
     );
   }).catchError((error) {
-    if (!context.mounted) return;
-    scaffoldMessenger?.showSnackBar(
-      SnackBar(
-          content: Text(l10n.errorGettingFolderProperties(error.toString()))),
-    );
+    toast.error(l10n.errorGettingFolderProperties(error.toString()));
   });
 }
 
@@ -1802,8 +1760,9 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CopyFiles(entitiesList));
-            _maybeScaffoldMessenger(context)?.showSnackBar(
-              SnackBar(content: Text(l10n.copiedToClipboard('$count items'))),
+            AppToast.info(
+              context,
+              l10n.copiedToClipboard(l10n.itemsCount(count)),
             );
           },
         ),
@@ -1815,8 +1774,9 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CutFiles(entitiesList));
-            _maybeScaffoldMessenger(context)?.showSnackBar(
-              SnackBar(content: Text(l10n.cutToClipboard('$count items'))),
+            AppToast.info(
+              context,
+              l10n.cutToClipboard(l10n.itemsCount(count)),
             );
           },
         ),

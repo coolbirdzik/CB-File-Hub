@@ -9,6 +9,7 @@ import 'package:cb_file_manager/models/file_template.dart';
 import 'package:cb_file_manager/services/file_template_service.dart';
 import 'package:cb_file_manager/services/directory_watcher_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
@@ -229,13 +230,11 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
       });
     } else {
       // Show inline error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)?.errorCreatingFile(
-                  'File may already exist or path is not writable') ??
-              'Error creating file'),
-          backgroundColor: Colors.red,
-        ),
+      AppToast.error(
+        context,
+        AppLocalizations.of(context)?.errorCreatingFile(
+                'File may already exist or path is not writable') ??
+            'Error creating file',
       );
       Navigator.of(context).pop();
     }

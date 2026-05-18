@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/album_service.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:path/path.dart' as path;
 import 'dart:async';
@@ -152,12 +154,8 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
       debugPrint('Error adding files to album: $e');
       if (mounted) {
         Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding files: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, l10n.addFilesToAlbumFailed(e.toString()));
       }
     }
   }

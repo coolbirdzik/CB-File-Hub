@@ -6,6 +6,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/folder_context_menu.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 
 /// Handles displaying context menu for folder background (empty areas)
 class FolderBackgroundContextMenu {
@@ -43,12 +44,9 @@ class FolderBackgroundContextMenu {
           folderListBloc.add(FolderListLoad(currentPath));
         } catch (error) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppLocalizations.of(context)!
-                    .errorCreatingFolder('$error')),
-                backgroundColor: Colors.red,
-              ),
+            AppToast.error(
+              context,
+              AppLocalizations.of(context)!.errorCreatingFolder('$error'),
             );
           }
         }

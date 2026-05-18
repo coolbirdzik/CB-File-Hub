@@ -19,6 +19,7 @@ import 'package:cb_file_manager/services/directory_watcher_service.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 
 /// Displays a context menu for empty areas in folder view
@@ -442,7 +443,7 @@ class FolderContextMenu {
     ValueChanged<String>? onAfterFileCreated,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    final scaffoldMessenger = _maybeScaffoldMessenger(context);
+    final toast = AppToast.capture(context);
 
     DirectoryWatcherService.instance.suppressRefreshForPath(currentPath);
     final createdPath = await DesktopNewFileService.instance.createItem(
@@ -451,19 +452,10 @@ class FolderContextMenu {
       customBaseName: _defaultDesktopNewFileBaseName(context, item),
     );
 
-    if (!context.mounted) {
-      return;
-    }
-
     if (createdPath == null) {
-      scaffoldMessenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.errorCreatingFile(
-              'File may already exist or the destination is not writable',
-            ),
-          ),
-          backgroundColor: Colors.red,
+      toast.error(
+        l10n.errorCreatingFile(
+          'File may already exist or the destination is not writable',
         ),
       );
       return;
@@ -778,7 +770,7 @@ class FolderContextMenu {
     String path,
   ) async {
     if (!context.mounted) return;
-    final scaffoldMessenger = _maybeScaffoldMessenger(context);
+    final toast = AppToast.capture(context);
 
     try {
       final directory = Directory(path);
@@ -877,14 +869,10 @@ class FolderContextMenu {
                               VideoThumbnailHelper.isSupportedVideoFormat(
                                   selectedPath);
                           if (!isImage && !isVideo) {
-                            if (context.mounted && scaffoldMessenger != null) {
-                              scaffoldMessenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(AppLocalizations.of(context)!
-                                      .invalidThumbnailFile),
-                                ),
-                              );
-                            }
+                            toast.warning(
+                              AppLocalizations.of(context)!
+                                  .invalidThumbnailFile,
+                            );
                             return;
                           }
 
@@ -931,15 +919,10 @@ class FolderContextMenu {
         ),
       );
     } catch (e) {
-      if (scaffoldMessenger?.mounted ?? false) {
-        scaffoldMessenger?.showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!
-                .errorGettingFolderProperties(e.toString())),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      toast.error(
+        AppLocalizations.of(context)!
+            .errorGettingFolderProperties(e.toString()),
+      );
     }
   }
 
@@ -956,13 +939,6 @@ class FolderContextMenu {
       final gb = sizeInBytes / (1024 * 1024 * 1024);
       return '${gb.toStringAsFixed(2)} GB';
     }
-  }
-
-  static ScaffoldMessengerState? _maybeScaffoldMessenger(BuildContext context) {
-    return ScaffoldMessenger.maybeOf(context) ??
-        ScaffoldMessenger.maybeOf(
-          Navigator.of(context, rootNavigator: true).context,
-        );
   }
 
   static Future<T?> _showNoAnimationDialog<T>({

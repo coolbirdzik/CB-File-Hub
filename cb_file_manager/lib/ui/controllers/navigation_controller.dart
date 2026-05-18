@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
@@ -193,12 +194,8 @@ class NavigationController {
         }
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.pathNotAccessible),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppToast.error(
+              context, AppLocalizations.of(context)!.pathNotAccessible);
         }
         // Revert to current path
         pathController.text = (isDrivesPath(currentPath) || currentPath.isEmpty)

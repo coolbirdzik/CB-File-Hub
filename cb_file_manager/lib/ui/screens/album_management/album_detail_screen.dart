@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dar
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/app_progress_indicator.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'create_album_dialog.dart';
 import 'batch_add_dialog.dart';
 import 'package:path/path.dart' as pathlib;
@@ -234,13 +235,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       await _loadAlbumFiles();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Removed $successCount ${successCount == 1 ? 'image' : 'images'} from album',
-            ),
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context, l10n.removedFromAlbum(successCount));
       }
     }
   }
@@ -718,22 +714,28 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       builder: (context) => BatchAddDialog(albumId: widget.album.id),
     );
     if (result != null && mounted) {
-      String message;
+      final l10n = AppLocalizations.of(context)!;
       if (result is Map<String, dynamic>) {
         if (result.containsKey('error')) {
-          message = 'Error: ${result['error']}';
+          AppToast.error(
+            context,
+            l10n.errorWithMessage(result['error'].toString()),
+          );
         } else if (result.containsKey('background')) {
-          message = 'Adding files in background...';
+          AppToast.info(context, l10n.addingFilesInBackground);
         } else {
           final added = result['added'] ?? 0;
           final total = result['total'] ?? 0;
-          message = 'Added $added out of $total files';
+          final addedInt = (added is int) ? added : int.tryParse('$added') ?? 0;
+          final totalInt = (total is int) ? total : int.tryParse('$total') ?? 0;
+          AppToast.success(
+            context,
+            l10n.addedFilesProgress(addedInt, totalInt),
+          );
         }
       } else {
-        message = 'Files added successfully';
+        AppToast.success(context, l10n.filesAddedSuccessfully);
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
       if (result is Map<String, dynamic> && !result.containsKey('background')) {
         _loadAlbumFiles();
       }

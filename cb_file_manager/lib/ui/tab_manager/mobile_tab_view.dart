@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Thêm import cho SystemUiOverlayStyle
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io'; // Thêm import cho Platform
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../config/theme_config.dart';
 import 'core/tab_manager.dart';
 import 'core/tab_data.dart';
@@ -116,12 +117,8 @@ class MobileTabView extends StatelessWidget {
               path: '',
               name: 'Search or enter path',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Vui lòng tạo một tab trước khi điều hướng'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+                AppToast.warning(
+                    context, 'Vui lòng tạo một tab trước khi điều hướng');
               },
               isDarkMode: isDarkMode,
             ),

@@ -238,6 +238,8 @@ abstract class AppLocalizations {
   String get fileDeleteSuccess;
   String get folderDeleteSuccess;
   String get operationFailed;
+  String get failedToCreateAlbum;
+  String get failedToUpdateAlbum;
 
   // Tags
   String get tags;
@@ -312,11 +314,21 @@ abstract class AppLocalizations {
   String get errorCreatingTag;
   String get tagsSavedSuccessfully;
   String get selectTagToRemove;
+  String get selectFilesToRemoveTags;
   String get doubleClickToRename;
   String get openingFolder;
   String get folderNotFound;
   String get refreshTags;
   String tagsRefreshed(int count);
+  String get tagManagementInfoTitle;
+  String get tagManagementInfoDescription;
+  String removeTagsFromFilesTitle(int count);
+  String get loadingTags;
+  String get noCommonTagsAcrossSelectedFiles;
+  String removeTagsSuccess(int removedTagCount, int fileCount);
+  String removeTagsError(String error);
+  String batchTagProcessingError(String error);
+  String searchError(String error);
 
   // Sorting
   String get sort;
@@ -324,6 +336,8 @@ abstract class AppLocalizations {
   String get sortByPopularity;
   String get sortByRecent;
   String get sortBySize;
+  String get viewModeFeatureComingSoon;
+  String get cannotCreateFileInThisLocation;
 
   // Bulk Selection
   String get bulkSelect;
@@ -402,6 +416,10 @@ abstract class AppLocalizations {
   String get syncFromCloud;
   String get cloudSyncEnabled;
   String get cloudSyncDisabled;
+  String get syncToCloudSuccess;
+  String get syncToCloudFailed;
+  String get syncFromCloudSuccess;
+  String get syncFromCloudFailed;
   String get enableDatabaseForCloud;
 
   // Database statistics
@@ -675,10 +693,25 @@ abstract class AppLocalizations {
   String get exitApplicationTitle;
   String get exitApplicationConfirm;
   String itemsSelected(int count);
+  String itemsCount(int count);
   String get noActiveTab;
   String get masonryLayoutName;
   String get undo;
   String errorWithMessage(String message);
+  String get referencedFile;
+  String referencedFiles(int count);
+  String pathsCopied(int count);
+  String get moveToTrashTitle;
+  String get imageMovedToTrash;
+  String get failedToMoveImageToTrash;
+  String failedToMoveImageToTrashWithError(String error);
+  String get copiedPathToClipboard;
+  String get unableToOpenWithExternalApp;
+  String failedToDisplayImageInformation(String error);
+  String removedFromAlbum(int count);
+  String get addingFilesInBackground;
+  String addedFilesProgress(int added, int total);
+  String get filesAddedSuccessfully;
 
   // File picker dialogs
   String get chooseBackupLocation;
@@ -1026,6 +1059,12 @@ abstract class AppLocalizations {
   String get screenshotCannotOpenTab;
   String get screenshotErrorOpeningFolder;
   String get closeAction;
+  String get pipOverlayEnabled;
+  String get pipAndroidEnableFailed;
+  String pipError(String error);
+  String get pipNoSource;
+  String get pipOpenedInSeparateWindow;
+  String get pipNotSupportedOnPlatform;
 
   // Video library
   String get videoLibrary;
@@ -1081,6 +1120,22 @@ abstract class AppLocalizations {
   String get folderNameLabel;
   String get fileNameLabel;
   String errorCreatingFile(String error);
+  String get noFileSelectedForBenchmarking;
+  String benchmarkError(String error);
+  String benchmarkFailed(String error);
+  String get saveTagToLocalDatabaseFailed;
+  String saveTagFailed(String error);
+  String debugTagsSeeded(int savedCount, int requestedCount);
+  String debugTagsSeedFailed(String error);
+  String get debugTagsCleared;
+  String debugTagsClearFailed(String error);
+  String addFolderToAlbumFailed(String error);
+  String addFilesToAlbumFailed(String error);
+  String loadRulesFailed(String error);
+  String openTerminalFailed(String error);
+  String startCleanupFailed(String error);
+  String startFormatFailed(String error);
+  String foundResultsWithTag(int count, String tag);
 
   // AI Agent
   String get aiSearchAgent;

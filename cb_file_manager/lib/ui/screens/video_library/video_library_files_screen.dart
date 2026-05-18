@@ -18,6 +18,7 @@ import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
+import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -64,6 +65,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   bool _isInitialized = false;
   String _searchQuery = '';
+  List<String> _activeSearchTags = const [];
+  Set<String>? _tagMatchedPaths;
   bool _showSearchBar = false;
   bool _useRegexSearch = false;
   bool _showFileTags = true;
@@ -264,32 +267,82 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   void _applySearchWithOptions(String value, bool useRegex) {
     final trimmed = value.trim();
-    if (_searchQuery == trimmed && _useRegexSearch == useRegex) return;
+    if (_searchQuery == trimmed &&
+        _useRegexSearch == useRegex &&
+        _activeSearchTags.isEmpty) {
+      return;
+    }
     setState(() {
       _searchQuery = trimmed;
       _useRegexSearch = useRegex;
+      _activeSearchTags = const [];
+      _tagMatchedPaths = null;
     });
-    _applyFilters();
+    unawaited(_applyFilters());
+  }
+
+  Future<void> _applyTagSearch(List<String> tags, bool _) async {
+    final normalizedTags = tags
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toSet()
+        .toList();
+    if (normalizedTags.isEmpty) return;
+
+    final int token = ++_filterToken;
+    try {
+      final files = List<FileSystemEntity>.from(_bloc.state.files);
+      final fileTags = await TagManager.getTagsForFiles(
+        files.map((entity) => entity.path).toList(),
+      );
+      if (!mounted || token != _filterToken) {
+        return;
+      }
+
+      final normalizedSearchTags =
+          normalizedTags.map((tag) => tag.toLowerCase()).toSet();
+      final matchedPaths = files
+          .where((entity) {
+            final tagsForFile = fileTags[entity.path] ?? const <String>[];
+            final normalizedFileTags =
+                tagsForFile.map((tag) => tag.toLowerCase()).toSet();
+            return normalizedSearchTags.every(normalizedFileTags.contains);
+          })
+          .map((entity) => entity.path)
+          .toSet();
+
+      setState(() {
+        _activeSearchTags = normalizedTags;
+        _tagMatchedPaths = matchedPaths;
+        _searchQuery = normalizedTags.map((tag) => '#$tag').join(' ');
+        _useRegexSearch = false;
+      });
+      _bloc.add(const FileNavigationClearSearchAndFilters());
+    } catch (_) {}
   }
 
   void _clearSearch() {
-    if (_searchQuery.isEmpty && !_useRegexSearch) return;
+    if (_searchQuery.isEmpty && !_useRegexSearch && _activeSearchTags.isEmpty) {
+      return;
+    }
     setState(() {
       _searchQuery = '';
       _useRegexSearch = false;
+      _activeSearchTags = const [];
+      _tagMatchedPaths = null;
     });
-    _applyFilters();
-  }
-
-  void _openSearchBar() {
-    setState(() {
-      _showSearchBar = true;
-    });
+    unawaited(_applyFilters());
   }
 
   void _closeSearchBar() {
     setState(() {
       _showSearchBar = false;
+    });
+  }
+
+  void _toggleSearchBar() {
+    setState(() {
+      _showSearchBar = !_showSearchBar;
     });
   }
 
@@ -317,11 +370,13 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         initialQuery: _searchQuery,
         hintText: l10n.searchByFilename,
         onSearchWithOptions: _applySearchWithOptions,
+        onTagSearch: _applyTagSearch,
         onClearSearch: _clearSearch,
         onCloseSearch: _closeSearchBar,
-        showClearButton: _searchQuery.isNotEmpty,
+        showClearButton:
+            _searchQuery.isNotEmpty || _activeSearchTags.isNotEmpty,
         showTipsButton: true,
-        showTagSearch: false,
+        showTagSearch: true,
         showGlobalSearchToggle: false,
         showRegexToggle: true,
       );
@@ -388,6 +443,12 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   List<FileSystemEntity> _visibleFilesForState(FileNavigationState state) {
     final trimmedQuery = _searchQuery.trim();
+    if (_activeSearchTags.isNotEmpty) {
+      final matchedPaths = _tagMatchedPaths ?? const <String>{};
+      return state.files
+          .where((entity) => matchedPaths.contains(entity.path))
+          .toList();
+    }
     return trimmedQuery.isEmpty
         ? state.files
         : _filterFilesBySearch(state.files, trimmedQuery);
@@ -400,11 +461,17 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       '#video-library/${widget.library.id}',
       files: visibleFiles,
       folders: const [],
-      searchResults: trimmedQuery.isEmpty ? const [] : visibleFiles,
+      searchResults: trimmedQuery.isEmpty && _activeSearchTags.isEmpty
+          ? const []
+          : visibleFiles,
       viewMode: state.viewMode,
       sortOption: state.sortOption,
       gridZoomLevel: state.gridZoomLevel,
-      currentSearchQuery: trimmedQuery.isEmpty ? null : trimmedQuery,
+      currentSearchTag:
+          _activeSearchTags.isEmpty ? null : _activeSearchTags.join(', '),
+      currentSearchQuery: trimmedQuery.isEmpty || _activeSearchTags.isNotEmpty
+          ? null
+          : trimmedQuery,
     );
   }
 
@@ -528,7 +595,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                   pathNavigationBar: _buildPathNavigationBar(l10n),
                   actions: SharedActionBar.buildCommonActions(
                     context: context,
-                    onSearchPressed: _openSearchBar,
+                    onSearchPressed: _toggleSearchBar,
+                    isSearchActive: _showSearchBar,
                     onSortOptionSelected: _setSortOption,
                     currentSortOption: state.sortOption,
                     viewMode: state.viewMode,
@@ -587,9 +655,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
     // Apply local search filter
     final trimmedQuery = _searchQuery.trim();
-    final visibleFiles = trimmedQuery.isEmpty
-        ? state.files
-        : _filterFilesBySearch(state.files, trimmedQuery);
+    final visibleFiles = _visibleFilesForState(state);
 
     if (state.files.isEmpty) {
       return Center(

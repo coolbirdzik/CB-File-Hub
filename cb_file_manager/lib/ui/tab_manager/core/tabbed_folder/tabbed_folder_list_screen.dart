@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_display_state.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -702,6 +704,17 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     }
   }
 
+  Future<void> _toggleSearchBar(BuildContext context) async {
+    if (_showSearchBar) {
+      setState(() {
+        _showSearchBar = false;
+      });
+      return;
+    }
+
+    await _showSearchTip(context);
+  }
+
   void _navigateToPath(String path) {
     _navigationController.navigateToPath(
       context,
@@ -1328,14 +1341,14 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final bool hasContent = state.folders.isNotEmpty || state.files.isNotEmpty;
     final bool isPathMismatch =
         !_currentPath.startsWith('#') && _isPathMismatch(state);
-    // When search results are displayed, SearchResults widget renders its own
-    // loading bar — suppress the top-level one to avoid showing two at once.
+    // When search results are displayed, SearchResults widget owns the search
+    // loading surface; suppress the top-level one to avoid duplicate loaders.
     final bool searchResultsActive = state.searchResults.isNotEmpty ||
         state.currentSearchQuery != null ||
         state.currentSearchTag != null;
-    // Top bar: only for initial loads (no content yet) or path mismatches.
+    // Status bar: only for initial loads and path mismatches.
     // Refresh operations use `state.isRefreshing` and show at the bottom instead.
-    final bool showTopLoadingIndicator = !searchResultsActive &&
+    final bool showStatusLoadingIndicator = !searchResultsActive &&
         !state.isRefreshing &&
         (state.isLoading || isPathMismatch);
     final bool shouldShowSkeleton = !hasContent &&
@@ -1362,7 +1375,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         ),
         // Bottom status bar indicator — shown during initial loading AND refresh
         // so the existing file list layout is never affected.
-        if (showTopLoadingIndicator || state.isRefreshing || _isRefreshing)
+        if (showStatusLoadingIndicator || state.isRefreshing || _isRefreshing)
           const Positioned(
             left: 0,
             right: 0,
@@ -1676,7 +1689,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       onViewModeToggled: _toggleViewMode,
       onViewModeSelected: _setViewMode,
       onRefresh: _refreshFileList,
-      onSearchPressed: () => _showSearchTip(context),
+      onSearchPressed: () => _toggleSearchBar(context),
+      isSearchActive: _showSearchBar,
       onSelectionModeToggled: _toggleSelectionMode,
       onManageTagsPressed: () {
         tab_components.showManageTagsDialog(

@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/file_details_screen.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class SearchDialog extends StatefulWidget {
@@ -227,6 +229,7 @@ class _SearchDialogState extends State<SearchDialog> {
 
   // Phương thức để thực hiện tìm kiếm tag toàn cục
   Future<void> _performTagSearch(String tag) async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _filteredFiles = [];
       _filteredFolders = [];
@@ -276,23 +279,15 @@ class _SearchDialogState extends State<SearchDialog> {
         });
 
         // Hiển thị thông báo kết quả
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('Đã tìm thấy ${results.length} kết quả với tag "$tag"'),
-            duration: const Duration(seconds: 2),
-          ),
+        AppToast.success(
+          context,
+          l10n.foundResultsWithTag(results.length, tag),
         );
       }
     } catch (e) {
       debugPrint('Lỗi khi tìm kiếm tag: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi tìm kiếm: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppToast.error(context, l10n.searchError(e.toString()));
       }
     }
   }

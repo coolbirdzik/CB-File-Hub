@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter/rendering.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../utils/route.dart';
@@ -230,9 +232,8 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   }
 
   void _onVideoError(String errorMessage) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi: $errorMessage')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.error(context, l10n.errorWithMessage(errorMessage));
   }
 
   void _onFullScreenChanged() {

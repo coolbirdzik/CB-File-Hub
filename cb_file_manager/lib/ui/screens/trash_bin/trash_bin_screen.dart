@@ -14,6 +14,7 @@ import 'package:cb_file_manager/ui/components/common/browser_like_collection_vie
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
@@ -209,9 +210,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       if (success) {
         if (mounted) {
           final l10n = AppLocalizations.of(context)!;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(l10n.itemRestoredSuccess(item.displayNameValue))),
+          AppToast.success(
+            context,
+            l10n.itemRestoredSuccess(item.displayNameValue),
           );
         }
         await _loadTrashItems();
@@ -297,9 +298,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     final dir = Directory(folderPath);
     if (!dir.existsSync()) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.folderNotFound)),
-      );
+      AppToast.error(context, l10n.folderNotFound);
       return;
     }
 
@@ -340,9 +339,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
 
       if (success) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.trashEmptiedSuccess)),
-          );
+          AppToast.success(context, l10n.trashEmptiedSuccess);
         }
         await _loadTrashItems();
       } else {
@@ -361,12 +358,14 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Future<void> _openSystemRecycleBin() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await _trashManager.openWindowsRecycleBin();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error opening recycle bin: $e')),
+        AppToast.error(
+          context,
+          l10n.errorOpeningRecycleBinWithError(e.toString()),
         );
       }
     }
@@ -503,10 +502,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.itemsPermanentlyDeletedCount(successCount)),
-          ),
+        AppToast.success(
+          context,
+          l10n.itemsPermanentlyDeletedCount(successCount),
         );
       }
 
@@ -650,7 +648,16 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   List<Widget> _buildNormalActions(AppLocalizations l10n) {
     return SharedActionBar.buildCommonActions(
       context: context,
-      onSearchPressed: () => setState(() => _showSearch = true),
+      onSearchPressed: () {
+        setState(() {
+          _showSearch = !_showSearch;
+          if (!_showSearch) {
+            _searchQuery = '';
+            _searchController.clear();
+          }
+        });
+      },
+      isSearchActive: _showSearch,
       onSortOptionSelected: (option) {
         setState(() => _sortOption = option);
         UserPreferences.instance.setTrashSortOption(option);
@@ -738,11 +745,19 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         hintStyle: TextStyle(
             color:
                 Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-        suffixIcon: IconButton(
-          icon: const Icon(PhosphorIconsLight.x),
-          tooltip: l10n.cancel,
-          onPressed: () => _closeSearch(),
-        ),
+        suffixIcon: _searchController.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(PhosphorIconsLight.broom),
+                tooltip: l10n.clearSearch,
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                  _updateThumbnailDisplayIndex();
+                },
+              ),
       ),
       style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
       onChanged: (v) {

@@ -35,6 +35,7 @@ import '../../streaming/stream_speed_indicator.dart';
 import '../../streaming/buffer_info_widget.dart';
 import '../../../utils/route.dart';
 import '../../../../config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../../tab_manager/core/tab_manager.dart';
 import 'video_player_advanced_menu.dart';
 import 'video_player_control_buttons.dart';
@@ -554,9 +555,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       if (mounted) {
         setState(() => _isPictureInPicture = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã bật PiP overlay trong ứng dụng')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context, l10n.pipOverlayEnabled);
       }
     }
   }
@@ -3414,13 +3414,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           debugPrint(
               'Screenshot rejected: File too small (${screenshotBytes.length} bytes - likely black/empty image)');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                    'Capture failed: Image appears to be empty. Try again.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
+            AppToast.error(context, localizations.screenshotFailed);
           }
           return;
         }
@@ -3516,51 +3510,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           // Cleanup: Delete old black/small screenshot files that are < 1KB
           _cleanupOldBlackScreenshots();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsLight.checkCircle,
-                        color: theme.colorScheme.primary,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        localizations.screenshotSaved,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    filePath,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-              duration: const Duration(seconds: 5),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              action: SnackBarAction(
-                label: 'Xem ảnh',
-                textColor: theme.colorScheme.primary,
-                onPressed: () => _openScreenshotImage(filePath),
-              ),
-            ),
+          AppToast.show(
+            context,
+            '${localizations.screenshotSaved}\n$filePath',
+            icon: PhosphorIconsLight.checkCircle,
+            accentColor: theme.colorScheme.primary,
+            duration: const Duration(seconds: 5),
+            actionLabel: localizations.viewImage,
+            onAction: () => _openScreenshotImage(filePath),
           );
         }
       } else {
@@ -3569,31 +3526,20 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         if (mounted) {
           if (_useFlutterVlc) {
             // VLC player doesn't support screenshot on Android
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Chụp ảnh màn hình không khả dụng với VLC player.\nVui lòng chuyển sang Media Kit player trong cài đặt.',
-                ),
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'Đóng',
-                  onPressed: () {},
-                ),
-              ),
+            AppToast.warning(
+              context,
+              localizations.screenshotNotAvailableVlcMessage,
+              duration: const Duration(seconds: 5),
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(localizations.screenshotFailed)),
-            );
+            AppToast.error(context, localizations.screenshotFailed);
           }
         }
       }
     } catch (e) {
       debugPrint('Error taking screenshot: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(localizations.screenshotFailed)),
-        );
+        AppToast.error(context, localizations.screenshotFailed);
       }
     } finally {
       // Resume video if it was playing before screenshot
@@ -3679,11 +3625,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       if (!exists) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(localizations.screenshotFileNotFound),
-              duration: const Duration(seconds: 3),
-            ),
+          AppToast.error(
+            context,
+            localizations.screenshotFileNotFound,
+            duration: const Duration(seconds: 3),
           );
         }
         return;
@@ -3697,11 +3642,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             (_vlcController?.value.isPlaying == true);
         try {
           await _suspendVideoForRoutePush();
-          if (mounted) {
-            try {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            } catch (_) {}
-          }
 
           // Load image bytes before opening viewer
           debugPrint('📂 Loading screenshot from: $filePath');
@@ -3873,11 +3813,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         } catch (e) {
           debugPrint('Launch file URI failed: $e');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(localizations.screenshotCannotOpenTab),
-                duration: const Duration(seconds: 3),
-              ),
+            AppToast.error(
+              context,
+              localizations.screenshotCannotOpenTab,
+              duration: const Duration(seconds: 3),
             );
           }
         }
@@ -3890,12 +3829,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       debugPrint(st.toString());
       debugPrint('========== END ERROR ==========');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                '${localizations.screenshotErrorOpeningFolder}: ${e.toString()}'),
-            duration: const Duration(seconds: 3),
-          ),
+        AppToast.error(
+          context,
+          '${localizations.screenshotErrorOpeningFolder}: ${e.toString()}',
+          duration: const Duration(seconds: 3),
         );
       }
     }
@@ -3999,27 +3936,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             debugPrint('PiP entry failed');
             if (mounted) {
               setState(() => _isAndroidPip = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Không thể bật PiP trên Android')),
-              );
+              final l10n = AppLocalizations.of(context)!;
+              AppToast.error(context, l10n.pipAndroidEnableFailed);
             }
           }
         } catch (e) {
           debugPrint('PiP method call error: $e');
           if (mounted) {
             setState(() => _isAndroidPip = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Lỗi PiP: $e')),
-            );
+            final l10n = AppLocalizations.of(context)!;
+            AppToast.error(context, l10n.pipError(e.toString()));
           }
         }
       } catch (e) {
         debugPrint('PIP error: $e');
         if (mounted) {
           setState(() => _isAndroidPip = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi PiP: $e')),
-          );
+          final l10n = AppLocalizations.of(context)!;
+          AppToast.error(context, l10n.pipError(e.toString()));
         }
       }
       return;
@@ -4067,9 +4001,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       if (sourceType == null || source == null || source.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không có nguồn video để mở PiP')),
-          );
+          final l10n = AppLocalizations.of(context)!;
+          AppToast.warning(context, l10n.pipNoSource);
         }
         return;
       }
@@ -4105,9 +4038,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               } catch (_) {}
               if (mounted) {
                 setState(() => _isPictureInPicture = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã mở PiP ở cửa sổ riêng')),
-                );
+                final l10n = AppLocalizations.of(context)!;
+                AppToast.success(context, l10n.pipOpenedInSeparateWindow);
               }
             } else {
               // External failed: close IPC and fallback to overlay
@@ -4146,11 +4078,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Other platforms: not implemented yet
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PiP chưa hỗ trợ trên nền tảng này'),
-        ),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.info(context, l10n.pipNotSupportedOnPlatform);
     }
   }
 

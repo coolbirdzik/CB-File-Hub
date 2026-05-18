@@ -11,6 +11,7 @@ import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:path/path.dart' as path;
@@ -276,7 +277,7 @@ class FileOperationsHandler {
     final l10n = AppLocalizations.of(context)!;
     final name = _entityBaseName(entity);
     bloc.add(CopyFile(entity));
-    _showSnackBarSafe(context, l10n.copiedToClipboard(name));
+    _showToastSafe(context, l10n.copiedToClipboard(name));
   }
 
   static void copyFilesToClipboard({
@@ -291,7 +292,7 @@ class FileOperationsHandler {
     final message = entities.length == 1
         ? l10n.copiedToClipboard(_entityBaseName(entities.first))
         : '${entities.length} items copied to clipboard';
-    _showSnackBarSafe(context, message);
+    _showToastSafe(context, message);
   }
 
   static void cutToClipboard({
@@ -303,7 +304,7 @@ class FileOperationsHandler {
     final l10n = AppLocalizations.of(context)!;
     final name = _entityBaseName(entity);
     bloc.add(CutFile(entity));
-    _showSnackBarSafe(context, l10n.cutToClipboard(name));
+    _showToastSafe(context, l10n.cutToClipboard(name));
   }
 
   static void cutFilesToClipboard({
@@ -318,7 +319,7 @@ class FileOperationsHandler {
     final message = entities.length == 1
         ? l10n.cutToClipboard(_entityBaseName(entities.first))
         : '${entities.length} items cut to clipboard';
-    _showSnackBarSafe(context, message);
+    _showToastSafe(context, message);
   }
 
   static void pasteFromClipboard({
@@ -329,18 +330,16 @@ class FileOperationsHandler {
     final bloc = folderListBloc ?? context.read<FolderListBloc>();
     final l10n = AppLocalizations.of(context)!;
     bloc.add(PasteFile(destinationPath));
-    _showSnackBarSafe(context, l10n.pasting);
+    _showToastSafe(context, l10n.pasting);
   }
 
-  /// Safely shows a snackbar, falling back to debugPrint if no ScaffoldMessenger is available.
-  static void _showSnackBarSafe(BuildContext context, String message) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) {
-      debugPrint(
-          'FileOperationsHandler: ScaffoldMessenger unavailable — $message');
+  /// Safely shows a toast, falling back to debugPrint if no overlay is available.
+  static void _showToastSafe(BuildContext context, String message) {
+    if (Overlay.maybeOf(context, rootOverlay: true) == null) {
+      debugPrint('FileOperationsHandler: Overlay unavailable - $message');
       return;
     }
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    AppToast.info(context, message);
   }
 
   static Future<void> showRenameDialog({
@@ -361,7 +360,7 @@ class FileOperationsHandler {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+    final toast = AppToast.capture(context);
     final preferences = UserPreferences.instance;
     await preferences.init();
     final allowFileExtensionRename =
@@ -404,13 +403,9 @@ class FileOperationsHandler {
       bloc.add(RenameFileOrFolder(entity, newName));
 
       try {
-        scaffoldMessenger?.showSnackBar(
-          SnackBar(
-            content: Text(isFile
-                ? l10n.renamedFileTo(newName)
-                : l10n.renamedFolderTo(newName)),
-          ),
-        );
+        toast.success(isFile
+            ? l10n.renamedFileTo(newName)
+            : l10n.renamedFolderTo(newName));
       } catch (_) {}
     } finally {}
   }

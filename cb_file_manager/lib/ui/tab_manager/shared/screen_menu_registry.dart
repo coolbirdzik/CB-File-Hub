@@ -6,6 +6,7 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/dialogs/create_file_dialog.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 
 /// Menu item cho dynamic menu system
@@ -197,18 +198,19 @@ class ScreenMenuRegistry {
 /// Helper class cho Tag Management menu
 class _TagManagementHelper {
   static void showCreateTagDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final TextEditingController tagController = TextEditingController();
 
     RouteUtils.showAcrylicDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Tạo thẻ mới'),
+        title: Text(l10n.newTagTitle),
         content: TextField(
           controller: tagController,
-          decoration: const InputDecoration(
-            hintText: 'Nhập tên thẻ...',
-            prefixIcon: Icon(PhosphorIconsLight.tag),
+          decoration: InputDecoration(
+            hintText: l10n.enterTagName,
+            prefixIcon: const Icon(PhosphorIconsLight.tag),
           ),
           autofocus: true,
           textInputAction: TextInputAction.done,
@@ -222,7 +224,7 @@ class _TagManagementHelper {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -232,7 +234,7 @@ class _TagManagementHelper {
                 _createNewTagInDatabase(context, tagName);
               }
             },
-            child: const Text('Tạo'),
+            child: Text(l10n.create),
           ),
         ],
       ),
@@ -241,70 +243,45 @@ class _TagManagementHelper {
 
   static Future<void> _createNewTagInDatabase(
       BuildContext context, String tagName) async {
+    final l10n = AppLocalizations.of(context)!;
+    final toast = AppToast.capture(context);
     try {
       await TagManager.initialize();
       final created = await TagManager.addStandaloneTag(tagName);
 
       if (!created) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.errorCreatingTag),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        toast.error(l10n.errorCreatingTag);
         return;
       }
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.tagCreatedSuccessfully(tagName)),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      toast.success(l10n.tagCreatedSuccessfully(tagName));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.errorCreatingTag + e.toString()),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      toast.error(l10n.errorCreatingTag + e.toString());
     }
   }
 
   static void showTagSearchDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Tìm kiếm thẻ'),
+        title: Text(l10n.searchTags),
         content: TextField(
-          decoration: const InputDecoration(
-            hintText: 'Nhập tên thẻ...',
-            prefixIcon: Icon(PhosphorIconsLight.magnifyingGlass),
+          decoration: InputDecoration(
+            hintText: l10n.searchTagsHint,
+            prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass),
           ),
           autofocus: true,
           onSubmitted: (value) {
+            final toast = AppToast.capture(dialogContext);
             Navigator.pop(dialogContext);
-            if (dialogContext.mounted) {
-              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                SnackBar(
-                    content: Text(AppLocalizations.of(dialogContext)!
-                        .searchingFor(value))),
-              );
-            }
+            toast.info(AppLocalizations.of(dialogContext)!.searchingFor(value));
           },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Hủy'),
+            child: Text(l10n.cancel),
           ),
         ],
       ),
@@ -312,21 +289,16 @@ class _TagManagementHelper {
   }
 
   static void showTagManagementInfo(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Thông tin quản lý thẻ'),
-        content: const Text(
-          'Màn hình này cho phép bạn quản lý các thẻ (tags) của file và thư mục.\n\n'
-          '• Xem danh sách tất cả thẻ\n'
-          '• Tìm kiếm thẻ\n'
-          '• Sắp xếp thẻ theo tên, độ phổ biến\n'
-          '• Xem file được gắn thẻ',
-        ),
+        title: Text(l10n.tagManagementInfoTitle),
+        content: Text(l10n.tagManagementInfoDescription),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
+            child: Text(l10n.close),
           ),
         ],
       ),
@@ -334,57 +306,43 @@ class _TagManagementHelper {
   }
 
   static void refreshTagManagement(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.tagListRefreshing),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+    AppToast.info(context, AppLocalizations.of(context)!.tagListRefreshing);
   }
 
   static void showTagSortOptions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Sắp xếp thẻ'),
+        title: Text(l10n.sortTags),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('Theo tên (A-Z)'),
+              title: Text(l10n.sortByAlphabet),
               leading: const Icon(PhosphorIconsLight.sortAscending),
               onTap: () {
+                final toast = AppToast.capture(dialogContext);
                 Navigator.pop(dialogContext);
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text('Sắp xếp theo tên A-Z')),
-                  );
-                }
+                toast.info(l10n.sortByName);
               },
             ),
             ListTile(
-              title: const Text('Theo độ phổ biến'),
+              title: Text(l10n.sortByPopular),
               leading: const Icon(PhosphorIconsLight.trendUp),
               onTap: () {
+                final toast = AppToast.capture(dialogContext);
                 Navigator.pop(dialogContext);
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text('Sắp xếp theo độ phổ biến')),
-                  );
-                }
+                toast.info(l10n.sortByPopularity);
               },
             ),
             ListTile(
-              title: const Text('Theo thời gian gần đây'),
+              title: Text(l10n.sortByRecent),
               leading: const Icon(PhosphorIconsLight.clockCounterClockwise),
               onTap: () {
+                final toast = AppToast.capture(dialogContext);
                 Navigator.pop(dialogContext);
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                        content: Text('Sắp xếp theo thời gian gần đây')),
-                  );
-                }
+                toast.info(l10n.sortByRecent);
               },
             ),
           ],
@@ -392,7 +350,7 @@ class _TagManagementHelper {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Hủy'),
+            child: Text(l10n.cancel),
           ),
         ],
       ),
@@ -400,12 +358,8 @@ class _TagManagementHelper {
   }
 
   static void toggleViewMode(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Chức năng chuyển chế độ xem sẽ được thêm sau'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.viewModeFeatureComingSoon);
   }
 }
 
@@ -426,9 +380,8 @@ class FileBrowserHelper {
   }
 
   static void createNewFolder(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Tạo thư mục mới')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.createNewFolder);
   }
 
   static void createNewFile(BuildContext context) {
@@ -450,9 +403,8 @@ class FileBrowserHelper {
 
     // Skip virtual/system tabs
     if (currentPath.isEmpty || currentPath.startsWith('#')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot create file in this location')),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.warning(context, l10n.cannotCreateFileInThisLocation);
       return;
     }
 
@@ -466,62 +418,53 @@ class FileBrowserHelper {
   }
 
   static void pasteFiles(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dán file')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.pasteHere);
   }
 
   static void showSortOptions(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sắp xếp file')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.sort);
   }
 
   static void toggleViewMode(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thay đổi chế độ xem')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.viewMode);
   }
 }
 
 /// Helper class cho Settings menu
 class _SettingsHelper {
   static void exportSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Xuất cài đặt')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.exportSettings);
   }
 
   static void importSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Nhập cài đặt')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.importSettings);
   }
 
   static void resetSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đặt lại cài đặt')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.resetSettings);
   }
 }
 
 /// Helper class cho Network menu
 class _NetworkHelper {
   static void addNewConnection(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thêm kết nối mới')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.addConnection);
   }
 
   static void scanNetwork(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Quét mạng')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.startScan);
   }
 
   static void refreshConnections(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Làm mới danh sách kết nối')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.info(context, l10n.refresh);
   }
 }

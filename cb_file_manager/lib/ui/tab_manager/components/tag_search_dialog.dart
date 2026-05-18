@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../utils/route.dart';
 
 /// Dialog for searching files by tag
@@ -54,7 +56,8 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
 
     // Pre-extract context-dependent values before async gap
     final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final toast = AppToast.capture(context);
+    final l10n = AppLocalizations.of(context)!;
 
     try {
       List<FileSystemEntity> results;
@@ -74,12 +77,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
       widget.onSearchComplete(results, _tagController.text.trim());
     } catch (e) {
       try {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Lỗi tìm kiếm: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        toast.error(l10n.searchError(e.toString()));
       } catch (_) {}
     } finally {
       if (mounted) {

@@ -6,7 +6,7 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     final controller = MobileFileActionsController.forTab(widget.tabId);
 
     // Register callbacks
-    controller.onSearchPressed = () => _showSearchTip(context);
+    controller.onSearchPressed = () => _toggleSearchBar(context);
     controller.onSearchSubmitted = (query) => _handleMobileSearch(query);
     controller.onSortOptionSelected = (option) {
       _folderListBloc.add(SetSortOption(option));
@@ -112,15 +112,15 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
   Future<void> _createNewFolder(String folderName) async {
     if (_currentPath.isEmpty) return;
 
+    final toast = AppToast.capture(context);
     try {
       final newFolderPath = '$_currentPath${Platform.pathSeparator}$folderName';
       await Directory(newFolderPath).create(recursive: true);
       _folderListBloc.add(FolderListRefresh(_currentPath));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating folder: $e')),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      toast.error(l10n.errorCreatingFolder(e.toString()));
     }
   }
 }

@@ -19,6 +19,7 @@ import '../mobile/mobile_tab_view.dart'; // Import giao diện mobile kiểu Chr
 import 'package:cb_file_manager/config/languages/app_localizations.dart'; // Import AppLocalizations
 import 'package:cb_file_manager/config/translation_helper.dart'; // Import translation helper
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart'; // Import system screen router
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 // import 'package:cb_file_manager/widgets/test_native_streaming.dart'; // Test widget removed
 import '../../utils/route.dart';
 import '../../screens/home/home_screen.dart'; // Import home screen
@@ -363,12 +364,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           final l10n = AppLocalizations.of(context)!;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.menuPinningOnlyLargeScreens),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          AppToast.warning(context, l10n.menuPinningOnlyLargeScreens);
         });
       }
     });
@@ -1479,10 +1475,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
     if (others.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(context.tr.noOtherWindows)),
-      );
+      AppToast.warning(context, context.tr.noOtherWindows);
       return null;
     }
 
@@ -1530,10 +1523,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
     if (incomingTabs.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(context.tr.noTabsOpen)),
-      );
+      AppToast.warning(context, context.tr.noTabsOpen);
       return;
     }
 

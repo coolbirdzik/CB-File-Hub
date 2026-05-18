@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/platform_paths.dart';
@@ -968,17 +969,14 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     if (success && mounted) {
       // Reload featured albums
       _loadFeaturedAlbums();
-      ScaffoldMessenger.of(_context).showSnackBar(
-        SnackBar(
-          content: Text('${album.name} removed from featured albums'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              await FeaturedAlbumsService.instance.addToFeatured(album.id);
-              _loadFeaturedAlbums();
-            },
-          ),
-        ),
+      AppToast.show(
+        _context,
+        '${album.name} removed from featured albums',
+        actionLabel: 'Undo',
+        onAction: () async {
+          await FeaturedAlbumsService.instance.addToFeatured(album.id);
+          _loadFeaturedAlbums();
+        },
       );
     }
   }

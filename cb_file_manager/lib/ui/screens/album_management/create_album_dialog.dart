@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
 
@@ -81,6 +82,7 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       return;
     }
 
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _isLoading = true;
     });
@@ -124,25 +126,18 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.editingAlbum != null
-                  ? 'Failed to update album'
-                  : 'Failed to create album'),
-              backgroundColor: Colors.red,
-            ),
+          AppToast.error(
+            context,
+            widget.editingAlbum != null
+                ? l10n.failedToUpdateAlbum
+                : l10n.failedToCreateAlbum,
           );
         }
       }
     } catch (e) {
       debugPrint('Error saving album: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppToast.error(context, l10n.errorWithMessage(e.toString()));
       }
     } finally {
       if (mounted) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../../ui/utils/route.dart';
 
 import '../../../bloc/network_browsing/network_browsing_bloc.dart';
@@ -89,10 +90,9 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
       bool hadError = false;
       if (state.errorMessage != null && _connectingCredentialIds.isNotEmpty) {
         hadError = true;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('${context.tr.connectionError}: ${state.errorMessage}')),
+        AppToast.error(
+          context,
+          '${context.tr.connectionError}: ${state.errorMessage}',
         );
       }
 

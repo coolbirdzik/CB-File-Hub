@@ -5,6 +5,7 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/file_details_screen.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/soft_checkbox.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
@@ -204,15 +205,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-            content:
-                Text('${AppLocalizations.of(context)!.errorLoadingTags}$e'),
-            backgroundColor: theme.colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppToast.error(
+            context, '${AppLocalizations.of(context)!.errorLoadingTags}$e');
         setState(() {
           _allTags = [];
           _filterTags();
@@ -623,9 +617,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       await _loadAllTags();
 
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.tagDeleted(tag))),
-        );
+        AppToast.success(context, localizations.tagDeleted(tag));
       }
 
       await _tagColorManager.removeTagColor(tag);
@@ -643,9 +635,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         detail: localizations.errorDeletingTag(e.toString()),
       );
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.errorDeletingTag(e.toString()))),
-        );
+        AppToast.error(context, localizations.errorDeletingTag(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -686,9 +676,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final allTagsLowercase = _allTags.map((t) => t.toLowerCase()).toSet();
     if (allTagsLowercase.contains(newTag.toLowerCase())) {
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.tagAlreadyExists(newTag))),
-        );
+        AppToast.warning(context, localizations.tagAlreadyExists(newTag));
       }
       return;
     }
@@ -707,9 +695,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         await _loadAllTags();
 
         if (mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(content: Text(localizations.tagRenamed(oldTag, newTag))),
-          );
+          AppToast.success(context, localizations.tagRenamed(oldTag, newTag));
         }
       }
     } catch (e) {
@@ -835,9 +821,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.bulkDeleteSuccess(count))),
-        );
+        AppToast.success(context, localizations.bulkDeleteSuccess(count));
       }
 
       if (_selectedTagForFiles != null &&
@@ -850,9 +834,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         detail: localizations.errorDeletingTag(e.toString()),
       );
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.errorDeletingTag(e.toString()))),
-        );
+        AppToast.error(context, localizations.errorDeletingTag(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -904,9 +886,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       final allTagsLowercase = _allTags.map((t) => t.toLowerCase()).toSet();
       if (allTagsLowercase.contains(newTag.toLowerCase())) {
         if (mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(content: Text(localizations.tagAlreadyExists(newTag))),
-          );
+          AppToast.warning(context, localizations.tagAlreadyExists(newTag));
         }
         return;
       }
@@ -926,9 +906,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           await _loadAllTags();
 
           if (mounted) {
-            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-              SnackBar(content: Text(localizations.tagRenamed(tag, newTag))),
-            );
+            AppToast.success(context, localizations.tagRenamed(tag, newTag));
           }
         }
       } finally {
@@ -1014,12 +992,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     setState(() {});
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: Text(localizations.tagColorUpdated(tag)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppToast.success(context, localizations.tagColorUpdated(tag));
   }
 
   KeyEventResult _handleInlineRenameKey(
@@ -2848,11 +2821,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
 
     if (hasExistingTag) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!
-              .tagAlreadyExists(normalizedTagName)),
-        ),
+      AppToast.warning(
+        context,
+        AppLocalizations.of(context)!.tagAlreadyExists(normalizedTagName),
       );
       return;
     }
@@ -2863,10 +2834,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       final saved = await TagManager.addStandaloneTag(normalizedTagName);
       if (!saved) {
         if (mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            const SnackBar(
-              content: Text('Failed to save tag to local database'),
-            ),
+          AppToast.error(
+            context,
+            AppLocalizations.of(context)!.saveTagToLocalDatabaseFailed,
           );
         }
         return;
@@ -2874,10 +2844,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     } catch (e) {
       AppLogger.warning('Error saving standalone tag: $e');
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-            content: Text('Failed to save tag: $e'),
-          ),
+        AppToast.error(
+          context,
+          AppLocalizations.of(context)!.saveTagFailed(e.toString()),
         );
       }
       return;
@@ -2910,11 +2879,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!
-              .tagCreatedSuccessfully(normalizedTagName)),
-        ),
+      AppToast.success(
+        context,
+        AppLocalizations.of(context)!.tagCreatedSuccessfully(normalizedTagName),
       );
     }
   }
@@ -2922,10 +2889,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   void _openContainingFolder(String folderPath) {
     if (Directory(folderPath).existsSync()) {
       try {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-              content: Text(
-                  '${AppLocalizations.of(context)!.openingFolder}$folderPath')),
+        AppToast.info(
+          context,
+          '${AppLocalizations.of(context)!.openingFolder}$folderPath',
         );
 
         final bool isInTabContext = context.findAncestorWidgetOfExactType<
@@ -2961,10 +2927,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         // ignore: empty_catches
       } catch (e) {}
     } else {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-            content: Text(
-                '${AppLocalizations.of(context)!.folderNotFound}$folderPath')),
+      AppToast.warning(
+        context,
+        '${AppLocalizations.of(context)!.folderNotFound}$folderPath',
       );
     }
   }

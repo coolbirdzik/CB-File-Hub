@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 
@@ -87,17 +89,14 @@ class _DebugTagsWidgetState extends State<DebugTagsWidget> {
       savedCount = await TagManager.addMultipleStandaloneTags(tagsToSeed);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Successfully seeded $savedCount/$count tags!')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context, l10n.debugTagsSeeded(savedCount, count));
         await _loadDebugInfo();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error seeding tags: $e')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, l10n.debugTagsSeedFailed(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -140,16 +139,14 @@ class _DebugTagsWidgetState extends State<DebugTagsWidget> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All tags cleared!')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context, l10n.debugTagsCleared);
         await _loadDebugInfo();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error clearing tags: $e')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, l10n.debugTagsClearFailed(e.toString()));
       }
     }
   }
