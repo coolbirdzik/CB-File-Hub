@@ -451,7 +451,8 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   }
 
   // Background processing limits
-  static const int maxConcurrentLoads = 5; // Tăng từ 3 để SMB thumbnails load nhanh hơn
+  static const int maxConcurrentLoads =
+      5; // Tăng từ 3 để SMB thumbnails load nhanh hơn
   static int _currentLoads = 0;
 
   // Track failed attempts with retry limits and backoff

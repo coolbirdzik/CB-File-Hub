@@ -165,7 +165,9 @@ class AppToastPresenter {
     );
 
     overlay!.insert(entry);
-    timer = Timer(duration ?? t?.durationInfo ?? const Duration(milliseconds: 2200), dismiss);
+    timer = Timer(
+        duration ?? t?.durationInfo ?? const Duration(milliseconds: 2200),
+        dismiss);
   }
 }
 
@@ -256,12 +258,14 @@ class _AppToastOverlay extends StatelessWidget {
                   color: colorScheme.surface.withValues(alpha: _surfaceOpacity),
                   borderRadius: BorderRadius.circular(_containerRadius),
                   border: Border.all(
-                    color: colorScheme.outline.withValues(alpha: _borderOpacity),
+                    color:
+                        colorScheme.outline.withValues(alpha: _borderOpacity),
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(
-                        alpha: isDark ? _shadowOpacityDark : _shadowOpacityLight,
+                        alpha:
+                            isDark ? _shadowOpacityDark : _shadowOpacityLight,
                       ),
                       blurRadius: 24,
                       offset: const Offset(0, 10),
@@ -275,7 +279,8 @@ class _AppToastOverlay extends StatelessWidget {
                       width: _iconBoxSize,
                       height: _iconBoxSize,
                       decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: _iconAccentOpacity),
+                        color:
+                            accentColor.withValues(alpha: _iconAccentOpacity),
                         borderRadius: BorderRadius.circular(_iconBoxRadius),
                       ),
                       child: Icon(icon, color: accentColor, size: _iconSize),
@@ -285,9 +290,9 @@ class _AppToastOverlay extends StatelessWidget {
                       child: Text(
                         message,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                     ),
                     if (actionLabel != null) ...[
