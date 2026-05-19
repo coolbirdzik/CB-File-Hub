@@ -112,7 +112,11 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
 
   @override
   void dispose() {
-    _closePanelOverlay();
+    // Remove the overlay entry directly without calling setState — the element
+    // is being unmounted so rebuilding is both unnecessary and illegal
+    // (_lifecycleState == defunct assertion in framework.dart:5340).
+    _panelOverlay?.remove();
+    _panelOverlay = null;
     _controller.removeListener(_onChanged);
     _pulseController.dispose();
     _glowController.dispose();

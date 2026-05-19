@@ -37,6 +37,51 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+/// Finder for the confirm/delete button in a confirmation dialog.
+///
+/// Matches any button widget (TextButton, ElevatedButton, FilledButton,
+/// OutlinedButton) whose visible label contains a delete/confirm word in
+/// English or Vietnamese. The DeleteConfirmationDialog uses TextButton with
+/// Vietnamese "Xóa" by default, so the regex must cover both.
+Finder _findDeleteConfirmButton() {
+  final pattern = RegExp(
+    r'^\s*(delete|remove|move to trash|confirm|xóa|xoá|chuyển vào thùng rác|xác nhận)\s*$',
+    caseSensitive: false,
+  );
+  return find.byWidgetPredicate((widget) {
+    if (widget is! ButtonStyleButton) return false;
+    final child = widget.child;
+    if (child is Text) {
+      return pattern.hasMatch(child.data ?? '');
+    }
+    return false;
+  });
+}
+
+/// Waits up to [timeout] for a delete confirmation dialog to appear, then
+/// taps its confirm button. Returns true if confirmed, false if no dialog
+/// appeared (caller may treat as already-confirmed in immediate-delete flow).
+///
+/// Polls every 200 ms because `pumpAndSettle` returns before async dialog
+/// route push completes when there are still active animations / timers in
+/// the tree (e.g. acrylic backdrop reapply, video thumbnail jobs).
+Future<bool> _confirmDeleteDialog(
+  E2ETester et, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final finder = _findDeleteConfirmButton();
+    if (finder.evaluate().isNotEmpty) {
+      await et.tap(finder.first, detail: 'confirm_delete_dialog');
+      await et.pumpAndSettle(const Duration(seconds: 3));
+      return true;
+    }
+    await et.pumpAndSettle(const Duration(milliseconds: 200));
+  }
+  return false;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -362,22 +407,11 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.delete);
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // A confirmation dialog should appear — find the confirm button
-        final dialogButton = find.byWidgetPredicate((widget) {
-          if (widget is ElevatedButton) {
-            final child = widget.child;
-            if (child is Text) {
-              return RegExp(r'delete|remove|move to trash|confirm',
-                      caseSensitive: false)
-                  .hasMatch(child.data ?? '');
-            }
-          }
-          return false;
-        });
-        if (dialogButton.evaluate().isNotEmpty) {
-          await et.tap(dialogButton.first, detail: 'confirm_delete_dialog');
-          await et.pumpAndSettle(const Duration(seconds: 3));
-        }
+        // A confirmation dialog should appear — find the confirm button.
+        // The DeleteConfirmationDialog uses TextButton with the localized
+        // "Xóa"/"Delete" label, so we use a shared helper that matches any
+        // ButtonStyleButton with delete/confirm text in EN+VI.
+        await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         expectFileRowAbsent(targetFile.path);
@@ -601,21 +635,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 2));
 
         // Handle confirmation dialog (same pattern as file delete test)
-        final dialogButton = find.byWidgetPredicate((widget) {
-          if (widget is ElevatedButton) {
-            final child = widget.child;
-            if (child is Text) {
-              return RegExp(r'delete|remove|move to trash|confirm',
-                      caseSensitive: false)
-                  .hasMatch(child.data ?? '');
-            }
-          }
-          return false;
-        });
-        if (dialogButton.evaluate().isNotEmpty) {
-          await et.tap(dialogButton.first, detail: 'confirm_delete_dialog');
-          await et.pumpAndSettle(const Duration(seconds: 3));
-        }
+        await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         expectFolderRowAbsent(targetFolder.path);
@@ -732,21 +752,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 2));
 
         // Handle confirmation dialog
-        final dialogButton = find.byWidgetPredicate((widget) {
-          if (widget is ElevatedButton) {
-            final child = widget.child;
-            if (child is Text) {
-              return RegExp(r'delete|remove|move to trash|confirm',
-                      caseSensitive: false)
-                  .hasMatch(child.data ?? '');
-            }
-          }
-          return false;
-        });
-        if (dialogButton.evaluate().isNotEmpty) {
-          await et.tap(dialogButton.first, detail: 'confirm_delete_dialog');
-          await et.pumpAndSettle(const Duration(seconds: 3));
-        }
+        await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         // Verify all files are gone

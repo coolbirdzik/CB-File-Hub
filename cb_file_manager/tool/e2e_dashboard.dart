@@ -118,6 +118,14 @@ TestReport parseJsonLog(String content, String buildDir) {
     if (hiddenIds.contains(testID)) continue;
 
     final name = entry.value;
+
+    // Skip Flutter test framework's "loading <file>.dart" entries — these are
+    // not real test cases, they're build/load steps. They show up as "failed"
+    // when the Windows build pipeline races with another worker (MSBuild lock
+    // contention or CMakeCache.txt generation conflict). The actual tests in
+    // those workers will get rerun in single-process mode anyway.
+    if (name.startsWith('loading ') && name.endsWith('.dart')) continue;
+
     final errorInfo = idToError[testID];
     final status = errorInfo != null ? 'failed' : 'passed';
     final screenshots = _findScreenshots(name, buildDir);

@@ -457,17 +457,37 @@ Future<void> tapDialogCancel(WidgetTester tester) async {
 /// Pass the button text to disambiguate when multiple TextButtons are present.
 Future<void> tapDialogConfirm(WidgetTester tester, {String? buttonText}) async {
   if (kDebugMode) {
-    debugPrint('[E2E] tapDialogConfirm: tapping confirm button');
+    debugPrint('[E2E] tapDialogConfirm: tapping confirm button '
+        '${buttonText != null ? '"$buttonText"' : '(last button)'}');
   }
   final Finder confirmFinder;
   if (buttonText != null) {
-    // The Delete confirmation dialog uses ElevatedButton for confirm,
-    // TextButton for cancel. Use byType to find the right widget.
-    if (buttonText.toLowerCase() == 'delete') {
-      confirmFinder = find.widgetWithText(ElevatedButton, buttonText);
-    } else {
-      confirmFinder = find.widgetWithText(TextButton, buttonText);
-    }
+    // Match any ButtonStyleButton (TextButton, ElevatedButton, FilledButton,
+    // OutlinedButton) whose label contains the requested text in either
+    // English or Vietnamese. The DeleteConfirmationDialog uses TextButton
+    // with localized text — older tests assumed ElevatedButton, which fails
+    // when running with the Vietnamese locale (default).
+    final wantedLower = buttonText.toLowerCase();
+    final viAliases = <String, List<String>>{
+      'delete': ['xóa', 'xoá', 'chuyển vào thùng rác'],
+      'remove': ['xóa', 'xoá'],
+      'confirm': ['xác nhận', 'đồng ý'],
+      'ok': ['đồng ý'],
+      'cancel': ['hủy', 'huỷ'],
+    };
+    final candidates = <String>{
+      buttonText,
+      ...?viAliases[wantedLower],
+    };
+    confirmFinder = find.byWidgetPredicate((widget) {
+      if (widget is! ButtonStyleButton) return false;
+      final child = widget.child;
+      if (child is Text) {
+        final label = (child.data ?? '').trim().toLowerCase();
+        return candidates.any((c) => label == c.toLowerCase());
+      }
+      return false;
+    });
   } else {
     // Fall back to last TextButton in the dialog (usually Cancel)
     confirmFinder = find.byType(TextButton);

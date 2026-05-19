@@ -242,7 +242,11 @@ class _TabMainScreenState extends State<TabMainScreen> {
     _operationProgressOverlayEntry = null;
     unawaited(_desktopWindowing?.dispose());
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      unawaited(locator<DesktopAppIconProgressService>().stop());
+      // Guard against locator already being reset during E2E teardown — the
+      // widget tree can still be unmounting when locator.reset() completes.
+      try {
+        unawaited(locator<DesktopAppIconProgressService>().stop());
+      } catch (_) {}
     }
     _tabManagerBloc.close();
     _networkBrowsingBloc.close();
