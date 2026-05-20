@@ -1046,6 +1046,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             currentFilter: _currentFilter,
             gridCrossAxisCount: _gridCrossAxisCount,
             onBackInTabHistory: () {
+              if (!mounted) return;
               final tabManagerBloc = context.read<TabManagerBloc>();
               if (tabManagerBloc.canTabNavigateBack(widget.tabId)) {
                 tabManagerBloc.backNavigationToPath(widget.tabId);

@@ -7,7 +7,7 @@ This is **not** a standard single-package Flutter app. The repo root is a worksp
 ```
 cb_file_manager/   ← main Flutter app (all flutter/dart commands run here)
 mobile_smb_native/ ← local FFI plugin (SMB/CIFS via libsmb2, path dependency)
-Makefile           ← primary build orchestrator (requires Git Bash on Windows)
+justfile           ← primary build orchestrator (uses `just` command runner, requires Git Bash on Windows)
 scripts/           ← build, version, and CI helper scripts (bash)
 installer/         ← Windows installer configs (Inno Setup, WiX)
 ```
@@ -20,22 +20,32 @@ Pinned to **3.41.5 stable** (`build.config`, CI workflows). Use this exact versi
 
 ## Developer commands
 
-Run from repo root via Makefile (requires Git Bash on Windows):
+Run from repo root via `just` (requires Git Bash on Windows):
 
 | Task | Command |
 |------|---------|
-| Install deps | `make deps` |
-| Unit/widget tests | `make dev-test mode=unit` |
-| E2E tests (parallel) | `make dev-test mode=e2e` |
-| E2E single suite | `make dev-test mode=e2e TEST=Navigation` |
-| E2E single file | `make dev-test mode=e2e TEST_FILE=video_thumbnails_e2e_test` |
-| Rerun failed E2E only | `make dev-test mode=e2e RERUN=1` |
-| E2E plain output (debug) | `make dev-test-e2e-only` |
-| Analyze | `make analyze` |
-| Format | `make format` |
-| Format + analyze | `make verify` |
-| Clean | `make clean` |
-| Deep clean (rebuild) | `make deep-clean` then `make deps` |
+| Show all recipes | `just` |
+| Install deps | `just deps` |
+| Unit/widget tests | `just test` |
+| E2E tests (parallel) | `just e2e-parallel` |
+| E2E single suite | `just e2e Navigation` |
+| E2E single test by name | `just e2e "navigate back to parent with Backspace"` |
+| E2E single file | `just e2e-file video_thumbnails_e2e_test` |
+| Rerun failed E2E only | `just e2e-failed` |
+| E2E plain output (debug) | `just e2e-plain` |
+| E2E serial (debug order) | `just e2e-serial` |
+| List all E2E test names | `just e2e-list` |
+| Analyze | `just analyze` |
+| Format | `just format` |
+| Format + analyze | `just verify` |
+| Clean | `just clean` |
+| Deep clean (rebuild) | `just deep-clean` then `just deps` |
+| Kill stray E2E processes | `just kill-e2e` |
+| Open dashboard | `just dashboard` |
+
+E2E parallel defaults to half the CPU cores (clamped 2..6). Override via:
+- `just e2e-parallel "" 4` (positional arg)
+- `CB_E2E_MAX_PARALLEL=4 just e2e-parallel` (env var)
 
 Or run Flutter directly from `cb_file_manager/`:
 
@@ -50,7 +60,7 @@ flutter test integration_test -d windows --dart-define=CB_E2E=true  # E2E
 
 ## CI pipeline order
 
-CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Match this locally with `make verify` before pushing.
+CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Match this locally with `just verify` before pushing.
 
 ## Architecture notes
 
@@ -81,12 +91,12 @@ Passed via `--dart-define=FLAG=value`:
 
 ## Windows build gotchas
 
-- If Windows build fails with `MSB3073` / `cmake_install` / `INSTALL.vcxproj`: run `make dev-test-e2e-clean` (or `make deep-clean && make deps`).
+- If Windows build fails with `MSB3073` / `cmake_install` / `INSTALL.vcxproj`: run `just e2e-clean` (or `just deep-clean` then `just deps`).
 - The `scripts/build.sh` auto-retries CMake race conditions and patches pdfx CMake compatibility.
 - MSI builds require WiX Toolset. MSIX signing requires `MSIX_CERT_BASE64` and `MSIX_CERT_PASSWORD` secrets.
 
 ## Release workflow
 
-- Version lives in `cb_file_manager/pubspec.yaml`. Use `make release-patch`, `release-minor`, or `release-major`.
+- Version lives in `cb_file_manager/pubspec.yaml`. Use `just release-patch`, `just release-minor`, or `just release-major`.
 - Tags matching `v*.*.*` trigger the release CI pipeline (GitHub Actions + GitLab CI).
 - Build number is auto-incremented in CI.

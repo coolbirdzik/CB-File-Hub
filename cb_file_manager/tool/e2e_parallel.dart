@@ -59,8 +59,17 @@ Future<void> main(List<String> args) async {
   final fullStartup = args.contains('--full-startup');
   final fullScreenshots = args.contains('--full-screenshots');
 
-  int maxParallel =
-      Platform.numberOfProcessors < 2 ? Platform.numberOfProcessors : 2;
+  // Default to half the CPU cores (clamped 2..6) — Windows desktop builds are
+  // I/O heavy (MSBuild + flutter assemble), so going wider than 6 usually
+  // saturates disk + RAM with little wall-clock benefit on top of the build
+  // cache warmup that happens before the parallel fan-out.
+  // Override via `--max-parallel N` or env `CB_E2E_MAX_PARALLEL=N`.
+  int maxParallel = _defaultMaxParallel();
+  final envMp = Platform.environment['CB_E2E_MAX_PARALLEL'];
+  if (envMp != null) {
+    final parsed = int.tryParse(envMp);
+    if (parsed != null && parsed > 0) maxParallel = parsed;
+  }
   final mpIdx = args.indexOf('--max-parallel');
   if (mpIdx >= 0 && mpIdx + 1 < args.length) {
     maxParallel = int.tryParse(args[mpIdx + 1]) ?? maxParallel;
@@ -231,9 +240,6 @@ Future<void> main(List<String> args) async {
   // ---- Extract test results from merged JSONL for screenshot HTML ----
   print('\n[Parallel E2E] Extracting test results...');
   await _writeScreenshotResultsJson(_kMergedJsonl);
-
-  // ---- Update screenshot HTML with embedded results (CORS workaround) ----
-  await _updateScreenshotHtmlWithResults();
 
   // ---- Save failed groups for RERUN ----
   await _saveFailedGroupsFromMerged(_kMergedJsonl);
@@ -771,12 +777,28 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
   final reportDir = Directory('build/e2e_report');
   if (!await reportDir.exists()) await reportDir.create(recursive: true);
   final resultsFile = File('${reportDir.path}/results.json');
-  final entries = strippedResults.entries
-      .map((e) => '  "${_esc(e.key)}": ${e.value}')
-      .join(',\n');
+
+  // Merge with existing results.json so partial reruns don't drop other tests
+  final merged = <String, bool>{};
+  if (await resultsFile.exists()) {
+    try {
+      final existing = jsonDecode(await resultsFile.readAsString());
+      if (existing is Map) {
+        for (final entry in existing.entries) {
+          final key = entry.key;
+          final val = entry.value;
+          if (key is String && val is bool) merged[key] = val;
+        }
+      }
+    } catch (_) {}
+  }
+  merged.addAll(strippedResults);
+
+  final entries =
+      merged.entries.map((e) => '  "${_esc(e.key)}": ${e.value}').join(',\n');
   await resultsFile.writeAsString('{\n$entries\n}');
-  print(
-      '[Parallel E2E] Wrote ${strippedResults.length} test results → results.json');
+  print('[Parallel E2E] Wrote ${merged.length} test results → results.json '
+      '(${strippedResults.length} fresh, ${merged.length - strippedResults.length} preserved)');
 }
 
 String _esc(String s) => s
@@ -785,35 +807,6 @@ String _esc(String s) => s
     .replaceAll('\n', '\\n')
     .replaceAll('\r', '\\r')
     .replaceAll('\t', '\\t');
-
-/// Updates the screenshot HTML to embed test results directly (CORS workaround).
-/// Browsers block fetch() on file:// URLs, so we inject results into the HTML.
-Future<void> _updateScreenshotHtmlWithResults() async {
-  final htmlFile = File('build/e2e_report/report.html');
-  final jsonFile = File('build/e2e_report/results.json');
-
-  if (!await htmlFile.exists() || !await jsonFile.exists()) {
-    print('[Parallel E2E] Skipping HTML update - files not found');
-    return;
-  }
-
-  final html = await htmlFile.readAsString();
-  final jsonContent = await jsonFile.readAsString();
-
-  // Replace the embedded _testResults variable with actual data
-  // Look for: const _testResults = {...};
-  final pattern = RegExp(r'const _testResults = \{[^}]*\};');
-  final replacement = 'const _testResults = $jsonContent;';
-
-  if (!pattern.hasMatch(html)) {
-    print('[Parallel E2E] Warning: Could not find _testResults in HTML');
-    return;
-  }
-
-  final updatedHtml = html.replaceFirst(pattern, replacement);
-  await htmlFile.writeAsString(updatedHtml);
-  print('[Parallel E2E] Updated screenshot HTML with embedded test results');
-}
 
 // ---------------------------------------------------------------------------
 // Count helpers
@@ -885,6 +878,19 @@ void _printSummary(Map<String, _WorkerResult> results) {
 // ---------------------------------------------------------------------------
 // Cleanup: kill all test processes after run
 // ---------------------------------------------------------------------------
+
+/// Picks a sensible default for parallel worker count based on CPU cores.
+/// Half the cores, clamped to [2, 6] — Windows desktop builds are I/O heavy
+/// (MSBuild + flutter assemble) so going wider rarely pays off, and very few
+/// cores would get hammered by even 2 workers.
+int _defaultMaxParallel() {
+  final cores = Platform.numberOfProcessors;
+  if (cores <= 2) return cores < 1 ? 1 : cores;
+  final half = (cores / 2).floor();
+  if (half < 2) return 2;
+  if (half > 6) return 6;
+  return half;
+}
 
 /// Kills all cb_file_hub.exe and flutter test processes.
 /// Called after the run completes (success or failure) to ensure no stray
@@ -981,10 +987,9 @@ void _printDryRun() {
   }
   print('');
   print('[Dry run] Device: ${Platform.environment['E2E_DEVICE'] ?? 'windows'}');
-  final defaultWorkers =
-      Platform.numberOfProcessors < 4 ? Platform.numberOfProcessors : 4;
   print('[Dry run] CPU cores: ${Platform.numberOfProcessors}');
-  print('[Dry run] Default max parallel: $defaultWorkers');
+  print('[Dry run] Default max parallel: ${_defaultMaxParallel()} '
+      '(override with --max-parallel N or env CB_E2E_MAX_PARALLEL=N)');
 }
 
 // ---------------------------------------------------------------------------

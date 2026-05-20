@@ -113,14 +113,12 @@ e2e suite="" full_startup="false" full_screenshots="false" no_open="false": kill
     cd {{project_dir}} && {{flutter}} test integration_test/app_e2e_test.dart --no-pub -d {{e2e_device}} --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST={{ if full_startup == "true" { "false" } else { "true" } }} --dart-define=CB_E2E_FULL_SCREENSHOTS={{full_screenshots}} --reporter {{test_reporter}} --file-reporter json:build/e2e_report.jsonl {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} || true
     cd {{project_dir}} && dart run tool/e2e_dashboard.dart --build-dir build
     @echo ""
-    @echo "Dashboard:   file://$(pwd)/{{project_dir}}/build/e2e_dashboard/index.html"
-    @echo "Screenshots: file://$(pwd)/{{project_dir}}/build/e2e_report/report.html"
+    @echo "Dashboard: file://$(pwd)/{{project_dir}}/build/e2e_dashboard/index.html"
     {{ if no_open != "true" { "just _open-dashboard" } else { "true" } }}
 
 # Open the dashboard in default browser (cross-platform)
 dashboard: _open-dashboard
-    @echo "Dashboard:   file://$(pwd)/{{project_dir}}/build/e2e_dashboard/index.html"
-    @echo "Screenshots: file://$(pwd)/{{project_dir}}/build/e2e_report/report.html"
+    @echo "Dashboard: file://$(pwd)/{{project_dir}}/build/e2e_dashboard/index.html"
 
 # List all available E2E test cases (group + test name).
 # Use the printed names with `just e2e "<name>"` to run specific tests.
@@ -135,6 +133,9 @@ _open-dashboard:
     @cmd.exe //c start "" "{{project_dir}}\\build\\e2e_dashboard\\index.html" 2>/dev/null || xdg-open "{{project_dir}}/build/e2e_dashboard/index.html" 2>/dev/null || open "{{project_dir}}/build/e2e_dashboard/index.html" 2>/dev/null || true
 
 # E2E parallel runner + dashboard (full run)
+# Default workers = half the CPU cores (clamped 2..6). Override via:
+#   - args: just e2e-parallel "" 4
+#   - env:  CB_E2E_MAX_PARALLEL=4 just e2e-parallel
 # Options: just e2e-parallel Navigation  |  just e2e-parallel "" 4 true true true
 e2e-parallel suite="" max_parallel="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-e2e
     cd {{project_dir}} && dart run tool/e2e_parallel.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if max_parallel != "" { "--max-parallel " + max_parallel } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}

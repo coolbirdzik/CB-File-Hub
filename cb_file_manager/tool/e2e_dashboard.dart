@@ -1,20 +1,27 @@
-// Generates a self-contained HTML E2E test dashboard from flutter --reporter json output.
+// Generates a unified HTML E2E test dashboard.
 // Pure Dart — no npm / Node.js required.
 //
-// Flow (called by e2e_allure.dart after test run):
-//   1. Read build/e2e_report.jsonl
-//   2. Parse test results (name, status, error, duration)
-//   3. Copy screenshots into build/e2e_dashboard/screenshots/
-//   4. Write build/e2e_dashboard/index.html
+// One self-contained page combining:
+//   - Pass/fail summary cards + pass rate bar
+//   - Search + status filter
+//   - Suite-grouped test list with collapsible details
+//   - Full screenshot gallery per test (each step with lightbox + thumbnails)
+//   - Failure error message + stack trace
+//
+// Sources merged on every run:
+//   - build/e2e_report.jsonl                   (Flutter --reporter json)
+//   - build/e2e_report/manifest.json           (E2ETester step-by-step screenshots)
+//   - build/e2e_dashboard/state.json           (persisted history across runs)
+//
+// Output:
+//   cb_file_manager/build/e2e_dashboard/
+//     index.html          ← unified dashboard (open in any browser)
+//     screenshots/        ← copied screenshot images
+//     state.json          ← persisted test history (don't edit by hand)
 //
 // Usage (from cb_file_manager):
 //   dart run tool/e2e_dashboard.dart
 //   dart run tool/e2e_dashboard.dart --build-dir build
-//
-// Output:
-//   cb_file_manager/build/e2e_dashboard/
-//     index.html          ← self-contained dashboard (open in any browser)
-//     screenshots/       ← copied failure screenshots
 
 import 'dart:convert';
 import 'dart:io';
@@ -22,28 +29,99 @@ import 'dart:io';
 const _kDefaultBuildDir = 'build';
 const _kReportFile = 'e2e_report.jsonl';
 const _kDashboardDir = 'e2e_dashboard';
+const _kStateFile = 'state.json';
 
 // ---------------------------------------------------------------------------
 // Data model
 // ---------------------------------------------------------------------------
+
+/// A single screenshot captured during a test step.
+class Shot {
+  /// Filename only (no directory). Lives in
+  /// `build/e2e_report/screenshots/<filename>`.
+  final String filename;
+
+  /// Human-readable step label, e.g. `"00_initial"`, `"result"`,
+  /// `"tap_002_save"`.
+  final String step;
+
+  /// When the screenshot was captured.
+  final DateTime ts;
+
+  Shot({required this.filename, required this.step, required this.ts});
+
+  Map<String, dynamic> toJson() => {
+        'filename': filename,
+        'step': step,
+        'ts': ts.toIso8601String(),
+      };
+
+  static Shot fromJson(Map<String, dynamic> j) => Shot(
+        filename: j['filename'] as String,
+        step: j['step'] as String? ?? '',
+        ts: DateTime.tryParse(j['ts'] as String? ?? '') ?? DateTime.now(),
+      );
+}
 
 class TestResult {
   final String name;
   final String status; // passed | failed | skipped | error
   final String? error;
   final String? stackTrace;
-  final List<String> screenshots;
+  final List<Shot> shots;
+  final DateTime updatedAt;
 
   TestResult({
     required this.name,
     required this.status,
     this.error,
     this.stackTrace,
-    this.screenshots = const [],
-  });
+    this.shots = const [],
+    DateTime? updatedAt,
+  }) : updatedAt = updatedAt ?? DateTime.now();
 
   bool get isPassed => status == 'passed' || status == 'success';
   bool get isFailed => status == 'failed' || status == 'error';
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'status': status,
+        if (error != null) 'error': error,
+        if (stackTrace != null) 'stackTrace': stackTrace,
+        'shots': shots.map((s) => s.toJson()).toList(),
+        'updatedAt': updatedAt.toIso8601String(),
+      };
+
+  static TestResult fromJson(Map<String, dynamic> j) {
+    // Back-compat with old `screenshots: [filename, ...]` format.
+    final List<Shot> shots;
+    final shotsRaw = j['shots'];
+    if (shotsRaw is List) {
+      shots = shotsRaw
+          .whereType<Map>()
+          .map((m) => Shot.fromJson(m.cast<String, dynamic>()))
+          .toList();
+    } else {
+      final legacy = j['screenshots'];
+      if (legacy is List) {
+        shots = legacy
+            .whereType<String>()
+            .map((f) => Shot(filename: f, step: '', ts: DateTime.now()))
+            .toList();
+      } else {
+        shots = const [];
+      }
+    }
+    return TestResult(
+      name: j['name'] as String,
+      status: j['status'] as String? ?? 'passed',
+      error: j['error'] as String?,
+      stackTrace: j['stackTrace'] as String?,
+      shots: shots,
+      updatedAt:
+          DateTime.tryParse(j['updatedAt'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
 }
 
 class TestReport {
@@ -64,7 +142,11 @@ class TestReport {
 // JSON parser
 // ---------------------------------------------------------------------------
 
-TestReport parseJsonLog(String content, String buildDir) {
+TestReport parseJsonLog(
+  String content,
+  String buildDir,
+  Map<String, List<Shot>> manifestShots,
+) {
   final idToName = <int, String>{};
   final idToError = <int, _ErrorInfo>{};
   final hiddenIds = <int>{};
@@ -128,14 +210,14 @@ TestReport parseJsonLog(String content, String buildDir) {
 
     final errorInfo = idToError[testID];
     final status = errorInfo != null ? 'failed' : 'passed';
-    final screenshots = _findScreenshots(name, buildDir);
+    final shots = _shotsForTest(name, manifestShots, buildDir);
 
     results.add(TestResult(
       name: name,
       status: status,
       error: errorInfo?.message,
       stackTrace: errorInfo?.trace,
-      screenshots: screenshots,
+      shots: shots,
     ));
   }
 
@@ -153,81 +235,191 @@ String _firstLine(String s) {
   return idx >= 0 ? s.substring(0, idx) : s;
 }
 
-List<String> _findScreenshots(String testName, String buildDir) {
-  // Scan actual screenshots in build dir — don't guess filenames
-  final buildPath = Directory(buildDir);
-  if (!buildPath.existsSync()) return [];
+// ---------------------------------------------------------------------------
+// Manifest loader — reads build/e2e_report/manifest.json (written by
+// integration_test/e2e_report.dart) so we get exact step labels per shot.
+// ---------------------------------------------------------------------------
 
-  final screenshots = <String>[];
+Future<Map<String, List<Shot>>> _loadManifestShots(String buildDir) async {
+  final out = <String, List<Shot>>{};
+  final manifestFile = File('$buildDir/e2e_report/manifest.json');
+  if (!await manifestFile.exists()) return out;
   try {
-    for (final entity in buildPath.listSync()) {
-      if (entity is File && entity.path.toLowerCase().endsWith('.png')) {
-        screenshots.add(entity.path.split(Platform.pathSeparator).last);
-      }
+    final decoded = jsonDecode(await manifestFile.readAsString());
+    if (decoded is! Map) return out;
+    final entries = decoded['entries'];
+    if (entries is! List) return out;
+    for (final raw in entries) {
+      if (raw is! Map) continue;
+      final tn = raw['testName'] as String?;
+      final step = raw['step'] as String? ?? '';
+      final filename = raw['filename'] as String?;
+      final tsStr = raw['ts'] as String?;
+      if (tn == null || filename == null) continue;
+      out.putIfAbsent(tn, () => []).add(Shot(
+            filename: filename,
+            step: step,
+            ts: DateTime.tryParse(tsStr ?? '') ?? DateTime.now(),
+          ));
+    }
+    // Sort each test's shots by capture timestamp.
+    for (final list in out.values) {
+      list.sort((a, b) => a.ts.compareTo(b.ts));
     }
   } catch (_) {}
+  return out;
+}
 
-  if (screenshots.isEmpty) return [];
+/// Looks up shots for [testName]: prefers the manifest (exact mapping),
+/// falls back to filename-slug scanning so old runs without a manifest still
+/// show something.
+List<Shot> _shotsForTest(
+  String testName,
+  Map<String, List<Shot>> manifestShots,
+  String buildDir,
+) {
+  final fromManifest = manifestShots[testName];
+  if (fromManifest != null && fromManifest.isNotEmpty) return fromManifest;
 
-  // Match screenshot to test by checking if test name keywords appear in filename
-  final keywords = testName
-      .toLowerCase()
-      .split(RegExp(r'\s+'))
-      .where((w) => w.length > 3 && !_stopWords.contains(w))
-      .toList();
+  // Fallback: scan disk for files whose name contains the slug.
+  // E2ETester writes filenames like:
+  //   001_<slug>_00_initial.png
+  //   002_<slug>_result.png
+  // where <slug> is built from the label passed to et.init() — which is the
+  // test name WITHOUT the group() prefix. We try the full name first, then
+  // fall back to the name with the suite prefix stripped.
+  final slugFull = _slugify(testName);
+  final suite = _inferSuite(testName);
+  final stripped = testName.startsWith('$suite ')
+      ? testName.substring(suite.length + 1)
+      : testName;
+  final slugStripped = _slugify(stripped);
+  final slugs = <String>{
+    if (slugStripped.isNotEmpty) slugStripped,
+    if (slugFull.isNotEmpty) slugFull,
+  };
+  if (slugs.isEmpty) return const [];
 
-  // Try each screenshot and score by keyword matches
-  final candidates = <_SsCandidate>[];
-
-  for (final ss in screenshots) {
-    final ssLower = ss.toLowerCase();
-    // Prioritize _failure screenshots for failed tests
-    if (!ssLower.contains('failure') && !ssLower.contains('error')) continue;
-
-    int score = 0;
-    for (final kw in keywords) {
-      if (ssLower.contains(kw)) score++;
-    }
-    if (score > 0) candidates.add(_SsCandidate(ss, score));
+  final candidates = <String>[];
+  final dirs = <Directory>[
+    Directory('$buildDir/e2e_report/screenshots'),
+    Directory(buildDir),
+  ];
+  for (final d in dirs) {
+    if (!d.existsSync()) continue;
+    try {
+      for (final entity in d.listSync()) {
+        if (entity is! File) continue;
+        final name = entity.path.split(Platform.pathSeparator).last;
+        final lower = name.toLowerCase();
+        if (!lower.endsWith('.png')) continue;
+        if (slugs.any(lower.contains)) candidates.add(name);
+      }
+      if (candidates.isNotEmpty) break;
+    } catch (_) {}
   }
 
-  // Sort by score descending
-  candidates.sort((a, b) => b.score - a.score);
+  candidates.sort((a, b) {
+    final ai = int.tryParse(a.split('_').first) ?? 0;
+    final bi = int.tryParse(b.split('_').first) ?? 0;
+    return ai.compareTo(bi);
+  });
 
-  return candidates.map((c) => c.name).toList();
+  // Use the longest matching slug for stripping the human-readable step label.
+  final bestSlug = slugs.reduce((a, b) => a.length >= b.length ? a : b);
+  return candidates
+      .map((f) => Shot(
+            filename: f,
+            step: _stepFromFilename(f, bestSlug),
+            ts: DateTime.now(),
+          ))
+      .toList();
 }
 
-class _SsCandidate {
-  final String name;
-  final int score;
-  _SsCandidate(this.name, this.score);
+/// Tries to recover a human-readable step label from a fallback filename.
+/// E.g. `"002_my_test_result.png"` with slug `"my_test"` -> `"result"`.
+String _stepFromFilename(String filename, String slug) {
+  var name = filename;
+  if (name.toLowerCase().endsWith('.png')) {
+    name = name.substring(0, name.length - 4);
+  }
+  // Strip leading "NNN_"
+  final firstUnderscore = name.indexOf('_');
+  if (firstUnderscore > 0 &&
+      int.tryParse(name.substring(0, firstUnderscore)) != null) {
+    name = name.substring(firstUnderscore + 1);
+  }
+  // Strip slug prefix
+  if (name.toLowerCase().startsWith(slug)) {
+    name = name.substring(slug.length);
+    if (name.startsWith('_')) name = name.substring(1);
+  }
+  return name.isEmpty ? 'screenshot' : name;
 }
 
-const _stopWords = {
-  'the',
-  'and',
-  'for',
-  'via',
-  'with',
-  'from',
-  'that',
-  'this',
-  'into',
-  'file',
-  'right'
-};
+String _slugify(String s) => s
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+    .replaceAll(RegExp(r'^_+|_+$'), '');
 
 // ---------------------------------------------------------------------------
-// HTML generator
+// Persisted state — keeps full test history across partial reruns so the
+// dashboard doesn't lose passed cases when only a few are rerun.
 // ---------------------------------------------------------------------------
 
-String generateHtml(TestReport report, String screenshotsDir) {
+Future<Map<String, TestResult>> _loadPersistedState(String dashboardDir) async {
+  final stateFile = File('$dashboardDir/$_kStateFile');
+  if (!await stateFile.exists()) return {};
+  try {
+    final content = await stateFile.readAsString();
+    if (content.trim().isEmpty) return {};
+    final decoded = jsonDecode(content);
+    if (decoded is! Map) return {};
+    final tests = decoded['tests'];
+    if (tests is! List) return {};
+    final out = <String, TestResult>{};
+    for (final t in tests) {
+      if (t is! Map) continue;
+      final tr = TestResult.fromJson(t.cast<String, dynamic>());
+      out[tr.name] = tr;
+    }
+    return out;
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> _savePersistedState(
+    String dashboardDir, Map<String, TestResult> tests) async {
+  final stateFile = File('$dashboardDir/$_kStateFile');
+  await stateFile.parent.create(recursive: true);
+  final body = {
+    'tests': tests.values.map((t) => t.toJson()).toList(),
+    'updatedAt': DateTime.now().toIso8601String(),
+  };
+  await stateFile.writeAsString(jsonEncode(body));
+}
+
+/// Merges fresh test results from this run into the persisted state.
+/// New results overwrite the previous entry for the same test name; tests
+/// that didn't run this time keep their previous status.
+Map<String, TestResult> _mergeResults(
+  Map<String, TestResult> persisted,
+  List<TestResult> fresh,
+) {
+  final out = Map<String, TestResult>.from(persisted);
+  for (final t in fresh) {
+    out[t.name] = t;
+  }
+  return out;
+}
+
+String generateHtml(TestReport report) {
   final passed = report.passed;
   final failed = report.failed;
   final total = report.total;
   final passRate = report.passRate;
-
-  final passColor = passed == total ? '#22c55e' : '#eab308';
+  final passColor = failed == 0 ? '#22c55e' : '#eab308';
 
   // Group tests by suite
   final Map<String, List<TestResult>> suiteGroups = {};
@@ -236,7 +428,12 @@ String generateHtml(TestReport report, String screenshotsDir) {
     suiteGroups.putIfAbsent(suite, () => []).add(t);
   }
 
-  // Build suite sections with collapsible <details>
+  // Build all-shots index for the lightbox: each entry = {test, step, src}.
+  // We render this as JSON so the lightbox can navigate across all shots
+  // without re-querying the DOM on every keypress.
+  final allShots = <Map<String, String>>[];
+
+  // Build suite sections
   final suiteSections = StringBuffer();
   for (final entry in suiteGroups.entries) {
     final suiteName = entry.key;
@@ -244,54 +441,94 @@ String generateHtml(TestReport report, String screenshotsDir) {
     final suitePassed = tests.where((t) => t.isPassed).length;
     final suiteTotal = tests.length;
     final suiteFailed = suiteTotal - suitePassed;
-    final allPassed = suitePassed == suiteTotal;
+    final allPassed = suiteFailed == 0;
 
     final statusClass = allPassed ? 'all-pass' : 'has-fail';
-    final statsText = suiteFailed > 0
-        ? '$suitePassed/$suiteTotal passed'
-        : '$suiteTotal/$suiteTotal passed';
+    final statsText = '$suitePassed/$suiteTotal';
+    final rateText =
+        suiteTotal > 0 ? '${(suitePassed / suiteTotal * 100).round()}%' : '-';
 
     suiteSections.writeln('<details class="suite-group" open>');
     suiteSections.writeln('<summary class="suite-header $statusClass">');
     suiteSections.writeln('<span class="suite-chevron">▶</span>');
     suiteSections
         .writeln('<span class="suite-name">${_escapeHtml(suiteName)}</span>');
-    suiteSections.writeln('<span class="suite-stats">$statsText</span>');
+    suiteSections.writeln(
+        '<span class="suite-stats">$statsText &middot; $rateText</span>');
     suiteSections.writeln('</summary>');
     suiteSections.writeln('<div class="suite-tests">');
 
     for (final t in tests) {
-      final badge = t.isPassed
-          ? '<span class="badge pass">PASSED</span>'
-          : '<span class="badge fail">FAILED</span>';
-
-      // Strip group prefix from display name for cleaner look
+      // Strip group prefix from display name for cleaner look.
       var displayName = t.name;
       if (displayName.startsWith('$suiteName ')) {
         displayName = displayName.substring(suiteName.length + 1);
       }
 
-      final expandBtn = t.isFailed
-          ? '<button class="expand-btn" onclick="toggleDetail(this)">Details</button>'
+      final badge = t.isPassed
+          ? '<span class="badge pass">PASSED</span>'
+          : '<span class="badge fail">FAILED</span>';
+      final shotCountBadge = t.shots.isNotEmpty
+          ? '<span class="shot-count">${t.shots.length} shot${t.shots.length == 1 ? '' : 's'}</span>'
           : '';
 
-      final errorSection = t.isFailed && t.error != null
-          ? '''
-      <div class="error-section">
-        <div class="error-msg">${_escapeHtml(t.error ?? '')}</div>
-        ${t.screenshots.isNotEmpty ? t.screenshots.map((s) => '<div class="screenshot-wrap"><img src="$screenshotsDir/$s" alt="failure screenshot" onclick="window.open(this.src)" title="Click to enlarge"/></div>').join('\n') : ''}
-      </div>'''
+      final hasContent = t.shots.isNotEmpty || (t.isFailed && t.error != null);
+
+      // Inline gallery
+      final galleryBuf = StringBuffer();
+      if (t.shots.isNotEmpty) {
+        galleryBuf.writeln('<div class="gallery">');
+        for (final shot in t.shots) {
+          final globalIdx = allShots.length;
+          allShots.add({
+            'test': t.name,
+            'step': shot.step,
+            'src': 'screenshots/${shot.filename}',
+          });
+          galleryBuf.writeln('<figure class="thumb" '
+              'onclick="lbOpen($globalIdx)" '
+              'title="${_escapeHtml(shot.step)}">');
+          galleryBuf
+              .writeln('<img src="screenshots/${_escapeHtml(shot.filename)}" '
+                  'alt="${_escapeHtml(shot.step)}" loading="lazy">');
+          galleryBuf.writeln(
+              '<figcaption>${_escapeHtml(shot.step.isEmpty ? 'screenshot' : shot.step)}</figcaption>');
+          galleryBuf.writeln('</figure>');
+        }
+        galleryBuf.writeln('</div>');
+      }
+
+      final errorBlock = t.isFailed && t.error != null
+          ? '<div class="error-msg">${_escapeHtml(t.error ?? '')}</div>'
           : '';
 
-      suiteSections.writeln('''
-    <div class="test-item ${t.isPassed ? 'passed' : 'failed'}">
-      <div class="test-header" ${t.isFailed ? 'onclick="toggleDetail(this.querySelector(\'.expand-btn\') || this)"' : ''}>
+      final detailsAttr = hasContent ? 'open' : '';
+
+      if (hasContent) {
+        suiteSections.writeln('''
+    <details class="test-item ${t.isPassed ? 'passed' : 'failed'}" data-status="${t.isPassed ? 'passed' : 'failed'}" data-search="${_escapeHtml(t.name.toLowerCase())}" $detailsAttr>
+      <summary class="test-header">
+        <span class="test-chevron">▶</span>
+        <span class="test-name">${_escapeHtml(displayName)}</span>
+        $shotCountBadge
+        $badge
+      </summary>
+      <div class="test-body">
+        $errorBlock
+        ${galleryBuf.toString()}
+      </div>
+    </details>''');
+      } else {
+        // No shots and no error — render as a non-collapsible row.
+        suiteSections.writeln('''
+    <div class="test-item ${t.isPassed ? 'passed' : 'failed'} no-detail" data-status="${t.isPassed ? 'passed' : 'failed'}" data-search="${_escapeHtml(t.name.toLowerCase())}">
+      <div class="test-header">
+        <span class="test-chevron empty"></span>
         <span class="test-name">${_escapeHtml(displayName)}</span>
         $badge
-        $expandBtn
       </div>
-      $errorSection
     </div>''');
+      }
     }
 
     suiteSections.writeln('</div>'); // .suite-tests
@@ -300,6 +537,7 @@ String generateHtml(TestReport report, String screenshotsDir) {
 
   final timestamp =
       report.generatedAt.toLocal().toString().replaceAll('.000', '');
+  final shotsJson = jsonEncode(allShots);
 
   return '''<!DOCTYPE html>
 <html lang="en">
@@ -309,101 +547,55 @@ String generateHtml(TestReport report, String screenshotsDir) {
 <title>E2E Test Dashboard</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    min-height: 100vh;
-    padding: 2rem;
+    background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 2rem;
   }
+  .container { max-width: 1200px; margin: 0 auto; }
 
-  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; font-weight: 700; color: #f8fafc; }
+  .subtitle { font-size: 0.8rem; color: #64748b; margin-bottom: 1.5rem; margin-top: 0.25rem; }
 
-  .title-row {
-    display: flex; align-items: baseline; gap: 1rem;
-    margin-bottom: 0.25rem; flex-wrap: wrap;
-  }
-  h1 {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #f8fafc;
-  }
-  .detail-link {
-    font-size: 0.8rem; font-weight: 500;
-    color: #3b82f6; text-decoration: none;
-    padding: 0.2rem 0.65rem; border-radius: 99px;
-    border: 1px solid #1d4ed8;
-    white-space: nowrap;
-    transition: background 0.15s, color 0.15s;
-  }
-  .detail-link:hover { background: #1d4ed8; color: #fff; }
-  .subtitle {
-    font-size: 0.8rem;
-    color: #64748b;
-    margin-bottom: 1.5rem;
-  }
-
-  /* ---- Summary cards ---- */
-  .summary-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-  }
-
+  /* Summary cards */
+  .summary-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
   .card {
-    background: #1e293b;
-    border-radius: 12px;
-    padding: 1.25rem 1.5rem;
-    flex: 1;
-    min-width: 140px;
-    border: 1px solid #334155;
+    background: #1e293b; border-radius: 12px; padding: 1.25rem 1.5rem;
+    flex: 1; min-width: 140px; border: 1px solid #334155;
   }
-
   .card-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
   .card-value { font-size: 2rem; font-weight: 700; }
   .card-value.green { color: #22c55e; }
   .card-value.red   { color: #ef4444; }
-  .card-value.gray  { color: #94a3b8; }
 
-  /* ---- Pass rate bar ---- */
   .bar-wrap {
-    background: #1e293b;
-    border-radius: 12px;
-    padding: 1.25rem 1.5rem;
-    flex: 2;
-    border: 1px solid #334155;
+    background: #1e293b; border-radius: 12px; padding: 1.25rem 1.5rem;
+    flex: 2; border: 1px solid #334155;
   }
   .bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
   .bar-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
   .bar-pct { font-size: 1.5rem; font-weight: 700; color: $passColor; }
-  .bar-track {
-    background: #334155;
-    border-radius: 99px;
-    height: 10px;
-    overflow: hidden;
-    display: flex;
-  }
+  .bar-track { background: #334155; border-radius: 99px; height: 10px; overflow: hidden; display: flex; }
   .bar-fill-pass { background: #22c55e; height: 100%; transition: width 0.6s ease; border-radius: 99px 0 0 99px; }
   .bar-fill-fail { background: #ef4444; height: 100%; transition: width 0.6s ease; }
-  .bar-sep { width: 2px; background: #0f172a; }
 
-  /* ---- Controls ---- */
+  /* Controls */
   .controls-row {
-    display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;
-    align-items: center;
+    display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;
   }
-  .filters { display: flex; gap: 0.5rem; flex: 1; flex-wrap: wrap; }
+  .search-box {
+    flex: 1; min-width: 200px; padding: 0.45rem 0.8rem;
+    background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+    border-radius: 8px; font-size: 0.85rem; outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-box::placeholder { color: #475569; }
+  .search-box:focus { border-color: #3b82f6; }
+
+  .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .filter-btn {
-    padding: 0.4rem 0.9rem;
-    border-radius: 99px;
-    border: 1px solid #334155;
-    background: #1e293b;
-    color: #94a3b8;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: all 0.15s;
+    padding: 0.4rem 0.9rem; border-radius: 99px;
+    border: 1px solid #334155; background: #1e293b; color: #94a3b8;
+    font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
   }
   .filter-btn:hover { border-color: #475569; color: #e2e8f0; }
   .filter-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
@@ -411,154 +603,189 @@ String generateHtml(TestReport report, String screenshotsDir) {
   .collapse-controls { display: flex; gap: 0.4rem; }
   .collapse-btn {
     padding: 0.35rem 0.75rem; border-radius: 6px;
-    border: 1px solid #334155; background: #1e293b;
-    color: #64748b; font-size: 0.75rem; cursor: pointer;
-    transition: all 0.15s;
+    border: 1px solid #334155; background: #1e293b; color: #64748b;
+    font-size: 0.75rem; cursor: pointer; transition: all 0.15s;
   }
   .collapse-btn:hover { border-color: #475569; color: #e2e8f0; }
 
-  /* ---- Suite groups (collapsible) ---- */
+  /* Suite groups */
   .suite-group {
     margin-bottom: 0.75rem; border: 1px solid #334155;
     border-radius: 12px; overflow: hidden;
   }
-
   .suite-header {
     display: flex; align-items: center; gap: 0.75rem;
     padding: 0.75rem 1.25rem; background: #1e293b;
     cursor: pointer; user-select: none; list-style: none;
   }
   .suite-header::-webkit-details-marker { display: none; }
-
   .suite-chevron {
     font-size: 0.65rem; color: #64748b; transition: transform 0.2s;
     flex-shrink: 0; width: 12px; text-align: center;
   }
-  details.suite-group[open] > .suite-header .suite-chevron {
-    transform: rotate(90deg);
-  }
-
-  .suite-name {
-    flex: 1; font-size: 0.9rem; font-weight: 600; color: #e2e8f0;
-  }
+  details.suite-group[open] > .suite-header .suite-chevron { transform: rotate(90deg); }
+  .suite-name { flex: 1; font-size: 0.9rem; font-weight: 600; color: #e2e8f0; }
   .suite-stats {
-    font-size: 0.75rem; padding: 0.15rem 0.6rem; border-radius: 99px;
-    flex-shrink: 0;
+    font-size: 0.75rem; padding: 0.15rem 0.6rem; border-radius: 99px; flex-shrink: 0;
   }
-  .suite-header.all-pass .suite-stats {
-    background: #14532d; color: #22c55e;
-  }
-  .suite-header.has-fail .suite-stats {
-    background: #451a03; color: #eab308;
-  }
-
+  .suite-header.all-pass .suite-stats { background: #14532d; color: #22c55e; }
+  .suite-header.has-fail .suite-stats { background: #451a03; color: #eab308; }
   .suite-tests { padding: 0.25rem 0; }
 
-  /* ---- Test list ---- */
+  /* Test item */
   .test-item {
-    border-bottom: 1px solid #1e293b;
-    transition: background-color 0.15s;
+    border-bottom: 1px solid #1e293b; transition: background-color 0.15s;
   }
   .test-item:last-child { border-bottom: none; }
   .test-item.passed { border-left: 3px solid #22c55e; }
-  .test-item.failed  { border-left: 3px solid #ef4444; }
+  .test-item.failed { border-left: 3px solid #ef4444; }
+  .test-item summary::-webkit-details-marker { display: none; }
+  .test-item summary { list-style: none; }
 
   .test-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 1rem 0.6rem 1.25rem;
-    cursor: default;
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 1rem 0.6rem 1.25rem; cursor: pointer;
+    user-select: none;
   }
-  .test-item.failed .test-header { cursor: pointer; }
-  .test-item.failed .test-header:hover { background: #263344; }
+  .test-item.no-detail .test-header { cursor: default; }
+  .test-item:not(.no-detail) .test-header:hover { background: #263344; }
+
+  .test-chevron {
+    font-size: 0.6rem; color: #64748b;
+    transition: transform 0.2s; flex-shrink: 0; width: 10px;
+  }
+  .test-chevron.empty { visibility: hidden; }
+  details.test-item[open] > .test-header .test-chevron { transform: rotate(90deg); }
 
   .test-name {
-    flex: 1;
-    font-size: 0.85rem;
-    color: #e2e8f0;
+    flex: 1; font-size: 0.85rem; color: #e2e8f0;
     font-family: 'Cascadia Code', 'Fira Code', monospace;
   }
 
   .badge {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 99px;
-    font-weight: 600;
-    white-space: nowrap;
-    flex-shrink: 0;
-    letter-spacing: 0.03em;
+    font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 99px;
+    font-weight: 600; white-space: nowrap; flex-shrink: 0; letter-spacing: 0.03em;
   }
   .badge.pass { background: #14532d; color: #22c55e; }
   .badge.fail { background: #450a0a; color: #ef4444; }
 
-  .expand-btn {
-    background: none;
-    border: 1px solid #334155;
-    color: #64748b;
-    font-size: 0.7rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 6px;
-    cursor: pointer;
-    flex-shrink: 0;
+  .shot-count {
+    font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 99px;
+    background: #1e3a5f; color: #93c5fd; flex-shrink: 0;
   }
-  .expand-btn:hover { border-color: #ef4444; color: #ef4444; }
 
-  .error-section {
-    display: none;
-    padding: 0.75rem 1rem 1rem 1.5rem;
-    border-top: 1px solid #334155;
-    animation: slideDown 0.2s ease;
-  }
-  .error-section.open { display: block; }
-
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-4px); }
-    to   { opacity: 1; transform: translateY(0); }
+  .test-body {
+    padding: 0.5rem 1.25rem 1rem 1.5rem;
+    border-top: 1px solid #1e293b; background: #0d1626;
   }
 
   .error-msg {
-    background: #2d0a0a;
-    border: 1px solid #450a0a;
-    border-radius: 8px;
-    padding: 0.75rem;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
-    font-size: 0.78rem;
-    color: #fca5a5;
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin-bottom: 0.75rem;
-    max-height: 200px;
-    overflow-y: auto;
+    background: #2d0a0a; border: 1px solid #450a0a; border-radius: 8px;
+    padding: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.78rem; color: #fca5a5; white-space: pre-wrap;
+    word-break: break-all; margin-bottom: 0.75rem;
+    max-height: 240px; overflow-y: auto;
   }
 
-  .screenshot-wrap {
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #334155;
-    cursor: zoom-in;
-    max-width: 500px;
+  /* Gallery */
+  .gallery {
+    display: grid; gap: 0.6rem;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    margin-top: 0.5rem;
   }
-  .screenshot-wrap img {
-    width: 100%;
-    display: block;
-    transition: transform 0.2s;
+  .thumb {
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    overflow: hidden; cursor: zoom-in; transition: border-color 0.15s, transform 0.15s;
   }
-  .screenshot-wrap img:hover { transform: scale(1.02); }
+  .thumb:hover { border-color: #3b82f6; transform: translateY(-2px); }
+  .thumb img {
+    width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block;
+    border-bottom: 1px solid #334155;
+  }
+  .thumb figcaption {
+    padding: 0.4rem 0.6rem; font-size: 0.72rem; color: #94a3b8;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   .hidden { display: none !important; }
+
+  /* Lightbox */
+  #lb-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.94); z-index: 9999;
+    flex-direction: column; align-items: center; justify-content: center;
+  }
+  #lb-overlay.on { display: flex; }
+  #lb-topbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 1.1rem;
+    background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(6px);
+    z-index: 10001;
+  }
+  #lb-info {
+    flex: 1; font-size: 0.82rem; color: #cbd5e1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #lb-info .lb-test  { color: #93c5fd; font-weight: 600; }
+  #lb-info .lb-sep   { color: #475569; margin: 0 0.4rem; }
+  #lb-info .lb-step  { color: #e2e8f0; }
+  #lb-counter { font-size: 0.75rem; color: #64748b; flex-shrink: 0; }
+  #lb-close {
+    font-size: 1.4rem; color: #94a3b8; cursor: pointer;
+    line-height: 1; user-select: none; flex-shrink: 0;
+    padding: 0.1rem 0.4rem; border-radius: 4px; transition: color 0.15s;
+  }
+  #lb-close:hover { color: #fff; }
+
+  #lb-body {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 100%; padding: 3.2rem 0 3rem; overflow: hidden;
+  }
+  #lb-img {
+    max-width: calc(100vw - 8rem); max-height: calc(100vh - 8rem);
+    border-radius: 4px; box-shadow: 0 0.5rem 3rem #000;
+    object-fit: contain; transition: opacity 0.12s;
+  }
+  .lb-nav-btn {
+    width: 3.5rem; height: 100%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    color: #475569; font-size: 1.8rem;
+    transition: color 0.15s, background 0.15s; user-select: none;
+  }
+  .lb-nav-btn:hover:not(:disabled) {
+    color: #fff; background: rgba(255, 255, 255, 0.06);
+  }
+  .lb-nav-btn:disabled { color: #1e293b; cursor: default; }
+
+  #lb-strip-wrap {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(4px);
+    padding: 0.3rem 0.8rem;
+  }
+  #lb-strip {
+    display: flex; gap: 0.3rem; overflow-x: auto;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  #lb-strip::-webkit-scrollbar { display: none; }
+  .lb-thumb {
+    width: 3rem; height: 2.2rem; flex-shrink: 0;
+    border-radius: 3px; object-fit: cover;
+    opacity: 0.4; cursor: pointer; border: 2px solid transparent;
+    transition: opacity 0.15s, border-color 0.15s;
+  }
+  .lb-thumb:hover { opacity: 0.8; }
+  .lb-thumb.active { opacity: 1; border-color: #3b82f6; }
 </style>
 </head>
 <body>
 <div class="container">
 
-  <div class="title-row">
-    <h1>E2E Test Dashboard</h1>
-    <a href="../e2e_report/report.html" class="detail-link">📸 Screenshot Report →</a>
-  </div>
+  <h1>E2E Test Dashboard</h1>
   <p class="subtitle">Generated: $timestamp &nbsp;|&nbsp; cb_file_manager</p>
 
-  <!-- Summary cards -->
   <div class="summary-row">
     <div class="card">
       <div class="card-label">Total</div>
@@ -584,9 +811,10 @@ String generateHtml(TestReport report, String screenshotsDir) {
     </div>
   </div>
 
-  <!-- Controls: filters + expand/collapse -->
   <div class="controls-row">
-    <div class="filters" id="filters">
+    <input type="text" id="searchInput" class="search-box"
+           placeholder="Search test cases..." oninput="applyFilters()">
+    <div class="filters">
       <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All ($total)</button>
       <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">Passed ($passed)</button>
       <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">Failed ($failed)</button>
@@ -597,51 +825,120 @@ String generateHtml(TestReport report, String screenshotsDir) {
     </div>
   </div>
 
-  <!-- Suite groups -->
   <div id="suiteList">
 $suiteSections
   </div>
+</div>
 
+<!-- Lightbox -->
+<div id="lb-overlay" onclick="lbClose()">
+  <div id="lb-topbar" onclick="event.stopPropagation()">
+    <div id="lb-info">
+      <span class="lb-test"></span>
+      <span class="lb-sep">›</span>
+      <span class="lb-step"></span>
+    </div>
+    <span id="lb-counter"></span>
+    <span id="lb-close" onclick="lbClose()">&#x2715;</span>
+  </div>
+  <div id="lb-body" onclick="event.stopPropagation()">
+    <button class="lb-nav-btn" id="lb-prev" onclick="lbPrev()">&#x276E;</button>
+    <img id="lb-img" src="" alt="">
+    <button class="lb-nav-btn" id="lb-next" onclick="lbNext()">&#x276F;</button>
+  </div>
+  <div id="lb-strip-wrap" onclick="event.stopPropagation()">
+    <div id="lb-strip"></div>
+  </div>
 </div>
 
 <script>
-  let currentFilter = 'all';
+  const _shots = $shotsJson;
+  let _idx = 0;
+  let _stripBuilt = false;
 
-  function setFilter(filter) {
-    currentFilter = filter;
+  function _buildStrip() {
+    if (_stripBuilt) return;
+    const strip = document.getElementById('lb-strip');
+    strip.innerHTML = '';
+    _shots.forEach((s, i) => {
+      const t = document.createElement('img');
+      t.src = s.src;
+      t.className = 'lb-thumb';
+      t.onclick = () => lbGoto(i);
+      strip.appendChild(t);
+    });
+    _stripBuilt = true;
+  }
+
+  function lbOpen(i) {
+    _buildStrip();
+    lbGoto(i);
+  }
+
+  function lbGoto(i) {
+    if (!_shots.length) return;
+    _idx = Math.max(0, Math.min(i, _shots.length - 1));
+    const s = _shots[_idx];
+    const img = document.getElementById('lb-img');
+    img.style.opacity = '0';
+    img.src = s.src;
+    img.onload = () => { img.style.opacity = '1'; };
+    document.querySelector('#lb-info .lb-test').textContent = s.test;
+    document.querySelector('#lb-info .lb-step').textContent = s.step;
+    document.getElementById('lb-counter').textContent = (_idx + 1) + ' / ' + _shots.length;
+    document.getElementById('lb-prev').disabled = _idx === 0;
+    document.getElementById('lb-next').disabled = _idx === _shots.length - 1;
+    const thumbs = document.querySelectorAll('.lb-thumb');
+    thumbs.forEach((t, j) => t.classList.toggle('active', j === _idx));
+    if (thumbs[_idx]) {
+      thumbs[_idx].scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    }
+    document.getElementById('lb-overlay').classList.add('on');
+  }
+
+  function lbClose() { document.getElementById('lb-overlay').classList.remove('on'); }
+  function lbPrev() { lbGoto(_idx - 1); }
+  function lbNext() { lbGoto(_idx + 1); }
+
+  document.addEventListener('keydown', e => {
+    const on = document.getElementById('lb-overlay').classList.contains('on');
+    if (!on) return;
+    if (e.key === 'Escape')     lbClose();
+    if (e.key === 'ArrowLeft')  lbPrev();
+    if (e.key === 'ArrowRight') lbNext();
+  });
+
+  // Filters + search
+  let _currentFilter = 'all';
+  function setFilter(f) {
+    _currentFilter = f;
     document.querySelectorAll('.filter-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.filter === filter);
+      b.classList.toggle('active', b.dataset.filter === f);
     });
+    applyFilters();
+  }
+  function applyFilters() {
+    const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
     document.querySelectorAll('.test-item').forEach(item => {
-      const isPass = item.classList.contains('passed');
-      if (filter === 'all') {
-        item.classList.remove('hidden');
-      } else if (filter === 'passed') {
-        item.classList.toggle('hidden', !isPass);
-      } else {
-        item.classList.toggle('hidden', isPass);
-      }
+      const status = item.dataset.status || '';
+      const search = item.dataset.search || '';
+      const matchFilter =
+        _currentFilter === 'all' ||
+        (_currentFilter === 'passed' && status === 'passed') ||
+        (_currentFilter === 'failed' && status === 'failed');
+      const matchSearch = q === '' || search.indexOf(q) !== -1;
+      item.classList.toggle('hidden', !(matchFilter && matchSearch));
     });
-    // Hide suite groups with no visible tests
     document.querySelectorAll('.suite-group').forEach(group => {
-      const visibleTests = group.querySelectorAll('.test-item:not(.hidden)').length;
-      group.classList.toggle('hidden', visibleTests === 0);
+      const visible = group.querySelectorAll('.test-item:not(.hidden)').length;
+      group.classList.toggle('hidden', visible === 0);
     });
   }
-
-  function toggleDetail(btn) {
-    const item = btn.closest('.test-item');
-    const section = item.querySelector('.error-section');
-    if (!section) return;
-    section.classList.toggle('open');
-  }
-
   function expandAll() {
-    document.querySelectorAll('.suite-group').forEach(d => d.open = true);
+    document.querySelectorAll('details').forEach(d => d.open = true);
   }
-
   function collapseAll() {
-    document.querySelectorAll('.suite-group').forEach(d => d.open = false);
+    document.querySelectorAll('details').forEach(d => d.open = false);
   }
 </script>
 </body>
@@ -765,10 +1062,20 @@ Future<void> copyScreenshots(
     await ssDir.create(recursive: true);
   }
 
+  // Possible source roots, in priority order. E2ETester writes to
+  // build/e2e_report/screenshots; older tooling drops files in build/.
+  final sourceRoots = <String>[
+    '$buildDir/e2e_report/screenshots',
+    buildDir,
+  ];
+
   for (final ss in screenshots) {
-    final src = File('$buildDir/$ss');
-    if (await src.exists()) {
-      await src.copy('$ssDir/$ss');
+    for (final root in sourceRoots) {
+      final src = File('$root/$ss');
+      if (await src.exists()) {
+        await src.copy('${ssDir.path}/$ss');
+        break;
+      }
     }
   }
 }
@@ -799,18 +1106,48 @@ Future<void> main(List<String> args) async {
   print('[Dashboard] Reading $reportFile ...');
   final content = await reportFile.readAsString();
 
-  print('[Dashboard] Parsing test results ...');
-  final report = parseJsonLog(content, buildDir);
+  print('[Dashboard] Loading screenshot manifest ...');
+  final manifestShots = await _loadManifestShots(buildDir);
 
-  if (report.tests.isEmpty) {
+  print('[Dashboard] Parsing test results ...');
+  final freshReport = parseJsonLog(content, buildDir, manifestShots);
+
+  // Merge with persisted state so reruns of a subset don't drop other tests.
+  final persisted = await _loadPersistedState(dashboardDir);
+  final merged = _mergeResults(persisted, freshReport.tests);
+
+  if (merged.isEmpty) {
     print('[Dashboard] WARNING: No test results parsed from log.');
     exit(1);
   }
 
-  // Collect all screenshots from failed tests
+  // Sort by suite then name for stable output
+  final sortedTests = merged.values.toList()
+    ..sort((a, b) {
+      final sa = _inferSuite(a.name);
+      final sb = _inferSuite(b.name);
+      final c = sa.compareTo(sb);
+      if (c != 0) return c;
+      return a.name.compareTo(b.name);
+    });
+
+  final report = TestReport(tests: sortedTests, generatedAt: DateTime.now());
+
+  // Persist the merged state for the next run.
+  await Directory(dashboardDir).create(recursive: true);
+  await _savePersistedState(dashboardDir, merged);
+
+  if (freshReport.tests.length < merged.length) {
+    print('[Dashboard] Merged ${freshReport.tests.length} fresh result(s) '
+        'with ${persisted.length} persisted — total ${merged.length}.');
+  }
+
+  // Collect all screenshots referenced by any test
   final allScreenshots = <String>{};
   for (final t in report.tests) {
-    allScreenshots.addAll(t.screenshots);
+    for (final s in t.shots) {
+      allScreenshots.add(s.filename);
+    }
   }
 
   // Copy screenshots into dashboard dir
@@ -820,9 +1157,8 @@ Future<void> main(List<String> args) async {
   }
 
   // Write HTML
-  await Directory(dashboardDir).create(recursive: true);
   final htmlPath = '$dashboardDir/index.html';
-  final html = generateHtml(report, 'screenshots');
+  final html = generateHtml(report);
   await File(htmlPath).writeAsString(html);
 
   print('');
