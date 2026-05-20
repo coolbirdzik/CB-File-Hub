@@ -33,7 +33,6 @@ import 'package:path/path.dart' as p;
 import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
 import 'e2e_report.dart';
-import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

@@ -444,7 +444,7 @@ class ThemeFactory {
       dividerColor:
           isLight ? Colors.black.withValues(alpha: 0.12) : Colors.grey.shade700,
     ).copyWith(
-      extensions: [
+      extensions: const [
         AppToastTheme(
           iconBoxSize: 30.0,
           iconSize: 18.0,
