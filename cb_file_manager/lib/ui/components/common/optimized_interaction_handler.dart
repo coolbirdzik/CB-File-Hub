@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import '../../../helpers/files/file_icon_helper.dart';
 import '../../widgets/thumbnail_loader.dart';
 import '../../widgets/lazy_video_thumbnail.dart';
@@ -219,7 +220,19 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
         ),
       );
     } else {
-      // Use cached future for regular files
+      // Try sync extension icon cache first (warmed by batch native call)
+      final ext = p.extension(widget.file.path).toLowerCase();
+      final cachedIcon =
+          FileIconHelper.getExtensionIconSync(ext, size: widget.size.toInt());
+      if (cachedIcon != null) {
+        return SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: cachedIcon,
+        );
+      }
+
+      // Fallback: use FutureBuilder for cold cache (rare after warmup)
       return FutureBuilder<Widget>(
         future: _iconFuture,
         builder: (context, snapshot) {

@@ -417,11 +417,13 @@ class FileNavigationBloc
     emit(state.copyWith(isLoading: true));
 
     try {
-      final folderSortManager = FolderSortManager();
-      await _safeCall(() => folderSortManager.saveFolderSortOption(
-            state.currentPath.path,
-            event.sortOption,
-          ));
+      if (event.persist) {
+        final folderSortManager = FolderSortManager();
+        await _safeCall(() => folderSortManager.saveFolderSortOption(
+              event.folderPath ?? state.currentPath.path,
+              event.sortOption,
+            ));
+      }
 
       if (isStale()) return;
 

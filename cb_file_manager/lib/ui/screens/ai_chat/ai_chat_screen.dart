@@ -19,6 +19,8 @@ import '../../tab_manager/core/tab_manager.dart';
 import '../../tab_manager/core/tab_paths.dart';
 import 'components/chat_input_bar.dart';
 import 'components/chat_message_bubble.dart';
+import 'components/raw_payload_dialog.dart';
+import 'components/tool_call_chip.dart';
 import 'components/conversation_list_panel.dart';
 import 'components/file_result_card.dart';
 import 'components/model_selector_button.dart';
@@ -200,6 +202,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
                     // Header
                     _buildHeader(context, l, theme, state),
 
+                    // Error banner (provider failures, bad request, etc.)
+                    if (state.error != null)
+                      _buildErrorBanner(context, theme, state),
+
                     // Messages / empty state
                     Expanded(
                       child: state.messages.isEmpty &&
@@ -317,6 +323,18 @@ class _AiChatBodyState extends State<_AiChatBody> {
               contextInfo: contextInfo,
               isDark: isDark,
             ),
+            const SizedBox(width: 4),
+            // Debug: view raw payload sent to provider
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.code, size: 14),
+              tooltip: 'View raw payload',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 24, minHeight: 24),
+              onPressed: () =>
+                  RawPayloadDialog.show(context, state),
+            ),
           ],
         ],
       ),
@@ -359,7 +377,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              l.aiChat,
+              l.cbAgent,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),
@@ -496,6 +514,68 @@ class _AiChatBodyState extends State<_AiChatBody> {
     );
   }
 
+  Widget _buildErrorBanner(
+      BuildContext context, ThemeData theme, AiAgentState state) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.error.withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(PhosphorIconsLight.warningCircle,
+              size: 16, color: theme.colorScheme.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Provider error',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                SelectableText(
+                  state.error!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          if (state.lastApiPayload != null)
+            TextButton.icon(
+              icon: const Icon(PhosphorIconsLight.code, size: 14),
+              label: const Text('View payload'),
+              onPressed: () => RawPayloadDialog.show(context, state),
+            ),
+          IconButton(
+            icon: const Icon(PhosphorIconsLight.x, size: 14),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Dismiss',
+            onPressed: () =>
+                context.read<AiAgentBloc>().add(const ClearError()),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMessageList(BuildContext context, AiAgentState state) {
     final theme = Theme.of(context);
     final hasThinking = state.thinkingText != null;
@@ -534,6 +614,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
               final hasResults = isAssistant &&
                   message.searchResults != null &&
                   message.searchResults!.isNotEmpty;
+              final hasToolCalls = isAssistant &&
+                  message.toolCalls != null &&
+                  message.toolCalls!.isNotEmpty;
               final showToolLog = isAssistant &&
                   !state.isLoading &&
                   index == state.messages.length - 1 &&
@@ -542,6 +625,19 @@ class _AiChatBodyState extends State<_AiChatBody> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Tool calls render BEFORE the assistant message because
+                  // chronologically the agent calls tools first, then writes
+                  // the answer using the tool results.
+                  if (hasToolCalls)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: message.toolCalls!
+                            .map((tc) => ToolCallChip(toolCall: tc))
+                            .toList(),
+                      ),
+                    ),
                   ChatMessageBubble(
                     message: message,
                     onEdit:
@@ -692,22 +788,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ShimmerThinkingText(text: text),
-            if (state.toolActivity.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              ...state.toolActivity.map((line) => Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      line,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontFamily: 'monospace',
-                        color: line.startsWith('>')
-                            ? theme.colorScheme.primary.withValues(alpha: 0.8)
-                            : theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.7),
-                      ),
-                    ),
-                  )),
+            if (state.currentToolCalls.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              ...state.currentToolCalls
+                  .map((tc) => ToolCallChip(toolCall: tc)),
             ],
           ],
         ),

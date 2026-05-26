@@ -160,3 +160,8 @@ class DeleteConversation extends AiAgentEvent {
 class RefreshConversations extends AiAgentEvent {
   const RefreshConversations();
 }
+
+/// Clear the current `state.error` banner.
+class ClearError extends AiAgentEvent {
+  const ClearError();
+}

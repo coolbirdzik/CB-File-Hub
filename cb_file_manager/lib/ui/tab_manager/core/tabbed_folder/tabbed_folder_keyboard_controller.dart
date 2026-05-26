@@ -140,13 +140,6 @@ class TabbedFolderKeyboardController {
     final String? lastPath = selectionState.lastSelectedPath;
     if (lastPath != null && lastPath != focusedPath) {
       focusedPath = lastPath;
-      return;
-    }
-
-    if (lastPath == null &&
-        selectionState.selectedFilePaths.isEmpty &&
-        selectionState.selectedFolderPaths.isEmpty) {
-      focusedPath = null;
     }
   }
 

@@ -187,6 +187,9 @@ class VietnameseLocalizations implements AppLocalizations {
 
   // Column names
   @override
+  String get columnName => 'Tên';
+
+  @override
   String get columnSize => 'Kích thước';
 
   @override
@@ -1507,6 +1510,22 @@ class VietnameseLocalizations implements AppLocalizations {
       'Khôi phục tab mở gần nhất và ghi nhớ trạng thái thu gọn của drawer theo từng tab.';
 
   @override
+  String get tabInactiveThreshold => 'Thời gian tab không hoạt động';
+
+  @override
+  String get tabInactiveThresholdDescription =>
+      'Tự động tạm dừng tab và giải phóng bộ nhớ cache sau khoảng thời gian không sử dụng. Chọn "Tắt" để giữ tab luôn hoạt động.';
+
+  @override
+  String get tabInactiveThresholdDisabled => 'Tắt';
+
+  @override
+  String get tabInactiveThresholdMinutesValue => 'phút';
+
+  @override
+  String get tabInactiveThresholdHoursValue => 'giờ';
+
+  @override
   String get cacheManagement => 'Quản lý bộ nhớ cache';
 
   @override
@@ -2205,6 +2224,12 @@ class VietnameseLocalizations implements AppLocalizations {
   String get closeTab => 'Đóng tab';
 
   @override
+  String get closeOtherTabs => 'Đóng các tab khác';
+
+  @override
+  String get markTabInactive => 'Đánh dấu không hoạt động';
+
+  @override
   String get addNewTab => 'Thêm tab mới';
 
   // Desktop windows (tabbed browsing)
@@ -2801,6 +2826,43 @@ class VietnameseLocalizations implements AppLocalizations {
   String get deleteConversation => 'Xóa cuộc trò chuyện';
   @override
   String get noConversations => 'Chưa có cuộc trò chuyện nào';
+
+  // CB Agent rebrand
+  @override
+  String get cbAgent => 'CB Agent';
+  @override
+  String get cbAgentTitle => 'CB Agent';
+  @override
+  String get cbAgentSubtitle => 'Trợ lý AI tích hợp trong CB File Hub';
+
+  // Disk Cleaner (CB Agent skill)
+  @override
+  String get cbAgentCleanerTitle => 'Dọn rác (CB Agent)';
+  @override
+  String get diskCleanerNotAvailable => 'Dọn rác chỉ khả dụng trên Windows';
+  @override
+  String get diskCleanerScanTitle => 'Quét tệp rác';
+  @override
+  String get diskCleanerScanRunning => 'Đang quét...';
+  @override
+  String get diskCleanerScanDone => 'Quét xong';
+  @override
+  String get diskCleanerCleanTitle => 'Dọn tệp rác';
+  @override
+  String get diskCleanerCleanDone => 'Dọn xong';
+  @override
+  String get diskCleanerAskAgent => 'Hỏi CB Agent';
+  @override
+  String get diskCleanerMoveToRecycleBin => 'Chuyển vào Thùng Rác';
+  @override
+  String get diskCleanerPermanentDelete => 'Xóa vĩnh viễn';
+  @override
+  String get diskCleanerSelectCategories => 'Chọn danh mục';
+  @override
+  String get diskCleanerSelectDrives => 'Chọn ổ đĩa';
+  @override
+  String get diskCleanerScanAgain => 'Quét lại';
+
   @override
   String get aiThinking0 => 'Đang suy nghĩ...';
   @override

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
+import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -291,7 +293,11 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   void _onSetSortOption(SetSortOption event, Emitter<FolderListState> emit) {
-    _navigationBloc.add(nav.FileNavigationSetSortOption(event.sortOption));
+    _navigationBloc.add(nav.FileNavigationSetSortOption(
+      event.sortOption,
+      persist: event.persist,
+      folderPath: event.folderPath,
+    ));
   }
 
   // ── External tag change listener ────────────────────────────────
@@ -342,6 +348,15 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
           hasActiveTagSearch ? state.isSearchByName : navState.isSearchByName,
       searchRecursive: navState.searchRecursive,
     ));
+
+    // Pre-warm extension icon cache when file listing arrives
+    if (!navState.isLoading && navState.files.isNotEmpty) {
+      final exts = navState.files
+          .map((f) => p.extension(f.path).toLowerCase())
+          .where((ext) => ext.isNotEmpty)
+          .toSet();
+      FileIconHelper.warmExtensionIcons(exts, size: 48);
+    }
   }
 
   void _onOpsStateChanged(FileOperationsState opsState) {

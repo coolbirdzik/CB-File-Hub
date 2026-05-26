@@ -21,6 +21,16 @@ class AiAgentState extends Equatable {
   final String currentPath;
   final String? thinkingText;
   final List<String> toolActivity;
+
+  /// In-flight tool calls for the current streaming response. Each call is
+  /// added when the agent starts the tool and updated when result arrives.
+  /// UI renders these as collapsible chips inside the thinking bubble.
+  final List<AiToolCall> currentToolCalls;
+
+  /// Last raw API payload sent to the provider, for debug "View raw payload"
+  /// inspection. Captured by the bloc before each chat/streamChat call.
+  final Map<String, dynamic>? lastApiPayload;
+
   final List<AiProviderModelCatalog>? _providerModelCatalogs;
   final bool? _isLoadingProviderModels;
 
@@ -62,6 +72,8 @@ class AiAgentState extends Equatable {
     this.currentPath = '',
     this.thinkingText,
     this.toolActivity = const [],
+    this.currentToolCalls = const [],
+    this.lastApiPayload,
     List<AiProviderModelCatalog>? providerModelCatalogs,
     bool? isLoadingProviderModels,
     this.thinkingPhrases = const ['Thinking...'],
@@ -91,6 +103,10 @@ class AiAgentState extends Equatable {
     bool clearThinking = false,
     List<String>? toolActivity,
     bool clearToolActivity = false,
+    List<AiToolCall>? currentToolCalls,
+    bool clearCurrentToolCalls = false,
+    Map<String, dynamic>? lastApiPayload,
+    bool clearLastApiPayload = false,
     List<AiProviderModelCatalog>? providerModelCatalogs,
     bool? isLoadingProviderModels,
     List<String>? thinkingPhrases,
@@ -120,6 +136,12 @@ class AiAgentState extends Equatable {
       thinkingText: clearThinking ? null : (thinkingText ?? this.thinkingText),
       toolActivity:
           clearToolActivity ? const [] : (toolActivity ?? this.toolActivity),
+      currentToolCalls: clearCurrentToolCalls
+          ? const []
+          : (currentToolCalls ?? this.currentToolCalls),
+      lastApiPayload: clearLastApiPayload
+          ? null
+          : (lastApiPayload ?? this.lastApiPayload),
       providerModelCatalogs:
           providerModelCatalogs ?? this.providerModelCatalogs,
       isLoadingProviderModels:
@@ -149,6 +171,8 @@ class AiAgentState extends Equatable {
         currentPath,
         thinkingText,
         toolActivity,
+        currentToolCalls,
+        lastApiPayload,
         providerModelCatalogs,
         isLoadingProviderModels,
         thinkingPhrases,

@@ -15,6 +15,8 @@ import '../../tab_manager/core/tab_manager.dart';
 import '../../tab_manager/core/tab_paths.dart';
 import 'components/chat_input_bar.dart';
 import 'components/chat_message_bubble.dart';
+import 'components/raw_payload_dialog.dart';
+import 'components/tool_call_chip.dart';
 import 'components/file_result_card.dart';
 import 'components/model_selector_button.dart';
 import 'components/shimmer_thinking_text.dart';
@@ -200,10 +202,27 @@ class _AiSidePanelState extends State<AiSidePanel> {
                 // Main panel content
                 Expanded(
                   child: BlocConsumer<AiAgentBloc, AiAgentState>(
-                    listenWhen: (prev, curr) =>
-                        prev.conversationId != curr.conversationId ||
-                        prev.messages.length != curr.messages.length ||
-                        prev.pendingApproval != curr.pendingApproval,
+                    listenWhen: (prev, curr) {
+                      if (prev.conversationId != curr.conversationId) {
+                        return true;
+                      }
+                      if (prev.messages.length != curr.messages.length) {
+                        return true;
+                      }
+                      if (prev.pendingApproval != curr.pendingApproval) {
+                        return true;
+                      }
+                      // Auto-scroll while streaming tokens — track last message
+                      // content changes so user follows the generated answer.
+                      if (!curr.isLoading) return false;
+                      final prevLast = prev.messages.isNotEmpty
+                          ? prev.messages.last.content
+                          : '';
+                      final currLast = curr.messages.isNotEmpty
+                          ? curr.messages.last.content
+                          : '';
+                      return prevLast != currLast;
+                    },
                     listener: (context, state) {
                       final animate =
                           _lastConversationId == state.conversationId;
@@ -216,6 +235,10 @@ class _AiSidePanelState extends State<AiSidePanel> {
                           // Header
                           _buildHeader(context, l, theme, state),
                           const Divider(height: 1),
+
+                          // Error banner (provider failures)
+                          if (state.error != null)
+                            _buildErrorBanner(context, theme, state),
 
                           // Messages
                           Expanded(
@@ -334,7 +357,84 @@ class _AiSidePanelState extends State<AiSidePanel> {
           if (state.messages.isNotEmpty) ...[
             const SizedBox(width: 6),
             _buildContextBadge(theme, totalChars, state.messages.length),
+            const SizedBox(width: 2),
+            // Debug: view raw payload sent to provider
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.code, size: 12),
+              tooltip: 'View raw payload',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 22, minHeight: 22),
+              onPressed: () => RawPayloadDialog.show(context, state),
+            ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(
+      BuildContext context, ThemeData theme, AiAgentState state) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: theme.colorScheme.error.withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(PhosphorIconsLight.warningCircle,
+              size: 14, color: theme.colorScheme.error),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Provider error',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                SelectableText(
+                  state.error!,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (state.lastApiPayload != null)
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.code, size: 12),
+              tooltip: 'View payload',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+              onPressed: () => RawPayloadDialog.show(context, state),
+            ),
+          IconButton(
+            icon: const Icon(PhosphorIconsLight.x, size: 12),
+            tooltip: 'Dismiss',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+            onPressed: () =>
+                _bloc.add(const ClearError()),
+          ),
         ],
       ),
     );
@@ -398,7 +498,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              l.aiChat,
+              l.cbAgent,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
@@ -532,10 +632,25 @@ class _AiSidePanelState extends State<AiSidePanel> {
               final hasResults = isAssistant &&
                   message.searchResults != null &&
                   message.searchResults!.isNotEmpty;
+              final hasToolCalls = isAssistant &&
+                  message.toolCalls != null &&
+                  message.toolCalls!.isNotEmpty;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Tool calls render BEFORE the assistant message
+                  if (hasToolCalls)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          left: 12, right: 12, bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: message.toolCalls!
+                            .map((tc) => ToolCallChip(toolCall: tc))
+                            .toList(),
+                      ),
+                    ),
                   ChatMessageBubble(
                     message: message,
                     onEdit:
@@ -635,7 +750,18 @@ class _AiSidePanelState extends State<AiSidePanel> {
           color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: ShimmerThinkingText(text: state.thinkingText ?? 'Thinking...'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ShimmerThinkingText(text: state.thinkingText ?? 'Thinking...'),
+            if (state.currentToolCalls.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              ...state.currentToolCalls
+                  .map((tc) => ToolCallChip(toolCall: tc)),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -319,10 +319,16 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
 
-      final viewMode = await prefs.getViewMode();
+      final globalViewMode = await prefs.getViewMode();
+      final viewMode = await prefs.getNetworkBrowserViewMode(
+        fallback: globalViewMode,
+      );
       final effectiveViewMode =
           viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode;
-      final sortOption = await prefs.getSortOption();
+      final globalSortOption = await prefs.getSortOption();
+      final sortOption = await prefs.getNetworkBrowserSortOption(
+        fallback: globalSortOption,
+      );
       final gridZoomLevel = await prefs.getGridZoomLevel();
       final columnVisibility = await prefs.getColumnVisibility();
       final maxZoom = GridZoomConstraints.maxGridSizeForContext(
@@ -356,7 +362,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     try {
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
-      await prefs.setViewMode(mode);
+      await prefs.setNetworkBrowserViewMode(mode);
     } catch (e) {
       // Reduced debug logging
     }
@@ -366,7 +372,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     try {
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
-      await prefs.setSortOption(option);
+      await prefs.setNetworkBrowserSortOption(option);
     } catch (e) {
       // Reduced debug logging
     }

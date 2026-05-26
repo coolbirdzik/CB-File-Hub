@@ -43,29 +43,16 @@ class FileOperationsHandler {
     required Set<String> pathsToDelete,
     String? anchorPath,
   }) {
+    if (anchorPath == null || !pathsToDelete.contains(anchorPath)) {
+      return null;
+    }
+
     final items = _getNavigableItems(state);
     if (items.isEmpty) return null;
 
     final orderedPaths = items.map((e) => e.path).toList(growable: false);
 
-    final String? effectiveAnchor = () {
-      if (anchorPath != null && orderedPaths.contains(anchorPath)) {
-        return anchorPath;
-      }
-      for (final p in orderedPaths) {
-        if (pathsToDelete.contains(p)) return p;
-      }
-      return null;
-    }();
-
-    if (effectiveAnchor == null) {
-      for (final p in orderedPaths) {
-        if (!pathsToDelete.contains(p)) return p;
-      }
-      return null;
-    }
-
-    final int anchorIndex = orderedPaths.indexOf(effectiveAnchor);
+    final int anchorIndex = orderedPaths.indexOf(anchorPath);
     if (anchorIndex < 0) return null;
 
     for (int i = anchorIndex + 1; i < orderedPaths.length; i++) {

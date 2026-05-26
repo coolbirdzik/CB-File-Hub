@@ -9,7 +9,10 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     controller.onSearchPressed = () => _toggleSearchBar(context);
     controller.onSearchSubmitted = (query) => _handleMobileSearch(query);
     controller.onSortOptionSelected = (option) {
-      _folderListBloc.add(SetSortOption(option));
+      _folderListBloc.add(SetSortOption(
+        option,
+        folderPath: _currentPath,
+      ));
       saveSortSetting(option, _currentPath);
     };
     controller.onViewModeToggled = _setViewMode;

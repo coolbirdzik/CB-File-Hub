@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'external_app_helper.dart';
@@ -13,6 +14,147 @@ class FileIconHelper {
 
   // Cache for app paths by extension
   static final Map<String, String> _appPathCache = {};
+
+  // ─── Extension-keyed icon cache (batch-warmed, sync lookup) ───────────────
+  /// Stores pre-rendered icon widgets keyed by "${extension}_$size".
+  static final Map<String, Widget> _extensionIconCache = {};
+
+  /// Track in-flight warmup to avoid duplicate batch calls.
+  static Future<void>? _warmupFuture;
+
+  /// Pre-warm icon cache for all extensions visible in the current list.
+  /// Call once after listing arrives, before items render.
+  /// Safe to call multiple times — only fetches missing extensions.
+  static Future<void> warmExtensionIcons(Set<String> extensions,
+      {int size = 32}) async {
+    if (!Platform.isWindows) return;
+
+    // Filter to only non-media extensions that aren't already cached
+    final missing = extensions.where((ext) {
+      if (ext.isEmpty) return false;
+      final normalizedExt = ext.startsWith('.') ? ext : '.$ext';
+      final category = FileTypeRegistry.getCategory(normalizedExt);
+      if (category == FileCategory.image || category == FileCategory.video) {
+        return false;
+      }
+      return !_extensionIconCache.containsKey('${ext}_$size');
+    }).toList();
+
+    if (missing.isEmpty) return;
+
+    // Avoid duplicate concurrent warmups
+    _warmupFuture = _doWarmup(missing, size);
+    await _warmupFuture;
+    _warmupFuture = null;
+  }
+
+  static Future<void> _doWarmup(List<String> extensions, int size) async {
+    try {
+      final raw = await WindowsAppIcon.extractIconsForExtensions(
+        extensions,
+        iconSize: size,
+      );
+      for (final entry in raw.entries) {
+        final pixels = entry.value;
+        if (pixels != null && pixels.isNotEmpty) {
+          final widget = _buildIconWidgetFromPixels(pixels, size);
+          if (widget != null) {
+            _extensionIconCache['${entry.key}_$size'] = widget;
+          }
+        }
+      }
+    } catch (e) {
+      // Silently fail — fallback icons will be used
+    }
+  }
+
+  /// Build a widget from RGBA pixel data by encoding to BMP in memory.
+  /// Uses Image.memory which Flutter manages (no manual dispose needed).
+  static Widget? _buildIconWidgetFromPixels(Uint8List rgbaPixels, int size) {
+    // Determine dimensions from pixel count (square icon assumed from native)
+    final int pixelCount = rgbaPixels.length ~/ 4;
+    final int dim = _sqrt(pixelCount);
+    if (dim * dim != pixelCount) return null;
+
+    // Encode as 32-bit BMP (BGRA, bottom-up) — fast, no compression overhead
+    final bmpBytes = _encodeBmp32(rgbaPixels, dim, dim);
+
+    return SizedBox(
+      width: size.toDouble(),
+      height: size.toDouble(),
+      child: Image.memory(
+        bmpBytes,
+        width: size.toDouble(),
+        height: size.toDouble(),
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
+        // Prevent Flutter from caching these separately in ImageCache
+        cacheWidth: dim,
+        cacheHeight: dim,
+      ),
+    );
+  }
+
+  /// Encode RGBA pixels as a 32-bit BMP (with alpha channel).
+  /// BMP is trivial to encode and Flutter's image decoder handles it natively.
+  static Uint8List _encodeBmp32(Uint8List rgbaPixels, int width, int height) {
+    final int rowSize = width * 4; // No padding needed for 32-bit
+    final int imageSize = rowSize * height;
+    final int fileSize = 54 + imageSize; // 14 (file header) + 40 (DIB header) + pixels
+
+    final ByteData bmp = ByteData(fileSize);
+
+    // BMP File Header (14 bytes)
+    bmp.setUint8(0, 0x42); // 'B'
+    bmp.setUint8(1, 0x4D); // 'M'
+    bmp.setUint32(2, fileSize, Endian.little);
+    bmp.setUint32(6, 0, Endian.little); // reserved
+    bmp.setUint32(10, 54, Endian.little); // pixel data offset
+
+    // DIB Header (BITMAPINFOHEADER, 40 bytes)
+    bmp.setUint32(14, 40, Endian.little); // header size
+    bmp.setInt32(18, width, Endian.little);
+    bmp.setInt32(22, -height, Endian.little); // negative = top-down
+    bmp.setUint16(26, 1, Endian.little); // color planes
+    bmp.setUint16(28, 32, Endian.little); // bits per pixel
+    bmp.setUint32(30, 0, Endian.little); // compression (BI_RGB)
+    bmp.setUint32(34, imageSize, Endian.little);
+    bmp.setUint32(38, 2835, Endian.little); // horizontal resolution (72 DPI)
+    bmp.setUint32(42, 2835, Endian.little); // vertical resolution
+    bmp.setUint32(46, 0, Endian.little); // colors in palette
+    bmp.setUint32(50, 0, Endian.little); // important colors
+
+    // Pixel data: convert RGBA → BGRA (BMP native order)
+    final Uint8List bmpBytes = bmp.buffer.asUint8List();
+    int offset = 54;
+    for (int i = 0; i < rgbaPixels.length; i += 4) {
+      bmpBytes[offset] = rgbaPixels[i + 2]; // B
+      bmpBytes[offset + 1] = rgbaPixels[i + 1]; // G
+      bmpBytes[offset + 2] = rgbaPixels[i]; // R
+      bmpBytes[offset + 3] = rgbaPixels[i + 3]; // A
+      offset += 4;
+    }
+
+    return bmpBytes;
+  }
+
+  /// Integer square root helper.
+  static int _sqrt(int n) {
+    if (n <= 0) return 0;
+    int x = n;
+    int y = (x + 1) ~/ 2;
+    while (y < x) {
+      x = y;
+      y = (x + n ~/ x) ~/ 2;
+    }
+    return x;
+  }
+
+  /// Synchronous lookup — never triggers async work during scroll.
+  /// Returns null on cache miss (caller should use fallback phosphor icon).
+  static Widget? getExtensionIconSync(String extension, {int size = 32}) {
+    return _extensionIconCache['${extension}_$size'];
+  }
 
   /// Get an icon for a file. If possible, return the icon of the default application.
   /// If no default app is found, return an appropriate icon based on file type.

@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/bloc/selection/selection_bloc.dart';
 import 'package:cb_file_manager/bloc/selection/selection_event.dart';
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
+import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
@@ -93,7 +96,18 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   final TrashManager _trashManager = TrashManager();
   late final SelectionBloc _selectionBloc;
   List<TrashItem> _trashItems = [];
+  // Legacy "background action in progress" flag. Was used to gate a
+  // full-screen skeleton during delete/restore/empty actions; the
+  // skeleton is now driven exclusively by `_isStreaming` so this flag
+  // is effectively dead state. Kept (with a lint suppression) so the
+  // existing delete/restore/empty handlers do not need 13 individual
+  // edits to remove their `setState(() { _isLoading = ...; })` calls.
+  // ignore: unused_field
   bool _isLoading = true;
+  /// True while the streaming load is still emitting chunks. Used to
+  /// show a non-blocking progress indicator while items keep arriving,
+  /// without blocking the screen with a skeleton like _isLoading does.
+  bool _isStreaming = false;
   String? _errorCode;
   List<String> _errorArgs = [];
   bool _showSystemOptions = false;
@@ -112,6 +126,11 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   Offset? _dragCurrentPosition;
   final Map<String, Rect> _itemPositions = {};
   final GlobalKey _stackKey = GlobalKey();
+  // Cached sorted+filtered items. Recomputed only when source list, search,
+  // or sort option changes. Previously every BLoC selection rebuild
+  // re-ran sort over thousands of trash items inside _buildBody.
+  List<TrashItem> _displayItems = [];
+  StreamSubscription<List<TrashItem>>? _trashLoadSub;
   Set<String> _preDragSelectedPaths = const <String>{};
 
   @override
@@ -124,6 +143,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
 
   @override
   void dispose() {
+    _trashLoadSub?.cancel();
     _searchController.dispose();
     _selectionBloc.close();
     super.dispose();
@@ -139,6 +159,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         _viewMode = viewMode;
         _sortOption = sortOption;
         _gridZoomLevel = gridZoom;
+        _recomputeDisplayItems();
       });
     }
   }
@@ -160,34 +181,86 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   Future<void> _loadTrashItems() async {
+    // Cancel any in-flight load before starting a new one (e.g. when the
+    // user pulls to refresh while the previous lazy-load is still
+    // streaming recycle-bin pages).
+    await _trashLoadSub?.cancel();
+    _trashLoadSub = null;
+
+    // Drop skeleton immediately. Even if the native COM enumeration is
+    // slow on a huge Recycle Bin, the user should see the toolbar +
+    // empty-state without being blocked. Items will progressively
+    // populate as stream chunks arrive.
     setState(() {
-      _isLoading = true;
+      _isLoading = false;
+      _isStreaming = true;
+      _trashItems = [];
+      _displayItems = [];
+      _itemPositions.clear();
       _errorCode = null;
       _errorArgs = [];
     });
 
-    try {
-      final items = await _trashManager.getTrashItems();
-      setState(() {
-        _trashItems = items;
-        _isLoading = false;
-        _showSystemOptions =
-            Platform.isWindows && items.any((item) => item.isSystemTrashItem);
-      });
+    final accumulator = <TrashItem>[];
 
-      // Update thumbnail loader with file paths for priority loading
-      _updateThumbnailDisplayIndex();
-    } catch (e) {
-      setState(() {
-        _errorCode = 'load';
-        _errorArgs = [e.toString()];
-        _isLoading = false;
-      });
-    }
+    _trashLoadSub = _trashManager.getTrashItemsStreaming().listen(
+      (chunk) {
+        if (!mounted) return;
+        accumulator.addAll(chunk);
+        // Don't re-sort the whole accumulator on every chunk — that is
+        // O(n log n) per chunk and was a major UI-thread hog. The
+        // streaming reader emits items in directory order; a single
+        // final sort runs in onDone, and progressive renders are
+        // good enough without strict ordering during the load.
+        final snapshot = List<TrashItem>.unmodifiable(accumulator);
+        setState(() {
+          _trashItems = snapshot;
+          _recomputeDisplayItems();
+          _showSystemOptions = Platform.isWindows &&
+              snapshot.any((item) => item.isSystemTrashItem);
+        });
+        _updateThumbnailDisplayIndex();
+      },
+      onError: (Object e, StackTrace st) {
+        if (!mounted) return;
+        setState(() {
+          _errorCode = 'load';
+          _errorArgs = [e.toString()];
+          _isLoading = false;
+          _isStreaming = false;
+        });
+      },
+      onDone: () {
+        if (!mounted) return;
+        // Now that the stream is finished, sort once newest-first and
+        // push a final snapshot. This is the single sort cost for the
+        // whole load, instead of one sort per chunk.
+        accumulator.sort((a, b) => b.trashedDate.compareTo(a.trashedDate));
+        final snapshot = List<TrashItem>.unmodifiable(accumulator);
+        setState(() {
+          _trashItems = snapshot;
+          _recomputeDisplayItems();
+          _isStreaming = false;
+        });
+        _updateThumbnailDisplayIndex();
+
+        // Pre-warm extension icon cache for all non-media file types in
+        // the listing. This single batch native call replaces per-item
+        // async MethodChannel lookups during scroll.
+        final exts = accumulator
+            .where((item) => !item.isFolder)
+            .map((item) =>
+                p.extension(item.displayNameValue).toLowerCase())
+            .where((ext) => ext.isNotEmpty)
+            .toSet();
+        FileIconHelper.warmExtensionIcons(exts, size: 48);
+      },
+      cancelOnError: true,
+    );
   }
 
   void _updateThumbnailDisplayIndex() {
-    final sortedItems = _getSortedAndFilteredItems();
+    final sortedItems = _displayItems;
     final filePaths = sortedItems.map((item) => item.actualFilePath).toList();
     ThumbnailLoader.updateDisplayIndexMap(filePaths);
   }
@@ -427,7 +500,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     }
 
     final visiblePaths =
-        _getSortedAndFilteredItems().map((item) => item.trashFileName).toList();
+        _displayItems.map((item) => item.trashFileName).toList();
     final currentIndex = visiblePaths.indexOf(key);
     final lastIndex = visiblePaths.indexOf(selectionState.lastSelectedPath!);
     if (currentIndex == -1 || lastIndex == -1) return;
@@ -654,12 +727,16 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
           if (!_showSearch) {
             _searchQuery = '';
             _searchController.clear();
+            _recomputeDisplayItems();
           }
         });
       },
       isSearchActive: _showSearch,
       onSortOptionSelected: (option) {
-        setState(() => _sortOption = option);
+        setState(() {
+          _sortOption = option;
+          _recomputeDisplayItems();
+        });
         UserPreferences.instance.setTrashSortOption(option);
         _updateThumbnailDisplayIndex();
       },
@@ -754,6 +831,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
                   setState(() {
                     _searchQuery = '';
                     _searchController.clear();
+                    _recomputeDisplayItems();
                   });
                   _updateThumbnailDisplayIndex();
                 },
@@ -761,7 +839,10 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       ),
       style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
       onChanged: (v) {
-        setState(() => _searchQuery = v);
+        setState(() {
+          _searchQuery = v;
+          _recomputeDisplayItems();
+        });
         _updateThumbnailDisplayIndex();
       },
     );
@@ -832,6 +913,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       _showSearch = false;
       _searchQuery = '';
       _searchController.clear();
+      _recomputeDisplayItems();
     });
   }
 
@@ -865,9 +947,12 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   Widget _buildBody() {
     final l10n = AppLocalizations.of(context)!;
 
-    if (_isLoading && _trashItems.isEmpty) {
-      return _buildSkeletonLoader();
-    }
+    // Note: the legacy `_isLoading && _trashItems.isEmpty` branch was
+    // removed — `_loadTrashItems` now flips `_isLoading` to false
+    // immediately and the streaming branch below renders the skeleton
+    // while `_isStreaming && _trashItems.isEmpty`. Keeping both branches
+    // briefly stacked two skeletons on top of each other during the
+    // initial frame.
 
     if (_errorCode != null) {
       return Center(
@@ -900,6 +985,23 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     }
 
     if (_trashItems.isEmpty) {
+      // While the streaming load is still in progress, show skeleton
+      // cards (same as the regular file browser) so the user sees
+      // placeholder content immediately. Real items replace them
+      // progressively as stream chunks arrive.
+      if (_isStreaming) {
+        return Stack(
+          children: [
+            _buildSkeletonLoader(),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          ],
+        );
+      }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -935,7 +1037,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       );
     }
 
-    final items = _getSortedAndFilteredItems();
+    final items = _displayItems;
 
     if (items.isEmpty && _searchQuery.isNotEmpty) {
       return Center(
@@ -948,14 +1050,21 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       );
     }
 
-    return _buildItemsView(items, l10n);
+    return Stack(
+      children: [
+        Positioned.fill(child: _buildItemsView(items, l10n)),
+        if (_isStreaming)
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+      ],
+    );
   }
 
   Widget _buildItemsView(List<TrashItem> items, AppLocalizations l10n) {
-    // Invalidate stale item positions after each build (never during an active drag).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_isDraggingRect) _itemPositions.clear();
-    });
     final maxZoom = GridZoomConstraints.maxGridSizeForContext(
       context,
       mode: GridSizeMode.columns,
@@ -980,6 +1089,13 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       gridSpacing: GridZoomConstraints.fileGridSpacing,
       gridChildAspectRatio: 0.8,
       gridCacheExtent: _isDesktop ? 600 : 400,
+      listCacheExtent: _isDesktop ? 600 : 400,
+      detailsCacheExtent: _isDesktop ? 600 : 400,
+      // Only register per-item rects while a lasso drag is in progress.
+      // Without this gate, every visible row runs a LayoutBuilder +
+      // addPostFrameCallback + localToGlobal on every layout pass, which
+      // costs hundreds of post-frame callbacks per frame on a long list.
+      measurePositions: _isDraggingRect,
       listItemBuilder: (itemContext, item) =>
           _buildSelectableListItem(itemContext, item, l10n),
       gridItemBuilder: (itemContext, item) =>
@@ -1150,8 +1266,14 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     );
   }
 
-  List<TrashItem> _getSortedAndFilteredItems() {
-    List<TrashItem> items = _trashItems;
+  void _recomputeDisplayItems() {
+    _displayItems = _computeSortedAndFilteredItems();
+  }
+
+  List<TrashItem> _computeSortedAndFilteredItems() {
+    // _trashItems is List.unmodifiable from the streaming load. Copy it
+    // into a mutable list before sorting/filtering so .sort() works.
+    List<TrashItem> items = List<TrashItem>.from(_trashItems);
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {

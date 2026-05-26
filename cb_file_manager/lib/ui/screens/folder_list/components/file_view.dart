@@ -1,11 +1,15 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
-import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
@@ -158,6 +162,7 @@ class FileView extends StatelessWidget {
                     isDesktopMode: actualIsDesktop,
                     lastSelectedPath: lastSelectedPath,
                     clearSelectionMode: clearSelectionMode,
+                    showItemBackground: false,
                   )
                 : FileItem(
                     key: ValueKey(
@@ -176,6 +181,7 @@ class FileView extends StatelessWidget {
                     isDesktopMode: actualIsDesktop,
                     lastSelectedPath: lastSelectedPath,
                     showFileTags: showFileTags,
+                    showItemBackground: false,
                   ),
           ),
         );
@@ -195,6 +201,7 @@ class FileView extends StatelessWidget {
       fontWeight: FontWeight.bold,
       color: Theme.of(context).colorScheme.onSurface,
     );
+    final l10n = AppLocalizations.of(context)!;
 
     // Debug selection count
     debugPrint(
@@ -215,21 +222,12 @@ class FileView extends StatelessWidget {
                   // Name column (always visible)
                   Expanded(
                     flex: 3,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 10.0, horizontal: 12.0),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Tên',
-                            style: headerStyle,
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(PhosphorIconsLight.arrowDown,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.onSurface),
-                        ],
-                      ),
+                    child: _buildSortableHeaderCell(
+                      context: context,
+                      label: l10n.columnName,
+                      style: headerStyle,
+                      ascendingOption: SortOption.nameAsc,
+                      descendingOption: SortOption.nameDesc,
                     ),
                   ),
 
@@ -237,13 +235,12 @@ class FileView extends StatelessWidget {
                   if (columnVisibility.type)
                     Expanded(
                       flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Loại',
-                          style: headerStyle,
-                        ),
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnType,
+                        style: headerStyle,
+                        ascendingOption: SortOption.typeAsc,
+                        descendingOption: SortOption.typeDesc,
                       ),
                     ),
 
@@ -251,13 +248,12 @@ class FileView extends StatelessWidget {
                   if (columnVisibility.size)
                     Expanded(
                       flex: 1,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Kích thước',
-                          style: headerStyle,
-                        ),
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnSize,
+                        style: headerStyle,
+                        ascendingOption: SortOption.sizeAsc,
+                        descendingOption: SortOption.sizeDesc,
                       ),
                     ),
 
@@ -265,13 +261,12 @@ class FileView extends StatelessWidget {
                   if (columnVisibility.dateModified)
                     Expanded(
                       flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Ngày sửa đổi',
-                          style: headerStyle,
-                        ),
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnDateModified,
+                        style: headerStyle,
+                        ascendingOption: SortOption.dateAsc,
+                        descendingOption: SortOption.dateDesc,
                       ),
                     ),
 
@@ -279,13 +274,12 @@ class FileView extends StatelessWidget {
                   if (columnVisibility.dateCreated)
                     Expanded(
                       flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Ngày tạo',
-                          style: headerStyle,
-                        ),
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnDateCreated,
+                        style: headerStyle,
+                        ascendingOption: SortOption.dateCreatedAsc,
+                        descendingOption: SortOption.dateCreatedDesc,
                       ),
                     ),
 
@@ -293,13 +287,12 @@ class FileView extends StatelessWidget {
                   if (columnVisibility.attributes)
                     Expanded(
                       flex: 1,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Thuộc tính',
-                          style: headerStyle,
-                        ),
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnAttributes,
+                        style: headerStyle,
+                        ascendingOption: SortOption.attributesAsc,
+                        descendingOption: SortOption.attributesDesc,
                       ),
                     ),
                 ],
@@ -311,8 +304,7 @@ class FileView extends StatelessWidget {
               right: 8,
               top: 8,
               child: Tooltip(
-                message:
-                    'Nhấn nút cài đặt cột ở thanh công cụ trên cùng để tùy chỉnh các cột hiển thị',
+                message: l10n.columnVisibilityInstructions,
                 child: Icon(
                   PhosphorIconsLight.info,
                   size: 16,
@@ -401,6 +393,54 @@ class FileView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSortableHeaderCell({
+    required BuildContext context,
+    required String label,
+    required TextStyle style,
+    required SortOption ascendingOption,
+    required SortOption descendingOption,
+  }) {
+    final currentSort = state.sortOption;
+    final bool isAscending = currentSort == ascendingOption;
+    final bool isDescending = currentSort == descendingOption;
+    final bool isActive = isAscending || isDescending;
+    final Color iconColor = isActive
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return InkWell(
+      onTap: () {
+        final nextSort = isAscending ? descendingOption : ascendingOption;
+        context.read<FolderListBloc>().add(SetSortOption(
+              nextSort,
+              folderPath: state.currentPath.path,
+            ));
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+        child: Row(
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: style,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              isDescending
+                  ? PhosphorIconsLight.arrowDown
+                  : PhosphorIconsLight.arrowUp,
+              size: 16,
+              color: iconColor,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

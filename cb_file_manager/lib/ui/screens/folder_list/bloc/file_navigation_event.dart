@@ -67,11 +67,17 @@ class FileNavigationFilter extends FileNavigationEvent {
 
 class FileNavigationSetSortOption extends FileNavigationEvent {
   final SortOption sortOption;
+  final bool persist;
+  final String? folderPath;
 
-  const FileNavigationSetSortOption(this.sortOption);
+  const FileNavigationSetSortOption(
+    this.sortOption, {
+    this.persist = true,
+    this.folderPath,
+  });
 
   @override
-  List<Object> get props => [sortOption];
+  List<Object?> get props => [sortOption, persist, folderPath];
 }
 
 // ─── View Mode ─────────────────────────────────────────────────────

@@ -61,6 +61,8 @@ class UserPreferences {
   static const String _previewPaneVisibleKey = 'preview_pane_visible';
   static const String _thumbnailModeKey = 'thumbnail_mode';
   static const String _maxThumbnailConcurrencyKey = 'max_thumbnail_concurrency';
+  static const String _tabInactiveThresholdMinutesKey =
+      'tab_inactive_threshold_minutes';
   static const String _previewPaneWidthKey = 'preview_pane_width';
   static const String _useSystemDefaultForVideoKey =
       'use_system_default_for_video';
@@ -84,6 +86,12 @@ class UserPreferences {
   static const String _trashViewModeKey = 'trash_view_mode';
   static const String _trashSortOptionKey = 'trash_sort_option';
   static const String _trashGridZoomLevelKey = 'trash_grid_zoom_level';
+  static const String _videoLibraryViewModePrefix = 'video_library_view_mode_';
+  static const String _videoLibrarySortOptionPrefix =
+      'video_library_sort_option_';
+  static const String _networkBrowserViewModeKey = 'network_browser_view_mode';
+  static const String _networkBrowserSortOptionKey =
+      'network_browser_sort_option';
 
   // Constants for grid zoom level
   static const int minGridZoomLevel = 2; // Largest thumbnails (2 per row)
@@ -117,6 +125,12 @@ class UserPreferences {
   static const int minThumbnailConcurrency = 1;
   static const int maxThumbnailConcurrency = 32;
   static const int defaultThumbnailConcurrency = 8;
+
+  // Constants for tab inactive threshold (in minutes).
+  // 0 means "never auto-suspend tabs".
+  static const int minTabInactiveThresholdMinutes = 0;
+  static const int maxTabInactiveThresholdMinutes = 24 * 60; // 24 hours
+  static const int defaultTabInactiveThresholdMinutes = 60;
 
   // Constants for recent paths
   static const int maxRecentPaths = 20;
@@ -931,6 +945,98 @@ class UserPreferences {
     return await _savePreference<int>(_sortOptionKey, sortOption.index);
   }
 
+  Future<ViewMode> getVideoLibraryViewMode(
+    int libraryId, {
+    ViewMode? fallback,
+  }) async {
+    final index = await _getPreference<int>(
+      '$_videoLibraryViewModePrefix$libraryId',
+      defaultValue: fallback?.index ?? ViewMode.grid.index,
+    );
+    final resolvedIndex = index ?? fallback?.index ?? ViewMode.grid.index;
+    if (resolvedIndex < 0 || resolvedIndex >= ViewMode.values.length) {
+      return fallback ?? ViewMode.grid;
+    }
+    return ViewMode.values[resolvedIndex];
+  }
+
+  Future<bool> setVideoLibraryViewMode(
+    int libraryId,
+    ViewMode viewMode,
+  ) async {
+    return await _savePreference<int>(
+      '$_videoLibraryViewModePrefix$libraryId',
+      viewMode.index,
+    );
+  }
+
+  Future<SortOption> getVideoLibrarySortOption(
+    int libraryId, {
+    SortOption? fallback,
+  }) async {
+    final index = await _getPreference<int>(
+      '$_videoLibrarySortOptionPrefix$libraryId',
+      defaultValue: fallback?.index ?? SortOption.nameAsc.index,
+    );
+    final resolvedIndex = index ?? fallback?.index ?? SortOption.nameAsc.index;
+    if (resolvedIndex < 0 || resolvedIndex >= SortOption.values.length) {
+      return fallback ?? SortOption.nameAsc;
+    }
+    return SortOption.values[resolvedIndex];
+  }
+
+  Future<bool> setVideoLibrarySortOption(
+    int libraryId,
+    SortOption sortOption,
+  ) async {
+    return await _savePreference<int>(
+      '$_videoLibrarySortOptionPrefix$libraryId',
+      sortOption.index,
+    );
+  }
+
+  Future<ViewMode> getNetworkBrowserViewMode({
+    ViewMode? fallback,
+  }) async {
+    final index = await _getPreference<int>(
+      _networkBrowserViewModeKey,
+      defaultValue: fallback?.index ?? ViewMode.list.index,
+    );
+    final resolvedIndex = index ?? fallback?.index ?? ViewMode.list.index;
+    if (resolvedIndex < 0 || resolvedIndex >= ViewMode.values.length) {
+      return fallback ?? ViewMode.list;
+    }
+    return ViewMode.values[resolvedIndex];
+  }
+
+  Future<bool> setNetworkBrowserViewMode(ViewMode viewMode) async {
+    return await _savePreference<int>(
+      _networkBrowserViewModeKey,
+      viewMode.index,
+    );
+  }
+
+  Future<SortOption> getNetworkBrowserSortOption({
+    SortOption? fallback,
+  }) async {
+    final index = await _getPreference<int>(
+      _networkBrowserSortOptionKey,
+      defaultValue: fallback?.index ?? SortOption.nameAsc.index,
+    );
+    final resolvedIndex = index ?? fallback?.index ?? SortOption.nameAsc.index;
+    if (resolvedIndex < 0 || resolvedIndex >= SortOption.values.length) {
+      return fallback ?? SortOption.nameAsc;
+    }
+    return SortOption.values[resolvedIndex];
+  }
+
+  Future<bool> setNetworkBrowserSortOption(SortOption sortOption) async {
+    return await _savePreference<int>(
+      _networkBrowserSortOptionKey,
+      sortOption.index,
+    );
+  }
+
   /// Get grid zoom level preference
   Future<int> getGridZoomLevel() async {
     return await _getPreference<int>(
@@ -1112,6 +1218,33 @@ class UserPreferences {
         concurrency.clamp(minThumbnailConcurrency, maxThumbnailConcurrency);
     return await _savePreference<int>(
         _maxThumbnailConcurrencyKey, validConcurrency);
+  }
+
+  /// Get the configured tab inactive threshold in minutes.
+  /// A value of 0 means tabs never auto-suspend.
+  Future<int> getTabInactiveThresholdMinutes() async {
+    final stored = await _getPreference<int>(
+      _tabInactiveThresholdMinutesKey,
+      defaultValue: defaultTabInactiveThresholdMinutes,
+    );
+    final value = stored ?? defaultTabInactiveThresholdMinutes;
+    return value.clamp(
+      minTabInactiveThresholdMinutes,
+      maxTabInactiveThresholdMinutes,
+    );
+  }
+
+  /// Save the tab inactive threshold in minutes.
+  /// Pass 0 to disable auto-suspend completely.
+  Future<bool> setTabInactiveThresholdMinutes(int minutes) async {
+    final validMinutes = minutes.clamp(
+      minTabInactiveThresholdMinutes,
+      maxTabInactiveThresholdMinutes,
+    );
+    return await _savePreference<int>(
+      _tabInactiveThresholdMinutesKey,
+      validMinutes,
+    );
   }
 
   /// Search tip shown preference

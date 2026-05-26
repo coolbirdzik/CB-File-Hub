@@ -12,6 +12,10 @@ enum ApprovalActionType {
   /// Permanently delete a file or directory.
   deleteFile,
 
+  /// Bulk-clean junk files via the Disk Cleaner skill (move-to-Recycle-Bin
+  /// by default, optionally permanent).
+  cleanJunk,
+
   /// Generic / unknown action.
   generic,
 }

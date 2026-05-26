@@ -188,6 +188,9 @@ class EnglishLocalizations implements AppLocalizations {
 
   // Column names
   @override
+  String get columnName => 'Name';
+
+  @override
   String get columnSize => 'Size';
 
   @override
@@ -1506,6 +1509,22 @@ class EnglishLocalizations implements AppLocalizations {
       'Restore last opened tab and keep drawer collapse state per tab.';
 
   @override
+  String get tabInactiveThreshold => 'Tab inactive timeout';
+
+  @override
+  String get tabInactiveThresholdDescription =>
+      'Auto-suspend a tab and release its caches after it has been left untouched for this duration. Set to "Off" to keep tabs always active.';
+
+  @override
+  String get tabInactiveThresholdDisabled => 'Off';
+
+  @override
+  String get tabInactiveThresholdMinutesValue => 'minutes';
+
+  @override
+  String get tabInactiveThresholdHoursValue => 'hours';
+
+  @override
   String get cacheManagement => 'Cache Management';
 
   @override
@@ -2209,6 +2228,12 @@ class EnglishLocalizations implements AppLocalizations {
   String get closeTab => 'Close tab';
 
   @override
+  String get closeOtherTabs => 'Close other tabs';
+
+  @override
+  String get markTabInactive => 'Mark as inactive';
+
+  @override
   String get addNewTab => 'Add new tab';
 
   // Desktop windows (tabbed browsing)
@@ -2803,6 +2828,44 @@ class EnglishLocalizations implements AppLocalizations {
   String get deleteConversation => 'Delete conversation';
   @override
   String get noConversations => 'No conversations yet';
+
+  // CB Agent rebrand
+  @override
+  String get cbAgent => 'CB Agent';
+  @override
+  String get cbAgentTitle => 'CB Agent';
+  @override
+  String get cbAgentSubtitle => 'Built-in AI assistant for CB File Hub';
+
+  // Disk Cleaner (CB Agent skill)
+  @override
+  String get cbAgentCleanerTitle => 'Disk Cleaner (CB Agent)';
+  @override
+  String get diskCleanerNotAvailable =>
+      'Disk Cleaner is only available on Windows';
+  @override
+  String get diskCleanerScanTitle => 'Scan for junk files';
+  @override
+  String get diskCleanerScanRunning => 'Scanning...';
+  @override
+  String get diskCleanerScanDone => 'Scan complete';
+  @override
+  String get diskCleanerCleanTitle => 'Clean junk files';
+  @override
+  String get diskCleanerCleanDone => 'Cleanup complete';
+  @override
+  String get diskCleanerAskAgent => 'Ask CB Agent';
+  @override
+  String get diskCleanerMoveToRecycleBin => 'Move to Recycle Bin';
+  @override
+  String get diskCleanerPermanentDelete => 'Permanent delete';
+  @override
+  String get diskCleanerSelectCategories => 'Select categories';
+  @override
+  String get diskCleanerSelectDrives => 'Select drives';
+  @override
+  String get diskCleanerScanAgain => 'Scan again';
+
   @override
   String get aiThinking0 => 'Thinking...';
   @override

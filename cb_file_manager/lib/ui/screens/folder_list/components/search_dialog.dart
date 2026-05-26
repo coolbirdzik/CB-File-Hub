@@ -365,29 +365,29 @@ class _SearchDialogState extends State<SearchDialog> {
 
   Widget _buildSearchResults() {
     if (_filteredFiles.isEmpty && _filteredFolders.isEmpty) {
-      return const Center(
-        child: Text('Không tìm thấy kết quả'),
+      return Center(
+        child: Text(AppLocalizations.of(context)!.noResultsFound),
       );
     }
 
     return ListView(
       children: [
         if (_filteredFolders.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.all(8.0),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
             child: Text(
-              'Thư mục',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              AppLocalizations.of(context)!.folder,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           ..._filteredFolders.map(_buildFolderItem).toList(),
         ],
         if (_filteredFiles.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.all(8.0),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
             child: Text(
-              'Tệp',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              AppLocalizations.of(context)!.file,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           ..._filteredFiles.map(_buildFileItem).toList(),

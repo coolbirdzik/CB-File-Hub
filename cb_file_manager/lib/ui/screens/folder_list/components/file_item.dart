@@ -90,6 +90,7 @@ class FileItem extends StatefulWidget {
   final String?
       lastSelectedPath; // Add parameter to track last selected file for shift-selection
   final bool showFileTags; // Add parameter to control tag display
+  final bool showItemBackground;
 
   const FileItem({
     Key? key,
@@ -106,6 +107,7 @@ class FileItem extends StatefulWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
+    this.showItemBackground = true,
   }) : super(key: key);
 
   @override
@@ -404,6 +406,9 @@ class _FileItemState extends State<FileItem> {
               isSelected: isSelected,
               isHovering: isHovering,
             );
+            final Color effectiveBackgroundColor = widget.showItemBackground
+                ? backgroundColor
+                : Colors.transparent;
 
             return RepaintBoundary(
               child: Opacity(
@@ -414,13 +419,20 @@ class _FileItemState extends State<FileItem> {
                   cursor: SystemMouseCursors.click,
                   child: Container(
                     margin: EdgeInsets.symmetric(
-                        horizontal: widget.isDesktopMode ? 8.0 : 0,
-                        vertical: widget.isDesktopMode ? 4.0 : 0),
+                        horizontal:
+                            widget.isDesktopMode && widget.showItemBackground
+                                ? 8.0
+                                : 0,
+                        vertical:
+                            widget.isDesktopMode && widget.showItemBackground
+                                ? 4.0
+                                : 0),
                     decoration: BoxDecoration(
-                      color: backgroundColor,
-                      borderRadius: widget.isDesktopMode
-                          ? BorderRadius.circular(16)
-                          : BorderRadius.zero,
+                      color: effectiveBackgroundColor,
+                      borderRadius:
+                          widget.isDesktopMode && widget.showItemBackground
+                              ? BorderRadius.circular(16)
+                              : BorderRadius.zero,
                     ),
                     child: Stack(
                       children: [
@@ -494,7 +506,9 @@ class _FileItemState extends State<FileItem> {
                             ),
                           ),
                         // Selection indicator - only rebuilds when selection changes
-                        if (isSelected && !widget.isDesktopMode)
+                        if (isSelected &&
+                            (!widget.isDesktopMode ||
+                                !widget.showItemBackground))
                           Positioned(
                             left: 0,
                             top: 0,

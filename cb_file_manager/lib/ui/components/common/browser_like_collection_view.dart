@@ -28,6 +28,11 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   final double? listCacheExtent;
   final double? gridCacheExtent;
   final double? detailsCacheExtent;
+  /// When false the per-item position registration (used for lasso/drag
+  /// selection) is skipped — every visible item then avoids a per-frame
+  /// `LayoutBuilder` + `addPostFrameCallback` + `localToGlobal` round-trip.
+  /// Trash bin / recycle bin enables this only while a drag is in progress.
+  final bool measurePositions;
 
   const BrowserLikeCollectionView({
     Key? key,
@@ -56,6 +61,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
     this.listCacheExtent,
     this.gridCacheExtent,
     this.detailsCacheExtent,
+    this.measurePositions = true,
   }) : super(key: key);
 
   @override
@@ -83,12 +89,47 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   }
 
   Widget _buildContent() {
+    // Reverse-lookup map for `findChildIndexCallback`. With this, when the
+    // underlying list is sorted/filtered Flutter reuses element slots
+    // instead of rebuilding every visible item from scratch.
+    final indexByIdentity = <String, int>{
+      for (var i = 0; i < items.length; i++) itemIdentity(items[i]): i,
+    };
+    int? findIndex(Key key) {
+      if (key is ValueKey<String>) {
+        return indexByIdentity[key.value];
+      }
+      return null;
+    }
+
+    Widget buildItem(BuildContext context, int index, Widget Function(BuildContext, T) builder) {
+      final item = items[index];
+      final id = itemIdentity(item);
+      final child = Builder(builder: (itemContext) => builder(itemContext, item));
+      final wrapped = RepaintBoundary(
+        child: measurePositions
+            ? _MeasuredCollectionItem(
+                identity: id,
+                registerItemPosition: registerItemPosition,
+                child: child,
+              )
+            : child,
+      );
+      return KeyedSubtree(
+        key: ValueKey<String>(id),
+        child: wrapped,
+      );
+    }
+
     if (viewMode == ViewMode.grid || viewMode == ViewMode.gridPreview) {
       return GridView.builder(
         controller: scrollController,
         padding: padding,
         physics: physics,
         cacheExtent: gridCacheExtent,
+        addAutomaticKeepAlives: true,
+        addRepaintBoundaries: true,
+        addSemanticIndexes: false,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: gridCrossAxisCount,
           crossAxisSpacing: gridSpacing,
@@ -96,16 +137,9 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
           childAspectRatio: gridChildAspectRatio,
         ),
         itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return _MeasuredCollectionItem(
-            identity: itemIdentity(item),
-            registerItemPosition: registerItemPosition,
-            child: Builder(
-              builder: (itemContext) => gridItemBuilder(itemContext, item),
-            ),
-          );
-        },
+        findChildIndexCallback: findIndex,
+        itemBuilder: (context, index) =>
+            buildItem(context, index, gridItemBuilder),
       );
     }
 
@@ -116,37 +150,27 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               padding: padding,
               physics: physics,
               cacheExtent: detailsCacheExtent,
+              addAutomaticKeepAlives: true,
+              addRepaintBoundaries: true,
+              addSemanticIndexes: false,
               itemCount: items.length,
               separatorBuilder: detailsSeparatorBuilder!,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return _MeasuredCollectionItem(
-                  identity: itemIdentity(item),
-                  registerItemPosition: registerItemPosition,
-                  child: Builder(
-                    builder: (itemContext) =>
-                        detailsItemBuilder(itemContext, item),
-                  ),
-                );
-              },
+              findItemIndexCallback: findIndex,
+              itemBuilder: (context, index) =>
+                  buildItem(context, index, detailsItemBuilder),
             )
           : ListView.builder(
               controller: scrollController,
               padding: padding,
               physics: physics,
               cacheExtent: detailsCacheExtent,
+              addAutomaticKeepAlives: true,
+              addRepaintBoundaries: true,
+              addSemanticIndexes: false,
               itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return _MeasuredCollectionItem(
-                  identity: itemIdentity(item),
-                  registerItemPosition: registerItemPosition,
-                  child: Builder(
-                    builder: (itemContext) =>
-                        detailsItemBuilder(itemContext, item),
-                  ),
-                );
-              },
+              findChildIndexCallback: findIndex,
+              itemBuilder: (context, index) =>
+                  buildItem(context, index, detailsItemBuilder),
             );
       return Column(
         children: [
@@ -163,17 +187,13 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       padding: padding,
       physics: physics,
       cacheExtent: listCacheExtent,
+      addAutomaticKeepAlives: true,
+      addRepaintBoundaries: true,
+      addSemanticIndexes: false,
       itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _MeasuredCollectionItem(
-          identity: itemIdentity(item),
-          registerItemPosition: registerItemPosition,
-          child: Builder(
-            builder: (itemContext) => listItemBuilder(itemContext, item),
-          ),
-        );
-      },
+      findChildIndexCallback: findIndex,
+      itemBuilder: (context, index) =>
+          buildItem(context, index, listItemBuilder),
     );
   }
 }

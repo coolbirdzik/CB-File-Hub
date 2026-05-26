@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -186,8 +187,8 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12.0, vertical: 10.0),
-                          child: const Text(
-                            'Thư mục',
+                          child: Text(
+                            AppLocalizations.of(context)!.folder,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

@@ -167,8 +167,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.sortAscending,
                     isChecked: currentSortOption == SortOption.nameAsc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.nameAsc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.nameAsc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.nameAsc);
                     },
                   ),
@@ -178,8 +180,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.sortDescending,
                     isChecked: currentSortOption == SortOption.nameDesc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.nameDesc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.nameDesc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.nameDesc);
                     },
                   ),
@@ -189,8 +193,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.calendarBlank,
                     isChecked: currentSortOption == SortOption.dateDesc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.dateDesc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.dateDesc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.dateDesc);
                     },
                   ),
@@ -200,8 +206,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.calendarBlank,
                     isChecked: currentSortOption == SortOption.dateAsc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.dateAsc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.dateAsc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.dateAsc);
                     },
                   ),
@@ -211,8 +219,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.arrowsOut,
                     isChecked: currentSortOption == SortOption.sizeDesc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.sizeDesc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.sizeDesc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.sizeDesc);
                     },
                   ),
@@ -222,8 +232,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.arrowsIn,
                     isChecked: currentSortOption == SortOption.sizeAsc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.sizeAsc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.sizeAsc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.sizeAsc);
                     },
                   ),
@@ -233,8 +245,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.textAa,
                     isChecked: currentSortOption == SortOption.typeAsc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.typeAsc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.typeAsc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.typeAsc);
                     },
                   ),
@@ -244,8 +258,10 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.textAa,
                     isChecked: currentSortOption == SortOption.typeDesc,
                     onSelected: (_) async {
-                      folderListBloc
-                          .add(const SetSortOption(SortOption.typeDesc));
+                      folderListBloc.add(SetSortOption(
+                        SortOption.typeDesc,
+                        folderPath: currentPath,
+                      ));
                       await onSortOptionSaved(SortOption.typeDesc);
                     },
                   ),

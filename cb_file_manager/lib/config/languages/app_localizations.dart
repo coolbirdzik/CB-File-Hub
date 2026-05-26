@@ -91,6 +91,7 @@ abstract class AppLocalizations {
   String get hidePreview;
 
   // Column names
+  String get columnName;
   String get columnSize;
   String get columnType;
   String get columnDateModified;
@@ -850,6 +851,11 @@ abstract class AppLocalizations {
   String get showFileTagsToggleDescription;
   String get rememberTabWorkspace;
   String get rememberTabWorkspaceDescription;
+  String get tabInactiveThreshold;
+  String get tabInactiveThresholdDescription;
+  String get tabInactiveThresholdDisabled;
+  String get tabInactiveThresholdMinutesValue;
+  String get tabInactiveThresholdHoursValue;
   String get cacheManagement;
   String get cacheManagementDescription;
   String get cacheFolder;
@@ -1018,6 +1024,8 @@ abstract class AppLocalizations {
   String get closeAllTabs;
   String get activeTab;
   String get closeTab;
+  String get closeOtherTabs;
+  String get markTabInactive;
   String get addNewTab;
 
   // Desktop windows (tabbed browsing)
@@ -1220,6 +1228,26 @@ abstract class AppLocalizations {
   String get conversations;
   String get deleteConversation;
   String get noConversations;
+
+  // CB Agent rebrand
+  String get cbAgent;
+  String get cbAgentTitle;
+  String get cbAgentSubtitle;
+
+  // Disk Cleaner (CB Agent skill)
+  String get cbAgentCleanerTitle;
+  String get diskCleanerNotAvailable;
+  String get diskCleanerScanTitle;
+  String get diskCleanerScanRunning;
+  String get diskCleanerScanDone;
+  String get diskCleanerCleanTitle;
+  String get diskCleanerCleanDone;
+  String get diskCleanerAskAgent;
+  String get diskCleanerMoveToRecycleBin;
+  String get diskCleanerPermanentDelete;
+  String get diskCleanerSelectCategories;
+  String get diskCleanerSelectDrives;
+  String get diskCleanerScanAgain;
 
   // AI thinking / loading indicators
   String get aiThinking0;

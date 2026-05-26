@@ -772,16 +772,11 @@ class FileListViewBuilder {
                             child: KeyedSubtree(
                               key: ValueKey("folder-${folder.path}"),
                               child: FluentBackground(
-                                enableBlur: isDesktopPlatform,
+                                enableBlur: false,
                                 blurAmount: 3.0,
-                                opacity: isSelected ? 0.7 : 0.0,
-                                backgroundColor: isSelected
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer
-                                        .withValues(alpha: 0.6)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(16.0),
+                                opacity: 0.0,
+                                backgroundColor: Colors.transparent,
+                                borderRadius: BorderRadius.zero,
                                 child: RepaintBoundary(
                                   child: folder_list_components.FolderItem(
                                     key: ValueKey("folder-item-${folder.path}"),
@@ -793,6 +788,7 @@ class FileListViewBuilder {
                                     isDesktopMode: isDesktopPlatform,
                                     lastSelectedPath:
                                         selectionState.lastSelectedPath,
+                                    showItemBackground: false,
                                   ),
                                 ),
                               ),
@@ -806,16 +802,11 @@ class FileListViewBuilder {
                             child: KeyedSubtree(
                               key: ValueKey("file-${file.path}"),
                               child: FluentBackground(
-                                enableBlur: isDesktopPlatform,
+                                enableBlur: false,
                                 blurAmount: 3.0,
-                                opacity: isSelected ? 0.7 : 0.0,
-                                backgroundColor: isSelected
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer
-                                        .withValues(alpha: 0.6)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(16.0),
+                                opacity: 0.0,
+                                backgroundColor: Colors.transparent,
+                                borderRadius: BorderRadius.zero,
                                 child: RepaintBoundary(
                                   child: folder_list_components.FileItem(
                                     key: ValueKey("file-item-${file.path}"),
@@ -834,6 +825,7 @@ class FileListViewBuilder {
                                     lastSelectedPath:
                                         selectionState.lastSelectedPath,
                                     showFileTags: showFileTags,
+                                    showItemBackground: false,
                                   ),
                                 ),
                               ),

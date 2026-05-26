@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
+import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_display_state.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
@@ -65,6 +66,8 @@ import 'package:cb_file_manager/ui/widgets/folder_content_builder.dart';
 import 'package:cb_file_manager/ui/widgets/refreshable_file_list_view.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 part 'tabbed_folder_list_screen.mobile_actions.dart';
 part 'tabbed_folder_list_screen.refresh.dart';
@@ -162,6 +165,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   @override
   FolderListBloc get folderListBloc => _folderListBloc;
 
+  @override
+  String get preferencePath => _currentPath;
+
   // Global search toggle for tag search
   bool isGlobalSearch = false;
 
@@ -176,7 +182,6 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   late final InlineRenameController _inlineRenameController;
   String? _pendingCreatedFilePath;
   Set<String> _pendingDeletedFocusPaths = const {};
-  String? _pendingCurrentDeletedFocusPath;
   String? _pendingNextFocusPathAfterDelete;
   bool _allowFileExtensionRename = false;
   bool _isMasonryLayout = false;
@@ -503,11 +508,15 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   void _queueFocusAfterDelete(Set<String> deletedPaths, String? nextFocusPath) {
+    final focusedPath = _keyboardController.focusedPath;
+    if (focusedPath == null || !deletedPaths.contains(focusedPath)) {
+      _pendingDeletedFocusPaths = const {};
+      _pendingNextFocusPathAfterDelete = null;
+      _selectionBloc.add(ClearSelection());
+      return;
+    }
+
     _pendingDeletedFocusPaths = deletedPaths;
-    _pendingCurrentDeletedFocusPath = _keyboardController.focusedPath != null &&
-            deletedPaths.contains(_keyboardController.focusedPath)
-        ? _keyboardController.focusedPath
-        : (deletedPaths.isEmpty ? null : deletedPaths.first);
     _pendingNextFocusPathAfterDelete = nextFocusPath;
   }
 
@@ -521,34 +530,23 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       ...state.filteredFiles.map((entity) => entity.path),
     };
 
-    final visibleDeletedPaths = _pendingDeletedFocusPaths
-        .where((path) => currentPaths.contains(path))
-        .toSet();
+    final currentFocusedPath = _keyboardController.focusedPath;
+    if (currentFocusedPath != null &&
+        currentPaths.contains(currentFocusedPath) &&
+        !_pendingDeletedFocusPaths.contains(currentFocusedPath)) {
+      _pendingDeletedFocusPaths = const {};
+      _pendingNextFocusPathAfterDelete = null;
+      return;
+    }
 
-    if (visibleDeletedPaths.isNotEmpty) {
-      final currentDeletedFocus = _pendingCurrentDeletedFocusPath != null &&
-              visibleDeletedPaths.contains(_pendingCurrentDeletedFocusPath)
-          ? _pendingCurrentDeletedFocusPath!
-          : visibleDeletedPaths.first;
-      _pendingCurrentDeletedFocusPath = currentDeletedFocus;
-      _keyboardController.focusedPath = currentDeletedFocus;
-
-      final selection = _selectionBloc.state;
-      if (!selection.allSelectedPaths.contains(currentDeletedFocus)) {
-        if (state.folders.any((entity) => entity.path == currentDeletedFocus)) {
-          _toggleFolderSelection(currentDeletedFocus,
-              shiftSelect: false, ctrlSelect: false);
-        } else {
-          _toggleFileSelection(currentDeletedFocus,
-              shiftSelect: false, ctrlSelect: false);
-        }
-      }
+    final hasDeletedItemsStillVisible =
+        _pendingDeletedFocusPaths.any((path) => currentPaths.contains(path));
+    if (hasDeletedItemsStillVisible) {
       return;
     }
 
     final nextFocusPath = _pendingNextFocusPathAfterDelete;
     _pendingDeletedFocusPaths = const {};
-    _pendingCurrentDeletedFocusPath = null;
     _pendingNextFocusPathAfterDelete = null;
 
     _clearSelection();
@@ -678,6 +676,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     setState(() {
       _isRefreshing = true;
     });
+
+    // Pull-to-refresh / explicit refresh counts as user interaction.
+    if (locator.isRegistered<TabActivityManager>()) {
+      locator<TabActivityManager>()
+          .onTabInteraction(widget.tabId, path: _currentPath);
+    }
 
     _refreshController.refreshFileList(
       currentPath: _currentPath,
@@ -936,6 +940,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         _currentFilter,
         _currentSearchTag,
       );
+      unawaited(_applyFolderDisplayPreferences(newPath));
       if (Platform.isAndroid || Platform.isIOS) {
         final controller = MobileFileActionsController.forTab(widget.tabId);
         controller.currentPath = newPath;
@@ -945,6 +950,64 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       }
       _isHandlingPathUpdate = false;
     });
+  }
+
+  Future<void> _applyFolderDisplayPreferences(String path) async {
+    try {
+      final prefs = UserPreferences.instance;
+      await prefs.init();
+      final folderSortManager = FolderSortManager();
+      final savedViewMode = await folderSortManager.getFolderViewMode(path) ??
+          await prefs.getViewMode();
+      final effectiveViewMode =
+          !isDesktopPlatform && savedViewMode == ViewMode.gridPreview
+              ? ViewMode.grid
+              : savedViewMode;
+      final savedSortOption =
+          await folderSortManager.getFolderSortOption(path) ??
+              await prefs.getSortOption();
+      final savedGridZoomLevel =
+          await folderSortManager.getFolderGridZoomLevel(path) ??
+              await prefs.getGridZoomLevel();
+      final savedColumnVisibility =
+          await folderSortManager.getFolderColumnVisibility(path) ??
+              await prefs.getColumnVisibility();
+      final savedShowFileTags =
+          await folderSortManager.getFolderShowFileTags(path) ??
+              await prefs.getShowFileTags();
+      final savedPreviewPaneVisible =
+          await folderSortManager.getFolderPreviewPaneVisible(path) ??
+              await prefs.getPreviewPaneVisible();
+      final savedPreviewPaneWidth =
+          await folderSortManager.getFolderPreviewPaneWidth(path) ??
+              await prefs.getPreviewPaneWidth();
+      if (!mounted || _currentPath != path) return;
+      final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+        context,
+        mode: GridSizeMode.referenceWidth,
+      );
+      final resolvedGridZoom = savedGridZoomLevel
+          .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+          .toInt();
+
+      setState(() {
+        viewMode = effectiveViewMode;
+        gridZoomLevel = resolvedGridZoom;
+        columnVisibility = savedColumnVisibility;
+        showFileTags = savedShowFileTags;
+        isPreviewPaneVisible = savedPreviewPaneVisible;
+        previewPaneWidth = savedPreviewPaneWidth;
+      });
+      _previewPaneWidthNotifier.value = savedPreviewPaneWidth;
+      _folderListBloc.add(SetViewMode(effectiveViewMode));
+      _folderListBloc.add(SetSortOption(
+        savedSortOption,
+        persist: false,
+      ));
+      _folderListBloc.add(SetGridZoom(resolvedGridZoom));
+    } catch (e) {
+      debugPrint('Error applying folder display preferences: $e');
+    }
   }
 
   // New method to handle lazy loading of drives
@@ -1000,10 +1063,48 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 'Tab path updated from $_currentPath to ${currentTab.path}');
             _updatePath(currentTab.path);
           }
+
+          // If this tab just became the active one, ask the activity manager
+          // whether a reload is required (i.e. it was previously inactive and
+          // had its caches released). When required, kick a fresh load so the
+          // user sees up-to-date content immediately on refocus.
+          if (currentTab.id.isNotEmpty &&
+              tabManagerState.activeTabId == widget.tabId) {
+            _maybeReloadIfRefocused();
+          }
         },
         child: _buildContentForCurrentPath(context),
       ),
     );
+  }
+
+  /// Triggers a fresh folder load if the tab activity manager flagged this
+  /// tab as needing a reload after its caches were aggressively released
+  /// during the inactive transition.
+  void _maybeReloadIfRefocused() {
+    if (!mounted) return;
+    if (!locator.isRegistered<TabActivityManager>()) return;
+    final activity = locator<TabActivityManager>();
+    if (!activity.consumeReloadFlag(widget.tabId)) return;
+
+    // System tabs that are not folder/network views do their own routing and
+    // do not need an explicit reload here.
+    if (_currentPath.startsWith('#') &&
+        !_currentPath.startsWith('#search?tag=') &&
+        !_currentPath.startsWith('#network/') &&
+        !isDrivesPath(_currentPath)) {
+      return;
+    }
+
+    AppLogger.perf(
+      '[TabActivity] reloading tab=${widget.tabId} after refocus path=$_currentPath',
+    );
+
+    if (isDrivesPath(_currentPath)) {
+      _folderListBloc.add(const FolderListLoadDrives());
+    } else {
+      _folderListBloc.add(FolderListRefresh(_currentPath));
+    }
   }
 
   // Build appropriate content depending on current path. This keeps the tab listening
@@ -1684,7 +1785,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       currentPath: _currentPath,
       isNetworkPath: _currentPath.startsWith('#network/'),
       onSortOptionSelected: (SortOption option) {
-        _folderListBloc.add(SetSortOption(option));
+        _folderListBloc.add(SetSortOption(
+          option,
+          folderPath: _currentPath,
+        ));
         saveSortSetting(option, _currentPath);
       },
       onViewModeToggled: _toggleViewMode,

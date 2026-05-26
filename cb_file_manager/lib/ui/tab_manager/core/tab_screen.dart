@@ -32,6 +32,8 @@ import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
 import '../../screens/ai_chat/ai_side_panel.dart';
 import '../../components/common/operation_progress_overlay.dart';
+import '../components/tab_inactive_indicator.dart';
+import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 // Create a custom scroll behavior that supports mouse wheel scrolling
 class TabBarMouseScrollBehavior extends MaterialScrollBehavior {
@@ -825,7 +827,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                               right: 4.0),
                                                       child: IconButton(
                                                         tooltip:
-                                                            context.tr.aiChat,
+                                                            context.tr.cbAgent,
                                                         icon: Icon(
                                                           PhosphorIconsLight
                                                               .sparkle,
@@ -915,6 +917,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                 TextOverflow
                                                                     .ellipsis,
                                                           ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 4),
+                                                        TabInactiveIndicator(
+                                                          tabId: tab.id,
                                                         ),
                                                       ],
                                                     ),
@@ -1562,6 +1569,25 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         ? '${context.tr.closeTab} ($selectionCount)'
         : context.tr.closeTab;
 
+    // Mark-as-inactive is offered only when the activity manager is available,
+    // the tab is not the focused/active one, and the tab is not already
+    // inactive. Multi-tab selection is treated as a single-tab action: the
+    // operation only applies to the right-clicked tab.
+    final activityManager = locator.isRegistered<TabActivityManager>()
+        ? locator<TabActivityManager>()
+        : null;
+    final canMarkInactive = activityManager != null &&
+        !activityManager.isInactive(tab.id) &&
+        activityManager.stateOf(tab.id) != TabActivityState.focused &&
+        // Defensive: also refuse the currently active tab even if the
+        // activity manager has not seen a focus event yet.
+        context.read<TabManagerBloc>().state.activeTabId != tab.id;
+
+    // "Close other tabs" only makes sense when there is at least one other
+    // tab to close.
+    final tabsCount = context.read<TabManagerBloc>().state.tabs.length;
+    final canCloseOthers = tabsCount > 1;
+
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     final size = overlay?.size ?? const Size(1, 1);
@@ -1583,6 +1609,17 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         PopupMenuItem(
           value: _DesktopTabAction.moveToWindow,
           child: Text(moveToWindowLabel),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: _DesktopTabAction.markInactive,
+          enabled: canMarkInactive,
+          child: Text(context.tr.markTabInactive),
+        ),
+        PopupMenuItem(
+          value: _DesktopTabAction.closeOtherTabs,
+          enabled: canCloseOthers,
+          child: Text(context.tr.closeOtherTabs),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -1628,6 +1665,16 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
               bloc.add(CloseTab(id));
             }
           }
+          return;
+        }
+      case _DesktopTabAction.markInactive:
+        {
+          activityManager?.markInactive(tab.id);
+          return;
+        }
+      case _DesktopTabAction.closeOtherTabs:
+        {
+          bloc.add(CloseOtherTabs(tab.id));
           return;
         }
       case _DesktopTabAction.closeTab:
@@ -1869,6 +1916,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 enum _DesktopTabAction {
   moveToNewWindow,
   moveToWindow,
+  markInactive,
+  closeOtherTabs,
   closeTab,
 }
 

@@ -111,10 +111,18 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   Future<void> _loadPreferences() async {
     try {
       await _preferences.init();
-      final viewMode = await _preferences.getViewMode();
+      final globalViewMode = await _preferences.getViewMode();
+      final viewMode = await _preferences.getVideoLibraryViewMode(
+        widget.library.id,
+        fallback: globalViewMode,
+      );
       final effectiveViewMode =
           viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode;
-      final sortOption = await _preferences.getSortOption();
+      final globalSortOption = await _preferences.getSortOption();
+      final sortOption = await _preferences.getVideoLibrarySortOption(
+        widget.library.id,
+        fallback: globalSortOption,
+      );
       final showFileTags = await _preferences.getShowFileTags();
       final gridZoomLevel = await _preferences.getGridZoomLevel();
       final columnVisibility = await _preferences.getColumnVisibility();
@@ -123,7 +131,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
       // Apply to bloc first
       _bloc.add(FileNavigationSetViewMode(effectiveViewMode));
-      _bloc.add(FileNavigationSetSortOption(sortOption));
+      _bloc.add(FileNavigationSetSortOption(
+        sortOption,
+        persist: false,
+      ));
       _bloc.add(FileNavigationSetGridZoom(gridZoomLevel));
 
       setState(() {
@@ -198,7 +209,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   Future<void> _saveViewMode(ViewMode mode) async {
     try {
       await _preferences.init();
-      await _preferences.setViewMode(mode);
+      await _preferences.setVideoLibraryViewMode(widget.library.id, mode);
     } catch (e) {
       // Ignore preference errors for now.
     }
@@ -212,7 +223,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   Future<void> _saveSortOption(SortOption option) async {
     try {
       await _preferences.init();
-      await _preferences.setSortOption(option);
+      await _preferences.setVideoLibrarySortOption(widget.library.id, option);
     } catch (e) {
       // Ignore preference errors for now.
     }

@@ -104,4 +104,19 @@ void main() {
 
     expect(next, equals('/c.mp4'));
   });
+
+  test('Does not choose a next focus when deleted item is not focused', () {
+    final state = _state(
+      folders: const <String>['/a', '/b'],
+      files: const <String>['/c.mp4'],
+    );
+
+    final next = FileOperationsHandler.computeNextFocusPathAfterDelete(
+      state: state,
+      pathsToDelete: const <String>{'/b'},
+      anchorPath: '/a',
+    );
+
+    expect(next, isNull);
+  });
 }

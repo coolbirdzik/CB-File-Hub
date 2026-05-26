@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
@@ -7,7 +6,6 @@ import 'package:cb_file_manager/helpers/core/filesystem_utils.dart'
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
-import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:path/path.dart' as path;
 
 import 'file_operations_event.dart';
@@ -192,29 +190,46 @@ class FileOperationsBloc
     final trashManager = TrashManager();
     int completed = 0;
     final List<String> failed = [];
+    final progressThrottle = _ProgressUpdateThrottle();
 
-    for (final filePath in event.filePaths) {
-      try {
-        final file = File(filePath);
-        if (await file.exists()) {
-          if (event.permanent) {
-            await file.delete();
-          } else {
-            await trashManager.moveToTrash(filePath);
-          }
-        }
-        completed++;
-        _progressController.update(
-          progressId,
-          completed: completed,
-          detail:
-              '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'}: $filePath',
-        );
-      } catch (e) {
-        failed.add(filePath);
-        AppLogger.warning('Delete failed for $filePath: $e');
-      }
+    navigationBloc.add(FileNavigationRemovePaths(targetPaths));
+
+    final pathsList = event.filePaths.toList(growable: false);
+    final Set<String> succeededSet = event.permanent
+        ? await trashManager.deleteMultiplePermanently(
+            pathsList,
+            onChunkDone: (done, total) {
+              completed = done;
+              progressThrottle.maybeUpdate(
+                completed: completed,
+                total: total,
+                update: () => _progressController.update(
+                  progressId,
+                  completed: completed,
+                  detail: 'Permanently deleted $completed of $total',
+                ),
+              );
+            },
+          )
+        : await trashManager.moveMultipleToTrashBatched(
+            pathsList,
+            onChunkDone: (done, total) {
+              completed = done;
+              progressThrottle.maybeUpdate(
+                completed: completed,
+                total: total,
+                update: () => _progressController.update(
+                  progressId,
+                  completed: completed,
+                  detail: 'Moved to Trash Bin $completed of $total',
+                ),
+              );
+            },
+          );
+    for (final p in pathsList) {
+      if (!succeededSet.contains(p)) failed.add(p);
     }
+    completed = pathsList.length;
 
     if (failed.isNotEmpty) {
       _progressController.fail(
@@ -274,55 +289,55 @@ class FileOperationsBloc
     final trashManager = TrashManager();
     int completed = 0;
     final List<String> failed = [];
+    final progressThrottle = _ProgressUpdateThrottle();
 
-    for (final path in event.filePaths) {
-      try {
-        final file = File(path);
-        if (await file.exists()) {
-          if (event.permanent) {
-            await file.delete();
-          } else {
-            await trashManager.moveToTrash(path);
-          }
-        }
-        completed++;
-        _progressController.update(
-          progressId,
-          completed: completed,
-          detail:
-              '${event.permanent ? 'Permanently deleting' : 'Moving to Trash Bin'} file $completed of $total: $path',
-        );
-      } catch (e) {
-        failed.add(path);
-        AppLogger.warning('Delete failed for $path: $e');
-      }
-    }
+    navigationBloc.add(FileNavigationRemovePaths(targets));
 
-    for (final path in event.folderPaths) {
-      try {
-        final dir = Directory(path);
-        if (await dir.exists()) {
-          if (event.permanent) {
-            await dir.delete(recursive: true);
-          } else {
-            await trashManager.moveToTrash(path);
-          }
-        }
-        completed++;
-        _progressController.update(
-          progressId,
-          completed: completed,
-          detail:
-              '${event.permanent ? 'Permanently deleting' : 'Moving to Trash Bin'} folder $completed of $total: $path',
-        );
-      } catch (e) {
-        failed.add(path);
-        AppLogger.warning('Delete failed for $path: $e');
-      }
+    // Combine files + folders into a single batch — SHFileOperationW handles
+    // both in one shell call, much faster than per-item Dart deletes.
+    final pathsList = <String>[
+      ...event.filePaths,
+      ...event.folderPaths,
+    ];
+
+    final Set<String> succeededSet = event.permanent
+        ? await trashManager.deleteMultiplePermanently(
+            pathsList,
+            onChunkDone: (done, t) {
+              completed = done;
+              progressThrottle.maybeUpdate(
+                completed: completed,
+                total: t,
+                update: () => _progressController.update(
+                  progressId,
+                  completed: completed,
+                  detail: 'Permanently deleted $completed of $t',
+                ),
+              );
+            },
+          )
+        : await trashManager.moveMultipleToTrashBatched(
+            pathsList,
+            onChunkDone: (done, t) {
+              completed = done;
+              progressThrottle.maybeUpdate(
+                completed: completed,
+                total: t,
+                update: () => _progressController.update(
+                  progressId,
+                  completed: completed,
+                  detail: 'Moved to Trash Bin $completed of $t',
+                ),
+              );
+            },
+          );
+    for (final p in pathsList) {
+      if (!succeededSet.contains(p)) failed.add(p);
     }
+    completed = pathsList.length;
 
     final successfulDeletes = targets.difference(failed.toSet());
-    if (successfulDeletes.isNotEmpty) {
+    if (successfulDeletes.isNotEmpty && failed.isNotEmpty) {
       navigationBloc.add(FileNavigationRemovePaths(successfulDeletes));
     }
 
@@ -398,5 +413,34 @@ class FileOperationsBloc
         ? path.basename(sourcePath)
         : '${path.basename(sourcePath)} and ${itemCount - 1} more';
     return '$action $sourceLabel from ${path.dirname(sourcePath)} to $destinationPath';
+  }
+}
+
+class _ProgressUpdateThrottle {
+  static const int _minimumItemInterval = 10;
+  static const Duration _minimumTimeInterval = Duration(milliseconds: 120);
+
+  final Stopwatch _stopwatch = Stopwatch()..start();
+  int _lastCompleted = 0;
+
+  void maybeUpdate({
+    required int completed,
+    required int total,
+    required void Function() update,
+  }) {
+    final isFirst = completed == 1;
+    final isLast = completed >= total;
+    final enoughItems = completed - _lastCompleted >= _minimumItemInterval;
+    final enoughTime = _stopwatch.elapsed >= _minimumTimeInterval;
+
+    if (!isFirst && !isLast && !enoughItems && !enoughTime) {
+      return;
+    }
+
+    _lastCompleted = completed;
+    _stopwatch
+      ..reset()
+      ..start();
+    update();
   }
 }

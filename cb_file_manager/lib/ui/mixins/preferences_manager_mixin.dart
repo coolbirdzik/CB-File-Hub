@@ -34,6 +34,8 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// The FolderListBloc instance to send events to
   FolderListBloc get folderListBloc;
 
+  String get preferencePath => folderListBloc.state.currentPath.path;
+
   /// Current view mode (list, grid, or details)
   ViewMode viewMode = ViewMode.list; // Default to list view
 
@@ -59,13 +61,37 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
 
-      final loadedViewMode = await prefs.getViewMode();
-      final sortOption = await prefs.getSortOption();
-      final loadedGridZoomLevel = await prefs.getGridZoomLevel();
-      final loadedColumnVisibility = await prefs.getColumnVisibility();
-      final loadedShowFileTags = await prefs.getShowFileTags();
-      final loadedPreviewPaneVisible = await prefs.getPreviewPaneVisible();
-      final loadedPreviewPaneWidth = await prefs.getPreviewPaneWidth();
+      final folderPreferencePath = preferencePath;
+      final folderSortManager = FolderSortManager();
+      final globalViewMode = await prefs.getViewMode();
+      final loadedViewMode =
+          await folderSortManager.getFolderViewMode(folderPreferencePath) ??
+              globalViewMode;
+      final globalSortOption = await prefs.getSortOption();
+      final sortOption =
+          await folderSortManager.getFolderSortOption(folderPreferencePath) ??
+              globalSortOption;
+      final loadedGridZoomLevel = await folderSortManager
+              .getFolderGridZoomLevel(folderPreferencePath) ??
+          await prefs.getGridZoomLevel();
+      final loadedColumnVisibility =
+          await folderSortManager.getFolderColumnVisibility(
+                folderPreferencePath,
+              ) ??
+              await prefs.getColumnVisibility();
+      final loadedShowFileTags =
+          await folderSortManager.getFolderShowFileTags(folderPreferencePath) ??
+              await prefs.getShowFileTags();
+      final loadedPreviewPaneVisible =
+          await folderSortManager.getFolderPreviewPaneVisible(
+                folderPreferencePath,
+              ) ??
+              await prefs.getPreviewPaneVisible();
+      final loadedPreviewPaneWidth =
+          await folderSortManager.getFolderPreviewPaneWidth(
+                folderPreferencePath,
+              ) ??
+              await prefs.getPreviewPaneWidth();
       final effectiveViewMode =
           !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
               ? ViewMode.grid
@@ -89,7 +115,10 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
         });
 
         folderListBloc.add(SetViewMode(effectiveViewMode));
-        folderListBloc.add(SetSortOption(sortOption));
+        folderListBloc.add(SetSortOption(
+          sortOption,
+          persist: false,
+        ));
         folderListBloc.add(SetGridZoom(resolvedGridZoom));
       }
     } catch (e) {
@@ -98,11 +127,14 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   }
 
   /// Save view mode setting to storage
-  Future<void> saveViewModeSetting(ViewMode mode) async {
+  Future<void> saveViewModeSetting(ViewMode mode, {String? currentPath}) async {
     try {
-      final UserPreferences prefs = UserPreferences.instance;
-      await prefs.init();
-      await prefs.setViewMode(mode);
+      await UserPreferences.instance.init();
+      final folderSortManager = FolderSortManager();
+      await folderSortManager.saveFolderViewMode(
+        currentPath ?? preferencePath,
+        mode,
+      );
     } catch (e) {
       debugPrint('Error saving view mode: $e');
     }
@@ -111,9 +143,7 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// Save sort option setting to storage
   Future<void> saveSortSetting(SortOption option, String currentPath) async {
     try {
-      final UserPreferences prefs = UserPreferences.instance;
-      await prefs.init();
-      await prefs.setSortOption(option);
+      await UserPreferences.instance.init();
       final folderSortManager = FolderSortManager();
       await folderSortManager.saveFolderSortOption(currentPath, option);
     } catch (e) {
@@ -124,9 +154,11 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// Save grid zoom level setting to storage
   Future<void> saveGridZoomSetting(int zoomLevel) async {
     try {
-      final UserPreferences prefs = UserPreferences.instance;
-      await prefs.init();
-      await prefs.setGridZoomLevel(zoomLevel);
+      await UserPreferences.instance.init();
+      await FolderSortManager().saveFolderGridZoomLevel(
+        preferencePath,
+        zoomLevel,
+      );
       setState(() {
         gridZoomLevel = zoomLevel;
       });
@@ -216,9 +248,11 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// Persist preview pane width to storage
   Future<void> savePreviewPaneWidthSetting(double width) async {
     try {
-      final UserPreferences prefs = UserPreferences.instance;
-      await prefs.init();
-      await prefs.setPreviewPaneWidth(width);
+      await UserPreferences.instance.init();
+      await FolderSortManager().saveFolderPreviewPaneWidth(
+        preferencePath,
+        width,
+      );
     } catch (e) {
       debugPrint('Error saving preview pane width: $e');
     }
@@ -227,9 +261,11 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// Persist preview pane visibility to storage
   Future<void> savePreviewPaneVisibilitySetting(bool visible) async {
     try {
-      final UserPreferences prefs = UserPreferences.instance;
-      await prefs.init();
-      await prefs.setPreviewPaneVisible(visible);
+      await UserPreferences.instance.init();
+      await FolderSortManager().saveFolderPreviewPaneVisible(
+        preferencePath,
+        visible,
+      );
     } catch (e) {
       debugPrint('Error saving preview pane visibility: $e');
     }
@@ -246,13 +282,31 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
         });
 
         try {
-          final UserPreferences prefs = UserPreferences.instance;
-          await prefs.init();
-          await prefs.setColumnVisibility(visibility);
+          await UserPreferences.instance.init();
+          await FolderSortManager().saveFolderColumnVisibility(
+            preferencePath,
+            visibility,
+          );
         } catch (e) {
           debugPrint('Error saving column visibility: $e');
         }
       },
     );
+  }
+
+  Future<void> saveShowFileTagsSetting(bool visible) async {
+    try {
+      await UserPreferences.instance.init();
+      await FolderSortManager().saveFolderShowFileTags(
+        preferencePath,
+        visible,
+      );
+      if (!mounted) return;
+      setState(() {
+        showFileTags = visible;
+      });
+    } catch (e) {
+      debugPrint('Error saving show file tags: $e');
+    }
   }
 }

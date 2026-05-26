@@ -258,9 +258,17 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
 
                       DrawerNavigationItem(
                         icon: PhosphorIconsLight.sparkle,
-                        title: context.tr.aiChat,
+                        title: context.tr.cbAgent,
                         onTap: () => _navigateToAiChat(context),
                       ),
+
+                      if (Platform.isWindows)
+                        DrawerNavigationItem(
+                          icon: PhosphorIconsLight.broom,
+                          title: context.tr.cbAgentCleanerTitle,
+                          onTap: () => _navigateTo(context,
+                              '#cb-agent-cleaner', context.tr.cbAgentCleanerTitle),
+                        ),
 
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 14),

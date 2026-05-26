@@ -26,6 +26,8 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -53,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Show file tags setting
   bool _showFileTags = true;
   bool _rememberTabWorkspace = false;
+  // Tab inactive threshold (in minutes). 0 means auto-suspend disabled.
+  int _tabInactiveThresholdMinutes =
+      UserPreferences.defaultTabInactiveThresholdMinutes;
 
   // Use system default app for video (false = in-app player by default)
   bool _useSystemDefaultForVideo = false;
@@ -117,6 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
           await _preferences.getUseSystemDefaultForVideo();
+      final tabInactiveMinutes =
+          await _preferences.getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
 
       if (mounted) {
@@ -128,6 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _showFileTags = showFileTags;
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
+          _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
       }
@@ -223,6 +231,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _rememberTabWorkspace = enabled;
     });
+  }
+
+  Future<void> _updateTabInactiveThresholdMinutes(int minutes) async {
+    final clamped = minutes.clamp(
+      UserPreferences.minTabInactiveThresholdMinutes,
+      UserPreferences.maxTabInactiveThresholdMinutes,
+    );
+    await _preferences.setTabInactiveThresholdMinutes(clamped);
+    if (locator.isRegistered<TabActivityManager>()) {
+      locator<TabActivityManager>()
+          .setInactiveThreshold(Duration(minutes: clamped));
+    }
+    if (mounted) {
+      setState(() {
+        _tabInactiveThresholdMinutes = clamped;
+      });
+    }
   }
 
   Future<void> _updateUseSystemDefaultForVideo(bool value) async {
@@ -437,6 +462,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _updateRememberTabWorkspace,
           ),
         ),
+        _buildTabInactiveThresholdTile(),
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.aboutApp,
           subtitle:
@@ -1570,6 +1596,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? const Icon(PhosphorIconsLight.caretRight, size: 16)
               : null),
       onTap: onTap,
+    );
+  }
+
+  /// Preset values offered to the user for the tab inactive threshold.
+  /// 0 means "off" (no auto-suspend).
+  static const List<int> _tabInactivePresetMinutes = <int>[
+    0,
+    1,
+    15,
+    30,
+    60,
+    120,
+    240,
+    480,
+    24 * 60,
+  ];
+
+  String _formatTabInactiveThresholdLabel(int minutes) {
+    final l10n = AppLocalizations.of(context)!;
+    if (minutes <= 0) {
+      return l10n.tabInactiveThresholdDisabled;
+    }
+    if (minutes < 60) {
+      return '$minutes ${l10n.tabInactiveThresholdMinutesValue}';
+    }
+    final hours = minutes ~/ 60;
+    final remaining = minutes % 60;
+    if (remaining == 0) {
+      return '$hours ${l10n.tabInactiveThresholdHoursValue}';
+    }
+    return '$hours ${l10n.tabInactiveThresholdHoursValue} '
+        '$remaining ${l10n.tabInactiveThresholdMinutesValue}';
+  }
+
+  Widget _buildTabInactiveThresholdTile() {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final current = _tabInactiveThresholdMinutes;
+
+    // Build the dropdown items from presets, plus the current value if it
+    // is not in the preset list (so we never lose user-entered values).
+    final values = <int>{..._tabInactivePresetMinutes, current}.toList()
+      ..sort();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(width: 0),
+          const Icon(PhosphorIconsLight.moon, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.tabInactiveThreshold,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.tabInactiveThresholdDescription,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          DropdownButton<int>(
+            value: current,
+            isDense: true,
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final v in values)
+                DropdownMenuItem<int>(
+                  value: v,
+                  child: Text(
+                    _formatTabInactiveThresholdLabel(v),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              _updateTabInactiveThresholdMinutes(value);
+            },
+          ),
+        ],
+      ),
     );
   }
 

@@ -43,6 +43,10 @@ class ApprovalCard extends StatelessWidget {
         actionIcon = PhosphorIconsLight.trash;
         accentColor = theme.colorScheme.error;
         break;
+      case ApprovalActionType.cleanJunk:
+        actionIcon = PhosphorIconsLight.broom;
+        accentColor = const Color(0xFFB45309); // amber-700
+        break;
       case ApprovalActionType.generic:
         actionIcon = PhosphorIconsLight.question;
         accentColor =
