@@ -201,8 +201,7 @@ void _scanWorker(_SpawnArgs args) async {
         }
 
         if (rule.minAgeMs > 0) {
-          final ageMs =
-              DateTime.now().difference(stat.modified).inMilliseconds;
+          final ageMs = DateTime.now().difference(stat.modified).inMilliseconds;
           if (ageMs < rule.minAgeMs) continue;
         }
 

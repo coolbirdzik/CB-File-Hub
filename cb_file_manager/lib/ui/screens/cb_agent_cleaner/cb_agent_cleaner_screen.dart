@@ -1462,7 +1462,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     await WidgetsBinding.instance.endOfFrame;
     _lastCleanProgressUiUpdate = DateTime.fromMillisecondsSinceEpoch(0);
     _cleanProgress.value = _CleanProgressSnapshot(
-      status: permanent ? 'Permanently deleting...' : 'Moving to Recycle Bin...',
+      status:
+          permanent ? 'Permanently deleting...' : 'Moving to Recycle Bin...',
     );
 
     try {
@@ -1707,9 +1708,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     Text(
                       'Retrying now will usually fail again until the app or process using this file is closed.',
                       style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(ctx)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                           ),
                     ),
                   ],

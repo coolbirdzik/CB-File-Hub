@@ -247,9 +247,8 @@ class _TreeNodeTileState extends State<_TreeNodeTile> {
       children: [
         // Node row
         InkWell(
-          onTap: hasChildren
-              ? () => setState(() => _expanded = !_expanded)
-              : null,
+          onTap:
+              hasChildren ? () => setState(() => _expanded = !_expanded) : null,
           child: Padding(
             padding: EdgeInsets.only(
                 left: 12 + indent, right: 12, top: 4, bottom: 4),

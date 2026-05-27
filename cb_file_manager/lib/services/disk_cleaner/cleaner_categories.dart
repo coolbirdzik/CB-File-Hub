@@ -74,8 +74,8 @@ class CleanerCategories {
         ),
         // Opera
         CleanerPathRule(
-          source: PathSource.env(
-              'APPDATA', r'Opera Software\Opera Stable\Cache'),
+          source:
+              PathSource.env('APPDATA', r'Opera Software\Opera Stable\Cache'),
         ),
         // Firefox cache2 lives under Profiles\<random>.default\cache2
         // The scanner will recurse so pointing at the parent is enough.
@@ -111,8 +111,7 @@ class CleanerCategories {
       defaultEnabled: true,
       rules: [
         CleanerPathRule(
-          source:
-              PathSource.env('LOCALAPPDATA', r'Microsoft\Windows\Explorer'),
+          source: PathSource.env('LOCALAPPDATA', r'Microsoft\Windows\Explorer'),
           includeGlobs: ['thumbcache_*.db', 'iconcache_*.db', 'IconCache.db'],
           recursive: false,
         ),
@@ -137,13 +136,15 @@ class CleanerCategories {
         // Spotify
         CleanerPathRule(
             source: PathSource.env('LOCALAPPDATA', r'Spotify\Storage')),
-        CleanerPathRule(source: PathSource.env('LOCALAPPDATA', r'Spotify\Data')),
+        CleanerPathRule(
+            source: PathSource.env('LOCALAPPDATA', r'Spotify\Data')),
         // Teams (new + classic)
         CleanerPathRule(
-          source: PathSource.env('APPDATA',
-              r'Microsoft\Teams\Service Worker\CacheStorage'),
+          source: PathSource.env(
+              'APPDATA', r'Microsoft\Teams\Service Worker\CacheStorage'),
         ),
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Microsoft\Teams\Cache')),
+        CleanerPathRule(
+            source: PathSource.env('APPDATA', r'Microsoft\Teams\Cache')),
         // VSCode
         CleanerPathRule(source: PathSource.env('APPDATA', r'Code\Cache')),
         CleanerPathRule(source: PathSource.env('APPDATA', r'Code\CachedData')),
@@ -197,7 +198,8 @@ class CleanerCategories {
       requiresAdmin: true,
       rules: [
         CleanerPathRule(
-          source: PathSource.absolute(r'C:\Windows\SoftwareDistribution\Download'),
+          source:
+              PathSource.absolute(r'C:\Windows\SoftwareDistribution\Download'),
         ),
       ],
     ),
@@ -258,7 +260,8 @@ class CleanerCategories {
         CleanerPathRule(source: PathSource.env('LOCALAPPDATA', r'pnpm-cache')),
         CleanerPathRule(source: PathSource.env('LOCALAPPDATA', r'Yarn\Cache')),
         CleanerPathRule(source: PathSource.env('LOCALAPPDATA', r'pip\Cache')),
-        CleanerPathRule(source: PathSource.env('USERPROFILE', r'.gradle\caches')),
+        CleanerPathRule(
+            source: PathSource.env('USERPROFILE', r'.gradle\caches')),
         CleanerPathRule(
             source: PathSource.env('USERPROFILE', r'.m2\repository')),
         CleanerPathRule(

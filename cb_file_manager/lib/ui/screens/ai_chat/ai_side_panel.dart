@@ -364,8 +364,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
               tooltip: 'View raw payload',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints:
-                  const BoxConstraints(minWidth: 22, minHeight: 22),
+              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
               onPressed: () => RawPayloadDialog.show(context, state),
             ),
           ],
@@ -432,8 +431,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-            onPressed: () =>
-                _bloc.add(const ClearError()),
+            onPressed: () => _bloc.add(const ClearError()),
           ),
         ],
       ),
@@ -642,8 +640,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
                   // Tool calls render BEFORE the assistant message
                   if (hasToolCalls)
                     Padding(
-                      padding: const EdgeInsets.only(
-                          left: 12, right: 12, bottom: 4),
+                      padding:
+                          const EdgeInsets.only(left: 12, right: 12, bottom: 4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: message.toolCalls!
@@ -757,8 +755,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
             ShimmerThinkingText(text: state.thinkingText ?? 'Thinking...'),
             if (state.currentToolCalls.isNotEmpty) ...[
               const SizedBox(height: 6),
-              ...state.currentToolCalls
-                  .map((tc) => ToolCallChip(toolCall: tc)),
+              ...state.currentToolCalls.map((tc) => ToolCallChip(toolCall: tc)),
             ],
           ],
         ),

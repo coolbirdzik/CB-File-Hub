@@ -28,6 +28,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   final double? listCacheExtent;
   final double? gridCacheExtent;
   final double? detailsCacheExtent;
+
   /// When false the per-item position registration (used for lasso/drag
   /// selection) is skipped — every visible item then avoids a per-frame
   /// `LayoutBuilder` + `addPostFrameCallback` + `localToGlobal` round-trip.
@@ -102,10 +103,12 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       return null;
     }
 
-    Widget buildItem(BuildContext context, int index, Widget Function(BuildContext, T) builder) {
+    Widget buildItem(BuildContext context, int index,
+        Widget Function(BuildContext, T) builder) {
       final item = items[index];
       final id = itemIdentity(item);
-      final child = Builder(builder: (itemContext) => builder(itemContext, item));
+      final child =
+          Builder(builder: (itemContext) => builder(itemContext, item));
       final wrapped = RepaintBoundary(
         child: measurePositions
             ? _MeasuredCollectionItem(

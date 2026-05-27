@@ -100,7 +100,8 @@ class FileIconHelper {
   static Uint8List _encodeBmp32(Uint8List rgbaPixels, int width, int height) {
     final int rowSize = width * 4; // No padding needed for 32-bit
     final int imageSize = rowSize * height;
-    final int fileSize = 54 + imageSize; // 14 (file header) + 40 (DIB header) + pixels
+    final int fileSize =
+        54 + imageSize; // 14 (file header) + 40 (DIB header) + pixels
 
     final ByteData bmp = ByteData(fileSize);
 

@@ -104,6 +104,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   // edits to remove their `setState(() { _isLoading = ...; })` calls.
   // ignore: unused_field
   bool _isLoading = true;
+
   /// True while the streaming load is still emitting chunks. Used to
   /// show a non-blocking progress indicator while items keep arriving,
   /// without blocking the screen with a skeleton like _isLoading does.
@@ -249,8 +250,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         // async MethodChannel lookups during scroll.
         final exts = accumulator
             .where((item) => !item.isFolder)
-            .map((item) =>
-                p.extension(item.displayNameValue).toLowerCase())
+            .map((item) => p.extension(item.displayNameValue).toLowerCase())
             .where((ext) => ext.isNotEmpty)
             .toSet();
         FileIconHelper.warmExtensionIcons(exts, size: 48);

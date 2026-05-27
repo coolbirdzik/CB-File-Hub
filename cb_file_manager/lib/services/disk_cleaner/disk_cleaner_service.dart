@@ -311,9 +311,8 @@ class DiskCleanerService {
 
     errorSub = errorPort.listen((dynamic err) {
       if (!completer.isCompleted) {
-        completer.completeError(err is List && err.length >= 2
-            ? err[0]
-            : err.toString());
+        completer.completeError(
+            err is List && err.length >= 2 ? err[0] : err.toString());
       }
       closePorts();
     });
@@ -664,7 +663,8 @@ class DiskCleanerService {
             } else {
               await resolveFailedItem(
                 item,
-                actionLabel: permanent ? 'permanent delete' : 'recycle-bin move',
+                actionLabel:
+                    permanent ? 'permanent delete' : 'recycle-bin move',
                 knownInUse: true,
               );
               done++;
@@ -703,8 +703,7 @@ class DiskCleanerService {
             recordSkippedByUserMany(
               remaining,
               reason: 'Skipped after user selected Skip all',
-              actionLabel:
-                  permanent ? 'permanent delete' : 'recycle-bin move',
+              actionLabel: permanent ? 'permanent delete' : 'recycle-bin move',
               log: false,
             );
             done += remaining.length;
@@ -1030,8 +1029,7 @@ class DiskCleanerService {
     // Bounded recursive pass — only run if we still have budget. This used
     // to be unbounded and was the primary source of the "clean is stuck at
     // 1/N" symptom on large junk directories.
-    if (probed >= _classifyMaxDescendants ||
-        DateTime.now().isAfter(deadline)) {
+    if (probed >= _classifyMaxDescendants || DateTime.now().isAfter(deadline)) {
       return null;
     }
 

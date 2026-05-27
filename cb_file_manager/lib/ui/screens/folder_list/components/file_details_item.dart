@@ -447,8 +447,8 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12.0, vertical: 10.0),
-                          child: _AsyncDimensionsCell(
-                              filePath: widget.file.path),
+                          child:
+                              _AsyncDimensionsCell(filePath: widget.file.path),
                         ),
                       ),
 
@@ -459,8 +459,7 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12.0, vertical: 10.0),
-                          child: _AsyncDurationCell(
-                              filePath: widget.file.path),
+                          child: _AsyncDurationCell(filePath: widget.file.path),
                         ),
                       ),
 

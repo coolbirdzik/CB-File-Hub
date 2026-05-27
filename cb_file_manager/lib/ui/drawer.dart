@@ -266,8 +266,8 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         DrawerNavigationItem(
                           icon: PhosphorIconsLight.broom,
                           title: context.tr.cbAgentCleanerTitle,
-                          onTap: () => _navigateTo(context,
-                              '#cb-agent-cleaner', context.tr.cbAgentCleanerTitle),
+                          onTap: () => _navigateTo(context, '#cb-agent-cleaner',
+                              context.tr.cbAgentCleanerTitle),
                         ),
 
                       Padding(

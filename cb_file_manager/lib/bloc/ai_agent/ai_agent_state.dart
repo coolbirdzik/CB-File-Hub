@@ -139,9 +139,8 @@ class AiAgentState extends Equatable {
       currentToolCalls: clearCurrentToolCalls
           ? const []
           : (currentToolCalls ?? this.currentToolCalls),
-      lastApiPayload: clearLastApiPayload
-          ? null
-          : (lastApiPayload ?? this.lastApiPayload),
+      lastApiPayload:
+          clearLastApiPayload ? null : (lastApiPayload ?? this.lastApiPayload),
       providerModelCatalogs:
           providerModelCatalogs ?? this.providerModelCatalogs,
       isLoadingProviderModels:

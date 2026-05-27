@@ -265,8 +265,8 @@ class _AppWaveLoaderState extends State<AppWaveLoader>
             children: List.generate(_dotCount, (index) {
               final staggerOffset = index / _dotCount;
               final t = (_controller.value + staggerOffset) % 1.0;
-              final scale = 0.4 + 0.6 *
-                  (math.sin(t * 2 * math.pi - math.pi / 2) + 1) / 2;
+              final scale =
+                  0.4 + 0.6 * (math.sin(t * 2 * math.pi - math.pi / 2) + 1) / 2;
               final alpha = 0.3 + 0.7 * scale;
 
               return Padding(

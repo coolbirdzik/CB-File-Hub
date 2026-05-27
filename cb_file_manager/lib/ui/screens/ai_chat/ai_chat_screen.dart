@@ -330,10 +330,8 @@ class _AiChatBodyState extends State<_AiChatBody> {
               tooltip: 'View raw payload',
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
-              constraints:
-                  const BoxConstraints(minWidth: 24, minHeight: 24),
-              onPressed: () =>
-                  RawPayloadDialog.show(context, state),
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              onPressed: () => RawPayloadDialog.show(context, state),
             ),
           ],
         ],
@@ -630,7 +628,8 @@ class _AiChatBodyState extends State<_AiChatBody> {
                   // the answer using the tool results.
                   if (hasToolCalls)
                     Padding(
-                      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                      padding:
+                          const EdgeInsets.only(left: 12, right: 12, bottom: 4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: message.toolCalls!
@@ -790,8 +789,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
             ShimmerThinkingText(text: text),
             if (state.currentToolCalls.isNotEmpty) ...[
               const SizedBox(height: 6),
-              ...state.currentToolCalls
-                  .map((tc) => ToolCallChip(toolCall: tc)),
+              ...state.currentToolCalls.map((tc) => ToolCallChip(toolCall: tc)),
             ],
           ],
         ),

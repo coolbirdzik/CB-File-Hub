@@ -201,9 +201,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     if (depth >= args.maxDepth) return;
 
     // Prepare search pattern: "C:\path\*"
-    final searchPath = dirPath.endsWith('\\')
-        ? '$dirPath*'
-        : '$dirPath\\*';
+    final searchPath = dirPath.endsWith('\\') ? '$dirPath*' : '$dirPath\\*';
     final lpFileName = searchPath.toNativeUtf16();
     final findData = calloc<win32.WIN32_FIND_DATA>();
 
@@ -272,9 +270,8 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     }
   }
 
-  final driveName = args.drivePath.endsWith('\\')
-      ? args.drivePath
-      : '${args.drivePath}\\';
+  final driveName =
+      args.drivePath.endsWith('\\') ? args.drivePath : '${args.drivePath}\\';
   final root = DiskTreeNode(name: driveName, fullPath: driveName);
   rootSnapshot = root;
   scanInto(root, 0);

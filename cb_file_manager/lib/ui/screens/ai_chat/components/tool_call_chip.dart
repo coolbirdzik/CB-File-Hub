@@ -26,9 +26,8 @@ class _ToolCallChipState extends State<ToolCallChip> {
     final theme = Theme.of(context);
     final call = widget.toolCall;
     final isSuccess = call.success;
-    final accent = isSuccess
-        ? theme.colorScheme.primary
-        : theme.colorScheme.error;
+    final accent =
+        isSuccess ? theme.colorScheme.primary : theme.colorScheme.error;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
@@ -45,8 +44,7 @@ class _ToolCallChipState extends State<ToolCallChip> {
             borderRadius: BorderRadius.circular(6),
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               child: Row(
                 children: [
                   Icon(
@@ -93,8 +91,7 @@ class _ToolCallChipState extends State<ToolCallChip> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (call.arguments.isNotEmpty &&
-                      call.arguments != '{}') ...[
+                  if (call.arguments.isNotEmpty && call.arguments != '{}') ...[
                     Text(
                       'Arguments',
                       style: theme.textTheme.labelSmall?.copyWith(

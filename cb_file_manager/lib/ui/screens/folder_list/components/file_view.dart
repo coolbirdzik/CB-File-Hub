@@ -238,152 +238,152 @@ class FileView extends StatelessWidget {
                       ),
                     ),
 
-                  // Type column
-                  if (columnVisibility.type)
-                    Expanded(
-                      flex: 2,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnType,
-                        style: headerStyle,
-                        ascendingOption: SortOption.typeAsc,
-                        descendingOption: SortOption.typeDesc,
+                    // Type column
+                    if (columnVisibility.type)
+                      Expanded(
+                        flex: 2,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnType,
+                          style: headerStyle,
+                          ascendingOption: SortOption.typeAsc,
+                          descendingOption: SortOption.typeDesc,
+                        ),
                       ),
-                    ),
 
-                  // Size column
-                  if (columnVisibility.size)
-                    Expanded(
-                      flex: 1,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnSize,
-                        style: headerStyle,
-                        ascendingOption: SortOption.sizeAsc,
-                        descendingOption: SortOption.sizeDesc,
+                    // Size column
+                    if (columnVisibility.size)
+                      Expanded(
+                        flex: 1,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnSize,
+                          style: headerStyle,
+                          ascendingOption: SortOption.sizeAsc,
+                          descendingOption: SortOption.sizeDesc,
+                        ),
                       ),
-                    ),
 
-                  // Date modified column
-                  if (columnVisibility.dateModified)
-                    Expanded(
-                      flex: 2,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnDateModified,
-                        style: headerStyle,
-                        ascendingOption: SortOption.dateAsc,
-                        descendingOption: SortOption.dateDesc,
+                    // Date modified column
+                    if (columnVisibility.dateModified)
+                      Expanded(
+                        flex: 2,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnDateModified,
+                          style: headerStyle,
+                          ascendingOption: SortOption.dateAsc,
+                          descendingOption: SortOption.dateDesc,
+                        ),
                       ),
-                    ),
 
-                  // Date created column
-                  if (columnVisibility.dateCreated)
-                    Expanded(
-                      flex: 2,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnDateCreated,
-                        style: headerStyle,
-                        ascendingOption: SortOption.dateCreatedAsc,
-                        descendingOption: SortOption.dateCreatedDesc,
+                    // Date created column
+                    if (columnVisibility.dateCreated)
+                      Expanded(
+                        flex: 2,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnDateCreated,
+                          style: headerStyle,
+                          ascendingOption: SortOption.dateCreatedAsc,
+                          descendingOption: SortOption.dateCreatedDesc,
+                        ),
                       ),
-                    ),
 
-                  // Attributes column
-                  if (columnVisibility.attributes)
-                    Expanded(
-                      flex: 1,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnAttributes,
-                        style: headerStyle,
-                        ascendingOption: SortOption.attributesAsc,
-                        descendingOption: SortOption.attributesDesc,
+                    // Attributes column
+                    if (columnVisibility.attributes)
+                      Expanded(
+                        flex: 1,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnAttributes,
+                          style: headerStyle,
+                          ascendingOption: SortOption.attributesAsc,
+                          descendingOption: SortOption.attributesDesc,
+                        ),
                       ),
-                    ),
 
-                  // Date Accessed column
-                  if (columnVisibility.dateAccessed)
-                    Expanded(
-                      flex: 2,
-                      child: _buildHeaderCell(
-                        context: context,
-                        label: l10n.columnDateAccessed,
-                        style: headerStyle,
+                    // Date Accessed column
+                    if (columnVisibility.dateAccessed)
+                      Expanded(
+                        flex: 2,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnDateAccessed,
+                          style: headerStyle,
+                        ),
                       ),
-                    ),
 
-                  // Extension column
-                  if (columnVisibility.extension)
-                    Expanded(
-                      flex: 1,
-                      child: _buildSortableHeaderCell(
-                        context: context,
-                        label: l10n.columnExtension,
-                        style: headerStyle,
-                        ascendingOption: SortOption.extensionAsc,
-                        descendingOption: SortOption.extensionDesc,
+                    // Extension column
+                    if (columnVisibility.extension)
+                      Expanded(
+                        flex: 1,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnExtension,
+                          style: headerStyle,
+                          ascendingOption: SortOption.extensionAsc,
+                          descendingOption: SortOption.extensionDesc,
+                        ),
                       ),
-                    ),
 
-                  // Path column
-                  if (columnVisibility.path)
-                    Expanded(
-                      flex: 3,
-                      child: _buildHeaderCell(
-                        context: context,
-                        label: l10n.columnPath,
-                        style: headerStyle,
+                    // Path column
+                    if (columnVisibility.path)
+                      Expanded(
+                        flex: 3,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnPath,
+                          style: headerStyle,
+                        ),
                       ),
-                    ),
 
-                  // Tags column
-                  if (columnVisibility.tags)
-                    Expanded(
-                      flex: 2,
-                      child: _buildHeaderCell(
-                        context: context,
-                        label: l10n.columnTags,
-                        style: headerStyle,
+                    // Tags column
+                    if (columnVisibility.tags)
+                      Expanded(
+                        flex: 2,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnTags,
+                          style: headerStyle,
+                        ),
                       ),
-                    ),
 
-                  // Dimensions column
-                  if (columnVisibility.dimensions)
-                    Expanded(
-                      flex: 1,
-                      child: _buildHeaderCell(
-                        context: context,
-                        label: l10n.columnDimensions,
-                        style: headerStyle,
+                    // Dimensions column
+                    if (columnVisibility.dimensions)
+                      Expanded(
+                        flex: 1,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnDimensions,
+                          style: headerStyle,
+                        ),
                       ),
-                    ),
 
-                  // Duration column
-                  if (columnVisibility.duration)
-                    Expanded(
-                      flex: 1,
-                      child: _buildHeaderCell(
-                        context: context,
-                        label: l10n.columnDuration,
-                        style: headerStyle,
+                    // Duration column
+                    if (columnVisibility.duration)
+                      Expanded(
+                        flex: 1,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnDuration,
+                          style: headerStyle,
+                        ),
                       ),
-                    ),
 
-                  // Item Count column
-                  if (columnVisibility.itemCount)
-                    Expanded(
-                      flex: 1,
-                      child: _buildHeaderCell(
-                        context: context,
-                        label: l10n.columnItemCount,
-                        style: headerStyle,
+                    // Item Count column
+                    if (columnVisibility.itemCount)
+                      Expanded(
+                        flex: 1,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnItemCount,
+                          style: headerStyle,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
             ),
 
             // Add info button with tooltip about customizing columns
@@ -567,14 +567,14 @@ class FileView extends StatelessWidget {
       items: [
         _buildColumnToggleItem(l10n.columnSize, 'size', columnVisibility.size),
         _buildColumnToggleItem(l10n.columnType, 'type', columnVisibility.type),
-        _buildColumnToggleItem(
-            l10n.columnDateModified, 'dateModified', columnVisibility.dateModified),
-        _buildColumnToggleItem(
-            l10n.columnDateCreated, 'dateCreated', columnVisibility.dateCreated),
+        _buildColumnToggleItem(l10n.columnDateModified, 'dateModified',
+            columnVisibility.dateModified),
+        _buildColumnToggleItem(l10n.columnDateCreated, 'dateCreated',
+            columnVisibility.dateCreated),
         _buildColumnToggleItem(
             l10n.columnAttributes, 'attributes', columnVisibility.attributes),
-        _buildColumnToggleItem(
-            l10n.columnDateAccessed, 'dateAccessed', columnVisibility.dateAccessed),
+        _buildColumnToggleItem(l10n.columnDateAccessed, 'dateAccessed',
+            columnVisibility.dateAccessed),
         _buildColumnToggleItem(
             l10n.columnExtension, 'extension', columnVisibility.extension),
         _buildColumnToggleItem(l10n.columnPath, 'path', columnVisibility.path),
@@ -600,7 +600,9 @@ class FileView extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isVisible ? PhosphorIconsLight.checkSquare : PhosphorIconsLight.square,
+            isVisible
+                ? PhosphorIconsLight.checkSquare
+                : PhosphorIconsLight.square,
             size: 20,
           ),
           const SizedBox(width: 8),

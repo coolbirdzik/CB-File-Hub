@@ -102,7 +102,8 @@ class TrashManager {
     if (!Platform.isWindows) {
       return const RecycleBinPage(items: [], total: 0);
     }
-    final native = await _getRecycleBinItemsNative(offset: offset, limit: limit);
+    final native =
+        await _getRecycleBinItemsNative(offset: offset, limit: limit);
     if (native != null) {
       return native;
     }
@@ -641,13 +642,9 @@ class TrashManager {
     final total = filePaths.length;
     final size = chunkSize <= 0 ? total : chunkSize;
     final batchTimeout = timeoutOverride ??
-        (permanent
-            ? const Duration(seconds: 20)
-            : const Duration(seconds: 2));
+        (permanent ? const Duration(seconds: 20) : const Duration(seconds: 2));
     final singleTimeout = timeoutOverride ??
-        (permanent
-            ? const Duration(seconds: 10)
-            : const Duration(seconds: 1));
+        (permanent ? const Duration(seconds: 10) : const Duration(seconds: 1));
 
     for (int start = 0; start < total; start += size) {
       final end = (start + size < total) ? start + size : total;
@@ -952,7 +949,9 @@ class TrashManager {
           // amortise rebuild cost.
           final flushAt = emittedCount == 0
               ? firstPageSize
-              : (emittedCount < firstPageSize * 8 ? firstPageSize * 2 : pageSize);
+              : (emittedCount < firstPageSize * 8
+                  ? firstPageSize * 2
+                  : pageSize);
           if (buffer.length >= flushAt) {
             yield _convertSystemTrashItems(buffer);
             emittedCount += buffer.length;

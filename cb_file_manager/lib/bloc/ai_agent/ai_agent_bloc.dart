@@ -627,8 +627,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         final permanent = call.arguments['permanent'] as bool? ?? false;
         final cats = call.arguments['categories'] as List?;
         final catsStr = cats != null ? cats.join(', ') : 'all scanned';
-        buffer.writeln(
-            'CLEAN DISK JUNK: scan_id=$scanId, categories=[$catsStr]');
+        buffer
+            .writeln('CLEAN DISK JUNK: scan_id=$scanId, categories=[$catsStr]');
         buffer.writeln(
             permanent ? 'Mode: PERMANENT DELETE' : 'Mode: Move to Recycle Bin');
       }
