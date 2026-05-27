@@ -204,6 +204,27 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get columnAttributes => 'Thuộc tính';
 
+  @override
+  String get columnDateAccessed => 'Ngày truy cập';
+
+  @override
+  String get columnExtension => 'Phần mở rộng';
+
+  @override
+  String get columnPath => 'Đường dẫn';
+
+  @override
+  String get columnTags => 'Nhãn';
+
+  @override
+  String get columnDimensions => 'Kích thước ảnh';
+
+  @override
+  String get columnDuration => 'Thời lượng';
+
+  @override
+  String get columnItemCount => 'Số mục';
+
   // Column descriptions
   @override
   String get columnSizeDescription => 'Hiển thị kích thước của file';
@@ -223,11 +244,52 @@ class VietnameseLocalizations implements AppLocalizations {
   String get columnAttributesDescription =>
       'Hiển thị thuộc tính tệp (quyền đọc/ghi)';
 
+  @override
+  String get columnDateAccessedDescription =>
+      'Hiển thị ngày giờ truy cập tệp lần cuối';
+
+  @override
+  String get columnExtensionDescription =>
+      'Hiển thị phần mở rộng tệp (ví dụ: .mp4, .docx)';
+
+  @override
+  String get columnPathDescription => 'Hiển thị đường dẫn tương đối của tệp';
+
+  @override
+  String get columnTagsDescription => 'Hiển thị nhãn của tệp';
+
+  @override
+  String get columnDimensionsDescription =>
+      'Hiển thị kích thước ảnh/video (rộng x cao)';
+
+  @override
+  String get columnDurationDescription =>
+      'Hiển thị thời lượng cho tệp video/âm thanh';
+
+  @override
+  String get columnItemCountDescription =>
+      'Hiển thị số lượng mục trong thư mục';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
       'Chọn các cột bạn muốn hiển thị trong chế độ xem chi tiết. '
       'Cột "Tên" luôn được hiển thị và không thể tắt.';
+
+  // List field visibility
+  @override
+  String get listFieldVisibilityTitle => 'Tùy chỉnh trường hiển thị';
+
+  @override
+  String get listFieldVisibilityInstructions =>
+      'Chọn các trường bạn muốn hiển thị trong chế độ xem danh sách.';
+
+  // Metadata format strings
+  @override
+  String dimensionsFormat(int width, int height) => '$width \u00D7 $height';
+
+  @override
+  String itemCountFormat(int count) => '$count mục';
 
   // Grid size dialog
   @override

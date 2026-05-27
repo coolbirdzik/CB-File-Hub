@@ -182,6 +182,20 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     ''');
 
     await db.execute('''
+      CREATE TABLE IF NOT EXISTS folder_display_preferences (
+        path TEXT PRIMARY KEY,
+        view_mode INTEGER,
+        sort_option INTEGER,
+        grid_zoom_level INTEGER,
+        column_visibility_json TEXT,
+        show_file_tags INTEGER,
+        preview_pane_visible INTEGER,
+        preview_pane_width REAL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS albums (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,

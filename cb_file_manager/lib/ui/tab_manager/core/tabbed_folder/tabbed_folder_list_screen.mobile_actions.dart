@@ -13,7 +13,6 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
         option,
         folderPath: _currentPath,
       ));
-      saveSortSetting(option, _currentPath);
     };
     controller.onViewModeToggled = _setViewMode;
     controller.onBack = _handleMouseBackButton;

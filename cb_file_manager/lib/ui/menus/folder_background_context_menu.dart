@@ -21,7 +21,6 @@ class FolderBackgroundContextMenu {
     required Function(ViewMode) onViewModeChanged,
     required VoidCallback onRefresh,
     required Function(String) onCreateFolder,
-    required Future<void> Function(SortOption) onSortOptionSaved,
     InlineRenameController? inlineRenameController,
     ValueChanged<String>? onAfterFileCreated,
   }) {
@@ -51,7 +50,6 @@ class FolderBackgroundContextMenu {
           }
         }
       },
-      onSortOptionSaved: onSortOptionSaved,
       inlineRenameController: inlineRenameController,
       onAfterFileCreated: onAfterFileCreated,
     );

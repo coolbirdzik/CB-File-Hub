@@ -10,6 +10,8 @@ import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 import '../../../components/common/shared_file_context_menu.dart';
 import '../../../components/common/optimized_interaction_handler.dart';
 import '../../../utils/item_interaction_style.dart';
+import 'package:cb_file_manager/services/file_metadata_service.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
 
 class FolderDetailsItem extends StatefulWidget {
   final Directory folder;
@@ -253,6 +255,107 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                           ),
                         ),
                       ),
+
+                    // Date Accessed column
+                    if (widget.columnVisibility.dateAccessed)
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: Text(
+                            _fileStat != null
+                                ? _fileStat!.accessed
+                                    .toString()
+                                    .split('.')
+                                    .first
+                                : 'Loading...',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Extension column (empty for folders)
+                    if (widget.columnVisibility.extension)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: const Text(
+                            '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Path column
+                    if (widget.columnVisibility.path)
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: Text(
+                            widget.folder.path,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Tags column (empty for folders)
+                    if (widget.columnVisibility.tags)
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: const Text(
+                            '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Dimensions column (empty for folders)
+                    if (widget.columnVisibility.dimensions)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: const Text(
+                            '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Duration column (empty for folders)
+                    if (widget.columnVisibility.duration)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: const Text(
+                            '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Item Count column
+                    if (widget.columnVisibility.itemCount)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: _AsyncItemCountCell(
+                              folderPath: widget.folder.path),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -405,6 +508,67 @@ class _FolderInteractionLayerState extends State<_FolderInteractionLayer> {
       behavior: HitTestBehavior.opaque,
       onTapDown: _handleTapDown,
       onLongPress: null,
+    );
+  }
+}
+
+/// Async widget that loads and displays folder item count.
+class _AsyncItemCountCell extends StatefulWidget {
+  final String folderPath;
+
+  const _AsyncItemCountCell({required this.folderPath});
+
+  @override
+  State<_AsyncItemCountCell> createState() => _AsyncItemCountCellState();
+}
+
+class _AsyncItemCountCellState extends State<_AsyncItemCountCell> {
+  int? _count;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCount();
+  }
+
+  @override
+  void didUpdateWidget(_AsyncItemCountCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.folderPath != oldWidget.folderPath) {
+      _loaded = false;
+      _count = null;
+      _loadCount();
+    }
+  }
+
+  Future<void> _loadCount() async {
+    try {
+      final service = locator<FileMetadataService>();
+      final count = await service.getFolderItemCount(widget.folderPath);
+      if (mounted) {
+        setState(() {
+          _count = count;
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Text('...', overflow: TextOverflow.ellipsis);
+    }
+    if (_count == null) {
+      return const Text('\u2014', overflow: TextOverflow.ellipsis);
+    }
+    final l10n = AppLocalizations.of(context)!;
+    return Text(
+      l10n.itemCountFormat(_count!),
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

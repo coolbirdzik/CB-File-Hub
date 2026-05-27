@@ -68,6 +68,7 @@ class FileView extends StatelessWidget {
   final bool showFileTags; // Add parameter to control tag display
   final ScrollController? scrollController;
   final GlobalKey Function(String path)? itemKeyForPath;
+  final Function(ColumnVisibility)? onColumnVisibilityChanged;
 
   const FileView({
     Key? key,
@@ -95,6 +96,7 @@ class FileView extends StatelessWidget {
     this.showFileTags = true, // Default to showing tags
     this.scrollController,
     this.itemKeyForPath,
+    this.onColumnVisibilityChanged,
   }) : super(key: key);
 
   Function(String, {bool shiftSelect, bool ctrlSelect})
@@ -212,24 +214,29 @@ class FileView extends StatelessWidget {
         // Column headers for details view with info tooltip
         Stack(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              ),
-              child: Row(
-                children: [
-                  // Name column (always visible)
-                  Expanded(
-                    flex: 3,
-                    child: _buildSortableHeaderCell(
-                      context: context,
-                      label: l10n.columnName,
-                      style: headerStyle,
-                      ascendingOption: SortOption.nameAsc,
-                      descendingOption: SortOption.nameDesc,
+            GestureDetector(
+              onSecondaryTapUp: (details) {
+                _showColumnHeaderContextMenu(
+                    context, details.globalPosition, l10n);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                child: Row(
+                  children: [
+                    // Name column (always visible)
+                    Expanded(
+                      flex: 3,
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnName,
+                        style: headerStyle,
+                        ascendingOption: SortOption.nameAsc,
+                        descendingOption: SortOption.nameDesc,
+                      ),
                     ),
-                  ),
 
                   // Type column
                   if (columnVisibility.type)
@@ -295,8 +302,88 @@ class FileView extends StatelessWidget {
                         descendingOption: SortOption.attributesDesc,
                       ),
                     ),
+
+                  // Date Accessed column
+                  if (columnVisibility.dateAccessed)
+                    Expanded(
+                      flex: 2,
+                      child: _buildHeaderCell(
+                        context: context,
+                        label: l10n.columnDateAccessed,
+                        style: headerStyle,
+                      ),
+                    ),
+
+                  // Extension column
+                  if (columnVisibility.extension)
+                    Expanded(
+                      flex: 1,
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnExtension,
+                        style: headerStyle,
+                        ascendingOption: SortOption.extensionAsc,
+                        descendingOption: SortOption.extensionDesc,
+                      ),
+                    ),
+
+                  // Path column
+                  if (columnVisibility.path)
+                    Expanded(
+                      flex: 3,
+                      child: _buildHeaderCell(
+                        context: context,
+                        label: l10n.columnPath,
+                        style: headerStyle,
+                      ),
+                    ),
+
+                  // Tags column
+                  if (columnVisibility.tags)
+                    Expanded(
+                      flex: 2,
+                      child: _buildHeaderCell(
+                        context: context,
+                        label: l10n.columnTags,
+                        style: headerStyle,
+                      ),
+                    ),
+
+                  // Dimensions column
+                  if (columnVisibility.dimensions)
+                    Expanded(
+                      flex: 1,
+                      child: _buildHeaderCell(
+                        context: context,
+                        label: l10n.columnDimensions,
+                        style: headerStyle,
+                      ),
+                    ),
+
+                  // Duration column
+                  if (columnVisibility.duration)
+                    Expanded(
+                      flex: 1,
+                      child: _buildHeaderCell(
+                        context: context,
+                        label: l10n.columnDuration,
+                        style: headerStyle,
+                      ),
+                    ),
+
+                  // Item Count column
+                  if (columnVisibility.itemCount)
+                    Expanded(
+                      flex: 1,
+                      child: _buildHeaderCell(
+                        context: context,
+                        label: l10n.columnItemCount,
+                        style: headerStyle,
+                      ),
+                    ),
                 ],
               ),
+            ),
             ),
 
             // Add info button with tooltip about customizing columns
@@ -442,6 +529,123 @@ class FileView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildHeaderCell({
+    required BuildContext context,
+    required String label,
+    required TextStyle style,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+      child: Text(
+        label,
+        style: style,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  void _showColumnHeaderContextMenu(
+    BuildContext context,
+    Offset position,
+    dynamic l10n,
+  ) {
+    if (onColumnVisibilityChanged == null) return;
+
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        overlay.size.width - position.dx,
+        overlay.size.height - position.dy,
+      ),
+      items: [
+        _buildColumnToggleItem(l10n.columnSize, 'size', columnVisibility.size),
+        _buildColumnToggleItem(l10n.columnType, 'type', columnVisibility.type),
+        _buildColumnToggleItem(
+            l10n.columnDateModified, 'dateModified', columnVisibility.dateModified),
+        _buildColumnToggleItem(
+            l10n.columnDateCreated, 'dateCreated', columnVisibility.dateCreated),
+        _buildColumnToggleItem(
+            l10n.columnAttributes, 'attributes', columnVisibility.attributes),
+        _buildColumnToggleItem(
+            l10n.columnDateAccessed, 'dateAccessed', columnVisibility.dateAccessed),
+        _buildColumnToggleItem(
+            l10n.columnExtension, 'extension', columnVisibility.extension),
+        _buildColumnToggleItem(l10n.columnPath, 'path', columnVisibility.path),
+        _buildColumnToggleItem(l10n.columnTags, 'tags', columnVisibility.tags),
+        _buildColumnToggleItem(
+            l10n.columnDimensions, 'dimensions', columnVisibility.dimensions),
+        _buildColumnToggleItem(
+            l10n.columnDuration, 'duration', columnVisibility.duration),
+        _buildColumnToggleItem(
+            l10n.columnItemCount, 'itemCount', columnVisibility.itemCount),
+      ],
+    ).then((value) {
+      if (value == null || onColumnVisibilityChanged == null) return;
+      final newVisibility = _toggleColumn(value);
+      onColumnVisibilityChanged!(newVisibility);
+    });
+  }
+
+  PopupMenuItem<String> _buildColumnToggleItem(
+      String label, String key, bool isVisible) {
+    return PopupMenuItem<String>(
+      value: key,
+      child: Row(
+        children: [
+          Icon(
+            isVisible ? PhosphorIconsLight.checkSquare : PhosphorIconsLight.square,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(label),
+        ],
+      ),
+    );
+  }
+
+  ColumnVisibility _toggleColumn(String key) {
+    switch (key) {
+      case 'size':
+        return columnVisibility.copyWith(size: !columnVisibility.size);
+      case 'type':
+        return columnVisibility.copyWith(type: !columnVisibility.type);
+      case 'dateModified':
+        return columnVisibility.copyWith(
+            dateModified: !columnVisibility.dateModified);
+      case 'dateCreated':
+        return columnVisibility.copyWith(
+            dateCreated: !columnVisibility.dateCreated);
+      case 'attributes':
+        return columnVisibility.copyWith(
+            attributes: !columnVisibility.attributes);
+      case 'dateAccessed':
+        return columnVisibility.copyWith(
+            dateAccessed: !columnVisibility.dateAccessed);
+      case 'extension':
+        return columnVisibility.copyWith(
+            extension: !columnVisibility.extension);
+      case 'path':
+        return columnVisibility.copyWith(path: !columnVisibility.path);
+      case 'tags':
+        return columnVisibility.copyWith(tags: !columnVisibility.tags);
+      case 'dimensions':
+        return columnVisibility.copyWith(
+            dimensions: !columnVisibility.dimensions);
+      case 'duration':
+        return columnVisibility.copyWith(duration: !columnVisibility.duration);
+      case 'itemCount':
+        return columnVisibility.copyWith(
+            itemCount: !columnVisibility.itemCount);
+      default:
+        return columnVisibility;
+    }
   }
 
   Widget _buildGridView() {

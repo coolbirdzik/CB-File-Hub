@@ -1,11 +1,18 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:cb_file_manager/models/database/database_manager.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
-import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:sqflite_common/sqlite_api.dart';
 
-/// Manages per-folder sorting preferences using JSON config files
+/// Stores display preferences per folder in the application's SQLite database.
 class FolderSortManager {
+  static const String _tableName = 'folder_display_preferences';
+  static const String _legacyConfigFileName = '.cbfile_config.json';
+  static const String _drivesPreferencePath = '#drives';
+
   static const String _viewModeKey = 'viewMode';
   static const String _sortOptionKey = 'sortOption';
   static const String _gridZoomLevelKey = 'gridZoomLevel';
@@ -16,118 +23,50 @@ class FolderSortManager {
 
   static final FolderSortManager _instance = FolderSortManager._internal();
 
-  // Singleton constructor
   factory FolderSortManager() => _instance;
 
   FolderSortManager._internal();
 
-  // Cache of sort options for each folder
-  final Map<String, SortOption> _folderSortCache = {};
-  final Map<String, ViewMode> _folderViewModeCache = {};
-  final Map<String, int> _folderGridZoomCache = {};
-  final Map<String, ColumnVisibility> _folderColumnVisibilityCache = {};
-  final Map<String, bool> _folderShowFileTagsCache = {};
-  final Map<String, bool> _folderPreviewPaneVisibleCache = {};
-  final Map<String, double> _folderPreviewPaneWidthCache = {};
+  final Map<String, Map<String, dynamic>> _folderConfigCache = {};
+  Future<void>? _tableInitialization;
 
-  // In-memory database for system paths
-  final Map<String, Map<String, dynamic>> _systemPathConfigs = {};
-
-  // Detect if a path is a system/virtual path (starts with #)
-  bool _isSystemPath(String path) {
-    return path.startsWith('#');
-  }
-
-  /// Get the sort option for a specific folder
-  /// If a folder-specific option is found, it's returned
-  /// Otherwise returns null (fallback to global preference)
-  /// This method is designed to never throw exceptions to avoid blocking folder loading
   Future<SortOption?> getFolderSortOption(String folderPath) async {
     try {
-      // Check cache first
-      if (_folderSortCache.containsKey(folderPath)) {
-        return _folderSortCache[folderPath];
-      }
-
-      SortOption? sortOption;
-
-      // Use JSON config for all platforms and paths - NO TIMEOUT for faster loading
-      try {
-        sortOption = await _getMobileSortOption(folderPath);
-      } catch (e) {
-        debugPrint('JSON config method failed: $e');
-        sortOption = null;
-      }
-
-      // Cache the result if found
-      if (sortOption != null) {
-        _folderSortCache[folderPath] = sortOption;
-      }
-
-      return sortOption;
+      return await _getConfigEnumValue<SortOption>(
+        folderPath: folderPath,
+        key: _sortOptionKey,
+        values: SortOption.values,
+      );
     } catch (e) {
-      // Ultimate safety net - never let this method throw exceptions
       debugPrint('Unexpected error in getFolderSortOption: $e');
       return null;
     }
   }
 
-  /// Save the sort option for a specific folder
-  /// This method is designed to never throw exceptions to avoid blocking folder operations
   Future<bool> saveFolderSortOption(
-      String folderPath, SortOption sortOption) async {
+    String folderPath,
+    SortOption sortOption,
+  ) async {
     try {
-      // Skip saving for invalid paths (URLs, protocols, etc.)
-      if (folderPath.contains('://') || folderPath.isEmpty) {
-        debugPrint('Skipping sort option save for invalid path: $folderPath');
-        // Still cache it in memory for the session
-        _folderSortCache[folderPath] = sortOption;
-        return true; // Return true to avoid error messages
-      }
-
-      bool success = false;
-
-      // Use JSON config for all platforms and paths - NO TIMEOUT for faster saving
-      try {
-        success = await _saveMobileSortOption(folderPath, sortOption);
-        if (success) {
-          debugPrint('Successfully saved sort option using JSON config');
-        }
-      } catch (e) {
-        debugPrint('JSON save method failed: $e');
-        success = false;
-      }
-
-      // Update cache if successful
-      if (success) {
-        _folderSortCache[folderPath] = sortOption;
-      }
-
-      return success;
+      return await _saveConfigValue(
+        folderPath: folderPath,
+        key: _sortOptionKey,
+        value: sortOption.index,
+      );
     } catch (e) {
-      // Ultimate safety net - never let this method throw exceptions
       debugPrint('Unexpected error in saveFolderSortOption: $e');
-      // Still try to cache it in memory as a last resort
-      _folderSortCache[folderPath] = sortOption;
+      _cacheValue(folderPath, _sortOptionKey, sortOption.index);
       return false;
     }
   }
 
   Future<ViewMode?> getFolderViewMode(String folderPath) async {
     try {
-      if (_folderViewModeCache.containsKey(folderPath)) {
-        return _folderViewModeCache[folderPath];
-      }
-
-      final viewMode = await _getConfigEnumValue<ViewMode>(
+      return await _getConfigEnumValue<ViewMode>(
         folderPath: folderPath,
         key: _viewModeKey,
         values: ViewMode.values,
       );
-      if (viewMode != null) {
-        _folderViewModeCache[folderPath] = viewMode;
-      }
-      return viewMode;
     } catch (e) {
       debugPrint('Unexpected error in getFolderViewMode: $e');
       return null;
@@ -136,39 +75,33 @@ class FolderSortManager {
 
   Future<bool> saveFolderViewMode(String folderPath, ViewMode viewMode) async {
     try {
-      if (folderPath.contains('://') || folderPath.isEmpty) {
-        debugPrint('Skipping view mode save for invalid path: $folderPath');
-        _folderViewModeCache[folderPath] = viewMode;
-        return true;
-      }
-
-      final success = await _saveConfigValue(
+      return await _saveConfigValue(
         folderPath: folderPath,
         key: _viewModeKey,
         value: viewMode.index,
       );
-      if (success) {
-        _folderViewModeCache[folderPath] = viewMode;
-      }
-      return success;
     } catch (e) {
       debugPrint('Unexpected error in saveFolderViewMode: $e');
-      _folderViewModeCache[folderPath] = viewMode;
+      _cacheValue(folderPath, _viewModeKey, viewMode.index);
       return false;
     }
   }
 
-  /// Clear the sort option for a specific folder
   Future<bool> clearFolderSortOption(String folderPath) async {
     try {
-      bool success = await _clearMobileSortOption(folderPath);
-
-      // Remove from cache if successful
-      if (success) {
-        _folderSortCache.remove(folderPath);
-      }
-
-      return success;
+      final config = await _readConfig(folderPath);
+      final database = await _getDatabase();
+      await database.rawUpdate(
+        '''
+        UPDATE $_tableName
+        SET sort_option = NULL, updated_at = ?
+        WHERE path = ?
+        ''',
+        <Object?>[_now(), _normalizePath(folderPath)],
+      );
+      config.remove(_sortOptionKey);
+      _folderConfigCache[_normalizePath(folderPath)] = config;
+      return true;
     } catch (e) {
       debugPrint('Error clearing folder sort option: $e');
       return false;
@@ -177,16 +110,10 @@ class FolderSortManager {
 
   Future<int?> getFolderGridZoomLevel(String folderPath) async {
     try {
-      final cached = _folderGridZoomCache[folderPath];
-      if (cached != null) return cached;
-      final value = await _getConfigInt(
+      return await _getConfigInt(
         folderPath: folderPath,
         key: _gridZoomLevelKey,
       );
-      if (value != null) {
-        _folderGridZoomCache[folderPath] = value;
-      }
-      return value;
     } catch (e) {
       debugPrint('Unexpected error in getFolderGridZoomLevel: $e');
       return null;
@@ -195,34 +122,25 @@ class FolderSortManager {
 
   Future<bool> saveFolderGridZoomLevel(String folderPath, int zoomLevel) async {
     try {
-      final success = await _saveConfigValue(
+      return await _saveConfigValue(
         folderPath: folderPath,
         key: _gridZoomLevelKey,
         value: zoomLevel,
       );
-      if (success) {
-        _folderGridZoomCache[folderPath] = zoomLevel;
-      }
-      return success;
     } catch (e) {
       debugPrint('Unexpected error in saveFolderGridZoomLevel: $e');
-      _folderGridZoomCache[folderPath] = zoomLevel;
+      _cacheValue(folderPath, _gridZoomLevelKey, zoomLevel);
       return false;
     }
   }
 
   Future<ColumnVisibility?> getFolderColumnVisibility(String folderPath) async {
     try {
-      final cached = _folderColumnVisibilityCache[folderPath];
-      if (cached != null) return cached;
       final map = await _getConfigMap(
         folderPath: folderPath,
         key: _columnVisibilityKey,
       );
-      if (map == null) return null;
-      final visibility = ColumnVisibility.fromMap(map);
-      _folderColumnVisibilityCache[folderPath] = visibility;
-      return visibility;
+      return map == null ? null : ColumnVisibility.fromMap(map);
     } catch (e) {
       debugPrint('Unexpected error in getFolderColumnVisibility: $e');
       return null;
@@ -234,34 +152,24 @@ class FolderSortManager {
     ColumnVisibility visibility,
   ) async {
     try {
-      final success = await _saveConfigValue(
+      return await _saveConfigValue(
         folderPath: folderPath,
         key: _columnVisibilityKey,
         value: visibility.toMap(),
       );
-      if (success) {
-        _folderColumnVisibilityCache[folderPath] = visibility;
-      }
-      return success;
     } catch (e) {
       debugPrint('Unexpected error in saveFolderColumnVisibility: $e');
-      _folderColumnVisibilityCache[folderPath] = visibility;
+      _cacheValue(folderPath, _columnVisibilityKey, visibility.toMap());
       return false;
     }
   }
 
   Future<bool?> getFolderShowFileTags(String folderPath) async {
     try {
-      final cached = _folderShowFileTagsCache[folderPath];
-      if (cached != null) return cached;
-      final value = await _getConfigBool(
+      return await _getConfigBool(
         folderPath: folderPath,
         key: _showFileTagsKey,
       );
-      if (value != null) {
-        _folderShowFileTagsCache[folderPath] = value;
-      }
-      return value;
     } catch (e) {
       debugPrint('Unexpected error in getFolderShowFileTags: $e');
       return null;
@@ -270,34 +178,24 @@ class FolderSortManager {
 
   Future<bool> saveFolderShowFileTags(String folderPath, bool showTags) async {
     try {
-      final success = await _saveConfigValue(
+      return await _saveConfigValue(
         folderPath: folderPath,
         key: _showFileTagsKey,
         value: showTags,
       );
-      if (success) {
-        _folderShowFileTagsCache[folderPath] = showTags;
-      }
-      return success;
     } catch (e) {
       debugPrint('Unexpected error in saveFolderShowFileTags: $e');
-      _folderShowFileTagsCache[folderPath] = showTags;
+      _cacheValue(folderPath, _showFileTagsKey, showTags);
       return false;
     }
   }
 
   Future<bool?> getFolderPreviewPaneVisible(String folderPath) async {
     try {
-      final cached = _folderPreviewPaneVisibleCache[folderPath];
-      if (cached != null) return cached;
-      final value = await _getConfigBool(
+      return await _getConfigBool(
         folderPath: folderPath,
         key: _previewPaneVisibleKey,
       );
-      if (value != null) {
-        _folderPreviewPaneVisibleCache[folderPath] = value;
-      }
-      return value;
     } catch (e) {
       debugPrint('Unexpected error in getFolderPreviewPaneVisible: $e');
       return null;
@@ -309,34 +207,24 @@ class FolderSortManager {
     bool visible,
   ) async {
     try {
-      final success = await _saveConfigValue(
+      return await _saveConfigValue(
         folderPath: folderPath,
         key: _previewPaneVisibleKey,
         value: visible,
       );
-      if (success) {
-        _folderPreviewPaneVisibleCache[folderPath] = visible;
-      }
-      return success;
     } catch (e) {
       debugPrint('Unexpected error in saveFolderPreviewPaneVisible: $e');
-      _folderPreviewPaneVisibleCache[folderPath] = visible;
+      _cacheValue(folderPath, _previewPaneVisibleKey, visible);
       return false;
     }
   }
 
   Future<double?> getFolderPreviewPaneWidth(String folderPath) async {
     try {
-      final cached = _folderPreviewPaneWidthCache[folderPath];
-      if (cached != null) return cached;
-      final value = await _getConfigDouble(
+      return await _getConfigDouble(
         folderPath: folderPath,
         key: _previewPaneWidthKey,
       );
-      if (value != null) {
-        _folderPreviewPaneWidthCache[folderPath] = value;
-      }
-      return value;
     } catch (e) {
       debugPrint('Unexpected error in getFolderPreviewPaneWidth: $e');
       return null;
@@ -348,73 +236,14 @@ class FolderSortManager {
     double width,
   ) async {
     try {
-      final success = await _saveConfigValue(
+      return await _saveConfigValue(
         folderPath: folderPath,
         key: _previewPaneWidthKey,
         value: width,
       );
-      if (success) {
-        _folderPreviewPaneWidthCache[folderPath] = width;
-      }
-      return success;
     } catch (e) {
       debugPrint('Unexpected error in saveFolderPreviewPaneWidth: $e');
-      _folderPreviewPaneWidthCache[folderPath] = width;
-      return false;
-    }
-  }
-
-  /// Get sorting option from cbfile_config.json file
-  Future<SortOption?> _getMobileSortOption(String folderPath) async {
-    try {
-      // For system paths, use in-memory database
-      if (_isSystemPath(folderPath)) {
-        final config = _systemPathConfigs[folderPath];
-        if (config != null && config.containsKey(_sortOptionKey)) {
-          int sortIndex = config[_sortOptionKey];
-          if (sortIndex >= 0 && sortIndex < SortOption.values.length) {
-            return SortOption.values[sortIndex];
-          }
-        }
-        return null;
-      }
-
-      // Normal path - use file-based approach
-      final configPath = pathlib.join(folderPath, '.cbfile_config.json');
-      final configFile = File(configPath);
-
-      if (!await configFile.exists()) {
-        return null;
-      }
-
-      final contents = await configFile.readAsString();
-      final Map<String, dynamic> config = json.decode(contents);
-
-      if (config.containsKey(_sortOptionKey)) {
-        int sortIndex = config[_sortOptionKey];
-        if (sortIndex >= 0 && sortIndex < SortOption.values.length) {
-          return SortOption.values[sortIndex];
-        }
-      }
-
-      return null;
-    } catch (e) {
-      debugPrint('Error reading sort option: $e');
-      return null;
-    }
-  }
-
-  /// Save sorting option to cbfile_config.json file
-  Future<bool> _saveMobileSortOption(
-      String folderPath, SortOption sortOption) async {
-    try {
-      return await _saveConfigValue(
-        folderPath: folderPath,
-        key: _sortOptionKey,
-        value: sortOption.index,
-      );
-    } catch (e) {
-      debugPrint('Error saving sort option: $e');
+      _cacheValue(folderPath, _previewPaneWidthKey, width);
       return false;
     }
   }
@@ -424,17 +253,12 @@ class FolderSortManager {
     required String key,
     required List<T> values,
   }) async {
-    try {
-      final config = await _readConfig(folderPath);
-      final rawIndex = config[key];
-      if (rawIndex is int && rawIndex >= 0 && rawIndex < values.length) {
-        return values[rawIndex];
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error reading $key: $e');
-      return null;
+    final config = await _readConfig(folderPath);
+    final rawIndex = config[key];
+    if (rawIndex is int && rawIndex >= 0 && rawIndex < values.length) {
+      return values[rawIndex];
     }
+    return null;
   }
 
   Future<int?> _getConfigInt({
@@ -461,9 +285,7 @@ class FolderSortManager {
   }) async {
     final config = await _readConfig(folderPath);
     final rawValue = config[key];
-    if (rawValue is double) return rawValue;
-    if (rawValue is int) return rawValue.toDouble();
-    return null;
+    return rawValue is num ? rawValue.toDouble() : null;
   }
 
   Future<Map<String, dynamic>?> _getConfigMap({
@@ -472,28 +294,28 @@ class FolderSortManager {
   }) async {
     final config = await _readConfig(folderPath);
     final rawValue = config[key];
-    if (rawValue is Map) {
-      return Map<String, dynamic>.from(rawValue);
-    }
-    return null;
+    return rawValue is Map ? Map<String, dynamic>.from(rawValue) : null;
   }
 
   Future<Map<String, dynamic>> _readConfig(String folderPath) async {
-    if (_isSystemPath(folderPath)) {
-      return Map<String, dynamic>.from(_systemPathConfigs[folderPath] ?? {});
+    final pathKey = _normalizePath(folderPath);
+    final cached = _folderConfigCache[pathKey];
+    if (cached != null) {
+      return Map<String, dynamic>.from(cached);
     }
 
-    final configPath = pathlib.join(folderPath, '.cbfile_config.json');
-    final configFile = File(configPath);
-    if (!await configFile.exists()) {
-      return <String, dynamic>{};
+    final stored = await _readStoredConfig(pathKey);
+    if (stored != null) {
+      _folderConfigCache[pathKey] = stored;
+      return Map<String, dynamic>.from(stored);
     }
 
-    final contents = await configFile.readAsString();
-    if (contents.isEmpty) {
-      return <String, dynamic>{};
+    final legacy = await _readLegacyConfig(folderPath);
+    if (legacy.isNotEmpty) {
+      await _insertLegacyConfig(pathKey, legacy);
     }
-    return Map<String, dynamic>.from(json.decode(contents) as Map);
+    _folderConfigCache[pathKey] = legacy;
+    return Map<String, dynamic>.from(legacy);
   }
 
   Future<bool> _saveConfigValue({
@@ -501,105 +323,268 @@ class FolderSortManager {
     required String key,
     required Object value,
   }) async {
-    if (folderPath.contains('://') || folderPath.isEmpty) {
-      debugPrint('Skipping config save for invalid path: $folderPath');
-      return true;
-    }
-
-    if (_isSystemPath(folderPath)) {
-      final config = Map<String, dynamic>.from(
-        _systemPathConfigs[folderPath] ?? {},
-      );
-      config[key] = value;
-      _systemPathConfigs[folderPath] = config;
-      debugPrint('Saved $key for system path in memory: $folderPath');
-      return true;
-    }
-
-    final configPath = pathlib.join(folderPath, '.cbfile_config.json');
-    final configFile = File(configPath);
-    final config = await _readConfig(folderPath);
-    config[key] = value;
-
-    final directory = Directory(folderPath);
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
-
-    if (await configFile.exists()) {
-      try {
-        await configFile.delete();
-      } catch (e) {
-        debugPrint('Warning: Failed to delete existing config file: $e');
-      }
-    }
-
-    final jsonString = const JsonEncoder.withIndent('  ').convert(config);
-    await configFile.writeAsString(jsonString);
-    debugPrint('Successfully saved config file: $jsonString');
-
-    if (Platform.isWindows) {
-      try {
-        final result = await Process.run('attrib', ['+H', configPath]);
-        debugPrint(
-            'Set hidden attribute on config file (exit code: ${result.exitCode})');
-      } catch (e) {
-        debugPrint('Error making config file hidden: $e');
-      }
-    } else if (Platform.isAndroid) {
-      try {
-        final nomediaFile = File(pathlib.join(folderPath, '.nomedia'));
-        if (!await nomediaFile.exists()) {
-          await nomediaFile.create();
-        }
-      } catch (e) {
-        debugPrint('Error creating .nomedia file: $e');
-      }
-    }
-
+    await _readConfig(folderPath);
+    final database = await _getDatabase();
+    final column = _columnForKey(key);
+    final sqlValue = _sqlValueForKey(key, value);
+    await database.rawInsert(
+      '''
+      INSERT INTO $_tableName (path, $column, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(path) DO UPDATE SET
+        $column = excluded.$column,
+        updated_at = excluded.updated_at
+      ''',
+      <Object?>[_normalizePath(folderPath), sqlValue, _now()],
+    );
+    _cacheValue(folderPath, key, value);
     return true;
   }
 
-  /// Clear mobile sort settings
-  Future<bool> _clearMobileSortOption(String folderPath) async {
+  Future<Database> _getDatabase() async {
+    final database = await DatabaseManager.getInstance().getDatabase();
+    _tableInitialization ??= _createTable(database);
     try {
-      // For system paths, use in-memory database
-      if (_isSystemPath(folderPath)) {
-        _systemPathConfigs.remove(folderPath);
-        debugPrint(
-            'Cleared sort option for system path from memory: $folderPath');
-        return true;
+      await _tableInitialization;
+    } catch (_) {
+      _tableInitialization = null;
+      rethrow;
+    }
+    return database;
+  }
+
+  Future<void> _createTable(Database database) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS $_tableName (
+        path TEXT PRIMARY KEY,
+        view_mode INTEGER,
+        sort_option INTEGER,
+        grid_zoom_level INTEGER,
+        column_visibility_json TEXT,
+        show_file_tags INTEGER,
+        preview_pane_visible INTEGER,
+        preview_pane_width REAL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  Future<Map<String, dynamic>?> _readStoredConfig(String pathKey) async {
+    final database = await _getDatabase();
+    final rows = await database.query(
+      _tableName,
+      where: 'path = ?',
+      whereArgs: <Object?>[pathKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final row = rows.first;
+    final config = <String, dynamic>{};
+    _copyIntColumn(row, 'view_mode', config, _viewModeKey);
+    _copyIntColumn(row, 'sort_option', config, _sortOptionKey);
+    _copyIntColumn(row, 'grid_zoom_level', config, _gridZoomLevelKey);
+    _copyBoolColumn(row, 'show_file_tags', config, _showFileTagsKey);
+    _copyBoolColumn(
+      row,
+      'preview_pane_visible',
+      config,
+      _previewPaneVisibleKey,
+    );
+    final width = row['preview_pane_width'];
+    if (width is num) {
+      config[_previewPaneWidthKey] = width.toDouble();
+    }
+    final columnJson = row['column_visibility_json'];
+    if (columnJson is String && columnJson.isNotEmpty) {
+      final decoded = json.decode(columnJson);
+      if (decoded is Map) {
+        config[_columnVisibilityKey] = Map<String, dynamic>.from(decoded);
       }
+    }
+    return config;
+  }
 
-      // Normal path - use file-based approach
-      final configPath = pathlib.join(folderPath, '.cbfile_config.json');
-      final configFile = File(configPath);
+  Future<Map<String, dynamic>> _readLegacyConfig(String folderPath) async {
+    if (folderPath.isEmpty ||
+        folderPath.startsWith('#') ||
+        folderPath.contains('://')) {
+      return <String, dynamic>{};
+    }
 
-      if (!await configFile.exists()) {
-        return true; // Nothing to clear
+    final configFile = File(pathlib.join(folderPath, _legacyConfigFileName));
+    if (!await configFile.exists()) {
+      return <String, dynamic>{};
+    }
+
+    try {
+      final decoded = json.decode(await configFile.readAsString());
+      if (decoded is! Map) {
+        return <String, dynamic>{};
       }
-
-      Map<String, dynamic> config = {};
-
-      // Load existing config
-      final contents = await configFile.readAsString();
-      config = json.decode(contents);
-
-      // Remove sort option
-      config.remove(_sortOptionKey);
-
-      // If config is now empty, delete the file
-      if (config.isEmpty) {
-        await configFile.delete();
-      } else {
-        // Otherwise, write back the updated config
-        await configFile.writeAsString(json.encode(config));
+      final source = Map<String, dynamic>.from(decoded);
+      final config = <String, dynamic>{};
+      _copyLegacyInt(source, config, _viewModeKey);
+      _copyLegacyInt(source, config, _sortOptionKey);
+      _copyLegacyInt(source, config, _gridZoomLevelKey);
+      _copyLegacyBool(source, config, _showFileTagsKey);
+      _copyLegacyBool(source, config, _previewPaneVisibleKey);
+      final width = source[_previewPaneWidthKey];
+      if (width is num) {
+        config[_previewPaneWidthKey] = width.toDouble();
       }
-
-      return true;
+      final columnVisibility = source[_columnVisibilityKey];
+      if (columnVisibility is Map) {
+        config[_columnVisibilityKey] =
+            Map<String, dynamic>.from(columnVisibility);
+      }
+      return config;
     } catch (e) {
-      debugPrint('Error clearing sort settings: $e');
-      return false;
+      debugPrint('Error reading legacy folder preferences: $e');
+      return <String, dynamic>{};
     }
   }
+
+  Future<void> _insertLegacyConfig(
+    String pathKey,
+    Map<String, dynamic> config,
+  ) async {
+    final database = await _getDatabase();
+    await database.rawInsert(
+      '''
+      INSERT OR IGNORE INTO $_tableName (
+        path,
+        view_mode,
+        sort_option,
+        grid_zoom_level,
+        column_visibility_json,
+        show_file_tags,
+        preview_pane_visible,
+        preview_pane_width,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ''',
+      <Object?>[
+        pathKey,
+        config[_viewModeKey],
+        config[_sortOptionKey],
+        config[_gridZoomLevelKey],
+        config[_columnVisibilityKey] == null
+            ? null
+            : json.encode(config[_columnVisibilityKey]),
+        _boolToInt(config[_showFileTagsKey]),
+        _boolToInt(config[_previewPaneVisibleKey]),
+        config[_previewPaneWidthKey],
+        _now(),
+      ],
+    );
+  }
+
+  String _normalizePath(String folderPath) {
+    final trimmed = folderPath.trim();
+    if (trimmed.isEmpty) {
+      return _drivesPreferencePath;
+    }
+    if (trimmed.startsWith('#') || trimmed.contains('://')) {
+      return trimmed;
+    }
+    final normalized = pathlib.normalize(trimmed);
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  }
+
+  String _columnForKey(String key) {
+    switch (key) {
+      case _viewModeKey:
+        return 'view_mode';
+      case _sortOptionKey:
+        return 'sort_option';
+      case _gridZoomLevelKey:
+        return 'grid_zoom_level';
+      case _columnVisibilityKey:
+        return 'column_visibility_json';
+      case _showFileTagsKey:
+        return 'show_file_tags';
+      case _previewPaneVisibleKey:
+        return 'preview_pane_visible';
+      case _previewPaneWidthKey:
+        return 'preview_pane_width';
+      default:
+        throw ArgumentError.value(key, 'key', 'Unknown folder preference key');
+    }
+  }
+
+  Object? _sqlValueForKey(String key, Object value) {
+    switch (key) {
+      case _columnVisibilityKey:
+        return json.encode(value);
+      case _showFileTagsKey:
+      case _previewPaneVisibleKey:
+        return value == true ? 1 : 0;
+      default:
+        return value;
+    }
+  }
+
+  void _cacheValue(String folderPath, String key, Object value) {
+    final pathKey = _normalizePath(folderPath);
+    final config = Map<String, dynamic>.from(
+      _folderConfigCache[pathKey] ?? <String, dynamic>{},
+    );
+    config[key] = value;
+    _folderConfigCache[pathKey] = config;
+  }
+
+  void _copyIntColumn(
+    Map<String, Object?> row,
+    String column,
+    Map<String, dynamic> config,
+    String key,
+  ) {
+    final value = row[column];
+    if (value is int) {
+      config[key] = value;
+    }
+  }
+
+  void _copyBoolColumn(
+    Map<String, Object?> row,
+    String column,
+    Map<String, dynamic> config,
+    String key,
+  ) {
+    final value = row[column];
+    if (value is int) {
+      config[key] = value == 1;
+    }
+  }
+
+  void _copyLegacyInt(
+    Map<String, dynamic> source,
+    Map<String, dynamic> config,
+    String key,
+  ) {
+    final value = source[key];
+    if (value is int) {
+      config[key] = value;
+    }
+  }
+
+  void _copyLegacyBool(
+    Map<String, dynamic> source,
+    Map<String, dynamic> config,
+    String key,
+  ) {
+    final value = source[key];
+    if (value is bool) {
+      config[key] = value;
+    }
+  }
+
+  int? _boolToInt(Object? value) {
+    return value is bool ? (value ? 1 : 0) : null;
+  }
+
+  int _now() => DateTime.now().millisecondsSinceEpoch;
 }

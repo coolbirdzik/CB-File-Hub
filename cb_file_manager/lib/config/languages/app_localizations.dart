@@ -97,6 +97,13 @@ abstract class AppLocalizations {
   String get columnDateModified;
   String get columnDateCreated;
   String get columnAttributes;
+  String get columnDateAccessed;
+  String get columnExtension;
+  String get columnPath;
+  String get columnTags;
+  String get columnDimensions;
+  String get columnDuration;
+  String get columnItemCount;
 
   // Column descriptions
   String get columnSizeDescription;
@@ -104,9 +111,24 @@ abstract class AppLocalizations {
   String get columnDateModifiedDescription;
   String get columnDateCreatedDescription;
   String get columnAttributesDescription;
+  String get columnDateAccessedDescription;
+  String get columnExtensionDescription;
+  String get columnPathDescription;
+  String get columnTagsDescription;
+  String get columnDimensionsDescription;
+  String get columnDurationDescription;
+  String get columnItemCountDescription;
 
   // Column visibility dialog
   String get columnVisibilityInstructions;
+
+  // List field visibility
+  String get listFieldVisibilityTitle;
+  String get listFieldVisibilityInstructions;
+
+  // Metadata format strings
+  String dimensionsFormat(int width, int height);
+  String itemCountFormat(int count);
 
   // Grid size dialog
   String gridSizeLabel(int count);

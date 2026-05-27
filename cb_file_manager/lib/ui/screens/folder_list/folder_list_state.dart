@@ -31,6 +31,13 @@ class ColumnVisibility {
   final bool dateModified;
   final bool dateCreated;
   final bool attributes;
+  final bool dateAccessed;
+  final bool extension;
+  final bool path;
+  final bool tags;
+  final bool dimensions;
+  final bool duration;
+  final bool itemCount;
 
   const ColumnVisibility({
     this.name = true, // Name is always visible by default
@@ -39,6 +46,13 @@ class ColumnVisibility {
     this.dateModified = true,
     this.dateCreated = false,
     this.attributes = false,
+    this.dateAccessed = false,
+    this.extension = false,
+    this.path = false,
+    this.tags = false,
+    this.dimensions = false,
+    this.duration = false,
+    this.itemCount = false,
   });
 
   // Create a copy with modified values
@@ -49,6 +63,13 @@ class ColumnVisibility {
     bool? dateModified,
     bool? dateCreated,
     bool? attributes,
+    bool? dateAccessed,
+    bool? extension,
+    bool? path,
+    bool? tags,
+    bool? dimensions,
+    bool? duration,
+    bool? itemCount,
   }) {
     return ColumnVisibility(
       name: name ?? this.name,
@@ -57,6 +78,13 @@ class ColumnVisibility {
       dateModified: dateModified ?? this.dateModified,
       dateCreated: dateCreated ?? this.dateCreated,
       attributes: attributes ?? this.attributes,
+      dateAccessed: dateAccessed ?? this.dateAccessed,
+      extension: extension ?? this.extension,
+      path: path ?? this.path,
+      tags: tags ?? this.tags,
+      dimensions: dimensions ?? this.dimensions,
+      duration: duration ?? this.duration,
+      itemCount: itemCount ?? this.itemCount,
     );
   }
 
@@ -69,6 +97,13 @@ class ColumnVisibility {
       'dateModified': dateModified,
       'dateCreated': dateCreated,
       'attributes': attributes,
+      'dateAccessed': dateAccessed,
+      'extension': extension,
+      'path': path,
+      'tags': tags,
+      'dimensions': dimensions,
+      'duration': duration,
+      'itemCount': itemCount,
     };
   }
 
@@ -81,6 +116,102 @@ class ColumnVisibility {
       dateModified: map['dateModified'] ?? true,
       dateCreated: map['dateCreated'] ?? false,
       attributes: map['attributes'] ?? false,
+      dateAccessed: map['dateAccessed'] ?? false,
+      extension: map['extension'] ?? false,
+      path: map['path'] ?? false,
+      tags: map['tags'] ?? false,
+      dimensions: map['dimensions'] ?? false,
+      duration: map['duration'] ?? false,
+      itemCount: map['itemCount'] ?? false,
+    );
+  }
+}
+
+// Define field visibility options for list view mode
+class ListFieldVisibility {
+  final bool size;
+  final bool dateModified;
+  final bool dateCreated;
+  final bool dateAccessed;
+  final bool type;
+  final bool extension;
+  final bool tags;
+  final bool dimensions;
+  final bool duration;
+  final bool itemCount;
+  final bool path;
+
+  const ListFieldVisibility({
+    this.size = true,
+    this.dateModified = false,
+    this.dateCreated = false,
+    this.dateAccessed = false,
+    this.type = false,
+    this.extension = false,
+    this.tags = true,
+    this.dimensions = false,
+    this.duration = false,
+    this.itemCount = false,
+    this.path = false,
+  });
+
+  ListFieldVisibility copyWith({
+    bool? size,
+    bool? dateModified,
+    bool? dateCreated,
+    bool? dateAccessed,
+    bool? type,
+    bool? extension,
+    bool? tags,
+    bool? dimensions,
+    bool? duration,
+    bool? itemCount,
+    bool? path,
+  }) {
+    return ListFieldVisibility(
+      size: size ?? this.size,
+      dateModified: dateModified ?? this.dateModified,
+      dateCreated: dateCreated ?? this.dateCreated,
+      dateAccessed: dateAccessed ?? this.dateAccessed,
+      type: type ?? this.type,
+      extension: extension ?? this.extension,
+      tags: tags ?? this.tags,
+      dimensions: dimensions ?? this.dimensions,
+      duration: duration ?? this.duration,
+      itemCount: itemCount ?? this.itemCount,
+      path: path ?? this.path,
+    );
+  }
+
+  Map<String, bool> toMap() {
+    return {
+      'size': size,
+      'dateModified': dateModified,
+      'dateCreated': dateCreated,
+      'dateAccessed': dateAccessed,
+      'type': type,
+      'extension': extension,
+      'tags': tags,
+      'dimensions': dimensions,
+      'duration': duration,
+      'itemCount': itemCount,
+      'path': path,
+    };
+  }
+
+  factory ListFieldVisibility.fromMap(Map<String, dynamic> map) {
+    return ListFieldVisibility(
+      size: map['size'] ?? true,
+      dateModified: map['dateModified'] ?? false,
+      dateCreated: map['dateCreated'] ?? false,
+      dateAccessed: map['dateAccessed'] ?? false,
+      type: map['type'] ?? false,
+      extension: map['extension'] ?? false,
+      tags: map['tags'] ?? true,
+      dimensions: map['dimensions'] ?? false,
+      duration: map['duration'] ?? false,
+      itemCount: map['itemCount'] ?? false,
+      path: map['path'] ?? false,
     );
   }
 }

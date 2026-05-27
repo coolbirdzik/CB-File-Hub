@@ -182,6 +182,13 @@ class SharedActionBar {
     bool dateModified = currentVisibility.dateModified;
     bool dateCreated = currentVisibility.dateCreated;
     bool attributes = currentVisibility.attributes;
+    bool dateAccessed = currentVisibility.dateAccessed;
+    bool extension = currentVisibility.extension;
+    bool path = currentVisibility.path;
+    bool tags = currentVisibility.tags;
+    bool dimensions = currentVisibility.dimensions;
+    bool duration = currentVisibility.duration;
+    bool itemCount = currentVisibility.itemCount;
 
     RouteUtils.showAcrylicDialog(
       context: context,
@@ -278,6 +285,97 @@ class SharedActionBar {
                       secondary: const Icon(PhosphorIconsLight.info),
                       dense: true,
                     ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnDateAccessed),
+                      subtitle: Text(l10n.columnDateAccessedDescription),
+                      value: dateAccessed,
+                      onChanged: (value) {
+                        setState(() {
+                          dateAccessed = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.clock),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnExtension),
+                      subtitle: Text(l10n.columnExtensionDescription),
+                      value: extension,
+                      onChanged: (value) {
+                        setState(() {
+                          extension = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.fileText),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnPath),
+                      subtitle: Text(l10n.columnPathDescription),
+                      value: path,
+                      onChanged: (value) {
+                        setState(() {
+                          path = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.path),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnTags),
+                      subtitle: Text(l10n.columnTagsDescription),
+                      value: tags,
+                      onChanged: (value) {
+                        setState(() {
+                          tags = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.tag),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnDimensions),
+                      subtitle: Text(l10n.columnDimensionsDescription),
+                      value: dimensions,
+                      onChanged: (value) {
+                        setState(() {
+                          dimensions = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.frameCorners),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnDuration),
+                      subtitle: Text(l10n.columnDurationDescription),
+                      value: duration,
+                      onChanged: (value) {
+                        setState(() {
+                          duration = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.timer),
+                      dense: true,
+                    ),
+                    const Divider(height: 1),
+                    CheckboxListTile(
+                      title: Text(l10n.columnItemCount),
+                      subtitle: Text(l10n.columnItemCountDescription),
+                      value: itemCount,
+                      onChanged: (value) {
+                        setState(() {
+                          itemCount = value ?? false;
+                        });
+                      },
+                      secondary: const Icon(PhosphorIconsLight.listNumbers),
+                      dense: true,
+                    ),
                   ],
                 ),
               ),
@@ -298,6 +396,13 @@ class SharedActionBar {
                       dateModified: dateModified,
                       dateCreated: dateCreated,
                       attributes: attributes,
+                      dateAccessed: dateAccessed,
+                      extension: extension,
+                      path: path,
+                      tags: tags,
+                      dimensions: dimensions,
+                      duration: duration,
+                      itemCount: itemCount,
                     );
                     onApply(newVisibility);
                     Navigator.pop(context);

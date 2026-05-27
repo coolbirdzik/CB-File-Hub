@@ -365,12 +365,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       tabId: widget.tabId,
       tabManagerBloc: context.read<TabManagerBloc>(),
       folderListBloc: _folderListBloc,
-      onPathChanged: (String path) {
-        setState(() {
-          _currentPath = path;
-          _pathController.text = _displayPathForInput(path);
-        });
-      },
+      onPathChanged: _handleCurrentPathChanged,
       onSaveLastAccessedFolder: _saveLastAccessedFolder,
     );
 
@@ -923,6 +918,15 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     ));
   }
 
+  void _handleCurrentPathChanged(String path) {
+    if (!mounted) return;
+    setState(() {
+      _currentPath = path;
+      _pathController.text = _displayPathForInput(path);
+    });
+    unawaited(_applyFolderDisplayPreferences(path));
+  }
+
   void _updatePath(String newPath) {
     if (_isHandlingPathUpdate) return;
     _isHandlingPathUpdate = true;
@@ -940,7 +944,6 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         _currentFilter,
         _currentSearchTag,
       );
-      unawaited(_applyFolderDisplayPreferences(newPath));
       if (Platform.isAndroid || Platform.isIOS) {
         final controller = MobileFileActionsController.forTab(widget.tabId);
         controller.currentPath = newPath;
@@ -1408,12 +1411,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   child: tab_components.DriveView(
                     tabId: widget.tabId,
                     folderListBloc: _folderListBloc,
-                    onPathChanged: (String path) {
-                      setState(() {
-                        _currentPath = path;
-                        _pathController.text = _displayPathForInput(path);
-                      });
-                    },
+                    onPathChanged: _handleCurrentPathChanged,
                     onBackButtonPressed: _handleMouseBackButton,
                     onForwardButtonPressed: _handleMouseForwardButton,
                     isLazyLoading: _isLazyLoadingDrives,
@@ -1732,7 +1730,6 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       onCreateFolder: (String folderName) {
         // This callback is now handled inside FolderBackgroundContextMenu
       },
-      onSortOptionSaved: (option) => saveSortSetting(option, _currentPath),
       inlineRenameController: _inlineRenameController,
       onAfterFileCreated: _handleCreatedFile,
     );
@@ -1789,7 +1786,6 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           option,
           folderPath: _currentPath,
         ));
-        saveSortSetting(option, _currentPath);
       },
       onViewModeToggled: _toggleViewMode,
       onViewModeSelected: _setViewMode,

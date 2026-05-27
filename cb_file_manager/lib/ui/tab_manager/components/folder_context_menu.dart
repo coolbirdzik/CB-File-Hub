@@ -35,7 +35,6 @@ class FolderContextMenu {
     required Function(ViewMode) onViewModeChanged,
     required VoidCallback onRefresh,
     required Future<void> Function(String) onCreateFolder,
-    required Future<void> Function(SortOption) onSortOptionSaved,
     InlineRenameController? inlineRenameController,
     ValueChanged<String>? onAfterFileCreated,
   }) async {
@@ -48,7 +47,6 @@ class FolderContextMenu {
       onViewModeChanged: onViewModeChanged,
       onRefresh: onRefresh,
       onCreateFolder: onCreateFolder,
-      onSortOptionSaved: onSortOptionSaved,
       inlineRenameController: inlineRenameController,
       onAfterFileCreated: onAfterFileCreated,
     );
@@ -105,7 +103,6 @@ class FolderContextMenu {
     required Function(ViewMode) onViewModeChanged,
     required VoidCallback onRefresh,
     required Future<void> Function(String) onCreateFolder,
-    required Future<void> Function(SortOption) onSortOptionSaved,
     InlineRenameController? inlineRenameController,
     ValueChanged<String>? onAfterFileCreated,
   }) async {
@@ -166,12 +163,11 @@ class FolderContextMenu {
                     label: l10n.sortNameAsc,
                     icon: PhosphorIconsLight.sortAscending,
                     isChecked: currentSortOption == SortOption.nameAsc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.nameAsc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.nameAsc);
                     },
                   ),
                   ContextMenuAction(
@@ -179,12 +175,11 @@ class FolderContextMenu {
                     label: l10n.sortNameDesc,
                     icon: PhosphorIconsLight.sortDescending,
                     isChecked: currentSortOption == SortOption.nameDesc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.nameDesc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.nameDesc);
                     },
                   ),
                   ContextMenuAction(
@@ -192,12 +187,11 @@ class FolderContextMenu {
                     label: l10n.sortDateModifiedNewest,
                     icon: PhosphorIconsLight.calendarBlank,
                     isChecked: currentSortOption == SortOption.dateDesc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.dateDesc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.dateDesc);
                     },
                   ),
                   ContextMenuAction(
@@ -205,12 +199,11 @@ class FolderContextMenu {
                     label: l10n.sortDateModifiedOldest,
                     icon: PhosphorIconsLight.calendarBlank,
                     isChecked: currentSortOption == SortOption.dateAsc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.dateAsc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.dateAsc);
                     },
                   ),
                   ContextMenuAction(
@@ -218,12 +211,11 @@ class FolderContextMenu {
                     label: l10n.sortSizeLargest,
                     icon: PhosphorIconsLight.arrowsOut,
                     isChecked: currentSortOption == SortOption.sizeDesc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.sizeDesc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.sizeDesc);
                     },
                   ),
                   ContextMenuAction(
@@ -231,12 +223,11 @@ class FolderContextMenu {
                     label: l10n.sortSizeSmallest,
                     icon: PhosphorIconsLight.arrowsIn,
                     isChecked: currentSortOption == SortOption.sizeAsc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.sizeAsc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.sizeAsc);
                     },
                   ),
                   ContextMenuAction(
@@ -244,12 +235,11 @@ class FolderContextMenu {
                     label: l10n.sortTypeAsc,
                     icon: PhosphorIconsLight.textAa,
                     isChecked: currentSortOption == SortOption.typeAsc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.typeAsc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.typeAsc);
                     },
                   ),
                   ContextMenuAction(
@@ -257,12 +247,11 @@ class FolderContextMenu {
                     label: l10n.sortTypeDesc,
                     icon: PhosphorIconsLight.textAa,
                     isChecked: currentSortOption == SortOption.typeDesc,
-                    onSelected: (_) async {
+                    onSelected: (_) {
                       folderListBloc.add(SetSortOption(
                         SortOption.typeDesc,
                         folderPath: currentPath,
                       ));
-                      await onSortOptionSaved(SortOption.typeDesc);
                     },
                   ),
                 ],

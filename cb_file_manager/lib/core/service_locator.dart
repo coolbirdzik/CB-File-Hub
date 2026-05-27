@@ -17,6 +17,7 @@ import '../services/ai/ai_chat_history_service.dart';
 import '../services/disk_cleaner/disk_cleaner_service.dart';
 import '../services/tab_activity/tab_activity_manager.dart';
 import '../services/tab_activity/tab_cache_release_helper.dart';
+import '../services/file_metadata_service.dart';
 
 /// Global service locator instance
 final GetIt locator = GetIt.instance;
@@ -113,6 +114,12 @@ Future<void> setupServiceLocator() async {
   // Register AiChatHistoryService for persisting conversation history
   locator.registerLazySingleton<AiChatHistoryService>(
     () => AiChatHistoryService(),
+  );
+
+  // File metadata service — provides cached image dimensions, video duration,
+  // and folder item counts for the details/list view columns.
+  locator.registerLazySingleton<FileMetadataService>(
+    () => FileMetadataService(),
   );
 
   // Disk cleaner skill — Windows-only, used both by the AI agent's

@@ -205,6 +205,27 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get columnAttributes => 'Attributes';
 
+  @override
+  String get columnDateAccessed => 'Date Accessed';
+
+  @override
+  String get columnExtension => 'Extension';
+
+  @override
+  String get columnPath => 'Path';
+
+  @override
+  String get columnTags => 'Tags';
+
+  @override
+  String get columnDimensions => 'Dimensions';
+
+  @override
+  String get columnDuration => 'Duration';
+
+  @override
+  String get columnItemCount => 'Item Count';
+
   // Column descriptions
   @override
   String get columnSizeDescription => 'Display file size';
@@ -224,11 +245,52 @@ class EnglishLocalizations implements AppLocalizations {
   String get columnAttributesDescription =>
       'Display file attributes (read/write permissions)';
 
+  @override
+  String get columnDateAccessedDescription =>
+      'Display date and time file was last accessed';
+
+  @override
+  String get columnExtensionDescription =>
+      'Display file extension (e.g. .mp4, .docx)';
+
+  @override
+  String get columnPathDescription => 'Display relative file path';
+
+  @override
+  String get columnTagsDescription => 'Display file tags';
+
+  @override
+  String get columnDimensionsDescription =>
+      'Display image/video dimensions (width x height)';
+
+  @override
+  String get columnDurationDescription =>
+      'Display media duration for video/audio files';
+
+  @override
+  String get columnItemCountDescription =>
+      'Display number of items inside folders';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
       'Select the columns you want to display in details view. '
       'The "Name" column is always displayed and cannot be disabled.';
+
+  // List field visibility
+  @override
+  String get listFieldVisibilityTitle => 'Customize List Fields';
+
+  @override
+  String get listFieldVisibilityInstructions =>
+      'Select the fields you want to display in list view.';
+
+  // Metadata format strings
+  @override
+  String dimensionsFormat(int width, int height) => '$width \u00D7 $height';
+
+  @override
+  String itemCountFormat(int count) => '$count items';
 
   // Grid size dialog
   @override
