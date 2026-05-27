@@ -351,8 +351,21 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
   }
 
   // Write results.json for the screenshot report HTML
-  // Strip suite prefix from test names to match HTML data-test-name attributes
+  // Strip suite prefix from test names to match HTML data-test-name attributes.
+  // New numbered prefixes are listed first; legacy names follow for
+  // backward-compat with persisted state.
   const suites = [
+    '01 Navigation',
+    '02 File Operations',
+    '03 Cut & Move',
+    '04 Folder Operations',
+    '05 Multi-Select',
+    '06 Keyboard Shortcuts',
+    '07 Search & Filter',
+    '08 View Mode',
+    '09 Tab Management',
+    '10 Edge Cases & Error Handling',
+    '11 Extended File Operations',
     'Navigation',
     'File Operations',
     'Cut & Move',

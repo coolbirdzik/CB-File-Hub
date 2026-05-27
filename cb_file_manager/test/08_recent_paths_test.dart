@@ -10,7 +10,7 @@ void main() {
   const MethodChannel pathProviderChannel =
       MethodChannel('plugins.flutter.io/path_provider');
 
-  group('UserPreferences recent paths', () {
+  group('08 UserPreferences recent paths', () {
     setUpAll(() async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(pathProviderChannel, (methodCall) async {
@@ -38,7 +38,8 @@ void main() {
       await UserPreferences.instance.clearRecentPaths();
     });
 
-    test('addRecentPath stores most recent first and deduplicates', () async {
+    test('08.01 addRecentPath stores most recent first and deduplicates',
+        () async {
       await UserPreferences.instance.addRecentPath('/tmp/a');
       await UserPreferences.instance.addRecentPath('/tmp/b');
       await UserPreferences.instance.addRecentPath('/tmp/a');
@@ -49,7 +50,7 @@ void main() {
       expect(paths, equals(<String>['/tmp/a', '/tmp/b']));
     });
 
-    test('addRecentPath ignores virtual paths', () async {
+    test('08.02 addRecentPath ignores virtual paths', () async {
       final result =
           await UserPreferences.instance.addRecentPath('#search?tag=cat');
       expect(result, isFalse);

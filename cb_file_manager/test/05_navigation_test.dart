@@ -4,15 +4,15 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 
 void main() {
-  group('Navigation Fix Tests', () {
-    test('SystemScreenRouter clearWidgetCache should work correctly', () {
+  group('05 Navigation Fix Tests', () {
+    test('05.01 SystemScreenRouter clearWidgetCache should work correctly', () {
       // Test that clearWidgetCache method exists and works
       expect(() => SystemScreenRouter.clearWidgetCache(), returnsNormally);
       expect(() => SystemScreenRouter.clearWidgetCache('test-tab'),
           returnsNormally);
     });
 
-    test('Path transition logic should work correctly', () {
+    test('05.02 Path transition logic should work correctly', () {
       // Test the logic that determines when to clear cache
       String currentPath = '#tags';
       String newPath = '/storage/emulated/0';
@@ -36,7 +36,7 @@ void main() {
       expect(shouldClearCache, isFalse);
     });
 
-    test('Tab history should include and navigate back to drives path',
+    test('05.03 Tab history should include and navigate back to drives path',
         () async {
       final bloc = TabManagerBloc();
       bloc.add(AddTab(path: kDrivesPath, name: 'Drives'));

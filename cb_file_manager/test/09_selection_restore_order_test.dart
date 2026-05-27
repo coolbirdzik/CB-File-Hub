@@ -4,7 +4,8 @@ import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('SelectItemsInRect (shift) keeps lastSelectedPath by insertion order',
+  test(
+      '09.01 SelectItemsInRect (shift) keeps lastSelectedPath by insertion order',
       () async {
     final bloc = SelectionBloc();
 
@@ -29,7 +30,7 @@ void main() {
     await bloc.close();
   });
 
-  test('SelectItemsInRect (shift) can use an explicit lastSelectedPath',
+  test('09.02 SelectItemsInRect (shift) can use an explicit lastSelectedPath',
       () async {
     final bloc = SelectionBloc();
 

@@ -2,7 +2,7 @@ import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dar
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('tracks multiple concurrent entries', () {
+  test('06.01 tracks multiple concurrent entries', () {
     final controller = OperationProgressController();
 
     final copyId = controller.begin(
@@ -23,7 +23,7 @@ void main() {
     expect(controller.runningEntries, hasLength(2));
   });
 
-  test('computes aggregate progress across determinate tasks', () {
+  test('06.02 computes aggregate progress across determinate tasks', () {
     final controller = OperationProgressController();
 
     final first = controller.begin(title: 'First', total: 4);
@@ -39,7 +39,7 @@ void main() {
     expect(aggregate.runningCount, 2);
   });
 
-  test('keeps success and failure entries in history', () {
+  test('06.03 keeps success and failure entries in history', () {
     final controller = OperationProgressController();
 
     final success = controller.begin(title: 'Success', total: 1);
@@ -58,7 +58,9 @@ void main() {
     );
   });
 
-  test('dismiss removes a single entry and dismissFinished clears history', () {
+  test(
+      '06.04 dismiss removes a single entry and dismissFinished clears history',
+      () {
     final controller = OperationProgressController();
 
     final running = controller.begin(title: 'Running', total: 1);
@@ -77,7 +79,7 @@ void main() {
     expect(controller.entries, isEmpty);
   });
 
-  test('indeterminate tasks make aggregate indeterminate', () {
+  test('06.05 indeterminate tasks make aggregate indeterminate', () {
     final controller = OperationProgressController();
 
     controller.begin(title: 'Scan', total: 0, isIndeterminate: true);
@@ -89,7 +91,8 @@ void main() {
     expect(aggregate.fraction, isNull);
   });
 
-  test('markAllSeen clears notification badge count without removing entries',
+  test(
+      '06.06 markAllSeen clears notification badge count without removing entries',
       () {
     final controller = OperationProgressController();
 

@@ -30,17 +30,17 @@ import 'dart:convert';
 import 'dart:io';
 
 const _kAllGroups = [
-  'Navigation',
-  'File Operations',
-  'Cut & Move',
-  'Folder Operations',
-  'Multi-Select',
-  'Keyboard Shortcuts',
-  'Search & Filter',
-  'View Mode',
-  'Tab Management',
-  'Edge Cases & Error Handling',
-  'Extended File Operations',
+  '01 Navigation',
+  '02 File Operations',
+  '03 Cut & Move',
+  '04 Folder Operations',
+  '05 Multi-Select',
+  '06 Keyboard Shortcuts',
+  '07 Search & Filter',
+  '08 View Mode',
+  '09 Tab Management',
+  '10 Edge Cases & Error Handling',
+  '11 Extended File Operations',
   'Video Thumbnails',
 ];
 

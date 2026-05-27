@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 void main() {
-  testWidgets('drives action profile shows minimal mobile actions',
+  testWidgets('04.01 drives action profile shows minimal mobile actions',
       (tester) async {
     MobileFileActionsController.clearAll();
     final controller = MobileFileActionsController.forTab('tab_drives');

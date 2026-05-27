@@ -38,7 +38,8 @@ void main() {
     await testRoot.delete(recursive: true);
   });
 
-  test('migrates legacy display preferences without rewriting thumbnail data',
+  test(
+      '03.01 migrates legacy display preferences without rewriting thumbnail data',
       () async {
     final folder = await Directory(path.join(testRoot.path, 'legacy-folder'))
         .create(recursive: true);
@@ -70,7 +71,7 @@ void main() {
     expect(stored.single['sort_option'], SortOption.nameDesc.index);
   });
 
-  test('persists virtual paths in SQLite', () async {
+  test('03.02 persists virtual paths in SQLite', () async {
     const virtualPath = '#network/server/share';
     final manager = FolderSortManager();
 

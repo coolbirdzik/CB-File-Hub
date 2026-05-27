@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {
-  testWidgets('Shift+arrow extends selection from the original anchor',
+  testWidgets('11.01 Shift+arrow extends selection from the original anchor',
       (tester) async {
     final controller = TabbedFolderKeyboardController();
     addTearDown(controller.dispose);

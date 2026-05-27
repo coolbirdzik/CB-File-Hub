@@ -955,8 +955,21 @@ String _escapeHtml(String s) {
 }
 
 String _inferSuite(String name) {
-  // 1. Explicit group() prefix (present in JSON reporter output)
+  // 1. Explicit group() prefix (present in JSON reporter output).
+  // New numbered prefixes are listed first; legacy names follow for
+  // backward-compat with persisted dashboard state.
   const groupPrefixes = [
+    '01 Navigation',
+    '02 File Operations',
+    '03 Cut & Move',
+    '04 Folder Operations',
+    '05 Multi-Select',
+    '06 Keyboard Shortcuts',
+    '07 Search & Filter',
+    '08 View Mode',
+    '09 Tab Management',
+    '10 Edge Cases & Error Handling',
+    '11 Extended File Operations',
     'Navigation',
     'File Operations',
     'Cut & Move',

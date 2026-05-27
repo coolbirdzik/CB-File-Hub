@@ -26,7 +26,7 @@ FolderListState _state({
 }
 
 void main() {
-  test('Delete focused item selects next item in order', () {
+  test('02.01 Delete focused item selects next item in order', () {
     final state = _state(
       folders: const <String>['/a', '/b'],
       files: const <String>['/c.mp4', '/d.mp4'],
@@ -41,7 +41,7 @@ void main() {
     expect(next, equals('/c.mp4'));
   });
 
-  test('Delete last item selects previous item', () {
+  test('02.02 Delete last item selects previous item', () {
     final state = _state(
       folders: const <String>['/a'],
       files: const <String>['/c.mp4', '/d.mp4'],
@@ -56,7 +56,7 @@ void main() {
     expect(next, equals('/c.mp4'));
   });
 
-  test('Delete contiguous block selects first item after block', () {
+  test('02.03 Delete contiguous block selects first item after block', () {
     final state = _state(
       folders: const <String>['/a', '/b'],
       files: const <String>['/c.mp4', '/d.mp4', '/e.mp4'],
@@ -71,7 +71,7 @@ void main() {
     expect(next, equals('/e.mp4'));
   });
 
-  test('Respects filtered view ordering', () {
+  test('02.04 Respects filtered view ordering', () {
     final state = _state(
       folders: const <String>['/a', '/b'],
       files: const <String>['/c.mp4', '/d.mp4'],
@@ -88,7 +88,7 @@ void main() {
     expect(next, equals('/c.mp4'));
   });
 
-  test('Respects search results ordering', () {
+  test('02.05 Respects search results ordering', () {
     final state = _state(
       folders: const <String>['/a', '/b'],
       files: const <String>['/c.mp4', '/d.mp4'],
@@ -105,7 +105,8 @@ void main() {
     expect(next, equals('/c.mp4'));
   });
 
-  test('Does not choose a next focus when deleted item is not focused', () {
+  test('02.06 Does not choose a next focus when deleted item is not focused',
+      () {
     final state = _state(
       folders: const <String>['/a', '/b'],
       files: const <String>['/c.mp4'],

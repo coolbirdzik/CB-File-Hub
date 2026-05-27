@@ -2,7 +2,7 @@ import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('TabActivityManager', () {
+  group('10 TabActivityManager', () {
     late DateTime fakeNow;
     late TabActivityManager manager;
 
@@ -20,14 +20,14 @@ void main() {
       }
     });
 
-    test('focuses a new tab and tracks it', () {
+    test('10.01 focuses a new tab and tracks it', () {
       manager.onTabFocused('tab1', path: 'C:\\foo');
       expect(manager.focusedTabId, 'tab1');
       expect(manager.stateOf('tab1'), TabActivityState.focused);
       expect(manager.trackedTabCount, 1);
     });
 
-    test('demotes previously focused tab when focus changes', () {
+    test('10.02 demotes previously focused tab when focus changes', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2');
 
@@ -36,7 +36,7 @@ void main() {
       expect(manager.focusedTabId, 'tab2');
     });
 
-    test('does not transition to inactive before threshold', () {
+    test('10.03 does not transition to inactive before threshold', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2'); // tab1 -> background
 
@@ -48,7 +48,7 @@ void main() {
       expect(manager.stateOf('tab1'), TabActivityState.backgroundActive);
     });
 
-    test('transitions tab to inactive after threshold', () {
+    test('10.04 transitions tab to inactive after threshold', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2'); // tab1 -> background
 
@@ -60,7 +60,7 @@ void main() {
       expect(manager.needsReload('tab1'), isTrue);
     });
 
-    test('does not transition focused tab regardless of age', () {
+    test('10.05 does not transition focused tab regardless of age', () {
       manager.onTabFocused('tab1');
 
       fakeNow = fakeNow.add(const Duration(hours: 5));
@@ -70,7 +70,7 @@ void main() {
       expect(manager.stateOf('tab1'), TabActivityState.focused);
     });
 
-    test('interaction resets idle counter and prevents inactive', () {
+    test('10.06 interaction resets idle counter and prevents inactive', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2');
 
@@ -84,7 +84,7 @@ void main() {
       expect(manager.stateOf('tab1'), TabActivityState.backgroundActive);
     });
 
-    test('refocusing inactive tab promotes it and flags reload', () {
+    test('10.07 refocusing inactive tab promotes it and flags reload', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2');
 
@@ -99,7 +99,8 @@ void main() {
       expect(manager.consumeReloadFlag('tab1'), isFalse);
     });
 
-    test('inactive listener fires on transition with last known path', () {
+    test('10.08 inactive listener fires on transition with last known path',
+        () {
       String? receivedTabId;
       String? receivedPath;
       manager.addInactiveListener((tabId, path) {
@@ -116,7 +117,7 @@ void main() {
       expect(receivedPath, 'D:\\videos');
     });
 
-    test('closing a tab fires close listener and clears tracking', () {
+    test('10.09 closing a tab fires close listener and clears tracking', () {
       String? closedTabId;
       manager.addClosedListener((tabId, _) => closedTabId = tabId);
 
@@ -128,7 +129,7 @@ void main() {
       expect(manager.focusedTabId, isNull);
     });
 
-    test('snapshotOf reflects current state', () {
+    test('10.10 snapshotOf reflects current state', () {
       manager.onTabFocused('tab1', path: 'C:\\b');
       final snap = manager.snapshotOf('tab1');
       expect(snap, isNotNull);
@@ -137,7 +138,7 @@ void main() {
       expect(snap.isInactive, isFalse);
     });
 
-    test('disposing prevents further state mutations', () {
+    test('10.11 disposing prevents further state mutations', () {
       manager.onTabFocused('tab1');
       manager.dispose();
       manager.onTabFocused('tab2');
@@ -145,7 +146,7 @@ void main() {
       expect(manager.focusedTabId, anyOf(isNull, equals('tab1')));
     });
 
-    test('changing the threshold at runtime affects evaluation', () {
+    test('10.12 changing the threshold at runtime affects evaluation', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2');
 
@@ -159,7 +160,8 @@ void main() {
       expect(manager.stateOf('tab1'), TabActivityState.inactive);
     });
 
-    test('zero threshold disables auto-suspend and revives inactive tabs', () {
+    test('10.13 zero threshold disables auto-suspend and revives inactive tabs',
+        () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2');
 
@@ -180,7 +182,8 @@ void main() {
       expect(manager.stateOf('tab1'), TabActivityState.backgroundActive);
     });
 
-    test('markInactive transitions a background tab and fires listener', () {
+    test('10.14 markInactive transitions a background tab and fires listener',
+        () {
       String? receivedTabId;
       manager.addInactiveListener((tabId, _) => receivedTabId = tabId);
 
@@ -194,13 +197,13 @@ void main() {
       expect(receivedTabId, 'tab1');
     });
 
-    test('markInactive refuses focused or unknown tabs', () {
+    test('10.15 markInactive refuses focused or unknown tabs', () {
       manager.onTabFocused('tab1');
       expect(manager.markInactive('tab1'), isFalse);
       expect(manager.markInactive('does-not-exist'), isFalse);
     });
 
-    test('markInactive is idempotent for already-inactive tabs', () {
+    test('10.16 markInactive is idempotent for already-inactive tabs', () {
       manager.onTabFocused('tab1');
       manager.onTabFocused('tab2');
       fakeNow = fakeNow.add(const Duration(hours: 1, seconds: 1));
@@ -210,7 +213,8 @@ void main() {
       expect(manager.markInactive('tab1'), isFalse);
     });
 
-    test('focusing a manually-inactive tab reactivates it and triggers reload',
+    test(
+        '10.17 focusing a manually-inactive tab reactivates it and triggers reload',
         () {
       manager.onTabFocused('tab1', path: 'C:\\one');
       manager.onTabFocused('tab2', path: 'C:\\two');

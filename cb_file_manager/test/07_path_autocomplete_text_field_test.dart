@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows recent paths on focus and filters on typing',
+  testWidgets('07.01 shows recent paths on focus and filters on typing',
       (tester) async {
     final controller = TextEditingController();
     String? submitted;
