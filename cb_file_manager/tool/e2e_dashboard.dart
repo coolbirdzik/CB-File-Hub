@@ -65,7 +65,7 @@ class Shot {
 
 class TestResult {
   final String name;
-  final String status; // passed | failed | skipped | error
+  final String status; // passed | failed | blocked | skipped | error
   final String? error;
   final String? stackTrace;
   final List<Shot> shots;
@@ -82,6 +82,7 @@ class TestResult {
 
   bool get isPassed => status == 'passed' || status == 'success';
   bool get isFailed => status == 'failed' || status == 'error';
+  bool get isBlocked => status == 'blocked';
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -127,12 +128,20 @@ class TestResult {
 class TestReport {
   final List<TestResult> tests;
   final DateTime generatedAt;
+  final String? suiteError;
+  final String? suiteStackTrace;
 
-  TestReport({required this.tests, required this.generatedAt});
+  TestReport({
+    required this.tests,
+    required this.generatedAt,
+    this.suiteError,
+    this.suiteStackTrace,
+  });
 
   int get total => tests.length;
   int get passed => tests.where((t) => t.isPassed).length;
   int get failed => tests.where((t) => t.isFailed).length;
+  int get blocked => tests.where((t) => t.isBlocked).length;
   int get skipped => tests.where((t) => t.status == 'skipped').length;
 
   double get passRate => total > 0 ? (passed / total * 100) : 0;
@@ -149,7 +158,9 @@ TestReport parseJsonLog(
 ) {
   final idToName = <int, String>{};
   final idToError = <int, _ErrorInfo>{};
+  final idToStatus = <int, String>{}; // raw `result` from testDone
   final hiddenIds = <int>{};
+  final hiddenErrors = <_ErrorInfo>[];
 
   for (final rawLine in content.split('\n')) {
     final line = rawLine.trim();
@@ -174,25 +185,79 @@ TestReport parseJsonLog(
           idToName[id] = name;
         }
       }
+    } else if (type == 'error') {
+      // Standalone error event — emitted by the JSON reporter when a suite
+      // fails to load (e.g. a global key-state assertion bubbles out before
+      // any individual test runs). The testID points at a hidden loader
+      // pseudo-test, so attach it for promotion later.
+      final testID = decoded['testID'] as int?;
+      final message = decoded['error'] as String? ?? '';
+      final trace = decoded['stackTrace'] as String? ?? '';
+      if (testID != null) {
+        idToError[testID] = _ErrorInfo(
+          message: _firstLine(message),
+          trace: trace.isEmpty ? message : '$message\n$trace',
+        );
+      } else {
+        hiddenErrors.add(_ErrorInfo(
+          message: _firstLine(message),
+          trace: trace.isEmpty ? message : '$message\n$trace',
+        ));
+      }
     } else if (type == 'testDone') {
       final testID = decoded['testID'] as int?;
       if (testID == null) continue;
 
+      final result = decoded['result'] as String?;
+      if (result != null) idToStatus[testID] = result;
+
       if (decoded['hidden'] == true) {
         hiddenIds.add(testID);
+        // Capture the failure so we can surface it as a suite-level banner
+        // even when the offending test is a hidden loader.
+        if (result != null && result != 'success') {
+          final existing = idToError[testID];
+          if (existing != null) {
+            hiddenErrors.add(existing);
+          } else {
+            final err = decoded['error'] as String?;
+            if (err != null && err.isNotEmpty) {
+              hiddenErrors.add(_ErrorInfo(
+                message: _firstLine(err),
+                trace: err,
+              ));
+            }
+          }
+        }
         continue;
       }
 
-      final result = decoded['result'] as String?;
       if (result != null && result != 'success') {
-        final error = decoded['error'] as String?;
-        idToError[testID] = _ErrorInfo(
-          message: _firstLine(error ?? ''),
-          trace: error ?? '',
-        );
+        final err = decoded['error'] as String?;
+        if (err != null && err.isNotEmpty) {
+          idToError[testID] = _ErrorInfo(
+            message: _firstLine(err),
+            trace: err,
+          );
+        }
       }
     }
   }
+
+  // Determine if the suite as a whole crashed — i.e. the loader pseudo-test
+  // failed, or the JSON reporter emitted a standalone error event without a
+  // matching testDone failure. When that happens, every visible test marked
+  // "error" with no individual error message is really "blocked" by the
+  // suite failure.
+  _ErrorInfo? suiteError;
+  for (final id in hiddenIds) {
+    final e = idToError[id];
+    if (e != null) {
+      suiteError = e;
+      break;
+    }
+  }
+  suiteError ??= hiddenErrors.isNotEmpty ? hiddenErrors.first : null;
 
   final results = <TestResult>[];
   for (final entry in idToName.entries) {
@@ -208,20 +273,56 @@ TestReport parseJsonLog(
     // those workers will get rerun in single-process mode anyway.
     if (name.startsWith('loading ') && name.endsWith('.dart')) continue;
 
+    // Skip group lifecycle pseudo-tests like "(setUpAll)" / "(tearDownAll)".
+    // They cascade to "did not complete" whenever the suite crashes and only
+    // add noise to the dashboard.
+    if (name.startsWith('(') && name.endsWith(')')) continue;
+
     final errorInfo = idToError[testID];
-    final status = errorInfo != null ? 'failed' : 'passed';
+    final rawResult = idToStatus[testID] ?? 'success';
     final shots = _shotsForTest(name, manifestShots, buildDir);
+
+    String status;
+    String? errMessage;
+    String? errTrace;
+
+    if (errorInfo != null) {
+      status = 'failed';
+      errMessage = errorInfo.message;
+      errTrace = errorInfo.trace;
+    } else if (rawResult != 'success') {
+      // Test was reported as error/failure but has no individual error —
+      // this happens when the suite loader crashed and every subsequent
+      // case is auto-marked "did not complete". Treat them as blocked and
+      // attribute the cause to the suite-level failure.
+      if (suiteError != null) {
+        status = 'blocked';
+        errMessage = 'Blocked by suite failure: ${suiteError.message}';
+        errTrace = suiteError.trace;
+      } else {
+        status = 'failed';
+        errMessage = 'Test reported "$rawResult" without an error message.';
+        errTrace = null;
+      }
+    } else {
+      status = 'passed';
+    }
 
     results.add(TestResult(
       name: name,
       status: status,
-      error: errorInfo?.message,
-      stackTrace: errorInfo?.trace,
+      error: errMessage,
+      stackTrace: errTrace,
       shots: shots,
     ));
   }
 
-  return TestReport(tests: results, generatedAt: DateTime.now());
+  return TestReport(
+    tests: results,
+    generatedAt: DateTime.now(),
+    suiteError: suiteError?.message,
+    suiteStackTrace: suiteError?.trace,
+  );
 }
 
 class _ErrorInfo {
@@ -403,12 +504,26 @@ Future<void> _savePersistedState(
 /// Merges fresh test results from this run into the persisted state.
 /// New results overwrite the previous entry for the same test name; tests
 /// that didn't run this time keep their previous status.
+///
+/// Drops legacy framework pseudo-tests like `"(tearDownAll)"` /
+/// `"(setUpAll)"` and `"loading <file>.dart"` that older runs may have
+/// persisted before we started filtering them at parse time.
 Map<String, TestResult> _mergeResults(
   Map<String, TestResult> persisted,
   List<TestResult> fresh,
 ) {
-  final out = Map<String, TestResult>.from(persisted);
+  bool isPseudo(String name) {
+    if (name.startsWith('(') && name.endsWith(')')) return true;
+    if (name.startsWith('loading ') && name.endsWith('.dart')) return true;
+    return false;
+  }
+
+  final out = <String, TestResult>{};
+  persisted.forEach((name, t) {
+    if (!isPseudo(name)) out[name] = t;
+  });
   for (final t in fresh) {
+    if (isPseudo(t.name)) continue;
     out[t.name] = t;
   }
   return out;
@@ -417,9 +532,10 @@ Map<String, TestResult> _mergeResults(
 String generateHtml(TestReport report) {
   final passed = report.passed;
   final failed = report.failed;
+  final blocked = report.blocked;
   final total = report.total;
   final passRate = report.passRate;
-  final passColor = failed == 0 ? '#22c55e' : '#eab308';
+  final passColor = (failed == 0 && blocked == 0) ? '#22c55e' : '#eab308';
 
   // Group tests by suite
   final Map<String, List<TestResult>> suiteGroups = {};
@@ -433,15 +549,53 @@ String generateHtml(TestReport report) {
   // without re-querying the DOM on every keypress.
   final allShots = <Map<String, String>>[];
 
+  // Suite-level failure banner. Surfaces the loader/setup error that caused
+  // a wave of "did not complete" tests so the user doesn't have to dig
+  // through individual test rows to find the real cause.
+  final suiteBanner = StringBuffer();
+  if (report.suiteError != null && report.suiteError!.isNotEmpty) {
+    suiteBanner.writeln('<div class="suite-error-banner">');
+    suiteBanner.writeln('<div class="suite-error-title">');
+    suiteBanner.writeln('<span class="suite-error-icon">!</span>');
+    suiteBanner.writeln(
+        'Suite failed to load — every blocked test below shares this root cause');
+    suiteBanner.writeln('</div>');
+    suiteBanner.writeln(
+        '<div class="suite-error-msg">${_escapeHtml(report.suiteError!)}</div>');
+    if (report.suiteStackTrace != null &&
+        report.suiteStackTrace!.trim().isNotEmpty &&
+        report.suiteStackTrace != report.suiteError) {
+      suiteBanner.writeln('<details class="suite-error-trace">');
+      suiteBanner.writeln('<summary>Show stack trace</summary>');
+      suiteBanner.writeln(
+          '<pre>${_escapeHtml(report.suiteStackTrace!)}</pre>');
+      suiteBanner.writeln('</details>');
+    }
+    suiteBanner.writeln('</div>');
+  }
+
+  String statusKey(TestResult t) {
+    if (t.isPassed) return 'passed';
+    if (t.isBlocked) return 'blocked';
+    return 'failed';
+  }
+
+  String statusBadge(TestResult t) {
+    if (t.isPassed) return '<span class="badge pass">PASSED</span>';
+    if (t.isBlocked) return '<span class="badge blocked">BLOCKED</span>';
+    return '<span class="badge fail">FAILED</span>';
+  }
+
   // Build suite sections
   final suiteSections = StringBuffer();
   for (final entry in suiteGroups.entries) {
     final suiteName = entry.key;
     final tests = entry.value;
     final suitePassed = tests.where((t) => t.isPassed).length;
+    final suiteFailedCount = tests.where((t) => t.isFailed).length;
+    final suiteBlockedCount = tests.where((t) => t.isBlocked).length;
     final suiteTotal = tests.length;
-    final suiteFailed = suiteTotal - suitePassed;
-    final allPassed = suiteFailed == 0;
+    final allPassed = suiteFailedCount == 0 && suiteBlockedCount == 0;
 
     final statusClass = allPassed ? 'all-pass' : 'has-fail';
     final statsText = '$suitePassed/$suiteTotal';
@@ -465,14 +619,15 @@ String generateHtml(TestReport report) {
         displayName = displayName.substring(suiteName.length + 1);
       }
 
-      final badge = t.isPassed
-          ? '<span class="badge pass">PASSED</span>'
-          : '<span class="badge fail">FAILED</span>';
+      final badge = statusBadge(t);
+      final stateClass = statusKey(t);
       final shotCountBadge = t.shots.isNotEmpty
           ? '<span class="shot-count">${t.shots.length} shot${t.shots.length == 1 ? '' : 's'}</span>'
           : '';
 
-      final hasContent = t.shots.isNotEmpty || (t.isFailed && t.error != null);
+      final hasErrorMessage =
+          (t.isFailed || t.isBlocked) && t.error != null && t.error!.isNotEmpty;
+      final hasContent = t.shots.isNotEmpty || hasErrorMessage;
 
       // Inline gallery
       final galleryBuf = StringBuffer();
@@ -498,15 +653,34 @@ String generateHtml(TestReport report) {
         galleryBuf.writeln('</div>');
       }
 
-      final errorBlock = t.isFailed && t.error != null
-          ? '<div class="error-msg">${_escapeHtml(t.error ?? '')}</div>'
-          : '';
+      // Reason block — explains why a test failed or was blocked. For
+      // blocked tests we colour the block differently so the user can
+      // immediately tell "this didn't run because of an upstream crash"
+      // apart from "this ran and asserted incorrectly".
+      final reasonBuf = StringBuffer();
+      if (hasErrorMessage) {
+        final cls = t.isBlocked ? 'reason-msg blocked' : 'reason-msg';
+        reasonBuf.writeln('<div class="$cls">');
+        reasonBuf.writeln(
+            '<div class="reason-label">${t.isBlocked ? 'BLOCKED — REASON' : 'FAILURE — REASON'}</div>');
+        reasonBuf.writeln(
+            '<div class="reason-text">${_escapeHtml(t.error!)}</div>');
+        if (t.stackTrace != null &&
+            t.stackTrace!.trim().isNotEmpty &&
+            t.stackTrace != t.error) {
+          reasonBuf.writeln('<details class="reason-trace">');
+          reasonBuf.writeln('<summary>Show stack trace</summary>');
+          reasonBuf.writeln('<pre>${_escapeHtml(t.stackTrace!)}</pre>');
+          reasonBuf.writeln('</details>');
+        }
+        reasonBuf.writeln('</div>');
+      }
 
       final detailsAttr = hasContent ? 'open' : '';
 
       if (hasContent) {
         suiteSections.writeln('''
-    <details class="test-item ${t.isPassed ? 'passed' : 'failed'}" data-status="${t.isPassed ? 'passed' : 'failed'}" data-search="${_escapeHtml(t.name.toLowerCase())}" $detailsAttr>
+    <details class="test-item $stateClass" data-status="$stateClass" data-search="${_escapeHtml(t.name.toLowerCase())}" $detailsAttr>
       <summary class="test-header">
         <span class="test-chevron">▶</span>
         <span class="test-name">${_escapeHtml(displayName)}</span>
@@ -514,14 +688,14 @@ String generateHtml(TestReport report) {
         $badge
       </summary>
       <div class="test-body">
-        $errorBlock
+        ${reasonBuf.toString()}
         ${galleryBuf.toString()}
       </div>
     </details>''');
       } else {
         // No shots and no error — render as a non-collapsible row.
         suiteSections.writeln('''
-    <div class="test-item ${t.isPassed ? 'passed' : 'failed'} no-detail" data-status="${t.isPassed ? 'passed' : 'failed'}" data-search="${_escapeHtml(t.name.toLowerCase())}">
+    <div class="test-item $stateClass no-detail" data-status="$stateClass" data-search="${_escapeHtml(t.name.toLowerCase())}">
       <div class="test-header">
         <span class="test-chevron empty"></span>
         <span class="test-name">${_escapeHtml(displayName)}</span>
@@ -564,8 +738,9 @@ String generateHtml(TestReport report) {
   }
   .card-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
   .card-value { font-size: 2rem; font-weight: 700; }
-  .card-value.green { color: #22c55e; }
-  .card-value.red   { color: #ef4444; }
+  .card-value.green  { color: #22c55e; }
+  .card-value.red    { color: #ef4444; }
+  .card-value.yellow { color: #eab308; }
 
   .bar-wrap {
     background: #1e293b; border-radius: 12px; padding: 1.25rem 1.5rem;
@@ -575,8 +750,9 @@ String generateHtml(TestReport report) {
   .bar-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
   .bar-pct { font-size: 1.5rem; font-weight: 700; color: $passColor; }
   .bar-track { background: #334155; border-radius: 99px; height: 10px; overflow: hidden; display: flex; }
-  .bar-fill-pass { background: #22c55e; height: 100%; transition: width 0.6s ease; border-radius: 99px 0 0 99px; }
-  .bar-fill-fail { background: #ef4444; height: 100%; transition: width 0.6s ease; }
+  .bar-fill-pass    { background: #22c55e; height: 100%; transition: width 0.6s ease; }
+  .bar-fill-fail    { background: #ef4444; height: 100%; transition: width 0.6s ease; }
+  .bar-fill-blocked { background: #eab308; height: 100%; transition: width 0.6s ease; }
 
   /* Controls */
   .controls-row {
@@ -637,8 +813,9 @@ String generateHtml(TestReport report) {
     border-bottom: 1px solid #1e293b; transition: background-color 0.15s;
   }
   .test-item:last-child { border-bottom: none; }
-  .test-item.passed { border-left: 3px solid #22c55e; }
-  .test-item.failed { border-left: 3px solid #ef4444; }
+  .test-item.passed  { border-left: 3px solid #22c55e; }
+  .test-item.failed  { border-left: 3px solid #ef4444; }
+  .test-item.blocked { border-left: 3px solid #eab308; }
   .test-item summary::-webkit-details-marker { display: none; }
   .test-item summary { list-style: none; }
 
@@ -666,8 +843,9 @@ String generateHtml(TestReport report) {
     font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 99px;
     font-weight: 600; white-space: nowrap; flex-shrink: 0; letter-spacing: 0.03em;
   }
-  .badge.pass { background: #14532d; color: #22c55e; }
-  .badge.fail { background: #450a0a; color: #ef4444; }
+  .badge.pass    { background: #14532d; color: #22c55e; }
+  .badge.fail    { background: #450a0a; color: #ef4444; }
+  .badge.blocked { background: #422006; color: #fbbf24; }
 
   .shot-count {
     font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 99px;
@@ -679,12 +857,73 @@ String generateHtml(TestReport report) {
     border-top: 1px solid #1e293b; background: #0d1626;
   }
 
-  .error-msg {
+  /* Failure / blocked reason block (per-test) */
+  .reason-msg {
     background: #2d0a0a; border: 1px solid #450a0a; border-radius: 8px;
-    padding: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace;
-    font-size: 0.78rem; color: #fca5a5; white-space: pre-wrap;
-    word-break: break-all; margin-bottom: 0.75rem;
-    max-height: 240px; overflow-y: auto;
+    padding: 0.6rem 0.75rem; margin-bottom: 0.75rem;
+  }
+  .reason-msg.blocked {
+    background: #1f1402; border-color: #422006;
+  }
+  .reason-label {
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em;
+    color: #fca5a5; margin-bottom: 0.35rem;
+  }
+  .reason-msg.blocked .reason-label { color: #fbbf24; }
+  .reason-text {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.78rem; color: #fecaca; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .reason-msg.blocked .reason-text { color: #fde68a; }
+  .reason-trace {
+    margin-top: 0.5rem; font-size: 0.72rem; color: #94a3b8;
+  }
+  .reason-trace summary { cursor: pointer; user-select: none; }
+  .reason-trace summary:hover { color: #cbd5e1; }
+  .reason-trace pre {
+    margin-top: 0.4rem; padding: 0.5rem 0.6rem;
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 6px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.72rem; color: #cbd5e1;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 220px; overflow-y: auto;
+  }
+
+  /* Suite-level error banner — explains a wave of "did not complete" tests */
+  .suite-error-banner {
+    background: linear-gradient(180deg, #2d0a0a 0%, #1f0606 100%);
+    border: 1px solid #7f1d1d; border-radius: 12px;
+    padding: 1rem 1.25rem; margin-bottom: 1rem;
+  }
+  .suite-error-title {
+    display: flex; align-items: center; gap: 0.6rem;
+    font-size: 0.85rem; font-weight: 600; color: #fecaca;
+    margin-bottom: 0.5rem;
+  }
+  .suite-error-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.4rem; height: 1.4rem; flex-shrink: 0;
+    background: #b91c1c; color: #fff; border-radius: 99px;
+    font-weight: 700; font-size: 0.85rem;
+  }
+  .suite-error-msg {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.78rem; color: #fda4af; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .suite-error-trace {
+    margin-top: 0.6rem; font-size: 0.72rem; color: #94a3b8;
+  }
+  .suite-error-trace summary { cursor: pointer; user-select: none; }
+  .suite-error-trace summary:hover { color: #cbd5e1; }
+  .suite-error-trace pre {
+    margin-top: 0.4rem; padding: 0.6rem 0.75rem;
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 6px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.72rem; color: #cbd5e1;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 280px; overflow-y: auto;
   }
 
   /* Gallery */
@@ -799,17 +1038,24 @@ String generateHtml(TestReport report) {
       <div class="card-label">Failed</div>
       <div class="card-value red">$failed</div>
     </div>
+    ${blocked > 0 ? '''<div class="card">
+      <div class="card-label">Blocked</div>
+      <div class="card-value yellow">$blocked</div>
+    </div>''' : ''}
     <div class="bar-wrap">
       <div class="bar-header">
         <span class="bar-label">Pass Rate</span>
         <span class="bar-pct">${passRate.toStringAsFixed(1)}%</span>
       </div>
       <div class="bar-track">
-        <div class="bar-fill-pass" style="width: $passRate%"></div>
-        ${failed > 0 ? '<div class="bar-fill-fail" style="width: ${100 - passRate}%"></div>' : ''}
+        <div class="bar-fill-pass" style="width: ${(passed / (total == 0 ? 1 : total) * 100).toStringAsFixed(2)}%"></div>
+        ${failed > 0 ? '<div class="bar-fill-fail" style="width: ${(failed / total * 100).toStringAsFixed(2)}%"></div>' : ''}
+        ${blocked > 0 ? '<div class="bar-fill-blocked" style="width: ${(blocked / total * 100).toStringAsFixed(2)}%"></div>' : ''}
       </div>
     </div>
   </div>
+
+  ${suiteBanner.toString()}
 
   <div class="controls-row">
     <input type="text" id="searchInput" class="search-box"
@@ -818,6 +1064,7 @@ String generateHtml(TestReport report) {
       <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All ($total)</button>
       <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">Passed ($passed)</button>
       <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">Failed ($failed)</button>
+      ${blocked > 0 ? '<button class="filter-btn" data-filter="blocked" onclick="setFilter(\'blocked\')">Blocked ($blocked)</button>' : ''}
     </div>
     <div class="collapse-controls">
       <button class="collapse-btn" onclick="expandAll()">Expand All</button>
@@ -924,8 +1171,9 @@ $suiteSections
       const search = item.dataset.search || '';
       const matchFilter =
         _currentFilter === 'all' ||
-        (_currentFilter === 'passed' && status === 'passed') ||
-        (_currentFilter === 'failed' && status === 'failed');
+        (_currentFilter === 'passed'  && status === 'passed') ||
+        (_currentFilter === 'failed'  && status === 'failed') ||
+        (_currentFilter === 'blocked' && status === 'blocked');
       const matchSearch = q === '' || search.indexOf(q) !== -1;
       item.classList.toggle('hidden', !(matchFilter && matchSearch));
     });
@@ -1179,7 +1427,14 @@ Future<void> main(List<String> args) async {
   print('[Dashboard] Open in browser:');
   print('  file://${Directory.current.path}/$htmlPath');
   print('');
-  print(
-      '  Summary: ${report.passed} passed, ${report.failed} failed, ${report.total} total');
+  final blockedSummary =
+      report.blocked > 0 ? ', ${report.blocked} blocked' : '';
+  print('  Summary: ${report.passed} passed, ${report.failed} failed'
+      '$blockedSummary, ${report.total} total');
   print('  Pass rate: ${report.passRate.toStringAsFixed(1)}%');
+  if (report.suiteError != null && report.suiteError!.isNotEmpty) {
+    print('');
+    print('[Dashboard] Suite-level failure:');
+    print('  ${report.suiteError}');
+  }
 }

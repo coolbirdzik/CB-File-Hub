@@ -351,6 +351,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   final bool _showSpeedIndicator = false;
   bool _useFlutterVlc = false;
 
+  // On Windows, media_kit's hardware (D3D11) decoding can fail on some
+  // GPUs/drivers or under GPU-memory pressure (e.g. "Failed to create D3D11
+  // Device", D3DERR_NOTAVAILABLE). When that happens we transparently retry
+  // once with software decoding instead of showing a fatal error. This flag
+  // guards against retrying repeatedly.
+  bool _hwDecodeFallbackAttempted = false;
+
   @override
   bool get _useVlcControls => _useFlutterVlc && _vlcController != null;
   @override
@@ -402,7 +409,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   String _selectedCodec = 'auto'; // auto, h264, h265, vp9, av1
   @override
-  bool _hardwareAcceleration = true;
+  // On Windows, media_kit's hardware (D3D11) path can fail to create a device
+  // ("Failed to create D3D11 Device", E_OUTOFMEMORY) on some GPUs/drivers or
+  // under GPU-memory pressure and take down the whole engine ("Lost connection
+  // to device"). Default to software decoding on Windows to avoid that crash,
+  // matching the desktop PiP windows. Users can still enable it in settings.
+  bool _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
   @override
   String _videoDecoder = 'auto'; // auto, software, hardware
   @override
@@ -697,6 +709,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         oldWidget.fileStream != widget.fileStream;
   }
 
+  /// Builds the [VideoControllerConfiguration] for the main media_kit player.
+  ///
+  /// When hardware acceleration is disabled we also force software video
+  /// decoding via `hwdec: 'no'`. The `enableHardwareAcceleration` flag only
+  /// controls the rendering/output path; without `hwdec: 'no'` libmpv would
+  /// still attempt a hardware (D3D11VA) decoder, which is exactly what crashes
+  /// with E_OUTOFMEMORY / "Lost connection to device" on the affected Windows
+  /// GPUs/drivers.
+  @override
+  VideoControllerConfiguration _buildVideoControllerConfig() {
+    return VideoControllerConfiguration(
+      enableHardwareAcceleration: _hardwareAcceleration,
+      hwdec: _hardwareAcceleration ? null : 'no',
+    );
+  }
+
   Future<void> _initializePlayer() async {
     try {
       setState(() {
@@ -704,6 +732,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         _hasError = false;
         _errorMessage = '';
       });
+
+      // Fresh initialization: allow a software-decoding fallback attempt again
+      // for this media source.
+      _hwDecodeFallbackAttempted = false;
 
       _initializationTimeout = Timer(const Duration(seconds: 30), () {
         if (_isLoading && mounted) {
@@ -770,9 +802,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           );
           _videoController = VideoController(
             _player!,
-            configuration: VideoControllerConfiguration(
-              enableHardwareAcceleration: _hardwareAcceleration,
-            ),
+            configuration: _buildVideoControllerConfig(),
           );
           _setupPlayerEventListeners(userPreferences);
         }
@@ -868,6 +898,31 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     // Track errors
     _player!.stream.error.listen((error) {
       debugPrint('Player error: $error');
+
+      // Hardware (D3D11/Direct3D) decoding can fail on some Windows
+      // GPUs/drivers or under GPU-memory pressure. We do NOT attempt to
+      // recreate the VideoController inline here: that would trigger another
+      // D3D11 device creation against an already-failing GPU/driver and can
+      // tear down the entire Flutter engine ("Lost connection to device").
+      //
+      // Instead, persist software decoding for next time and surface a clear
+      // error so the user just needs to reopen the video.
+      if (_isHardwareDecodeError(error)) {
+        _persistSoftwareDecodingPreference();
+        if (mounted && !_hasError) {
+          setState(() {
+            _hasError = true;
+            _errorMessage =
+                'Video card ran out of memory while decoding this video. '
+                'Hardware acceleration has been disabled — please reopen the '
+                'video to retry with software decoding.\n\n'
+                'Original error: $error';
+          });
+          widget.onError?.call(_errorMessage);
+        }
+        return;
+      }
+
       if (mounted && !_hasError) {
         setState(() {
           _hasError = true;
@@ -876,6 +931,46 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         widget.onError?.call(_errorMessage);
       }
     });
+  }
+
+  /// Returns true if [error] looks like a hardware/GPU decoding failure that
+  /// could be resolved by falling back to software decoding.
+  bool _isHardwareDecodeError(String error) {
+    final lower = error.toLowerCase();
+    return lower.contains('d3d11') ||
+        lower.contains('direct3d') ||
+        lower.contains('d3derr') ||
+        lower.contains('0x8007000e') || // E_OUTOFMEMORY
+        lower.contains('0x8876086a') || // D3DERR_NOTAVAILABLE
+        lower.contains('hardware') ||
+        lower.contains('hwdec') ||
+        lower.contains('gpu');
+  }
+
+  /// Persists `hardware_acceleration=false` and `video_decoder=software` so the
+  /// next playback session on this machine skips the failing hardware path.
+  /// Does not touch the live player/controller — see notes in the error
+  /// listener above for why we avoid creating new GPU resources here.
+  void _persistSoftwareDecodingPreference() {
+    if (_hwDecodeFallbackAttempted) return;
+    _hwDecodeFallbackAttempted = true;
+    debugPrint(
+        'VideoPlayer: persisting software decoding preference after HW failure');
+    () async {
+      try {
+        final prefs = UserPreferences.instance;
+        await prefs.init();
+        await prefs.setVideoPlayerBool('hardware_acceleration', false);
+        await prefs.setVideoPlayerString('video_decoder', 'software');
+        // Update in-memory state so a manual settings reopen reflects reality.
+        if (mounted) {
+          _hardwareAcceleration = false;
+          _videoDecoder = 'software';
+        }
+      } catch (e) {
+        debugPrint('VideoPlayer: failed to persist software decoding pref: $e');
+      }
+    }();
   }
 
   Future<void> _openMediaSource() async {
@@ -4355,9 +4450,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         try {
           _videoController = VideoController(
             _player!,
-            configuration: VideoControllerConfiguration(
-              enableHardwareAcceleration: _hardwareAcceleration,
-            ),
+            configuration: _buildVideoControllerConfig(),
           );
           debugPrint('Media Kit VideoController restored after route pop');
           if (mounted) {
@@ -4388,9 +4481,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       try {
         _videoController = VideoController(
           _player!,
-          configuration: VideoControllerConfiguration(
-            enableHardwareAcceleration: _hardwareAcceleration,
-          ),
+          configuration: _buildVideoControllerConfig(),
         );
       } catch (_) {}
     }
