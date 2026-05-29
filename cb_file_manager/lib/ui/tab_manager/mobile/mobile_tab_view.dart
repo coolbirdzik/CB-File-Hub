@@ -20,6 +20,7 @@ import '../../screens/system_screen_router.dart'; // Import SystemScreenRouter f
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'mobile_file_actions_controller.dart';
 import '../components/tab_inactive_indicator.dart';
+import '../components/tab_always_active_indicator.dart';
 
 /// Giao diện kiểu Chrome cho thiết bị di động, hiển thị thanh địa chỉ ở trên
 /// và một nút hiển thị số lượng tab bên cạnh
@@ -532,6 +533,7 @@ class MobileTabView extends StatelessWidget {
                       ),
                     ),
                   ),
+                  TabAlwaysActiveIndicator(tabId: tab.id, iconSize: 16),
                   TabInactiveIndicator(tabId: tab.id, iconSize: 16),
                   const SizedBox(width: 8),
                   InkWell(

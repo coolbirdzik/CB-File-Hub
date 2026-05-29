@@ -847,6 +847,37 @@ class SharedActionBar {
               ],
             ),
           ),
+          if (showPreviewModeOption)
+            PopupMenuItem<ViewMode>(
+              value: ViewMode.columns,
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsLight.columns,
+                    size: 20,
+                    color: viewMode == ViewMode.columns
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    l10n.viewModeColumns,
+                    style: TextStyle(
+                      fontWeight: viewMode == ViewMode.columns
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: viewMode == ViewMode.columns
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (viewMode == ViewMode.columns)
+                    Icon(PhosphorIconsLight.check,
+                        color: Theme.of(context).colorScheme.primary, size: 20),
+                ],
+              ),
+            ),
         ],
         onSelected: (ViewMode selectedMode) {
           if (selectedMode != viewMode) {

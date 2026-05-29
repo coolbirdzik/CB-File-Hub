@@ -250,68 +250,72 @@ Future<List<FileSystemEntity>> sort(List<FileSystemEntity> elements, Sorting by,
 
 /// Get all available drives on Windows systems
 /// Returns a list of directories representing each drive
-/// Now also detects drives that require admin privileges and includes drive labels
+/// Now also detects drives that require admin privileges and includes drive labels.
+///
+/// Probes A: through Z: in parallel so a single stuck/optical/network drive
+/// no longer serializes the entire enumeration. Per-drive permission probe
+/// keeps the same 500 ms timeout, but they all run concurrently.
 Future<List<Directory>> getAllWindowsDrives() async {
   if (!Platform.isWindows) {
     return [];
   }
 
-  List<Directory> drives = [];
+  // Build one async probe per possible drive letter.
+  final List<Future<Directory?>> probes = <Future<Directory?>>[
+    for (var i = 65; i <= 90; i++) _probeWindowsDrive(String.fromCharCode(i)),
+  ];
 
-  // Check all possible drive letters from A to Z
-  for (var i = 65; i <= 90; i++) {
-    String driveLetter = String.fromCharCode(i);
-    String drivePath = '$driveLetter:\\';
+  final List<Directory?> results = await Future.wait(probes);
+  // Preserve A→Z order while filtering misses.
+  return <Directory>[
+    for (final drive in results)
+      if (drive != null) drive,
+  ];
+}
+
+/// Probe a single Windows drive letter and return a populated [Directory] when
+/// it exists (accessible or admin-restricted). Returns null when the letter is
+/// not mounted or the probe fails outright.
+Future<Directory?> _probeWindowsDrive(String driveLetter) async {
+  final String drivePath = '$driveLetter:\\';
+  try {
+    Directory drive = Directory(drivePath);
+    if (!await drive.exists()) {
+      return null;
+    }
 
     try {
-      Directory drive = Directory(drivePath);
+      // Quick permission probe: try to enumerate one entry. Bail on timeout
+      // so a hung volume can't stall the whole drives list.
+      await drive
+          .list(followLinks: false)
+          .first
+          .timeout(const Duration(milliseconds: 500), onTimeout: () {
+        throw TimeoutException('Permission check timed out');
+      });
 
-      // First check if the drive exists
-      if (await drive.exists()) {
-        // Try to test if we can list files as a permission check
-        try {
-          // Just try to list one file to check permissions
-          await drive
-              .list(followLinks: false)
-              .first
-              .timeout(const Duration(milliseconds: 500), onTimeout: () {
-            throw TimeoutException('Permission check timed out');
-          });
-
-          // If we reach here, we have access
-          drives.add(drive);
-
-          // Get drive label and store it in the directory metadata
-          String driveLabel = await getDriveLabel(drivePath);
-          drive.setProperty('driveLabel', driveLabel);
-
-          debugPrint('Found accessible drive: $drivePath - Label: $driveLabel');
-        } catch (permissionError) {
-          // Drive exists but we don't have permission
-          // Create a special metadata property to mark as protected
-          drive = Directory(drivePath);
-          drives.add(drive);
-          // Add a "tag" to mark this as a protected drive
-          drive.setProperty('requiresAdmin', true);
-
-          // Get drive label when possible and store it
-          try {
-            String driveLabel = await getDriveLabel(drivePath);
-            drive.setProperty('driveLabel', driveLabel);
-            debugPrint(
-                'Found protected drive: $drivePath - Label: $driveLabel (requires admin)');
-          } catch (e) {
-            debugPrint('Found protected drive: $drivePath (requires admin)');
-          }
-        }
+      // Accessible. Tag with label when available.
+      try {
+        final String driveLabel = await getDriveLabel(drivePath);
+        drive.setProperty('driveLabel', driveLabel);
+      } catch (_) {
+        // Label is optional metadata; ignore failures here.
       }
-    } catch (e) {
-      // Ignore drives that can't be accessed or don't exist
-      debugPrint('Drive not found or cannot be accessed: $drivePath - $e');
+      return drive;
+    } catch (_) {
+      // Drive exists but listing failed (admin-only, BitLocker-locked, etc.).
+      drive = Directory(drivePath);
+      drive.setProperty('requiresAdmin', true);
+      try {
+        final String driveLabel = await getDriveLabel(drivePath);
+        drive.setProperty('driveLabel', driveLabel);
+      } catch (_) {}
+      return drive;
     }
+  } catch (e) {
+    debugPrint('Drive not found or cannot be accessed: $drivePath - $e');
+    return null;
   }
-
-  return drives;
 }
 
 /// Get the volume label for a Windows drive

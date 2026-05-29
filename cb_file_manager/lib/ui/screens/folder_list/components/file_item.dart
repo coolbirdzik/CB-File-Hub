@@ -406,9 +406,13 @@ class _FileItemState extends State<FileItem> {
               isSelected: isSelected,
               isHovering: isHovering,
             );
+            // When showItemBackground is false, still show selection/hover
+            // highlight but skip the rounded card styling (margin + radius).
             final Color effectiveBackgroundColor = widget.showItemBackground
                 ? backgroundColor
-                : Colors.transparent;
+                : (isSelected || isHovering)
+                    ? backgroundColor
+                    : Colors.transparent;
 
             return RepaintBoundary(
               child: Opacity(

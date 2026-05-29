@@ -168,6 +168,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get viewModeGridPreview => 'Lưới + Xem trước';
 
   @override
+  String get viewModeColumns => 'Cột';
+
+  @override
   String get previewPaneTitle => 'Xem trước';
 
   @override
@@ -2290,6 +2293,18 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get markTabInactive => 'Đánh dấu không hoạt động';
+
+  @override
+  String get restoringTab => 'Đang khôi phục tab…';
+
+  @override
+  String get keepTabAlwaysActive => 'Giữ tab luôn hoạt động';
+
+  @override
+  String get allowTabAutoSuspend => 'Cho phép tab tự tạm dừng';
+
+  @override
+  String get tabAlwaysActiveTooltip => 'Luôn hoạt động';
 
   @override
   String get addNewTab => 'Thêm tab mới';

@@ -169,6 +169,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewModeGridPreview => 'Grid + Preview';
 
   @override
+  String get viewModeColumns => 'Columns';
+
+  @override
   String get previewPaneTitle => 'Preview';
 
   @override
@@ -2294,6 +2297,18 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get markTabInactive => 'Mark as inactive';
+
+  @override
+  String get restoringTab => 'Restoring tab…';
+
+  @override
+  String get keepTabAlwaysActive => 'Keep tab always active';
+
+  @override
+  String get allowTabAutoSuspend => 'Allow tab to auto-suspend';
+
+  @override
+  String get tabAlwaysActiveTooltip => 'Always active';
 
   @override
   String get addNewTab => 'Add new tab';

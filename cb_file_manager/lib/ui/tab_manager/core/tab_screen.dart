@@ -33,6 +33,7 @@ import '../../screens/ai_chat/ai_panel_controller.dart';
 import '../../screens/ai_chat/ai_side_panel.dart';
 import '../../components/common/operation_progress_overlay.dart';
 import '../components/tab_inactive_indicator.dart';
+import '../components/tab_always_active_indicator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 // Create a custom scroll behavior that supports mouse wheel scrolling
@@ -920,6 +921,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                         ),
                                                         const SizedBox(
                                                             width: 4),
+                                                        TabAlwaysActiveIndicator(
+                                                          tabId: tab.id,
+                                                        ),
                                                         TabInactiveIndicator(
                                                           tabId: tab.id,
                                                         ),
@@ -1576,12 +1580,20 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final activityManager = locator.isRegistered<TabActivityManager>()
         ? locator<TabActivityManager>()
         : null;
+    final isAlwaysActive =
+        activityManager != null && activityManager.isAlwaysActive(tab.id);
     final canMarkInactive = activityManager != null &&
+        !isAlwaysActive &&
         !activityManager.isInactive(tab.id) &&
         activityManager.stateOf(tab.id) != TabActivityState.focused &&
         // Defensive: also refuse the currently active tab even if the
         // activity manager has not seen a focus event yet.
         context.read<TabManagerBloc>().state.activeTabId != tab.id;
+
+    final canToggleAlwaysActive = activityManager != null;
+    final alwaysActiveLabel = isAlwaysActive
+        ? context.tr.allowTabAutoSuspend
+        : context.tr.keepTabAlwaysActive;
 
     // "Close other tabs" only makes sense when there is at least one other
     // tab to close.
@@ -1615,6 +1627,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           value: _DesktopTabAction.markInactive,
           enabled: canMarkInactive,
           child: Text(context.tr.markTabInactive),
+        ),
+        PopupMenuItem(
+          value: _DesktopTabAction.toggleAlwaysActive,
+          enabled: canToggleAlwaysActive,
+          child: Text(alwaysActiveLabel),
         ),
         PopupMenuItem(
           value: _DesktopTabAction.closeOtherTabs,
@@ -1670,6 +1687,13 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       case _DesktopTabAction.markInactive:
         {
           activityManager?.markInactive(tab.id);
+          return;
+        }
+      case _DesktopTabAction.toggleAlwaysActive:
+        {
+          if (activityManager == null) return;
+          final pinned = activityManager.isAlwaysActive(tab.id);
+          activityManager.setAlwaysActive(tab.id, !pinned);
           return;
         }
       case _DesktopTabAction.closeOtherTabs:
@@ -1917,6 +1941,7 @@ enum _DesktopTabAction {
   moveToNewWindow,
   moveToWindow,
   markInactive,
+  toggleAlwaysActive,
   closeOtherTabs,
   closeTab,
 }

@@ -686,6 +686,8 @@ class MobileFileActionsController {
         return PhosphorIconsLight.rows;
       case ViewMode.gridPreview:
         return PhosphorIconsLight.layout;
+      case ViewMode.columns:
+        return PhosphorIconsLight.columns;
     }
   }
 }

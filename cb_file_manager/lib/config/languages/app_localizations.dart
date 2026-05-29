@@ -81,6 +81,7 @@ abstract class AppLocalizations {
   String get viewModeGrid;
   String get viewModeDetails;
   String get viewModeGridPreview;
+  String get viewModeColumns;
 
   // Preview pane
   String get previewPaneTitle;
@@ -1049,6 +1050,16 @@ abstract class AppLocalizations {
   String get closeOtherTabs;
   String get markTabInactive;
   String get addNewTab;
+
+  /// Section 12: Refocus loading hint shown while an inactive tab is
+  /// being restored after the user clicks back into it.
+  String get restoringTab;
+
+  /// Section 13: Always-active tab pinning (right-click menu entries
+  /// + tab indicator tooltip).
+  String get keepTabAlwaysActive;
+  String get allowTabAutoSuspend;
+  String get tabAlwaysActiveTooltip;
 
   // Desktop windows (tabbed browsing)
   String get newWindow;

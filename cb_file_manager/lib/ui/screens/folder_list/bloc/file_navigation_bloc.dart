@@ -105,6 +105,36 @@ class FileNavigationBloc
     return super.close();
   }
 
+  /// Pause directory watching for this bloc.
+  ///
+  /// Used by the tab activity manager when the bloc's tab transitions to
+  /// inactive. Cancels the local refresh subscription so background fs
+  /// events don't trigger needless work; the global singleton watcher
+  /// only watches the currently focused tab's path so this primarily
+  /// serves as a defensive cleanup.
+  void pauseWatching() {
+    _directoryWatcherSubscription?.cancel();
+    _directoryWatcherSubscription = null;
+  }
+
+  /// Resume directory watching for this bloc after [pauseWatching].
+  ///
+  /// Idempotent: if the subscription is already active, returns immediately.
+  /// The actual filesystem watch is re-armed on the next navigation event
+  /// (the tab refocus pipeline triggers a refresh which calls
+  /// [_directoryWatcher.startWatching]).
+  void resumeWatching() {
+    if (_directoryWatcherSubscription != null) return;
+    _directoryWatcherSubscription = _directoryWatcher.onDirectoryRefresh.listen(
+      (path) {
+        DirectoryListingCacheService.instance.invalidate(path);
+        if (path == state.currentPath.path) {
+          add(FileNavigationRefresh(path));
+        }
+      },
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────
   // Lifecycle handlers
   // ─────────────────────────────────────────────────────────────

@@ -3,16 +3,17 @@ import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'file_item.dart';
 import 'file_grid_item.dart';
@@ -69,6 +70,7 @@ class FileView extends StatelessWidget {
   final ScrollController? scrollController;
   final GlobalKey Function(String path)? itemKeyForPath;
   final Function(ColumnVisibility)? onColumnVisibilityChanged;
+  final TabbedFolderDragSelectionController? dragSelectionController;
 
   const FileView({
     Key? key,
@@ -97,6 +99,7 @@ class FileView extends StatelessWidget {
     this.scrollController,
     this.itemKeyForPath,
     this.onColumnVisibilityChanged,
+    this.dragSelectionController,
   }) : super(key: key);
 
   Function(String, {bool shiftSelect, bool ctrlSelect})
@@ -145,7 +148,8 @@ class FileView extends StatelessWidget {
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       addSemanticIndexes: false,
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      // Extra bottom padding so users can drag-select in empty space below items
+      padding: const EdgeInsets.only(top: 4.0, bottom: 200.0),
       itemCount: folders.length + files.length,
       itemBuilder: (context, index) {
         // Use RepaintBoundary to reduce rendering load during scrolling
@@ -420,7 +424,8 @@ class FileView extends StatelessWidget {
             addAutomaticKeepAlives: true,
             addRepaintBoundaries: true,
             addSemanticIndexes: false,
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            // Extra bottom padding so users can drag-select in empty space below items
+            padding: const EdgeInsets.only(top: 4.0, bottom: 200.0),
             itemCount: folders.length + files.length,
             itemBuilder: (context, index) {
               // Add alternating row colors to make it look more like a details table
@@ -428,6 +433,10 @@ class FileView extends StatelessWidget {
               final Color rowColor = isEvenRow
                   ? Colors.transparent
                   : const Color.fromRGBO(128, 128, 128, 0.03);
+
+              final String itemPath = index < folders.length
+                  ? folders[index].path
+                  : files[index - folders.length].path;
 
               return Container(
                 padding:
@@ -437,42 +446,70 @@ class FileView extends StatelessWidget {
                 ),
                 // Use KeyedSubtree with a stable key to prevent unnecessary rebuilds
                 child: Container(
-                  key: itemKeyForPath?.call(index < folders.length
-                      ? folders[index].path
-                      : files[index - folders.length].path),
-                  child: RepaintBoundary(
-                    child: index < folders.length
-                        ? _FolderDetailsItemWrapper(
-                            key: ValueKey(
-                                'folder-detail-${folders[index].path}'),
-                            folder: folders[index],
-                            onTap: onFolderTap,
-                            isSelected:
-                                selectedFiles.contains(folders[index].path),
-                            columnVisibility: columnVisibility,
-                            toggleFolderSelection: _folderSelectionHandler,
-                            isDesktopMode: isDesktopMode,
-                            lastSelectedPath: lastSelectedPath,
-                            clearSelectionMode: clearSelectionMode,
-                          )
-                        : _FileDetailsItemWrapper(
-                            key: ValueKey(
-                                'file-detail-${files[index - folders.length].path}'),
-                            file: files[index - folders.length],
-                            state: state,
-                            isSelected: selectedFiles
-                                .contains(files[index - folders.length].path),
-                            columnVisibility: columnVisibility,
-                            toggleFileSelection: toggleFileSelection,
-                            showDeleteTagDialog: showDeleteTagDialog,
-                            showAddTagToFileDialog: showAddTagToFileDialog,
-                            onDeleteFile: onDeleteFile,
-                            onDeleteFiles: onDeleteFiles,
-                            onTap: onFileTap,
-                            isDesktopMode: isDesktopMode,
-                            lastSelectedPath: lastSelectedPath,
-                            showFileTags: showFileTags,
-                          ),
+                  key: itemKeyForPath?.call(itemPath),
+                  child: LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                      // Register item position for drag-selection hit-testing
+                      if (isDesktop && dragSelectionController != null) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          try {
+                            final RenderBox? renderBox =
+                                context.findRenderObject() as RenderBox?;
+                            if (renderBox != null &&
+                                renderBox.hasSize &&
+                                renderBox.attached) {
+                              final position =
+                                  renderBox.localToGlobal(Offset.zero);
+                              dragSelectionController!.registerItemPosition(
+                                  itemPath,
+                                  Rect.fromLTWH(
+                                      position.dx,
+                                      position.dy,
+                                      renderBox.size.width,
+                                      renderBox.size.height));
+                            }
+                          } catch (e) {
+                            debugPrint('Layout error in details view: $e');
+                          }
+                        });
+                      }
+
+                      return RepaintBoundary(
+                        child: index < folders.length
+                            ? _FolderDetailsItemWrapper(
+                                key: ValueKey(
+                                    'folder-detail-${folders[index].path}'),
+                                folder: folders[index],
+                                onTap: onFolderTap,
+                                isSelected:
+                                    selectedFiles.contains(folders[index].path),
+                                columnVisibility: columnVisibility,
+                                toggleFolderSelection: _folderSelectionHandler,
+                                isDesktopMode: isDesktopMode,
+                                lastSelectedPath: lastSelectedPath,
+                                clearSelectionMode: clearSelectionMode,
+                              )
+                            : _FileDetailsItemWrapper(
+                                key: ValueKey(
+                                    'file-detail-${files[index - folders.length].path}'),
+                                file: files[index - folders.length],
+                                state: state,
+                                isSelected: selectedFiles.contains(
+                                    files[index - folders.length].path),
+                                columnVisibility: columnVisibility,
+                                toggleFileSelection: toggleFileSelection,
+                                showDeleteTagDialog: showDeleteTagDialog,
+                                showAddTagToFileDialog: showAddTagToFileDialog,
+                                onDeleteFile: onDeleteFile,
+                                onDeleteFiles: onDeleteFiles,
+                                onTap: onFileTap,
+                                isDesktopMode: isDesktopMode,
+                                lastSelectedPath: lastSelectedPath,
+                                showFileTags: showFileTags,
+                              ),
+                      );
+                    },
                   ),
                 ),
               );

@@ -102,6 +102,21 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     return super.close();
   }
 
+  /// Pause the underlying directory watcher subscription. Used by the tab
+  /// activity manager when the bloc's tab transitions to inactive so
+  /// background filesystem events don't trigger refresh work for a tab the
+  /// user is not actively using.
+  void pauseDirectoryWatching() {
+    _navigationBloc.pauseWatching();
+  }
+
+  /// Resume the underlying directory watcher subscription. Idempotent.
+  /// The actual filesystem watch handle is re-armed lazily on the next
+  /// `FolderListLoad` / `FolderListRefresh` event.
+  void resumeDirectoryWatching() {
+    _navigationBloc.resumeWatching();
+  }
+
   // ── Forwarding handlers ───────────────────────────────────────────
 
   void _onInit(FolderListInit event, Emitter<FolderListState> emit) {

@@ -167,16 +167,18 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// Toggle between view modes (list -> grid -> details -> list)
+  /// Toggle between view modes (list -> grid -> gridPreview -> details -> columns -> list)
   void toggleViewMode() {
     setState(() {
-      // Cycle through view modes: list -> grid -> grid preview -> details -> list
+      // Cycle: list -> grid -> gridPreview (desktop) -> details -> columns (desktop) -> list
       if (viewMode == ViewMode.list) {
         viewMode = ViewMode.grid;
       } else if (viewMode == ViewMode.grid) {
         viewMode = isDesktopPlatform ? ViewMode.gridPreview : ViewMode.details;
       } else if (viewMode == ViewMode.gridPreview) {
         viewMode = ViewMode.details;
+      } else if (viewMode == ViewMode.details) {
+        viewMode = isDesktopPlatform ? ViewMode.columns : ViewMode.list;
       } else {
         viewMode = ViewMode.list;
       }

@@ -58,6 +58,18 @@ class DriveView extends StatefulWidget {
 }
 
 class _DriveViewState extends State<DriveView> {
+  /// Cache of the most recent drive snapshot, shared across all DriveView
+  /// instances in the process so navigating back from a folder doesn't
+  /// trigger a cold spinner — we render cached entries immediately and
+  /// revalidate in the background.
+  static List<_DriveEntry>? _cachedDriveEntries;
+
+  /// How long a cached drive snapshot is considered fresh enough to skip
+  /// background revalidation. We still revalidate older snapshots to pick up
+  /// newly mounted/unmounted volumes.
+  static const Duration _cacheFreshness = Duration(minutes: 5);
+  static DateTime? _cachedAt;
+
   List<_DriveEntry> _driveEntries = const <_DriveEntry>[];
   bool _isLoadingDrives = false;
   Object? _loadError;
@@ -68,8 +80,24 @@ class _DriveViewState extends State<DriveView> {
   @override
   void initState() {
     super.initState();
+
+    // Seed from the process-wide cache so back-navigation shows content
+    // instantly instead of an empty pane + spinner.
+    final cached = _cachedDriveEntries;
+    if (cached != null && cached.isNotEmpty) {
+      _driveEntries = cached;
+    }
+
     if (!widget.isLazyLoading) {
-      _reloadDriveEntries();
+      // If we have a fresh cache, skip the foreground reload entirely.
+      // Otherwise reload (foreground if no cache, background if stale).
+      final hasFreshCache = cached != null &&
+          cached.isNotEmpty &&
+          _cachedAt != null &&
+          DateTime.now().difference(_cachedAt!) < _cacheFreshness;
+      if (!hasFreshCache) {
+        _revalidateDrivesInBackground();
+      }
     }
   }
 
@@ -81,6 +109,25 @@ class _DriveViewState extends State<DriveView> {
         (oldWidget.isLazyLoading && !widget.isLazyLoading) ||
         (!oldWidget.isRefreshing && widget.isRefreshing)) {
       _reloadDriveEntries();
+    }
+  }
+
+  /// Revalidate drives in the background without blocking the UI.
+  /// If the cache is stale, fetch fresh data but don't setState until done,
+  /// so the UI shows stale entries immediately while we refresh.
+  Future<void> _revalidateDrivesInBackground() async {
+    try {
+      final entries = await _loadDriveEntries();
+      _cachedDriveEntries = entries;
+      _cachedAt = DateTime.now();
+      if (mounted) {
+        setState(() {
+          _driveEntries = entries;
+        });
+      }
+    } catch (e) {
+      debugPrint('Background drive revalidation failed: $e');
+      // Keep showing stale data on error; don't update _loadError.
     }
   }
 
@@ -96,6 +143,9 @@ class _DriveViewState extends State<DriveView> {
 
     try {
       final entries = await _loadDriveEntries();
+      // Update the process-wide cache for the next mount.
+      _cachedDriveEntries = entries;
+      _cachedAt = DateTime.now();
       if (!mounted) return;
       setState(() {
         _driveEntries = entries;
@@ -178,8 +228,11 @@ class _DriveViewState extends State<DriveView> {
   }
 
   Widget _buildActualDriveList(BuildContext context) {
+    // No cached/loaded entries yet but a fetch is in flight: show the
+    // structural skeleton instead of a centered spinner so back-navigation
+    // never lands on a blank pane with a circular loader.
     if (_isLoadingDrives && _driveEntries.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return _buildSkeletonDriveList(context);
     }
 
     if (_loadError != null && _driveEntries.isEmpty) {

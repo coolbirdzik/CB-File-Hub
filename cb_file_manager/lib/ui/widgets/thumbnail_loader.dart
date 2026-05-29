@@ -310,6 +310,46 @@ class ThumbnailLoader extends StatefulWidget {
     debugPrint('ThumbnailLoader: Disposed static resources');
   }
 
+  // ── Tab suspend/resume registry ───────────────────────────────────────────
+  // Allows the tab activity system to suspend thumbnail loading for inactive
+  // tabs and resume when they become active again.
+  static final Map<String, Set<String>> _suspendedTabs = {};
+
+  /// Suspend thumbnail loading for a tab. Widgets whose [filePath] starts
+  /// with [path] will skip enqueue while the tab is suspended.
+  /// If [path] is empty, the tab entry is removed (no-op suspend).
+  static void suspendTab(String tabId, String path) {
+    if (path.isEmpty) {
+      _suspendedTabs.remove(tabId);
+      return;
+    }
+    _suspendedTabs.putIfAbsent(tabId, () => <String>{}).add(path);
+  }
+
+  /// Resume thumbnail loading for a tab.
+  static void resumeTab(String tabId) {
+    _suspendedTabs.remove(tabId);
+  }
+
+  /// Whether a given file path is currently suspended (belongs to an
+  /// inactive tab).
+  static bool isPathSuspended(String filePath) {
+    for (final paths in _suspendedTabs.values) {
+      for (final p in paths) {
+        if (filePath.startsWith(p)) return true;
+      }
+    }
+    return false;
+  }
+
+  /// Debug helper: number of currently suspended tabs.
+  static int debugSuspendedTabCount() => _suspendedTabs.length;
+
+  /// Debug helper: clear the suspend registry.
+  static void debugClearSuspendRegistry() {
+    _suspendedTabs.clear();
+  }
+
   // Static method to reset failed attempts (useful for network reconnection)
   static void resetFailedAttempts() {
     _ThumbnailLoaderState._failedAttempts.clear();
@@ -939,16 +979,23 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
                 }
               });
             }
+            // Compute play icon size proportional to thumbnail so it
+            // doesn't overflow small containers (e.g. 20x20 Miller columns).
+            final double minDim =
+                widget.width < widget.height ? widget.width : widget.height;
+            final double playSize = minDim == double.infinity
+                ? 32
+                : (minDim * 0.7).clamp(12.0, 32.0);
             return Stack(
               fit: StackFit.expand,
               children: [
                 child,
                 // Add video play icon overlay
-                const Center(
+                Center(
                   child: Icon(
                     PhosphorIconsLight.playCircle,
                     color: Colors.white,
-                    size: 32,
+                    size: playSize,
                   ),
                 ),
               ],

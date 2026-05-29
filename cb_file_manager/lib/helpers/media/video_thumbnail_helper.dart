@@ -696,6 +696,51 @@ class VideoThumbnailHelper {
     }
   }
 
+  /// Cancel all pending and processing thumbnail requests whose video path
+  /// lies inside [dirPath]. Used by the tab activity manager when a tab
+  /// transitions to inactive so background thumbnail work for that tab's
+  /// folder is suspended.
+  ///
+  /// This is the inverse of [cancelThumbnailsNotInDirectory]. Both queues
+  /// (`_pendingQueue` and `_processingQueue`) are scrubbed; pending
+  /// completers are completed with `null` so callers don't hang.
+  static void cancelForDirectory(String dirPath) {
+    if (dirPath.isEmpty) return;
+
+    int canceledCount = 0;
+
+    final List<_ThumbnailRequest> toRemovePending = [];
+    for (final request in _pendingQueue) {
+      final requestDir = path.dirname(request.videoPath);
+      if (_isSameOrWithinDirectory(dirPath, requestDir)) {
+        if (!request.completer.isCompleted) {
+          request.completer.complete(null);
+        }
+        toRemovePending.add(request);
+        canceledCount++;
+      }
+    }
+    _pendingQueue.removeWhere((req) => toRemovePending.contains(req));
+
+    final List<_ThumbnailRequest> toRemoveProcessing = [];
+    for (final request in _processingQueue) {
+      final requestDir = path.dirname(request.videoPath);
+      if (_isSameOrWithinDirectory(dirPath, requestDir)) {
+        if (!request.completer.isCompleted) {
+          request.completer.complete(null);
+        }
+        toRemoveProcessing.add(request);
+        canceledCount++;
+      }
+    }
+    _processingQueue.removeWhere((req) => toRemoveProcessing.contains(req));
+
+    _log(
+      'VideoThumbnail: Canceled $canceledCount thumbnails inside $dirPath',
+      forceShow: true,
+    );
+  }
+
   static void cancelThumbnailsNotInDirectory(String dirPath) {
     if (dirPath.isEmpty) return;
 

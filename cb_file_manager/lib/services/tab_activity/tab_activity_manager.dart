@@ -24,13 +24,20 @@ class _TabActivityRecord {
   bool needsReload;
   String? lastKnownPath;
 
+  /// When true, this tab is excluded from automatic inactive transitions and
+  /// from manual [TabActivityManager.markInactive]. Set by user via the tab
+  /// context menu ("Keep tab always active"). Session-only — defaults to
+  /// false on app restart.
+  bool alwaysActive;
+
   _TabActivityRecord({
     required this.state,
     required this.lastFocusedAt,
     required this.lastInteractionAt,
     this.lastKnownPath,
   })  : inactiveSince = null,
-        needsReload = false;
+        needsReload = false,
+        alwaysActive = false;
 }
 
 /// Snapshot of a tab's activity, exposed for UI/diagnostics.
@@ -193,6 +200,40 @@ class TabActivityManager extends ChangeNotifier {
     return r != null && r.state == TabActivityState.inactive;
   }
 
+  /// Returns whether [tabId] is pinned as always-active and excluded from
+  /// automatic inactive transitions.
+  bool isAlwaysActive(String tabId) {
+    final r = _records[tabId];
+    return r != null && r.alwaysActive;
+  }
+
+  /// Set the always-active pin for [tabId].
+  ///
+  /// When [value] is true the tab is excluded from
+  /// [evaluateInactiveTabs] and [markInactive]. If the tab was already
+  /// inactive at the moment of pinning it is promoted back to background
+  /// (or focused, if it is the currently focused tab) and the reload flag
+  /// is preserved so the existing refocus pipeline still runs the next
+  /// time the user clicks the tab.
+  ///
+  /// State is in-memory only (session-scoped). Listeners are notified once
+  /// per change.
+  void setAlwaysActive(String tabId, bool value) {
+    if (_disposed) return;
+    final r = _records[tabId];
+    if (r == null) return;
+    if (r.alwaysActive == value) return;
+    r.alwaysActive = value;
+
+    if (value && r.state == TabActivityState.inactive) {
+      r.state = (tabId == _focusedTabId)
+          ? TabActivityState.focused
+          : TabActivityState.backgroundActive;
+      r.inactiveSince = null;
+    }
+    notifyListeners();
+  }
+
   /// Returns whether [tabId] needs a reload.
   bool needsReload(String tabId) {
     final r = _records[tabId];
@@ -321,7 +362,7 @@ class TabActivityManager extends ChangeNotifier {
   /// Triggered by user action (e.g. right-click menu "Mark inactive"). The
   /// focused tab is refused — the user must switch away first or pick another
   /// tab. Returns true on success, false if the tab is unknown, already
-  /// inactive, or currently focused.
+  /// inactive, currently focused, or pinned via [setAlwaysActive].
   ///
   /// Fires the inactive listener so the same cache release pipeline runs as
   /// for automatic transitions.
@@ -329,6 +370,7 @@ class TabActivityManager extends ChangeNotifier {
     if (_disposed) return false;
     final r = _records[tabId];
     if (r == null) return false;
+    if (r.alwaysActive) return false;
     if (r.state == TabActivityState.focused) return false;
     if (r.state == TabActivityState.inactive) return false;
 
@@ -380,6 +422,7 @@ class TabActivityManager extends ChangeNotifier {
     _records.forEach((tabId, r) {
       if (r.state == TabActivityState.focused) return;
       if (r.state == TabActivityState.inactive) return;
+      if (r.alwaysActive) return;
 
       final reference = r.lastInteractionAt.isAfter(r.lastFocusedAt)
           ? r.lastInteractionAt

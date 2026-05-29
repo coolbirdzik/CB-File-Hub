@@ -505,4 +505,41 @@ class FolderThumbnailService {
     // Also clear the VideoThumbnailHelper cache
     unawaited(VideoThumbnailHelper.clearCache());
   }
+
+  /// Cancel any pending folder thumbnail work for [dirPath] and drop the
+  /// in-memory cache entry for that folder. Used by the tab activity manager
+  /// when a tab transitions to inactive so cached folder cover thumbnails
+  /// are released and any underlying video thumbnail work for the same
+  /// directory is also suspended.
+  ///
+  /// On-disk caches and folder config files are intentionally left intact;
+  /// only the in-memory bitmap reference is dropped so RAM can be reclaimed.
+  void cancelForDirectory(String dirPath) {
+    if (dirPath.isEmpty) return;
+
+    final normalized = path.normalize(dirPath);
+    // Drop in-memory cache for this directory and any direct child entries.
+    final keysToDrop = _thumbnailCache.keys
+        .where((k) =>
+            path.normalize(k) == normalized ||
+            path.isWithin(normalized, path.normalize(k)))
+        .toList();
+    for (final k in keysToDrop) {
+      _removeFromCache(k);
+    }
+
+    // Drop cached folder configs as well — they are tiny but we want a
+    // clean re-read after refocus so user-facing changes are visible.
+    final configKeysToDrop = _folderConfigCache.keys
+        .where((k) =>
+            path.normalize(k) == normalized ||
+            path.isWithin(normalized, path.normalize(k)))
+        .toList();
+    for (final k in configKeysToDrop) {
+      _folderConfigCache.remove(k);
+    }
+
+    // Cascade into the underlying video thumbnail pipeline.
+    VideoThumbnailHelper.cancelForDirectory(dirPath);
+  }
 }

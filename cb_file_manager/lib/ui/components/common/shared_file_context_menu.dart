@@ -1253,7 +1253,8 @@ bool _tryStartInlineRename(BuildContext context, FileSystemEntity entity) {
   }();
   final bool supportsInlineRename = viewMode == ViewMode.grid ||
       viewMode == ViewMode.gridPreview ||
-      viewMode == ViewMode.details;
+      viewMode == ViewMode.details ||
+      viewMode == ViewMode.columns;
   if (!supportsInlineRename) {
     return false;
   }

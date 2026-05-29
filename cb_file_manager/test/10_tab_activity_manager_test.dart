@@ -233,5 +233,73 @@ void main() {
       expect(manager.consumeReloadFlag('tab1'), isTrue);
       expect(manager.consumeReloadFlag('tab1'), isFalse);
     });
+
+    test(
+        '10.18 always-active pin excludes a tab from automatic inactive transition',
+        () {
+      manager.onTabFocused('tab1', path: 'C:\\pinned');
+      manager.onTabFocused('tab2');
+
+      // Pin tab1 while it sits in background.
+      manager.setAlwaysActive('tab1', true);
+      expect(manager.isAlwaysActive('tab1'), isTrue);
+
+      // Age past the threshold — pinned tab must not transition.
+      fakeNow = fakeNow.add(const Duration(hours: 5));
+      final transitioned = manager.evaluateInactiveTabs();
+      expect(transitioned, isEmpty);
+      expect(manager.stateOf('tab1'), TabActivityState.backgroundActive);
+
+      // Unpinning re-enables normal evaluation immediately.
+      manager.setAlwaysActive('tab1', false);
+      final after = manager.evaluateInactiveTabs();
+      expect(after, ['tab1']);
+      expect(manager.stateOf('tab1'), TabActivityState.inactive);
+    });
+
+    test('10.19 always-active pin makes markInactive return false', () {
+      manager.onTabFocused('tab1', path: 'C:\\pinned');
+      manager.onTabFocused('tab2');
+
+      manager.setAlwaysActive('tab1', true);
+      expect(manager.markInactive('tab1'), isFalse);
+      expect(manager.stateOf('tab1'), TabActivityState.backgroundActive);
+    });
+
+    test(
+        '10.20 pinning an inactive tab promotes it back to background and notifies',
+        () {
+      manager.onTabFocused('tab1', path: 'C:\\one');
+      manager.onTabFocused('tab2');
+
+      // Force inactive.
+      fakeNow = fakeNow.add(const Duration(hours: 1, seconds: 1));
+      manager.evaluateInactiveTabs();
+      expect(manager.stateOf('tab1'), TabActivityState.inactive);
+
+      var listenerFires = 0;
+      manager.addListener(() => listenerFires++);
+
+      manager.setAlwaysActive('tab1', true);
+
+      expect(manager.stateOf('tab1'), TabActivityState.backgroundActive);
+      expect(manager.isAlwaysActive('tab1'), isTrue);
+      expect(listenerFires, 1);
+    });
+
+    test('10.21 toggling pin state fires listener exactly once per change', () {
+      manager.onTabFocused('tab1');
+      manager.onTabFocused('tab2');
+
+      var fires = 0;
+      manager.addListener(() => fires++);
+
+      manager.setAlwaysActive('tab1', true);
+      manager.setAlwaysActive('tab1', true); // no-op
+      manager.setAlwaysActive('tab1', false);
+      manager.setAlwaysActive('tab1', false); // no-op
+
+      expect(fires, 2);
+    });
   });
 }

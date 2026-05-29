@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
@@ -150,6 +151,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   // Refresh state
   bool _isRefreshing = false;
+
+  /// Set true while a refocus-from-inactive reload is in flight. Drives the
+  /// dedicated "restoring tab" UI (skeleton + slim progress bar + status
+  /// hint) so the user sees an explicit loading state rather than a stale
+  /// or empty screen while caches are warmed back up.
+  bool _isRestoringFromInactive = false;
 
   // Create the bloc instance at the class level
   late FolderListBloc _folderListBloc;
@@ -1103,6 +1110,21 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       '[TabActivity] reloading tab=${widget.tabId} after refocus path=$_currentPath',
     );
 
+    // Resume background work suspended during the inactive transition.
+    // ThumbnailLoader.resumeTab unblocks visibility-driven enqueues; the
+    // FolderListBloc resumes its directory watcher subscription so future
+    // filesystem events repopulate the listing.
+    ThumbnailLoader.resumeTab(widget.tabId);
+    _folderListBloc.resumeDirectoryWatching();
+
+    // Drive the section 12 restore UX: enter "restoring" state immediately
+    // so the user sees a skeleton + slim progress bar within the same
+    // frame the tab becomes active. The flag is cleared by the
+    // BlocListener<FolderListBloc> when loading completes.
+    setState(() {
+      _isRestoringFromInactive = true;
+    });
+
     if (isDrivesPath(_currentPath)) {
       _folderListBloc.add(const FolderListLoadDrives());
     } else {
@@ -1222,6 +1244,24 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 _maybeApplyFocusAfterDelete(folderState);
                 _maybeStartPendingCreatedFileRename(folderState);
                 _maybeScrollToHighlightedFile(folderState);
+
+                // Clear the refocus restore flag once the folder list bloc
+                // has finished loading. We watch both isLoading and
+                // isRefreshing so the flag is dropped as soon as either
+                // completion path settles. The check is cheap enough to
+                // run on every state change.
+                if (_isRestoringFromInactive &&
+                    !folderState.isLoading &&
+                    !folderState.isRefreshing) {
+                  // Defer to next frame so the skeleton cross-fades cleanly
+                  // with real content rather than disappearing mid-build.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    setState(() {
+                      _isRestoringFromInactive = false;
+                    });
+                  });
+                }
 
                 // Check if there are any video/image files in the current directory
                 final hasVideoOrImageFiles = _hasVideoOrImageFiles(folderState);
@@ -1451,17 +1491,19 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final bool showStatusLoadingIndicator = !searchResultsActive &&
         !state.isRefreshing &&
         (state.isLoading || isPathMismatch);
-    final bool shouldShowSkeleton = !hasContent &&
-        (state.isLoading || isPathMismatch) &&
-        state.error == null &&
-        state.searchResults.isEmpty &&
-        state.currentSearchTag == null &&
-        state.currentSearchQuery == null;
+    final bool shouldShowSkeleton = (_isRestoringFromInactive && !hasContent) ||
+        (!hasContent &&
+            (state.isLoading || isPathMismatch) &&
+            state.error == null &&
+            state.searchResults.isEmpty &&
+            state.currentSearchTag == null &&
+            state.currentSearchQuery == null);
 
     return Stack(
       children: [
         Column(
           children: [
+            if (_isRestoringFromInactive) _buildRestoringTabHint(context),
             Expanded(
               child: _buildAcrylicContentContainer(
                 context: context,
@@ -1475,7 +1517,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         ),
         // Bottom status bar indicator — shown during initial loading AND refresh
         // so the existing file list layout is never affected.
-        if (showStatusLoadingIndicator || state.isRefreshing || _isRefreshing)
+        if (showStatusLoadingIndicator ||
+            state.isRefreshing ||
+            _isRefreshing ||
+            _isRestoringFromInactive)
           const Positioned(
             left: 0,
             right: 0,
@@ -1483,6 +1528,36 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             child: SlimProgressBar(),
           ),
       ],
+    );
+  }
+
+  /// Subtle inline status hint that appears at the top of the tab content
+  /// while a refocus-from-inactive reload is in flight (section 12). The
+  /// hint sits above the file list so the breadcrumb / appbar are still
+  /// readable, and disappears as soon as the reload completes.
+  Widget _buildRestoringTabHint(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            context.tr.restoringTab,
+            style: theme.textTheme.bodySmall?.copyWith(color: color),
+          ),
+        ],
+      ),
     );
   }
 

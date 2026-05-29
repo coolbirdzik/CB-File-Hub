@@ -77,7 +77,7 @@ class VideoPlayer extends StatefulWidget {
   final VoidCallback? onNextVideo;
   final VoidCallback? onPreviousVideo;
   final VoidCallback? onClose;
-  final VoidCallback? onControlVisibilityChanged;
+  final ValueChanged<bool>? onControlVisibilityChanged;
   final VoidCallback? onFullScreenChanged;
   final VoidCallback? onInitialized;
   final Function(String folderPath, String highlightedFileName)? onOpenFolder;
@@ -140,7 +140,7 @@ class VideoPlayer extends StatefulWidget {
     Function(String)? onError,
     VoidCallback? onNextVideo,
     VoidCallback? onPreviousVideo,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     Function(String folderPath, String highlightedFileName)? onOpenFolder,
@@ -189,7 +189,7 @@ class VideoPlayer extends StatefulWidget {
     Function(Map<String, dynamic>)? onVideoInitialized,
     Function(String)? onError,
     VoidCallback? onClose,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     bool showStreamingSpeed = false,
@@ -232,7 +232,7 @@ class VideoPlayer extends StatefulWidget {
     Function(Map<String, dynamic>)? onVideoInitialized,
     Function(String)? onError,
     VoidCallback? onClose,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     bool showStreamingSpeed = false,
@@ -275,7 +275,7 @@ class VideoPlayer extends StatefulWidget {
     Function(Map<String, dynamic>)? onVideoInitialized,
     Function(String)? onError,
     VoidCallback? onClose,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     bool showStreamingSpeed = false,
@@ -2112,7 +2112,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _showControls = true;
     });
     _startHideControlsTimer();
-    widget.onControlVisibilityChanged?.call();
+    widget.onControlVisibilityChanged?.call(true);
   }
 
   bool _isCurrentlyPlaying() {
@@ -2140,7 +2140,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         setState(() {
           _showControls = false;
         });
-        widget.onControlVisibilityChanged?.call();
+        widget.onControlVisibilityChanged?.call(false);
       }
     });
   }

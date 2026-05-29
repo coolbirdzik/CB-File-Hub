@@ -21,6 +21,7 @@ import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/widgets/miller_columns_view.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
@@ -166,6 +167,27 @@ class FileListViewBuilder {
         isMasonryLayout: effectiveMasonryLayout,
         onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
         onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+        scrollController: scrollController,
+        itemKeyForPath: itemKeyForPath,
+      );
+    } else if (displayState.viewMode == ViewMode.columns && isDesktopPlatform) {
+      return MillerColumnsView(
+        state: displayState,
+        selectionState: selectionState,
+        isDesktopPlatform: isDesktopPlatform,
+        onNavigateToPath: onNavigateToPath,
+        onFileTap: onFileTap,
+        toggleFileSelection: toggleFileSelection,
+        toggleFolderSelection: toggleFolderSelection,
+        clearSelection: clearSelection,
+        dragSelectionController: dragSelectionController,
+        showFileTags: showFileTags,
+        showDeleteTagDialog: showDeleteTagDialog,
+        showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        onDeleteFiles: onDeleteFiles,
+        toggleSelectionMode: toggleSelectionMode,
+        showContextMenu: showContextMenu,
         scrollController: scrollController,
         itemKeyForPath: itemKeyForPath,
       );
@@ -632,6 +654,7 @@ class FileListViewBuilder {
                     showFileTags: showFileTags,
                     scrollController: scrollController,
                     itemKeyForPath: itemKeyForPath,
+                    dragSelectionController: dragSelectionController,
                   ),
                 ),
               );
@@ -730,6 +753,8 @@ class FileListViewBuilder {
                     addAutomaticKeepAlives: true,
                     addRepaintBoundaries: true,
                     addSemanticIndexes: false,
+                    // Extra bottom padding so users can drag-select in empty space below items
+                    padding: const EdgeInsets.only(bottom: 200.0),
                     itemCount: state.folders.length + state.files.length,
                     itemBuilder: (context, index) {
                       final String itemPath = index < state.folders.length
