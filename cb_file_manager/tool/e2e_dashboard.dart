@@ -195,14 +195,11 @@ TestReport parseJsonLog(
       final trace = decoded['stackTrace'] as String? ?? '';
       if (testID != null) {
         idToError[testID] = _ErrorInfo(
-          message: _firstLine(message),
-          trace: trace.isEmpty ? message : '$message\n$trace',
+          message: message,
+          trace: trace,
         );
       } else {
-        hiddenErrors.add(_ErrorInfo(
-          message: _firstLine(message),
-          trace: trace.isEmpty ? message : '$message\n$trace',
-        ));
+        hiddenErrors.add(_ErrorInfo(message: message, trace: trace));
       }
     } else if (type == 'testDone') {
       final testID = decoded['testID'] as int?;
@@ -222,10 +219,7 @@ TestReport parseJsonLog(
           } else {
             final err = decoded['error'] as String?;
             if (err != null && err.isNotEmpty) {
-              hiddenErrors.add(_ErrorInfo(
-                message: _firstLine(err),
-                trace: err,
-              ));
+              hiddenErrors.add(_ErrorInfo(message: err, trace: ''));
             }
           }
         }
@@ -235,10 +229,7 @@ TestReport parseJsonLog(
       if (result != null && result != 'success') {
         final err = decoded['error'] as String?;
         if (err != null && err.isNotEmpty) {
-          idToError[testID] = _ErrorInfo(
-            message: _firstLine(err),
-            trace: err,
-          );
+          idToError[testID] = _ErrorInfo(message: err, trace: '');
         }
       }
     }
@@ -331,9 +322,97 @@ class _ErrorInfo {
   const _ErrorInfo({required this.message, required this.trace});
 }
 
-String _firstLine(String s) {
-  final idx = s.indexOf('\n');
-  return idx >= 0 ? s.substring(0, idx) : s;
+/// Renders a stack trace into HTML, highlighting frames that point at user
+/// code. Each user frame gets wrapped in `<span class="trace-user">` so the
+/// CSS can pull it out of the wall of grey Flutter frames.
+String _renderTrace(String trace) {
+  final lines = trace.split('\n');
+  final out = StringBuffer();
+  final userPathPattern = RegExp(
+    r'(integration_test/|package:cb_file_manager/|test/|[A-Za-z]:[/\\])',
+    caseSensitive: false,
+  );
+  for (final line in lines) {
+    final escaped = _escapeHtml(line);
+    final lower = line.toLowerCase();
+    final isFlutter = lower.contains('package:flutter') ||
+        lower.contains('/flutter/') ||
+        lower.contains(r'\flutter\') ||
+        lower.startsWith('dart:') ||
+        lower.contains(' dart:') ||
+        lower.contains('package:flutter_test');
+    final hasUserPath = userPathPattern.hasMatch(line);
+    if (hasUserPath && !isFlutter) {
+      out.writeln('<span class="trace-user">$escaped</span>');
+    } else {
+      out.writeln(escaped);
+    }
+  }
+  return out.toString();
+}
+
+/// Returns the first stack-trace frame that points at user code (the test
+/// suite or app package), e.g. `integration_test/app_e2e_test.dart 123:5`
+/// or `package:cb_file_manager/foo.dart 42:10`. Returns `null` when no
+/// such frame is found (pure Flutter/Dart SDK trace).
+///
+/// When no frame with a line number can be found we fall back to a bare
+/// file path mention (e.g. `Failed to load "/.../app_e2e_test.dart"`) so
+/// the user still sees *which file* is implicated.
+///
+/// Accepts mixed text — error messages may bundle the trace into the
+/// message itself, so we scan everything we get.
+String? _firstUserFrame(String text) {
+  if (text.isEmpty) return null;
+
+  bool isFlutterPath(String p) {
+    final lower = p.toLowerCase();
+    return lower.contains('/flutter/') ||
+        lower.contains(r'\flutter\') ||
+        lower.contains('package:flutter') ||
+        lower.contains('dart:') ||
+        lower.contains('sdk/lib/');
+  }
+
+  // Stack frames look like one of these (whitespace varies):
+  //   package:cb_file_manager/foo.dart 42:10                Class.method
+  //   integration_test/app_e2e_test.dart 123:5              main.<fn>
+  //   file:///.../app_e2e_test.dart:123:5
+  //   #4      main.<fn> (file:///.../app_e2e_test.dart:42:5)
+  final patterns = <RegExp>[
+    RegExp(r'(integration_test/[^\s:"]+\.dart)[: ](\d+)(?::(\d+))?'),
+    RegExp(r'(package:cb_file_manager/[^\s:"]+\.dart)[: ](\d+)(?::(\d+))?'),
+    RegExp(r'(test/[^\s:"]+\.dart)[: ](\d+)(?::(\d+))?'),
+    RegExp(r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?\.dart):(\d+)(?::(\d+))?'),
+  ];
+
+  for (final p in patterns) {
+    for (final m in p.allMatches(text)) {
+      final path = m.group(1) ?? '';
+      if (isFlutterPath(path)) continue;
+      final line = m.group(2);
+      final col = m.group(3);
+      if (line == null) continue;
+      return col != null ? '$path:$line:$col' : '$path:$line';
+    }
+  }
+
+  // Fallback: bare-path mentions, no line number. Still useful — at least
+  // tells the user which file is involved (e.g. "Failed to load X.dart").
+  final pathOnlyPatterns = <RegExp>[
+    RegExp(r'(integration_test/[^\s:"]+\.dart)'),
+    RegExp(r'(package:cb_file_manager/[^\s:"]+\.dart)'),
+    RegExp(r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?integration_test[/\\][^\s:"]*?\.dart)'),
+    RegExp(r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?cb_file_manager[/\\][^\s:"]*?\.dart)'),
+  ];
+  for (final p in pathOnlyPatterns) {
+    for (final m in p.allMatches(text)) {
+      final path = m.group(1) ?? '';
+      if (isFlutterPath(path)) continue;
+      return path;
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -554,22 +633,30 @@ String generateHtml(TestReport report) {
   // through individual test rows to find the real cause.
   final suiteBanner = StringBuffer();
   if (report.suiteError != null && report.suiteError!.isNotEmpty) {
+    final suiteCombined =
+        '${report.suiteError ?? ''}\n${report.suiteStackTrace ?? ''}';
+    final suiteFrame = _firstUserFrame(suiteCombined);
+
     suiteBanner.writeln('<div class="suite-error-banner">');
     suiteBanner.writeln('<div class="suite-error-title">');
     suiteBanner.writeln('<span class="suite-error-icon">!</span>');
     suiteBanner.writeln(
         'Suite failed to load — every blocked test below shares this root cause');
     suiteBanner.writeln('</div>');
+    if (suiteFrame != null) {
+      suiteBanner.writeln('<div class="reason-where">'
+          '<span class="reason-where-label">at</span> '
+          '<code>${_escapeHtml(suiteFrame)}</code>'
+          '</div>');
+    }
     suiteBanner.writeln(
         '<div class="suite-error-msg">${_escapeHtml(report.suiteError!)}</div>');
     if (report.suiteStackTrace != null &&
         report.suiteStackTrace!.trim().isNotEmpty &&
         report.suiteStackTrace != report.suiteError) {
-      suiteBanner.writeln('<details class="suite-error-trace">');
-      suiteBanner.writeln('<summary>Show stack trace</summary>');
+      suiteBanner.writeln('<div class="reason-trace-label">Stack trace</div>');
       suiteBanner.writeln(
-          '<pre>${_escapeHtml(report.suiteStackTrace!)}</pre>');
-      suiteBanner.writeln('</details>');
+          '<pre class="reason-trace-pre">${_renderTrace(report.suiteStackTrace!)}</pre>');
     }
     suiteBanner.writeln('</div>');
   }
@@ -660,18 +747,30 @@ String generateHtml(TestReport report) {
       final reasonBuf = StringBuffer();
       if (hasErrorMessage) {
         final cls = t.isBlocked ? 'reason-msg blocked' : 'reason-msg';
+        final label = t.isBlocked ? 'BLOCKED — REASON' : 'FAILED — REASON';
+
+        // Find the first user-code frame across both message + trace so
+        // even tests whose error embeds the trace get a "failed at"
+        // pointer at the top of the card.
+        final combined = '${t.error ?? ''}\n${t.stackTrace ?? ''}';
+        final userFrame = _firstUserFrame(combined);
+
         reasonBuf.writeln('<div class="$cls">');
-        reasonBuf.writeln(
-            '<div class="reason-label">${t.isBlocked ? 'BLOCKED — REASON' : 'FAILURE — REASON'}</div>');
+        reasonBuf.writeln('<div class="reason-label">$label</div>');
+        if (userFrame != null) {
+          reasonBuf.writeln('<div class="reason-where">'
+              '<span class="reason-where-label">at</span> '
+              '<code>${_escapeHtml(userFrame)}</code>'
+              '</div>');
+        }
         reasonBuf.writeln(
             '<div class="reason-text">${_escapeHtml(t.error!)}</div>');
         if (t.stackTrace != null &&
             t.stackTrace!.trim().isNotEmpty &&
             t.stackTrace != t.error) {
-          reasonBuf.writeln('<details class="reason-trace">');
-          reasonBuf.writeln('<summary>Show stack trace</summary>');
-          reasonBuf.writeln('<pre>${_escapeHtml(t.stackTrace!)}</pre>');
-          reasonBuf.writeln('</details>');
+          reasonBuf.writeln('<div class="reason-trace-label">Stack trace</div>');
+          reasonBuf.writeln(
+              '<pre class="reason-trace-pre">${_renderTrace(t.stackTrace!)}</pre>');
         }
         reasonBuf.writeln('</div>');
       }
@@ -860,7 +959,7 @@ String generateHtml(TestReport report) {
   /* Failure / blocked reason block (per-test) */
   .reason-msg {
     background: #2d0a0a; border: 1px solid #450a0a; border-radius: 8px;
-    padding: 0.6rem 0.75rem; margin-bottom: 0.75rem;
+    padding: 0.65rem 0.8rem; margin-bottom: 0.75rem;
   }
   .reason-msg.blocked {
     background: #1f1402; border-color: #422006;
@@ -870,25 +969,49 @@ String generateHtml(TestReport report) {
     color: #fca5a5; margin-bottom: 0.35rem;
   }
   .reason-msg.blocked .reason-label { color: #fbbf24; }
+
+  /* "at <file>:<line>" pointer — the single most actionable thing on the card */
+  .reason-where {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.78rem; margin-bottom: 0.45rem;
+  }
+  .reason-where-label {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em;
+    color: #94a3b8; text-transform: uppercase;
+  }
+  .reason-where code {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.78rem; color: #fde68a;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 0.12rem 0.45rem; border-radius: 4px;
+    word-break: break-all;
+  }
+  .reason-msg:not(.blocked) .reason-where code { color: #fecaca; }
+
   .reason-text {
     font-family: 'Cascadia Code', 'Fira Code', monospace;
     font-size: 0.78rem; color: #fecaca; white-space: pre-wrap;
     word-break: break-word;
+    max-height: 260px; overflow-y: auto;
   }
   .reason-msg.blocked .reason-text { color: #fde68a; }
-  .reason-trace {
-    margin-top: 0.5rem; font-size: 0.72rem; color: #94a3b8;
+
+  .reason-trace-label {
+    margin-top: 0.65rem; margin-bottom: 0.3rem;
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em;
+    color: #94a3b8; text-transform: uppercase;
   }
-  .reason-trace summary { cursor: pointer; user-select: none; }
-  .reason-trace summary:hover { color: #cbd5e1; }
-  .reason-trace pre {
-    margin-top: 0.4rem; padding: 0.5rem 0.6rem;
+  .reason-trace-pre {
+    padding: 0.55rem 0.7rem;
     background: #0f172a; border: 1px solid #1e293b; border-radius: 6px;
     font-family: 'Cascadia Code', 'Fira Code', monospace;
-    font-size: 0.72rem; color: #cbd5e1;
+    font-size: 0.72rem; color: #94a3b8;
     white-space: pre-wrap; word-break: break-word;
-    max-height: 220px; overflow-y: auto;
+    max-height: 260px; overflow-y: auto;
   }
+  /* User-code frames inside the trace pop out from grey Flutter frames */
+  .trace-user { color: #fde68a; font-weight: 600; }
+  .reason-msg:not(.blocked) .trace-user { color: #fecaca; }
 
   /* Suite-level error banner — explains a wave of "did not complete" tests */
   .suite-error-banner {
@@ -911,20 +1034,11 @@ String generateHtml(TestReport report) {
     font-family: 'Cascadia Code', 'Fira Code', monospace;
     font-size: 0.78rem; color: #fda4af; white-space: pre-wrap;
     word-break: break-word;
-  }
-  .suite-error-trace {
-    margin-top: 0.6rem; font-size: 0.72rem; color: #94a3b8;
-  }
-  .suite-error-trace summary { cursor: pointer; user-select: none; }
-  .suite-error-trace summary:hover { color: #cbd5e1; }
-  .suite-error-trace pre {
-    margin-top: 0.4rem; padding: 0.6rem 0.75rem;
-    background: #0f172a; border: 1px solid #1e293b; border-radius: 6px;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
-    font-size: 0.72rem; color: #cbd5e1;
-    white-space: pre-wrap; word-break: break-word;
     max-height: 280px; overflow-y: auto;
   }
+  .suite-error-banner .reason-where { margin-top: 0.1rem; }
+  .suite-error-banner .reason-where code { color: #fde68a; }
+  .suite-error-banner .reason-trace-pre { color: #cbd5e1; max-height: 320px; }
 
   /* Gallery */
   .gallery {
@@ -1392,7 +1506,12 @@ Future<void> main(List<String> args) async {
       return a.name.compareTo(b.name);
     });
 
-  final report = TestReport(tests: sortedTests, generatedAt: DateTime.now());
+  final report = TestReport(
+    tests: sortedTests,
+    generatedAt: DateTime.now(),
+    suiteError: freshReport.suiteError,
+    suiteStackTrace: freshReport.suiteStackTrace,
+  );
 
   // Persist the merged state for the next run.
   await Directory(dashboardDir).create(recursive: true);
