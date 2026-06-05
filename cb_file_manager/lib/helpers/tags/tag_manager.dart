@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:path_provider/path_provider.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
@@ -1196,7 +1198,9 @@ class TagManager {
     }
   }
 
-  /// Deletes a tag from all files in the system
+  /// Deletes a tag from all files in the system.
+  ///
+  /// Also cleans up any associated hierarchy relationships and thumbnail data.
   static Future<void> deleteTagGlobally(String tag) async {
     final instance = TagManager.instance;
 
@@ -1212,6 +1216,24 @@ class TagManager {
 
       // Also remove from standalone tags if present
       await removeStandaloneTag(tag);
+
+      // Clean up hierarchy relationships (parent and child)
+      try {
+        final TagHierarchyManager hierarchyManager =
+            TagHierarchyManager.instance;
+        await hierarchyManager.removeAllForTag(tag);
+      } catch (_) {
+        // Non-fatal: hierarchy cleanup is best-effort
+      }
+
+      // Clean up thumbnail
+      try {
+        final TagThumbnailManager thumbnailManager =
+            TagThumbnailManager.instance;
+        await thumbnailManager.deleteThumbnail(tag);
+      } catch (_) {
+        // Non-fatal: thumbnail cleanup is best-effort
+      }
 
       // Clear cache to ensure fresh data
       clearCache();

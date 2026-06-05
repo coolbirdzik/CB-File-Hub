@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'window_startup_payload.dart';
+import 'windows_explorer_drag_drop_service.dart';
 
 enum WindowsNativeTabDragResult {
   moved,
@@ -29,6 +30,10 @@ class WindowsNativeTabDragDropService {
     _initialized = true;
 
     _channel.setMethodCallHandler((call) async {
+      if (WindowsExplorerDragDropService.handleNativeMethodCall(call)) {
+        return;
+      }
+
       if (call.method == 'onNativeTabDragHover') {
         final arg = call.arguments;
         if (arg is bool) {

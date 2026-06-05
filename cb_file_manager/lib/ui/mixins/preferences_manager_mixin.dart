@@ -167,10 +167,10 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// Toggle between view modes (list -> grid -> gridPreview -> details -> columns -> list)
+  /// Toggle between view modes
+  /// (list -> grid -> gridPreview (desktop) -> details -> columns (desktop) -> tree -> list)
   void toggleViewMode() {
     setState(() {
-      // Cycle: list -> grid -> gridPreview (desktop) -> details -> columns (desktop) -> list
       if (viewMode == ViewMode.list) {
         viewMode = ViewMode.grid;
       } else if (viewMode == ViewMode.grid) {
@@ -178,8 +178,11 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       } else if (viewMode == ViewMode.gridPreview) {
         viewMode = ViewMode.details;
       } else if (viewMode == ViewMode.details) {
-        viewMode = isDesktopPlatform ? ViewMode.columns : ViewMode.list;
+        viewMode = isDesktopPlatform ? ViewMode.columns : ViewMode.tree;
+      } else if (viewMode == ViewMode.columns) {
+        viewMode = ViewMode.tree;
       } else {
+        // tree (or any unhandled) → list
         viewMode = ViewMode.list;
       }
     });

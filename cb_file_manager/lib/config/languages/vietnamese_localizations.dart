@@ -171,6 +171,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get viewModeColumns => 'Cột';
 
   @override
+  String get viewModeTree => 'Cây';
+
+  @override
   String get previewPaneTitle => 'Xem trước';
 
   @override
@@ -305,6 +308,9 @@ class VietnameseLocalizations implements AppLocalizations {
   // More options menu
   @override
   String get selectMultipleFiles => 'Chọn nhiều file';
+
+  @override
+  String get selectMultipleTags => 'Chọn nhiều thẻ';
 
   @override
   String get viewImageGallery => 'Xem thư viện ảnh';
@@ -614,6 +620,8 @@ class VietnameseLocalizations implements AppLocalizations {
   String get listViewMode => 'Chế độ danh sách';
   @override
   String get gridViewMode => 'Chế độ lưới';
+  @override
+  String get treeViewMode => 'Chế độ cây';
   @override
   String get previousPage => 'Trang trước';
   @override

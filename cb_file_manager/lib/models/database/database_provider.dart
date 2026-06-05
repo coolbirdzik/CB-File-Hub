@@ -104,6 +104,46 @@ abstract class IDatabaseProvider {
   /// Count unique files that have at least one tag.
   /// Uses a single SQL query (COUNT DISTINCT) instead of loading all file paths.
   Future<int> countUniqueTaggedFiles();
+
+  // ---------------------------------------------------------------------------
+  // Tag Metadata (Thumbnails)
+  // ---------------------------------------------------------------------------
+
+  /// Set thumbnail path for a tag (by normalized tag name)
+  Future<bool> setTagThumbnail(String normalizedTag, String thumbnailPath);
+
+  /// Get thumbnail path for a tag (by normalized tag name)
+  Future<String?> getTagThumbnail(String normalizedTag);
+
+  /// Delete thumbnail for a tag
+  Future<bool> deleteTagThumbnail(String normalizedTag);
+
+  /// Get all tag thumbnails as a map of normalizedTag → thumbnailPath
+  Future<Map<String, String>> getAllTagThumbnails();
+
+  // ---------------------------------------------------------------------------
+  // Tag Hierarchy (Parent-Child relationships)
+  // ---------------------------------------------------------------------------
+
+  /// Add a parent-child relationship between two tags
+  Future<bool> setTagHierarchy(
+      String parentNormalizedTag, String childNormalizedTag);
+
+  /// Remove a parent-child relationship between two tags
+  Future<bool> removeTagHierarchy(
+      String parentNormalizedTag, String childNormalizedTag);
+
+  /// Get all child tags of a parent tag
+  Future<List<String>> getChildTags(String parentNormalizedTag);
+
+  /// Get all parent tags of a child tag
+  Future<List<String>> getParentTags(String childNormalizedTag);
+
+  /// Get the full hierarchy as a map of parent → [children]
+  Future<Map<String, List<String>>> getAllTagHierarchy();
+
+  /// Remove all hierarchy relationships involving a tag (as parent or child)
+  Future<bool> removeAllHierarchyForTag(String normalizedTag);
 }
 
 /// Factory for creating database providers

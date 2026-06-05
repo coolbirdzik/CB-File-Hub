@@ -82,6 +82,7 @@ abstract class AppLocalizations {
   String get viewModeDetails;
   String get viewModeGridPreview;
   String get viewModeColumns;
+  String get viewModeTree;
 
   // Preview pane
   String get previewPaneTitle;
@@ -137,6 +138,7 @@ abstract class AppLocalizations {
 
   // More options menu
   String get selectMultipleFiles;
+  String get selectMultipleTags;
   String get viewImageGallery;
   String get viewVideoGallery;
 
@@ -307,6 +309,7 @@ abstract class AppLocalizations {
   String get sortByPopular;
   String get listViewMode;
   String get gridViewMode;
+  String get treeViewMode;
   String get previousPage;
   String get nextPage;
   String get page;

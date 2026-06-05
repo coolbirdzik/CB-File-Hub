@@ -131,6 +131,11 @@ class NavigationController {
     debugPrint(
         'Navigation history length: ${updatedTab.navigationHistory.length}');
 
+    // Commit the visible path before the directory scan starts. The listing
+    // can take time for large or slow folders, but the address bar and tab
+    // should reflect the user's navigation immediately.
+    onPathChanged(path);
+
     // Update the folder list to show the new path
     folderListBloc.add(FolderListLoad(path));
 
@@ -149,9 +154,6 @@ class NavigationController {
       final tabName = lastPart.isEmpty ? l10n.rootFolder : lastPart;
       tabManagerBloc.add(UpdateTabName(tabId, tabName));
     }
-
-    // Notify path changed
-    onPathChanged(path);
   }
 
   /// Handle path submission when user manually edits the path
@@ -367,6 +369,11 @@ class NavigationController {
       folderListBloc.add(const ClearSearchAndFilters());
     }
 
+    // Commit the visible path before the directory scan starts. This keeps
+    // external tab path changes, history navigation, and split-pane navigation
+    // responsive even when folder enumeration is slow.
+    onPathChanged(newPath);
+
     // Load the folder contents with the new path
     folderListBloc.add(FolderListLoad(newPath));
 
@@ -374,9 +381,6 @@ class NavigationController {
 
     // Save as last accessed folder
     onSaveLastAccessedFolder();
-
-    // Notify path changed
-    onPathChanged(newPath);
   }
 
   /// Handle result from gallery screens (Video/Image Gallery)

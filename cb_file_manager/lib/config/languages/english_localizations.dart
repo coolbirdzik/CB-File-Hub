@@ -172,6 +172,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewModeColumns => 'Columns';
 
   @override
+  String get viewModeTree => 'Tree';
+
+  @override
   String get previewPaneTitle => 'Preview';
 
   @override
@@ -305,6 +308,9 @@ class EnglishLocalizations implements AppLocalizations {
   // More options menu
   @override
   String get selectMultipleFiles => 'Select multiple files';
+
+  @override
+  String get selectMultipleTags => 'Select multiple tags';
 
   @override
   String get viewImageGallery => 'View image gallery';
@@ -618,6 +624,8 @@ class EnglishLocalizations implements AppLocalizations {
   String get listViewMode => 'List Mode';
   @override
   String get gridViewMode => 'Grid Mode';
+  @override
+  String get treeViewMode => 'Tree Mode';
   @override
   String get previousPage => 'Previous Page';
   @override

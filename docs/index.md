@@ -24,6 +24,7 @@
   - `ui-patterns/01-operation-progress.md`
   - `ui-patterns/02-file-folder-listing.md`
   - `ui-patterns/03-skeleton-loading.md`
+  - `ui-patterns/04-tree-view.md` — Generic tree view component + tag/file/network integrations
 - **Coding Rules**
   - `coding-rules/01-theme-styling-guide.md`
   - `coding-rules/02-i18n-internationalization-guide.md`

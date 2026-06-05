@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/helpers/tags/batch_tag_manager.dart';
@@ -103,15 +108,28 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   String _draftTagText = '';
   bool _isLoading = true;
   bool _isSaving = false;
+  Timer? _debounceTimer;
+  final _thumbnailManager = TagThumbnailManager.instance;
+  final _hierarchyManager = TagHierarchyManager.instance;
 
   @override
   void initState() {
     super.initState();
     _loadTags();
+    _initManagers();
+  }
+
+  Future<void> _initManagers() async {
+    await Future.wait([
+      _thumbnailManager.initialize(),
+      _hierarchyManager.initialize(),
+    ]);
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -147,27 +165,84 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   }
 
   Future<void> _updateTagSuggestions(String text) async {
+    _debounceTimer?.cancel();
     final query = text.trim();
+
     if (query.isEmpty) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _tagSuggestions = <String>[];
       });
       return;
     }
 
-    final suggestions = await TagManager.instance.searchTags(query);
-    if (!mounted) {
-      return;
-    }
+    // Debounce 100ms
+    _debounceTimer = Timer(const Duration(milliseconds: 100), () async {
+      // Handle parent:child format — show children of the parent
+      if (query.contains(':')) {
+        final colonIndex = query.indexOf(':');
+        final parentPart = query.substring(0, colonIndex).trim();
+        final childPart = query.substring(colonIndex + 1).trim();
 
-    setState(() {
-      _tagSuggestions = suggestions
+        if (parentPart.isNotEmpty) {
+          final children = _hierarchyManager.getChildren(parentPart);
+          List<String> filtered;
+
+          if (childPart.isEmpty) {
+            // Show all children of this parent
+            filtered = children
+                .where((c) => !_containsTag(c))
+                .take(10)
+                .toList(growable: false);
+          } else {
+            // Handle comma-separated: show remaining children
+            final existingChildren = childPart
+                .split(',')
+                .map((c) => c.trim().toLowerCase())
+                .where((c) => c.isNotEmpty)
+                .toSet();
+
+            // Get the last partial entry (what user is currently typing)
+            final parts = childPart.split(',');
+            final currentPart = parts.last.trim().toLowerCase();
+
+            filtered = children.where((c) {
+              final normalized = c.toLowerCase();
+              return !existingChildren.contains(normalized) &&
+                  !_containsTag(c) &&
+                  (currentPart.isEmpty || normalized.contains(currentPart));
+            }).take(10).toList(growable: false);
+          }
+
+          if (!mounted) return;
+          setState(() {
+            _tagSuggestions = filtered;
+          });
+          return;
+        }
+      }
+
+      // Regular search with hierarchy-aware ordering
+      final suggestions = await TagManager.instance.searchTags(query);
+      if (!mounted) return;
+
+      // Sort: parents first, then children (with context), then standalone
+      final sorted = suggestions
           .where((tag) => !_containsTag(tag))
-          .take(6)
-          .toList(growable: false);
+          .toList();
+
+      // Move parents to front
+      sorted.sort((a, b) {
+        final aIsParent = _hierarchyManager.isParent(a);
+        final bIsParent = _hierarchyManager.isParent(b);
+        if (aIsParent && !bIsParent) return -1;
+        if (!aIsParent && bIsParent) return 1;
+        return a.toLowerCase().compareTo(b.toLowerCase());
+      });
+
+      setState(() {
+        _tagSuggestions = sorted.take(10).toList(growable: false);
+      });
     });
   }
 
@@ -180,7 +255,18 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
   void _addTag(String rawTag) {
     final tag = rawTag.trim();
-    if (tag.isEmpty || _containsTag(tag)) {
+    if (tag.isEmpty) {
+      _draftTagText = '';
+      return;
+    }
+
+    // Handle parent:child format
+    if (tag.contains(':')) {
+      _addHierarchyTags(tag);
+      return;
+    }
+
+    if (_containsTag(tag)) {
       _draftTagText = '';
       return;
     }
@@ -192,6 +278,72 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     });
     AppLogger.info('[ManageTags][Dialog] Tag added',
         error: 'filePath=${widget.filePath} tag=$tag');
+  }
+
+  /// Parse and add tags in parent:child format.
+  /// Creates hierarchy relationships and adds all tags to the selection.
+  void _addHierarchyTags(String input) {
+    final colonIndex = input.indexOf(':');
+    final parentName = input.substring(0, colonIndex).trim();
+    final childrenPart = input.substring(colonIndex + 1).trim();
+
+    if (parentName.isEmpty || childrenPart.isEmpty) return;
+
+    final childNames = childrenPart
+        .split(',')
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+
+    if (childNames.isEmpty) return;
+
+    // Add parent tag if not already selected
+    final tagsToAdd = <String>[];
+    if (!_containsTag(parentName)) {
+      tagsToAdd.add(parentName);
+    }
+
+    // Add child tags
+    for (final child in childNames) {
+      if (!_containsTag(child)) {
+        tagsToAdd.add(child);
+      }
+    }
+
+    if (tagsToAdd.isEmpty) {
+      _draftTagText = '';
+      return;
+    }
+
+    setState(() {
+      _selectedTags = <String>[..._selectedTags, ...tagsToAdd];
+      _draftTagText = '';
+      _tagSuggestions = <String>[];
+    });
+
+    // Create hierarchy relationships asynchronously (fire and forget)
+    _createHierarchyRelationships(parentName, childNames);
+
+    AppLogger.info('[ManageTags][Dialog] Hierarchy tags added',
+        error:
+            'filePath=${widget.filePath} parent=$parentName children=$childNames');
+  }
+
+  Future<void> _createHierarchyRelationships(
+      String parentName, List<String> childNames) async {
+    // Ensure parent tag exists in standalone
+    await TagManager.addStandaloneTag(parentName);
+
+    for (final childName in childNames) {
+      await TagManager.addStandaloneTag(childName);
+      final ok = await _hierarchyManager.addChild(parentName, childName);
+      if (!ok) {
+        AppLogger.warning(
+          '[ManageTags][Dialog] Failed to create hierarchy',
+          error: 'parent=$parentName child=$childName',
+        );
+      }
+    }
   }
 
   void _removeTag(String tag) {
@@ -276,7 +428,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     return _buildSectionCard(
       icon: PhosphorIconsLight.pencilSimpleLine,
       title: l10n.addTag,
-      subtitle: 'Type a new tag or pick from the library below',
+      subtitle: 'Type a tag, or use parent:child for hierarchy',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -284,6 +436,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
             values: _selectedTags,
             suggestions: _tagSuggestions,
             onSuggestionSelected: _addTag,
+            suggestionBuilder: _buildSuggestionItem,
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -307,7 +460,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                 ),
               ),
               labelText: l10n.tagName,
-              hintText: l10n.enterTagName,
+              hintText: '${l10n.enterTagName} (e.g. Actress:Hung)',
               prefixIcon: const Icon(PhosphorIconsLight.tag),
               filled: true,
               fillColor: isDarkMode
@@ -335,6 +488,107 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Custom suggestion item with thumbnail (40x40), hierarchy context, and
+  /// highlighted matching text.
+  Widget _buildSuggestionItem(
+      BuildContext context, String suggestion, bool isHighlighted, Color tagColor) {
+    final theme = Theme.of(context);
+    final thumbnailPath = _thumbnailManager.getThumbnailSync(suggestion);
+    final parents = _hierarchyManager.getParents(suggestion);
+    final children = _hierarchyManager.getChildren(suggestion);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        children: [
+          // Thumbnail or tag icon
+          if (thumbnailPath != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(
+                File(thumbnailPath),
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: tagColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(PhosphorIconsLight.tag, size: 18, color: tagColor),
+                ),
+              ),
+            )
+          else
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: tagColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                _hierarchyManager.isParent(suggestion)
+                    ? PhosphorIconsLight.treeStructure
+                    : PhosphorIconsLight.tag,
+                size: 18,
+                color: tagColor,
+              ),
+            ),
+          const SizedBox(width: 10),
+          // Tag name + hierarchy context
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  suggestion,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w400,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                if (parents.isNotEmpty)
+                  Text(
+                    'Parent: ${parents.join(", ")}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.7),
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (children.isNotEmpty)
+                  Text(
+                    '${children.length} child${children.length > 1 ? "ren" : ""}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.7),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          if (isHighlighted)
+            Icon(
+              PhosphorIconsLight.arrowRight,
+              size: 14,
+              color: theme.colorScheme.primary,
+            ),
         ],
       ),
     );

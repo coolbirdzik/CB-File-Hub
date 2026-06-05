@@ -568,6 +568,77 @@ class DatabaseManager implements IDatabaseProvider {
     return _provider.countUniqueTaggedFiles();
   }
 
+  // ---------------------------------------------------------------------------
+  // Tag Metadata (Thumbnails)
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<bool> setTagThumbnail(
+      String normalizedTag, String thumbnailPath) async {
+    await _ensureInitialized();
+    return _provider.setTagThumbnail(normalizedTag, thumbnailPath);
+  }
+
+  @override
+  Future<String?> getTagThumbnail(String normalizedTag) async {
+    await _ensureInitialized();
+    return _provider.getTagThumbnail(normalizedTag);
+  }
+
+  @override
+  Future<bool> deleteTagThumbnail(String normalizedTag) async {
+    await _ensureInitialized();
+    return _provider.deleteTagThumbnail(normalizedTag);
+  }
+
+  @override
+  Future<Map<String, String>> getAllTagThumbnails() async {
+    await _ensureInitialized();
+    return _provider.getAllTagThumbnails();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tag Hierarchy (Parent-Child relationships)
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<bool> setTagHierarchy(
+      String parentNormalizedTag, String childNormalizedTag) async {
+    await _ensureInitialized();
+    return _provider.setTagHierarchy(parentNormalizedTag, childNormalizedTag);
+  }
+
+  @override
+  Future<bool> removeTagHierarchy(
+      String parentNormalizedTag, String childNormalizedTag) async {
+    await _ensureInitialized();
+    return _provider.removeTagHierarchy(parentNormalizedTag, childNormalizedTag);
+  }
+
+  @override
+  Future<List<String>> getChildTags(String parentNormalizedTag) async {
+    await _ensureInitialized();
+    return _provider.getChildTags(parentNormalizedTag);
+  }
+
+  @override
+  Future<List<String>> getParentTags(String childNormalizedTag) async {
+    await _ensureInitialized();
+    return _provider.getParentTags(childNormalizedTag);
+  }
+
+  @override
+  Future<Map<String, List<String>>> getAllTagHierarchy() async {
+    await _ensureInitialized();
+    return _provider.getAllTagHierarchy();
+  }
+
+  @override
+  Future<bool> removeAllHierarchyForTag(String normalizedTag) async {
+    await _ensureInitialized();
+    return _provider.removeAllHierarchyForTag(normalizedTag);
+  }
+
   /// Returns the shared SQLite database instance.
   Future<Database> getDatabase() async {
     if (!_isInitialized) {

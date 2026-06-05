@@ -160,7 +160,24 @@ class FileNavigationBloc
       return;
     }
 
-    emit(state.copyWith(isLoading: true, currentPath: Directory(event.path)));
+    emit(state.copyWith(
+      isLoading: true,
+      isRefreshing: false,
+      error: null,
+      currentPath: Directory(event.path),
+      folders: const [],
+      files: const [],
+      filteredFiles: const [],
+      searchResults: const [],
+      hasMoreSearchResults: false,
+      isLoadingMoreSearchResults: false,
+      searchResultsTotal: null,
+      currentFilter: null,
+      currentSearchQuery: null,
+      isSearchByName: false,
+      searchRecursive: false,
+      fileStatsCache: const {},
+    ));
 
     // Gate: pause thumbnail generation while we scan/sort the file list.
     // Thumbnails will start AFTER the listing is emitted to the UI.

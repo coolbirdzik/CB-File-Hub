@@ -1,4 +1,5 @@
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 import 'package:flutter/material.dart';
 
 class BrowserLikeCollectionView<T> extends StatelessWidget {
@@ -18,6 +19,27 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   final Widget Function(BuildContext itemContext, T item) listItemBuilder;
   final Widget Function(BuildContext itemContext, T item) gridItemBuilder;
   final Widget Function(BuildContext itemContext, T item) detailsItemBuilder;
+
+  /// Optional row builder used for [ViewMode.tree]. Receives the tree
+  /// node so callers can render whatever depth-aware UI they want
+  /// (icon, name, badge, etc.). The shell handles the indent column +
+  /// expand chevron itself.
+  final Widget Function(
+    BuildContext itemContext,
+    TreeNode<T> node,
+    int depth,
+  )? treeItemBuilder;
+
+  /// Async loader called the first time a folder node is expanded.
+  /// Result is cached on the node.
+  final Future<List<TreeNode<T>>> Function(TreeNode<T> node)?
+      treeChildrenLoader;
+
+  /// Per-item flag indicating whether the item itself is a leaf
+  /// (e.g. a file). Used to decide whether the chevron is shown and
+  /// whether the children loader should be called. Defaults to `false`
+  /// (everything expandable) when omitted.
+  final bool Function(T item)? treeIsLeaf;
   final Widget? detailsHeader;
   final Widget Function(BuildContext context, int index)?
       detailsSeparatorBuilder;
@@ -50,6 +72,9 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
     required this.listItemBuilder,
     required this.gridItemBuilder,
     required this.detailsItemBuilder,
+    this.treeItemBuilder,
+    this.treeChildrenLoader,
+    this.treeIsLeaf,
     required this.dragSelectionOverlay,
     this.onDragStart,
     this.onDragUpdate,
@@ -185,6 +210,17 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       );
     }
 
+    if (viewMode == ViewMode.tree && treeItemBuilder != null) {
+      return _BrowserTreeView<T>(
+        items: items,
+        itemIdentity: itemIdentity,
+        treeIsLeaf: treeIsLeaf,
+        treeChildrenLoader: treeChildrenLoader,
+        treeItemBuilder: treeItemBuilder!,
+        scrollController: scrollController,
+      );
+    }
+
     return ListView.builder(
       controller: scrollController,
       padding: padding,
@@ -197,6 +233,81 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       findChildIndexCallback: findIndex,
       itemBuilder: (context, index) =>
           buildItem(context, index, listItemBuilder),
+    );
+  }
+}
+
+class _BrowserTreeView<T> extends StatefulWidget {
+  final List<T> items;
+  final String Function(T item) itemIdentity;
+  final bool Function(T item)? treeIsLeaf;
+  final Future<List<TreeNode<T>>> Function(TreeNode<T> node)?
+      treeChildrenLoader;
+  final Widget Function(
+    BuildContext itemContext,
+    TreeNode<T> node,
+    int depth,
+  ) treeItemBuilder;
+  final ScrollController? scrollController;
+
+  const _BrowserTreeView({
+    Key? key,
+    required this.items,
+    required this.itemIdentity,
+    required this.treeIsLeaf,
+    required this.treeChildrenLoader,
+    required this.treeItemBuilder,
+    required this.scrollController,
+  }) : super(key: key);
+
+  @override
+  State<_BrowserTreeView<T>> createState() => _BrowserTreeViewState<T>();
+}
+
+class _BrowserTreeViewState<T> extends State<_BrowserTreeView<T>> {
+  List<TreeNode<T>> _roots = const [];
+  String? _signature;
+
+  @override
+  void didUpdateWidget(covariant _BrowserTreeView<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _maybeRebuildRoots();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _maybeRebuildRoots();
+  }
+
+  /// Rebuild root nodes only when the input list actually changes
+  /// (cheap signature: count + last id). This preserves expansion
+  /// state across rebuilds caused by selection changes etc.
+  void _maybeRebuildRoots() {
+    final items = widget.items;
+    final last = items.isEmpty ? '' : widget.itemIdentity(items.last);
+    final sig = '${items.length}|$last';
+    if (sig == _signature && _roots.isNotEmpty) return;
+    _signature = sig;
+    _roots = items
+        .map(
+          (item) => TreeNode<T>(
+            id: widget.itemIdentity(item),
+            data: item,
+            isLeaf: widget.treeIsLeaf?.call(item) ?? false,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GenericTreeView<T>(
+      roots: _roots,
+      itemExtent: 30,
+      childrenLoader: widget.treeChildrenLoader,
+      itemBuilder: widget.treeItemBuilder,
+      scrollController: widget.scrollController,
     );
   }
 }

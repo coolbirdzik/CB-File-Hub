@@ -18,6 +18,8 @@ class SharedActionBar {
     IconData icon,
     SortOption currentOption,
   ) {
+    final theme = Theme.of(context);
+    final isActive = option == currentOption;
     return PopupMenuItem<SortOption>(
       value: option,
       child: Row(
@@ -25,28 +27,49 @@ class SharedActionBar {
           Icon(
             icon,
             size: 20,
-            color: option == currentOption
-                ? Theme.of(context).colorScheme.primary
-                : null,
+            color: isActive ? theme.colorScheme.primary : null,
           ),
           const SizedBox(width: 10),
           Text(
             label,
             style: TextStyle(
-              fontWeight:
-                  option == currentOption ? FontWeight.bold : FontWeight.normal,
-              color: option == currentOption
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              color: isActive ? theme.colorScheme.primary : null,
             ),
           ),
           const Spacer(),
-          if (option == currentOption)
-            Icon(PhosphorIconsLight.check,
-                color: Theme.of(context).colorScheme.primary, size: 20),
+          if (isActive)
+            Icon(
+              _isAscendingSortOption(option)
+                  ? PhosphorIconsLight.arrowUp
+                  : PhosphorIconsLight.arrowDown,
+              color: theme.colorScheme.primary,
+              size: 18,
+            ),
         ],
       ),
     );
+  }
+
+  static bool _isAscendingSortOption(SortOption option) {
+    switch (option) {
+      case SortOption.nameAsc:
+      case SortOption.dateAsc:
+      case SortOption.sizeAsc:
+      case SortOption.typeAsc:
+      case SortOption.dateCreatedAsc:
+      case SortOption.extensionAsc:
+      case SortOption.attributesAsc:
+        return true;
+      case SortOption.nameDesc:
+      case SortOption.dateDesc:
+      case SortOption.sizeDesc:
+      case SortOption.typeDesc:
+      case SortOption.dateCreatedDesc:
+      case SortOption.extensionDesc:
+      case SortOption.attributesDesc:
+        return false;
+    }
   }
 
   /// Shows grid size selector as a modal bottom sheet (for mobile callers).
@@ -571,7 +594,7 @@ class SharedActionBar {
     // Add sort button
     actions.add(
       PopupMenuButton<SortOption>(
-        icon: const Icon(PhosphorIconsLight.funnelSimple),
+        icon: const Icon(PhosphorIconsLight.sortAscending),
         tooltip: l10n.sortByTooltip,
         offset: const Offset(0, 50),
         initialValue: currentSortOption,
@@ -878,6 +901,36 @@ class SharedActionBar {
                 ],
               ),
             ),
+          PopupMenuItem<ViewMode>(
+            value: ViewMode.tree,
+            child: Row(
+              children: [
+                Icon(
+                  PhosphorIconsLight.treeView,
+                  size: 20,
+                  color: viewMode == ViewMode.tree
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  l10n.viewModeTree,
+                  style: TextStyle(
+                    fontWeight: viewMode == ViewMode.tree
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: viewMode == ViewMode.tree
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                ),
+                const Spacer(),
+                if (viewMode == ViewMode.tree)
+                  Icon(PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary, size: 20),
+              ],
+            ),
+          ),
         ],
         onSelected: (ViewMode selectedMode) {
           if (selectedMode != viewMode) {

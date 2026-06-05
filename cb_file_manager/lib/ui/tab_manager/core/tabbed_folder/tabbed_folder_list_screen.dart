@@ -6,6 +6,8 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
+import 'package:cb_file_manager/services/file_drag_drop/file_drag_drop_move_service.dart';
+import 'package:cb_file_manager/services/windowing/windows_explorer_drag_drop_service.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_display_state.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
@@ -199,6 +201,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   // Flag to track if there are background thumbnail tasks
   bool _hasPendingThumbnails = false;
   StreamSubscription<int>? _pendingTasksSubscription;
+  StreamSubscription<WindowsExplorerFileDropEvent>? _fileDropSubscription;
 
   // Add a method to check if there are any video/image files in the current state
   bool _hasVideoOrImageFiles(FolderListState state) {
@@ -344,6 +347,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       folderListBloc: _folderListBloc,
       selectionBloc: _selectionBloc,
     );
+    _fileDropSubscription =
+        WindowsExplorerDragDropService.fileDrops.listen(_handleNativeFileDrop);
 
     _saveLastAccessedFolder();
 
@@ -439,6 +444,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     FileBrowserHelper.setInlineRenameController(null);
     FileBrowserHelper.setAfterFileCreatedCallback(null);
     _pendingTasksSubscription?.cancel();
+    _fileDropSubscription?.cancel();
 
     // Remove mobile actions controller
     if (Platform.isAndroid || Platform.isIOS) {
@@ -507,6 +513,75 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _clearSelection() {
     _selectionCoordinator.clearSelection();
+  }
+
+  void _startFileDrag(List<String> paths) {
+    if (!Platform.isWindows || paths.isEmpty) return;
+    WindowsExplorerDragDropService.startFileDrag(paths).then((result) {
+      if (!mounted) return;
+      if (result == WindowsExplorerDragResult.moved && !_isDrivesMode()) {
+        _folderListBloc.add(FolderListRefresh(_currentPath));
+        _selectionBloc.add(ClearSelection());
+      }
+    });
+  }
+
+  Future<void> _handleNativeFileDrop(
+    WindowsExplorerFileDropEvent event,
+  ) async {
+    if (!mounted || !Platform.isWindows) return;
+    if (context.read<TabManagerBloc>().state.activeTabId != widget.tabId) {
+      return;
+    }
+    if (_currentPath.startsWith('#') || _isDrivesMode()) return;
+
+    final folderPaths = _folderListBloc.state.folders
+        .whereType<Directory>()
+        .map((folder) => folder.path)
+        .toSet();
+    final hitFolder = _dragSelectionController.hitTestItem(
+      event.globalPosition,
+      allowedPaths: folderPaths,
+    );
+    await _moveDroppedItemsToFolder(
+      event.paths,
+      hitFolder ?? _currentPath,
+    );
+  }
+
+  Future<void> _moveDroppedItemsToFolder(
+    List<String> sources,
+    String destinationFolder,
+  ) async {
+    final rejection = await FileDragDropMoveService.move(
+      sources: sources,
+      destination: destinationFolder,
+    );
+    if (!mounted) return;
+
+    switch (rejection) {
+      case FileDragDropMoveRejection.none:
+        _selectionBloc.add(ClearSelection());
+        _folderListBloc.add(FolderListRefresh(_currentPath));
+        AppToast.success(context, 'Moved ${sources.length} item(s)');
+        return;
+      case FileDragDropMoveRejection.sameParent:
+        return;
+      case FileDragDropMoveRejection.selfDrop:
+      case FileDragDropMoveRejection.descendantDrop:
+        AppToast.warning(context, 'Cannot move a folder into itself');
+        return;
+      case FileDragDropMoveRejection.nonLocalPath:
+        AppToast.warning(context, 'Drag and drop supports local paths only');
+        return;
+      case FileDragDropMoveRejection.destinationMissing:
+        AppToast.warning(context, 'Destination folder is not available');
+        return;
+      case FileDragDropMoveRejection.empty:
+      case FileDragDropMoveRejection.moveFailed:
+        AppToast.error(context, 'Move failed');
+        return;
+    }
   }
 
   void _queueFocusAfterDelete(Set<String> deletedPaths, String? nextFocusPath) {
@@ -1718,6 +1793,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                     });
                   }
                 },
+                onStartFileDrag: _startFileDrag,
+                onMoveItemsToFolder: _moveDroppedItemsToFolder,
               ),
             );
           },

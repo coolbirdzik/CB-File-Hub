@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -760,6 +764,10 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
   late Animation<double> _scaleAnimation;
   late Animation<double> _elevationAnimation;
   late final TagColorManager _colorManager = TagColorManager.instance;
+  late final TagThumbnailManager _thumbnailManager =
+      TagThumbnailManager.instance;
+  late final TagHierarchyManager _hierarchyManager =
+      TagHierarchyManager.instance;
 
   @override
   void initState() {
@@ -854,23 +862,26 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        PhosphorIconsLight.tag,
-                        size: 14,
-                        color: iconColor,
-                      ),
+                      _buildLeadingWidget(iconColor, tagColor),
                       const SizedBox(width: 4),
                       Flexible(
-                        child: Text(
-                          widget.displayText,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 13,
-                            fontWeight: _isHovered
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.displayText,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 13,
+                                fontWeight: _isHovered
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            _buildHierarchyLabel(textColor),
+                          ],
                         ),
                       ),
                       if (_isHovered) ...[
@@ -906,5 +917,49 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
     final lighter = aLuminance > bLuminance ? aLuminance : bLuminance;
     final darker = aLuminance > bLuminance ? bLuminance : aLuminance;
     return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  /// Builds thumbnail image or tag icon as the leading widget.
+  Widget _buildLeadingWidget(Color iconColor, Color tagColor) {
+    final thumbnailPath = _thumbnailManager.getThumbnailSync(widget.tag);
+    if (thumbnailPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Image.file(
+          File(thumbnailPath),
+          width: 20,
+          height: 20,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(
+            PhosphorIconsLight.tag,
+            size: 14,
+            color: iconColor,
+          ),
+        ),
+      );
+    }
+    return Icon(
+      _hierarchyManager.isParent(widget.tag)
+          ? PhosphorIconsLight.treeStructure
+          : PhosphorIconsLight.tag,
+      size: 14,
+      color: iconColor,
+    );
+  }
+
+  /// Builds a small hierarchy label if tag has parents.
+  Widget _buildHierarchyLabel(Color textColor) {
+    final parents = _hierarchyManager.getParents(widget.tag);
+    if (parents.isEmpty) return const SizedBox.shrink();
+    return Text(
+      parents.join(', '),
+      style: TextStyle(
+        fontSize: 10,
+        color: textColor.withValues(alpha: 0.6),
+        fontStyle: FontStyle.italic,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }

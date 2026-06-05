@@ -65,6 +65,12 @@ class AppPathHelper {
   /// Directory for video thumbnails
   static Future<Directory> getVideoCacheDir() => _subDir('video_thumbnails');
 
+  /// Directory for tag thumbnails (extracted from video frames, etc.)
+  static Future<Directory> getTagThumbnailDir() => _subDir('tag_thumbnails');
+
+  /// Ensure and return a named sub-folder inside the root directory.
+  static Future<Directory> getSubDir(String name) => _subDir(name);
+
   /// Directory for photo thumbnails
   static Future<Directory> getPhotoCacheDir() => _subDir('photo_thumbnails');
 

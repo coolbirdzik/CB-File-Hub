@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'file_item.dart';
@@ -71,6 +72,9 @@ class FileView extends StatelessWidget {
   final GlobalKey Function(String path)? itemKeyForPath;
   final Function(ColumnVisibility)? onColumnVisibilityChanged;
   final TabbedFolderDragSelectionController? dragSelectionController;
+  final ValueChanged<List<String>>? onStartFileDrag;
+  final Future<void> Function(List<String> sources, String destinationFolder)?
+      onMoveItemsToFolder;
 
   const FileView({
     Key? key,
@@ -100,11 +104,79 @@ class FileView extends StatelessWidget {
     this.itemKeyForPath,
     this.onColumnVisibilityChanged,
     this.dragSelectionController,
+    this.onStartFileDrag,
+    this.onMoveItemsToFolder,
   }) : super(key: key);
 
   Function(String, {bool shiftSelect, bool ctrlSelect})
       get _folderSelectionHandler =>
           toggleFolderSelection ?? toggleFileSelection;
+
+  List<String> _dragPayloadFor(String itemPath) {
+    if (selectedFiles.contains(itemPath) && selectedFiles.isNotEmpty) {
+      return selectedFiles.toSet().toList(growable: false);
+    }
+    return <String>[itemPath];
+  }
+
+  Widget _wrapFileDragDrop({
+    required Widget child,
+    required bool isFolder,
+    required String itemPath,
+  }) {
+    if (!isDesktopMode) return child;
+
+    final payload = _dragPayloadFor(itemPath);
+    Widget wrapped = Draggable<List<String>>(
+      data: payload,
+      maxSimultaneousDrags: 1,
+      feedback: Material(
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text(
+              payload.length == 1
+                  ? p.basename(payload.first)
+                  : '${payload.length} items',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.55, child: child),
+      onDragStarted: () => onStartFileDrag?.call(payload),
+      child: child,
+    );
+
+    if (!isFolder || onMoveItemsToFolder == null) return wrapped;
+
+    return DragTarget<List<String>>(
+      onWillAcceptWithDetails: (details) =>
+          details.data.isNotEmpty && !details.data.contains(itemPath),
+      onAcceptWithDetails: (details) =>
+          onMoveItemsToFolder!(details.data, itemPath),
+      builder: (context, candidateData, rejectedData) {
+        if (candidateData.isEmpty) return wrapped;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: wrapped,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,35 +231,43 @@ class FileView extends StatelessWidget {
               : files[index - folders.length].path),
           child: RepaintBoundary(
             child: index < folders.length
-                ? FolderItem(
-                    key: ValueKey('folder-item-${folders[index].path}'),
-                    folder: folders[index],
-                    onTap: onFolderTap,
-                    isSelected: selectedFiles.contains(folders[index].path),
-                    toggleFolderSelection: _folderSelectionHandler,
-                    isDesktopMode: actualIsDesktop,
-                    lastSelectedPath: lastSelectedPath,
-                    clearSelectionMode: clearSelectionMode,
-                    showItemBackground: false,
+                ? _wrapFileDragDrop(
+                    isFolder: true,
+                    itemPath: folders[index].path,
+                    child: FolderItem(
+                      key: ValueKey('folder-item-${folders[index].path}'),
+                      folder: folders[index],
+                      onTap: onFolderTap,
+                      isSelected: selectedFiles.contains(folders[index].path),
+                      toggleFolderSelection: _folderSelectionHandler,
+                      isDesktopMode: actualIsDesktop,
+                      lastSelectedPath: lastSelectedPath,
+                      clearSelectionMode: clearSelectionMode,
+                      showItemBackground: false,
+                    ),
                   )
-                : FileItem(
-                    key: ValueKey(
-                        'file-item-${files[index - folders.length].path}'),
-                    file: files[index - folders.length],
-                    state: state,
-                    isSelectionMode: isSelectionMode,
-                    isSelected: selectedFiles
-                        .contains(files[index - folders.length].path),
-                    toggleFileSelection: toggleFileSelection,
-                    showDeleteTagDialog: showDeleteTagDialog,
-                    showAddTagToFileDialog: showAddTagToFileDialog,
-                    onDeleteFile: onDeleteFile,
-                    onDeleteFiles: onDeleteFiles,
-                    onFileTap: onFileTap,
-                    isDesktopMode: actualIsDesktop,
-                    lastSelectedPath: lastSelectedPath,
-                    showFileTags: showFileTags,
-                    showItemBackground: false,
+                : _wrapFileDragDrop(
+                    isFolder: false,
+                    itemPath: files[index - folders.length].path,
+                    child: FileItem(
+                      key: ValueKey(
+                          'file-item-${files[index - folders.length].path}'),
+                      file: files[index - folders.length],
+                      state: state,
+                      isSelectionMode: isSelectionMode,
+                      isSelected: selectedFiles
+                          .contains(files[index - folders.length].path),
+                      toggleFileSelection: toggleFileSelection,
+                      showDeleteTagDialog: showDeleteTagDialog,
+                      showAddTagToFileDialog: showAddTagToFileDialog,
+                      onDeleteFile: onDeleteFile,
+                      onDeleteFiles: onDeleteFiles,
+                      onFileTap: onFileTap,
+                      isDesktopMode: actualIsDesktop,
+                      lastSelectedPath: lastSelectedPath,
+                      showFileTags: showFileTags,
+                      showItemBackground: false,
+                    ),
                   ),
           ),
         );
@@ -477,36 +557,46 @@ class FileView extends StatelessWidget {
 
                       return RepaintBoundary(
                         child: index < folders.length
-                            ? _FolderDetailsItemWrapper(
-                                key: ValueKey(
-                                    'folder-detail-${folders[index].path}'),
-                                folder: folders[index],
-                                onTap: onFolderTap,
-                                isSelected:
-                                    selectedFiles.contains(folders[index].path),
-                                columnVisibility: columnVisibility,
-                                toggleFolderSelection: _folderSelectionHandler,
-                                isDesktopMode: isDesktopMode,
-                                lastSelectedPath: lastSelectedPath,
-                                clearSelectionMode: clearSelectionMode,
+                            ? _wrapFileDragDrop(
+                                isFolder: true,
+                                itemPath: folders[index].path,
+                                child: _FolderDetailsItemWrapper(
+                                  key: ValueKey(
+                                      'folder-detail-${folders[index].path}'),
+                                  folder: folders[index],
+                                  onTap: onFolderTap,
+                                  isSelected: selectedFiles
+                                      .contains(folders[index].path),
+                                  columnVisibility: columnVisibility,
+                                  toggleFolderSelection:
+                                      _folderSelectionHandler,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  clearSelectionMode: clearSelectionMode,
+                                ),
                               )
-                            : _FileDetailsItemWrapper(
-                                key: ValueKey(
-                                    'file-detail-${files[index - folders.length].path}'),
-                                file: files[index - folders.length],
-                                state: state,
-                                isSelected: selectedFiles.contains(
-                                    files[index - folders.length].path),
-                                columnVisibility: columnVisibility,
-                                toggleFileSelection: toggleFileSelection,
-                                showDeleteTagDialog: showDeleteTagDialog,
-                                showAddTagToFileDialog: showAddTagToFileDialog,
-                                onDeleteFile: onDeleteFile,
-                                onDeleteFiles: onDeleteFiles,
-                                onTap: onFileTap,
-                                isDesktopMode: isDesktopMode,
-                                lastSelectedPath: lastSelectedPath,
-                                showFileTags: showFileTags,
+                            : _wrapFileDragDrop(
+                                isFolder: false,
+                                itemPath: files[index - folders.length].path,
+                                child: _FileDetailsItemWrapper(
+                                  key: ValueKey(
+                                      'file-detail-${files[index - folders.length].path}'),
+                                  file: files[index - folders.length],
+                                  state: state,
+                                  isSelected: selectedFiles.contains(
+                                      files[index - folders.length].path),
+                                  columnVisibility: columnVisibility,
+                                  toggleFileSelection: toggleFileSelection,
+                                  showDeleteTagDialog: showDeleteTagDialog,
+                                  showAddTagToFileDialog:
+                                      showAddTagToFileDialog,
+                                  onDeleteFile: onDeleteFile,
+                                  onDeleteFiles: onDeleteFiles,
+                                  onTap: onFileTap,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  showFileTags: showFileTags,
+                                ),
                               ),
                       );
                     },
@@ -778,37 +868,47 @@ class FileView extends StatelessWidget {
                         width: itemWidth,
                         height: itemHeight,
                         child: index < folders.length
-                            ? FolderGridItem(
-                                key: ValueKey(
-                                    'folder-grid-item-${folders[index].path}'),
-                                folder: folders[index],
-                                onNavigate: onFolderTap ?? (_) {},
-                                isSelected:
-                                    selectedFiles.contains(folders[index].path),
-                                toggleFolderSelection: _folderSelectionHandler,
-                                isDesktopMode: isDesktopMode,
-                                lastSelectedPath: lastSelectedPath,
-                                clearSelectionMode: clearSelectionMode,
+                            ? _wrapFileDragDrop(
+                                isFolder: true,
+                                itemPath: folders[index].path,
+                                child: FolderGridItem(
+                                  key: ValueKey(
+                                      'folder-grid-item-${folders[index].path}'),
+                                  folder: folders[index],
+                                  onNavigate: onFolderTap ?? (_) {},
+                                  isSelected: selectedFiles
+                                      .contains(folders[index].path),
+                                  toggleFolderSelection:
+                                      _folderSelectionHandler,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  clearSelectionMode: clearSelectionMode,
+                                ),
                               )
-                            : FileGridItem(
-                                key: ValueKey(
-                                    'file-grid-item-${files[index - folders.length].path}'),
-                                file: files[index - folders.length],
-                                state: state,
-                                isSelected: selectedFiles.contains(
-                                    files[index - folders.length].path),
-                                toggleFileSelection: toggleFileSelection,
-                                toggleSelectionMode: toggleSelectionMode,
-                                isSelectionMode: isSelectionMode,
-                                onFileTap: onFileTap,
-                                isDesktopMode: isDesktopMode,
-                                lastSelectedPath: lastSelectedPath,
-                                onThumbnailGenerated: onThumbnailGenerated,
-                                showDeleteTagDialog: showDeleteTagDialog,
-                                showAddTagToFileDialog: showAddTagToFileDialog,
-                                onDeleteFile: onDeleteFile,
-                                onDeleteFiles: onDeleteFiles,
-                                showFileTags: showFileTags,
+                            : _wrapFileDragDrop(
+                                isFolder: false,
+                                itemPath: files[index - folders.length].path,
+                                child: FileGridItem(
+                                  key: ValueKey(
+                                      'file-grid-item-${files[index - folders.length].path}'),
+                                  file: files[index - folders.length],
+                                  state: state,
+                                  isSelected: selectedFiles.contains(
+                                      files[index - folders.length].path),
+                                  toggleFileSelection: toggleFileSelection,
+                                  toggleSelectionMode: toggleSelectionMode,
+                                  isSelectionMode: isSelectionMode,
+                                  onFileTap: onFileTap,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  onThumbnailGenerated: onThumbnailGenerated,
+                                  showDeleteTagDialog: showDeleteTagDialog,
+                                  showAddTagToFileDialog:
+                                      showAddTagToFileDialog,
+                                  onDeleteFile: onDeleteFile,
+                                  onDeleteFiles: onDeleteFiles,
+                                  showFileTags: showFileTags,
+                                ),
                               ),
                       ),
                     ),

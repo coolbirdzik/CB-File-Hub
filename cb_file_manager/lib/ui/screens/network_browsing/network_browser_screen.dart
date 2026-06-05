@@ -31,6 +31,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart'; // Import Ta
 
 // Add imports for hardware acceleration
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
@@ -522,6 +523,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         _viewMode = ViewMode.grid;
       } else if (_viewMode == ViewMode.grid) {
         _viewMode = ViewMode.details;
+      } else if (_viewMode == ViewMode.details) {
+        _viewMode = ViewMode.tree;
       } else {
         _viewMode = ViewMode.list;
       }
@@ -1144,6 +1147,10 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           _buildGridItem(itemContext, item, selectionState),
       detailsItemBuilder: (itemContext, item) =>
           _buildDetailsItem(itemContext, item, selectionState),
+      treeIsLeaf: (item) => item is File,
+      treeChildrenLoader: _loadNetworkChildren,
+      treeItemBuilder: (itemContext, node, depth) =>
+          _buildNetworkTreeRow(itemContext, node, depth),
     );
   }
 
@@ -1429,6 +1436,106 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           isDesktopMode: _isDesktopMode,
           lastSelectedPath: selectionState.lastSelectedPath,
         ),
+      ),
+    );
+  }
+
+  /// Lazy children loader for the network tree view.
+  ///
+  /// Reuses the active connection's `NetworkServiceBase.listDirectory`
+  /// (the same call the navigation flow uses), then maps results into
+  /// `TreeNode<FileSystemEntity>` with folders first, then files.
+  Future<List<TreeNode<FileSystemEntity>>> _loadNetworkChildren(
+    TreeNode<FileSystemEntity> node,
+  ) async {
+    final entity = node.data;
+    if (entity is! Directory) return const [];
+    final service = _networkBrowsingBloc.state.currentService;
+    if (service == null) return const [];
+
+    try {
+      final contents = await service.listDirectory(entity.path);
+      final folders = contents.whereType<Directory>().toList()
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
+      final files = contents.whereType<File>().toList()
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
+      return [
+        ...folders.map((d) => TreeNode<FileSystemEntity>(
+              id: d.path,
+              data: d,
+              isLeaf: false,
+            )),
+        ...files.map((f) => TreeNode<FileSystemEntity>(
+              id: f.path,
+              data: f,
+              isLeaf: true,
+            )),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Compact row for the network tree.
+  Widget _buildNetworkTreeRow(
+    BuildContext itemContext,
+    TreeNode<FileSystemEntity> node,
+    int depth,
+  ) {
+    final entity = node.data;
+    final isDir = entity is Directory;
+    final segments = entity.path
+        .split(RegExp(r'[\\/]+'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final name = segments.isEmpty ? entity.path : segments.last;
+    final theme = Theme.of(itemContext);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (isDir) {
+          _navigateToPath(entity.path);
+        }
+      },
+      onDoubleTap: () {
+        if (isDir) {
+          _navigateToPath(entity.path);
+        } else if (entity is File) {
+          _handleFileOpen(itemContext, entity);
+        }
+      },
+      child: Row(
+        children: [
+          Icon(
+            isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
+            size: 14,
+            color: isDir
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isDir ? FontWeight.w500 : FontWeight.normal,
+                color: theme.colorScheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

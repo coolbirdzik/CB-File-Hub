@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:equatable/equatable.dart';
 
 // Define view modes
-enum ViewMode { list, grid, details, gridPreview, columns }
+enum ViewMode { list, grid, details, gridPreview, columns, tree }
 
 // Define sort options
 enum SortOption {

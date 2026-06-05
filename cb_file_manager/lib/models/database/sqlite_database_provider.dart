@@ -99,12 +99,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     return databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 3,
         onConfigure: (db) async {
           await _configureDatabase(db);
         },
         onCreate: (db, version) async {
           await _createSchema(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          await _onUpgrade(db, oldVersion, newVersion);
         },
       ),
     );
@@ -336,11 +339,126 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         updated_at INTEGER NOT NULL
       )
     ''');
+
+    // Tag metadata (thumbnails) — added in schema v2
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tag_metadata (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        normalized_tag TEXT NOT NULL UNIQUE,
+        thumbnail_path TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tag_metadata_normalized_tag ON tag_metadata(normalized_tag)',
+    );
+
+    // Tag hierarchy (parent-child relationships) — added in schema v2
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tag_hierarchy (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        parent_normalized_tag TEXT NOT NULL,
+        child_normalized_tag TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE(parent_normalized_tag, child_normalized_tag)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_parent ON tag_hierarchy(parent_normalized_tag)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_child ON tag_hierarchy(child_normalized_tag)',
+    );
   }
 
   int _now() => DateTime.now().millisecondsSinceEpoch;
 
   String _normalizeTag(String tag) => tag.trim().toLowerCase();
+
+  /// Runs incremental migrations when an existing database is opened with a
+  /// higher [version] than it was originally created with.
+  Future<void> _onUpgrade(
+      DatabaseExecutor db, int oldVersion, int newVersion) async {
+    AppLogger.info('[SQLite] Upgrading database',
+        error: 'oldVersion=$oldVersion newVersion=$newVersion');
+
+    if (oldVersion < 2) {
+      // v2: tag_metadata (thumbnails) and tag_hierarchy (parent-child)
+      // Drop first in case partially-created tables exist from development.
+      await db.execute('DROP TABLE IF EXISTS tag_metadata');
+      await db.execute('DROP TABLE IF EXISTS tag_hierarchy');
+
+      await db.execute('''
+        CREATE TABLE tag_metadata (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          normalized_tag TEXT NOT NULL UNIQUE,
+          thumbnail_path TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tag_metadata_normalized_tag ON tag_metadata(normalized_tag)',
+      );
+
+      await db.execute('''
+        CREATE TABLE tag_hierarchy (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          parent_normalized_tag TEXT NOT NULL,
+          child_normalized_tag TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          UNIQUE(parent_normalized_tag, child_normalized_tag)
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_parent ON tag_hierarchy(parent_normalized_tag)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_child ON tag_hierarchy(child_normalized_tag)',
+      );
+    }
+
+    if (oldVersion == 2) {
+      // v3: Fix broken v2 migration — recreate tag_metadata and tag_hierarchy
+      // with correct schema. These tables are new in v2 and may have been
+      // created without the correct columns.
+      await db.execute('DROP TABLE IF EXISTS tag_metadata');
+      await db.execute('DROP TABLE IF EXISTS tag_hierarchy');
+
+      await db.execute('''
+        CREATE TABLE tag_metadata (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          normalized_tag TEXT NOT NULL UNIQUE,
+          thumbnail_path TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tag_metadata_normalized_tag ON tag_metadata(normalized_tag)',
+      );
+
+      await db.execute('''
+        CREATE TABLE tag_hierarchy (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          parent_normalized_tag TEXT NOT NULL,
+          child_normalized_tag TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          UNIQUE(parent_normalized_tag, child_normalized_tag)
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_parent ON tag_hierarchy(parent_normalized_tag)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_child ON tag_hierarchy(child_normalized_tag)',
+      );
+    }
+
+    AppLogger.info('[SQLite] Database upgrade complete',
+        error: 'newVersion=$newVersion');
+  }
 
   Future<Map<String, Object?>?> _getPreferenceRow(String key) async {
     final database = await getDatabase();
@@ -643,6 +761,214 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       AppLogger.error('[SQLite] Failed to replace standalone tags',
           error: error);
       debugPrint('Error replacing standalone tags: $error');
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tag Metadata (Thumbnails)
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<bool> setTagThumbnail(
+      String normalizedTag, String thumbnailPath) async {
+    try {
+      final database = await getDatabase();
+      await database.insert(
+        'tag_metadata',
+        <String, Object?>{
+          'normalized_tag': normalizedTag,
+          'thumbnail_path': thumbnailPath,
+          'created_at': _now(),
+          'updated_at': _now(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Error setting tag thumbnail: $error');
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> getTagThumbnail(String normalizedTag) async {
+    try {
+      final database = await getDatabase();
+      final rows = await database.query(
+        'tag_metadata',
+        columns: <String>['thumbnail_path'],
+        where: 'normalized_tag = ?',
+        whereArgs: [normalizedTag],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return rows.first['thumbnail_path'] as String?;
+    } catch (error) {
+      debugPrint('Error getting tag thumbnail: $error');
+      return null;
+    }
+  }
+
+  @override
+  Future<bool> deleteTagThumbnail(String normalizedTag) async {
+    try {
+      final database = await getDatabase();
+      await database.delete(
+        'tag_metadata',
+        where: 'normalized_tag = ?',
+        whereArgs: [normalizedTag],
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Error deleting tag thumbnail: $error');
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, String>> getAllTagThumbnails() async {
+    try {
+      final database = await getDatabase();
+      final rows = await database.query(
+        'tag_metadata',
+        columns: <String>['normalized_tag', 'thumbnail_path'],
+      );
+      final result = <String, String>{};
+      for (final row in rows) {
+        final tag = row['normalized_tag'] as String?;
+        final path = row['thumbnail_path'] as String?;
+        if (tag != null && path != null) {
+          result[tag] = path;
+        }
+      }
+      return result;
+    } catch (error) {
+      debugPrint('Error getting all tag thumbnails: $error');
+      return <String, String>{};
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tag Hierarchy (Parent-Child relationships)
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<bool> setTagHierarchy(
+      String parentNormalizedTag, String childNormalizedTag) async {
+    try {
+      final database = await getDatabase();
+      await database.insert(
+        'tag_hierarchy',
+        <String, Object?>{
+          'parent_normalized_tag': parentNormalizedTag,
+          'child_normalized_tag': childNormalizedTag,
+          'created_at': _now(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Error setting tag hierarchy: $error');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> removeTagHierarchy(
+      String parentNormalizedTag, String childNormalizedTag) async {
+    try {
+      final database = await getDatabase();
+      await database.delete(
+        'tag_hierarchy',
+        where: 'parent_normalized_tag = ? AND child_normalized_tag = ?',
+        whereArgs: [parentNormalizedTag, childNormalizedTag],
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Error removing tag hierarchy: $error');
+      return false;
+    }
+  }
+
+  @override
+  Future<List<String>> getChildTags(String parentNormalizedTag) async {
+    try {
+      final database = await getDatabase();
+      final rows = await database.query(
+        'tag_hierarchy',
+        columns: <String>['child_normalized_tag'],
+        where: 'parent_normalized_tag = ?',
+        whereArgs: [parentNormalizedTag],
+      );
+      return rows
+          .map((row) => row['child_normalized_tag'])
+          .whereType<String>()
+          .toList(growable: false);
+    } catch (error) {
+      debugPrint('Error getting child tags: $error');
+      return <String>[];
+    }
+  }
+
+  @override
+  Future<List<String>> getParentTags(String childNormalizedTag) async {
+    try {
+      final database = await getDatabase();
+      final rows = await database.query(
+        'tag_hierarchy',
+        columns: <String>['parent_normalized_tag'],
+        where: 'child_normalized_tag = ?',
+        whereArgs: [childNormalizedTag],
+      );
+      return rows
+          .map((row) => row['parent_normalized_tag'])
+          .whereType<String>()
+          .toList(growable: false);
+    } catch (error) {
+      debugPrint('Error getting parent tags: $error');
+      return <String>[];
+    }
+  }
+
+  @override
+  Future<Map<String, List<String>>> getAllTagHierarchy() async {
+    try {
+      final database = await getDatabase();
+      final rows = await database.query(
+        'tag_hierarchy',
+        columns: <String>['parent_normalized_tag', 'child_normalized_tag'],
+        orderBy: 'parent_normalized_tag ASC',
+      );
+      final result = <String, List<String>>{};
+      for (final row in rows) {
+        final parent = row['parent_normalized_tag'] as String?;
+        final child = row['child_normalized_tag'] as String?;
+        if (parent != null && child != null) {
+          result.putIfAbsent(parent, () => <String>[]).add(child);
+        }
+      }
+      return result;
+    } catch (error) {
+      debugPrint('Error getting all tag hierarchy: $error');
+      return <String, List<String>>{};
+    }
+  }
+
+  @override
+  Future<bool> removeAllHierarchyForTag(String normalizedTag) async {
+    try {
+      final database = await getDatabase();
+      await database.transaction((txn) async {
+        await txn.delete(
+          'tag_hierarchy',
+          where: 'parent_normalized_tag = ? OR child_normalized_tag = ?',
+          whereArgs: [normalizedTag, normalizedTag],
+        );
+      });
+      return true;
+    } catch (error) {
+      debugPrint('Error removing all hierarchy for tag: $error');
       return false;
     }
   }

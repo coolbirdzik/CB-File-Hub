@@ -4,6 +4,8 @@ import '../models/database/database_manager.dart';
 import '../services/album_service.dart';
 import '../helpers/tags/tag_manager.dart';
 import '../helpers/tags/batch_tag_manager.dart';
+import '../helpers/tags/tag_thumbnail_manager.dart';
+import '../helpers/tags/tag_hierarchy_manager.dart';
 import '../services/network_credentials_service.dart';
 import '../providers/theme_provider.dart';
 import '../services/streaming_service_manager.dart';
@@ -57,6 +59,16 @@ Future<void> setupServiceLocator() async {
   // Register BatchTagManager for batch tag operations
   locator.registerLazySingleton<BatchTagManager>(
     () => BatchTagManager.getInstance(),
+  );
+
+  // Register TagThumbnailManager for tag thumbnail images
+  locator.registerLazySingleton<TagThumbnailManager>(
+    () => TagThumbnailManager.instance,
+  );
+
+  // Register TagHierarchyManager for parent-child tag relationships
+  locator.registerLazySingleton<TagHierarchyManager>(
+    () => TagHierarchyManager.instance,
   );
 
   // Network services
