@@ -169,10 +169,12 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
       // Add all folders in the selection range
       newSelectedFolders.addAll(event.folderPaths);
 
-      // Save the last selected path if available
-      final lastSelectedPath = event.filePaths.isNotEmpty
-          ? event.filePaths.last
-          : (event.folderPaths.isNotEmpty ? event.folderPaths.last : null);
+      // Save the explicit endpoint when available. Range selection from the
+      // keyboard can end on either a file or folder, independent of set order.
+      final lastSelectedPath = event.lastSelectedPath ??
+          (event.filePaths.isNotEmpty
+              ? event.filePaths.last
+              : (event.folderPaths.isNotEmpty ? event.folderPaths.last : null));
 
       emit(state.copyWith(
         selectedFilePaths: newSelectedFiles,

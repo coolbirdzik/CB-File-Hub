@@ -110,3 +110,20 @@ tags.addAll(standaloneTags);
 ### JSON fallback
 If SQLite fails to initialize, app falls back to JSON storage at:
 - `Documents/cb_file_hub/cb_file_hub_global_tags.json`
+
+## View Modes
+
+The tag management screen has three view modes, selected from the `eye` icon popup menu in the toolbar: **List**, **Grid**, and **Tree**.
+
+### Tree mode
+
+Tree mode shows the parent/child tag hierarchy using the shared `GenericTreeView<T>` component (see `docs/ui-patterns/04-tree-view.md`).
+
+- **Roots** = root parent tags (`TagHierarchyManager.getRootParents()`) + standalone tags (no parents, no children).
+- **Children** come from `TagHierarchyManager.getChildren()`; the whole hierarchy is in memory, so no lazy loading.
+- **Search/filter** keeps ancestors of matches visible so nested matches are reachable.
+
+Two implementation gotchas (both handled in `_buildTagsTreeView`):
+
+1. **Case normalization** — `TagHierarchyManager` stores names lowercased/trimmed, while the tag lists keep display case. Hierarchy names are mapped back to display case via `_normalizedToDisplay`; otherwise parent/child nodes get filtered out and only standalone tags show.
+2. **Root caching** — tree nodes hold their own expansion state, so the roots are cached and only rebuilt when the tag set or hierarchy actually changes. Rebuilding on every `setState` would collapse the tree and reset scroll.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/ui/components/common/item_shell.dart';
+import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'trash_list_item.dart';
 
 /// Grid item widget for trash bin - displays trash item in grid view
@@ -36,32 +37,45 @@ class TrashGridItem extends StatelessWidget {
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       isDesktopMode: isDesktop,
-      onTap: onTap,
-      onDoubleTap: onDoubleTap,
+      onTap: isDesktop ? onToggleSelection : onTap,
+      onDoubleTap: isDesktop ? onDoubleTap : null,
       onToggleSelection: onToggleSelection,
       onEnterSelectionMode: onEnterSelectionMode,
       onSecondaryTapUp: (d) => onContextMenu(d.globalPosition),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
-          // Thumbnail area — Windows Explorer style: fills available space
           Expanded(
-            child: Center(
-              child: TrashItemIcon(
-                  originalPath: item.originalPath,
-                  size: 56,
-                  isFolder: item.isFolder),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8.0),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  TrashItemIcon(
+                    originalPath: item.originalPath,
+                    actualFilePath: item.actualFilePath,
+                    displayName: item.displayNameValue,
+                    size: 48,
+                    isFolder: item.isFolder,
+                    fillAvailable: true,
+                  ),
+                ],
+              ),
             ),
           ),
-          // Filename below icon
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-            child: Text(
-              item.displayNameValue,
-              style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          SizedBox(
+            height: GridZoomConstraints.gridItemNameAreaHeight,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+              child: Text(
+                item.displayNameValue,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: GridZoomConstraints.gridItemFilenameFontSize,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],

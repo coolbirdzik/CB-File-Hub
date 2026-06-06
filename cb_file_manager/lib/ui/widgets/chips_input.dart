@@ -17,6 +17,7 @@ class ChipsInput<T> extends StatefulWidget {
     this.onTextChanged,
     this.suggestions = const [],
     this.onSuggestionSelected,
+    this.suggestionBuilder,
   }) : super(key: key);
 
   final List<T> values;
@@ -35,6 +36,11 @@ class ChipsInput<T> extends StatefulWidget {
 
   /// Called when a suggestion is picked (via Tab or click).
   final ValueChanged<String>? onSuggestionSelected;
+
+  /// Custom builder for suggestion items. If null, uses default rendering.
+  /// Parameters: context, suggestion string, isHighlighted, tagColor.
+  final Widget Function(BuildContext context, String suggestion,
+      bool isHighlighted, Color tagColor)? suggestionBuilder;
 
   final Widget Function(BuildContext context, T data) chipBuilder;
 
@@ -206,6 +212,21 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                             final isHighlighted = index == _highlightedIndex;
                             final tagColor = TagColorManager.instance
                                 .getTagColor(suggestion);
+
+                            // Use custom builder if provided
+                            if (widget.suggestionBuilder != null) {
+                              return InkWell(
+                                onTap: () => _pickSuggestion(suggestion),
+                                child: Container(
+                                  color: isHighlighted
+                                      ? theme.colorScheme.primary
+                                          .withValues(alpha: 0.1)
+                                      : null,
+                                  child: widget.suggestionBuilder!(context,
+                                      suggestion, isHighlighted, tagColor),
+                                ),
+                              );
+                            }
 
                             return InkWell(
                               onTap: () => _pickSuggestion(suggestion),

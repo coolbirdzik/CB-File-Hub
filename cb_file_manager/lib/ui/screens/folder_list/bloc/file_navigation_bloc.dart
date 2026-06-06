@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
@@ -49,6 +50,7 @@ class FileNavigationBloc
     on<FileNavigationSearchByFileName>(_onSearchByFileName);
     on<FileNavigationClearSearchAndFilters>(_onClearSearchAndFilters);
     on<FileNavigationLoadMoreSearchResults>(_onLoadMoreSearchResults);
+    on<FileNavigationRemovePaths>(_onRemovePaths);
 
     // ── Directory watching ─────────────────────────────────────
     _directoryWatcherSubscription = _directoryWatcher.onDirectoryRefresh.listen(
@@ -63,11 +65,74 @@ class FileNavigationBloc
     );
   }
 
+  void _onRemovePaths(
+    FileNavigationRemovePaths event,
+    Emitter<FileNavigationState> emit,
+  ) {
+    if (event.paths.isEmpty) return;
+    final removed = event.paths;
+    final searchBefore = state.searchResults.length;
+    _pendingSearchResults = _pendingSearchResults
+        .where((entity) => !removed.contains(entity.path))
+        .toList();
+    final filteredSearchResults = state.searchResults
+        .where((entity) => !removed.contains(entity.path))
+        .toList();
+    final removedFromSearch = searchBefore - filteredSearchResults.length;
+    final currentTotal = state.searchResultsTotal;
+
+    emit(state.copyWith(
+      folders: state.folders
+          .where((entity) => !removed.contains(entity.path))
+          .toList(),
+      files: state.files
+          .where((entity) => !removed.contains(entity.path))
+          .toList(),
+      filteredFiles: state.filteredFiles
+          .where((entity) => !removed.contains(entity.path))
+          .toList(),
+      searchResults: filteredSearchResults,
+      searchResultsTotal: currentTotal == null
+          ? null
+          : math.max(0, currentTotal - removedFromSearch),
+    ));
+  }
+
   @override
   Future<void> close() {
     _directoryWatcherSubscription?.cancel();
     _directoryWatcher.stopWatching();
     return super.close();
+  }
+
+  /// Pause directory watching for this bloc.
+  ///
+  /// Used by the tab activity manager when the bloc's tab transitions to
+  /// inactive. Cancels the local refresh subscription so background fs
+  /// events don't trigger needless work; the global singleton watcher
+  /// only watches the currently focused tab's path so this primarily
+  /// serves as a defensive cleanup.
+  void pauseWatching() {
+    _directoryWatcherSubscription?.cancel();
+    _directoryWatcherSubscription = null;
+  }
+
+  /// Resume directory watching for this bloc after [pauseWatching].
+  ///
+  /// Idempotent: if the subscription is already active, returns immediately.
+  /// The actual filesystem watch is re-armed on the next navigation event
+  /// (the tab refocus pipeline triggers a refresh which calls
+  /// [_directoryWatcher.startWatching]).
+  void resumeWatching() {
+    if (_directoryWatcherSubscription != null) return;
+    _directoryWatcherSubscription = _directoryWatcher.onDirectoryRefresh.listen(
+      (path) {
+        DirectoryListingCacheService.instance.invalidate(path);
+        if (path == state.currentPath.path) {
+          add(FileNavigationRefresh(path));
+        }
+      },
+    );
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -95,7 +160,24 @@ class FileNavigationBloc
       return;
     }
 
-    emit(state.copyWith(isLoading: true, currentPath: Directory(event.path)));
+    emit(state.copyWith(
+      isLoading: true,
+      isRefreshing: false,
+      error: null,
+      currentPath: Directory(event.path),
+      folders: const [],
+      files: const [],
+      filteredFiles: const [],
+      searchResults: const [],
+      hasMoreSearchResults: false,
+      isLoadingMoreSearchResults: false,
+      searchResultsTotal: null,
+      currentFilter: null,
+      currentSearchQuery: null,
+      isSearchByName: false,
+      searchRecursive: false,
+      fileStatsCache: const {},
+    ));
 
     // Gate: pause thumbnail generation while we scan/sort the file list.
     // Thumbnails will start AFTER the listing is emitted to the UI.
@@ -382,11 +464,13 @@ class FileNavigationBloc
     emit(state.copyWith(isLoading: true));
 
     try {
-      final folderSortManager = FolderSortManager();
-      await _safeCall(() => folderSortManager.saveFolderSortOption(
-            state.currentPath.path,
-            event.sortOption,
-          ));
+      if (event.persist) {
+        final folderSortManager = FolderSortManager();
+        await _safeCall(() => folderSortManager.saveFolderSortOption(
+              event.folderPath ?? state.currentPath.path,
+              event.sortOption,
+            ));
+      }
 
       if (isStale()) return;
 

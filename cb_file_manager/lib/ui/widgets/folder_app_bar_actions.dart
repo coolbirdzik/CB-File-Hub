@@ -15,6 +15,7 @@ class FolderAppBarActions {
     required Function(ViewMode) onViewModeSelected,
     required VoidCallback onRefresh,
     required VoidCallback onSearchPressed,
+    bool isSearchActive = false,
     required VoidCallback onSelectionModeToggled,
     required VoidCallback onManageTagsPressed,
     bool allowFileExtensionRename = false,
@@ -29,6 +30,7 @@ class FolderAppBarActions {
     return SharedActionBar.buildCommonActions(
       context: context,
       onSearchPressed: onSearchPressed,
+      isSearchActive: isSearchActive,
       onSortOptionSelected: onSortOptionSelected,
       currentSortOption: folderListState.sortOption,
       viewMode: folderListState.viewMode,

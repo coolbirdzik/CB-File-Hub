@@ -52,8 +52,8 @@ class TrashDetailsRow extends StatelessWidget {
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       isDesktopMode: isDesktop,
-      onTap: onTap,
-      onDoubleTap: onDoubleTap,
+      onTap: isDesktop ? onToggleSelection : onTap,
+      onDoubleTap: isDesktop ? onDoubleTap : null,
       onToggleSelection: onToggleSelection,
       onEnterSelectionMode: onEnterSelectionMode,
       onSecondaryTapUp: (d) => onContextMenu(d.globalPosition),
@@ -67,6 +67,8 @@ class TrashDetailsRow extends StatelessWidget {
               children: [
                 TrashItemIcon(
                     originalPath: item.originalPath,
+                    actualFilePath: item.actualFilePath,
+                    displayName: item.displayNameValue,
                     size: 24,
                     isFolder: item.isFolder),
                 const SizedBox(width: 12),

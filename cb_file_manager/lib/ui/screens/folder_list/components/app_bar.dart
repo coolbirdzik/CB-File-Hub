@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
@@ -84,11 +85,13 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               child: Slider(
-                value: currentGridZoomLevel.toDouble(),
+                // Invert: right = larger items (fewer columns).
+                // display = (2 + 5) - zoom; convert back on change.
+                value: (7 - currentGridZoomLevel).toDouble(),
                 min: 2,
                 max: 5,
                 divisions: 3,
-                onChanged: (value) => setGridZoomLevel(value.toInt()),
+                onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
               ),
             ),
           ),
@@ -120,6 +123,7 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                     : l10n.moveItemsToTrashConfirmation(totalCount, l10n.items),
                 confirmText: l10n.deleteTitle,
                 cancelText: l10n.cancel,
+                previewPaths: selectedFiles.take(4).toList(),
               ),
             );
 
@@ -164,11 +168,12 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                     const RoundSliderOverlayShape(overlayRadius: 14.0),
               ),
               child: Slider(
-                value: currentGridZoomLevel.toDouble(),
+                // Invert: right = larger items (fewer columns).
+                value: (7 - currentGridZoomLevel).toDouble(),
                 min: 2,
                 max: 5,
                 divisions: 3,
-                onChanged: (value) => setGridZoomLevel(value.toInt()),
+                onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
               ),
             ),
           ),
@@ -198,12 +203,9 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
               case 'debug_apk':
                 await FileIconHelper.debugApkIcons();
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'APK icon cache cleared. Check console for debug info.'),
-                      duration: Duration(seconds: 2),
-                    ),
+                  AppToast.info(
+                    context,
+                    'APK icon cache cleared. Check console for debug info.',
                   );
                 }
                 break;

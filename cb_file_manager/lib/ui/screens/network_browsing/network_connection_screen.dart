@@ -38,7 +38,7 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.networkConnections)),
+      appBar: AppBar(),
       body: BlocBuilder<NetworkBrowsingBloc, NetworkBrowsingState>(
         builder: (context, state) {
           if (state.isLoading && state.connections.isEmpty) {

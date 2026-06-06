@@ -1,7 +1,7 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-// Add this import for mouse buttons
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/index.dart'
     as folder_list_components;
@@ -13,8 +13,11 @@ class SearchResultsView extends StatefulWidget {
   final FolderListState state;
   final bool isSelectionMode;
   final List<String> selectedFiles;
+  final String? lastSelectedPath;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
       toggleFileSelection;
+  final Function(String, {bool shiftSelect, bool ctrlSelect})?
+      toggleFolderSelection;
   final VoidCallback toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
@@ -24,13 +27,16 @@ class SearchResultsView extends StatefulWidget {
   final VoidCallback? onBackButtonPressed; // Add callback for back button
   final VoidCallback? onForwardButtonPressed; // Add callback for forward button
   final VoidCallback? onLoadMore;
+  final ValueChanged<int>? onZoomLevelChanged;
 
   const SearchResultsView({
     Key? key,
     required this.state,
     required this.isSelectionMode,
     required this.selectedFiles,
+    this.lastSelectedPath,
     required this.toggleFileSelection,
+    this.toggleFolderSelection,
     required this.toggleSelectionMode,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
@@ -40,6 +46,7 @@ class SearchResultsView extends StatefulWidget {
     this.onBackButtonPressed,
     this.onForwardButtonPressed,
     this.onLoadMore,
+    this.onZoomLevelChanged,
   }) : super(key: key);
 
   @override
@@ -89,12 +96,6 @@ class _SearchResultsViewState extends State<SearchResultsView> {
       },
       child: Column(
         children: [
-          // Top progress bar when searching
-          if (widget.state.isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: LinearProgressIndicator(),
-            ),
           // Search results header with clear search button
           Container(
             padding:
@@ -120,12 +121,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
           ),
 
           // Results list
-          Expanded(
-            child: (widget.state.viewMode == ViewMode.grid ||
-                    widget.state.viewMode == ViewMode.gridPreview)
-                ? _buildGridView(isDesktop)
-                : _buildListView(isDesktop),
-          ),
+          Expanded(child: _buildResultsView(isDesktop)),
         ],
       ),
     );
@@ -230,143 +226,59 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     return ' (${parts.join(', ')})';
   }
 
-  Widget _buildListView(bool isDesktop) {
+  Widget _buildResultsView(bool isDesktop) {
     final state = widget.state;
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount:
-          state.searchResults.length + (state.hasMoreSearchResults ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= state.searchResults.length) {
-          if (state.isLoadingMoreSearchResults) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16.0),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
+    final files = state.searchResults.whereType<File>().toList();
+    final folders = state.searchResults.whereType<Directory>().toList();
+    final displayState = state.copyWith(
+      files: files,
+      folders: folders,
+    );
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
+    return Stack(
+      children: [
+        NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification.metrics.extentAfter < 600) {
+              _onScroll();
+            }
+            return false;
+          },
+          child: folder_list_components.FileView(
+            files: files,
+            folders: folders,
+            state: displayState,
+            isSelectionMode: widget.isSelectionMode,
+            isGridView: state.viewMode == ViewMode.grid ||
+                state.viewMode == ViewMode.gridPreview,
+            selectedFiles: widget.selectedFiles,
+            toggleFileSelection: widget.toggleFileSelection,
+            toggleFolderSelection:
+                widget.toggleFolderSelection ?? widget.toggleFileSelection,
+            toggleSelectionMode: widget.toggleSelectionMode,
+            showDeleteTagDialog: widget.showDeleteTagDialog,
+            showAddTagToFileDialog: widget.showAddTagToFileDialog,
+            onFolderTap: widget.onFolderTap,
+            onFileTap: widget.onFileTap,
+            onZoomChanged: widget.onZoomLevelChanged,
+            isDesktopMode: isDesktop,
+            lastSelectedPath: widget.lastSelectedPath,
+            scrollController: _scrollController,
+          ),
+        ),
+        if (state.hasMoreSearchResults && !state.isLoadingMoreSearchResults)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 8,
             child: Center(
               child: TextButton(
                 onPressed: widget.onLoadMore,
                 child: Text(AppLocalizations.of(context)!.nextPage),
               ),
             ),
-          );
-        }
-
-        final entity = state.searchResults[index];
-        if (entity is File) {
-          return folder_list_components.FileItem(
-            file: entity,
-            state: state,
-            isSelectionMode: widget.isSelectionMode,
-            isSelected: widget.selectedFiles.contains(entity.path),
-            toggleFileSelection: widget.toggleFileSelection,
-            showDeleteTagDialog: widget.showDeleteTagDialog,
-            showAddTagToFileDialog: widget.showAddTagToFileDialog,
-            onFileTap: widget.onFileTap,
-            isDesktopMode: isDesktop,
-          );
-        } else if (entity is Directory) {
-          // Hiển thị thư mục trong kết quả tìm kiếm
-          return ListTile(
-            leading: const Icon(PhosphorIconsLight.folder, color: Colors.amber),
-            // Show only folder name instead of full path
-            title: Text(entity.path.split(Platform.pathSeparator).last),
-            // Keep subtitle as full path for reference
-            subtitle: Text(entity.path),
-            onTap: () {
-              if (widget.onFolderTap != null) {
-                // Sử dụng callback để chuyển đường dẫn trong tab hiện tại
-                widget.onFolderTap!(entity.path);
-              }
-            },
-          );
-        } else {
-          return const SizedBox.shrink();
-        }
-      },
-    );
-  }
-
-  Widget _buildGridView(bool isDesktop) {
-    final state = widget.state;
-    return GridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(8.0),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: state.gridZoomLevel,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount:
-          state.searchResults.length + (state.hasMoreSearchResults ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= state.searchResults.length) {
-          if (state.isLoadingMoreSearchResults) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return Center(
-            child: TextButton(
-              onPressed: widget.onLoadMore,
-              child: Text(AppLocalizations.of(context)!.nextPage),
-            ),
-          );
-        }
-
-        final entity = state.searchResults[index];
-        if (entity is File) {
-          return folder_list_components.FileGridItem(
-            file: entity,
-            state: state,
-            isSelectionMode: widget.isSelectionMode,
-            isSelected: widget.selectedFiles.contains(entity.path),
-            toggleFileSelection: widget.toggleFileSelection,
-            toggleSelectionMode: widget.toggleSelectionMode,
-            onFileTap: widget.onFileTap,
-            isDesktopMode: isDesktop,
-          );
-        } else if (entity is Directory) {
-          // Xử lý thư mục trong chế độ xem lưới
-          return InkWell(
-            onTap: () {
-              if (widget.onFolderTap != null) {
-                // Sử dụng callback để chuyển đường dẫn trong tab hiện tại
-                widget.onFolderTap!(entity.path);
-              }
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-                borderRadius: BorderRadius.circular(16.0),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(PhosphorIconsLight.folder,
-                      size: 48, color: Colors.amber),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Text(
-                      entity.path.split(Platform.pathSeparator).last,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        } else {
-          return const SizedBox.shrink();
-        }
-      },
+          ),
+      ],
     );
   }
 }

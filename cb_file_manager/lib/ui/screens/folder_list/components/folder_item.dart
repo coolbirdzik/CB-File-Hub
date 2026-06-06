@@ -22,6 +22,7 @@ class FolderItem extends StatefulWidget {
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
+  final bool showItemBackground;
 
   const FolderItem({
     Key? key,
@@ -32,6 +33,7 @@ class FolderItem extends StatefulWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.clearSelectionMode,
+    this.showItemBackground = true,
   }) : super(key: key);
 
   @override
@@ -100,8 +102,9 @@ class _FolderItemState extends State<FolderItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    // Trong mobile mode, luôn sử dụng ctrlSelect để add to selection
-    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode
+        ? isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed)
+        : true;
 
     // Call toggleFolderSelection with appropriate parameters
     widget.toggleFolderSelection!(widget.folder.path,
@@ -156,6 +159,8 @@ class _FolderItemState extends State<FolderItem> {
           isSelected: widget.isSelected,
           isHovering: isHovering,
         );
+        final Color effectiveBackgroundColor =
+            widget.showItemBackground ? backgroundColor : Colors.transparent;
 
         return Opacity(
           opacity: isBeingCut ? ItemInteractionStyle.cutOpacity : 1.0,
@@ -168,13 +173,19 @@ class _FolderItemState extends State<FolderItem> {
               cursor: SystemMouseCursors.click,
               child: Container(
                 margin: EdgeInsets.symmetric(
-                    horizontal: widget.isDesktopMode ? 8.0 : 0,
-                    vertical: widget.isDesktopMode ? 4.0 : 0),
+                    horizontal:
+                        widget.isDesktopMode && widget.showItemBackground
+                            ? 8.0
+                            : 0,
+                    vertical: widget.isDesktopMode && widget.showItemBackground
+                        ? 4.0
+                        : 0),
                 decoration: BoxDecoration(
-                  color: backgroundColor,
-                  borderRadius: widget.isDesktopMode
-                      ? BorderRadius.circular(16.0)
-                      : BorderRadius.zero,
+                  color: effectiveBackgroundColor,
+                  borderRadius:
+                      widget.isDesktopMode && widget.showItemBackground
+                          ? BorderRadius.circular(16.0)
+                          : BorderRadius.zero,
                 ),
                 child: Stack(
                   children: [

@@ -1,25 +1,33 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
-import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/components/common/item_shell.dart';
 import 'package:cb_file_manager/ui/components/common/optimized_interaction_handler.dart';
+import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
+import 'package:path/path.dart' as p;
 
-/// File icon for trash items - based on the original file path extension
+/// File icon for trash items - generates thumbnails from the actual trash file path
 /// Shows a folder icon when the item is a directory.
 class TrashItemIcon extends StatelessWidget {
   final String originalPath;
+  final String actualFilePath;
+  final String displayName;
   final double size;
   final bool isFolder;
+  final bool fillAvailable;
 
   const TrashItemIcon({
     Key? key,
     required this.originalPath,
+    required this.actualFilePath,
+    required this.displayName,
     this.size = 48,
     this.isFolder = false,
+    this.fillAvailable = false,
   }) : super(key: key);
 
   @override
@@ -32,22 +40,42 @@ class TrashItemIcon extends StatelessWidget {
       );
     }
 
-    final String ext = originalPath.contains('.')
-        ? originalPath.split('.').last.toLowerCase()
-        : '';
-    final IconData fallback = FileTypeRegistry.getIcon('.$ext');
-    final Color fallbackColor = FileTypeRegistry.getColor('.$ext');
-    final bool isVideo = FileTypeUtils.isVideoFile(originalPath);
-    final bool isImage = FileTypeUtils.isImageFile(originalPath);
+    final String typePath =
+        displayName.isNotEmpty ? displayName : p.basename(originalPath);
+    final String extension = p.extension(typePath).toLowerCase();
+    final FileCategory category = FileTypeRegistry.getCategory(extension);
+    final IconData fallback = FileTypeRegistry.getIcon(extension);
+    final Color fallbackColor = FileTypeRegistry.getColor(extension);
+    final bool isVideo = category == FileCategory.video;
+    final bool isImage = category == FileCategory.image;
+
+    if (fillAvailable && (isVideo || isImage)) {
+      return ThumbnailLoader(
+        filePath: actualFilePath,
+        isVideo: isVideo,
+        isImage: isImage,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        borderRadius: BorderRadius.circular(0),
+        fallbackBuilder: () => Center(
+          child: Icon(
+            fallback,
+            size: size,
+            color: fallbackColor,
+          ),
+        ),
+      );
+    }
 
     return OptimizedFileIcon(
-      file: File(originalPath),
+      file: File(actualFilePath),
       isVideo: isVideo,
       isImage: isImage,
       size: size,
       fallbackIcon: fallback,
       fallbackColor: fallbackColor,
-      borderRadius: BorderRadius.circular(size >= 32 ? 12.0 : 4.0),
+      borderRadius: BorderRadius.circular(size >= 32 ? 8.0 : 2.0),
     );
   }
 }
@@ -91,8 +119,8 @@ class TrashListItem extends StatelessWidget {
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       isDesktopMode: isDesktop,
-      onTap: onTap,
-      onDoubleTap: onDoubleTap,
+      onTap: isDesktop ? onToggleSelection : onTap,
+      onDoubleTap: isDesktop ? onDoubleTap : null,
       onToggleSelection: onToggleSelection,
       onEnterSelectionMode: onEnterSelectionMode,
       onSecondaryTapUp: (d) => onContextMenu(d.globalPosition),
@@ -105,6 +133,8 @@ class TrashListItem extends StatelessWidget {
             height: 48,
             child: TrashItemIcon(
                 originalPath: item.originalPath,
+                actualFilePath: item.actualFilePath,
+                displayName: item.displayNameValue,
                 size: 48,
                 isFolder: item.isFolder),
           ),

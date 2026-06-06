@@ -65,6 +65,20 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
     });
   }
 
+  /// Replace the current selection and optionally control whether the
+  /// screen should be considered in multi-selection mode.
+  void replaceSelection(
+    Iterable<String> paths, {
+    bool? selectionMode,
+  }) {
+    setState(() {
+      selectedPaths
+        ..clear()
+        ..addAll(paths);
+      _isSelectionMode = selectionMode ?? selectedPaths.isNotEmpty;
+    });
+  }
+
   /// Deselect a single item
   void deselectItem(String path) {
     setState(() {

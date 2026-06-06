@@ -9,7 +9,13 @@ class TabbedFolderKeyboardController {
   final FocusNode focusNode =
       FocusNode(debugLabel: 'tabbed-folder-list-keyboard');
 
+  /// Scroll controller attached to the active list/grid view.
+  /// The screen creates this and passes it to [FileListViewBuilder].
+  final ScrollController scrollController = ScrollController();
+  final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
+
   String? focusedPath;
+  String? _keyboardRangeAnchorPath;
 
   // Type-ahead search state
   String _searchBuffer = '';
@@ -18,23 +24,122 @@ class TabbedFolderKeyboardController {
 
   void dispose() {
     focusNode.dispose();
+    scrollController.dispose();
+  }
+
+  GlobalKey itemKeyForPath(String path) {
+    return _itemKeys.putIfAbsent(
+      path,
+      () => GlobalKey(debugLabel: 'file-browser-item-$path'),
+    );
+  }
+
+  void pruneItemKeys(Iterable<String> visiblePaths) {
+    final visible = visiblePaths.toSet();
+    _itemKeys.removeWhere((path, _) => !visible.contains(path));
+  }
+
+  bool hasRenderedItem(String path) {
+    return _itemKeys[path]?.currentContext != null;
+  }
+
+  void ensurePathVisible(
+    String path, {
+    required int index,
+    required int crossAxisCount,
+    required double itemMainAxisExtent,
+    bool forward = true,
+  }) {
+    _ensurePathVisible(
+      path,
+      forward: forward,
+      index: index,
+      crossAxisCount: crossAxisCount,
+      itemHeight: itemMainAxisExtent,
+    );
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      _ensurePathVisible(
+        path,
+        forward: forward,
+        index: index,
+        crossAxisCount: crossAxisCount,
+        itemHeight: itemMainAxisExtent,
+      );
+    });
+  }
+
+  void _ensurePathVisible(String path,
+      {required bool forward,
+      int? index,
+      int? crossAxisCount,
+      double? itemHeight}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _itemKeys[path];
+      final context = key?.currentContext;
+
+      if (context == null) {
+        // Fallback: if item is not rendered yet, we might need a manual jump
+        // to bring it into the "cache area" so it gets built.
+        if (index != null &&
+            crossAxisCount != null &&
+            itemHeight != null &&
+            scrollController.hasClients) {
+          final pos = scrollController.position;
+          final int rowIndex = (index / crossAxisCount).floor();
+          final double itemStart = rowIndex * itemHeight;
+          final double itemEnd = itemStart + itemHeight;
+          final double viewStart = pos.pixels;
+          final double viewEnd = viewStart + pos.viewportDimension;
+
+          if (itemEnd > viewEnd) {
+            scrollController.jumpTo((itemEnd - pos.viewportDimension)
+                .clamp(pos.minScrollExtent, pos.maxScrollExtent));
+          } else if (itemStart < viewStart) {
+            scrollController.jumpTo(
+                itemStart.clamp(pos.minScrollExtent, pos.maxScrollExtent));
+          }
+        }
+        return;
+      }
+
+      // Check if item is already visible to avoid unnecessary jittery scrolls
+      final RenderBox? box = context.findRenderObject() as RenderBox?;
+      final ScrollableState scrollable = Scrollable.of(context);
+      if (box == null) return;
+
+      final viewport = scrollable.context.findRenderObject() as RenderBox?;
+      if (viewport == null) return;
+
+      final itemTop = box.localToGlobal(Offset.zero, ancestor: viewport).dy;
+      final itemBottom = itemTop + box.size.height;
+      final viewportHeight = viewport.size.height;
+
+      // If item is fully within [0, viewportHeight], no scroll needed
+      if (itemTop >= 0 && itemBottom <= viewportHeight) {
+        return;
+      }
+
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        alignment: forward ? 1.0 : 0.0,
+        alignmentPolicy: forward
+            ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd
+            : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      );
+    });
   }
 
   void clearFocus() {
     focusedPath = null;
+    _keyboardRangeAnchorPath = null;
   }
 
   void syncFromSelection(SelectionState selectionState) {
     final String? lastPath = selectionState.lastSelectedPath;
     if (lastPath != null && lastPath != focusedPath) {
       focusedPath = lastPath;
-      return;
-    }
-
-    if (lastPath == null &&
-        selectionState.selectedFilePaths.isEmpty &&
-        selectionState.selectedFolderPaths.isEmpty) {
-      focusedPath = null;
     }
   }
 
@@ -47,6 +152,12 @@ class TabbedFolderKeyboardController {
     required VoidCallback onBackInTabHistory,
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
+    required void Function({
+      required Set<String> folderPaths,
+      required Set<String> filePaths,
+      required String lastSelectedPath,
+      required bool ctrlSelect,
+    }) selectRange,
     required void Function(FileSystemEntity entity) activateEntity,
     required void Function(bool permanent) onDelete,
     VoidCallback? onSelectAll,
@@ -55,6 +166,13 @@ class TabbedFolderKeyboardController {
     VoidCallback? onPaste,
     VoidCallback? onRename,
     VoidCallback? onRefresh,
+
+    /// Called after focus moves to a new index so the list can scroll it into view.
+    /// [index] is the flat item index, [crossAxisCount] is the grid column count
+    /// (1 for list/details), [itemMainAxisExtent] is the item height (list/details)
+    /// or cell height (grid).
+    void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
+        onScrollToIndex,
     KeyEvent? event,
   }) {
     if (!isDesktop || event == null) return KeyEventResult.ignored;
@@ -64,16 +182,14 @@ class TabbedFolderKeyboardController {
 
     final LogicalKeyboardKey key = event.logicalKey;
     final bool isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
+    final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed ||
+        HardwareKeyboard.instance.logicalKeysPressed
+            .contains(LogicalKeyboardKey.shiftLeft) ||
+        HardwareKeyboard.instance.logicalKeysPressed
+            .contains(LogicalKeyboardKey.shiftRight);
 
     // Delete key - move to trash or permanent delete
     if (key == LogicalKeyboardKey.delete) {
-      // Check shift key state from both event and hardware keyboard for reliability
-      final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed ||
-          HardwareKeyboard.instance.logicalKeysPressed
-              .contains(LogicalKeyboardKey.shiftLeft) ||
-          HardwareKeyboard.instance.logicalKeysPressed
-              .contains(LogicalKeyboardKey.shiftRight);
-
       debugPrint('Delete key pressed - Shift: $isShiftPressed');
 
       onDelete(isShiftPressed);
@@ -181,6 +297,8 @@ class TabbedFolderKeyboardController {
           index: currentIndex,
           focusFolderPath: focusFolderPath,
           focusFilePath: focusFilePath,
+          onScrollToIndex: onScrollToIndex,
+          crossAxisCount: crossAxisCount,
         );
         return KeyEventResult.handled;
       }
@@ -199,18 +317,34 @@ class TabbedFolderKeyboardController {
           currentFilter: currentFilter,
           focusFolderPath: focusFolderPath,
           focusFilePath: focusFilePath,
+          onScrollToIndex: onScrollToIndex,
         );
       }
       return KeyEventResult.ignored;
     }
 
     final int newIndex = targetIndex.clamp(0, items.length - 1).toInt();
-    _focusItemAtIndex(
-      items: items,
-      index: newIndex,
-      focusFolderPath: focusFolderPath,
-      focusFilePath: focusFilePath,
-    );
+    if (isShiftPressed) {
+      _selectRangeToIndex(
+        items: items,
+        currentIndex: currentIndex,
+        targetIndex: newIndex,
+        selectionState: selectionState,
+        selectRange: selectRange,
+        ctrlSelect: isCtrlPressed,
+        crossAxisCount: crossAxisCount,
+      );
+    } else {
+      _keyboardRangeAnchorPath = null;
+      _focusItemAtIndex(
+        items: items,
+        index: newIndex,
+        focusFolderPath: focusFolderPath,
+        focusFilePath: focusFilePath,
+        onScrollToIndex: onScrollToIndex,
+        crossAxisCount: crossAxisCount,
+      );
+    }
     return KeyEventResult.handled;
   }
 
@@ -235,17 +369,94 @@ class TabbedFolderKeyboardController {
     required int index,
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
+    void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
+        onScrollToIndex,
+    int crossAxisCount = 1,
   }) {
     if (index < 0 || index >= items.length) return;
 
+    final previousIndex = focusedPath == null
+        ? -1
+        : items.indexWhere((item) => item.path == focusedPath);
     final FileSystemEntity target = items[index];
     focusedPath = target.path;
+    _keyboardRangeAnchorPath = target.path;
 
     if (target is Directory) {
       focusFolderPath(target.path);
     } else if (target is File) {
       focusFilePath(target.path);
     }
+
+    _ensurePathVisible(
+      target.path,
+      forward: previousIndex == -1 || index >= previousIndex,
+      index: index,
+      crossAxisCount: crossAxisCount,
+      itemHeight: 48.0,
+    );
+  }
+
+  void _selectRangeToIndex({
+    required List<FileSystemEntity> items,
+    required int currentIndex,
+    required int targetIndex,
+    required SelectionState selectionState,
+    required void Function({
+      required Set<String> folderPaths,
+      required Set<String> filePaths,
+      required String lastSelectedPath,
+      required bool ctrlSelect,
+    }) selectRange,
+    required bool ctrlSelect,
+    required int crossAxisCount,
+  }) {
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+
+    final String anchorPath = _keyboardRangeAnchorPath ??
+        focusedPath ??
+        selectionState.lastSelectedPath ??
+        items[currentIndex].path;
+    _keyboardRangeAnchorPath = anchorPath;
+
+    int anchorIndex =
+        items.indexWhere((FileSystemEntity item) => item.path == anchorPath);
+    if (anchorIndex == -1) {
+      anchorIndex = currentIndex;
+      _keyboardRangeAnchorPath = items[currentIndex].path;
+    }
+
+    final int startIndex =
+        anchorIndex < targetIndex ? anchorIndex : targetIndex;
+    final int endIndex = anchorIndex < targetIndex ? targetIndex : anchorIndex;
+    final Set<String> folderPaths = <String>{};
+    final Set<String> filePaths = <String>{};
+
+    for (int i = startIndex; i <= endIndex; i++) {
+      final FileSystemEntity item = items[i];
+      if (item is Directory) {
+        folderPaths.add(item.path);
+      } else if (item is File) {
+        filePaths.add(item.path);
+      }
+    }
+
+    final target = items[targetIndex];
+    focusedPath = target.path;
+    selectRange(
+      folderPaths: folderPaths,
+      filePaths: filePaths,
+      lastSelectedPath: target.path,
+      ctrlSelect: ctrlSelect,
+    );
+
+    _ensurePathVisible(
+      target.path,
+      forward: targetIndex >= currentIndex,
+      index: targetIndex,
+      crossAxisCount: crossAxisCount,
+      itemHeight: 48.0,
+    );
   }
 
   KeyEventResult _performTypeAheadSearch({
@@ -254,6 +465,8 @@ class TabbedFolderKeyboardController {
     required String? currentFilter,
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
+    void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
+        onScrollToIndex,
   }) {
     final now = DateTime.now();
     final bool isTimeout = now.difference(_lastTypeTime) > _typeAheadTimeout;
@@ -307,6 +520,8 @@ class TabbedFolderKeyboardController {
         index: matchIndex,
         focusFolderPath: focusFolderPath,
         focusFilePath: focusFilePath,
+        onScrollToIndex: onScrollToIndex,
+        crossAxisCount: 1,
       );
       return KeyEventResult.handled;
     }

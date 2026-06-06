@@ -169,6 +169,12 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewModeGridPreview => 'Grid + Preview';
 
   @override
+  String get viewModeColumns => 'Columns';
+
+  @override
+  String get viewModeTree => 'Tree';
+
+  @override
   String get previewPaneTitle => 'Preview';
 
   @override
@@ -188,6 +194,9 @@ class EnglishLocalizations implements AppLocalizations {
 
   // Column names
   @override
+  String get columnName => 'Name';
+
+  @override
   String get columnSize => 'Size';
 
   @override
@@ -201,6 +210,27 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get columnAttributes => 'Attributes';
+
+  @override
+  String get columnDateAccessed => 'Date Accessed';
+
+  @override
+  String get columnExtension => 'Extension';
+
+  @override
+  String get columnPath => 'Path';
+
+  @override
+  String get columnTags => 'Tags';
+
+  @override
+  String get columnDimensions => 'Dimensions';
+
+  @override
+  String get columnDuration => 'Duration';
+
+  @override
+  String get columnItemCount => 'Item Count';
 
   // Column descriptions
   @override
@@ -221,11 +251,52 @@ class EnglishLocalizations implements AppLocalizations {
   String get columnAttributesDescription =>
       'Display file attributes (read/write permissions)';
 
+  @override
+  String get columnDateAccessedDescription =>
+      'Display date and time file was last accessed';
+
+  @override
+  String get columnExtensionDescription =>
+      'Display file extension (e.g. .mp4, .docx)';
+
+  @override
+  String get columnPathDescription => 'Display relative file path';
+
+  @override
+  String get columnTagsDescription => 'Display file tags';
+
+  @override
+  String get columnDimensionsDescription =>
+      'Display image/video dimensions (width x height)';
+
+  @override
+  String get columnDurationDescription =>
+      'Display media duration for video/audio files';
+
+  @override
+  String get columnItemCountDescription =>
+      'Display number of items inside folders';
+
   // Column visibility dialog
   @override
   String get columnVisibilityInstructions =>
       'Select the columns you want to display in details view. '
       'The "Name" column is always displayed and cannot be disabled.';
+
+  // List field visibility
+  @override
+  String get listFieldVisibilityTitle => 'Customize List Fields';
+
+  @override
+  String get listFieldVisibilityInstructions =>
+      'Select the fields you want to display in list view.';
+
+  // Metadata format strings
+  @override
+  String dimensionsFormat(int width, int height) => '$width \u00D7 $height';
+
+  @override
+  String itemCountFormat(int count) => '$count items';
 
   // Grid size dialog
   @override
@@ -237,6 +308,9 @@ class EnglishLocalizations implements AppLocalizations {
   // More options menu
   @override
   String get selectMultipleFiles => 'Select multiple files';
+
+  @override
+  String get selectMultipleTags => 'Select multiple tags';
 
   @override
   String get viewImageGallery => 'View image gallery';
@@ -454,6 +528,10 @@ class EnglishLocalizations implements AppLocalizations {
   String get folderDeleteSuccess => 'Folder deleted successfully';
   @override
   String get operationFailed => 'Operation failed';
+  @override
+  String get failedToCreateAlbum => 'Failed to create album';
+  @override
+  String get failedToUpdateAlbum => 'Failed to update album';
 
   // Tags
   @override
@@ -547,6 +625,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get gridViewMode => 'Grid Mode';
   @override
+  String get treeViewMode => 'Tree Mode';
+  @override
   String get previousPage => 'Previous Page';
   @override
   String get nextPage => 'Next Page';
@@ -611,6 +691,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get selectTagToRemove => 'Select a tag to remove:';
   @override
+  String get selectFilesToRemoveTags => 'Please select files to remove tags';
+  @override
   String get doubleClickToRename => 'Double-click to rename';
   @override
   String get openingFolder => 'Opening folder: ';
@@ -620,6 +702,32 @@ class EnglishLocalizations implements AppLocalizations {
   String get refreshTags => 'Refresh tags';
   @override
   String tagsRefreshed(int count) => 'Tags refreshed - $count tags loaded';
+  @override
+  String get tagManagementInfoTitle => 'Tag management info';
+  @override
+  String get tagManagementInfoDescription =>
+      'This screen lets you manage tags for files and folders.\n\n'
+      '• View all tags\n'
+      '• Search tags\n'
+      '• Sort tags by name or popularity\n'
+      '• View files assigned to a tag';
+  @override
+  String removeTagsFromFilesTitle(int count) => 'Remove tags from $count files';
+  @override
+  String get loadingTags => 'Loading tags...';
+  @override
+  String get noCommonTagsAcrossSelectedFiles =>
+      'There are no common tags across the selected files';
+  @override
+  String removeTagsSuccess(int removedTagCount, int fileCount) =>
+      'Removed $removedTagCount tags from $fileCount files';
+  @override
+  String removeTagsError(String error) => 'Error removing tags: $error';
+  @override
+  String batchTagProcessingError(String error) =>
+      'Error processing tags: $error';
+  @override
+  String searchError(String error) => 'Search error: $error';
 
   // Gallery
   @override
@@ -662,6 +770,14 @@ class EnglishLocalizations implements AppLocalizations {
       'Tags and preferences will be synced to the cloud';
   @override
   String get cloudSyncDisabled => 'Cloud sync is disabled';
+  @override
+  String get syncToCloudSuccess => 'Synced to cloud successfully';
+  @override
+  String get syncToCloudFailed => 'Failed to sync to cloud';
+  @override
+  String get syncFromCloudSuccess => 'Synced from cloud successfully';
+  @override
+  String get syncFromCloudFailed => 'Failed to sync from cloud';
   @override
   String get enableDatabaseForCloud =>
       'Enable SQLite database to use cloud sync';
@@ -1071,6 +1187,12 @@ class EnglishLocalizations implements AppLocalizations {
   String get sortBySize => 'Sort by size';
   @override
   String get sortByDate => 'Sort by date';
+  @override
+  String get viewModeFeatureComingSoon =>
+      'View mode switching will be added later';
+  @override
+  String get cannotCreateFileInThisLocation =>
+      'Cannot create a file in this location';
 
   // Bulk Selection
   @override
@@ -1460,6 +1582,22 @@ class EnglishLocalizations implements AppLocalizations {
       'Restore last opened tab and keep drawer collapse state per tab.';
 
   @override
+  String get tabInactiveThreshold => 'Tab inactive timeout';
+
+  @override
+  String get tabInactiveThresholdDescription =>
+      'Auto-suspend a tab and release its caches after it has been left untouched for this duration. Set to "Off" to keep tabs always active.';
+
+  @override
+  String get tabInactiveThresholdDisabled => 'Off';
+
+  @override
+  String get tabInactiveThresholdMinutesValue => 'minutes';
+
+  @override
+  String get tabInactiveThresholdHoursValue => 'hours';
+
+  @override
   String get cacheManagement => 'Cache Management';
 
   @override
@@ -1758,6 +1896,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String itemsSelected(int count) => '$count selected';
   @override
+  String itemsCount(int count) => '$count items';
+  @override
   String get noActiveTab => 'No active tab';
   @override
   String get masonryLayoutName => 'Masonry layout (Pinterest)';
@@ -1765,6 +1905,38 @@ class EnglishLocalizations implements AppLocalizations {
   String get undo => 'Undo';
   @override
   String errorWithMessage(String message) => 'Error: $message';
+  @override
+  String get referencedFile => 'Referenced file';
+  @override
+  String referencedFiles(int count) => '$count referenced files';
+  @override
+  String pathsCopied(int count) => '$count path(s) copied';
+  @override
+  String get moveToTrashTitle => 'Move to Trash';
+  @override
+  String get imageMovedToTrash => 'Image moved to trash';
+  @override
+  String get failedToMoveImageToTrash => 'Failed to move image to trash';
+  @override
+  String failedToMoveImageToTrashWithError(String error) =>
+      'Failed to move image to trash: $error';
+  @override
+  String get copiedPathToClipboard => 'Copied path to clipboard';
+  @override
+  String get unableToOpenWithExternalApp => 'Unable to open with external app';
+  @override
+  String failedToDisplayImageInformation(String error) =>
+      'Failed to display image information: $error';
+  @override
+  String removedFromAlbum(int count) =>
+      'Removed $count ${count == 1 ? 'image' : 'images'} from album';
+  @override
+  String get addingFilesInBackground => 'Adding files in background...';
+  @override
+  String addedFilesProgress(int added, int total) =>
+      'Added $added out of $total files';
+  @override
+  String get filesAddedSuccessfully => 'Files added successfully';
 
   @override
   String get processing => 'Processing...';
@@ -2129,6 +2301,24 @@ class EnglishLocalizations implements AppLocalizations {
   String get closeTab => 'Close tab';
 
   @override
+  String get closeOtherTabs => 'Close other tabs';
+
+  @override
+  String get markTabInactive => 'Mark as inactive';
+
+  @override
+  String get restoringTab => 'Restoring tab…';
+
+  @override
+  String get keepTabAlwaysActive => 'Keep tab always active';
+
+  @override
+  String get allowTabAutoSuspend => 'Allow tab to auto-suspend';
+
+  @override
+  String get tabAlwaysActiveTooltip => 'Always active';
+
+  @override
   String get addNewTab => 'Add new tab';
 
   // Desktop windows (tabbed browsing)
@@ -2360,6 +2550,25 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get closeAction => 'Close';
 
+  @override
+  String get pipOverlayEnabled => 'PiP overlay enabled';
+
+  @override
+  String get pipAndroidEnableFailed => 'Unable to enable PiP on Android';
+
+  @override
+  String pipError(String error) => 'PiP error: $error';
+
+  @override
+  String get pipNoSource => 'No video source available to open PiP';
+
+  @override
+  String get pipOpenedInSeparateWindow => 'PiP opened in a separate window';
+
+  @override
+  String get pipNotSupportedOnPlatform =>
+      'PiP is not supported on this platform';
+
   // Video library
   @override
   String get videoLibrary => 'Video Library';
@@ -2498,6 +2707,42 @@ class EnglishLocalizations implements AppLocalizations {
   String get fileNameLabel => 'File Name';
   @override
   String errorCreatingFile(String error) => 'Error creating file: $error';
+  @override
+  String get noFileSelectedForBenchmarking =>
+      'No file selected for benchmarking';
+  @override
+  String benchmarkError(String error) => 'Benchmark error: $error';
+  @override
+  String benchmarkFailed(String error) => 'Benchmark failed: $error';
+  @override
+  String get saveTagToLocalDatabaseFailed =>
+      'Failed to save tag to local database';
+  @override
+  String saveTagFailed(String error) => 'Failed to save tag: $error';
+  @override
+  String debugTagsSeeded(int savedCount, int requestedCount) =>
+      'Successfully seeded $savedCount/$requestedCount tags';
+  @override
+  String debugTagsSeedFailed(String error) => 'Error seeding tags: $error';
+  @override
+  String get debugTagsCleared => 'All tags cleared';
+  @override
+  String debugTagsClearFailed(String error) => 'Error clearing tags: $error';
+  @override
+  String addFolderToAlbumFailed(String error) => 'Error adding folder: $error';
+  @override
+  String addFilesToAlbumFailed(String error) => 'Error adding files: $error';
+  @override
+  String loadRulesFailed(String error) => 'Error loading rules: $error';
+  @override
+  String openTerminalFailed(String error) => 'Unable to open terminal: $error';
+  @override
+  String startCleanupFailed(String error) => 'Unable to start cleanup: $error';
+  @override
+  String startFormatFailed(String error) => 'Unable to start format: $error';
+  @override
+  String foundResultsWithTag(int count, String tag) =>
+      'Found $count results with tag "$tag"';
 
   // AI Agent
   @override
@@ -2668,6 +2913,44 @@ class EnglishLocalizations implements AppLocalizations {
   String get deleteConversation => 'Delete conversation';
   @override
   String get noConversations => 'No conversations yet';
+
+  // CB Agent rebrand
+  @override
+  String get cbAgent => 'CB Agent';
+  @override
+  String get cbAgentTitle => 'CB Agent';
+  @override
+  String get cbAgentSubtitle => 'Built-in AI assistant for CB File Hub';
+
+  // Disk Cleaner (CB Agent skill)
+  @override
+  String get cbAgentCleanerTitle => 'Disk Cleaner (CB Agent)';
+  @override
+  String get diskCleanerNotAvailable =>
+      'Disk Cleaner is only available on Windows';
+  @override
+  String get diskCleanerScanTitle => 'Scan for junk files';
+  @override
+  String get diskCleanerScanRunning => 'Scanning...';
+  @override
+  String get diskCleanerScanDone => 'Scan complete';
+  @override
+  String get diskCleanerCleanTitle => 'Clean junk files';
+  @override
+  String get diskCleanerCleanDone => 'Cleanup complete';
+  @override
+  String get diskCleanerAskAgent => 'Ask CB Agent';
+  @override
+  String get diskCleanerMoveToRecycleBin => 'Move to Recycle Bin';
+  @override
+  String get diskCleanerPermanentDelete => 'Permanent delete';
+  @override
+  String get diskCleanerSelectCategories => 'Select categories';
+  @override
+  String get diskCleanerSelectDrives => 'Select drives';
+  @override
+  String get diskCleanerScanAgain => 'Scan again';
+
   @override
   String get aiThinking0 => 'Thinking...';
   @override

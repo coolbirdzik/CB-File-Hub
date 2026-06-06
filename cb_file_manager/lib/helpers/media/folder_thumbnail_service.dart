@@ -3,16 +3,20 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
+import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common/sqlite_api.dart';
 
 class FolderThumbnailService {
   static const String _customThumbnailsKey = 'folder_custom_thumbnails';
-  static const String _configFileName = '.cbfile_config.json';
-  static const String _folderThumbnailKey = 'folderThumbnail';
-  static const String _folderAutoThumbnailKey = 'folderAutoThumbnail';
+  static const String _legacyConfigFileName = '.cbfile_config.json';
+  static const String _legacyFolderThumbnailKey = 'folderThumbnail';
+  static const String _legacyFolderAutoThumbnailKey = 'folderAutoThumbnail';
+  static const String _tableName = 'folder_thumbnails';
+
   static final FolderThumbnailService _instance =
       FolderThumbnailService._internal();
   static final StreamController<String> _thumbnailChangedController =
@@ -25,18 +29,18 @@ class FolderThumbnailService {
   // List to track LRU order (most recently used at the end)
   final List<String> _cacheAccessOrder = [];
 
-  // In-memory cache for custom thumbnail settings
-  Map<String, String> _customThumbnailSettings = {};
-
-  // Cache folder config to avoid repeated disk reads
-  final Map<String, Map<String, dynamic>> _folderConfigCache = {};
-  final Map<String, Map<String, dynamic>> _systemPathConfigs = {};
+  // Cache stored thumbnail rows to avoid repeated disk reads
+  final Map<String, _StoredThumbnailRow> _rowCache = {};
+  // Track folders we have already attempted to migrate from legacy json
+  final Set<String> _migratedLegacyPaths = {};
 
   // Track failed video paths to prevent infinite reload loops
   final Set<String> _failedVideoPathsCache = {};
 
   // Last cache cleanup timestamp
   DateTime _lastCacheCleanup = DateTime.now();
+
+  Future<void>? _tableInitialization;
 
   // Singleton pattern
   factory FolderThumbnailService() {
@@ -45,48 +49,35 @@ class FolderThumbnailService {
 
   FolderThumbnailService._internal();
 
-  // Initialize the service and load saved preferences
+  // Initialize the service and migrate any legacy SharedPreferences entries
   Future<void> initialize() async {
-    await _loadCustomThumbnailSettings();
+    await _migrateSharedPreferencesIfNeeded();
     debugPrint('FolderThumbnailService initialized');
   }
 
-  // Load custom thumbnail settings from SharedPreferences
-  Future<void> _loadCustomThumbnailSettings() async {
+  Future<void> _migrateSharedPreferencesIfNeeded() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String? settingsJson = prefs.getString(_customThumbnailsKey);
-
-      if (settingsJson != null) {
-        _customThumbnailSettings = Map<String, String>.from(settingsJson
-            .split('|')
-            .map((item) {
-              final parts = item.split('::');
-              return parts.length == 2 ? MapEntry(parts[0], parts[1]) : null;
-            })
-            .where((item) => item != null)
-            .fold({}, (map, item) {
-              map[item!.key] = item.value;
-              return map;
-            }));
+      final settingsJson = prefs.getString(_customThumbnailsKey);
+      if (settingsJson == null || settingsJson.isEmpty) {
+        return;
       }
-    } catch (e) {
-      debugPrint('Error loading custom thumbnail settings: $e');
-      _customThumbnailSettings = {};
-    }
-  }
 
-  // Save custom thumbnail settings to SharedPreferences
-  Future<void> _saveCustomThumbnailSettings() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String settingsJson = _customThumbnailSettings.entries
-          .map((entry) => '${entry.key}::${entry.value}')
-          .join('|');
+      for (final item in settingsJson.split('|')) {
+        final parts = item.split('::');
+        if (parts.length != 2) continue;
+        final folderPath = parts[0];
+        final value = parts[1];
+        if (folderPath.isEmpty || value.isEmpty) continue;
+        await _writeRow(
+          folderPath,
+          customThumbnail: _normalizeThumbnailValue(value),
+        );
+      }
 
-      await prefs.setString(_customThumbnailsKey, settingsJson);
+      await prefs.remove(_customThumbnailsKey);
     } catch (e) {
-      debugPrint('Error saving custom thumbnail settings: $e');
+      debugPrint('Error migrating legacy SharedPreferences thumbnails: $e');
     }
   }
 
@@ -111,89 +102,170 @@ class FolderThumbnailService {
     return folderPath.startsWith('#');
   }
 
-  Future<Map<String, dynamic>> _readFolderConfig(String folderPath) async {
-    if (_isSystemPath(folderPath)) {
-      return _systemPathConfigs[folderPath] ?? {};
+  String _normalizePath(String folderPath) {
+    final trimmed = folderPath.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
     }
-
-    if (_folderConfigCache.containsKey(folderPath)) {
-      return _folderConfigCache[folderPath] ?? {};
+    if (_isSystemPath(trimmed) || trimmed.contains('://')) {
+      return trimmed;
     }
-
-    final configPath = path.join(folderPath, _configFileName);
-    final configFile = File(configPath);
-    if (!await configFile.exists()) {
-      _folderConfigCache[folderPath] = {};
-      return {};
-    }
-
-    try {
-      final contents = await configFile.readAsString();
-      final decoded = json.decode(contents);
-      if (decoded is Map<String, dynamic>) {
-        _folderConfigCache[folderPath] = decoded;
-        return decoded;
-      }
-    } catch (e) {
-      debugPrint('Error reading folder config: $e');
-    }
-
-    _folderConfigCache[folderPath] = {};
-    return {};
+    final normalized = path.normalize(trimmed);
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
   }
 
-  Future<void> _writeFolderConfig(
-      String folderPath, Map<String, dynamic> config) async {
-    if (_isSystemPath(folderPath)) {
-      _systemPathConfigs[folderPath] = Map<String, dynamic>.from(config);
-      _folderConfigCache[folderPath] = Map<String, dynamic>.from(config);
-      return;
-    }
-
-    _folderConfigCache[folderPath] = Map<String, dynamic>.from(config);
-
-    final configPath = path.join(folderPath, _configFileName);
-    final configFile = File(configPath);
-
-    if (config.isEmpty) {
-      if (await configFile.exists()) {
-        try {
-          await configFile.delete();
-        } catch (e) {
-          debugPrint('Error deleting empty config file: $e');
-        }
-      }
-      return;
-    }
-
+  Future<Database> _getDatabase() async {
+    final database = await DatabaseManager.getInstance().getDatabase();
+    _tableInitialization ??= _ensureTable(database);
     try {
-      final directory = Directory(folderPath);
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
+      await _tableInitialization;
+    } catch (_) {
+      _tableInitialization = null;
+      rethrow;
+    }
+    return database;
+  }
+
+  Future<void> _ensureTable(Database database) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS $_tableName (
+        path TEXT PRIMARY KEY,
+        custom_thumbnail TEXT,
+        auto_thumbnail TEXT,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  Future<_StoredThumbnailRow> _readRow(String folderPath) async {
+    final pathKey = _normalizePath(folderPath);
+    final cached = _rowCache[pathKey];
+    if (cached != null) {
+      return cached;
+    }
+
+    final database = await _getDatabase();
+    final rows = await database.query(
+      _tableName,
+      where: 'path = ?',
+      whereArgs: <Object?>[pathKey],
+      limit: 1,
+    );
+
+    var row = rows.isEmpty
+        ? const _StoredThumbnailRow(custom: null, auto: null)
+        : _StoredThumbnailRow(
+            custom: rows.first['custom_thumbnail'] as String?,
+            auto: rows.first['auto_thumbnail'] as String?,
+          );
+
+    if (row.isEmpty && !_isSystemPath(folderPath)) {
+      final migrated = await _migrateLegacyConfig(folderPath, pathKey);
+      if (migrated != null) {
+        row = migrated;
       }
+    }
 
-      final jsonString = const JsonEncoder.withIndent('  ').convert(config);
-      await configFile.writeAsString(jsonString);
+    _rowCache[pathKey] = row;
+    return row;
+  }
 
-      if (Platform.isWindows) {
-        try {
-          await Process.run('attrib', ['+H', configPath]);
-        } catch (e) {
-          debugPrint('Error setting hidden attribute: $e');
+  Future<_StoredThumbnailRow?> _migrateLegacyConfig(
+    String folderPath,
+    String pathKey,
+  ) async {
+    if (_migratedLegacyPaths.contains(pathKey)) {
+      return null;
+    }
+    _migratedLegacyPaths.add(pathKey);
+
+    if (folderPath.isEmpty ||
+        _isSystemPath(folderPath) ||
+        folderPath.contains('://')) {
+      return null;
+    }
+
+    final configFile = File(path.join(folderPath, _legacyConfigFileName));
+    if (!await configFile.exists()) {
+      return null;
+    }
+
+    String? customValue;
+    String? autoValue;
+    try {
+      final decoded = json.decode(await configFile.readAsString());
+      if (decoded is Map) {
+        final raw = decoded[_legacyFolderThumbnailKey];
+        if (raw is String && raw.isNotEmpty) {
+          customValue = _normalizeThumbnailValue(raw);
         }
-      } else if (Platform.isAndroid) {
-        try {
-          final nomediaFile = File(path.join(folderPath, '.nomedia'));
-          if (!await nomediaFile.exists()) {
-            await nomediaFile.create();
-          }
-        } catch (e) {
-          debugPrint('Error creating .nomedia: $e');
+        final rawAuto = decoded[_legacyFolderAutoThumbnailKey];
+        if (rawAuto is String && rawAuto.isNotEmpty) {
+          autoValue = _normalizeThumbnailValue(rawAuto);
         }
       }
     } catch (e) {
-      debugPrint('Error writing folder config: $e');
+      debugPrint('Error reading legacy folder thumbnail config: $e');
     }
+
+    // Always remove the legacy file after attempting migration so the
+    // hidden `.cbfile_config.json` artifact stops appearing in user folders.
+    try {
+      await configFile.delete();
+    } catch (e) {
+      debugPrint('Error deleting legacy folder thumbnail config: $e');
+    }
+
+    if (customValue == null && autoValue == null) {
+      return null;
+    }
+
+    final migrated = _StoredThumbnailRow(
+      custom: customValue,
+      auto: autoValue,
+    );
+    await _persistRow(pathKey, migrated);
+    return migrated;
+  }
+
+  Future<void> _writeRow(
+    String folderPath, {
+    String? customThumbnail,
+    String? autoThumbnail,
+    bool clearCustom = false,
+    bool clearAuto = false,
+  }) async {
+    final pathKey = _normalizePath(folderPath);
+    final current = await _readRow(folderPath);
+    final next = _StoredThumbnailRow(
+      custom: clearCustom ? null : (customThumbnail ?? current.custom),
+      auto: clearAuto ? null : (autoThumbnail ?? current.auto),
+    );
+    await _persistRow(pathKey, next);
+    _rowCache[pathKey] = next;
+  }
+
+  Future<void> _persistRow(String pathKey, _StoredThumbnailRow row) async {
+    final database = await _getDatabase();
+    if (row.isEmpty) {
+      await database.delete(
+        _tableName,
+        where: 'path = ?',
+        whereArgs: <Object?>[pathKey],
+      );
+      return;
+    }
+
+    await database.insert(
+      _tableName,
+      <String, Object?>{
+        'path': pathKey,
+        'custom_thumbnail': row.custom,
+        'auto_thumbnail': row.auto,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   void _notifyThumbnailChanged(String folderPath) {
@@ -232,7 +304,7 @@ class FolderThumbnailService {
     bool isVideo = false,
   }) async {
     final value = isVideo ? 'video::$filePath' : filePath;
-    await _saveCustomThumbnailToConfig(folderPath, value);
+    await _writeRow(folderPath, customThumbnail: value);
     // Clear from cache to force regeneration
     _removeFromCache(folderPath);
     _notifyThumbnailChanged(folderPath);
@@ -240,9 +312,7 @@ class FolderThumbnailService {
 
   // Clear custom thumbnail for a folder
   Future<void> clearCustomThumbnail(String folderPath) async {
-    _customThumbnailSettings.remove(folderPath);
-    await _saveCustomThumbnailSettings();
-    await _clearCustomThumbnailInConfig(folderPath);
+    await _writeRow(folderPath, clearCustom: true);
     // Clear from cache to force regeneration
     _removeFromCache(folderPath);
     _notifyThumbnailChanged(folderPath);
@@ -250,21 +320,11 @@ class FolderThumbnailService {
 
   // Get custom thumbnail path for a folder (if set)
   Future<String?> getCustomThumbnailPath(String folderPath) async {
-    final config = await _readFolderConfig(folderPath);
-    final value = config[_folderThumbnailKey];
-    if (value is String && value.isNotEmpty) {
+    final row = await _readRow(folderPath);
+    final value = row.custom;
+    if (value != null && value.isNotEmpty) {
       return _normalizeThumbnailValue(value);
     }
-
-    final legacyValue = _customThumbnailSettings[folderPath];
-    if (legacyValue != null && legacyValue.isNotEmpty) {
-      final normalizedLegacy = _normalizeThumbnailValue(legacyValue);
-      await _saveCustomThumbnailToConfig(folderPath, normalizedLegacy);
-      _customThumbnailSettings.remove(folderPath);
-      await _saveCustomThumbnailSettings();
-      return normalizedLegacy;
-    }
-
     return null;
   }
 
@@ -272,19 +332,6 @@ class FolderThumbnailService {
   Future<bool> hasCustomThumbnail(String folderPath) async {
     final customValue = await getCustomThumbnailPath(folderPath);
     return customValue != null && customValue.isNotEmpty;
-  }
-
-  Future<void> _saveCustomThumbnailToConfig(
-      String folderPath, String value) async {
-    final config = await _readFolderConfig(folderPath);
-    config[_folderThumbnailKey] = value;
-    await _writeFolderConfig(folderPath, config);
-  }
-
-  Future<void> _clearCustomThumbnailInConfig(String folderPath) async {
-    final config = await _readFolderConfig(folderPath);
-    config.remove(_folderThumbnailKey);
-    await _writeFolderConfig(folderPath, config);
   }
 
   // Add to cache with LRU management
@@ -337,10 +384,13 @@ class FolderThumbnailService {
       return cachedPath;
     }
 
+    final row = await _readRow(folderPath);
+
     // Check if there is a custom thumbnail
-    final customPath = await getCustomThumbnailPath(folderPath);
-    if (customPath != null) {
-      final validCustom = await _validateThumbnailValue(customPath);
+    final customRaw = row.custom;
+    if (customRaw != null && customRaw.isNotEmpty) {
+      final normalized = _normalizeThumbnailValue(customRaw);
+      final validCustom = await _validateThumbnailValue(normalized);
       if (validCustom != null) {
         _addToCache(folderPath, validCustom);
         return validCustom;
@@ -349,17 +399,15 @@ class FolderThumbnailService {
     }
 
     // Check if we already have an auto-selected thumbnail saved
-    final config = await _readFolderConfig(folderPath);
-    final autoValue = config[_folderAutoThumbnailKey];
-    if (autoValue is String && autoValue.isNotEmpty) {
-      final normalized = _normalizeThumbnailValue(autoValue);
+    final autoRaw = row.auto;
+    if (autoRaw != null && autoRaw.isNotEmpty) {
+      final normalized = _normalizeThumbnailValue(autoRaw);
       final validAuto = await _validateThumbnailValue(normalized);
       if (validAuto != null) {
         _addToCache(folderPath, validAuto);
         return validAuto;
       }
-      config.remove(_folderAutoThumbnailKey);
-      await _writeFolderConfig(folderPath, config);
+      await _writeRow(folderPath, clearAuto: true);
     }
 
     // Find and generate thumbnail from folder content
@@ -372,8 +420,7 @@ class FolderThumbnailService {
     }
 
     if (thumbnailPath != null) {
-      config[_folderAutoThumbnailKey] = thumbnailPath;
-      await _writeFolderConfig(folderPath, config);
+      await _writeRow(folderPath, autoThumbnail: thumbnailPath);
       _addToCache(folderPath, thumbnailPath);
     }
 
@@ -395,7 +442,7 @@ class FolderThumbnailService {
         }
 
         final basename = path.basename(entity.path);
-        if (basename == _configFileName || basename == '.nomedia') {
+        if (basename == _legacyConfigFileName || basename == '.nomedia') {
           continue;
         }
 
@@ -433,7 +480,7 @@ class FolderThumbnailService {
         }
 
         final basename = path.basename(entity.path);
-        if (basename == _configFileName || basename == '.nomedia') {
+        if (basename == _legacyConfigFileName || basename == '.nomedia') {
           continue;
         }
 
@@ -449,14 +496,12 @@ class FolderThumbnailService {
   }
 
   Future<String?> setAutoThumbnail(String folderPath, String value) async {
-    final config = await _readFolderConfig(folderPath);
-    final customValue = config[_folderThumbnailKey];
-    if (customValue is String && customValue.isNotEmpty) {
+    final row = await _readRow(folderPath);
+    if (row.custom != null && row.custom!.isNotEmpty) {
       return null;
     }
 
-    config[_folderAutoThumbnailKey] = value;
-    await _writeFolderConfig(folderPath, config);
+    await _writeRow(folderPath, autoThumbnail: value);
     _addToCache(folderPath, value);
     _notifyThumbnailChanged(folderPath);
     return value;
@@ -498,11 +543,59 @@ class FolderThumbnailService {
   void clearCache() {
     _thumbnailCache.clear();
     _cacheAccessOrder.clear();
-    _folderConfigCache.clear();
+    _rowCache.clear();
     _failedVideoPathsCache.clear();
     debugPrint('FolderThumbnailService: Cache cleared');
 
     // Also clear the VideoThumbnailHelper cache
     unawaited(VideoThumbnailHelper.clearCache());
   }
+
+  /// Cancel any pending folder thumbnail work for [dirPath] and drop the
+  /// in-memory cache entry for that folder. Used by the tab activity manager
+  /// when a tab transitions to inactive so cached folder cover thumbnails
+  /// are released and any underlying video thumbnail work for the same
+  /// directory is also suspended.
+  ///
+  /// On-disk caches and persisted thumbnail rows are intentionally left
+  /// intact; only the in-memory bitmap reference is dropped so RAM can be
+  /// reclaimed.
+  void cancelForDirectory(String dirPath) {
+    if (dirPath.isEmpty) return;
+
+    final normalized = path.normalize(dirPath);
+    // Drop in-memory cache for this directory and any direct child entries.
+    final keysToDrop = _thumbnailCache.keys
+        .where((k) =>
+            path.normalize(k) == normalized ||
+            path.isWithin(normalized, path.normalize(k)))
+        .toList();
+    for (final k in keysToDrop) {
+      _removeFromCache(k);
+    }
+
+    // Drop cached rows as well so a clean re-read after refocus reflects
+    // any user-facing changes made while the tab was inactive.
+    final rowKeysToDrop = _rowCache.keys
+        .where((k) =>
+            path.normalize(k) == normalized ||
+            path.isWithin(normalized, path.normalize(k)))
+        .toList();
+    for (final k in rowKeysToDrop) {
+      _rowCache.remove(k);
+    }
+
+    // Cascade into the underlying video thumbnail pipeline.
+    VideoThumbnailHelper.cancelForDirectory(dirPath);
+  }
+}
+
+class _StoredThumbnailRow {
+  const _StoredThumbnailRow({required this.custom, required this.auto});
+
+  final String? custom;
+  final String? auto;
+
+  bool get isEmpty =>
+      (custom == null || custom!.isEmpty) && (auto == null || auto!.isEmpty);
 }

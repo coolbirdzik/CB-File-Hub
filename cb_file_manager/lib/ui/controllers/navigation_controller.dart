@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
@@ -130,6 +131,11 @@ class NavigationController {
     debugPrint(
         'Navigation history length: ${updatedTab.navigationHistory.length}');
 
+    // Commit the visible path before the directory scan starts. The listing
+    // can take time for large or slow folders, but the address bar and tab
+    // should reflect the user's navigation immediately.
+    onPathChanged(path);
+
     // Update the folder list to show the new path
     folderListBloc.add(FolderListLoad(path));
 
@@ -148,9 +154,6 @@ class NavigationController {
       final tabName = lastPart.isEmpty ? l10n.rootFolder : lastPart;
       tabManagerBloc.add(UpdateTabName(tabId, tabName));
     }
-
-    // Notify path changed
-    onPathChanged(path);
   }
 
   /// Handle path submission when user manually edits the path
@@ -193,12 +196,8 @@ class NavigationController {
         }
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.pathNotAccessible),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppToast.error(
+              context, AppLocalizations.of(context)!.pathNotAccessible);
         }
         // Revert to current path
         pathController.text = (isDrivesPath(currentPath) || currentPath.isEmpty)
@@ -370,6 +369,11 @@ class NavigationController {
       folderListBloc.add(const ClearSearchAndFilters());
     }
 
+    // Commit the visible path before the directory scan starts. This keeps
+    // external tab path changes, history navigation, and split-pane navigation
+    // responsive even when folder enumeration is slow.
+    onPathChanged(newPath);
+
     // Load the folder contents with the new path
     folderListBloc.add(FolderListLoad(newPath));
 
@@ -377,9 +381,6 @@ class NavigationController {
 
     // Save as last accessed folder
     onSaveLastAccessedFolder();
-
-    // Notify path changed
-    onPathChanged(newPath);
   }
 
   /// Handle result from gallery screens (Video/Image Gallery)

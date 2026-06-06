@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
@@ -36,13 +36,27 @@ import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 class FileViewShell extends StatefulWidget {
   final Widget child;
 
-  // ── Grid zoom ──────────────────────────────────────────────────────────────
-  /// Current view mode — Ctrl+scroll only activates in [ViewMode.grid].
+  // ── Grid zoom / view spectrum ───────────────────────────────────────────────
+  /// Current view mode — used to decide whether Ctrl+scroll adjusts zoom only
+  /// (legacy [onGridZoomDelta]) or walks the full view spectrum
+  /// ([onViewScaleDelta]).
   final ViewMode viewMode;
 
   /// Called with +1 (zoom in = fewer columns) or -1 (zoom out = more columns).
   /// The callback is responsible for clamping and persisting the new level.
+  ///
+  /// Legacy: only active in grid/gridPreview modes. Prefer [onViewScaleDelta]
+  /// for the unified tree↔column↔detail↔list↔grid spectrum.
   final void Function(int delta)? onGridZoomDelta;
+
+  /// Called for Ctrl+scroll in **any** view mode with a spectrum delta:
+  /// `+1` = more spacious (wider modes / bigger grid items),
+  /// `-1` = denser (narrower modes / smaller grid items).
+  ///
+  /// When provided this takes precedence over [onGridZoomDelta] and the
+  /// gesture is active in every view mode. The callback owns clamping,
+  /// mode-transition, and persistence (typically via `ViewModeSpectrum.step`).
+  final void Function(int delta)? onViewScaleDelta;
 
   // ── Mouse navigation ───────────────────────────────────────────────────────
   /// Called when mouse XButton1 (back) is pressed. Pass `null` to disable.
@@ -63,18 +77,29 @@ class FileViewShell extends StatefulWidget {
 
   /// `Delete` (permanent = false) / `Shift+Delete` (permanent = true).
   final void Function({required bool permanent})? onDelete;
+  final VoidCallback? onCopy;
+  final VoidCallback? onCut;
+  final VoidCallback? onPaste;
+  final VoidCallback? onRename;
+  final bool enableKeyboardShortcuts;
 
   const FileViewShell({
     Key? key,
     required this.child,
     required this.viewMode,
     this.onGridZoomDelta,
+    this.onViewScaleDelta,
     this.onMouseBack,
     this.onMouseForward,
     this.onEscape,
     this.onRefresh,
     this.onSelectAll,
     this.onDelete,
+    this.onCopy,
+    this.onCut,
+    this.onPaste,
+    this.onRename,
+    this.enableKeyboardShortcuts = true,
   }) : super(key: key);
 
   @override
@@ -109,63 +134,43 @@ class _FileViewShellState extends State<FileViewShell> {
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
 
   KeyEventResult _onKeyEvent(FocusNode _, KeyEvent event) {
-    if (!_isDesktop) return KeyEventResult.ignored;
-
-    // Only react to key-down and key-repeat events.
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+    if (!widget.enableKeyboardShortcuts) {
       return KeyEventResult.ignored;
     }
-
-    // Skip all shortcuts when a text field has keyboard focus.
-    if (FocusManager.instance.primaryFocus?.context?.widget is EditableText) {
-      return KeyEventResult.ignored;
-    }
-
-    final key = event.logicalKey;
-    final isCtrl = HardwareKeyboard.instance.isControlPressed;
-    final isShift = HardwareKeyboard.instance.isShiftPressed;
-
-    // Escape ─────────────────────────────────────────────────────────────────
-    if (key == LogicalKeyboardKey.escape && widget.onEscape != null) {
-      widget.onEscape!();
-      return KeyEventResult.handled;
-    }
-
-    // F5 / Ctrl+R ─────────────────────────────────────────────────────────────
-    if (widget.onRefresh != null &&
-        (key == LogicalKeyboardKey.f5 ||
-            (isCtrl && key == LogicalKeyboardKey.keyR))) {
-      widget.onRefresh!();
-      return KeyEventResult.handled;
-    }
-
-    // Ctrl+A ──────────────────────────────────────────────────────────────────
-    if (isCtrl &&
-        key == LogicalKeyboardKey.keyA &&
-        widget.onSelectAll != null) {
-      widget.onSelectAll!();
-      return KeyEventResult.handled;
-    }
-
-    // Delete / Shift+Delete ───────────────────────────────────────────────────
-    if (key == LogicalKeyboardKey.delete && widget.onDelete != null) {
-      widget.onDelete!(permanent: isShift);
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
+    return BrowserLikeKeyboardShortcuts.handleBasic(
+      isDesktop: _isDesktop,
+      event: event,
+      onEscape: widget.onEscape,
+      onRefresh: widget.onRefresh,
+      onSelectAll: widget.onSelectAll,
+      onDelete: widget.onDelete == null
+          ? null
+          : (permanent) => widget.onDelete!(permanent: permanent),
+      onCopy: widget.onCopy,
+      onCut: widget.onCut,
+      onPaste: widget.onPaste,
+      onRename: widget.onRename,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Ctrl+scroll zoom is active only in grid/gridPreview modes.
-    final zoomDelta = (widget.viewMode == ViewMode.grid ||
-            widget.viewMode == ViewMode.gridPreview)
-        ? widget.onGridZoomDelta
-        : null;
+    // Unified view spectrum (Ctrl+scroll in every mode) takes precedence.
+    // CtrlScrollZoom emits +1 on scroll-down; the spectrum convention is
+    // +1 = more spacious (scroll-up), so invert the raw sign here.
+    final void Function(int delta)? scrollDelta;
+    if (widget.onViewScaleDelta != null) {
+      scrollDelta = (raw) => widget.onViewScaleDelta!(-raw);
+    } else {
+      // Legacy: Ctrl+scroll zoom is active only in grid/gridPreview modes.
+      scrollDelta = (widget.viewMode == ViewMode.grid ||
+              widget.viewMode == ViewMode.gridPreview)
+          ? widget.onGridZoomDelta
+          : null;
+    }
 
     return CtrlScrollZoom(
-      onDelta: zoomDelta,
+      onDelta: scrollDelta,
       child: Listener(
         onPointerDown:
             (widget.onMouseBack != null || widget.onMouseForward != null)
@@ -173,7 +178,7 @@ class _FileViewShellState extends State<FileViewShell> {
                 : null,
         child: Focus(
           focusNode: _focusNode,
-          autofocus: true,
+          autofocus: widget.enableKeyboardShortcuts,
           onKeyEvent: _onKeyEvent,
           child: widget.child,
         ),

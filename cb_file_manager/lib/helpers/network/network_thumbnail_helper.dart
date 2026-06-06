@@ -193,6 +193,65 @@ class NetworkThumbnailHelper {
     // debugPrint('Cancelled thumbnail processing for invisible path: $path');
   }
 
+  /// Cancel all in-flight and queued thumbnail work whose path lies under
+  /// [prefix]. Used by the tab activity manager when a tab transitions to
+  /// inactive so background thumbnail work for the tab's network folder is
+  /// suspended.
+  ///
+  /// [prefix] should be a normalized network path such as
+  /// `#network/host/share/folder`. Matching is performed by exact-equality
+  /// or by `path.startsWith('$prefix/')` so a trailing-slash mismatch does
+  /// not cause leaks.
+  void cancelPathsUnder(String prefix) {
+    if (prefix.isEmpty) return;
+    final matchPrefix = prefix.endsWith('/') ? prefix : '$prefix/';
+
+    // Collect matching visible/queued/in-flight paths first to avoid mutation
+    // while iterating.
+    final matchingVisible = <String>[];
+    for (final p in _visiblePaths) {
+      if (p == prefix || p.startsWith(matchPrefix)) {
+        matchingVisible.add(p);
+      }
+    }
+
+    final matchingQueued = <String>{};
+    for (final req in _requestQueue) {
+      if (req.path == prefix || req.path.startsWith(matchPrefix)) {
+        matchingQueued.add(req.path);
+      }
+    }
+
+    final matchingIsolates = <String>[];
+    for (final p in _isolatePorts.keys) {
+      if (p == prefix || p.startsWith(matchPrefix)) {
+        matchingIsolates.add(p);
+      }
+    }
+
+    // Cancel via the existing per-path machinery.
+    for (final p in <String>{
+      ...matchingVisible,
+      ...matchingQueued,
+      ...matchingIsolates,
+    }) {
+      _cancelPath(p);
+      _visiblePaths.remove(p);
+    }
+
+    // Defensive: also kill any debounce timers whose key falls under prefix.
+    final debounceKeys = _debounceTimers.keys.where((k) {
+      // Keys are formed as `<path>:<size>`.
+      final colonIdx = k.lastIndexOf(':');
+      final pathPart = colonIdx > 0 ? k.substring(0, colonIdx) : k;
+      return pathPart == prefix || pathPart.startsWith(matchPrefix);
+    }).toList();
+    for (final key in debounceKeys) {
+      _debounceTimers[key]?.cancel();
+      _debounceTimers.remove(key);
+    }
+  }
+
   /// Cancel all in-flight and queued thumbnail work.
   ///
   /// This is useful when navigating away from a folder, especially on SMB where

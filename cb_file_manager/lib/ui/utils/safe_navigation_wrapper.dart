@@ -89,6 +89,15 @@ class _SafeNavigationWrapperState extends State<SafeNavigationWrapper> {
   }
 
   @override
+  void dispose() {
+    // Restore the previous error handler so the next test's SafeNavigationWrapper
+    // starts from a clean slate. Without this, each testWidgets call chains a new
+    // handler on top of a stale one that holds a reference to the disposed state.
+    FlutterError.onError = _previousOnError;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return widget.child;
   }

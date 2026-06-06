@@ -5,6 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:path_provider/path_provider.dart';
 
+import '../../utils/app_logger.dart';
+import 'recycle_bin_reader.dart' as direct_reader;
+import 'windows_file_operations.dart';
+
 /// A class that manages the trash bin functionality with platform-specific implementation
 class TrashManager {
   static final TrashManager _instance = TrashManager._internal();
@@ -71,58 +75,140 @@ class TrashManager {
 
   /// Get files from the Windows Recycle Bin
   /// Returns a list of SystemTrashItem objects representing files in the Windows Recycle Bin
-  Future<List<SystemTrashItem>> getWindowsRecycleBinItems() async {
+  Future<List<SystemTrashItem>> getWindowsRecycleBinItems({
+    int? offset,
+    int? limit,
+  }) async {
     if (!Platform.isWindows) {
       return [];
     }
 
+    // Native first: ~10-50x faster than PowerShell because it avoids
+    // process spawn, JSON serialization, and runs the COM enumeration
+    // in-process on a worker thread.
+    final native =
+        await _getRecycleBinItemsNative(offset: offset ?? 0, limit: limit);
+    if (native != null) {
+      return native.items;
+    }
+    return _getRecycleBinItemsPowerShell();
+  }
+
+  /// Returns the slice + the total bin size so callers can drive a paged
+  /// load. Falls back to PowerShell (with a [total] inferred from the
+  /// returned slice) when the native plugin is unavailable.
+  Future<RecycleBinPage> getWindowsRecycleBinItemsPage(
+      {int offset = 0, int? limit}) async {
+    if (!Platform.isWindows) {
+      return const RecycleBinPage(items: [], total: 0);
+    }
+    final native =
+        await _getRecycleBinItemsNative(offset: offset, limit: limit);
+    if (native != null) {
+      return native;
+    }
+    final fallback = await _getRecycleBinItemsPowerShell();
+    return RecycleBinPage(items: fallback, total: fallback.length);
+  }
+
+  Future<RecycleBinPage?> _getRecycleBinItemsNative(
+      {int offset = 0, int? limit}) async {
+    try {
+      final raw = await WindowsFileOperations.enumerateRecycleBin(
+        offset: offset,
+        limit: limit,
+      );
+      if (raw == null) return null;
+
+      final items = <SystemTrashItem>[];
+      for (final entry in raw.items) {
+        final size = entry['size'];
+        items.add(SystemTrashItem(
+          name: (entry['name'] as String?) ?? 'Unknown',
+          recycleBinPath: (entry['path'] as String?) ?? '',
+          originalPath: (entry['originalPath'] as String?) ?? 'Unknown',
+          size: size is int
+              ? size
+              : size is num
+                  ? size.toInt()
+                  : 0,
+          trashedDate: _parseRecycleBinDate(entry['deletedDate'] as String?) ??
+              DateTime.now(),
+          isSystemItem: true,
+          isFolder: entry['isFolder'] == true,
+        ));
+      }
+      return RecycleBinPage(items: items, total: raw.total);
+    } catch (e, st) {
+      AppLogger.warning(
+        '[TrashManager] Native Recycle Bin enumeration failed: $e',
+        stackTrace: st,
+      );
+      return null;
+    }
+  }
+
+  DateTime? _parseRecycleBinDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final s = raw.trim();
+    if (s.contains('/') || s.contains('-')) {
+      return DateTime.tryParse(s);
+    }
+    return null;
+  }
+
+  Future<List<SystemTrashItem>> _getRecycleBinItemsPowerShell() async {
     List<SystemTrashItem> recycleBinItems = [];
 
     try {
-      // Use PowerShell to access the Recycle Bin through COM objects
+      // PowerShell fallback for the legacy code path. The script caches
+      // the "Original Location" and "Date deleted" property indices once
+      // instead of scanning 500 properties per item, and uses
+      // -NoLogo/-NoProfile/-NonInteractive to skip ~1-3s of profile load.
       final result = await Process.run('powershell.exe', [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
         '-Command',
-        '''
-        \$shell = New-Object -ComObject Shell.Application
-        \$recycleBin = \$shell.NameSpace(0xa) # 0xa is the Recycle Bin
-        
-        \$items = @()
-        foreach (\$item in \$recycleBin.Items()) {
-            \$name = \$item.Name
-            \$path = \$item.Path
-            \$size = \$item.Size
-            
-            # Get the original path from extended property
-            \$originalPath = ""
-            for (\$i = 0; \$i -lt 500; \$i++) {
-                \$propName = \$recycleBin.GetDetailsOf(\$null, \$i)
-                if (\$propName -eq "Original Location") {
-                    \$originalPath = \$recycleBin.GetDetailsOf(\$item, \$i)
-                    break
-                }
+        r'''
+        $ErrorActionPreference = 'Stop'
+        $shell = New-Object -ComObject Shell.Application
+        $recycleBin = $shell.NameSpace(0xa)
+
+        $origIdx = -1
+        $dateIdx = -1
+        for ($i = 0; $i -lt 500; $i++) {
+            $propName = $recycleBin.GetDetailsOf($null, $i)
+            if ($origIdx -lt 0 -and $propName -eq 'Original Location') {
+                $origIdx = $i
+            } elseif ($dateIdx -lt 0 -and $propName -eq 'Date deleted') {
+                $dateIdx = $i
             }
-            
-            # Get delete date from extended property
-            \$deletedDate = ""
-            for (\$i = 0; \$i -lt 500; \$i++) {
-                \$propName = \$recycleBin.GetDetailsOf(\$null, \$i)
-                if (\$propName -eq "Date deleted") {
-                    \$deletedDate = \$recycleBin.GetDetailsOf(\$item, \$i)
-                    break
-                }
+            if ($origIdx -ge 0 -and $dateIdx -ge 0) { break }
+        }
+
+        $items = @()
+        foreach ($item in $recycleBin.Items()) {
+            $originalPath = ''
+            if ($origIdx -ge 0) {
+                $originalPath = $recycleBin.GetDetailsOf($item, $origIdx)
             }
-            
-            \$items += [PSCustomObject]@{
-                Name = \$name
-                Path = \$path
-                Size = \$size
-                OriginalPath = \$originalPath
-                DeletedDate = \$deletedDate
-                IsFolder = \$item.IsFolder
+            $deletedDate = ''
+            if ($dateIdx -ge 0) {
+                $deletedDate = $recycleBin.GetDetailsOf($item, $dateIdx)
+            }
+
+            $items += [PSCustomObject]@{
+                Name         = $item.Name
+                Path         = $item.Path
+                Size         = $item.Size
+                OriginalPath = $originalPath
+                DeletedDate  = $deletedDate
+                IsFolder     = $item.IsFolder
             }
         }
-        
-        ConvertTo-Json -InputObject \$items
+
+        ConvertTo-Json -InputObject $items -Compress
         '''
       ]);
 
@@ -136,21 +222,15 @@ class TrashManager {
         final List<dynamic> items = json.decode(result.stdout.toString());
 
         for (var item in items) {
-          // Convert PowerShell date format to DateTime
           DateTime? deletedDate;
           try {
             if (item['DeletedDate'] != null &&
                 item['DeletedDate'].toString().isNotEmpty) {
-              // PowerShell date format can vary, try common formats
               String dateStr = item['DeletedDate'].toString().trim();
-
-              // Try to handle various date formats
               if (dateStr.contains('/') || dateStr.contains('-')) {
                 deletedDate = DateTime.tryParse(dateStr) ??
-                    DateTime.now()
-                        .subtract(const Duration(days: 1)); // Fallback
+                    DateTime.now().subtract(const Duration(days: 1));
               } else {
-                // If no specific date found, use a default recent date
                 deletedDate = DateTime.now().subtract(const Duration(days: 1));
               }
             }
@@ -162,7 +242,6 @@ class TrashManager {
           int size = 0;
           try {
             if (item['Size'] != null) {
-              // Try to parse the size
               String sizeStr = item['Size']
                   .toString()
                   .replaceAll(',', '')
@@ -463,17 +542,179 @@ class TrashManager {
     }
   }
 
-  /// Move multiple files to trash
-  Future<int> moveMultipleToTrash(List<String> filePaths) async {
-    int successCount = 0;
+  /// Move multiple files to trash.
+  ///
+  /// On Windows, this uses a single native `IFileOperation` batch call which
+  /// is dramatically faster than the per-file PowerShell fallback. Returns
+  /// the set of paths that were successfully moved to the Recycle Bin.
+  ///
+  /// The work is split into chunks of [chunkSize] so the caller can show
+  /// progress via [onChunkDone] (called after each chunk with the number of
+  /// items processed and the total).
+  Future<Set<String>> moveMultipleToTrashBatched(
+    List<String> filePaths, {
+    int chunkSize = 200,
+    void Function(String currentPath, int done, int total)? onChunkStart,
+    void Function(int done, int total)? onChunkDone,
+    Duration? timeoutOverride,
+  }) async {
+    if (filePaths.isEmpty) return <String>{};
 
+    if (Platform.isWindows && WindowsFileOperations.isAvailable) {
+      return _runDeleteBatch(
+        filePaths,
+        permanent: false,
+        chunkSize: chunkSize,
+        onChunkStart: onChunkStart,
+        onChunkDone: onChunkDone,
+        timeoutOverride: timeoutOverride,
+      );
+    }
+
+    final succeeded = <String>{};
+    int done = 0;
     for (final path in filePaths) {
       if (await moveToTrash(path)) {
-        successCount++;
+        succeeded.add(path);
+      }
+      done++;
+      onChunkDone?.call(done, filePaths.length);
+    }
+    return succeeded;
+  }
+
+  /// Permanently delete multiple files/folders using a single native
+  /// `IFileOperation` batch call on Windows. Returns the set of paths that
+  /// were successfully deleted. Falls back to per-path Dart `delete()` on
+  /// other platforms or if the native call fails.
+  Future<Set<String>> deleteMultiplePermanently(
+    List<String> filePaths, {
+    int chunkSize = 200,
+    void Function(String currentPath, int done, int total)? onChunkStart,
+    void Function(int done, int total)? onChunkDone,
+    Duration? timeoutOverride,
+  }) async {
+    if (filePaths.isEmpty) return <String>{};
+
+    if (Platform.isWindows && WindowsFileOperations.isAvailable) {
+      return _runDeleteBatch(
+        filePaths,
+        permanent: true,
+        chunkSize: chunkSize,
+        onChunkStart: onChunkStart,
+        onChunkDone: onChunkDone,
+        timeoutOverride: timeoutOverride,
+      );
+    }
+
+    final succeeded = <String>{};
+    int done = 0;
+    for (final path in filePaths) {
+      try {
+        final type = FileSystemEntity.typeSync(path);
+        if (type == FileSystemEntityType.directory) {
+          await Directory(path).delete(recursive: true);
+          succeeded.add(path);
+        } else if (type == FileSystemEntityType.file) {
+          await File(path).delete();
+          succeeded.add(path);
+        }
+      } catch (_) {}
+      done++;
+      onChunkDone?.call(done, filePaths.length);
+    }
+    return succeeded;
+  }
+
+  /// Drives the Windows IFileOperation batch in chunks. Trusts the native
+  /// return code: a successful batch marks every path in the chunk as
+  /// succeeded; a failed batch is degraded to per-item native calls so a
+  /// single bad path in the chunk does not lose the rest.
+  Future<Set<String>> _runDeleteBatch(
+    List<String> filePaths, {
+    required bool permanent,
+    required int chunkSize,
+    void Function(String currentPath, int done, int total)? onChunkStart,
+    void Function(int done, int total)? onChunkDone,
+    Duration? timeoutOverride,
+  }) async {
+    final succeeded = <String>{};
+    final total = filePaths.length;
+    final size = chunkSize <= 0 ? total : chunkSize;
+    final batchTimeout = timeoutOverride ??
+        (permanent ? const Duration(seconds: 20) : const Duration(seconds: 2));
+    final singleTimeout = timeoutOverride ??
+        (permanent ? const Duration(seconds: 10) : const Duration(seconds: 1));
+
+    for (int start = 0; start < total; start += size) {
+      final end = (start + size < total) ? start + size : total;
+      final chunk = filePaths.sublist(start, end);
+      final action = permanent ? 'permanent delete' : 'move to Recycle Bin';
+      final stopwatch = Stopwatch()..start();
+      AppLogger.info(
+        '[TrashManager] Starting native $action batch | range=${start + 1}-$end/$total | chunkSize=${chunk.length} | first=${chunk.first}'
+        '${chunk.length > 1 ? ' | last=${chunk.last}' : ''}',
+      );
+      onChunkStart?.call(chunk.first, start, total);
+
+      final ok = await WindowsFileOperations.deleteItems(
+        sources: chunk,
+        permanent: permanent,
+        silent: true,
+        timeout: batchTimeout,
+      );
+      stopwatch.stop();
+      AppLogger.info(
+        '[TrashManager] Finished native $action batch | range=${start + 1}-$end/$total | ok=$ok | elapsedMs=${stopwatch.elapsedMilliseconds} | first=${chunk.first}',
+      );
+
+      if (ok) {
+        succeeded.addAll(chunk);
+      } else if (chunk.length > 1 && permanent) {
+        AppLogger.warning(
+          '[TrashManager] Native $action batch failed; retrying per item | range=${start + 1}-$end/$total | first=${chunk.first}',
+        );
+        // Batch failed — degrade to per-item native call so a single bad
+        // path does not lose the whole chunk.
+        for (final p in chunk) {
+          final singleStopwatch = Stopwatch()..start();
+          AppLogger.info(
+            '[TrashManager] Retrying native $action for single path: $p',
+          );
+          final single = await WindowsFileOperations.deleteItems(
+            sources: [p],
+            permanent: permanent,
+            silent: true,
+            timeout: singleTimeout,
+          );
+          singleStopwatch.stop();
+          AppLogger.info(
+            '[TrashManager] Finished single-path native $action | ok=$single | elapsedMs=${singleStopwatch.elapsedMilliseconds} | path=$p',
+          );
+          if (single) succeeded.add(p);
+        }
+      } else {
+        AppLogger.warning(
+          '[TrashManager] Native $action failed | range=${start + 1}-$end/$total | first=${chunk.first}',
+        );
+      }
+
+      onChunkDone?.call(end, total);
+
+      // Yield back to the event loop between chunks so Flutter can repaint
+      // progress indicators during long-running delete/trash operations.
+      if (end < total) {
+        await Future<void>.delayed(Duration.zero);
       }
     }
 
-    return successCount;
+    return succeeded;
+  }
+
+  /// Move multiple files to trash
+  Future<int> moveMultipleToTrash(List<String> filePaths) async {
+    final succeeded = await moveMultipleToTrashBatched(filePaths);
+    return succeeded.length;
   }
 
   /// Restore a file from trash
@@ -628,61 +869,33 @@ class TrashManager {
   /// Get the list of files in trash with their metadata
   /// Combines both internal trash items and system trash items on Windows
   Future<List<TrashItem>> getTrashItems() async {
-    List<TrashItem> allTrashItems = [];
+    // Run internal trash and Windows Recycle Bin queries in parallel
+    final results = await Future.wait([
+      _getInternalTrashItems(),
+      if (Platform.isWindows)
+        getWindowsRecycleBinItems()
+      else
+        Future.value(<SystemTrashItem>[]),
+    ]);
 
-    // First get files from our internal trash
-    try {
-      final trashDir = await getTrashDirectory();
-      final metadata = await loadMetadata();
+    final List<TrashItem> allTrashItems =
+        List.from(results[0] as List<TrashItem>);
 
-      // List all files in the trash directory
-      final entities = await trashDir.list().toList();
-
-      for (final entity in entities) {
-        final fileName = pathlib.basename(entity.path);
-        if (fileName == metadataFileName) continue;
-
-        final bool isDir = entity is Directory;
-        final bool isFile = entity is File;
-        if (!isDir && !isFile) continue;
-
-        final originalPath = metadata[fileName] ?? 'Unknown';
-        final fileStat = await entity.stat();
-
-        allTrashItems.add(TrashItem(
-          trashFileName: fileName,
-          originalPath: originalPath,
-          size: fileStat.size,
-          trashedDate: DateTime.fromMillisecondsSinceEpoch(
-              int.tryParse(fileName.split('_').first) ?? 0),
-          isSystemTrashItem: false,
-          isFolder: isDir,
-        ));
-      }
-    } catch (e) {
-      debugPrint('Error getting internal trash items: $e');
-    }
-
-    // On Windows, also get items from Recycle Bin
+    // Convert SystemTrashItems to TrashItems
     if (Platform.isWindows) {
-      try {
-        final recycleBinItems = await getWindowsRecycleBinItems();
-
-        // Convert SystemTrashItems to TrashItems
-        for (final item in recycleBinItems) {
-          allTrashItems.add(TrashItem(
-            trashFileName: item
-                .recycleBinPath, // For system items, use the full path as identifier
-            originalPath: item.originalPath,
-            size: item.size,
-            trashedDate: item.trashedDate,
-            isSystemTrashItem: true,
-            displayName: item.name,
-            isFolder: item.isFolder,
-          ));
-        }
-      } catch (e) {
-        debugPrint('Error getting Windows Recycle Bin items: $e');
+      final recycleBinItems = results[1] as List<SystemTrashItem>;
+      for (final item in recycleBinItems) {
+        allTrashItems.add(TrashItem(
+          trashFileName: item.recycleBinPath,
+          originalPath: item.originalPath,
+          actualFilePath:
+              item.recycleBinPath, // For system trash, use the recycle bin path
+          size: item.size,
+          trashedDate: item.trashedDate,
+          isSystemTrashItem: true,
+          displayName: item.name,
+          isFolder: item.isFolder,
+        ));
       }
     }
 
@@ -690,6 +903,187 @@ class TrashManager {
     allTrashItems.sort((a, b) => b.trashedDate.compareTo(a.trashedDate));
 
     return allTrashItems;
+  }
+
+  /// Streamed variant of [getTrashItems] for the trash bin UI.
+  ///
+  /// Yields chunks as they become available so a screen with thousands of
+  /// recycle-bin entries can render the first batch immediately and append
+  /// the rest progressively.
+  ///
+  /// Order of emission is tuned for fastest first paint:
+  ///  1. A tiny first page (default [firstPageSize] = 50) of the Windows
+  ///     Recycle Bin — typically arrives in well under a second.
+  ///  2. Internal-trash items in parallel — emitted as soon as their
+  ///     stats finish.
+  ///  3. The remaining Recycle Bin pages with [pageSize] entries each.
+  Stream<List<TrashItem>> getTrashItemsStreaming({
+    int firstPageSize = 50,
+    int pageSize = 500,
+  }) async* {
+    final overall = Stopwatch()..start();
+    AppLogger.info('[TrashManager] Stream start');
+    // Kick off internal-trash collection in parallel; do NOT await it
+    // before the first Recycle Bin page so we never let internal-trash
+    // I/O delay first paint.
+    final internalFuture = _getInternalTrashItems();
+
+    if (Platform.isWindows) {
+      // PRIMARY PATH: read $Recycle.Bin\<SID>\$I* files directly. This
+      // bypasses the Shell.Application COM enumeration entirely, which
+      // is what made the trash bin tab feel slow — `IShellDispatch.
+      // Items()` materialises the full namespace before returning the
+      // first entry, so paged COM calls cannot stream items as they
+      // are read. Reading $I* files lets us yield each entry the
+      // moment its 544-byte metadata is parsed.
+      final t1 = Stopwatch()..start();
+      final buffer = <SystemTrashItem>[];
+      var emittedCount = 0;
+      var directReadFailed = false;
+      try {
+        await for (final item in direct_reader.streamRecycleBinEntries()) {
+          buffer.add(item);
+          // Emit small chunks early, larger chunks once the screen has
+          // rendered. The first chunk is intentionally tiny so the user
+          // sees rows within ~50 ms; subsequent chunks are bigger to
+          // amortise rebuild cost.
+          final flushAt = emittedCount == 0
+              ? firstPageSize
+              : (emittedCount < firstPageSize * 8
+                  ? firstPageSize * 2
+                  : pageSize);
+          if (buffer.length >= flushAt) {
+            yield _convertSystemTrashItems(buffer);
+            emittedCount += buffer.length;
+            buffer.clear();
+            // Give the event loop a tick so the UI can paint the new
+            // rows between chunks.
+            await Future<void>.delayed(Duration.zero);
+          }
+        }
+      } catch (e, st) {
+        AppLogger.warning(
+          '[TrashManager] Direct \$Recycle.Bin reader failed, will fall back to COM: $e',
+          stackTrace: st,
+        );
+        directReadFailed = true;
+      }
+      // Flush any remainder.
+      if (buffer.isNotEmpty) {
+        yield _convertSystemTrashItems(buffer);
+        emittedCount += buffer.length;
+        buffer.clear();
+      }
+      t1.stop();
+      AppLogger.info(
+        '[TrashManager] Stream direct reader finished | items=$emittedCount | elapsedMs=${t1.elapsedMilliseconds} | failed=$directReadFailed',
+      );
+
+      // Drain internal trash now (it has been running in parallel).
+      final t2 = Stopwatch()..start();
+      final internal = await internalFuture;
+      t2.stop();
+      AppLogger.info(
+        '[TrashManager] Stream internal trash | items=${internal.length} | elapsedMs=${t2.elapsedMilliseconds}',
+      );
+      if (internal.isNotEmpty) {
+        internal.sort((a, b) => b.trashedDate.compareTo(a.trashedDate));
+        yield internal;
+      }
+
+      // Fallback: if the direct reader threw and produced nothing, fall
+      // back to the legacy COM enumeration so the user is never left
+      // looking at an empty bin when there is data they could see.
+      if (directReadFailed && emittedCount == 0) {
+        AppLogger.info(
+          '[TrashManager] Falling back to COM enumeration after direct reader failure',
+        );
+        final fullPage = await getWindowsRecycleBinItemsPage(offset: 0);
+        if (fullPage.items.isNotEmpty) {
+          yield _convertSystemTrashItems(fullPage.items);
+        }
+      }
+
+      overall.stop();
+      AppLogger.info(
+        '[TrashManager] Stream complete | totalElapsedMs=${overall.elapsedMilliseconds}',
+      );
+      return;
+    }
+
+    // Non-Windows: just emit internal trash when it is ready.
+    final internal = await internalFuture;
+    if (internal.isNotEmpty) {
+      internal.sort((a, b) => b.trashedDate.compareTo(a.trashedDate));
+      yield internal;
+    }
+    overall.stop();
+    AppLogger.info(
+      '[TrashManager] Stream complete (non-Windows) | totalElapsedMs=${overall.elapsedMilliseconds}',
+    );
+  }
+
+  List<TrashItem> _convertSystemTrashItems(List<SystemTrashItem> items) {
+    return [
+      for (final item in items)
+        TrashItem(
+          trashFileName: item.recycleBinPath,
+          originalPath: item.originalPath,
+          actualFilePath: item.recycleBinPath,
+          size: item.size,
+          trashedDate: item.trashedDate,
+          isSystemTrashItem: true,
+          displayName: item.name,
+          isFolder: item.isFolder,
+        ),
+    ];
+  }
+
+  /// Get items from internal trash directory with parallel stat operations
+  Future<List<TrashItem>> _getInternalTrashItems() async {
+    try {
+      final trashDir = await getTrashDirectory();
+      final metadata = await loadMetadata();
+
+      // List all files in the trash directory
+      final entities = await trashDir.list().toList();
+
+      // Filter valid entities first
+      final validEntities = entities.where((entity) {
+        final fileName = pathlib.basename(entity.path);
+        if (fileName == metadataFileName) return false;
+        return entity is Directory || entity is File;
+      }).toList();
+
+      // Retrieve all file stats in parallel
+      final statFutures = validEntities.map((entity) => entity.stat()).toList();
+      final stats = await Future.wait(statFutures);
+
+      // Build TrashItem list
+      final List<TrashItem> items = [];
+      for (int i = 0; i < validEntities.length; i++) {
+        final entity = validEntities[i];
+        final fileStat = stats[i];
+        final fileName = pathlib.basename(entity.path);
+        final originalPath = metadata[fileName] ?? 'Unknown';
+
+        items.add(TrashItem(
+          trashFileName: fileName,
+          originalPath: originalPath,
+          actualFilePath: entity.path, // The actual path in trash directory
+          size: fileStat.size,
+          trashedDate: DateTime.fromMillisecondsSinceEpoch(
+              int.tryParse(fileName.split('_').first) ?? 0),
+          isSystemTrashItem: false,
+          isFolder: entity is Directory,
+        ));
+      }
+
+      return items;
+    } catch (e) {
+      debugPrint('Error getting internal trash items: $e');
+      return [];
+    }
   }
 
   /// Check if trash is empty
@@ -705,11 +1099,26 @@ class TrashManager {
   }
 }
 
+/// A single page returned by [TrashManager.getWindowsRecycleBinItemsPage].
+///
+/// `items` is the slice (up to `limit` entries starting at the requested
+/// offset). `total` is the **total** number of entries currently in the
+/// Windows Recycle Bin, regardless of slice size, so callers can drive a
+/// progressive load.
+class RecycleBinPage {
+  final List<SystemTrashItem> items;
+  final int total;
+
+  const RecycleBinPage({required this.items, required this.total});
+}
+
 /// Represents a file in the trash (either internal or system trash)
 class TrashItem {
   final String
       trashFileName; // Identifier for the file (filename for internal, full path for system)
   final String originalPath;
+  final String
+      actualFilePath; // The actual path to the file in trash (for thumbnail generation)
   final int size;
   final DateTime trashedDate;
   final bool isSystemTrashItem; // Whether this item is from the system trash
@@ -720,6 +1129,7 @@ class TrashItem {
   TrashItem({
     required this.trashFileName,
     required this.originalPath,
+    required this.actualFilePath,
     required this.size,
     required this.trashedDate,
     this.isSystemTrashItem = false,

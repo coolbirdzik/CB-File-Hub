@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Thêm import cho SystemUiOverlayStyle
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io'; // Thêm import cho Platform
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../core/tab_manager.dart';
 import '../core/tab_data.dart';
 import '../core/tab_paths.dart';
@@ -18,6 +19,8 @@ import 'package:cb_file_manager/ui/state/video_ui_state.dart';
 import '../../screens/system_screen_router.dart'; // Import SystemScreenRouter for system paths
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'mobile_file_actions_controller.dart';
+import '../components/tab_inactive_indicator.dart';
+import '../components/tab_always_active_indicator.dart';
 
 /// Giao diện kiểu Chrome cho thiết bị di động, hiển thị thanh địa chỉ ở trên
 /// và một nút hiển thị số lượng tab bên cạnh
@@ -134,12 +137,7 @@ class MobileTabView extends StatelessWidget {
               path: '',
               name: localizations.searchOrEnterPath,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(localizations.pleaseCreateTabFirst),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                AppToast.warning(context, localizations.pleaseCreateTabFirst);
               },
               isDarkMode: isDarkMode,
             ),
@@ -535,6 +533,8 @@ class MobileTabView extends StatelessWidget {
                       ),
                     ),
                   ),
+                  TabAlwaysActiveIndicator(tabId: tab.id, iconSize: 16),
+                  TabInactiveIndicator(tabId: tab.id, iconSize: 16),
                   const SizedBox(width: 8),
                   InkWell(
                     onTap: () {
@@ -774,6 +774,7 @@ class MobileTabView extends StatelessWidget {
               builder: (context) => TabContentScreen(
                 path: activeTab.path,
                 tabId: activeTab.id,
+                highlightedFileName: activeTab.highlightedFileName,
               ),
             );
           },
@@ -1133,9 +1134,7 @@ extension MobileTabViewDynamicMenu on MobileTabView {
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(localizations.pleaseCreateTabFirst)),
-                  );
+                  AppToast.warning(context, localizations.pleaseCreateTabFirst);
                 },
               ),
               ListTile(
@@ -1147,9 +1146,7 @@ extension MobileTabViewDynamicMenu on MobileTabView {
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(localizations.pleaseCreateTabFirst)),
-                  );
+                  AppToast.warning(context, localizations.pleaseCreateTabFirst);
                 },
               ),
               const SizedBox(height: 16),
@@ -1165,11 +1162,13 @@ extension MobileTabViewDynamicMenu on MobileTabView {
 class TabContentScreen extends StatelessWidget {
   final String path;
   final String tabId;
+  final String? highlightedFileName;
 
   const TabContentScreen({
     Key? key,
     required this.path,
     required this.tabId,
+    this.highlightedFileName,
   }) : super(key: key);
 
   @override
@@ -1184,6 +1183,7 @@ class TabContentScreen extends StatelessWidget {
         path: path,
         tabId: tabId,
         showAppBar: false, // Keep app bar hidden, tools will be in Chrome bar
+        highlightedFileName: highlightedFileName,
       ),
     );
   }

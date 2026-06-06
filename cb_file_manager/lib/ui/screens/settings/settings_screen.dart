@@ -22,9 +22,12 @@ import 'package:cb_file_manager/services/video_library_cache_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -52,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Show file tags setting
   bool _showFileTags = true;
   bool _rememberTabWorkspace = false;
+  // Tab inactive threshold (in minutes). 0 means auto-suspend disabled.
+  int _tabInactiveThresholdMinutes =
+      UserPreferences.defaultTabInactiveThresholdMinutes;
 
   // Use system default app for video (false = in-app player by default)
   bool _useSystemDefaultForVideo = false;
@@ -116,6 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
           await _preferences.getUseSystemDefaultForVideo();
+      final tabInactiveMinutes =
+          await _preferences.getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
 
       if (mounted) {
@@ -127,6 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _showFileTags = showFileTags;
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
+          _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
       }
@@ -136,13 +145,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('${AppLocalizations.of(context)!.errorLoadingTags}$e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, '${l10n.errorLoadingTags}$e');
       }
     }
   }
@@ -154,18 +158,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '${AppLocalizations.of(context)!.language} ${AppLocalizations.of(context)!.save}'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          width: 200,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(context, '${l10n.language} ${l10n.save}');
     }
   }
 
@@ -178,17 +172,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await VideoThumbnailHelper.refreshThumbnailPercentage();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '${AppLocalizations.of(context)!.thumbnailPositionUpdated}$percentage%'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          width: 320,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(
+        context,
+        '${l10n.thumbnailPositionUpdated}$percentage%',
       );
     }
   }
@@ -202,18 +189,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await VideoThumbnailHelper.refreshThumbnailMode();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(mode == 'fast'
-              ? AppLocalizations.of(context)!.thumbnailModeFast
-              : AppLocalizations.of(context)!.thumbnailModeCustom),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          width: 200,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(
+        context,
+        mode == 'fast' ? l10n.thumbnailModeFast : l10n.thumbnailModeCustom,
       );
     }
   }
@@ -234,18 +213,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(showTags
-              ? AppLocalizations.of(context)!.fileTagsEnabled
-              : AppLocalizations.of(context)!.fileTagsDisabled),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          width: 200,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(
+        context,
+        showTags ? l10n.fileTagsEnabled : l10n.fileTagsDisabled,
       );
     }
   }
@@ -262,22 +233,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  Future<void> _updateTabInactiveThresholdMinutes(int minutes) async {
+    final clamped = minutes.clamp(
+      UserPreferences.minTabInactiveThresholdMinutes,
+      UserPreferences.maxTabInactiveThresholdMinutes,
+    );
+    await _preferences.setTabInactiveThresholdMinutes(clamped);
+    if (locator.isRegistered<TabActivityManager>()) {
+      locator<TabActivityManager>()
+          .setInactiveThreshold(Duration(minutes: clamped));
+    }
+    if (mounted) {
+      setState(() {
+        _tabInactiveThresholdMinutes = clamped;
+      });
+    }
+  }
+
   Future<void> _updateUseSystemDefaultForVideo(bool value) async {
     await _preferences.setUseSystemDefaultForVideo(value);
     setState(() => _useSystemDefaultForVideo = value);
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(value
-              ? AppLocalizations.of(context)!.useSystemDefaultForVideoEnabled
-              : AppLocalizations.of(context)!.useSystemDefaultForVideoDisabled),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          width: 280,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(
+        context,
+        value
+            ? l10n.useSystemDefaultForVideoEnabled
+            : l10n.useSystemDefaultForVideoDisabled,
       );
     }
   }
@@ -480,6 +462,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _updateRememberTabWorkspace,
           ),
         ),
+        _buildTabInactiveThresholdTile(),
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.aboutApp,
           subtitle:
@@ -842,13 +825,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 : () async {
                                     await _loadCacheInfo();
                                     if (!mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                            AppLocalizations.of(context)!
-                                                .cacheInfoUpdated),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
+                                    final l10n = AppLocalizations.of(context)!;
+                                    AppToast.success(
+                                      context,
+                                      l10n.cacheInfoUpdated,
                                     );
                                   },
                             icon: const Icon(
@@ -1356,24 +1336,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _isCloudSyncEnabled = value;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(value
-                ? AppLocalizations.of(context)!.cloudSyncEnabled
-                : AppLocalizations.of(context)!.cloudSyncDisabled),
-            behavior: SnackBarBehavior.floating,
-          ),
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(
+          context,
+          value ? l10n.cloudSyncEnabled : l10n.cloudSyncDisabled,
         );
       }
     } catch (e) {
       debugPrint('Error toggling cloud sync: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, l10n.errorWithMessage(e.toString()));
       }
     }
   }
@@ -1384,14 +1357,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final success = await _databaseManager.syncToCloud();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success
-                ? 'Synced to cloud successfully'
-                : 'Failed to sync to cloud'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context,
+            success ? l10n.syncToCloudSuccess : l10n.syncToCloudFailed);
       }
     } catch (e) {
       debugPrint('Error syncing to cloud: $e');
@@ -1409,14 +1377,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await _loadDatabaseStats();
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success
-                ? 'Synced from cloud successfully'
-                : 'Failed to sync from cloud'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context,
+            success ? l10n.syncFromCloudSuccess : l10n.syncFromCloudFailed);
       }
     } catch (e) {
       debugPrint('Error syncing from cloud: $e');
@@ -1428,8 +1391,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _exportDatabase(BuildContext context) async {
     // Pre-extract context-dependent values before async gaps
     final l10n = AppLocalizations.of(context)!;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
+    final toast = AppToast.capture(context);
 
     try {
       String? saveLocation = await FilePicker.platform.saveFile(
@@ -1446,34 +1408,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             await dbManager.exportDatabase(customPath: saveLocation);
         if (filePath != null) {
           if (mounted) {
-            scaffoldMessenger.showSnackBar(
-              SnackBar(
-                content: Text(l10n.exportSuccess + filePath),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            toast.success(l10n.exportSuccess + filePath);
           }
         } else {
           if (mounted) {
-            scaffoldMessenger.showSnackBar(
-              SnackBar(
-                content: Text(l10n.exportFailed),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: colorScheme.error,
-              ),
-            );
+            toast.error(l10n.exportFailed);
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(l10n.errorExporting + e.toString()),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: colorScheme.error,
-          ),
-        );
+        toast.error(l10n.errorExporting + e.toString());
       }
     }
   }
@@ -1481,8 +1426,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _importDatabase(BuildContext context) async {
     // Pre-extract context-dependent values before async gaps
     final l10n = AppLocalizations.of(context)!;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
+    final toast = AppToast.capture(context);
 
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -1504,14 +1448,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           barrierDismissible: false,
           builder: (dialogContext) {
             dialogNavigator = Navigator.of(dialogContext);
-            return const PopScope(
+            return PopScope(
               canPop: false,
               child: AlertDialog(
                 content: Row(
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(width: 20),
-                    Text('Importing database...'),
+                    const CircularProgressIndicator(),
+                    const SizedBox(width: 20),
+                    Text(l10n.importing),
                   ],
                 ),
               ),
@@ -1547,22 +1491,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
 
             if (mounted) {
-              scaffoldMessenger.showSnackBar(
-                SnackBar(
-                  content: Text(l10n.importSuccess),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              toast.success(l10n.importSuccess);
             }
           } else {
             if (mounted) {
-              scaffoldMessenger.showSnackBar(
-                SnackBar(
-                  content: Text(l10n.importFailed),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: colorScheme.error,
-                ),
-              );
+              toast.error(l10n.importFailed);
             }
           }
         } catch (e) {
@@ -1572,33 +1505,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               dialogNavigator.pop();
             } catch (_) {}
 
-            scaffoldMessenger.showSnackBar(
-              SnackBar(
-                content: Text(l10n.errorImporting + e.toString()),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: colorScheme.error,
-              ),
-            );
+            toast.error(l10n.errorImporting + e.toString());
           }
         }
       } else {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(l10n.importCancelled),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        toast.info(l10n.importCancelled);
       }
     } catch (e) {
       // Handle picker errors
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(l10n.errorImporting + e.toString()),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: colorScheme.error,
-          ),
-        );
+        toast.error(l10n.errorImporting + e.toString());
       }
     }
   }
@@ -1680,6 +1596,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? const Icon(PhosphorIconsLight.caretRight, size: 16)
               : null),
       onTap: onTap,
+    );
+  }
+
+  /// Preset values offered to the user for the tab inactive threshold.
+  /// 0 means "off" (no auto-suspend).
+  static const List<int> _tabInactivePresetMinutes = <int>[
+    0,
+    1,
+    15,
+    30,
+    60,
+    120,
+    240,
+    480,
+    24 * 60,
+  ];
+
+  String _formatTabInactiveThresholdLabel(int minutes) {
+    final l10n = AppLocalizations.of(context)!;
+    if (minutes <= 0) {
+      return l10n.tabInactiveThresholdDisabled;
+    }
+    if (minutes < 60) {
+      return '$minutes ${l10n.tabInactiveThresholdMinutesValue}';
+    }
+    final hours = minutes ~/ 60;
+    final remaining = minutes % 60;
+    if (remaining == 0) {
+      return '$hours ${l10n.tabInactiveThresholdHoursValue}';
+    }
+    return '$hours ${l10n.tabInactiveThresholdHoursValue} '
+        '$remaining ${l10n.tabInactiveThresholdMinutesValue}';
+  }
+
+  Widget _buildTabInactiveThresholdTile() {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final current = _tabInactiveThresholdMinutes;
+
+    // Build the dropdown items from presets, plus the current value if it
+    // is not in the preset list (so we never lose user-entered values).
+    final values = <int>{..._tabInactivePresetMinutes, current}.toList()
+      ..sort();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(width: 0),
+          const Icon(PhosphorIconsLight.moon, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.tabInactiveThreshold,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.tabInactiveThresholdDescription,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          DropdownButton<int>(
+            value: current,
+            isDense: true,
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final v in values)
+                DropdownMenuItem<int>(
+                  value: v,
+                  child: Text(
+                    _formatTabInactiveThresholdLabel(v),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              _updateTabInactiveThresholdMinutes(value);
+            },
+          ),
+        ],
+      ),
     );
   }
 

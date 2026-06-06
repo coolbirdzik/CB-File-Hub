@@ -25,11 +25,15 @@ class SplitPaneView extends StatefulWidget {
   /// Path shown in the right pane.
   final String rightPath;
 
+  /// File name to highlight/scroll to in the left pane when it opens.
+  final String? highlightedFileName;
+
   const SplitPaneView({
     Key? key,
     required this.tabId,
     required this.leftPath,
     required this.rightPath,
+    this.highlightedFileName,
   }) : super(key: key);
 
   @override
@@ -135,6 +139,7 @@ class _SplitPaneViewState extends State<SplitPaneView> {
           path: widget.leftPath,
           tabId: widget.tabId,
           appBarDataNotifier: _leftBarNotifier,
+          highlightedFileName: widget.highlightedFileName,
         ),
       );
 

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../controllers/file_operations_handler.dart';
 import '../../screens/folder_list/file_details_screen.dart';
 import '../../screens/media_gallery/image_viewer_screen.dart';
@@ -280,13 +281,16 @@ Widget _buildContextMenuActionRow(
     trailing = null;
   }
 
-  return Row(
-    children: [
-      icon,
-      const SizedBox(width: 12),
-      Expanded(child: text),
-      if (trailing != null) trailing,
-    ],
+  return KeyedSubtree(
+    key: ValueKey<String>('context-menu-action-${action.id}'),
+    child: Row(
+      children: [
+        icon,
+        const SizedBox(width: 12),
+        Expanded(child: text),
+        if (trailing != null) trailing,
+      ],
+    ),
   );
 }
 
@@ -388,6 +392,9 @@ class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
                           ),
                         for (final childAction in section.actions)
                           InkWell(
+                            key: ValueKey<String>(
+                              'context-menu-action-tap-${childAction.id}',
+                            ),
                             onTap: !childAction.isEnabled
                                 ? null
                                 : () async {
@@ -581,6 +588,7 @@ class _ContextMenuSheetActionTile extends StatelessWidget {
             : theme.colorScheme.onSurface;
 
     return ListTile(
+      key: ValueKey<String>('context-menu-action-tap-${action.id}'),
       enabled: action.isEnabled,
       minTileHeight: 44,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -642,6 +650,8 @@ class SharedFileContextMenu extends StatelessWidget {
   final FolderListBloc? folderListBloc;
   final BuildContext? actionContext;
   final Function(BuildContext, String)? showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final bool showOpenFileLocation;
 
   const SharedFileContextMenu({
     Key? key,
@@ -652,6 +662,8 @@ class SharedFileContextMenu extends StatelessWidget {
     this.folderListBloc,
     this.actionContext,
     this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.showOpenFileLocation = false,
   }) : super(key: key);
 
   @override
@@ -757,6 +769,8 @@ class SharedFileContextMenu extends StatelessWidget {
         isVideo: isVideo,
         isImage: isImage,
         showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        showOpenFileLocation: showOpenFileLocation,
         remotePath: remotePath,
         remoteFileName: remoteFileName,
       ),
@@ -828,6 +842,8 @@ List<ContextMenuSection> _buildFileContextMenuSections({
   required bool isVideo,
   required bool isImage,
   Function(BuildContext, String)? showAddTagToFileDialog,
+  Future<void> Function(BuildContext, File)? onDeleteFile,
+  bool showOpenFileLocation = false,
   String? remotePath,
   String? remoteFileName,
   Offset? globalPosition,
@@ -874,6 +890,17 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           onSelected: (_) =>
               ExternalAppHelper.openFileWithApp(file.path, 'shell_open'),
         ),
+        if (showOpenFileLocation && isDesktopPlatform)
+          ContextMenuAction(
+            id: 'open_file_location',
+            label: 'Open file location',
+            icon: PhosphorIconsLight.folderOpen,
+            onSelected: (_) => EntityOpenActions.openInNewTab(
+              context,
+              sourcePath: file.path,
+              preferredTabName: pathlib.basename(file.parent.path),
+            ),
+          ),
         if (isDesktopPlatform)
           ContextMenuAction(
             id: 'open_in_new_tab',
@@ -997,21 +1024,25 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           label: l10n.moveToTrash,
           icon: PhosphorIconsLight.trash,
           isDestructive: true,
-          onSelected: (_) {
+          onSelected: (actionContext) async {
+            if (onDeleteFile != null) {
+              await onDeleteFile(actionContext, file);
+              return;
+            }
             final isDir = FileSystemEntity.isDirectorySync(file.path);
             SelectionBloc? selBloc;
             try {
-              selBloc = context.read<SelectionBloc>();
+              selBloc = actionContext.read<SelectionBloc>();
             } catch (_) {
               selBloc = null;
             }
             final targetFolderListBloc =
-                folderListBloc ?? _maybeFolderListBloc(context);
+                folderListBloc ?? _maybeFolderListBloc(actionContext);
             if (targetFolderListBloc == null) {
               return;
             }
             FileOperationsHandler.handleDelete(
-              context: context,
+              context: actionContext,
               folderListBloc: targetFolderListBloc,
               selectedFiles: isDir ? [] : [file.path],
               selectedFolders: isDir ? [file.path] : [],
@@ -1038,14 +1069,6 @@ List<ContextMenuSection> _buildFileContextMenuSections({
       ],
     ),
   ];
-}
-
-ScaffoldMessengerState? _maybeScaffoldMessenger(BuildContext context) {
-  try {
-    return ScaffoldMessenger.maybeOf(context);
-  } catch (_) {
-    return null;
-  }
 }
 
 FolderListBloc? _maybeFolderListBloc(BuildContext context) {
@@ -1082,6 +1105,8 @@ void showFileContextMenu({
   required bool isVideo,
   required bool isImage,
   Function(BuildContext, String)? showAddTagToFileDialog,
+  Future<void> Function(BuildContext, File)? onDeleteFile,
+  bool showOpenFileLocation = false,
   Offset? globalPosition,
 }) {
   final folderListBloc = _maybeFolderListBloc(context);
@@ -1101,6 +1126,8 @@ void showFileContextMenu({
             folderListBloc: folderListBloc,
             actionContext: context,
             showAddTagToFileDialog: showAddTagToFileDialog,
+            onDeleteFile: onDeleteFile,
+            showOpenFileLocation: showOpenFileLocation,
           ),
         ),
       ),
@@ -1132,6 +1159,8 @@ void showFileContextMenu({
     isVideo: isVideo,
     isImage: isImage,
     showAddTagToFileDialog: showAddTagToFileDialog,
+    onDeleteFile: onDeleteFile,
+    showOpenFileLocation: showOpenFileLocation,
     remotePath: remotePath,
     remoteFileName: remoteFileName,
     globalPosition: effectivePosition,
@@ -1150,6 +1179,8 @@ Future<void> _downloadRemoteFile({
   required File file,
   String? remoteFileName,
 }) async {
+  final l10n = AppLocalizations.of(context)!;
+  final toast = AppToast.capture(context);
   try {
     final fileName = remoteFileName ?? pathlib.basename(file.path);
     final String? saveLocation = await FilePicker.platform.saveFile(
@@ -1160,25 +1191,9 @@ Future<void> _downloadRemoteFile({
       return;
     }
     await StreamingHelper.instance.downloadFile(file.path, saveLocation);
-    if (!context.mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.downloadedTo(saveLocation)),
-      ),
-    );
+    toast.success(l10n.downloadedTo(saveLocation));
   } catch (error) {
-    if (!context.mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            AppLocalizations.of(context)!.downloadFailed(error.toString())),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+    toast.error(l10n.downloadFailed(error.toString()));
   }
 }
 
@@ -1192,6 +1207,8 @@ Future<void> _toggleSidebarPinnedPathWithFeedback(
   BuildContext context,
   String path,
 ) async {
+  final l10n = AppLocalizations.of(context)!;
+  final toast = AppToast.capture(context);
   final prefs = UserPreferences.instance;
   await prefs.init();
 
@@ -1202,13 +1219,8 @@ Future<void> _toggleSidebarPinnedPathWithFeedback(
     await prefs.addSidebarPinnedPath(path);
   }
 
-  if (!context.mounted) return;
-
-  final l10n = AppLocalizations.of(context)!;
   final message = isPinned ? l10n.removedFromSidebar : l10n.pinnedToSidebar;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  toast.info(message);
 }
 
 String _openInNewWindowLabel(BuildContext context) {
@@ -1248,7 +1260,8 @@ bool _tryStartInlineRename(BuildContext context, FileSystemEntity entity) {
   }();
   final bool supportsInlineRename = viewMode == ViewMode.grid ||
       viewMode == ViewMode.gridPreview ||
-      viewMode == ViewMode.details;
+      viewMode == ViewMode.details ||
+      viewMode == ViewMode.columns;
   if (!supportsInlineRename) {
     return false;
   }
@@ -1519,7 +1532,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
   final folderName = folder.path.split(Platform.pathSeparator).last;
   final l10n = AppLocalizations.of(context)!;
   final thumbnailService = FolderThumbnailService();
-  final scaffoldMessenger = _maybeScaffoldMessenger(context);
+  final toast = AppToast.capture(context);
   Future<String?> customThumbnailFuture =
       thumbnailService.getCustomThumbnailPath(folder.path);
 
@@ -1590,12 +1603,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
                             VideoThumbnailHelper.isSupportedVideoFormat(
                                 selectedPath);
                         if (!isImage && !isVideo) {
-                          if (context.mounted && scaffoldMessenger != null) {
-                            scaffoldMessenger.showSnackBar(
-                              SnackBar(
-                                  content: Text(l10n.invalidThumbnailFile)),
-                            );
-                          }
+                          toast.warning(l10n.invalidThumbnailFile);
                           return;
                         }
 
@@ -1611,11 +1619,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
                                 : selectedPath);
                           });
                         }
-                        if (context.mounted && scaffoldMessenger != null) {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(content: Text(l10n.folderThumbnailSet)),
-                          );
-                        }
+                        toast.success(l10n.folderThumbnailSet);
                       },
                       child: Text(l10n.chooseThumbnail.toUpperCase()),
                     ),
@@ -1628,12 +1632,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
                             customThumbnailFuture = Future.value(null);
                           });
                         }
-                        if (context.mounted && scaffoldMessenger != null) {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(
-                                content: Text(l10n.folderThumbnailCleared)),
-                          );
-                        }
+                        toast.success(l10n.folderThumbnailCleared);
                       },
                       child: Text(l10n.clearThumbnail.toUpperCase()),
                     ),
@@ -1652,11 +1651,7 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
       ),
     );
   }).catchError((error) {
-    if (!context.mounted) return;
-    scaffoldMessenger?.showSnackBar(
-      SnackBar(
-          content: Text(l10n.errorGettingFolderProperties(error.toString()))),
-    );
+    toast.error(l10n.errorGettingFolderProperties(error.toString()));
   });
 }
 
@@ -1694,6 +1689,7 @@ void showMultipleFilesContextMenu({
   required List<String> selectedPaths,
   Offset? globalPosition,
   required VoidCallback onClearSelection,
+  Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
 }) {
   final screenSize = MediaQuery.of(context).size;
   final effectivePosition =
@@ -1703,6 +1699,7 @@ void showMultipleFilesContextMenu({
     folderListBloc: _maybeFolderListBloc(context),
     selectedPaths: selectedPaths,
     onClearSelection: onClearSelection,
+    onDeleteFiles: onDeleteFiles,
     globalPosition: effectivePosition,
   );
 
@@ -1733,6 +1730,7 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
   FolderListBloc? folderListBloc,
   required List<String> selectedPaths,
   required VoidCallback onClearSelection,
+  Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
   Offset? globalPosition,
 }) {
   final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
@@ -1770,8 +1768,9 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CopyFiles(entitiesList));
-            _maybeScaffoldMessenger(context)?.showSnackBar(
-              SnackBar(content: Text(l10n.copiedToClipboard('$count items'))),
+            AppToast.info(
+              context,
+              l10n.copiedToClipboard(l10n.itemsCount(count)),
             );
           },
         ),
@@ -1783,8 +1782,9 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CutFiles(entitiesList));
-            _maybeScaffoldMessenger(context)?.showSnackBar(
-              SnackBar(content: Text(l10n.cutToClipboard('$count items'))),
+            AppToast.info(
+              context,
+              l10n.cutToClipboard(l10n.itemsCount(count)),
             );
           },
         ),
@@ -1817,8 +1817,12 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           label: l10n.deleteTitle,
           icon: PhosphorIconsLight.trash,
           isDestructive: true,
-          isEnabled: bloc != null,
-          onSelected: (_) {
+          isEnabled: onDeleteFiles != null || bloc != null,
+          onSelected: (actionContext) async {
+            if (onDeleteFiles != null) {
+              await onDeleteFiles(actionContext, selectedPaths);
+              return;
+            }
             if (bloc == null) return;
             SelectionBloc? selectionBloc;
             try {

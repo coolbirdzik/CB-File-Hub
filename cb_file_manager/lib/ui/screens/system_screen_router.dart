@@ -26,10 +26,12 @@ import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/ui/screens/gallery_hub/gallery_hub_screen.dart';
 import 'package:cb_file_manager/ui/screens/video_library/video_hub_screen.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import '../utils/route.dart';
 import 'trash_bin/trash_bin_screen.dart';
 import 'settings/settings_screen.dart';
 import 'ai_chat/ai_chat_screen.dart';
+import 'cb_agent_cleaner/cb_agent_cleaner_screen.dart';
 import 'package:path/path.dart' as pathlib;
 
 /// A router that handles system screens and special paths
@@ -100,6 +102,13 @@ class SystemScreenRouter {
         return FTPBrowserScreen(tabId: tabId);
       case '#webdav':
         return WebDAVBrowserScreen(tabId: tabId);
+      case '#cb-agent-cleaner':
+        if (!Platform.isWindows) {
+          return _buildErrorWidget(
+              context, AppLocalizations.of(context)!.diskCleanerNotAvailable,
+              cacheKey: cacheKey);
+        }
+        return const CbAgentCleanerScreen();
     }
 
     // 2. Handle dynamic paths

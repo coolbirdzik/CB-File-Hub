@@ -112,6 +112,9 @@ dev_dependencies:
   flutter_lints: ^2.0.0
   build_runner: ^2.4.6
   msix: ^3.16.9
+  # Used by integration_test/e2e_sandbox_paths.dart to isolate app data
+  # (DB/tags/prefs/cache) into a throwaway sandbox during E2E + screenshots.
+  path_provider_platform_interface: ^2.0.1
 
 # Ghi đè các phiên bản gói phụ thuộc để giải quyết xung đột
 dependency_overrides:

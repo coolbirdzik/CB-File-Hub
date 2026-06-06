@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/album_auto_rule_service.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 
@@ -42,9 +44,8 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading rules: $e')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.error(context, l10n.loadRulesFailed(e.toString()));
       }
     }
   }
@@ -134,9 +135,6 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.scopedAlbumId != null
-            ? 'Auto Rules — ${widget.scopedAlbumName ?? 'Album'}'
-            : 'Auto Album Rules'),
         actions: [
           IconButton(
             icon: const Icon(PhosphorIconsLight.plus),
@@ -199,17 +197,17 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     final examples = [
       {
         'title': 'Screenshots',
-        'description': 'Files containing "screenshot" → Screenshots album',
+        'description': 'Files containing "screenshot" â†’ Screenshots album',
         'icon': PhosphorIconsLight.screencast,
       },
       {
         'title': 'Camera Photos',
-        'description': 'Files starting with "IMG_" → Camera album',
+        'description': 'Files starting with "IMG_" â†’ Camera album',
         'icon': PhosphorIconsLight.camera,
       },
       {
         'title': 'Edited Photos',
-        'description': 'Files ending with "_edited" → Edited album',
+        'description': 'Files ending with "_edited" â†’ Edited album',
         'icon': PhosphorIconsLight.imageSquare,
       },
     ];
@@ -698,7 +696,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                   (example) => Padding(
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Text(
-                      '• $example',
+                      'â€¢ $example',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'monospace',
                         color:

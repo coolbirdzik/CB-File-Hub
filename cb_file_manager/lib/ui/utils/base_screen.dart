@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/ui/drawer.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
@@ -152,11 +153,9 @@ class _BaseScreenState extends State<BaseScreen> {
 
         // Show a message explaining why pinning isn't available
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Menu pinning is only available on larger screens'),
-              duration: Duration(seconds: 2),
-            ),
+          AppToast.warning(
+            context,
+            'Menu pinning is only available on larger screens',
           );
         });
       }

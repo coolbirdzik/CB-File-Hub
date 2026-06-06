@@ -1,12 +1,21 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/file_details_screen.dart';
+import 'package:cb_file_manager/ui/dialogs/video_frame_picker_dialog.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/soft_checkbox.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
@@ -22,7 +31,31 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
+import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import '../../utils/route.dart';
+
+/// Tag view modes (cycled by the toolbar icon button).
+enum _TagViewMode { list, grid, tree }
+
+class _TagTreeLayoutMetrics {
+  final double rowExtent;
+  final double thumbnailSize;
+  final double fontSize;
+  final double spacing;
+  final double indentPerDepth;
+
+  const _TagTreeLayoutMetrics({
+    required this.rowExtent,
+    required this.thumbnailSize,
+    required this.fontSize,
+    required this.spacing,
+    required this.indentPerDepth,
+  });
+}
 
 class TagManagementScreen extends StatefulWidget {
   final String startingDirectory;
@@ -42,6 +75,8 @@ class TagManagementScreen extends StatefulWidget {
 
 class _TagManagementScreenState extends State<TagManagementScreen> {
   late TagColorManager _tagColorManager;
+  late TagThumbnailManager _tagThumbnailManager;
+  late TagHierarchyManager _tagHierarchyManager;
   StreamSubscription<String>? _tagChangeSubscription;
   Timer? _tagReloadDebounce;
 
@@ -75,12 +110,45 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   String _sortCriteria = 'name';
   bool _sortAscending = true;
 
-  // View mode options
-  bool _isGridView = false;
+  // Filter options
+  /// 'all' | 'parents' | 'children' | 'standalone'
+  String _hierarchyFilter = 'all';
 
-  // Multi-selection state
+  /// 'all' | 'with' | 'without'
+  String _thumbnailFilter = 'all';
+
+  // View mode options
+  _TagViewMode _viewMode = _TagViewMode.list;
+
+  // Grid item-size zoom level (2 = biggest items / fewest columns,
+  // maxGridZoomLevel = smallest items / most columns). Persisted to
+  // UserPreferences with key 'tags_grid_zoom_level'.
+  int _tagGridZoomLevel = UserPreferences.defaultGridZoomLevel;
+
+  // Tree layout size level (0 = densest, 2 = default, 4 = most spacious).
+  // Kept in memory; only grid zoom has an existing tag preference today.
+  static const int _minTagTreeSizeLevel = 0;
+  static const int _defaultTagTreeSizeLevel = 2;
+  static const int _maxTagTreeSizeLevel = 4;
+  int _tagTreeSizeLevel = _defaultTagTreeSizeLevel;
+
+  // Cached tree roots ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â rebuilt only when tag data changes (not on every setState)
+  List<TreeNode<String>> _cachedTreeRoots = const [];
+  String? _treeRootsSignature;
+
+  /// Maps normalized (lowercase) tag name -> display-cased name from
+  /// [_allTags]. Used by the tree view because [TagHierarchyManager] stores
+  /// relationships normalized while [_allTags] keeps original case.
+  Map<String, String> get _normalizedToDisplay => {
+        for (final t in _allTags) t.trim().toLowerCase(): t,
+      };
+
+  // Selection state
   final Set<String> _selectedTags = {};
-  bool _isMultiSelectMode = false;
+
+  // Single-vs-double click detection (per tag)
+  Timer? _singleTapTimer;
+  String? _pendingSingleTapTag;
 
   // Inline rename state (desktop)
   String? _editingTag;
@@ -111,7 +179,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     _initializeDatabase();
 
     _tagColorManager = TagColorManager.instance;
+    _tagThumbnailManager = TagThumbnailManager.instance;
+    _tagHierarchyManager = TagHierarchyManager.instance;
     _initTagColorManager();
+    _initThumbnailAndHierarchy();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setDefaultViewMode();
@@ -137,6 +208,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   bool _onKeyEvent(KeyEvent event) {
+    final isCtrlOrMetaPressed = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+    final isSelectAll = event is KeyDownEvent &&
+        isCtrlOrMetaPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyA;
+
+    if (isSelectAll &&
+        _selectedTagForFiles == null &&
+        _editingTag == null &&
+        !_isTextInputFocused()) {
+      _selectAllFilteredTags();
+      return true;
+    }
+
     setState(() {
       _isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
       _isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
@@ -144,16 +229,203 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     return false;
   }
 
+  bool _isTextInputFocused() {
+    final focusedContext = FocusManager.instance.primaryFocus?.context;
+    if (focusedContext == null) {
+      return false;
+    }
+    return focusedContext.widget is EditableText ||
+        focusedContext.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
   void _setDefaultViewMode() {
     if (!mounted) return;
     final screenWidth = MediaQuery.of(context).size.width;
-    _isGridView = screenWidth > 600;
+    _viewMode = screenWidth > 600 ? _TagViewMode.grid : _TagViewMode.list;
+    // Load persisted grid zoom level after the default view mode is set.
+    _loadTagGridZoom();
+  }
+
+  /// Loads the persisted tag-grid zoom level from SharedPreferences.
+  Future<void> _loadTagGridZoom() async {
+    try {
+      final prefs = UserPreferences.instance;
+      await prefs.init();
+      final loaded = await prefs.getTagsGridZoomLevel();
+      if (mounted) setState(() => _tagGridZoomLevel = loaded);
+    } catch (_) {}
+  }
+
+  /// Persists the tag-grid zoom level to SharedPreferences.
+  Future<void> _saveTagGridZoom(int level) async {
+    try {
+      final prefs = UserPreferences.instance;
+      await prefs.init();
+      await prefs.setTagsGridZoomLevel(level);
+    } catch (_) {}
+  }
+
+  /// Handles a Ctrl+scroll view-scale delta on the tags page.
+  ///
+  /// Maps the tags page's three-mode spectrum (tree ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ list ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ grid with zoom)
+  /// to the shared [ViewModeSpectrum] helper and applies the result.
+  void _handleTagViewScaleDelta(int delta) {
+    if (!_isDesktop) return;
+    if (_viewMode == _TagViewMode.tree) {
+      final nextTreeSize = (_tagTreeSizeLevel + delta)
+          .clamp(_minTagTreeSizeLevel, _maxTagTreeSizeLevel)
+          .toInt();
+      if (nextTreeSize != _tagTreeSizeLevel) {
+        setState(() => _tagTreeSizeLevel = nextTreeSize);
+        return;
+      }
+    }
+
+    // Convert _TagViewMode to the shared ViewMode for the spectrum helper.
+    ViewMode sharedMode;
+    switch (_viewMode) {
+      case _TagViewMode.tree:
+        sharedMode = ViewMode.tree;
+        break;
+      case _TagViewMode.list:
+        sharedMode = ViewMode.list;
+        break;
+      case _TagViewMode.grid:
+        sharedMode = ViewMode.grid;
+        break;
+    }
+
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+
+    final result = ViewModeSpectrum.step(
+      currentMode: sharedMode,
+      currentZoom: _tagGridZoomLevel,
+      // Explorer convention: scroll-up (delta = -1 from CtrlScrollZoom) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ bigger items.
+      // FileViewShell already inverts the sign, so delta here is already Explorer-signed.
+      delta: delta,
+      supported: const {ViewMode.tree, ViewMode.list, ViewMode.grid},
+      maxZoom: maxZoom,
+    );
+
+    // Convert result back to _TagViewMode.
+    _TagViewMode newTagMode;
+    switch (result.mode) {
+      case ViewMode.tree:
+        newTagMode = _TagViewMode.tree;
+        break;
+      case ViewMode.list:
+        newTagMode = _TagViewMode.list;
+        break;
+      default:
+        newTagMode = _TagViewMode.grid;
+        break;
+    }
+
+    if (newTagMode == _viewMode && result.gridZoomLevel == _tagGridZoomLevel) {
+      return;
+    }
+
+    setState(() {
+      _viewMode = newTagMode;
+      _tagGridZoomLevel = result.gridZoomLevel;
+    });
+    _saveTagGridZoom(result.gridZoomLevel);
+  }
+
+  _TagTreeLayoutMetrics get _tagTreeLayoutMetrics {
+    switch (_tagTreeSizeLevel) {
+      case 0:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 28,
+          thumbnailSize: 18,
+          fontSize: 12,
+          spacing: 6,
+          indentPerDepth: 14,
+        );
+      case 1:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 32,
+          thumbnailSize: 21,
+          fontSize: 12.5,
+          spacing: 7,
+          indentPerDepth: 15,
+        );
+      case 3:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 44,
+          thumbnailSize: 30,
+          fontSize: 14,
+          spacing: 10,
+          indentPerDepth: 17,
+        );
+      case 4:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 52,
+          thumbnailSize: 36,
+          fontSize: 15,
+          spacing: 12,
+          indentPerDepth: 18,
+        );
+      case _defaultTagTreeSizeLevel:
+      default:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 36,
+          thumbnailSize: 24,
+          fontSize: 13,
+          spacing: 8,
+          indentPerDepth: 16,
+        );
+    }
+  }
+
+  /// Builds a single tag view mode entry for the toolbar PopupMenuButton.
+  /// Mirrors the file/network browsers' menu styling (active row gets
+  /// primary color, bold weight, and a trailing check icon).
+  PopupMenuItem<_TagViewMode> _buildTagViewModeMenuItem(
+    BuildContext context,
+    _TagViewMode mode,
+    IconData icon,
+    String label,
+  ) {
+    final theme = Theme.of(context);
+    final isActive = _viewMode == mode;
+    return PopupMenuItem<_TagViewMode>(
+      value: mode,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: isActive ? theme.colorScheme.primary : null,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              color: isActive ? theme.colorScheme.primary : null,
+            ),
+          ),
+          const Spacer(),
+          if (isActive)
+            Icon(
+              PhosphorIconsLight.check,
+              color: theme.colorScheme.primary,
+              size: 20,
+            ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
     _tagReloadDebounce?.cancel();
     _tagChangeSubscription?.cancel();
+    _singleTapTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _searchController.removeListener(_filterTags);
     _searchController.dispose();
@@ -162,6 +434,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   Future<void> _initTagColorManager() async {
     await _tagColorManager.initialize();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _initThumbnailAndHierarchy() async {
+    await Future.wait([
+      _tagThumbnailManager.initialize(),
+      _tagHierarchyManager.initialize(),
+    ]);
     if (mounted) setState(() {});
   }
 
@@ -204,15 +484,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-            content:
-                Text('${AppLocalizations.of(context)!.errorLoadingTags}$e'),
-            backgroundColor: theme.colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppToast.error(
+            context, '${AppLocalizations.of(context)!.errorLoadingTags}$e');
         setState(() {
           _allTags = [];
           _filterTags();
@@ -227,13 +500,43 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final String query = _searchController.text.toLowerCase().trim();
 
     setState(() {
+      // Step 1: Text search
+      List<String> result;
       if (query.isEmpty) {
-        _filteredTags = List.from(_allTags);
+        result = List.from(_allTags);
       } else {
-        _filteredTags =
+        result =
             _allTags.where((tag) => tag.toLowerCase().contains(query)).toList();
       }
 
+      // Step 2: Hierarchy filter
+      if (_hierarchyFilter != 'all') {
+        result = result.where((tag) {
+          final isParent = _tagHierarchyManager.isParent(tag);
+          final isChild = _tagHierarchyManager.isChild(tag);
+          switch (_hierarchyFilter) {
+            case 'parents':
+              return isParent;
+            case 'children':
+              return isChild;
+            case 'standalone':
+              return !isParent && !isChild;
+            default:
+              return true;
+          }
+        }).toList();
+      }
+
+      // Step 3: Thumbnail filter
+      if (_thumbnailFilter != 'all') {
+        result = result.where((tag) {
+          final hasThumbnail =
+              _tagThumbnailManager.getThumbnailSync(tag) != null;
+          return _thumbnailFilter == 'with' ? hasThumbnail : !hasThumbnail;
+        }).toList();
+      }
+
+      _filteredTags = result;
       _sortTags();
       _updatePagination();
     });
@@ -253,7 +556,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         break;
       case 'popularity':
       case 'recent':
-        // Defer to async sort — load data then re-sort
+        // Defer to async sort ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â load data then re-sort
         _loadSortDataForFilteredTags();
         break;
     }
@@ -391,6 +694,37 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
+  /// Handle a single tap on a tag with double-click detection.
+  ///
+  /// On desktop: schedules a delayed `_selectTag()` call. If a second tap comes
+  /// within 250ms, the timer is cancelled and `_directTagSearch()` runs instead.
+  ///
+  /// On mobile: tap immediately opens the tag (no double-tap on touch).
+  void _handleTagTap(String tag) {
+    if (!_isDesktop) {
+      _directTagSearch(tag);
+      return;
+    }
+
+    // If there's a pending single-tap on the SAME tag, treat as double-click
+    if (_singleTapTimer?.isActive == true && _pendingSingleTapTag == tag) {
+      _singleTapTimer!.cancel();
+      _pendingSingleTapTag = null;
+      _directTagSearch(tag);
+      return;
+    }
+
+    // Cancel any pending tap on a different tag and start a new timer
+    _singleTapTimer?.cancel();
+    _pendingSingleTapTag = tag;
+    _singleTapTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted && _pendingSingleTapTag == tag) {
+        _selectTag(tag);
+        _pendingSingleTapTag = null;
+      }
+    });
+  }
+
   /// Select a tag (click to select, similar to file/folder selection)
   /// This highlights the tag and shows it as selected
   void _selectTag(String tag) {
@@ -399,10 +733,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         // Ctrl + Click: toggle selection (add/remove from multi-select)
         if (_selectedTags.contains(tag)) {
           _selectedTags.remove(tag);
-          _isMultiSelectMode = _selectedTags.isNotEmpty;
         } else {
           _selectedTags.add(tag);
-          _isMultiSelectMode = _selectedTags.isNotEmpty;
         }
         // Update focused tag for future Shift+Click
         _focusedTag = tag;
@@ -416,21 +748,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           for (int i = start; i <= end; i++) {
             _selectedTags.add(_currentPageTags[i]);
           }
-          _isMultiSelectMode = true;
         }
       } else {
-        // Normal click: select single tag (toggle) and enter multi-select mode
-        if (_focusedTag == tag) {
-          // Already focused, enter multi-select mode with this tag selected
-          _focusedTag = null;
-          _selectedTags.clear();
-        } else {
-          // First click on this tag - enter multi-select mode
-          _focusedTag = tag;
-          _selectedTags.clear();
-          _selectedTags.add(tag);
-          _isMultiSelectMode = true;
-        }
+        // Normal click: select exactly this tag, same as file/folder items.
+        _focusedTag = tag;
+        _selectedTags
+          ..clear()
+          ..add(tag);
       }
     });
   }
@@ -453,7 +777,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _dragStartPosition = position;
       _dragCurrentPosition = position;
       _selectedTags.clear();
-      _isMultiSelectMode = true;
     });
   }
 
@@ -507,7 +830,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         _selectedTags.clear();
         _selectedTags.addAll(newlySelected);
       }
-      _isMultiSelectMode = _selectedTags.isNotEmpty;
     });
   }
 
@@ -576,6 +898,70 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   Future<void> _confirmDeleteTag(String tag) async {
     final theme = Theme.of(context);
     final AppLocalizations localizations = AppLocalizations.of(context)!;
+    final children = _tagHierarchyManager.getChildren(tag);
+
+    if (children.isNotEmpty) {
+      // Parent tag ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â show hierarchy-aware delete dialog
+      final result = await RouteUtils.showAcrylicDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(localizations.deleteTagConfirmation(tag)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This tag has ${children.length} child tag${children.length > 1 ? "s" : ""}: ${children.join(", ")}',
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'What would you like to do?',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: Text(localizations.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('keep_children'),
+              child: const Text('Delete parent only'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('delete_all'),
+              child: Text(
+                'Delete parent and children',
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (result == 'keep_children') {
+        // Remove hierarchy relationships only, then delete the parent tag
+        await _tagHierarchyManager.removeAllForTag(tag);
+        await _deleteTag(tag);
+      } else if (result == 'delete_all') {
+        // Delete parent and all children
+        final tagsToDelete = [tag, ...children];
+        for (final t in tagsToDelete) {
+          await _tagHierarchyManager.removeAllForTag(t);
+        }
+        for (final t in tagsToDelete) {
+          await _deleteTag(t, silent: tagsToDelete.length > 1);
+        }
+        if (mounted) {
+          AppToast.success(context,
+              'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}');
+        }
+      }
+      return;
+    }
+
+    // Non-parent tag ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â simple confirmation
     final bool result = await RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -598,11 +984,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
 
     if (result == true) {
+      // Clean up hierarchy relationships (if this tag is a child of something)
+      await _tagHierarchyManager.removeAllForTag(tag);
       await _deleteTag(tag);
     }
   }
 
-  Future<void> _deleteTag(String tag) async {
+  Future<void> _deleteTag(String tag, {bool silent = false}) async {
     final AppLocalizations localizations = AppLocalizations.of(context)!;
     final operation = locator<OperationProgressController>();
     final operationId = operation.begin(
@@ -622,10 +1010,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       await TagManager.deleteTagGlobally(tag);
       await _loadAllTags();
 
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.tagDeleted(tag))),
-        );
+      if (mounted && !silent) {
+        AppToast.success(context, localizations.tagDeleted(tag));
       }
 
       await _tagColorManager.removeTagColor(tag);
@@ -643,9 +1029,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         detail: localizations.errorDeletingTag(e.toString()),
       );
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.errorDeletingTag(e.toString()))),
-        );
+        AppToast.error(context, localizations.errorDeletingTag(e.toString()));
       }
     } finally {
       if (mounted) {
@@ -686,9 +1070,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final allTagsLowercase = _allTags.map((t) => t.toLowerCase()).toSet();
     if (allTagsLowercase.contains(newTag.toLowerCase())) {
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.tagAlreadyExists(newTag))),
-        );
+        AppToast.warning(context, localizations.tagAlreadyExists(newTag));
       }
       return;
     }
@@ -707,9 +1089,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         await _loadAllTags();
 
         if (mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(content: Text(localizations.tagRenamed(oldTag, newTag))),
-          );
+          AppToast.success(context, localizations.tagRenamed(oldTag, newTag));
         }
       }
     } catch (e) {
@@ -723,47 +1103,34 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  // ── Multi-selection methods ──
-
-  void _enterMultiSelectMode(String tag) {
-    setState(() {
-      _isMultiSelectMode = true;
-      _selectedTags.add(tag);
-    });
-  }
+  // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Selection methods ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
 
   void _toggleTagSelection(String tag) {
     setState(() {
       if (_selectedTags.contains(tag)) {
         _selectedTags.remove(tag);
-        if (_selectedTags.isEmpty) {
-          _isMultiSelectMode = false;
-        }
       } else {
         _selectedTags.add(tag);
       }
+      _focusedTag = tag;
     });
   }
 
   void _selectAllFilteredTags() {
     setState(() {
       _selectedTags.addAll(_filteredTags);
-      _isMultiSelectMode = true;
+      if (_selectedTags.isNotEmpty) {
+        _focusedTag = _selectedTags.last;
+      }
     });
   }
 
   void _deselectAllTags() {
     setState(() {
       _selectedTags.clear();
-      _isMultiSelectMode = false;
+      _focusedTag = null;
     });
   }
-
-  bool get _allFilteredSelected =>
-      _filteredTags.isNotEmpty &&
-      _filteredTags.every((t) => _selectedTags.contains(t));
-
-  bool get _someSelected => _selectedTags.isNotEmpty && !_allFilteredSelected;
 
   Future<void> _confirmBulkDeleteTags() async {
     if (_selectedTags.isEmpty) return;
@@ -826,7 +1193,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       }
 
       _selectedTags.clear();
-      _isMultiSelectMode = false;
       await _loadAllTags();
 
       operation.succeed(
@@ -835,9 +1201,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.bulkDeleteSuccess(count))),
-        );
+        AppToast.success(context, localizations.bulkDeleteSuccess(count));
       }
 
       if (_selectedTagForFiles != null &&
@@ -850,9 +1214,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         detail: localizations.errorDeletingTag(e.toString()),
       );
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(localizations.errorDeletingTag(e.toString()))),
-        );
+        AppToast.error(context, localizations.errorDeletingTag(e.toString()));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -904,9 +1266,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       final allTagsLowercase = _allTags.map((t) => t.toLowerCase()).toSet();
       if (allTagsLowercase.contains(newTag.toLowerCase())) {
         if (mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(content: Text(localizations.tagAlreadyExists(newTag))),
-          );
+          AppToast.warning(context, localizations.tagAlreadyExists(newTag));
         }
         return;
       }
@@ -926,9 +1286,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           await _loadAllTags();
 
           if (mounted) {
-            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-              SnackBar(content: Text(localizations.tagRenamed(tag, newTag))),
-            );
+            AppToast.success(context, localizations.tagRenamed(tag, newTag));
           }
         }
       } finally {
@@ -937,6 +1295,214 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             _isLoading = false;
           });
         }
+      }
+    }
+  }
+
+  /// Full hierarchy management dialog for a tag.
+  /// Shows current parent(s), current children, and allows editing both.
+  Future<void> _showManageHierarchyDialog(String tag) async {
+    await RouteUtils.showAcrylicDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return _ManageHierarchyDialog(
+          tag: tag,
+          hierarchyManager: _tagHierarchyManager,
+          allTags: _allTags,
+          onChanged: () async {
+            await _loadAllTags();
+            if (mounted) setState(() {});
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showThumbnailPicker(String tag) async {
+    final currentThumbnail = _tagThumbnailManager.getThumbnailSync(tag);
+    final theme = Theme.of(context);
+
+    final result = await RouteUtils.showAcrylicDialog<String?>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Thumbnail for "$tag"'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Preview area
+                  Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: currentThumbnail != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: Image.file(
+                              File(currentThumbnail),
+                              width: 160,
+                              height: 160,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(PhosphorIconsLight.imageSquare,
+                                        size: 48,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant),
+                                    const SizedBox(height: 8),
+                                    Text('File not found',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant,
+                                        )),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(PhosphorIconsLight.image,
+                                    size: 48,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.5)),
+                                const SizedBox(height: 8),
+                                Text('No thumbnail',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: theme.colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.7),
+                                    )),
+                              ],
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+              actions: [
+                if (currentThumbnail != null)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop('remove'),
+                    child: Text(
+                      'Remove',
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: Text(AppLocalizations.of(context)!.cancel),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).pop('video'),
+                  icon: const Icon(PhosphorIconsLight.filmSlate, size: 18),
+                  label: const Text('From Video'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).pop('image'),
+                  icon: const Icon(PhosphorIconsLight.folderOpen, size: 18),
+                  label: const Text('Browse Image'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == 'image') {
+      await _pickThumbnailImage(tag);
+    } else if (result == 'video') {
+      await _pickThumbnailFromVideo(tag);
+    } else if (result == 'remove') {
+      await _tagThumbnailManager.deleteThumbnail(tag);
+      if (mounted) {
+        AppToast.success(context, 'Thumbnail removed for "$tag"');
+        setState(() {});
+      }
+    }
+  }
+
+  Future<void> _pickThumbnailImage(String tag) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        dialogTitle: 'Choose thumbnail for "$tag"',
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final filePath = result.files.single.path;
+      if (filePath == null) return;
+
+      final ok = await _tagThumbnailManager.setThumbnail(tag, filePath);
+      if (mounted) {
+        if (ok) {
+          AppToast.success(context, 'Thumbnail set for "$tag"');
+          setState(() {});
+        } else {
+          AppToast.error(context, 'Failed to set thumbnail');
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error picking thumbnail: $e');
+      if (mounted) {
+        AppToast.error(context, 'Error: $e');
+      }
+    }
+  }
+
+  /// Pick a video file, then open the video frame picker to extract a frame.
+  Future<void> _pickThumbnailFromVideo(String tag) async {
+    try {
+      // Step 1: Pick a video file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.video,
+        allowMultiple: false,
+        dialogTitle: 'Choose video for "$tag" thumbnail',
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final videoPath = result.files.single.path;
+      if (videoPath == null) return;
+
+      // Step 2: Open video frame picker dialog
+      if (!mounted) return;
+      final framePath = await VideoFramePickerDialog.show(context, videoPath);
+
+      if (framePath == null) return;
+
+      // Step 3: Set the extracted frame as thumbnail
+      final ok = await _tagThumbnailManager.setThumbnail(tag, framePath);
+      if (mounted) {
+        if (ok) {
+          AppToast.success(context, 'Video frame thumbnail set for "$tag"');
+          setState(() {});
+        } else {
+          AppToast.error(context, 'Failed to set video frame thumbnail');
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error picking video thumbnail: $e');
+      if (mounted) {
+        AppToast.error(context, 'Error: $e');
       }
     }
   }
@@ -1014,12 +1580,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     setState(() {});
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: Text(localizations.tagColorUpdated(tag)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppToast.success(context, localizations.tagColorUpdated(tag));
   }
 
   KeyEventResult _handleInlineRenameKey(
@@ -1088,37 +1649,54 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(PhosphorIconsLight.arrowLeft),
-                  onPressed: showingTaggedFiles
-                      ? _clearTagSelection
-                      : () => _handleBack(context),
+                  icon: Icon(_selectedTags.isNotEmpty && !showingTaggedFiles
+                      ? PhosphorIconsLight.x
+                      : PhosphorIconsLight.arrowLeft),
+                  onPressed: _selectedTags.isNotEmpty && !showingTaggedFiles
+                      ? _deselectAllTags
+                      : showingTaggedFiles
+                          ? _clearTagSelection
+                          : () => _handleBack(context),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _isSearching && !showingTaggedFiles
-                      ? TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          textInputAction: TextInputAction.search,
-                          style: TextStyle(color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            hintText: localizations.searchTagsHint,
-                            hintStyle: TextStyle(
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.5)),
-                            border: InputBorder.none,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                          ),
-                        )
-                      : showingTaggedFiles
-                          ? _buildTaggedFilesHeaderTitle(theme, localizations)
-                          : Text(
-                              localizations.tagManagementTitle,
-                              style: const TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w500),
-                            ),
-                ),
+                if (_isSearching && !showingTaggedFiles)
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      style: TextStyle(color: theme.colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        hintText: localizations.searchTagsHint,
+                        hintStyle: TextStyle(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+                  )
+                else if (showingTaggedFiles)
+                  Expanded(
+                    child: _buildTaggedFilesHeaderTitle(theme, localizations),
+                  )
+                else
+                  const Spacer(),
+                if (_selectedTags.isNotEmpty &&
+                    !showingTaggedFiles &&
+                    _isMobile) ...[
+                  IconButton(
+                    icon: const Icon(PhosphorIconsLight.trash),
+                    onPressed: _selectedTags.isNotEmpty
+                        ? _confirmBulkDeleteTags
+                        : null,
+                    tooltip: localizations.deleteSelected,
+                  ),
+                ],
+                if (!showingTaggedFiles)
+                  ..._buildTagToolbarActions(theme, localizations),
                 if (!showingTaggedFiles || !_isMobile) ...[
                   IconButton(
                     icon: const Icon(PhosphorIconsLight.arrowsClockwise),
@@ -1141,6 +1719,44 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         : PhosphorIconsLight.magnifyingGlass),
                     onPressed: _toggleSearch,
                     tooltip: localizations.searchTags,
+                  ),
+                if (!showingTaggedFiles)
+                  PopupMenuButton<String>(
+                    icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
+                    tooltip: localizations.moreOptionsTooltip,
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'select_all':
+                          _selectAllFilteredTags();
+                          break;
+                        case 'new_tag':
+                          _showCreateTagDialog();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem<String>(
+                        value: 'select_all',
+                        child: Row(
+                          children: [
+                            const Icon(PhosphorIconsLight.checks, size: 20),
+                            const SizedBox(width: 10),
+                            Text(localizations.selectAllTags),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem<String>(
+                        value: 'new_tag',
+                        child: Row(
+                          children: [
+                            const Icon(PhosphorIconsLight.plus, size: 20),
+                            const SizedBox(width: 10),
+                            Text(localizations.createNewTagButton),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -1180,6 +1796,163 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           badge: '${_filesBySelectedTag.length}',
         ),
       ],
+    );
+  }
+
+  List<Widget> _buildTagToolbarActions(
+    ThemeData theme,
+    AppLocalizations localizations,
+  ) {
+    return [
+      _buildFilterButton(theme, localizations),
+      _buildSortMenuButton(theme, localizations),
+      _buildViewModeMenuButton(theme, localizations),
+      if (_viewMode == _TagViewMode.grid)
+        _buildTagGridSizeButton(theme, localizations),
+    ];
+  }
+
+  Widget _buildTagGridSizeButton(
+    ThemeData theme,
+    AppLocalizations localizations,
+  ) {
+    final dynamicMax = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final clampedMax = dynamicMax
+        .clamp(
+          UserPreferences.minGridZoomLevel,
+          UserPreferences.maxGridZoomLevel,
+        )
+        .toInt();
+    final clampedZoom = _tagGridZoomLevel
+        .clamp(
+          UserPreferences.minGridZoomLevel,
+          clampedMax,
+        )
+        .toInt();
+
+    if (_isMobile) {
+      return IconButton(
+        icon: Icon(
+          PhosphorIconsLight.squaresFour,
+          color: theme.colorScheme.onSurfaceVariant,
+          size: 20,
+        ),
+        tooltip: localizations.adjustGridSizeTooltip,
+        onPressed: () => SharedActionBar.showGridSizeDialog(
+          context,
+          currentGridSize: clampedZoom,
+          onApply: _setTagGridZoomLevel,
+        ),
+      );
+    }
+
+    return PopupMenuButton<void>(
+      icon: Icon(
+        PhosphorIconsLight.squaresFour,
+        color: theme.colorScheme.onSurfaceVariant,
+        size: 20,
+      ),
+      tooltip: localizations.adjustGridSizeTooltip,
+      offset: const Offset(0, 50),
+      itemBuilder: (context) => [
+        PopupMenuItem<void>(
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: GridSizeSliderMenu(
+            currentValue: clampedZoom,
+            minValue: UserPreferences.minGridZoomLevel,
+            maxValue: clampedMax,
+            onChanged: _setTagGridZoomLevel,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _setTagGridZoomLevel(int value) {
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final next = value.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    if (next == _tagGridZoomLevel) return;
+    setState(() => _tagGridZoomLevel = next);
+    _saveTagGridZoom(next);
+  }
+
+  Widget _buildSortMenuButton(
+    ThemeData theme,
+    AppLocalizations localizations,
+  ) {
+    return PopupMenuButton<String>(
+      tooltip: localizations.sortTags,
+      onSelected: _changeSortCriteria,
+      icon: Icon(
+        PhosphorIconsLight.sortAscending,
+        size: 20,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+      itemBuilder: (context) => [
+        _buildSortMenuItem(
+          'name',
+          PhosphorIconsLight.sortAscending,
+          localizations.sortByAlphabet,
+        ),
+        _buildSortMenuItem(
+          'popularity',
+          PhosphorIconsLight.chartBar,
+          localizations.sortByPopular,
+        ),
+        _buildSortMenuItem(
+          'recent',
+          PhosphorIconsLight.clockCounterClockwise,
+          localizations.sortByRecent,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViewModeMenuButton(
+    ThemeData theme,
+    AppLocalizations localizations,
+  ) {
+    return PopupMenuButton<_TagViewMode>(
+      icon: Icon(
+        PhosphorIconsLight.eye,
+        color: theme.colorScheme.onSurfaceVariant,
+        size: 20,
+      ),
+      tooltip: localizations.viewModeTooltip,
+      offset: const Offset(0, 50),
+      initialValue: _viewMode,
+      itemBuilder: (context) => [
+        _buildTagViewModeMenuItem(
+          context,
+          _TagViewMode.list,
+          PhosphorIconsLight.list,
+          localizations.viewModeList,
+        ),
+        _buildTagViewModeMenuItem(
+          context,
+          _TagViewMode.grid,
+          PhosphorIconsLight.squaresFour,
+          localizations.viewModeGrid,
+        ),
+        _buildTagViewModeMenuItem(
+          context,
+          _TagViewMode.tree,
+          PhosphorIconsLight.treeView,
+          localizations.viewModeTree,
+        ),
+      ],
+      onSelected: (mode) {
+        if (mode != _viewMode) {
+          setState(() => _viewMode = mode);
+        }
+      },
     );
   }
 
@@ -1351,108 +2124,119 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     Navigator.of(context).pop();
   }
 
-  void _showTagOptions(String tag) {
-    final theme = Theme.of(context);
-    showModalBottomSheet(
+  Future<void> _showTagOptions(String tag, {Offset? globalPosition}) async {
+    final l10n = AppLocalizations.of(context)!;
+    final sections = _buildTagContextMenuSections(tag, l10n);
+
+    if (_isMobile || globalPosition == null) {
+      await showContextMenuSheet(
+        context: context,
+        title: tag,
+        icon: PhosphorIconsLight.tag,
+        sections: sections,
+      );
+      return;
+    }
+
+    await showContextMenuPopup(
       context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(PhosphorIconsLight.folder),
-                title: Text(AppLocalizations.of(context)!.viewFilesWithTag),
-                onTap: () {
-                  Navigator.pop(context);
-                  _directTagSearch(tag);
-                },
-              ),
-              ListTile(
-                leading: const Icon(PhosphorIconsLight.pencilSimple),
-                title: Text(AppLocalizations.of(context)!.renameTag),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (_isDesktop) {
-                    _startTagRename(tag);
-                  } else {
-                    _showRenameDialog(tag);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(PhosphorIconsLight.palette),
-                title: Text(AppLocalizations.of(context)!.changeTagColor),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showColorPickerDialog(tag);
-                },
-              ),
-              if (widget.onTagSelected == null)
-                ListTile(
-                  leading: const Icon(PhosphorIconsLight.appWindow),
-                  title: Text(AppLocalizations.of(context)!.openInNewTab),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _directTagSearch(tag);
-                  },
-                ),
-              ListTile(
-                leading: Icon(PhosphorIconsLight.trash,
-                    color: theme.colorScheme.error),
-                title: Text(AppLocalizations.of(context)!.deleteTag,
-                    style: TextStyle(color: theme.colorScheme.error)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmDeleteTag(tag);
-                },
-              ),
-            ],
-          ),
-        );
-      },
+      sections: sections,
+      globalPosition: globalPosition,
     );
   }
 
-  /// Show context menu for multi-selected tags (right-click on PC)
-  /// Reuses the same pattern as shared_file_context_menu.dart
-  void _showMultiSelectContextMenu(Offset globalPosition) {
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (overlay == null) return;
-
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromPoints(globalPosition, globalPosition),
-      Offset.zero & overlay.size,
-    );
-
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
-
-    showMenu<String>(
-      context: context,
-      position: position,
-      items: [
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(PhosphorIconsLight.trash,
-                  size: 18, color: theme.colorScheme.error),
-              const SizedBox(width: 8),
-              Text(
-                l10n.deleteSelected,
-                style: TextStyle(color: theme.colorScheme.error),
-              ),
-            ],
+  List<ContextMenuSection> _buildTagContextMenuSections(
+    String tag,
+    AppLocalizations l10n,
+  ) {
+    return [
+      ContextMenuSection(
+        actions: [
+          ContextMenuAction(
+            id: 'view_files',
+            label: l10n.viewFilesWithTag,
+            icon: PhosphorIconsLight.folder,
+            onSelected: (_) => _directTagSearch(tag),
           ),
-        ),
-      ],
-    ).then((value) {
-      if (value == 'delete') {
-        _confirmBulkDeleteTags();
-      }
-    });
+          if (widget.onTagSelected == null)
+            ContextMenuAction(
+              id: 'open_tab',
+              label: l10n.openInNewTab,
+              icon: PhosphorIconsLight.appWindow,
+              onSelected: (_) => _directTagSearch(tag),
+            ),
+        ],
+      ),
+      ContextMenuSection(
+        actions: [
+          ContextMenuAction(
+            id: 'rename',
+            label: l10n.renameTag,
+            icon: PhosphorIconsLight.pencilSimple,
+            onSelected: (_) {
+              if (_isDesktop) {
+                _startTagRename(tag);
+              } else {
+                _showRenameDialog(tag);
+              }
+            },
+          ),
+          ContextMenuAction(
+            id: 'color',
+            label: l10n.changeTagColor,
+            icon: PhosphorIconsLight.palette,
+            onSelected: (_) => _showColorPickerDialog(tag),
+          ),
+          ContextMenuAction(
+            id: 'thumbnail',
+            label: 'Set Thumbnail',
+            icon: PhosphorIconsLight.image,
+            onSelected: (_) => _showThumbnailPicker(tag),
+          ),
+          ContextMenuAction(
+            id: 'hierarchy',
+            label: 'Manage Hierarchy',
+            icon: PhosphorIconsLight.treeStructure,
+            onSelected: (_) => _showManageHierarchyDialog(tag),
+          ),
+        ],
+      ),
+      ContextMenuSection(
+        actions: [
+          ContextMenuAction(
+            id: 'delete',
+            label: l10n.deleteTag,
+            icon: PhosphorIconsLight.trash,
+            isDestructive: true,
+            onSelected: (_) => _confirmDeleteTag(tag),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  /// Show context menu for multi-selected tags (right-click on PC)
+  Future<void> _showMultiSelectContextMenu(Offset globalPosition) async {
+    final l10n = AppLocalizations.of(context)!;
+    final sections = [
+      ContextMenuSection(
+        actions: [
+          ContextMenuAction(
+            id: 'delete',
+            label: l10n.deleteSelected,
+            icon: PhosphorIconsLight.trash,
+            isDestructive: true,
+            onSelected: (_) => _confirmBulkDeleteTags(),
+          ),
+        ],
+      ),
+    ];
+
+    await showContextMenuPopup(
+      context: context,
+      sections: sections,
+      globalPosition: globalPosition,
+    );
   }
 
   Widget _buildTagsList() {
@@ -1539,87 +2323,29 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     final localizations = AppLocalizations.of(context)!;
-    final screenWidth = MediaQuery.of(context).size.width;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header with tag count and controls
+        // Header with tag count
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Row(
             children: [
-              // Select all checkbox with label - larger tap target
-              InkWell(
-                onTap: () {
-                  if (_allFilteredSelected) {
-                    _deselectAllTags();
-                  } else {
-                    _selectAllFilteredTags();
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SoftCheckbox(
-                        value: _allFilteredSelected
-                            ? true
-                            : _someSelected
-                                ? null
-                                : false,
-                        tristate: true,
-                        onChanged: (_) {
-                          if (_allFilteredSelected) {
-                            _deselectAllTags();
-                          } else {
-                            _selectAllFilteredTags();
-                          }
-                        },
-                        size: 24,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _allFilteredSelected
-                            ? localizations.deselectAllTags
-                            : localizations.selectAllTags,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
               Icon(PhosphorIconsLight.tag,
                   size: 20, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
               Expanded(
-                child: _isMultiSelectMode
-                    ? Text(
-                        localizations.tagsSelected(_selectedTags.length),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
-                        ),
-                      )
-                    : Text(
-                        '${_filteredTags.length} ${localizations.tagsCreated}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                child: Text(
+                  '${_filteredTags.length} ${localizations.tagsCreated}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-              if (_isMultiSelectMode) ...[
+              if (_selectedTags.isNotEmpty && !_isDesktop) ...[
                 IconButton(
                   icon: const Icon(PhosphorIconsLight.trash, size: 20),
                   onPressed:
@@ -1634,46 +2360,17 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   visualDensity: VisualDensity.compact,
                 ),
               ],
-              if (!_isMultiSelectMode && screenWidth > 600) ...[
-                PopupMenuButton<String>(
-                  tooltip: localizations.sortTags,
-                  onSelected: _changeSortCriteria,
-                  icon: Icon(PhosphorIconsLight.sortAscending,
-                      size: 20, color: theme.colorScheme.onSurfaceVariant),
-                  itemBuilder: (context) => [
-                    _buildSortMenuItem('name', PhosphorIconsLight.sortAscending,
-                        localizations.sortByAlphabet),
-                    _buildSortMenuItem(
-                        'popularity',
-                        PhosphorIconsLight.chartBar,
-                        localizations.sortByPopular),
-                    _buildSortMenuItem(
-                        'recent',
-                        PhosphorIconsLight.clockCounterClockwise,
-                        localizations.sortByRecent),
-                  ],
-                ),
-                IconButton(
-                  onPressed: () => setState(() => _isGridView = !_isGridView),
-                  icon: Icon(
-                    _isGridView
-                        ? PhosphorIconsLight.listBullets
-                        : PhosphorIconsLight.squaresFour,
-                    color: theme.colorScheme.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  tooltip: _isGridView
-                      ? localizations.listViewMode
-                      : localizations.gridViewMode,
-                ),
-              ],
             ],
           ),
         ),
 
-        // Tags list or grid
+        // Active filters chip row
+        if (_hierarchyFilter != 'all' || _thumbnailFilter != 'all')
+          _buildActiveFiltersBar(theme),
+
+        // Tags list, grid or tree
         Expanded(
-          child: _isGridView ? _buildTagsGridView() : _buildTagsListView(),
+          child: _buildTagsContent(),
         ),
 
         // Bottom pagination controls
@@ -1736,6 +2433,343 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Filter button with badge showing active filter count.
+  Widget _buildFilterButton(ThemeData theme, AppLocalizations localizations) {
+    final activeCount = (_hierarchyFilter != 'all' ? 1 : 0) +
+        (_thumbnailFilter != 'all' ? 1 : 0);
+    final hasActive = activeCount > 0;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: Icon(
+            PhosphorIconsLight.funnel,
+            size: 20,
+            color: hasActive
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+          tooltip: 'Filter tags',
+          onPressed: _showFilterDialog,
+        ),
+        if (hasActive)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                '$activeCount',
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Bar showing active filters as removable chips.
+  Widget _buildActiveFiltersBar(ThemeData theme) {
+    final chips = <Widget>[];
+
+    if (_hierarchyFilter != 'all') {
+      String label;
+      IconData icon;
+      switch (_hierarchyFilter) {
+        case 'parents':
+          label = 'Parent tags';
+          icon = PhosphorIconsLight.treeStructure;
+          break;
+        case 'children':
+          label = 'Child tags';
+          icon = PhosphorIconsLight.arrowBendUpLeft;
+          break;
+        case 'standalone':
+          label = 'Standalone';
+          icon = PhosphorIconsLight.tag;
+          break;
+        default:
+          label = '';
+          icon = PhosphorIconsLight.funnel;
+      }
+      chips.add(_buildFilterChip(
+        theme,
+        label: label,
+        icon: icon,
+        onRemove: () {
+          setState(() => _hierarchyFilter = 'all');
+          _filterTags();
+        },
+      ));
+    }
+
+    if (_thumbnailFilter != 'all') {
+      chips.add(_buildFilterChip(
+        theme,
+        label: _thumbnailFilter == 'with' ? 'Has thumbnail' : 'No thumbnail',
+        icon: PhosphorIconsLight.image,
+        onRemove: () {
+          setState(() => _thumbnailFilter = 'all');
+          _filterTags();
+        },
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        children: [
+          Icon(PhosphorIconsLight.funnel,
+              size: 14,
+              color: theme.colorScheme.primary.withValues(alpha: 0.7)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Wrap(
+                spacing: 6,
+                children: chips,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _hierarchyFilter = 'all';
+                _thumbnailFilter = 'all';
+              });
+              _filterTags();
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Clear all', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(
+    ThemeData theme, {
+    required String label,
+    required IconData icon,
+    required VoidCallback onRemove,
+  }) {
+    return Chip(
+      avatar: Icon(icon, size: 14, color: theme.colorScheme.primary),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      deleteIcon: const Icon(PhosphorIconsLight.x, size: 14),
+      onDeleted: onRemove,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      backgroundColor:
+          theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+      side: BorderSide(
+        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+      ),
+    );
+  }
+
+  /// Show the filter selection dialog.
+  Future<void> _showFilterDialog() async {
+    final theme = Theme.of(context);
+
+    await RouteUtils.showAcrylicDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(PhosphorIconsLight.funnel,
+                      size: 20, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text('Filter tags'),
+                ],
+              ),
+              content: SizedBox(
+                width: 320,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Hierarchy',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: theme.colorScheme.primary,
+                        )),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterOption(
+                          theme,
+                          label: 'All',
+                          selected: _hierarchyFilter == 'all',
+                          onTap: () =>
+                              setDialogState(() => _hierarchyFilter = 'all'),
+                        ),
+                        _buildFilterOption(
+                          theme,
+                          label: 'Parent tags',
+                          icon: PhosphorIconsLight.treeStructure,
+                          selected: _hierarchyFilter == 'parents',
+                          onTap: () => setDialogState(
+                              () => _hierarchyFilter = 'parents'),
+                        ),
+                        _buildFilterOption(
+                          theme,
+                          label: 'Child tags',
+                          icon: PhosphorIconsLight.arrowBendUpLeft,
+                          selected: _hierarchyFilter == 'children',
+                          onTap: () => setDialogState(
+                              () => _hierarchyFilter = 'children'),
+                        ),
+                        _buildFilterOption(
+                          theme,
+                          label: 'Standalone',
+                          icon: PhosphorIconsLight.tag,
+                          selected: _hierarchyFilter == 'standalone',
+                          onTap: () => setDialogState(
+                              () => _hierarchyFilter = 'standalone'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text('Thumbnail',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: theme.colorScheme.primary,
+                        )),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterOption(
+                          theme,
+                          label: 'All',
+                          selected: _thumbnailFilter == 'all',
+                          onTap: () =>
+                              setDialogState(() => _thumbnailFilter = 'all'),
+                        ),
+                        _buildFilterOption(
+                          theme,
+                          label: 'Has thumbnail',
+                          icon: PhosphorIconsLight.image,
+                          selected: _thumbnailFilter == 'with',
+                          onTap: () =>
+                              setDialogState(() => _thumbnailFilter = 'with'),
+                        ),
+                        _buildFilterOption(
+                          theme,
+                          label: 'No thumbnail',
+                          icon: PhosphorIconsLight.imageBroken,
+                          selected: _thumbnailFilter == 'without',
+                          onTap: () => setDialogState(
+                              () => _thumbnailFilter = 'without'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    setDialogState(() {
+                      _hierarchyFilter = 'all';
+                      _thumbnailFilter = 'all';
+                    });
+                  },
+                  child: const Text('Reset'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    _filterTags();
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterOption(
+    ThemeData theme, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: 0.15)
+              : theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 14,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1811,6 +2845,151 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     return indicators;
   }
 
+  /// Builds a thumbnail image or a color dot fallback for a tag.
+  Widget _buildTagThumbnailOrDot(String tag, Color tagColor,
+      {double size = 40}) {
+    final thumbnailPath = _tagThumbnailManager.getThumbnailSync(tag);
+    if (thumbnailPath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size > 40 ? 12 : 8),
+        child: Image.file(
+          File(thumbnailPath),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: tagColor,
+              borderRadius: BorderRadius.circular(size > 40 ? 12 : 8),
+            ),
+            child: Icon(
+              PhosphorIconsLight.image,
+              size: size * 0.5,
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      );
+    }
+    // Fallback: color dot (larger for grid, smaller for list)
+    final dotSize = size > 40 ? 32.0 : 12.0;
+    return Container(
+      width: dotSize,
+      height: dotSize,
+      decoration: BoxDecoration(color: tagColor, shape: BoxShape.circle),
+    );
+  }
+
+  /// Edge-to-edge thumbnail for the grid card top area. Fills the available
+  /// space (cover) so the card reads like a media/tag card. Falls back to a
+  /// color-tinted panel with a centered icon when no thumbnail exists.
+  Widget _buildTagCardThumbnailFill(String tag, Color tagColor) {
+    final thumbnailPath = _tagThumbnailManager.getThumbnailSync(tag);
+    if (thumbnailPath != null) {
+      return Image.file(
+        File(thumbnailPath),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _buildTagCardThumbnailPlaceholder(
+          tagColor,
+          PhosphorIconsLight.image,
+        ),
+      );
+    }
+    return _buildTagCardThumbnailPlaceholder(tagColor, PhosphorIconsLight.tag);
+  }
+
+  Widget _buildTagCardThumbnailPlaceholder(Color tagColor, IconData icon) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            tagColor.withValues(alpha: 0.55),
+            tagColor.withValues(alpha: 0.22),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          icon,
+          color: Colors.white.withValues(alpha: 0.85),
+          size: 40,
+        ),
+      ),
+    );
+  }
+
+  /// Builds a small hierarchy context label below the tag name.
+  Widget _buildHierarchyContext(String tag, ThemeData theme,
+      {bool centered = false}) {
+    final parents = _tagHierarchyManager.getParents(tag);
+    final children = _tagHierarchyManager.getChildren(tag);
+
+    if (parents.isEmpty && children.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Column(
+        crossAxisAlignment:
+            centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (parents.isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  PhosphorIconsLight.arrowBendUpLeft,
+                  size: 12,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    parents.join(', '),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          if (children.isNotEmpty)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  PhosphorIconsLight.treeStructure,
+                  size: 12,
+                  color: theme.colorScheme.tertiary.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    '${children.length}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.tertiary.withValues(alpha: 0.8),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   /// Build a single tag list tile with proper widget key for position tracking
   Widget _buildTagListTile(String tag, int index, Color tagColor,
       bool isEditing, bool isSelected, bool isFocused) {
@@ -1835,179 +3014,417 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           }
         });
 
-        return ListTile(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            side: isEditing
-                ? BorderSide(color: theme.colorScheme.primary, width: 2)
-                : isSelected || isFocused
-                    ? BorderSide(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                        width: 1.5)
-                    : BorderSide.none,
-          ),
-          tileColor: isSelected || isFocused
-              ? theme.colorScheme.primary.withValues(alpha: 0.12)
-              : tagColor.withValues(alpha: 0.08),
-          leading: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 12,
-                height: 12,
-                decoration:
-                    BoxDecoration(color: tagColor, shape: BoxShape.circle),
-              ),
-            ],
-          ),
-          title: isEditing && _editingTagController != null
-              ? Focus(
-                  onKeyEvent: (node, event) =>
-                      _handleInlineRenameKey(node, event, tag),
-                  child: TextField(
-                    controller: _editingTagController,
-                    autofocus: true,
-                    textInputAction: TextInputAction.done,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 2),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                            color: theme.colorScheme.primary, width: 2),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                            color: theme.colorScheme.primary, width: 2),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(
-                            color: theme.colorScheme.primary, width: 2),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surface,
-                    ),
-                    cursorColor: theme.colorScheme.primary,
-                    onEditingComplete: () => _commitTagRename(tag),
-                    onSubmitted: (_) => _commitTagRename(tag),
-                    onTapOutside: (_) => _commitTagRename(tag),
+        return GestureDetector(
+          onSecondaryTapUp: isEditing
+              ? null
+              : (details) =>
+                  _showTagOptions(tag, globalPosition: details.globalPosition),
+          child: ListTile(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+              side: isEditing
+                  ? BorderSide(color: theme.colorScheme.primary, width: 2)
+                  : isSelected || isFocused
+                      ? BorderSide(
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.5),
+                          width: 1.5)
+                      : BorderSide.none,
+            ),
+            tileColor: isSelected || isFocused
+                ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                : tagColor.withValues(alpha: 0.08),
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) ...[
+                  SoftCheckbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleTagSelection(tag),
+                    size: 22,
                   ),
-                )
-              : GestureDetector(
-                  onDoubleTap: _isMultiSelectMode ? null : () => _openTag(tag),
-                  behavior: HitTestBehavior.opaque,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          tag,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  const SizedBox(width: 10),
+                ],
+                _buildTagThumbnailOrDot(tag, tagColor, size: 40),
+              ],
+            ),
+            title: isEditing && _editingTagController != null
+                ? Focus(
+                    onKeyEvent: (node, event) =>
+                        _handleInlineRenameKey(node, event, tag),
+                    child: TextField(
+                      controller: _editingTagController,
+                      autofocus: true,
+                      textInputAction: TextInputAction.done,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: theme.colorScheme.onSurface,
                       ),
-                      if (isDesktop && !_isMultiSelectMode) ...[
-                        const SizedBox(width: 4),
-                        Tooltip(
-                          message:
-                              AppLocalizations.of(context)!.doubleClickToRename,
-                          child: Icon(PhosphorIconsLight.pencilSimple,
-                              size: 14,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.5)),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 2),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: theme.colorScheme.primary, width: 2),
+                          borderRadius: BorderRadius.circular(2),
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: theme.colorScheme.primary, width: 2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: theme.colorScheme.primary, width: 2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        filled: true,
+                        fillColor: theme.colorScheme.surface,
+                      ),
+                      cursorColor: theme.colorScheme.primary,
+                      onEditingComplete: () => _commitTagRename(tag),
+                      onSubmitted: (_) => _commitTagRename(tag),
+                      onTapOutside: (_) => _commitTagRename(tag),
+                    ),
+                  )
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                tag,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isDesktop) ...[
+                              const SizedBox(width: 4),
+                              Tooltip(
+                                message: AppLocalizations.of(context)!
+                                    .doubleClickToRename,
+                                child: Icon(PhosphorIconsLight.pencilSimple,
+                                    size: 14,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.5)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        _buildHierarchyContext(tag, theme),
                       ],
-                    ],
+                    ),
                   ),
+            onTap: isEditing ? null : () => _handleTagTap(tag),
+            onLongPress: isEditing ? null : () => _showTagOptions(tag),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(PhosphorIconsLight.pencilSimple,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.onSurfaceVariant),
+                  onPressed: isEditing
+                      ? null
+                      : () {
+                          if (isDesktop) {
+                            _startTagRename(tag);
+                          } else {
+                            _showRenameDialog(tag);
+                          }
+                        },
+                  tooltip: AppLocalizations.of(context)!.renameTag,
+                  visualDensity: VisualDensity.compact,
                 ),
-          onTap: isEditing
-              ? null
-              : _isMultiSelectMode
-                  ? () => _toggleTagSelection(tag)
-                  : () {
-                      if (_isDesktop) {
-                        _selectTag(tag);
-                      } else {
-                        // On mobile, tap directly opens the tag
-                        _directTagSearch(tag);
-                      }
-                    },
-          onLongPress: isEditing
-              ? null
-              : _isMultiSelectMode
-                  ? () => _showTagOptions(tag)
-                  : () => _enterMultiSelectMode(tag),
-          trailing: _isMultiSelectMode
-              ? null
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(PhosphorIconsLight.pencilSimple,
-                          size: 20,
-                          color: isEditing
-                              ? theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.3)
-                              : theme.colorScheme.onSurfaceVariant),
-                      onPressed: isEditing
-                          ? null
-                          : () {
-                              if (isDesktop) {
-                                _startTagRename(tag);
-                              } else {
-                                _showRenameDialog(tag);
-                              }
-                            },
-                      tooltip: AppLocalizations.of(context)!.renameTag,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    IconButton(
-                      icon: Icon(PhosphorIconsLight.folder,
-                          size: 20,
-                          color: isEditing
-                              ? theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.3)
-                              : theme.colorScheme.primary),
-                      onPressed: isEditing ? null : () => _directTagSearch(tag),
-                      tooltip: AppLocalizations.of(context)!.viewFilesWithTag,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    IconButton(
-                      icon: Icon(PhosphorIconsLight.palette,
-                          size: 20,
-                          color: isEditing
-                              ? theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.3)
-                              : theme.colorScheme.onSurfaceVariant),
-                      onPressed:
-                          isEditing ? null : () => _showColorPickerDialog(tag),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    IconButton(
-                      icon: Icon(PhosphorIconsLight.trash,
-                          size: 20,
-                          color: isEditing
-                              ? theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.3)
-                              : theme.colorScheme.error.withValues(alpha: 0.7)),
-                      onPressed:
-                          isEditing ? null : () => _confirmDeleteTag(tag),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
+                IconButton(
+                  icon: Icon(PhosphorIconsLight.folder,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.primary),
+                  onPressed: isEditing ? null : () => _directTagSearch(tag),
+                  tooltip: AppLocalizations.of(context)!.viewFilesWithTag,
+                  visualDensity: VisualDensity.compact,
                 ),
+                IconButton(
+                  icon: Icon(PhosphorIconsLight.palette,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.onSurfaceVariant),
+                  onPressed:
+                      isEditing ? null : () => _showColorPickerDialog(tag),
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  icon: Icon(PhosphorIconsLight.image,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.onSurfaceVariant),
+                  onPressed: isEditing ? null : () => _showThumbnailPicker(tag),
+                  tooltip: 'Set thumbnail',
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  icon: Icon(PhosphorIconsLight.treeStructure,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : (_tagHierarchyManager.isParent(tag) ||
+                                  _tagHierarchyManager.isChild(tag)
+                              ? theme.colorScheme.tertiary
+                              : theme.colorScheme.onSurfaceVariant)),
+                  onPressed:
+                      isEditing ? null : () => _showManageHierarchyDialog(tag),
+                  tooltip: 'Manage hierarchy (parent/child)',
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  icon: Icon(PhosphorIconsLight.trash,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.error.withValues(alpha: 0.7)),
+                  onPressed: isEditing ? null : () => _confirmDeleteTag(tag),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTagsContent() {
+    final Widget content;
+    switch (_viewMode) {
+      case _TagViewMode.list:
+        content = _buildTagsListView();
+        break;
+      case _TagViewMode.grid:
+        content = _buildTagsGridView();
+        break;
+      case _TagViewMode.tree:
+        content = _buildTagsTreeView();
+        break;
+    }
+
+    return CtrlScrollZoom(
+      onDelta: _isDesktop ? (delta) => _handleTagViewScaleDelta(-delta) : null,
+      child: content,
+    );
+  }
+
+  /// Builds the tag tree.
+  ///
+  /// Roots = parent tags (from [TagHierarchyManager.getRootParents]) plus
+  /// standalone tags (no parents and no children). Children are pulled
+  /// synchronously from the in-memory hierarchy.
+  ///
+  /// Search and the active filters (`_hierarchyFilter`, `_thumbnailFilter`)
+  /// are honoured: any node whose subtree contains a match is kept (so
+  /// ancestors of matches stay visible). Result respects the current
+  /// `_filteredTags` set.
+  Widget _buildTagsTreeView() {
+    final visibleSet = _filteredTags.toSet();
+    final treeLayout = _tagTreeLayoutMetrics;
+
+    // The hierarchy manager stores tags NORMALIZED (lowercased + trimmed),
+    // but _allTags / _filteredTags hold the original display case. Build a
+    // normalized -> display map so tree nodes use display names that match
+    // the visible set (otherwise every parent/child gets filtered out).
+    String displayOf(String normalized) =>
+        _normalizedToDisplay[normalized] ?? normalized;
+
+    // Only rebuild tree structure when tag data actually changes.
+    // Signature captures all tags + the full hierarchy tree so adding a
+    // child to an existing parent also invalidates the cache.
+    final rootParents = _tagHierarchyManager.getRootParents();
+    final hierarchyTree = _tagHierarchyManager.getHierarchyTree();
+    final hierarchySig = (hierarchyTree.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key)))
+        .map((e) => '${e.key}>${e.value.join("+")}')
+        .join("|");
+    final sig = '${_allTags.length}|$hierarchySig';
+    if (sig != _treeRootsSignature) {
+      _treeRootsSignature = sig;
+      final standalone = _allTags
+          .where((t) =>
+              !_tagHierarchyManager.isParent(t) &&
+              !_tagHierarchyManager.isChild(t))
+          .toList();
+
+      // [tag] here is a NORMALIZED hierarchy name; nodes store the display
+      // form so selection/filtering line up with _allTags / _filteredTags.
+      TreeNode<String> buildTagNode(String tag, Set<String> ancestry) {
+        final children = _tagHierarchyManager
+            .getChildren(tag)
+            .where((c) => !ancestry.contains(c))
+            .toList();
+        final nextAncestry = {...ancestry, tag};
+        return TreeNode<String>(
+          id: displayOf(tag),
+          data: displayOf(tag),
+          isLeaf: children.isEmpty,
+          children: children.map((c) => buildTagNode(c, nextAncestry)).toList(),
+        );
+      }
+
+      _cachedTreeRoots = <TreeNode<String>>[
+        ...rootParents.map((p) => buildTagNode(p, const <String>{})),
+        ...standalone.map(
+          (t) => TreeNode<String>(
+            id: t,
+            data: t,
+            isLeaf: true,
+            children: const <TreeNode<String>>[],
+          ),
+        ),
+      ];
+    }
+
+    // Compute the "should show" set: any node whose data is in
+    // visibleSet, plus all of its ancestors.
+    final showIds = <String>{};
+    bool walk(TreeNode<String> node, List<String> path) {
+      var matched = visibleSet.contains(node.data);
+      for (final c in node.children ?? const <TreeNode<String>>[]) {
+        if (walk(c, [...path, node.id])) matched = true;
+      }
+      if (matched) {
+        showIds.add(node.id);
+        showIds.addAll(path);
+      }
+      return matched;
+    }
+
+    for (final r in _cachedTreeRoots) {
+      walk(r, const <String>[]);
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (_selectedTags.isNotEmpty && _editingTag == null) {
+          _deselectAllTags();
+        }
+      },
+      onSecondaryTapUp: (details) {
+        if (_selectedTags.isNotEmpty) {
+          _showMultiSelectContextMenu(details.globalPosition);
+        }
+      },
+      behavior: HitTestBehavior.translucent,
+      child: GenericTreeView<String>(
+        roots: _cachedTreeRoots,
+        itemExtent: treeLayout.rowExtent,
+        indentPerDepth: treeLayout.indentPerDepth,
+        expandOnRowTap: true,
+        nodeFilter: (node) => showIds.contains(node.id),
+        selectedIds: _selectedTags,
+        focusedId: _focusedTag,
+        // Tree rows: select immediately. The tree row shell does its own
+        // double-tap detection (fires onDoubleTap), so we must NOT route
+        // through _handleTagTap's 250ms timer here or a double-tap would
+        // both open and select.
+        onTap: (node) => _selectTag(node.data),
+        onDoubleTap: (node) => _directTagSearch(node.data),
+        onSecondary: (node, globalPosition) => _showTagOptions(
+          node.data,
+          globalPosition: globalPosition,
+        ),
+        emptyState: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              AppLocalizations.of(context)!.noTagsFound,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ),
+        itemBuilder: (context, node, depth) {
+          final tag = node.data;
+          final tagColor = TagColorManager.instance.getTagColor(tag);
+          return _buildTagTreeDragDropRow(
+            tag: tag,
+            child: _TagTreeRowContent(
+              tag: tag,
+              tagColor: tagColor,
+              thumbnailSize: treeLayout.thumbnailSize,
+              fontSize: treeLayout.fontSize,
+              spacing: treeLayout.spacing,
+              buildThumbnail: (size) =>
+                  _buildTagThumbnailOrDot(tag, tagColor, size: size),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTagTreeDragDropRow({
+    required String tag,
+    required Widget child,
+  }) {
+    if (!_isDesktop || _viewMode != _TagViewMode.tree) return child;
+
+    final draggable = Draggable<String>(
+      data: tag,
+      maxSimultaneousDrags: 1,
+      feedback: Material(
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text(
+              tag,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.55, child: child),
+      child: child,
+    );
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) =>
+          _canDropTagOnParent(details.data, tag),
+      onAcceptWithDetails: (details) => _moveTagUnderParent(
+        childTag: details.data,
+        parentTag: tag,
+      ),
+      builder: (context, candidateData, rejectedData) {
+        if (candidateData.isEmpty) return draggable;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: draggable,
         );
       },
     );
@@ -2026,7 +3443,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         GestureDetector(
           onTap: () {
             // Tap to deselect when not in edit mode
-            if (_editingTag == null && _isMultiSelectMode) {
+            if (_editingTag == null && _selectedTags.isNotEmpty) {
               _deselectAllTags();
             }
           },
@@ -2067,11 +3484,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               : null,
           behavior: HitTestBehavior.translucent,
           child: ListView.separated(
-            padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 8,
-                bottom: _isMultiSelectMode ? 80 : 8),
+            padding:
+                const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8),
             itemCount: _currentPageTags.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
@@ -2092,21 +3506,156 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
   }
 
+  /// A single compact action button used inside the grid hover toolbar.
+  Widget _buildTagToolbarButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    required Color color,
+    required double iconSize,
+    double padding = 7.0,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20.0),
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: Icon(icon, size: iconSize, color: color),
+        ),
+      ),
+    );
+  }
+
+  /// Desktop hover toolbar shown floating near the bottom of a tag thumbnail.
+  ///
+  /// Surfaces the three most-used actions (view files, rename, delete) plus an
+  /// overflow button that opens the full tag context menu anchored to itself.
+  Widget _buildTagHoverToolbar(
+    String tag,
+    ThemeData theme,
+    double iconSize, {
+    required double maxWidth,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    final compact = maxWidth < 144;
+    final effectiveIconSize =
+        compact ? (iconSize - 2).clamp(14.0, 18.0) : iconSize;
+    final buttonPadding = compact ? 4.0 : 7.0;
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(24.0),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth - 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTagToolbarButton(
+                icon: PhosphorIconsLight.folder,
+                tooltip: l10n.viewFilesWithTag,
+                onTap: () => _directTagSearch(tag),
+                color: theme.colorScheme.primary,
+                iconSize: effectiveIconSize,
+                padding: buttonPadding,
+              ),
+              _buildTagToolbarButton(
+                icon: PhosphorIconsLight.pencilSimple,
+                tooltip: l10n.renameTag,
+                onTap: () => _startTagRename(tag),
+                color: theme.colorScheme.onSurfaceVariant,
+                iconSize: effectiveIconSize,
+                padding: buttonPadding,
+              ),
+              _buildTagToolbarButton(
+                icon: PhosphorIconsLight.trash,
+                tooltip: l10n.deleteTag,
+                onTap: () => _confirmDeleteTag(tag),
+                color: theme.colorScheme.error.withValues(alpha: 0.85),
+                iconSize: effectiveIconSize,
+                padding: buttonPadding,
+              ),
+              Builder(
+                builder: (btnContext) => _buildTagToolbarButton(
+                  icon: PhosphorIconsLight.dotsThreeOutline,
+                  tooltip: l10n.moreOptions,
+                  onTap: () => _showTagOptions(
+                    tag,
+                    globalPosition: _anchorOf(btnContext),
+                  ),
+                  color: theme.colorScheme.onSurfaceVariant,
+                  iconSize: effectiveIconSize,
+                  padding: buttonPadding,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Overflow ("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦") button used on mobile (and as the touch fallback) that
+  /// opens the full tag context menu.
+  Widget _buildTagOverflowButton(String tag, ThemeData theme) {
+    return Material(
+      color: theme.colorScheme.surface.withValues(alpha: 0.7),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showTagOptions(tag),
+        child: Padding(
+          padding: const EdgeInsets.all(5.0),
+          child: Icon(
+            PhosphorIconsLight.dotsThreeOutline,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Returns the global position to anchor a context-menu popup to the given
+  /// element (its center), falling back to null when unavailable.
+  Offset? _anchorOf(BuildContext elementContext) {
+    final renderBox = elementContext.findRenderObject() as RenderBox?;
+    if (renderBox == null || !renderBox.hasSize) return null;
+    return renderBox.localToGlobal(renderBox.size.center(Offset.zero));
+  }
+
   Widget _buildTagsGridView() {
     final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = _isDesktop;
 
-    // Larger grid for desktop
-    final crossAxisCount = isDesktop
-        ? (screenWidth / 200).floor().clamp(4, 10)
-        : screenWidth > 1200
-            ? 8
-            : screenWidth > 900
-                ? 6
-                : screenWidth > 600
-                    ? 5
-                    : 3;
+    // Use zoom-level-driven column count (same math as the file browser).
+    // _tagGridZoomLevel is the number of columns at the 960 px reference width.
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final effectiveZoom = _tagGridZoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
+    final crossAxisCount = GridZoomConstraints.columnCountForZoom(
+      effectiveZoom,
+      MediaQuery.of(context).size.width,
+    ).clamp(1, 20);
 
     // Larger fonts and spacing for desktop
     final fontSize = isDesktop ? 14.0 : 12.0;
@@ -2118,13 +3667,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _clearTagPositions();
     });
 
-    // GridView with drag selection support (same as ListView)
+    // GridView with drag selection support (same as ListView).
+    // Ctrl+scroll is handled by _buildTagsContent so it works in all modes.
     return Stack(
       children: [
         GestureDetector(
           onTap: () {
             // Tap to deselect when not in edit mode
-            if (_editingTag == null && _isMultiSelectMode) {
+            if (_editingTag == null && _selectedTags.isNotEmpty) {
               _deselectAllTags();
             }
           },
@@ -2169,11 +3719,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               left: isDesktop ? 16 : 12,
               right: isDesktop ? 16 : 12,
               top: isDesktop ? 16 : 12,
-              bottom: _isMultiSelectMode ? 80 : (isDesktop ? 16 : 12),
+              bottom: isDesktop ? 16 : 12,
             ),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              childAspectRatio: isDesktop ? 1.8 : 1.6,
+              childAspectRatio: isDesktop ? 1.25 : 1.15,
               crossAxisSpacing: isDesktop ? 12 : 8,
               mainAxisSpacing: isDesktop ? 12 : 8,
             ),
@@ -2207,283 +3757,328 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16.0),
-                      onTap: isEditing
+                      onTap: isEditing ? null : () => _handleTagTap(tag),
+                      onDoubleTap:
+                          isEditing ? null : () => _directTagSearch(tag),
+                      onLongPress:
+                          isEditing ? null : () => _showTagOptions(tag),
+                      onSecondaryTapUp: isEditing
                           ? null
-                          : _isMultiSelectMode
-                              ? () => _toggleTagSelection(tag)
-                              : () {
-                                  if (_isDesktop) {
-                                    _selectTag(tag);
-                                  } else {
-                                    // On mobile, tap directly opens the tag
-                                    _directTagSearch(tag);
-                                  }
-                                },
-                      onLongPress: isEditing
-                          ? null
-                          : _isMultiSelectMode
-                              ? () => _showTagOptions(tag)
-                              : () => _enterMultiSelectMode(tag),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected || isFocused
-                              ? theme.colorScheme.primary
-                                  .withValues(alpha: 0.15)
-                              : tagColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(16.0),
-                          border: isEditing
-                              ? Border.all(
-                                  color: theme.colorScheme.primary, width: 2)
-                              : isSelected || isFocused
-                                  ? Border.all(
-                                      color: theme.colorScheme.primary
-                                          .withValues(alpha: 0.5),
-                                      width: 1.5)
-                                  : null,
-                        ),
-                        child: Column(
-                          children: [
-                            // Top area: color dot only (no checkbox)
-                            Expanded(
-                              child: Center(
+                          : (details) => _showTagOptions(
+                                tag,
+                                globalPosition: details.globalPosition,
+                              ),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16.0),
+                              child: BackdropFilter(
+                                filter:
+                                    ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                                 child: Container(
-                                  width: isDesktop ? 32 : 24,
-                                  height: isDesktop ? 32 : 24,
                                   decoration: BoxDecoration(
-                                      color: tagColor, shape: BoxShape.circle),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: isSelected || isFocused
+                                          ? [
+                                              theme.colorScheme.primary
+                                                  .withValues(alpha: 0.26),
+                                              theme.colorScheme.primary
+                                                  .withValues(alpha: 0.16),
+                                            ]
+                                          : [
+                                              theme.colorScheme.surface
+                                                  .withValues(alpha: 0.34),
+                                              Color.alphaBlend(
+                                                tagColor.withValues(
+                                                    alpha: 0.10),
+                                                theme.colorScheme.surface
+                                                    .withValues(alpha: 0.22),
+                                              ),
+                                            ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(16.0),
+                                    border: Border.all(
+                                      color: isEditing
+                                          ? theme.colorScheme.primary
+                                          : isSelected || isFocused
+                                              ? theme.colorScheme.primary
+                                                  .withValues(alpha: 0.55)
+                                              : Colors.white
+                                                  .withValues(alpha: 0.14),
+                                      width: isEditing
+                                          ? 2
+                                          : isSelected || isFocused
+                                              ? 1.5
+                                              : 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.08),
+                                        blurRadius: 18,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      // Top area: thumbnail or color dot, with a
+                                      // hover toolbar (desktop) / overflow button
+                                      // (mobile) revealed over the bottom edge.
+                                      Expanded(
+                                        child: _HoverReveal(
+                                          enabled: isDesktop && !isEditing,
+                                          builder: (context, hovering) => Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Positioned.fill(
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      const BorderRadius
+                                                          .vertical(
+                                                    top: Radius.circular(16.0),
+                                                  ),
+                                                  child:
+                                                      _buildTagCardThumbnailFill(
+                                                          tag, tagColor),
+                                                ),
+                                              ),
+                                              // Desktop: floating action toolbar
+                                              // that slides up + fades in on hover.
+                                              if (isDesktop && !isEditing)
+                                                Positioned(
+                                                  left: 0,
+                                                  right: 0,
+                                                  // Float over the bottom edge of
+                                                  // the full-bleed thumbnail.
+                                                  bottom: 6,
+                                                  child: Center(
+                                                    child: AnimatedSlide(
+                                                      offset: Offset(0,
+                                                          hovering ? 0 : 0.35),
+                                                      duration: const Duration(
+                                                          milliseconds: 160),
+                                                      curve:
+                                                          Curves.easeOutCubic,
+                                                      child: AnimatedOpacity(
+                                                        opacity: hovering
+                                                            ? 1.0
+                                                            : 0.0,
+                                                        duration:
+                                                            const Duration(
+                                                                milliseconds:
+                                                                    160),
+                                                        child: IgnorePointer(
+                                                          ignoring: !hovering,
+                                                          child: _buildTagHoverToolbar(
+                                                              tag,
+                                                              theme,
+                                                              iconSize,
+                                                              maxWidth:
+                                                                  constraints
+                                                                      .maxWidth),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              // Mobile: always-visible overflow
+                                              if (_isMobile && !isEditing)
+                                                Positioned(
+                                                  top: 4,
+                                                  right: 4,
+                                                  child:
+                                                      _buildTagOverflowButton(
+                                                          tag, theme),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      // Bottom area: tag name
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 1),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.surface
+                                              .withValues(alpha: 0.28),
+                                          border: Border(
+                                            top: BorderSide(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.12),
+                                            ),
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                            top: spacing,
+                                            left: isDesktop ? 8 : 6,
+                                            right: isDesktop ? 8 : 6,
+                                            bottom: isDesktop ? 8 : 6,
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              // Tag name or rename TextField
+                                              if (isEditing &&
+                                                  _editingTagController != null)
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: Stack(
+                                                    alignment: Alignment.center,
+                                                    children: [
+                                                      Opacity(
+                                                        opacity: 0,
+                                                        child: Text(
+                                                          tag,
+                                                          style: TextStyle(
+                                                              fontSize:
+                                                                  fontSize,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                      Positioned.fill(
+                                                        child: Focus(
+                                                          onKeyEvent: (node,
+                                                                  event) =>
+                                                              _handleInlineRenameKey(
+                                                                  node,
+                                                                  event,
+                                                                  tag),
+                                                          child: TextField(
+                                                            controller:
+                                                                _editingTagController,
+                                                            autofocus: true,
+                                                            textInputAction:
+                                                                TextInputAction
+                                                                    .done,
+                                                            style: TextStyle(
+                                                                fontSize:
+                                                                    fontSize,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: theme
+                                                                    .colorScheme
+                                                                    .onSurface),
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            maxLines: 2,
+                                                            decoration:
+                                                                InputDecoration(
+                                                              isDense: true,
+                                                              contentPadding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          4,
+                                                                      vertical:
+                                                                          2),
+                                                              border:
+                                                                  OutlineInputBorder(
+                                                                borderSide: BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                    width: 2),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2),
+                                                              ),
+                                                              enabledBorder:
+                                                                  OutlineInputBorder(
+                                                                borderSide: BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                    width: 2),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2),
+                                                              ),
+                                                              focusedBorder:
+                                                                  OutlineInputBorder(
+                                                                borderSide: BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                    width: 2),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2),
+                                                              ),
+                                                              filled: true,
+                                                              fillColor: theme
+                                                                  .colorScheme
+                                                                  .surface,
+                                                            ),
+                                                            cursorColor: theme
+                                                                .colorScheme
+                                                                .primary,
+                                                            onEditingComplete: () =>
+                                                                _commitTagRename(
+                                                                    tag),
+                                                            onSubmitted: (_) =>
+                                                                _commitTagRename(
+                                                                    tag),
+                                                            onTapOutside: (_) =>
+                                                                _commitTagRename(
+                                                                    tag),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              else
+                                                Tooltip(
+                                                  message:
+                                                      'Double click to open in new tab',
+                                                  child: Column(
+                                                    children: [
+                                                      Text(
+                                                        tag,
+                                                        style: TextStyle(
+                                                            fontSize: fontSize,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: theme
+                                                                .colorScheme
+                                                                .onSurface),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                      _buildHierarchyContext(
+                                                          tag, theme,
+                                                          centered: true),
+                                                    ],
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                            // Bottom area: tag name + action buttons
-                            Padding(
-                              padding: EdgeInsets.only(
-                                top: spacing,
-                                left: isDesktop ? 8 : 6,
-                                right: isDesktop ? 8 : 6,
-                                bottom: isDesktop ? 8 : 6,
-                              ),
-                              child: Column(
-                                children: [
-                                  // Tag name or rename TextField
-                                  if (isEditing &&
-                                      _editingTagController != null)
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          Opacity(
-                                            opacity: 0,
-                                            child: Text(
-                                              tag,
-                                              style: TextStyle(
-                                                  fontSize: fontSize,
-                                                  fontWeight: FontWeight.w600),
-                                              textAlign: TextAlign.center,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          Positioned.fill(
-                                            child: Focus(
-                                              onKeyEvent: (node, event) =>
-                                                  _handleInlineRenameKey(
-                                                      node, event, tag),
-                                              child: TextField(
-                                                controller:
-                                                    _editingTagController,
-                                                autofocus: true,
-                                                textInputAction:
-                                                    TextInputAction.done,
-                                                style: TextStyle(
-                                                    fontSize: fontSize,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: theme
-                                                        .colorScheme.onSurface),
-                                                textAlign: TextAlign.center,
-                                                maxLines: 2,
-                                                decoration: InputDecoration(
-                                                  isDense: true,
-                                                  contentPadding:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 4,
-                                                          vertical: 2),
-                                                  border: OutlineInputBorder(
-                                                    borderSide: BorderSide(
-                                                        color: theme.colorScheme
-                                                            .primary,
-                                                        width: 2),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            2),
-                                                  ),
-                                                  enabledBorder:
-                                                      OutlineInputBorder(
-                                                    borderSide: BorderSide(
-                                                        color: theme.colorScheme
-                                                            .primary,
-                                                        width: 2),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            2),
-                                                  ),
-                                                  focusedBorder:
-                                                      OutlineInputBorder(
-                                                    borderSide: BorderSide(
-                                                        color: theme.colorScheme
-                                                            .primary,
-                                                        width: 2),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            2),
-                                                  ),
-                                                  filled: true,
-                                                  fillColor:
-                                                      theme.colorScheme.surface,
-                                                ),
-                                                cursorColor:
-                                                    theme.colorScheme.primary,
-                                                onEditingComplete: () =>
-                                                    _commitTagRename(tag),
-                                                onSubmitted: (_) =>
-                                                    _commitTagRename(tag),
-                                                onTapOutside: (_) =>
-                                                    _commitTagRename(tag),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  else
-                                    GestureDetector(
-                                      onDoubleTap: _isMultiSelectMode
-                                          ? null
-                                          : () => _openTag(tag),
-                                      child: Tooltip(
-                                        message: !_isMultiSelectMode
-                                            ? 'Double click to open'
-                                            : '',
-                                        child: Text(
-                                          tag,
-                                          style: TextStyle(
-                                              fontSize: fontSize,
-                                              fontWeight: FontWeight.w600,
-                                              color:
-                                                  theme.colorScheme.onSurface),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                  if (!_isMultiSelectMode) ...[
-                                    SizedBox(height: spacing),
-                                    // Action buttons row (hidden in multi-select mode)
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        InkWell(
-                                          onTap: isEditing
-                                              ? null
-                                              : () {
-                                                  if (isDesktop) {
-                                                    _startTagRename(tag);
-                                                  } else {
-                                                    _showRenameDialog(tag);
-                                                  }
-                                                },
-                                          borderRadius:
-                                              BorderRadius.circular(16.0),
-                                          child: Padding(
-                                            padding: EdgeInsets.all(
-                                                isDesktop ? 6 : 4),
-                                            child: Icon(
-                                                PhosphorIconsLight.pencilSimple,
-                                                size: iconSize,
-                                                color: isEditing
-                                                    ? theme
-                                                        .colorScheme.onSurface
-                                                        .withValues(alpha: 0.3)
-                                                    : theme.colorScheme
-                                                        .onSurfaceVariant),
-                                          ),
-                                        ),
-                                        SizedBox(width: isDesktop ? 8 : 4),
-                                        InkWell(
-                                          onTap: isEditing
-                                              ? null
-                                              : () => _directTagSearch(tag),
-                                          borderRadius:
-                                              BorderRadius.circular(16.0),
-                                          child: Padding(
-                                            padding: EdgeInsets.all(
-                                                isDesktop ? 6 : 4),
-                                            child: Icon(
-                                                PhosphorIconsLight.folder,
-                                                size: iconSize,
-                                                color: isEditing
-                                                    ? theme
-                                                        .colorScheme.onSurface
-                                                        .withValues(alpha: 0.3)
-                                                    : theme
-                                                        .colorScheme.primary),
-                                          ),
-                                        ),
-                                        SizedBox(width: isDesktop ? 8 : 4),
-                                        InkWell(
-                                          onTap: isEditing
-                                              ? null
-                                              : () =>
-                                                  _showColorPickerDialog(tag),
-                                          borderRadius:
-                                              BorderRadius.circular(16.0),
-                                          child: Padding(
-                                            padding: EdgeInsets.all(
-                                                isDesktop ? 6 : 4),
-                                            child: Icon(
-                                                PhosphorIconsLight.palette,
-                                                size: iconSize,
-                                                color: isEditing
-                                                    ? theme
-                                                        .colorScheme.onSurface
-                                                        .withValues(alpha: 0.3)
-                                                    : theme.colorScheme
-                                                        .onSurfaceVariant),
-                                          ),
-                                        ),
-                                        SizedBox(width: isDesktop ? 8 : 4),
-                                        InkWell(
-                                          onTap: isEditing
-                                              ? null
-                                              : () => _confirmDeleteTag(tag),
-                                          borderRadius:
-                                              BorderRadius.circular(16.0),
-                                          child: Padding(
-                                            padding: EdgeInsets.all(
-                                                isDesktop ? 6 : 4),
-                                            child: Icon(
-                                                PhosphorIconsLight.trash,
-                                                size: iconSize,
-                                                color: isEditing
-                                                    ? theme
-                                                        .colorScheme.onSurface
-                                                        .withValues(alpha: 0.3)
-                                                    : theme.colorScheme.error
-                                                        .withValues(
-                                                            alpha: 0.7)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -2798,20 +4393,36 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text(AppLocalizations.of(context)!.newTagTitle),
-          content: TextField(
-            controller: tagController,
-            decoration: InputDecoration(
-              hintText: AppLocalizations.of(context)!.enterTagName,
-              prefixIcon: const Icon(PhosphorIconsLight.hash),
-            ),
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (value) {
-              if (value.trim().isNotEmpty) {
-                Navigator.of(context).pop();
-                _createNewTag(value.trim());
-              }
-            },
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: tagController,
+                decoration: InputDecoration(
+                  hintText: AppLocalizations.of(context)!.enterTagName,
+                  prefixIcon: const Icon(PhosphorIconsLight.hash),
+                  helperText:
+                      'Use parent:child format for hierarchy\ne.g. Actress:Hung or Actress:Hung,Van',
+                  helperMaxLines: 3,
+                  helperStyle: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant
+                        .withValues(alpha: 0.7),
+                  ),
+                ),
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) {
+                  if (value.trim().isNotEmpty) {
+                    Navigator.of(context).pop();
+                    _createNewTag(value.trim());
+                  }
+                },
+              ),
+            ],
           ),
           actions: <Widget>[
             TextButton(
@@ -2842,17 +4453,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       return;
     }
 
+    // Parse parent:child format (e.g. "Actress:Hung" or "Actress:Hung,Van,Linh")
+    if (normalizedTagName.contains(':')) {
+      await _createHierarchyTag(normalizedTagName);
+      return;
+    }
+
     final hasExistingTag = _allTags.any(
       (existingTag) =>
           existingTag.toLowerCase() == normalizedTagName.toLowerCase(),
     );
 
     if (hasExistingTag) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!
-              .tagAlreadyExists(normalizedTagName)),
-        ),
+      AppToast.warning(
+        context,
+        AppLocalizations.of(context)!.tagAlreadyExists(normalizedTagName),
       );
       return;
     }
@@ -2863,10 +4478,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       final saved = await TagManager.addStandaloneTag(normalizedTagName);
       if (!saved) {
         if (mounted) {
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            const SnackBar(
-              content: Text('Failed to save tag to local database'),
-            ),
+          AppToast.error(
+            context,
+            AppLocalizations.of(context)!.saveTagToLocalDatabaseFailed,
           );
         }
         return;
@@ -2874,10 +4488,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     } catch (e) {
       AppLogger.warning('Error saving standalone tag: $e');
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-            content: Text('Failed to save tag: $e'),
-          ),
+        AppToast.error(
+          context,
+          AppLocalizations.of(context)!.saveTagFailed(e.toString()),
         );
       }
       return;
@@ -2905,27 +4518,177 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _selectedTags
         ..clear()
         ..add(normalizedTagName);
-      _isMultiSelectMode = false;
       _updatePagination();
     });
 
     if (mounted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!
-              .tagCreatedSuccessfully(normalizedTagName)),
-        ),
+      AppToast.success(
+        context,
+        AppLocalizations.of(context)!.tagCreatedSuccessfully(normalizedTagName),
       );
     }
+  }
+
+  /// Create tags with parent:child hierarchy format.
+  /// Supports: "Parent:Child" and "Parent:Child1,Child2,Child3"
+  Future<void> _createHierarchyTag(String input) async {
+    final colonIndex = input.indexOf(':');
+    final parentName = input.substring(0, colonIndex).trim();
+    final childrenPart = input.substring(colonIndex + 1).trim();
+
+    if (parentName.isEmpty || childrenPart.isEmpty) {
+      if (mounted) {
+        AppToast.warning(context,
+            'Invalid format. Use parent:child or parent:child1,child2');
+      }
+      return;
+    }
+
+    final childNames = childrenPart
+        .split(',')
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+
+    if (childNames.isEmpty) {
+      if (mounted) {
+        AppToast.warning(context, 'No child tags specified');
+      }
+      return;
+    }
+
+    try {
+      // Ensure parent tag exists
+      final parentExists =
+          _allTags.any((t) => t.toLowerCase() == parentName.toLowerCase());
+      if (!parentExists) {
+        await TagManager.addStandaloneTag(parentName);
+        _standaloneCreatedTags.add(parentName);
+      }
+
+      // Create child tags and hierarchy relationships
+      int createdCount = 0;
+      for (final childName in childNames) {
+        final childExists =
+            _allTags.any((t) => t.toLowerCase() == childName.toLowerCase());
+        if (!childExists) {
+          await TagManager.addStandaloneTag(childName);
+          _standaloneCreatedTags.add(childName);
+        }
+
+        final ok = await _tagHierarchyManager.addChild(parentName, childName);
+        if (ok) {
+          createdCount++;
+        } else {
+          if (mounted) {
+            AppToast.warning(context,
+                'Could not create relationship: $parentName -> $childName (circular reference?)');
+          }
+        }
+      }
+
+      await _loadAllTags();
+
+      if (!mounted) return;
+
+      final currentQuery = _searchController.text.trim().toLowerCase();
+      if (currentQuery.isNotEmpty &&
+          !parentName.toLowerCase().contains(currentQuery)) {
+        _searchController.clear();
+      }
+
+      setState(() {
+        _currentPage = 0;
+        _focusedTag = parentName;
+        _selectedTags
+          ..clear()
+          ..add(parentName);
+        _updatePagination();
+      });
+
+      if (mounted) {
+        AppToast.success(context,
+            'Created hierarchy: $parentName -> ${childNames.join(", ")} ($createdCount relationships)');
+      }
+    } catch (e) {
+      AppLogger.warning('Error creating hierarchy tag: $e');
+      if (mounted) {
+        AppToast.error(
+            context, AppLocalizations.of(context)!.saveTagFailed(e.toString()));
+      }
+    }
+  }
+
+  bool _canDropTagOnParent(String childTag, String parentTag) {
+    final child = childTag.trim().toLowerCase();
+    final parent = parentTag.trim().toLowerCase();
+    if (child.isEmpty || parent.isEmpty || child == parent) return false;
+    return !_tagDescendantsContain(child, parent);
+  }
+
+  bool _tagDescendantsContain(String sourceTag, String targetTag) {
+    final normalizedTarget = targetTag.trim().toLowerCase();
+    final visited = <String>{};
+
+    bool walk(String current) {
+      final normalizedCurrent = current.trim().toLowerCase();
+      if (!visited.add(normalizedCurrent)) return false;
+      for (final child in _tagHierarchyManager.getChildren(normalizedCurrent)) {
+        final normalizedChild = child.trim().toLowerCase();
+        if (normalizedChild == normalizedTarget) return true;
+        if (walk(normalizedChild)) return true;
+      }
+      return false;
+    }
+
+    return walk(sourceTag);
+  }
+
+  Future<void> _moveTagUnderParent({
+    required String childTag,
+    required String parentTag,
+  }) async {
+    if (!_canDropTagOnParent(childTag, parentTag)) {
+      AppToast.warning(context, 'Cannot create circular tag hierarchy');
+      return;
+    }
+
+    final oldParents = _tagHierarchyManager.getParents(childTag);
+    if (oldParents.length == 1 &&
+        oldParents.first.toLowerCase() == parentTag.toLowerCase()) {
+      return;
+    }
+
+    final added = await _tagHierarchyManager.addChild(parentTag, childTag);
+    if (!mounted) return;
+    if (!added) {
+      AppToast.warning(context, 'Cannot create circular tag hierarchy');
+      return;
+    }
+
+    for (final oldParent in oldParents) {
+      if (oldParent.toLowerCase() == parentTag.toLowerCase()) continue;
+      await _tagHierarchyManager.removeChild(oldParent, childTag);
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _treeRootsSignature = null;
+      _focusedTag = childTag;
+      _selectedTags
+        ..clear()
+        ..add(childTag);
+    });
+    _filterTags();
+    AppToast.success(context, 'Moved "$childTag" under "$parentTag"');
   }
 
   void _openContainingFolder(String folderPath) {
     if (Directory(folderPath).existsSync()) {
       try {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(
-              content: Text(
-                  '${AppLocalizations.of(context)!.openingFolder}$folderPath')),
+        AppToast.info(
+          context,
+          '${AppLocalizations.of(context)!.openingFolder}$folderPath',
         );
 
         final bool isInTabContext = context.findAncestorWidgetOfExactType<
@@ -2961,11 +4724,478 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         // ignore: empty_catches
       } catch (e) {}
     } else {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-            content: Text(
-                '${AppLocalizations.of(context)!.folderNotFound}$folderPath')),
+      AppToast.warning(
+        context,
+        '${AppLocalizations.of(context)!.folderNotFound}$folderPath',
       );
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Manage Hierarchy Dialog ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â a StatefulWidget shown in a dialog
+// ---------------------------------------------------------------------------
+
+class _ManageHierarchyDialog extends StatefulWidget {
+  final String tag;
+  final TagHierarchyManager hierarchyManager;
+  final List<String> allTags;
+  final VoidCallback onChanged;
+
+  const _ManageHierarchyDialog({
+    required this.tag,
+    required this.hierarchyManager,
+    required this.allTags,
+    required this.onChanged,
+  });
+
+  @override
+  State<_ManageHierarchyDialog> createState() => _ManageHierarchyDialogState();
+}
+
+class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
+  late List<String> _parents;
+  late List<String> _children;
+  final _addChildController = TextEditingController();
+  final _setParentController = TextEditingController();
+  List<String> _childSuggestions = [];
+  List<String> _parentSuggestions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  void _refresh() {
+    _parents = widget.hierarchyManager.getParents(widget.tag);
+    _children = widget.hierarchyManager.getChildren(widget.tag);
+  }
+
+  @override
+  void dispose() {
+    _addChildController.dispose();
+    _setParentController.dispose();
+    super.dispose();
+  }
+
+  void _updateChildSuggestions(String query) {
+    if (query.trim().isEmpty) {
+      setState(() => _childSuggestions = []);
+      return;
+    }
+    final q = query.toLowerCase().trim();
+    final suggestions = widget.allTags
+        .where((t) {
+          final tl = t.toLowerCase();
+          return tl.contains(q) &&
+              tl != widget.tag.toLowerCase() &&
+              !_children.any((c) => c.toLowerCase() == tl);
+        })
+        .take(8)
+        .toList();
+    setState(() => _childSuggestions = suggestions);
+  }
+
+  void _updateParentSuggestions(String query) {
+    if (query.trim().isEmpty) {
+      setState(() => _parentSuggestions = []);
+      return;
+    }
+    final q = query.toLowerCase().trim();
+    final suggestions = widget.allTags
+        .where((t) {
+          final tl = t.toLowerCase();
+          return tl.contains(q) &&
+              tl != widget.tag.toLowerCase() &&
+              !_parents.any((p) => p.toLowerCase() == tl);
+        })
+        .take(8)
+        .toList();
+    setState(() => _parentSuggestions = suggestions);
+  }
+
+  Future<void> _addChild(String childName) async {
+    if (childName.trim().isEmpty) return;
+
+    // Create tag if it doesn't exist
+    final exists =
+        widget.allTags.any((t) => t.toLowerCase() == childName.toLowerCase());
+    if (!exists) {
+      await TagManager.addStandaloneTag(childName.trim());
+    }
+
+    final ok =
+        await widget.hierarchyManager.addChild(widget.tag, childName.trim());
+    if (ok) {
+      _addChildController.clear();
+      _refresh();
+      widget.onChanged();
+      if (mounted) setState(() => _childSuggestions = []);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'Cannot add "$childName" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error')),
+      );
+    }
+  }
+
+  Future<void> _removeChild(String child) async {
+    await widget.hierarchyManager.removeChild(widget.tag, child);
+    _refresh();
+    widget.onChanged();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _addParent(String parentName) async {
+    if (parentName.trim().isEmpty) return;
+
+    final exists =
+        widget.allTags.any((t) => t.toLowerCase() == parentName.toLowerCase());
+    if (!exists) {
+      await TagManager.addStandaloneTag(parentName.trim());
+    }
+
+    final ok =
+        await widget.hierarchyManager.addChild(parentName.trim(), widget.tag);
+    if (ok) {
+      _setParentController.clear();
+      _refresh();
+      widget.onChanged();
+      if (mounted) setState(() => _parentSuggestions = []);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'Cannot set "$parentName" as parent ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error')),
+      );
+    }
+  }
+
+  Future<void> _removeParent(String parent) async {
+    await widget.hierarchyManager.removeChild(parent, widget.tag);
+    _refresh();
+    widget.onChanged();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(PhosphorIconsLight.treeStructure,
+              size: 22, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text('Hierarchy: "${widget.tag}"',
+                style: const TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Parents section ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
+              Text('Parents',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: theme.colorScheme.primary,
+                  )),
+              const SizedBox(height: 6),
+              if (_parents.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('No parent tags',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
+                        fontStyle: FontStyle.italic,
+                      )),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _parents
+                      .map((parent) => Chip(
+                            avatar: Icon(PhosphorIconsLight.arrowBendUpLeft,
+                                size: 14, color: theme.colorScheme.primary),
+                            label: Text(parent,
+                                style: const TextStyle(fontSize: 13)),
+                            deleteIcon:
+                                const Icon(PhosphorIconsLight.x, size: 14),
+                            onDeleted: () => _removeParent(parent),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ))
+                      .toList(),
+                ),
+              const SizedBox(height: 6),
+              // Add parent input
+              _buildAutocompleteInput(
+                controller: _setParentController,
+                hint: 'Add parent...',
+                suggestions: _parentSuggestions,
+                onChanged: _updateParentSuggestions,
+                onSubmit: _addParent,
+              ),
+
+              const SizedBox(height: 20),
+              Divider(
+                  color:
+                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+              const SizedBox(height: 12),
+
+              // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Children section ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
+              Text('Children',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: theme.colorScheme.tertiary,
+                  )),
+              const SizedBox(height: 6),
+              if (_children.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('No child tags',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
+                        fontStyle: FontStyle.italic,
+                      )),
+                )
+              else
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _children
+                      .map((child) => Chip(
+                            avatar: Icon(PhosphorIconsLight.treeStructure,
+                                size: 14, color: theme.colorScheme.tertiary),
+                            label: Text(child,
+                                style: const TextStyle(fontSize: 13)),
+                            deleteIcon:
+                                const Icon(PhosphorIconsLight.x, size: 14),
+                            onDeleted: () => _removeChild(child),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ))
+                      .toList(),
+                ),
+              const SizedBox(height: 6),
+              // Add child input
+              _buildAutocompleteInput(
+                controller: _addChildController,
+                hint: 'Add child... (comma-separated)',
+                suggestions: _childSuggestions,
+                onChanged: _updateChildSuggestions,
+                onSubmit: (value) async {
+                  // Support comma-separated
+                  final names = value
+                      .split(',')
+                      .map((s) => s.trim())
+                      .where((s) => s.isNotEmpty);
+                  for (final name in names) {
+                    await _addChild(name);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAutocompleteInput({
+    required TextEditingController controller,
+    required String hint,
+    required List<String> suggestions,
+    required ValueChanged<String> onChanged,
+    required Future<void> Function(String) onSubmit,
+  }) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                  color:
+                      theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            suffixIcon: IconButton(
+              icon: const Icon(PhosphorIconsLight.plus, size: 18),
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  onSubmit(text);
+                }
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          style: const TextStyle(fontSize: 13),
+          onChanged: onChanged,
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) {
+              onSubmit(value.trim());
+            }
+          },
+        ),
+        if (suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            constraints: const BoxConstraints(maxHeight: 150),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color:
+                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: suggestions.length,
+              itemBuilder: (context, index) {
+                final suggestion = suggestions[index];
+                return InkWell(
+                  onTap: () => onSubmit(suggestion),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(PhosphorIconsLight.tag,
+                            size: 14,
+                            color: TagColorManager.instance
+                                .getTagColor(suggestion)),
+                        const SizedBox(width: 8),
+                        Text(suggestion, style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Compact row content used inside the tag tree view. Renders the tag's
+/// thumbnail + name + a hierarchy badge if the tag is a parent or child.
+/// All gestures (tap, double-tap, secondary) are handled by the
+/// `GenericTreeView` shell, so this widget is purely visual.
+class _TagTreeRowContent extends StatelessWidget {
+  final String tag;
+  final Color tagColor;
+  final double thumbnailSize;
+  final double fontSize;
+  final double spacing;
+  final Widget Function(double size) buildThumbnail;
+
+  const _TagTreeRowContent({
+    Key? key,
+    required this.tag,
+    required this.tagColor,
+    required this.thumbnailSize,
+    required this.fontSize,
+    required this.spacing,
+    required this.buildThumbnail,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        buildThumbnail(thumbnailSize),
+        SizedBox(width: spacing),
+        Expanded(
+          child: Text(
+            tag,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Wraps a subtree with a local hover state so that hovering a single grid
+/// card only rebuilds that card instead of the whole grid.
+///
+/// When [enabled] is false (e.g. on mobile, or while inline-renaming) the
+/// builder is invoked once with `hovering == false` and no `MouseRegion` is
+/// attached.
+class _HoverReveal extends StatefulWidget {
+  final bool enabled;
+  final Widget Function(BuildContext context, bool hovering) builder;
+
+  const _HoverReveal({
+    Key? key,
+    required this.enabled,
+    required this.builder,
+  }) : super(key: key);
+
+  @override
+  State<_HoverReveal> createState() => _HoverRevealState();
+}
+
+class _HoverRevealState extends State<_HoverReveal> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) {
+      return widget.builder(context, false);
+    }
+
+    return MouseRegion(
+      onEnter: (_) {
+        if (!_hovering) setState(() => _hovering = true);
+      },
+      onExit: (_) {
+        if (_hovering) setState(() => _hovering = false);
+      },
+      child: widget.builder(context, _hovering),
+    );
   }
 }

@@ -139,11 +139,9 @@ Future<void> main(List<String> args) async {
   // Step 5: Save failed tests for RERUN=1
   await _saveFailedTestsFromJson('build/e2e_report.jsonl');
 
-  // Step 6: Write results.json so screenshot HTML shows pass/fail badges
+  // Step 6: Write results.json (consumed by external CI tooling that scrapes
+  // pass/fail per test name). The unified dashboard does not need it.
   await _writeScreenshotResultsJson('build/e2e_report.jsonl');
-
-  // Step 6b: Update screenshot HTML with embedded results (CORS workaround)
-  await _updateScreenshotHtmlWithResults();
 
   // Step 7: Generate HTML dashboard
   if (!skipGenerate) {
@@ -353,8 +351,21 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
   }
 
   // Write results.json for the screenshot report HTML
-  // Strip suite prefix from test names to match HTML data-test-name attributes
+  // Strip suite prefix from test names to match HTML data-test-name attributes.
+  // New numbered prefixes are listed first; legacy names follow for
+  // backward-compat with persisted state.
   const suites = [
+    '01 Navigation',
+    '02 File Operations',
+    '03 Cut & Move',
+    '04 Folder Operations',
+    '05 Multi-Select',
+    '06 Keyboard Shortcuts',
+    '07 Search & Filter',
+    '08 View Mode',
+    '09 Tab Management',
+    '10 Edge Cases & Error Handling',
+    '11 Extended File Operations',
     'Navigation',
     'File Operations',
     'Cut & Move',
@@ -386,12 +397,28 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
   final reportDir = Directory('build/e2e_report');
   if (!await reportDir.exists()) await reportDir.create(recursive: true);
   final resultsFile = File('${reportDir.path}/results.json');
-  final entries = strippedResults.entries
-      .map((e) => '  "${_esc(e.key)}": ${e.value}')
-      .join(',\n');
+
+  // Merge with existing results.json so partial reruns don't drop other tests
+  final merged = <String, bool>{};
+  if (await resultsFile.exists()) {
+    try {
+      final existing = jsonDecode(await resultsFile.readAsString());
+      if (existing is Map) {
+        for (final entry in existing.entries) {
+          final key = entry.key;
+          final val = entry.value;
+          if (key is String && val is bool) merged[key] = val;
+        }
+      }
+    } catch (_) {}
+  }
+  merged.addAll(strippedResults);
+
+  final entries =
+      merged.entries.map((e) => '  "${_esc(e.key)}": ${e.value}').join(',\n');
   await resultsFile.writeAsString('{\n$entries\n}');
-  print(
-      '[Allure E2E] Wrote ${strippedResults.length} test results → results.json');
+  print('[Allure E2E] Wrote ${merged.length} test results → results.json '
+      '(${strippedResults.length} fresh, ${merged.length - strippedResults.length} preserved)');
 }
 
 String _esc(String s) => s
@@ -400,35 +427,6 @@ String _esc(String s) => s
     .replaceAll('\n', '\\n')
     .replaceAll('\r', '\\r')
     .replaceAll('\t', '\\t');
-
-/// Updates the screenshot HTML to embed test results directly (CORS workaround).
-/// Browsers block fetch() on file:// URLs, so we inject results into the HTML.
-Future<void> _updateScreenshotHtmlWithResults() async {
-  final htmlFile = File('build/e2e_report/report.html');
-  final jsonFile = File('build/e2e_report/results.json');
-
-  if (!await htmlFile.exists() || !await jsonFile.exists()) {
-    print('[Allure E2E] Skipping HTML update - files not found');
-    return;
-  }
-
-  final html = await htmlFile.readAsString();
-  final jsonContent = await jsonFile.readAsString();
-
-  // Replace the embedded _testResults variable with actual data
-  // Look for: const _testResults = {...};
-  final pattern = RegExp(r'const _testResults = \{[^}]*\};');
-  final replacement = 'const _testResults = $jsonContent;';
-
-  if (!pattern.hasMatch(html)) {
-    print('[Allure E2E] Warning: Could not find _testResults in HTML');
-    return;
-  }
-
-  final updatedHtml = html.replaceFirst(pattern, replacement);
-  await htmlFile.writeAsString(updatedHtml);
-  print('[Allure E2E] Updated screenshot HTML with embedded test results');
-}
 
 Future<void> _dryRun() async {
   print('[Dry run] E2E Allure runner');

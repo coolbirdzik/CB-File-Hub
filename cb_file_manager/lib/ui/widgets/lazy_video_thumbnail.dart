@@ -434,6 +434,16 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
     return size.clamp(24, 320);
   }
 
+  /// Play-circle overlay size proportional to the thumbnail so it doesn't
+  /// overflow small containers (e.g. 20x20 in Miller columns view).
+  double _playIconSize() {
+    final double w = widget.width;
+    final double h = widget.height;
+    if (!w.isFinite || !h.isFinite) return 32;
+    final double minDim = w < h ? w : h;
+    return (minDim * 0.7).clamp(10.0, 32.0);
+  }
+
   /// Simulate progress updates for better UX while thumbnail is generating
   /// PERFORMANCE: Removed periodic timer to eliminate timer storm during scrolling
   void _simulateProgressUpdates() {
@@ -664,11 +674,11 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
                 children: [
                   child,
                   // Add video play icon overlay
-                  const Center(
+                  Center(
                     child: Icon(
                       PhosphorIconsLight.playCircle,
                       color: Colors.white,
-                      size: 32,
+                      size: _playIconSize(),
                     ),
                   ),
                 ],
@@ -704,11 +714,11 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
                       children: [
                         child,
                         // Add video play icon overlay for local videos
-                        const Center(
+                        Center(
                           child: Icon(
                             PhosphorIconsLight.playCircle,
                             color: Colors.white,
-                            size: 32,
+                            size: _playIconSize(),
                           ),
                         ),
                       ],

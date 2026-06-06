@@ -22,7 +22,7 @@ class UriUtils {
 
   /// Build a tag search path with proper encoding.
   static String buildTagSearchPath(String tag) {
-    return '#search?tag=$tag';
+    return '#search?tag=${safeEncodeComponent(tag)}';
   }
 
   /// Extract the tag from a #search?tag=... path, if present.

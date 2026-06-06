@@ -66,6 +66,22 @@ class TabbedFolderDragSelectionController {
     _itemPositions[path] = position;
   }
 
+  String? hitTestItem(
+    Offset globalPosition, {
+    Set<String>? allowedPaths,
+  }) {
+    final entries = _itemPositions.entries.toList(growable: false).reversed;
+    for (final entry in entries) {
+      if (allowedPaths != null && !allowedPaths.contains(entry.key)) {
+        continue;
+      }
+      if (entry.value.contains(globalPosition)) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
   void start(Offset position) {
     if (isDragging.value) return;
 

@@ -231,7 +231,20 @@ Future<void> tapContextMenuItem(
   final actionIds = _actionIdAliases(actionId);
   final labels = _actionIdLabels(actionId);
 
-  // Step 1: direct PopupMenuItem<String> value match (top-level non-submenu items).
+  // Step 1: stable action keys from the shared context menu renderer.
+  final keyedFinder = _findFirstVisibleContextMenuAction(actionIds);
+  final keyedCount = keyedFinder?.evaluate().length ?? 0;
+  if (kDebugMode) {
+    debugPrint(
+        '[E2E] tapContextMenuItem: keyed action match found $keyedCount item(s)');
+  }
+  if (keyedFinder != null && keyedCount > 0) {
+    await tester.tap(keyedFinder.first, warnIfMissed: false);
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    return;
+  }
+
+  // Step 2: direct PopupMenuItem<String> value match (top-level non-submenu items).
   var foundCount = 0;
   final allMenuItems = tester
       .widgetList<PopupMenuItem<String>>(
@@ -257,7 +270,7 @@ Future<void> tapContextMenuItem(
     return;
   }
 
-  // Step 2: label text match — handles items that are already visible as Text
+  // Step 3: label text match — handles items that are already visible as Text
   // (e.g. submenu OverlayEntry InkWell rows that are already open).
   final textFinder = _findFirstVisibleText(labels);
   final textCount = textFinder?.evaluate().length ?? 0;
@@ -271,7 +284,7 @@ Future<void> tapContextMenuItem(
     return;
   }
 
-  // Step 3: submenu exploration.
+  // Step 4: submenu exploration.
   // On Windows desktop, items like 'new_folder' live inside a submenu.
   // Submenu triggers are `PopupMenuItem<String>` with `enabled: false` and no value —
   // tapping them inserts an OverlayEntry with InkWell rows for each child action.
@@ -296,6 +309,17 @@ Future<void> tapContextMenuItem(
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
 
+    final retryKeyedFinder = _findFirstVisibleContextMenuAction(actionIds);
+    if (retryKeyedFinder != null && retryKeyedFinder.evaluate().isNotEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+            '[E2E] tapContextMenuItem: found $actionId via keyed submenu #$i');
+      }
+      await tester.tap(retryKeyedFinder.first, warnIfMissed: false);
+      await tester.pumpAndSettle(const Duration(seconds: 3));
+      return;
+    }
+
     final retryFinder = _findFirstVisibleText(labels);
     if (retryFinder != null && retryFinder.evaluate().isNotEmpty) {
       if (kDebugMode) {
@@ -311,6 +335,19 @@ Future<void> tapContextMenuItem(
   // All strategies exhausted.
   if (kDebugMode) debugPrint('[E2E] tapContextMenuItem: all strategies failed');
   fail('Context menu item not found: "$actionId"');
+}
+
+Finder? _findFirstVisibleContextMenuAction(Set<String> actionIds) {
+  for (final id in actionIds) {
+    for (final key in <String>[
+      'context-menu-action-tap-$id',
+      'context-menu-action-$id',
+    ]) {
+      final finder = find.byKey(ValueKey<String>(key));
+      if (finder.evaluate().isNotEmpty) return finder;
+    }
+  }
+  return null;
 }
 
 Set<String> _actionIdAliases(String actionId) {
@@ -457,17 +494,37 @@ Future<void> tapDialogCancel(WidgetTester tester) async {
 /// Pass the button text to disambiguate when multiple TextButtons are present.
 Future<void> tapDialogConfirm(WidgetTester tester, {String? buttonText}) async {
   if (kDebugMode) {
-    debugPrint('[E2E] tapDialogConfirm: tapping confirm button');
+    debugPrint('[E2E] tapDialogConfirm: tapping confirm button '
+        '${buttonText != null ? '"$buttonText"' : '(last button)'}');
   }
   final Finder confirmFinder;
   if (buttonText != null) {
-    // The Delete confirmation dialog uses ElevatedButton for confirm,
-    // TextButton for cancel. Use byType to find the right widget.
-    if (buttonText.toLowerCase() == 'delete') {
-      confirmFinder = find.widgetWithText(ElevatedButton, buttonText);
-    } else {
-      confirmFinder = find.widgetWithText(TextButton, buttonText);
-    }
+    // Match any ButtonStyleButton (TextButton, ElevatedButton, FilledButton,
+    // OutlinedButton) whose label contains the requested text in either
+    // English or Vietnamese. The DeleteConfirmationDialog uses TextButton
+    // with localized text — older tests assumed ElevatedButton, which fails
+    // when running with the Vietnamese locale (default).
+    final wantedLower = buttonText.toLowerCase();
+    final viAliases = <String, List<String>>{
+      'delete': ['xóa', 'xoá', 'chuyển vào thùng rác'],
+      'remove': ['xóa', 'xoá'],
+      'confirm': ['xác nhận', 'đồng ý'],
+      'ok': ['đồng ý'],
+      'cancel': ['hủy', 'huỷ'],
+    };
+    final candidates = <String>{
+      buttonText,
+      ...?viAliases[wantedLower],
+    };
+    confirmFinder = find.byWidgetPredicate((widget) {
+      if (widget is! ButtonStyleButton) return false;
+      final child = widget.child;
+      if (child is Text) {
+        final label = (child.data ?? '').trim().toLowerCase();
+        return candidates.any((c) => label == c.toLowerCase());
+      }
+      return false;
+    });
   } else {
     // Fall back to last TextButton in the dialog (usually Cancel)
     confirmFinder = find.byType(TextButton);

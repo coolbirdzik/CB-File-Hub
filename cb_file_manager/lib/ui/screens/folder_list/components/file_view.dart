@@ -1,14 +1,20 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
-import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'file_item.dart';
 import 'file_grid_item.dart';
@@ -45,9 +51,13 @@ class FileView extends StatelessWidget {
   final List<String> selectedFiles;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
       toggleFileSelection;
+  final Function(String, {bool shiftSelect, bool ctrlSelect})?
+      toggleFolderSelection;
   final Function() toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final Function(String)? onFolderTap;
   final Function(File, bool)? onFileTap;
   final Function()? onThumbnailGenerated;
@@ -58,6 +68,13 @@ class FileView extends StatelessWidget {
   final Function()?
       clearSelectionMode; // Add new callback for clearing selection mode
   final bool showFileTags; // Add parameter to control tag display
+  final ScrollController? scrollController;
+  final GlobalKey Function(String path)? itemKeyForPath;
+  final Function(ColumnVisibility)? onColumnVisibilityChanged;
+  final TabbedFolderDragSelectionController? dragSelectionController;
+  final ValueChanged<List<String>>? onStartFileDrag;
+  final Future<void> Function(List<String> sources, String destinationFolder)?
+      onMoveItemsToFolder;
 
   const FileView({
     Key? key,
@@ -68,9 +85,12 @@ class FileView extends StatelessWidget {
     required this.isGridView,
     required this.selectedFiles,
     required this.toggleFileSelection,
+    this.toggleFolderSelection,
     required this.toggleSelectionMode,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.onFolderTap,
     this.onFileTap,
     this.onThumbnailGenerated,
@@ -80,7 +100,83 @@ class FileView extends StatelessWidget {
     this.columnVisibility = const ColumnVisibility(),
     this.clearSelectionMode, // Add new parameter
     this.showFileTags = true, // Default to showing tags
+    this.scrollController,
+    this.itemKeyForPath,
+    this.onColumnVisibilityChanged,
+    this.dragSelectionController,
+    this.onStartFileDrag,
+    this.onMoveItemsToFolder,
   }) : super(key: key);
+
+  Function(String, {bool shiftSelect, bool ctrlSelect})
+      get _folderSelectionHandler =>
+          toggleFolderSelection ?? toggleFileSelection;
+
+  List<String> _dragPayloadFor(String itemPath) {
+    if (selectedFiles.contains(itemPath) && selectedFiles.isNotEmpty) {
+      return selectedFiles.toSet().toList(growable: false);
+    }
+    return <String>[itemPath];
+  }
+
+  Widget _wrapFileDragDrop({
+    required Widget child,
+    required bool isFolder,
+    required String itemPath,
+  }) {
+    if (!isDesktopMode) return child;
+
+    final payload = _dragPayloadFor(itemPath);
+    Widget wrapped = Draggable<List<String>>(
+      data: payload,
+      maxSimultaneousDrags: 1,
+      feedback: Material(
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text(
+              payload.length == 1
+                  ? p.basename(payload.first)
+                  : '${payload.length} items',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.55, child: child),
+      onDragStarted: () => onStartFileDrag?.call(payload),
+      child: child,
+    );
+
+    if (!isFolder || onMoveItemsToFolder == null) return wrapped;
+
+    return DragTarget<List<String>>(
+      onWillAcceptWithDetails: (details) =>
+          details.data.isNotEmpty && !details.data.contains(itemPath),
+      onAcceptWithDetails: (details) =>
+          onMoveItemsToFolder!(details.data, itemPath),
+      builder: (context, candidateData, rejectedData) {
+        if (candidateData.isEmpty) return wrapped;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: wrapped,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +204,7 @@ class FileView extends StatelessWidget {
     final bool actualIsDesktop = isDesktop;
 
     return ListView.builder(
+      controller: scrollController,
       // Optimized physics for desktop smooth scrolling
       physics: isDesktop
           ? const ClampingScrollPhysics(
@@ -123,44 +220,54 @@ class FileView extends StatelessWidget {
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       addSemanticIndexes: false,
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      // Extra bottom padding so users can drag-select in empty space below items
+      padding: const EdgeInsets.only(top: 4.0, bottom: 200.0),
       itemCount: folders.length + files.length,
       itemBuilder: (context, index) {
-        // Generate a stable key for item identity
-        final String itemKey = index < folders.length
-            ? 'folder-${folders[index].path}'
-            : 'file-${files[index - folders.length].path}';
-
         // Use RepaintBoundary to reduce rendering load during scrolling
-        return KeyedSubtree(
-          key: ValueKey(itemKey),
+        return Container(
+          key: itemKeyForPath?.call(index < folders.length
+              ? folders[index].path
+              : files[index - folders.length].path),
           child: RepaintBoundary(
             child: index < folders.length
-                ? FolderItem(
-                    key: ValueKey('folder-item-${folders[index].path}'),
-                    folder: folders[index],
-                    onTap: onFolderTap,
-                    isSelected: selectedFiles.contains(folders[index].path),
-                    toggleFolderSelection: toggleFileSelection,
-                    isDesktopMode: actualIsDesktop,
-                    lastSelectedPath: lastSelectedPath,
-                    clearSelectionMode: clearSelectionMode,
+                ? _wrapFileDragDrop(
+                    isFolder: true,
+                    itemPath: folders[index].path,
+                    child: FolderItem(
+                      key: ValueKey('folder-item-${folders[index].path}'),
+                      folder: folders[index],
+                      onTap: onFolderTap,
+                      isSelected: selectedFiles.contains(folders[index].path),
+                      toggleFolderSelection: _folderSelectionHandler,
+                      isDesktopMode: actualIsDesktop,
+                      lastSelectedPath: lastSelectedPath,
+                      clearSelectionMode: clearSelectionMode,
+                      showItemBackground: false,
+                    ),
                   )
-                : FileItem(
-                    key: ValueKey(
-                        'file-item-${files[index - folders.length].path}'),
-                    file: files[index - folders.length],
-                    state: state,
-                    isSelectionMode: isSelectionMode,
-                    isSelected: selectedFiles
-                        .contains(files[index - folders.length].path),
-                    toggleFileSelection: toggleFileSelection,
-                    showDeleteTagDialog: showDeleteTagDialog,
-                    showAddTagToFileDialog: showAddTagToFileDialog,
-                    onFileTap: onFileTap,
-                    isDesktopMode: actualIsDesktop,
-                    lastSelectedPath: lastSelectedPath,
-                    showFileTags: showFileTags,
+                : _wrapFileDragDrop(
+                    isFolder: false,
+                    itemPath: files[index - folders.length].path,
+                    child: FileItem(
+                      key: ValueKey(
+                          'file-item-${files[index - folders.length].path}'),
+                      file: files[index - folders.length],
+                      state: state,
+                      isSelectionMode: isSelectionMode,
+                      isSelected: selectedFiles
+                          .contains(files[index - folders.length].path),
+                      toggleFileSelection: toggleFileSelection,
+                      showDeleteTagDialog: showDeleteTagDialog,
+                      showAddTagToFileDialog: showAddTagToFileDialog,
+                      onDeleteFile: onDeleteFile,
+                      onDeleteFiles: onDeleteFiles,
+                      onFileTap: onFileTap,
+                      isDesktopMode: actualIsDesktop,
+                      lastSelectedPath: lastSelectedPath,
+                      showFileTags: showFileTags,
+                      showItemBackground: false,
+                    ),
                   ),
           ),
         );
@@ -180,6 +287,7 @@ class FileView extends StatelessWidget {
       fontWeight: FontWeight.bold,
       color: Theme.of(context).colorScheme.onSurface,
     );
+    final l10n = AppLocalizations.of(context)!;
 
     // Debug selection count
     debugPrint(
@@ -190,104 +298,175 @@ class FileView extends StatelessWidget {
         // Column headers for details view with info tooltip
         Stack(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              ),
-              child: Row(
-                children: [
-                  // Name column (always visible)
-                  Expanded(
-                    flex: 3,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 10.0, horizontal: 12.0),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Tên',
-                            style: headerStyle,
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(PhosphorIconsLight.arrowDown,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.onSurface),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Type column
-                  if (columnVisibility.type)
+            GestureDetector(
+              onSecondaryTapUp: (details) {
+                _showColumnHeaderContextMenu(
+                    context, details.globalPosition, l10n);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                child: Row(
+                  children: [
+                    // Name column (always visible)
                     Expanded(
-                      flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Loại',
-                          style: headerStyle,
-                        ),
+                      flex: 3,
+                      child: _buildSortableHeaderCell(
+                        context: context,
+                        label: l10n.columnName,
+                        style: headerStyle,
+                        ascendingOption: SortOption.nameAsc,
+                        descendingOption: SortOption.nameDesc,
                       ),
                     ),
 
-                  // Size column
-                  if (columnVisibility.size)
-                    Expanded(
-                      flex: 1,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Kích thước',
+                    // Type column
+                    if (columnVisibility.type)
+                      Expanded(
+                        flex: 2,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnType,
                           style: headerStyle,
+                          ascendingOption: SortOption.typeAsc,
+                          descendingOption: SortOption.typeDesc,
                         ),
                       ),
-                    ),
 
-                  // Date modified column
-                  if (columnVisibility.dateModified)
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Ngày sửa đổi',
+                    // Size column
+                    if (columnVisibility.size)
+                      Expanded(
+                        flex: 1,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnSize,
                           style: headerStyle,
+                          ascendingOption: SortOption.sizeAsc,
+                          descendingOption: SortOption.sizeDesc,
                         ),
                       ),
-                    ),
 
-                  // Date created column
-                  if (columnVisibility.dateCreated)
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Ngày tạo',
+                    // Date modified column
+                    if (columnVisibility.dateModified)
+                      Expanded(
+                        flex: 2,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnDateModified,
                           style: headerStyle,
+                          ascendingOption: SortOption.dateAsc,
+                          descendingOption: SortOption.dateDesc,
                         ),
                       ),
-                    ),
 
-                  // Attributes column
-                  if (columnVisibility.attributes)
-                    Expanded(
-                      flex: 1,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 10.0, horizontal: 12.0),
-                        child: Text(
-                          'Thuộc tính',
+                    // Date created column
+                    if (columnVisibility.dateCreated)
+                      Expanded(
+                        flex: 2,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnDateCreated,
+                          style: headerStyle,
+                          ascendingOption: SortOption.dateCreatedAsc,
+                          descendingOption: SortOption.dateCreatedDesc,
+                        ),
+                      ),
+
+                    // Attributes column
+                    if (columnVisibility.attributes)
+                      Expanded(
+                        flex: 1,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnAttributes,
+                          style: headerStyle,
+                          ascendingOption: SortOption.attributesAsc,
+                          descendingOption: SortOption.attributesDesc,
+                        ),
+                      ),
+
+                    // Date Accessed column
+                    if (columnVisibility.dateAccessed)
+                      Expanded(
+                        flex: 2,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnDateAccessed,
                           style: headerStyle,
                         ),
                       ),
-                    ),
-                ],
+
+                    // Extension column
+                    if (columnVisibility.extension)
+                      Expanded(
+                        flex: 1,
+                        child: _buildSortableHeaderCell(
+                          context: context,
+                          label: l10n.columnExtension,
+                          style: headerStyle,
+                          ascendingOption: SortOption.extensionAsc,
+                          descendingOption: SortOption.extensionDesc,
+                        ),
+                      ),
+
+                    // Path column
+                    if (columnVisibility.path)
+                      Expanded(
+                        flex: 3,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnPath,
+                          style: headerStyle,
+                        ),
+                      ),
+
+                    // Tags column
+                    if (columnVisibility.tags)
+                      Expanded(
+                        flex: 2,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnTags,
+                          style: headerStyle,
+                        ),
+                      ),
+
+                    // Dimensions column
+                    if (columnVisibility.dimensions)
+                      Expanded(
+                        flex: 1,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnDimensions,
+                          style: headerStyle,
+                        ),
+                      ),
+
+                    // Duration column
+                    if (columnVisibility.duration)
+                      Expanded(
+                        flex: 1,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnDuration,
+                          style: headerStyle,
+                        ),
+                      ),
+
+                    // Item Count column
+                    if (columnVisibility.itemCount)
+                      Expanded(
+                        flex: 1,
+                        child: _buildHeaderCell(
+                          context: context,
+                          label: l10n.columnItemCount,
+                          style: headerStyle,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
 
@@ -296,8 +475,7 @@ class FileView extends StatelessWidget {
               right: 8,
               top: 8,
               child: Tooltip(
-                message:
-                    'Nhấn nút cài đặt cột ở thanh công cụ trên cùng để tùy chỉnh các cột hiển thị',
+                message: l10n.columnVisibilityInstructions,
                 child: Icon(
                   PhosphorIconsLight.info,
                   size: 16,
@@ -311,6 +489,7 @@ class FileView extends StatelessWidget {
         // List of files and folders
         Expanded(
           child: ListView.builder(
+            controller: scrollController,
             physics: isDesktop
                 ? const ClampingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
@@ -325,7 +504,8 @@ class FileView extends StatelessWidget {
             addAutomaticKeepAlives: true,
             addRepaintBoundaries: true,
             addSemanticIndexes: false,
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            // Extra bottom padding so users can drag-select in empty space below items
+            padding: const EdgeInsets.only(top: 4.0, bottom: 200.0),
             itemCount: folders.length + files.length,
             itemBuilder: (context, index) {
               // Add alternating row colors to make it look more like a details table
@@ -334,10 +514,9 @@ class FileView extends StatelessWidget {
                   ? Colors.transparent
                   : const Color.fromRGBO(128, 128, 128, 0.03);
 
-              // Generate a stable key to help Flutter reuse widgets
-              final String itemKey = index < folders.length
-                  ? 'folder-${folders[index].path}'
-                  : 'file-${files[index - folders.length].path}';
+              final String itemPath = index < folders.length
+                  ? folders[index].path
+                  : files[index - folders.length].path;
 
               return Container(
                 padding:
@@ -346,39 +525,81 @@ class FileView extends StatelessWidget {
                   color: rowColor,
                 ),
                 // Use KeyedSubtree with a stable key to prevent unnecessary rebuilds
-                child: KeyedSubtree(
-                  key: ValueKey(itemKey),
-                  child: RepaintBoundary(
-                    child: index < folders.length
-                        ? _FolderDetailsItemWrapper(
-                            key: ValueKey(
-                                'folder-detail-${folders[index].path}'),
-                            folder: folders[index],
-                            onTap: onFolderTap,
-                            isSelected:
-                                selectedFiles.contains(folders[index].path),
-                            columnVisibility: columnVisibility,
-                            toggleFolderSelection: toggleFileSelection,
-                            isDesktopMode: isDesktopMode,
-                            lastSelectedPath: lastSelectedPath,
-                            clearSelectionMode: clearSelectionMode,
-                          )
-                        : _FileDetailsItemWrapper(
-                            key: ValueKey(
-                                'file-detail-${files[index - folders.length].path}'),
-                            file: files[index - folders.length],
-                            state: state,
-                            isSelected: selectedFiles
-                                .contains(files[index - folders.length].path),
-                            columnVisibility: columnVisibility,
-                            toggleFileSelection: toggleFileSelection,
-                            showDeleteTagDialog: showDeleteTagDialog,
-                            showAddTagToFileDialog: showAddTagToFileDialog,
-                            onTap: onFileTap,
-                            isDesktopMode: isDesktopMode,
-                            lastSelectedPath: lastSelectedPath,
-                            showFileTags: showFileTags,
-                          ),
+                child: Container(
+                  key: itemKeyForPath?.call(itemPath),
+                  child: LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                      // Register item position for drag-selection hit-testing
+                      if (isDesktop && dragSelectionController != null) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          try {
+                            final RenderBox? renderBox =
+                                context.findRenderObject() as RenderBox?;
+                            if (renderBox != null &&
+                                renderBox.hasSize &&
+                                renderBox.attached) {
+                              final position =
+                                  renderBox.localToGlobal(Offset.zero);
+                              dragSelectionController!.registerItemPosition(
+                                  itemPath,
+                                  Rect.fromLTWH(
+                                      position.dx,
+                                      position.dy,
+                                      renderBox.size.width,
+                                      renderBox.size.height));
+                            }
+                          } catch (e) {
+                            debugPrint('Layout error in details view: $e');
+                          }
+                        });
+                      }
+
+                      return RepaintBoundary(
+                        child: index < folders.length
+                            ? _wrapFileDragDrop(
+                                isFolder: true,
+                                itemPath: folders[index].path,
+                                child: _FolderDetailsItemWrapper(
+                                  key: ValueKey(
+                                      'folder-detail-${folders[index].path}'),
+                                  folder: folders[index],
+                                  onTap: onFolderTap,
+                                  isSelected: selectedFiles
+                                      .contains(folders[index].path),
+                                  columnVisibility: columnVisibility,
+                                  toggleFolderSelection:
+                                      _folderSelectionHandler,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  clearSelectionMode: clearSelectionMode,
+                                ),
+                              )
+                            : _wrapFileDragDrop(
+                                isFolder: false,
+                                itemPath: files[index - folders.length].path,
+                                child: _FileDetailsItemWrapper(
+                                  key: ValueKey(
+                                      'file-detail-${files[index - folders.length].path}'),
+                                  file: files[index - folders.length],
+                                  state: state,
+                                  isSelected: selectedFiles.contains(
+                                      files[index - folders.length].path),
+                                  columnVisibility: columnVisibility,
+                                  toggleFileSelection: toggleFileSelection,
+                                  showDeleteTagDialog: showDeleteTagDialog,
+                                  showAddTagToFileDialog:
+                                      showAddTagToFileDialog,
+                                  onDeleteFile: onDeleteFile,
+                                  onDeleteFiles: onDeleteFiles,
+                                  onTap: onFileTap,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  showFileTags: showFileTags,
+                                ),
+                              ),
+                      );
+                    },
                   ),
                 ),
               );
@@ -387,6 +608,173 @@ class FileView extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildSortableHeaderCell({
+    required BuildContext context,
+    required String label,
+    required TextStyle style,
+    required SortOption ascendingOption,
+    required SortOption descendingOption,
+  }) {
+    final currentSort = state.sortOption;
+    final bool isAscending = currentSort == ascendingOption;
+    final bool isDescending = currentSort == descendingOption;
+    final bool isActive = isAscending || isDescending;
+    final Color iconColor = isActive
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return InkWell(
+      onTap: () {
+        final nextSort = isAscending ? descendingOption : ascendingOption;
+        context.read<FolderListBloc>().add(SetSortOption(
+              nextSort,
+              folderPath: state.currentPath.path,
+            ));
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+        child: Row(
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: style,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              isDescending
+                  ? PhosphorIconsLight.arrowDown
+                  : PhosphorIconsLight.arrowUp,
+              size: 16,
+              color: iconColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell({
+    required BuildContext context,
+    required String label,
+    required TextStyle style,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
+      child: Text(
+        label,
+        style: style,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  void _showColumnHeaderContextMenu(
+    BuildContext context,
+    Offset position,
+    dynamic l10n,
+  ) {
+    if (onColumnVisibilityChanged == null) return;
+
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        overlay.size.width - position.dx,
+        overlay.size.height - position.dy,
+      ),
+      items: [
+        _buildColumnToggleItem(l10n.columnSize, 'size', columnVisibility.size),
+        _buildColumnToggleItem(l10n.columnType, 'type', columnVisibility.type),
+        _buildColumnToggleItem(l10n.columnDateModified, 'dateModified',
+            columnVisibility.dateModified),
+        _buildColumnToggleItem(l10n.columnDateCreated, 'dateCreated',
+            columnVisibility.dateCreated),
+        _buildColumnToggleItem(
+            l10n.columnAttributes, 'attributes', columnVisibility.attributes),
+        _buildColumnToggleItem(l10n.columnDateAccessed, 'dateAccessed',
+            columnVisibility.dateAccessed),
+        _buildColumnToggleItem(
+            l10n.columnExtension, 'extension', columnVisibility.extension),
+        _buildColumnToggleItem(l10n.columnPath, 'path', columnVisibility.path),
+        _buildColumnToggleItem(l10n.columnTags, 'tags', columnVisibility.tags),
+        _buildColumnToggleItem(
+            l10n.columnDimensions, 'dimensions', columnVisibility.dimensions),
+        _buildColumnToggleItem(
+            l10n.columnDuration, 'duration', columnVisibility.duration),
+        _buildColumnToggleItem(
+            l10n.columnItemCount, 'itemCount', columnVisibility.itemCount),
+      ],
+    ).then((value) {
+      if (value == null || onColumnVisibilityChanged == null) return;
+      final newVisibility = _toggleColumn(value);
+      onColumnVisibilityChanged!(newVisibility);
+    });
+  }
+
+  PopupMenuItem<String> _buildColumnToggleItem(
+      String label, String key, bool isVisible) {
+    return PopupMenuItem<String>(
+      value: key,
+      child: Row(
+        children: [
+          Icon(
+            isVisible
+                ? PhosphorIconsLight.checkSquare
+                : PhosphorIconsLight.square,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(label),
+        ],
+      ),
+    );
+  }
+
+  ColumnVisibility _toggleColumn(String key) {
+    switch (key) {
+      case 'size':
+        return columnVisibility.copyWith(size: !columnVisibility.size);
+      case 'type':
+        return columnVisibility.copyWith(type: !columnVisibility.type);
+      case 'dateModified':
+        return columnVisibility.copyWith(
+            dateModified: !columnVisibility.dateModified);
+      case 'dateCreated':
+        return columnVisibility.copyWith(
+            dateCreated: !columnVisibility.dateCreated);
+      case 'attributes':
+        return columnVisibility.copyWith(
+            attributes: !columnVisibility.attributes);
+      case 'dateAccessed':
+        return columnVisibility.copyWith(
+            dateAccessed: !columnVisibility.dateAccessed);
+      case 'extension':
+        return columnVisibility.copyWith(
+            extension: !columnVisibility.extension);
+      case 'path':
+        return columnVisibility.copyWith(path: !columnVisibility.path);
+      case 'tags':
+        return columnVisibility.copyWith(tags: !columnVisibility.tags);
+      case 'dimensions':
+        return columnVisibility.copyWith(
+            dimensions: !columnVisibility.dimensions);
+      case 'duration':
+        return columnVisibility.copyWith(duration: !columnVisibility.duration);
+      case 'itemCount':
+        return columnVisibility.copyWith(
+            itemCount: !columnVisibility.itemCount);
+      default:
+        return columnVisibility;
+    }
   }
 
   Widget _buildGridView() {
@@ -480,35 +868,47 @@ class FileView extends StatelessWidget {
                         width: itemWidth,
                         height: itemHeight,
                         child: index < folders.length
-                            ? FolderGridItem(
-                                key: ValueKey(
-                                    'folder-grid-item-${folders[index].path}'),
-                                folder: folders[index],
-                                onNavigate: onFolderTap ?? (_) {},
-                                isSelected:
-                                    selectedFiles.contains(folders[index].path),
-                                toggleFolderSelection: toggleFileSelection,
-                                isDesktopMode: isDesktopMode,
-                                lastSelectedPath: lastSelectedPath,
-                                clearSelectionMode: clearSelectionMode,
+                            ? _wrapFileDragDrop(
+                                isFolder: true,
+                                itemPath: folders[index].path,
+                                child: FolderGridItem(
+                                  key: ValueKey(
+                                      'folder-grid-item-${folders[index].path}'),
+                                  folder: folders[index],
+                                  onNavigate: onFolderTap ?? (_) {},
+                                  isSelected: selectedFiles
+                                      .contains(folders[index].path),
+                                  toggleFolderSelection:
+                                      _folderSelectionHandler,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  clearSelectionMode: clearSelectionMode,
+                                ),
                               )
-                            : FileGridItem(
-                                key: ValueKey(
-                                    'file-grid-item-${files[index - folders.length].path}'),
-                                file: files[index - folders.length],
-                                state: state,
-                                isSelected: selectedFiles.contains(
-                                    files[index - folders.length].path),
-                                toggleFileSelection: toggleFileSelection,
-                                toggleSelectionMode: toggleSelectionMode,
-                                isSelectionMode: isSelectionMode,
-                                onFileTap: onFileTap,
-                                isDesktopMode: isDesktopMode,
-                                lastSelectedPath: lastSelectedPath,
-                                onThumbnailGenerated: onThumbnailGenerated,
-                                showDeleteTagDialog: showDeleteTagDialog,
-                                showAddTagToFileDialog: showAddTagToFileDialog,
-                                showFileTags: showFileTags,
+                            : _wrapFileDragDrop(
+                                isFolder: false,
+                                itemPath: files[index - folders.length].path,
+                                child: FileGridItem(
+                                  key: ValueKey(
+                                      'file-grid-item-${files[index - folders.length].path}'),
+                                  file: files[index - folders.length],
+                                  state: state,
+                                  isSelected: selectedFiles.contains(
+                                      files[index - folders.length].path),
+                                  toggleFileSelection: toggleFileSelection,
+                                  toggleSelectionMode: toggleSelectionMode,
+                                  isSelectionMode: isSelectionMode,
+                                  onFileTap: onFileTap,
+                                  isDesktopMode: isDesktopMode,
+                                  lastSelectedPath: lastSelectedPath,
+                                  onThumbnailGenerated: onThumbnailGenerated,
+                                  showDeleteTagDialog: showDeleteTagDialog,
+                                  showAddTagToFileDialog:
+                                      showAddTagToFileDialog,
+                                  onDeleteFile: onDeleteFile,
+                                  onDeleteFiles: onDeleteFiles,
+                                  showFileTags: showFileTags,
+                                ),
                               ),
                       ),
                     ),
@@ -534,6 +934,8 @@ class _FileDetailsItemWrapper extends StatelessWidget {
       toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final Function(File, bool)? onTap;
   final bool isDesktopMode;
   final String? lastSelectedPath;
@@ -548,6 +950,8 @@ class _FileDetailsItemWrapper extends StatelessWidget {
     required this.toggleFileSelection,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.onTap,
     this.isDesktopMode = false,
     this.lastSelectedPath,
@@ -566,6 +970,8 @@ class _FileDetailsItemWrapper extends StatelessWidget {
       toggleFileSelection: toggleFileSelection,
       showDeleteTagDialog: showDeleteTagDialog,
       showAddTagToFileDialog: showAddTagToFileDialog,
+      onDeleteFile: onDeleteFile,
+      onDeleteFiles: onDeleteFiles,
       onTap: onTap,
       isDesktopMode: isDesktopMode,
       lastSelectedPath: lastSelectedPath,

@@ -6,17 +6,17 @@
 // Use `make dev-test-e2e` to run all, or individual suites via --plain-name.
 //
 // Individual suites (--plain-name matches group() prefix):
-//   --plain-name "Navigation"             # sandbox, navigation, empty, backspace
-//   --plain-name "File Operations"        # create, copy, rename, delete
-//   --plain-name "Cut & Move"             # cut via menu, cut via Ctrl+X
-//   --plain-name "Folder Operations"      # copy folder, delete folder, rename
-//   --plain-name "Multi-Select"           # batch copy, select all + delete
-//   --plain-name "Keyboard Shortcuts"     # F5 refresh, Escape cancel, Enter
-//   --plain-name "Search & Filter"        # search box, clear search
-//   --plain-name "View Mode"              # grid/list toggle, ops in grid
-//   --plain-name "Tab Management"         # Ctrl+T, Ctrl+W, Ctrl+Tab
-//   --plain-name "Edge Cases & Error Handling"  # cancel, empty name, no file
-//   --plain-name "Extended File Operations"    # batch move, deep copy
+//   --plain-name "01 Navigation"             # sandbox, navigation, empty, backspace
+//   --plain-name "02 File Operations"        # create, copy, rename, delete
+//   --plain-name "03 Cut & Move"             # cut via menu, cut via Ctrl+X
+//   --plain-name "04 Folder Operations"      # copy folder, delete folder, rename
+//   --plain-name "05 Multi-Select"           # batch copy, select all + delete
+//   --plain-name "06 Keyboard Shortcuts"     # F5 refresh, Escape cancel, Enter
+//   --plain-name "07 Search & Filter"        # search box, clear search
+//   --plain-name "08 View Mode"              # grid/list toggle, ops in grid
+//   --plain-name "09 Tab Management"         # Ctrl+T, Ctrl+W, Ctrl+Tab
+//   --plain-name "10 Edge Cases & Error Handling"  # cancel, empty name, no file
+//   --plain-name "11 Extended File Operations"    # batch move, deep copy
 //   --plain-name "Video Thumbnails"           # video display, context menu, thumbnails
 import 'dart:io';
 
@@ -37,6 +37,51 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+/// Finder for the confirm/delete button in a confirmation dialog.
+///
+/// Matches any button widget (TextButton, ElevatedButton, FilledButton,
+/// OutlinedButton) whose visible label contains a delete/confirm word in
+/// English or Vietnamese. The DeleteConfirmationDialog uses TextButton with
+/// Vietnamese "Xóa" by default, so the regex must cover both.
+Finder _findDeleteConfirmButton() {
+  final pattern = RegExp(
+    r'^\s*(delete|remove|move to trash|confirm|xóa|xoá|chuyển vào thùng rác|xác nhận)\s*$',
+    caseSensitive: false,
+  );
+  return find.byWidgetPredicate((widget) {
+    if (widget is! ButtonStyleButton) return false;
+    final child = widget.child;
+    if (child is Text) {
+      return pattern.hasMatch(child.data ?? '');
+    }
+    return false;
+  });
+}
+
+/// Waits up to [timeout] for a delete confirmation dialog to appear, then
+/// taps its confirm button. Returns true if confirmed, false if no dialog
+/// appeared (caller may treat as already-confirmed in immediate-delete flow).
+///
+/// Polls every 200 ms because `pumpAndSettle` returns before async dialog
+/// route push completes when there are still active animations / timers in
+/// the tree (e.g. acrylic backdrop reapply, video thumbnail jobs).
+Future<bool> _confirmDeleteDialog(
+  E2ETester et, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final finder = _findDeleteConfirmButton();
+    if (finder.evaluate().isNotEmpty) {
+      await et.tap(finder.first, detail: 'confirm_delete_dialog');
+      await et.pumpAndSettle(const Duration(seconds: 3));
+      return true;
+    }
+    await et.pumpAndSettle(const Duration(milliseconds: 200));
+  }
+  return false;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -44,8 +89,8 @@ void main() {
   // Suite 1: Navigation
   // ===========================================================================
 
-  group('Navigation', () {
-    testWidgets('sandbox lists two files and a subfolder',
+  group('01 Navigation', () {
+    testWidgets('01.01 sandbox lists two files and a subfolder',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_');
@@ -64,7 +109,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('sandbox lists two files and a subfolder');
+        await et.init('01.01 sandbox lists two files and a subfolder');
 
         expectFileRowVisible(aFile.path);
         expectFileRowVisible(bFile.path);
@@ -75,7 +120,7 @@ void main() {
       }
     });
 
-    testWidgets('open subfolder shows file inside',
+    testWidgets('01.02 open subfolder shows file inside',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_nav_');
@@ -94,7 +139,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('open subfolder shows file inside');
+        await et.init('01.02 open subfolder shows file inside');
 
         expectFolderRowVisible(sub.path);
         if (kDebugMode) {
@@ -110,7 +155,7 @@ void main() {
       }
     });
 
-    testWidgets('empty sandbox has no file or folder rows',
+    testWidgets('01.03 empty sandbox has no file or folder rows',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_empty_');
@@ -123,7 +168,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('empty sandbox has no file or folder rows');
+        await et.init('01.03 empty sandbox has no file or folder rows');
 
         expect(find.byType(FileItem), findsNothing);
         expect(find.byType(FolderItem), findsNothing);
@@ -136,7 +181,7 @@ void main() {
     });
 
     testWidgets(
-        'navigate back to parent with Backspace after entering subfolder',
+        '01.04 navigate back to parent with Backspace after entering subfolder',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_back_');
@@ -156,7 +201,7 @@ void main() {
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init(
-            'navigate back to parent with Backspace after entering subfolder');
+            '01.04 navigate back to parent with Backspace after entering subfolder');
 
         // Verify root contents visible
         expectFileRowVisible(rootFile.path);
@@ -190,8 +235,8 @@ void main() {
   // Suite 2: File Operations
   // ===========================================================================
 
-  group('File Operations', () {
-    testWidgets('create new folder via right-click context menu',
+  group('02 File Operations', () {
+    testWidgets('02.01 create new folder via right-click context menu',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_newfolder_');
@@ -207,7 +252,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('create new folder via right-click context menu');
+        await et.init('02.01 create new folder via right-click context menu');
 
         // Verify dummy file is visible (confirms FileListViewBuilder has rendered)
         expectFileRowVisible(dummyFile.path);
@@ -242,7 +287,7 @@ void main() {
       }
     });
 
-    testWidgets('copy file via right-click context menu and paste',
+    testWidgets('02.02 copy file via right-click context menu and paste',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_copy_');
@@ -259,7 +304,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('copy file via right-click context menu and paste');
+        await et.init('02.02 copy file via right-click context menu and paste');
 
         expectFileRowVisible(srcFile.path);
 
@@ -286,7 +331,7 @@ void main() {
       }
     });
 
-    testWidgets('rename file via F2 keyboard shortcut',
+    testWidgets('02.03 rename file via F2 keyboard shortcut',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_rename_');
@@ -303,7 +348,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('rename file via F2 keyboard shortcut');
+        await et.init('02.03 rename file via F2 keyboard shortcut');
 
         expectFileRowVisible(originalFile.path);
 
@@ -334,7 +379,7 @@ void main() {
       }
     });
 
-    testWidgets('delete file via keyboard shortcut',
+    testWidgets('02.04 delete file via keyboard shortcut',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_delete_');
@@ -350,7 +395,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('delete file via keyboard shortcut');
+        await et.init('02.04 delete file via keyboard shortcut');
 
         expectFileRowVisible(targetFile.path);
 
@@ -362,22 +407,11 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.delete);
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // A confirmation dialog should appear — find the confirm button
-        final dialogButton = find.byWidgetPredicate((widget) {
-          if (widget is ElevatedButton) {
-            final child = widget.child;
-            if (child is Text) {
-              return RegExp(r'delete|remove|move to trash|confirm',
-                      caseSensitive: false)
-                  .hasMatch(child.data ?? '');
-            }
-          }
-          return false;
-        });
-        if (dialogButton.evaluate().isNotEmpty) {
-          await et.tap(dialogButton.first, detail: 'confirm_delete_dialog');
-          await et.pumpAndSettle(const Duration(seconds: 3));
-        }
+        // A confirmation dialog should appear — find the confirm button.
+        // The DeleteConfirmationDialog uses TextButton with the localized
+        // "Xóa"/"Delete" label, so we use a shared helper that matches any
+        // ButtonStyleButton with delete/confirm text in EN+VI.
+        await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         expectFileRowAbsent(targetFile.path);
@@ -393,8 +427,8 @@ void main() {
   // Suite 3: Cut & Move
   // ===========================================================================
 
-  group('Cut & Move', () {
-    testWidgets('cut and move file via right-click context menu',
+  group('03 Cut & Move', () {
+    testWidgets('03.01 cut and move file via right-click context menu',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_cut_');
@@ -411,7 +445,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('cut and move file via right-click context menu');
+        await et.init('03.01 cut and move file via right-click context menu');
 
         expectFileRowVisible(srcFile.path);
 
@@ -445,7 +479,7 @@ void main() {
       }
     });
 
-    testWidgets('cut and move file via Ctrl+X Ctrl+V keyboard shortcuts',
+    testWidgets('03.02 cut and move file via Ctrl+X Ctrl+V keyboard shortcuts',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_cutkey_');
@@ -462,7 +496,8 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('cut and move file via Ctrl+X Ctrl+V keyboard shortcuts');
+        await et.init(
+            '03.02 cut and move file via Ctrl+X Ctrl+V keyboard shortcuts');
 
         expectFileRowVisible(srcFile.path);
 
@@ -509,8 +544,8 @@ void main() {
   // Suite 4: Folder Operations
   // ===========================================================================
 
-  group('Folder Operations', () {
-    testWidgets('copy folder to another location via context menu',
+  group('04 Folder Operations', () {
+    testWidgets('04.01 copy folder to another location via context menu',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_copyfolder_');
@@ -531,7 +566,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('copy folder to another location via context menu');
+        await et.init('04.01 copy folder to another location via context menu');
 
         expectFolderRowVisible(sourceFolder.path);
         expectFolderRowVisible(destFolder.path);
@@ -567,7 +602,7 @@ void main() {
       }
     });
 
-    testWidgets('delete folder via keyboard shortcut',
+    testWidgets('04.02 delete folder via keyboard shortcut',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_delfolder_');
@@ -588,7 +623,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('delete folder via keyboard shortcut');
+        await et.init('04.02 delete folder via keyboard shortcut');
 
         expectFolderRowVisible(targetFolder.path);
 
@@ -601,21 +636,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 2));
 
         // Handle confirmation dialog (same pattern as file delete test)
-        final dialogButton = find.byWidgetPredicate((widget) {
-          if (widget is ElevatedButton) {
-            final child = widget.child;
-            if (child is Text) {
-              return RegExp(r'delete|remove|move to trash|confirm',
-                      caseSensitive: false)
-                  .hasMatch(child.data ?? '');
-            }
-          }
-          return false;
-        });
-        if (dialogButton.evaluate().isNotEmpty) {
-          await et.tap(dialogButton.first, detail: 'confirm_delete_dialog');
-          await et.pumpAndSettle(const Duration(seconds: 3));
-        }
+        await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         expectFolderRowAbsent(targetFolder.path);
@@ -631,8 +652,9 @@ void main() {
   // Suite 5: Multi-Select
   // ===========================================================================
 
-  group('Multi-Select', () {
-    testWidgets('multi-select two files and batch copy via keyboard shortcuts',
+  group('05 Multi-Select', () {
+    testWidgets(
+        '05.01 multi-select two files and batch copy via keyboard shortcuts',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_multiselect_');
@@ -652,7 +674,7 @@ void main() {
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init(
-            'multi-select two files and batch copy via keyboard shortcuts');
+            '05.01 multi-select two files and batch copy via keyboard shortcuts');
 
         expectFileRowVisible(fileA.path);
         expectFileRowVisible(fileB.path);
@@ -692,7 +714,7 @@ void main() {
       }
     });
 
-    testWidgets('select all with Ctrl+A and batch delete',
+    testWidgets('05.02 select all with Ctrl+A and batch delete',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_selectall_');
@@ -711,7 +733,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('select all with Ctrl+A and batch delete');
+        await et.init('05.02 select all with Ctrl+A and batch delete');
 
         expectFileRowVisible(fileA.path);
         expectFileRowVisible(fileB.path);
@@ -732,21 +754,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 2));
 
         // Handle confirmation dialog
-        final dialogButton = find.byWidgetPredicate((widget) {
-          if (widget is ElevatedButton) {
-            final child = widget.child;
-            if (child is Text) {
-              return RegExp(r'delete|remove|move to trash|confirm',
-                      caseSensitive: false)
-                  .hasMatch(child.data ?? '');
-            }
-          }
-          return false;
-        });
-        if (dialogButton.evaluate().isNotEmpty) {
-          await et.tap(dialogButton.first, detail: 'confirm_delete_dialog');
-          await et.pumpAndSettle(const Duration(seconds: 3));
-        }
+        await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         // Verify all files are gone
@@ -765,8 +773,8 @@ void main() {
   // Suite 6: Keyboard Shortcuts
   // ===========================================================================
 
-  group('Keyboard Shortcuts', () {
-    testWidgets('refresh folder listing with F5 after external change',
+  group('06 Keyboard Shortcuts', () {
+    testWidgets('06.01 refresh folder listing with F5 after external change',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_refresh_');
@@ -782,7 +790,8 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('refresh folder listing with F5 after external change');
+        await et
+            .init('06.01 refresh folder listing with F5 after external change');
 
         expectFileRowVisible(existingFile.path);
 
@@ -811,7 +820,7 @@ void main() {
       }
     });
 
-    testWidgets('cancel rename with Escape key after pressing F2',
+    testWidgets('06.02 cancel rename with Escape key after pressing F2',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_rename_esc_');
@@ -827,7 +836,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('cancel rename with Escape key after pressing F2');
+        await et.init('06.02 cancel rename with Escape key after pressing F2');
 
         expectFileRowVisible(targetFile.path);
 
@@ -855,7 +864,7 @@ void main() {
       }
     });
 
-    testWidgets('open file with Enter key when file is selected',
+    testWidgets('06.03 open file with Enter key when file is selected',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_enter_');
@@ -870,7 +879,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('open file with Enter key when file is selected');
+        await et.init('06.03 open file with Enter key when file is selected');
 
         expectFileRowVisible(targetFile.path);
 
@@ -900,8 +909,8 @@ void main() {
   // Suite 7: Search & Filter
   // ===========================================================================
 
-  group('Search & Filter', () {
-    testWidgets('search for file by typing in search box',
+  group('07 Search & Filter', () {
+    testWidgets('07.01 search for file by typing in search box',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_search_');
@@ -920,7 +929,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('search for file by typing in search box');
+        await et.init('07.01 search for file by typing in search box');
 
         expectFileRowVisible(targetFile.path);
         expectFileRowVisible(otherFile.path);
@@ -952,7 +961,7 @@ void main() {
       }
     });
 
-    testWidgets('clear search to show all files again',
+    testWidgets('07.02 clear search to show all files again',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_searchclear_');
@@ -969,7 +978,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('clear search to show all files again');
+        await et.init('07.02 clear search to show all files again');
 
         expectFileRowVisible(fileA.path);
         expectFileRowVisible(fileB.path);
@@ -1004,8 +1013,8 @@ void main() {
   // Suite 8: View Mode (Grid / List Toggle)
   // ===========================================================================
 
-  group('View Mode', () {
-    testWidgets('toggle to grid view from list view',
+  group('08 View Mode', () {
+    testWidgets('08.01 toggle to grid view from list view',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_viewgrid_');
@@ -1022,7 +1031,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('toggle to grid view from list view');
+        await et.init('08.01 toggle to grid view from list view');
 
         expectFileRowVisible(fileA.path);
         expectFileRowVisible(fileB.path);
@@ -1044,7 +1053,7 @@ void main() {
       }
     });
 
-    testWidgets('toggle back to list view from grid view',
+    testWidgets('08.02 toggle back to list view from grid view',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_viewlist_');
@@ -1061,7 +1070,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('toggle back to list view from grid view');
+        await et.init('08.02 toggle back to list view from grid view');
 
         expectFileRowVisible(fileA.path);
         expectFileRowVisible(fileB.path);
@@ -1090,7 +1099,7 @@ void main() {
       }
     });
 
-    testWidgets('file operations work correctly in grid view',
+    testWidgets('08.03 file operations work correctly in grid view',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_gridops_');
@@ -1108,7 +1117,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('file operations work correctly in grid view');
+        await et.init('08.03 file operations work correctly in grid view');
 
         // Switch to grid view first
         final gridIcon = find.byIcon(Icons.grid_view);
@@ -1149,8 +1158,9 @@ void main() {
   // Suite 9: Tab Management
   // ===========================================================================
 
-  group('Tab Management', () {
-    testWidgets('open a new tab with Ctrl+T', (WidgetTester tester) async {
+  group('09 Tab Management', () {
+    testWidgets('09.01 open a new tab with Ctrl+T',
+        (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_tab_');
 
@@ -1162,7 +1172,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('open a new tab with Ctrl+T');
+        await et.init('09.01 open a new tab with Ctrl+T');
 
         // Press Ctrl+T to open new tab
         if (kDebugMode) debugPrint('[E2E] Pressing Ctrl+T for new tab');
@@ -1180,7 +1190,7 @@ void main() {
       }
     });
 
-    testWidgets('close a tab with Ctrl+W', (WidgetTester tester) async {
+    testWidgets('09.02 close a tab with Ctrl+W', (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_tabclose_');
       final fileA =
@@ -1195,7 +1205,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('close a tab with Ctrl+W');
+        await et.init('09.02 close a tab with Ctrl+W');
 
         expectFileRowVisible(fileA.path);
 
@@ -1216,7 +1226,7 @@ void main() {
       }
     });
 
-    testWidgets('switch between tabs with Ctrl+Tab',
+    testWidgets('09.03 switch between tabs with Ctrl+Tab',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_tabswitch_');
@@ -1229,7 +1239,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('switch between tabs with Ctrl+Tab');
+        await et.init('09.03 switch between tabs with Ctrl+Tab');
 
         // Open a new tab first
         await et.sendKeyboardShortcut(
@@ -1257,8 +1267,8 @@ void main() {
   // Suite 10: Edge Cases & Error Handling
   // ===========================================================================
 
-  group('Edge Cases & Error Handling', () {
-    testWidgets('handle delete confirmation cancel correctly',
+  group('10 Edge Cases & Error Handling', () {
+    testWidgets('10.01 handle delete confirmation cancel correctly',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_delcancel_');
@@ -1274,7 +1284,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('handle delete confirmation cancel correctly');
+        await et.init('10.01 handle delete confirmation cancel correctly');
 
         expectFileRowVisible(targetFile.path);
 
@@ -1309,7 +1319,7 @@ void main() {
       }
     });
 
-    testWidgets('handle rename with empty name correctly',
+    testWidgets('10.02 handle rename with empty name correctly',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_renameempty_');
@@ -1325,7 +1335,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('handle rename with empty name correctly');
+        await et.init('10.02 handle rename with empty name correctly');
 
         expectFileRowVisible(targetFile.path);
 
@@ -1351,7 +1361,7 @@ void main() {
       }
     });
 
-    testWidgets('handle paste when no file is copied or cut',
+    testWidgets('10.03 handle paste when no file is copied or cut',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_nopaste_');
@@ -1370,7 +1380,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('handle paste when no file is copied or cut');
+        await et.init('10.03 handle paste when no file is copied or cut');
 
         expectFileRowVisible(existingFile.path);
 
@@ -1394,7 +1404,7 @@ void main() {
       }
     });
 
-    testWidgets('handle navigating to a folder that no longer exists',
+    testWidgets('10.04 handle navigating to a folder that no longer exists',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_navmiss_');
@@ -1409,7 +1419,8 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('handle navigating to a folder that no longer exists');
+        await et
+            .init('10.04 handle navigating to a folder that no longer exists');
 
         expectFileRowVisible(file.path);
 
@@ -1435,8 +1446,8 @@ void main() {
   // Suite 11: Extended File Operations
   // ===========================================================================
 
-  group('Extended File Operations', () {
-    testWidgets('create new file via context menu',
+  group('11 Extended File Operations', () {
+    testWidgets('11.01 create new file via context menu',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_newfile_');
@@ -1451,7 +1462,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('create new file via context menu');
+        await et.init('11.01 create new file via context menu');
 
         expectFileRowVisible(dummyFile.path);
 
@@ -1470,7 +1481,8 @@ void main() {
       }
     });
 
-    testWidgets('rename file via context menu', (WidgetTester tester) async {
+    testWidgets('11.02 rename file via context menu',
+        (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_rename_ctx_');
       final originalFile =
@@ -1486,7 +1498,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('rename file via context menu');
+        await et.init('11.02 rename file via context menu');
 
         expectFileRowVisible(originalFile.path);
 
@@ -1514,7 +1526,7 @@ void main() {
       }
     });
 
-    testWidgets('batch move multiple files to destination folder',
+    testWidgets('11.03 batch move multiple files to destination folder',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_batchmove_');
@@ -1534,7 +1546,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('batch move multiple files to destination folder');
+        await et.init('11.03 batch move multiple files to destination folder');
 
         expectFileRowVisible(fileA.path);
         expectFileRowVisible(fileB.path);
@@ -1573,7 +1585,7 @@ void main() {
       }
     });
 
-    testWidgets('copy folder with nested contents to another location',
+    testWidgets('11.04 copy folder with nested contents to another location',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_deepcopy_');
@@ -1600,7 +1612,8 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('copy folder with nested contents to another location');
+        await et
+            .init('11.04 copy folder with nested contents to another location');
 
         expectFolderRowVisible(sourceFolder.path);
 
@@ -1638,7 +1651,7 @@ void main() {
       }
     });
 
-    testWidgets('rename folder via F2 keyboard shortcut',
+    testWidgets('11.05 rename folder via F2 keyboard shortcut',
         (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_renfolder_');
@@ -1657,7 +1670,7 @@ void main() {
         if (kDebugMode) debugPrint('[E2E] Test started, sandbox: ${dir.path}');
         await runCbFileApp();
         await tester.pumpAndSettle(const Duration(seconds: 5));
-        await et.init('rename folder via F2 keyboard shortcut');
+        await et.init('11.05 rename folder via F2 keyboard shortcut');
 
         expectFolderRowVisible(originalFolder.path);
 

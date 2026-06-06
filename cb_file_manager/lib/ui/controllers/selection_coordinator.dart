@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -54,10 +55,13 @@ class SelectionCoordinator {
       }
 
       // Get lists of all paths for selection range
-      final List<String> allFolderPaths =
-          folderListBloc.state.folders.map((f) => f.path).toList();
+      final visibleItems = _visibleItems();
+      final List<String> allFolderPaths = visibleItems
+          .whereType<Directory>()
+          .map((entity) => entity.path)
+          .toList();
       final List<String> allFilePaths =
-          folderListBloc.state.files.map((f) => f.path).toList();
+          visibleItems.whereType<File>().map((entity) => entity.path).toList();
       final List<String> allPaths = [...allFolderPaths, ...allFilePaths];
 
       // Find indices
@@ -122,10 +126,13 @@ class SelectionCoordinator {
       }
 
       // Get lists of all paths for selection range
-      final List<String> allFolderPaths =
-          folderListBloc.state.folders.map((f) => f.path).toList();
+      final visibleItems = _visibleItems();
+      final List<String> allFolderPaths = visibleItems
+          .whereType<Directory>()
+          .map((entity) => entity.path)
+          .toList();
       final List<String> allFilePaths =
-          folderListBloc.state.files.map((f) => f.path).toList();
+          visibleItems.whereType<File>().map((entity) => entity.path).toList();
       final List<String> allPaths = [...allFolderPaths, ...allFilePaths];
 
       // Find indices
@@ -165,6 +172,22 @@ class SelectionCoordinator {
   void clearSelection() {
     selectionBloc.add(ClearSelection());
     clearKeyboardFocus();
+  }
+
+  List<FileSystemEntity> _visibleItems() {
+    final state = folderListBloc.state;
+    if (state.currentSearchTag != null || state.currentSearchQuery != null) {
+      return List<FileSystemEntity>.from(state.searchResults);
+    }
+
+    if (state.currentFilter != null && state.currentFilter!.isNotEmpty) {
+      return List<FileSystemEntity>.from(state.filteredFiles);
+    }
+
+    return <FileSystemEntity>[
+      ...state.folders.whereType<FileSystemEntity>(),
+      ...state.files.whereType<FileSystemEntity>(),
+    ];
   }
 
   /// Show dialog to remove tags from selected files

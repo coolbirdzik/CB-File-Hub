@@ -77,6 +77,7 @@ class AiPanelController extends ChangeNotifier {
       final bloc = AiAgentBloc(
         providerService: GetIt.instance<AiProviderService>(),
         historyService: GetIt.instance<AiChatHistoryService>(),
+        ownerTabId: tabId,
         thinkingPhrases: thinkingPhrases,
         waitingApproval: waitingApproval,
         runningToolTemplate: runningToolTemplate,

@@ -67,10 +67,12 @@ class _FolderGridItemState extends State<FolderGridItem> {
     final bool isShiftPressed = keyboard.isShiftPressed;
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
+    final bool shouldCtrlSelect =
+        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
 
     // Visual update depends on the selection type
     if (!isShiftPressed) {
-      if (!isCtrlPressed) {
+      if (!shouldCtrlSelect) {
         _visuallySelected = true;
       } else {
         _visuallySelected = !_visuallySelected;
@@ -78,7 +80,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
     }
 
     widget.toggleFolderSelection!(widget.folder.path,
-        shiftSelect: isShiftPressed, ctrlSelect: isCtrlPressed);
+        shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
   }
 
   @override

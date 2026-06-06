@@ -189,13 +189,20 @@ class ExternalAppHelper {
       } else if (Platform.isWindows) {
         // Special case for shell_open
         if (packageName == 'shell_open') {
-          final process = await Process.start('explorer', [filePath]);
-          await process.exitCode;
+          await Process.start(
+            'explorer',
+            [filePath],
+            mode: ProcessStartMode.detached,
+          );
           return true;
         } else {
           // On Windows, the packageName is actually the path to the executable
-          final result = Process.runSync(packageName, [filePath]);
-          return result.exitCode == 0;
+          await Process.start(
+            packageName,
+            [filePath],
+            mode: ProcessStartMode.detached,
+          );
+          return true;
         }
       }
       return false;
@@ -402,8 +409,11 @@ class ExternalAppHelper {
   static Future<bool> openWithSystemDefault(String filePath) async {
     try {
       if (Platform.isWindows) {
-        final process = await Process.start('explorer', [filePath]);
-        await process.exitCode;
+        await Process.start(
+          'explorer',
+          [filePath],
+          mode: ProcessStartMode.detached,
+        );
         return true;
       }
       if (Platform.isAndroid) {

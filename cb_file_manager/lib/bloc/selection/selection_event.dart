@@ -59,6 +59,7 @@ class SelectItemsInRect extends SelectionEvent {
   final Set<String> filePaths;
   final bool isCtrlPressed;
   final bool isShiftPressed;
+  final String? lastSelectedPath;
 
   /// Snapshot of selected files taken at the moment the Ctrl+drag started.
   /// The bloc uses this to compute a stable toggle delta instead of
@@ -71,13 +72,19 @@ class SelectItemsInRect extends SelectionEvent {
     required this.filePaths,
     this.isCtrlPressed = false,
     this.isShiftPressed = false,
+    this.lastSelectedPath,
     this.preCtrlDragFiles = const {},
     this.preCtrlDragFolders = const {},
   });
 
   @override
-  List<Object?> get props =>
-      [folderPaths, filePaths, isCtrlPressed, isShiftPressed];
+  List<Object?> get props => [
+        folderPaths,
+        filePaths,
+        isCtrlPressed,
+        isShiftPressed,
+        lastSelectedPath,
+      ];
 }
 
 /// Event to select all files and folders in the current view

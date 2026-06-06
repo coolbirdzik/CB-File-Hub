@@ -11,6 +11,7 @@ import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:path/path.dart' as path;
@@ -42,29 +43,16 @@ class FileOperationsHandler {
     required Set<String> pathsToDelete,
     String? anchorPath,
   }) {
+    if (anchorPath == null || !pathsToDelete.contains(anchorPath)) {
+      return null;
+    }
+
     final items = _getNavigableItems(state);
     if (items.isEmpty) return null;
 
     final orderedPaths = items.map((e) => e.path).toList(growable: false);
 
-    final String? effectiveAnchor = () {
-      if (anchorPath != null && orderedPaths.contains(anchorPath)) {
-        return anchorPath;
-      }
-      for (final p in orderedPaths) {
-        if (pathsToDelete.contains(p)) return p;
-      }
-      return null;
-    }();
-
-    if (effectiveAnchor == null) {
-      for (final p in orderedPaths) {
-        if (!pathsToDelete.contains(p)) return p;
-      }
-      return null;
-    }
-
-    final int anchorIndex = orderedPaths.indexOf(effectiveAnchor);
+    final int anchorIndex = orderedPaths.indexOf(anchorPath);
     if (anchorIndex < 0) return null;
 
     for (int i = anchorIndex + 1; i < orderedPaths.length; i++) {
@@ -155,6 +143,8 @@ class FileOperationsHandler {
     String? focusedPath,
     required bool permanent,
     required VoidCallback onClearSelection,
+    void Function(Set<String> deletedPaths, String? nextFocusPath)?
+        onDeleteConfirmed,
   }) async {
     // Clone lists to avoid modifying the original lists from state
     final filesToDelete = List<String>.from(selectedFiles);
@@ -165,7 +155,7 @@ class FileOperationsHandler {
         foldersToDelete.isEmpty &&
         focusedPath != null) {
       final focusedType =
-          FileSystemEntity.typeSync(focusedPath, followLinks: false);
+          await FileSystemEntity.type(focusedPath, followLinks: false);
       if (focusedType == FileSystemEntityType.directory) {
         foldersToDelete.add(focusedPath);
       } else {
@@ -177,6 +167,7 @@ class FileOperationsHandler {
       return;
     }
 
+    if (!context.mounted) return;
     final localizations = AppLocalizations.of(context);
     if (localizations == null) {
       return;
@@ -197,8 +188,15 @@ class FileOperationsHandler {
         ? path.basename(filesToDelete.first)
         : path.basename(foldersToDelete.first);
 
+    // Build preview paths: up to 4 items, files first then folders
+    final previewPaths = <String>[
+      ...filesToDelete.take(4),
+      ...foldersToDelete.take(4),
+    ].take(4).toList();
+
     if (permanent) {
       // Show permanent delete dialog with keyboard support
+      if (!context.mounted) return;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => DeleteConfirmationDialog(
@@ -208,6 +206,7 @@ class FileOperationsHandler {
               : localizations.confirmDeletePermanentMultiple(totalCount),
           confirmText: localizations.deleteTitle,
           cancelText: localizations.cancel,
+          previewPaths: previewPaths,
         ),
       );
 
@@ -217,28 +216,16 @@ class FileOperationsHandler {
           folderPaths: foldersToDelete,
           permanent: true,
         ));
-        onClearSelection();
-        if (selectionBloc != null && nextFocusPath != null) {
-          final nextType =
-              FileSystemEntity.typeSync(nextFocusPath, followLinks: false);
-          if (nextType == FileSystemEntityType.directory) {
-            selectionBloc.add(ToggleFolderSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          } else {
-            selectionBloc.add(ToggleFileSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          }
+        if (onDeleteConfirmed != null) {
+          onDeleteConfirmed(pathsToDelete, nextFocusPath);
+        } else {
+          onClearSelection();
         }
       }
     } else {
       // Show trash delete dialog with keyboard support
       debugPrint('Showing trash delete dialog');
+      if (!context.mounted) return;
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => DeleteConfirmationDialog(
@@ -249,6 +236,7 @@ class FileOperationsHandler {
                   totalCount, localizations.items),
           confirmText: localizations.deleteTitle,
           cancelText: localizations.cancel,
+          previewPaths: previewPaths,
         ),
       );
 
@@ -258,23 +246,10 @@ class FileOperationsHandler {
           folderPaths: foldersToDelete,
           permanent: false,
         ));
-        onClearSelection();
-        if (selectionBloc != null && nextFocusPath != null) {
-          final nextType =
-              FileSystemEntity.typeSync(nextFocusPath, followLinks: false);
-          if (nextType == FileSystemEntityType.directory) {
-            selectionBloc.add(ToggleFolderSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          } else {
-            selectionBloc.add(ToggleFileSelection(
-              nextFocusPath,
-              shiftSelect: false,
-              ctrlSelect: false,
-            ));
-          }
+        if (onDeleteConfirmed != null) {
+          onDeleteConfirmed(pathsToDelete, nextFocusPath);
+        } else {
+          onClearSelection();
         }
       }
     }
@@ -289,7 +264,7 @@ class FileOperationsHandler {
     final l10n = AppLocalizations.of(context)!;
     final name = _entityBaseName(entity);
     bloc.add(CopyFile(entity));
-    _showSnackBarSafe(context, l10n.copiedToClipboard(name));
+    _showToastSafe(context, l10n.copiedToClipboard(name));
   }
 
   static void copyFilesToClipboard({
@@ -304,7 +279,7 @@ class FileOperationsHandler {
     final message = entities.length == 1
         ? l10n.copiedToClipboard(_entityBaseName(entities.first))
         : '${entities.length} items copied to clipboard';
-    _showSnackBarSafe(context, message);
+    _showToastSafe(context, message);
   }
 
   static void cutToClipboard({
@@ -316,7 +291,7 @@ class FileOperationsHandler {
     final l10n = AppLocalizations.of(context)!;
     final name = _entityBaseName(entity);
     bloc.add(CutFile(entity));
-    _showSnackBarSafe(context, l10n.cutToClipboard(name));
+    _showToastSafe(context, l10n.cutToClipboard(name));
   }
 
   static void cutFilesToClipboard({
@@ -331,7 +306,7 @@ class FileOperationsHandler {
     final message = entities.length == 1
         ? l10n.cutToClipboard(_entityBaseName(entities.first))
         : '${entities.length} items cut to clipboard';
-    _showSnackBarSafe(context, message);
+    _showToastSafe(context, message);
   }
 
   static void pasteFromClipboard({
@@ -342,18 +317,16 @@ class FileOperationsHandler {
     final bloc = folderListBloc ?? context.read<FolderListBloc>();
     final l10n = AppLocalizations.of(context)!;
     bloc.add(PasteFile(destinationPath));
-    _showSnackBarSafe(context, l10n.pasting);
+    _showToastSafe(context, l10n.pasting);
   }
 
-  /// Safely shows a snackbar, falling back to debugPrint if no ScaffoldMessenger is available.
-  static void _showSnackBarSafe(BuildContext context, String message) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) {
-      debugPrint(
-          'FileOperationsHandler: ScaffoldMessenger unavailable — $message');
+  /// Safely shows a toast, falling back to debugPrint if no overlay is available.
+  static void _showToastSafe(BuildContext context, String message) {
+    if (Overlay.maybeOf(context, rootOverlay: true) == null) {
+      debugPrint('FileOperationsHandler: Overlay unavailable - $message');
       return;
     }
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    AppToast.info(context, message);
   }
 
   static Future<void> showRenameDialog({
@@ -374,7 +347,7 @@ class FileOperationsHandler {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+    final toast = AppToast.capture(context);
     final preferences = UserPreferences.instance;
     await preferences.init();
     final allowFileExtensionRename =
@@ -417,13 +390,9 @@ class FileOperationsHandler {
       bloc.add(RenameFileOrFolder(entity, newName));
 
       try {
-        scaffoldMessenger?.showSnackBar(
-          SnackBar(
-            content: Text(isFile
-                ? l10n.renamedFileTo(newName)
-                : l10n.renamedFolderTo(newName)),
-          ),
-        );
+        toast.success(isFile
+            ? l10n.renamedFileTo(newName)
+            : l10n.renamedFolderTo(newName));
       } catch (_) {}
     } finally {}
   }

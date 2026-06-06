@@ -38,9 +38,7 @@ class _FeaturedAlbumsSettingsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Featured Albums Settings'),
-      ),
+      appBar: AppBar(),
       body: FutureBuilder<List<dynamic>>(
         future: Future.wait([_configFuture, _allAlbumsFuture]),
         builder: (context, snapshot) {

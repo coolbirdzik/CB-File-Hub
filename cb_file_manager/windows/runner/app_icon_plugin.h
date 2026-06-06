@@ -42,6 +42,14 @@ class AppIconPlugin : public flutter::Plugin {
   std::vector<std::pair<std::string, std::string>> GetAppsForExtension(
       const std::string& extension);
 
+  // Batch extract file-type icons for a list of extensions using SHGetFileInfo
+  // with SHGFI_USEFILEATTRIBUTES (no real file needed). Returns map of
+  // extension -> BGRA pixel data (or empty vector on failure).
+  void ExtractIconsForExtensions(
+      const std::vector<std::string>& extensions,
+      int iconSize,
+      std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+
   // Plugin registrar
   flutter::PluginRegistrarWindows* registrar_;
 };

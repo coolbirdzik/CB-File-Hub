@@ -1,0 +1,119 @@
+/// Tree node representing a directory or file in the full disk scan.
+///
+/// Used by the full-disk TreeSize-style view. Each node tracks its own size
+/// (for files) or the sum of children sizes (for directories), plus metadata
+/// about whether it matches a known junk category.
+class DiskTreeNode {
+  /// Display name (last path segment).
+  final String name;
+
+  /// Full absolute path.
+  final String fullPath;
+
+  /// True if this node is a file (leaf), false if directory.
+  final bool isFile;
+
+  /// Size in bytes. For directories, this is the sum of all descendant files.
+  int sizeBytes;
+
+  /// Number of files in this subtree (1 for leaf files).
+  int fileCount;
+
+  /// Children nodes (empty for files). Sorted by size descending after scan.
+  final List<DiskTreeNode> children;
+
+  /// If this node (or its subtree) matches a known junk category, this is set
+  /// to the category ID. Null means "not junk / unknown".
+  String? junkCategoryId;
+
+  /// Whether the user has selected this node for deletion.
+  bool isSelectedForDeletion;
+
+  /// Whether this node is expanded in the UI.
+  bool isExpanded;
+
+  DiskTreeNode({
+    required this.name,
+    required this.fullPath,
+    this.isFile = false,
+    this.sizeBytes = 0,
+    this.fileCount = 0,
+    List<DiskTreeNode>? children,
+    this.junkCategoryId,
+    this.isSelectedForDeletion = false,
+    this.isExpanded = false,
+  }) : children = children ?? [];
+
+  /// Percentage of parent's size.
+  double percentOf(int parentSize) =>
+      parentSize > 0 ? sizeBytes / parentSize : 0.0;
+
+  /// Whether this node or any descendant is junk.
+  bool get isJunk => junkCategoryId != null;
+
+  /// Whether any child is junk (for partial highlighting).
+  bool get hasJunkChildren {
+    for (final child in children) {
+      if (child.isJunk || child.hasJunkChildren) return true;
+    }
+    return false;
+  }
+
+  /// Total junk bytes in this subtree.
+  int get junkBytes {
+    if (isJunk) return sizeBytes;
+    int total = 0;
+    for (final child in children) {
+      total += child.junkBytes;
+    }
+    return total;
+  }
+
+  /// Sort children by size descending (recursive).
+  void sortBySize() {
+    children.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+    for (final child in children) {
+      child.sortBySize();
+    }
+  }
+}
+
+/// Progress event from the full disk scan isolate.
+class FullDiskScanProgress {
+  /// Number of directories scanned so far.
+  final int directoriesScanned;
+
+  /// Number of files counted so far.
+  final int filesScanned;
+
+  /// Total bytes counted so far.
+  final int bytesScanned;
+
+  /// Current directory being scanned.
+  final String currentPath;
+
+  const FullDiskScanProgress({
+    required this.directoriesScanned,
+    required this.filesScanned,
+    required this.bytesScanned,
+    required this.currentPath,
+  });
+}
+
+/// Result of a full disk scan.
+class FullDiskScanResult {
+  /// Root node of the tree (the drive root, e.g. C:\).
+  final DiskTreeNode root;
+
+  /// Total scan duration.
+  final Duration duration;
+
+  /// Directories that could not be accessed (permission denied, etc.).
+  final List<String> inaccessible;
+
+  const FullDiskScanResult({
+    required this.root,
+    required this.duration,
+    required this.inaccessible,
+  });
+}

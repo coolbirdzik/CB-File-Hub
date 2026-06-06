@@ -27,12 +27,15 @@ class SearchFilterResultsView extends StatelessWidget {
   final Function(File, bool) onFileTap;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
       toggleFileSelection;
+  final Function(String, {bool shiftSelect, bool ctrlSelect})
+      toggleFolderSelection;
   final VoidCallback toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
   final VoidCallback onClearSearch;
   final VoidCallback onBackButtonPressed;
   final VoidCallback onForwardButtonPressed;
+  final bool isDesktopPlatform;
   final bool showFileTags;
   final ValueChanged<int> onZoomLevelChanged;
 
@@ -48,12 +51,14 @@ class SearchFilterResultsView extends StatelessWidget {
     required this.onNavigateToPath,
     required this.onFileTap,
     required this.toggleFileSelection,
+    required this.toggleFolderSelection,
     required this.toggleSelectionMode,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
     required this.onClearSearch,
     required this.onBackButtonPressed,
     required this.onForwardButtonPressed,
+    required this.isDesktopPlatform,
     required this.showFileTags,
     required this.onZoomLevelChanged,
   }) : super(key: key);
@@ -96,9 +101,11 @@ class SearchFilterResultsView extends StatelessWidget {
     if (folderListState.searchResults.isNotEmpty) {
       return tab_components.SearchResultsView(
         state: folderListState,
-        isSelectionMode: selectionState.isSelectionMode,
-        selectedFiles: selectionState.selectedFilePaths.toList(),
+        isSelectionMode: selectionState.isSelectionMode && !isDesktopPlatform,
+        selectedFiles: selectionState.allSelectedPaths,
+        lastSelectedPath: selectionState.lastSelectedPath,
         toggleFileSelection: toggleFileSelection,
+        toggleFolderSelection: toggleFolderSelection,
         toggleSelectionMode: toggleSelectionMode,
         showDeleteTagDialog: showDeleteTagDialog,
         showAddTagToFileDialog: showAddTagToFileDialog,
@@ -119,6 +126,7 @@ class SearchFilterResultsView extends StatelessWidget {
         onLoadMore: () {
           context.read<FolderListBloc>().add(const LoadMoreSearchResults());
         },
+        onZoomLevelChanged: onZoomLevelChanged,
       );
     } else {
       return _buildNoSearchResults(context);
@@ -239,11 +247,13 @@ class SearchFilterResultsView extends StatelessWidget {
                       folderListState.filteredFiles.whereType<File>().toList(),
                   folders: const [], // No folders in filtered view
                   state: folderListState,
-                  isSelectionMode: selectionState.isSelectionMode,
+                  isSelectionMode:
+                      selectionState.isSelectionMode && !isDesktopPlatform,
                   isGridView: folderListState.viewMode == ViewMode.grid ||
                       folderListState.viewMode == ViewMode.gridPreview,
                   selectedFiles: selectionState.selectedFilePaths.toList(),
                   toggleFileSelection: toggleFileSelection,
+                  toggleFolderSelection: toggleFolderSelection,
                   toggleSelectionMode: toggleSelectionMode,
                   showDeleteTagDialog: showDeleteTagDialog,
                   showAddTagToFileDialog: showAddTagToFileDialog,

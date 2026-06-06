@@ -46,7 +46,10 @@ import 'dev/dev_overlay.dart';
 // Permission explainer is pushed from TabMainScreen; no direct import needed here
 
 // Global access to test the video thumbnail screen (for development)
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+// ignore: prefer_final_top_level_variables — must be reassignable in E2E to
+// avoid "Duplicate GlobalKey" when runCbFileApp() calls runApp() multiple times
+// in the same process (each testWidgets block re-enters runCbFileApp).
+GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // Error patterns to suppress (Flutter engine-level noise that doesn't affect functionality)
 const List<String> _debugLogSuppressList = <String>[
@@ -154,6 +157,15 @@ Future<void> runCbFileApp() async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('theme_onboarding_completed_v1', true);
     } catch (_) {}
+
+    // Reset the global navigatorKey so the new runApp() call gets a fresh key.
+    // The top-level navigatorKey is a process-wide singleton. When runApp() is
+    // called again in the next testWidgets block, Flutter sees the same
+    // GlobalKey<NavigatorState> instance being attached to a brand-new widget
+    // tree, which triggers "Duplicate GlobalKey detected in widget tree" and
+    // corrupts the Provider scope (ThemeProvider not found). Creating a new key
+    // here ensures each test gets a clean navigator with no stale state.
+    navigatorKey = GlobalKey<NavigatorState>();
   }
   final env = Platform.environment;
   final isDesktopPlatform =

@@ -35,6 +35,7 @@ import '../../streaming/stream_speed_indicator.dart';
 import '../../streaming/buffer_info_widget.dart';
 import '../../../utils/route.dart';
 import '../../../../config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../../tab_manager/core/tab_manager.dart';
 import 'video_player_advanced_menu.dart';
 import 'video_player_control_buttons.dart';
@@ -76,7 +77,7 @@ class VideoPlayer extends StatefulWidget {
   final VoidCallback? onNextVideo;
   final VoidCallback? onPreviousVideo;
   final VoidCallback? onClose;
-  final VoidCallback? onControlVisibilityChanged;
+  final ValueChanged<bool>? onControlVisibilityChanged;
   final VoidCallback? onFullScreenChanged;
   final VoidCallback? onInitialized;
   final Function(String folderPath, String highlightedFileName)? onOpenFolder;
@@ -139,7 +140,7 @@ class VideoPlayer extends StatefulWidget {
     Function(String)? onError,
     VoidCallback? onNextVideo,
     VoidCallback? onPreviousVideo,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     Function(String folderPath, String highlightedFileName)? onOpenFolder,
@@ -188,7 +189,7 @@ class VideoPlayer extends StatefulWidget {
     Function(Map<String, dynamic>)? onVideoInitialized,
     Function(String)? onError,
     VoidCallback? onClose,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     bool showStreamingSpeed = false,
@@ -231,7 +232,7 @@ class VideoPlayer extends StatefulWidget {
     Function(Map<String, dynamic>)? onVideoInitialized,
     Function(String)? onError,
     VoidCallback? onClose,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     bool showStreamingSpeed = false,
@@ -274,7 +275,7 @@ class VideoPlayer extends StatefulWidget {
     Function(Map<String, dynamic>)? onVideoInitialized,
     Function(String)? onError,
     VoidCallback? onClose,
-    VoidCallback? onControlVisibilityChanged,
+    ValueChanged<bool>? onControlVisibilityChanged,
     VoidCallback? onFullScreenChanged,
     VoidCallback? onInitialized,
     bool showStreamingSpeed = false,
@@ -350,6 +351,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   final bool _showSpeedIndicator = false;
   bool _useFlutterVlc = false;
 
+  // On Windows, media_kit's hardware (D3D11) decoding can fail on some
+  // GPUs/drivers or under GPU-memory pressure (e.g. "Failed to create D3D11
+  // Device", D3DERR_NOTAVAILABLE). When that happens we transparently retry
+  // once with software decoding instead of showing a fatal error. This flag
+  // guards against retrying repeatedly.
+  bool _hwDecodeFallbackAttempted = false;
+
   @override
   bool get _useVlcControls => _useFlutterVlc && _vlcController != null;
   @override
@@ -401,7 +409,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   String _selectedCodec = 'auto'; // auto, h264, h265, vp9, av1
   @override
-  bool _hardwareAcceleration = true;
+  // On Windows, media_kit's hardware (D3D11) path can fail to create a device
+  // ("Failed to create D3D11 Device", E_OUTOFMEMORY) on some GPUs/drivers or
+  // under GPU-memory pressure and take down the whole engine ("Lost connection
+  // to device"). Default to software decoding on Windows to avoid that crash,
+  // matching the desktop PiP windows. Users can still enable it in settings.
+  bool _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
   @override
   String _videoDecoder = 'auto'; // auto, software, hardware
   @override
@@ -554,9 +567,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       if (mounted) {
         setState(() => _isPictureInPicture = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã bật PiP overlay trong ứng dụng')),
-        );
+        final l10n = AppLocalizations.of(context)!;
+        AppToast.success(context, l10n.pipOverlayEnabled);
       }
     }
   }
@@ -697,6 +709,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         oldWidget.fileStream != widget.fileStream;
   }
 
+  /// Builds the [VideoControllerConfiguration] for the main media_kit player.
+  ///
+  /// When hardware acceleration is disabled we also force software video
+  /// decoding via `hwdec: 'no'`. The `enableHardwareAcceleration` flag only
+  /// controls the rendering/output path; without `hwdec: 'no'` libmpv would
+  /// still attempt a hardware (D3D11VA) decoder, which is exactly what crashes
+  /// with E_OUTOFMEMORY / "Lost connection to device" on the affected Windows
+  /// GPUs/drivers.
+  @override
+  VideoControllerConfiguration _buildVideoControllerConfig() {
+    return VideoControllerConfiguration(
+      enableHardwareAcceleration: _hardwareAcceleration,
+      hwdec: _hardwareAcceleration ? null : 'no',
+    );
+  }
+
   Future<void> _initializePlayer() async {
     try {
       setState(() {
@@ -704,6 +732,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         _hasError = false;
         _errorMessage = '';
       });
+
+      // Fresh initialization: allow a software-decoding fallback attempt again
+      // for this media source.
+      _hwDecodeFallbackAttempted = false;
 
       _initializationTimeout = Timer(const Duration(seconds: 30), () {
         if (_isLoading && mounted) {
@@ -770,9 +802,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           );
           _videoController = VideoController(
             _player!,
-            configuration: VideoControllerConfiguration(
-              enableHardwareAcceleration: _hardwareAcceleration,
-            ),
+            configuration: _buildVideoControllerConfig(),
           );
           _setupPlayerEventListeners(userPreferences);
         }
@@ -868,6 +898,31 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     // Track errors
     _player!.stream.error.listen((error) {
       debugPrint('Player error: $error');
+
+      // Hardware (D3D11/Direct3D) decoding can fail on some Windows
+      // GPUs/drivers or under GPU-memory pressure. We do NOT attempt to
+      // recreate the VideoController inline here: that would trigger another
+      // D3D11 device creation against an already-failing GPU/driver and can
+      // tear down the entire Flutter engine ("Lost connection to device").
+      //
+      // Instead, persist software decoding for next time and surface a clear
+      // error so the user just needs to reopen the video.
+      if (_isHardwareDecodeError(error)) {
+        _persistSoftwareDecodingPreference();
+        if (mounted && !_hasError) {
+          setState(() {
+            _hasError = true;
+            _errorMessage =
+                'Video card ran out of memory while decoding this video. '
+                'Hardware acceleration has been disabled — please reopen the '
+                'video to retry with software decoding.\n\n'
+                'Original error: $error';
+          });
+          widget.onError?.call(_errorMessage);
+        }
+        return;
+      }
+
       if (mounted && !_hasError) {
         setState(() {
           _hasError = true;
@@ -876,6 +931,46 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         widget.onError?.call(_errorMessage);
       }
     });
+  }
+
+  /// Returns true if [error] looks like a hardware/GPU decoding failure that
+  /// could be resolved by falling back to software decoding.
+  bool _isHardwareDecodeError(String error) {
+    final lower = error.toLowerCase();
+    return lower.contains('d3d11') ||
+        lower.contains('direct3d') ||
+        lower.contains('d3derr') ||
+        lower.contains('0x8007000e') || // E_OUTOFMEMORY
+        lower.contains('0x8876086a') || // D3DERR_NOTAVAILABLE
+        lower.contains('hardware') ||
+        lower.contains('hwdec') ||
+        lower.contains('gpu');
+  }
+
+  /// Persists `hardware_acceleration=false` and `video_decoder=software` so the
+  /// next playback session on this machine skips the failing hardware path.
+  /// Does not touch the live player/controller — see notes in the error
+  /// listener above for why we avoid creating new GPU resources here.
+  void _persistSoftwareDecodingPreference() {
+    if (_hwDecodeFallbackAttempted) return;
+    _hwDecodeFallbackAttempted = true;
+    debugPrint(
+        'VideoPlayer: persisting software decoding preference after HW failure');
+    () async {
+      try {
+        final prefs = UserPreferences.instance;
+        await prefs.init();
+        await prefs.setVideoPlayerBool('hardware_acceleration', false);
+        await prefs.setVideoPlayerString('video_decoder', 'software');
+        // Update in-memory state so a manual settings reopen reflects reality.
+        if (mounted) {
+          _hardwareAcceleration = false;
+          _videoDecoder = 'software';
+        }
+      } catch (e) {
+        debugPrint('VideoPlayer: failed to persist software decoding pref: $e');
+      }
+    }();
   }
 
   Future<void> _openMediaSource() async {
@@ -2112,7 +2207,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _showControls = true;
     });
     _startHideControlsTimer();
-    widget.onControlVisibilityChanged?.call();
+    widget.onControlVisibilityChanged?.call(true);
   }
 
   bool _isCurrentlyPlaying() {
@@ -2140,7 +2235,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         setState(() {
           _showControls = false;
         });
-        widget.onControlVisibilityChanged?.call();
+        widget.onControlVisibilityChanged?.call(false);
       }
     });
   }
@@ -3414,13 +3509,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           debugPrint(
               'Screenshot rejected: File too small (${screenshotBytes.length} bytes - likely black/empty image)');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                    'Capture failed: Image appears to be empty. Try again.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
+            AppToast.error(context, localizations.screenshotFailed);
           }
           return;
         }
@@ -3516,51 +3605,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           // Cleanup: Delete old black/small screenshot files that are < 1KB
           _cleanupOldBlackScreenshots();
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsLight.checkCircle,
-                        color: theme.colorScheme.primary,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        localizations.screenshotSaved,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    filePath,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-              duration: const Duration(seconds: 5),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              action: SnackBarAction(
-                label: 'Xem ảnh',
-                textColor: theme.colorScheme.primary,
-                onPressed: () => _openScreenshotImage(filePath),
-              ),
-            ),
+          AppToast.show(
+            context,
+            '${localizations.screenshotSaved}\n$filePath',
+            icon: PhosphorIconsLight.checkCircle,
+            accentColor: theme.colorScheme.primary,
+            duration: const Duration(seconds: 5),
+            actionLabel: localizations.viewImage,
+            onAction: () => _openScreenshotImage(filePath),
           );
         }
       } else {
@@ -3569,31 +3621,20 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         if (mounted) {
           if (_useFlutterVlc) {
             // VLC player doesn't support screenshot on Android
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Chụp ảnh màn hình không khả dụng với VLC player.\nVui lòng chuyển sang Media Kit player trong cài đặt.',
-                ),
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'Đóng',
-                  onPressed: () {},
-                ),
-              ),
+            AppToast.warning(
+              context,
+              localizations.screenshotNotAvailableVlcMessage,
+              duration: const Duration(seconds: 5),
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(localizations.screenshotFailed)),
-            );
+            AppToast.error(context, localizations.screenshotFailed);
           }
         }
       }
     } catch (e) {
       debugPrint('Error taking screenshot: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(localizations.screenshotFailed)),
-        );
+        AppToast.error(context, localizations.screenshotFailed);
       }
     } finally {
       // Resume video if it was playing before screenshot
@@ -3679,11 +3720,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       if (!exists) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(localizations.screenshotFileNotFound),
-              duration: const Duration(seconds: 3),
-            ),
+          AppToast.error(
+            context,
+            localizations.screenshotFileNotFound,
+            duration: const Duration(seconds: 3),
           );
         }
         return;
@@ -3697,11 +3737,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             (_vlcController?.value.isPlaying == true);
         try {
           await _suspendVideoForRoutePush();
-          if (mounted) {
-            try {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            } catch (_) {}
-          }
 
           // Load image bytes before opening viewer
           debugPrint('📂 Loading screenshot from: $filePath');
@@ -3873,11 +3908,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         } catch (e) {
           debugPrint('Launch file URI failed: $e');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(localizations.screenshotCannotOpenTab),
-                duration: const Duration(seconds: 3),
-              ),
+            AppToast.error(
+              context,
+              localizations.screenshotCannotOpenTab,
+              duration: const Duration(seconds: 3),
             );
           }
         }
@@ -3890,12 +3924,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       debugPrint(st.toString());
       debugPrint('========== END ERROR ==========');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                '${localizations.screenshotErrorOpeningFolder}: ${e.toString()}'),
-            duration: const Duration(seconds: 3),
-          ),
+        AppToast.error(
+          context,
+          '${localizations.screenshotErrorOpeningFolder}: ${e.toString()}',
+          duration: const Duration(seconds: 3),
         );
       }
     }
@@ -3999,27 +4031,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             debugPrint('PiP entry failed');
             if (mounted) {
               setState(() => _isAndroidPip = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Không thể bật PiP trên Android')),
-              );
+              final l10n = AppLocalizations.of(context)!;
+              AppToast.error(context, l10n.pipAndroidEnableFailed);
             }
           }
         } catch (e) {
           debugPrint('PiP method call error: $e');
           if (mounted) {
             setState(() => _isAndroidPip = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Lỗi PiP: $e')),
-            );
+            final l10n = AppLocalizations.of(context)!;
+            AppToast.error(context, l10n.pipError(e.toString()));
           }
         }
       } catch (e) {
         debugPrint('PIP error: $e');
         if (mounted) {
           setState(() => _isAndroidPip = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi PiP: $e')),
-          );
+          final l10n = AppLocalizations.of(context)!;
+          AppToast.error(context, l10n.pipError(e.toString()));
         }
       }
       return;
@@ -4067,9 +4096,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       if (sourceType == null || source == null || source.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không có nguồn video để mở PiP')),
-          );
+          final l10n = AppLocalizations.of(context)!;
+          AppToast.warning(context, l10n.pipNoSource);
         }
         return;
       }
@@ -4105,9 +4133,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               } catch (_) {}
               if (mounted) {
                 setState(() => _isPictureInPicture = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã mở PiP ở cửa sổ riêng')),
-                );
+                final l10n = AppLocalizations.of(context)!;
+                AppToast.success(context, l10n.pipOpenedInSeparateWindow);
               }
             } else {
               // External failed: close IPC and fallback to overlay
@@ -4146,11 +4173,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Other platforms: not implemented yet
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PiP chưa hỗ trợ trên nền tảng này'),
-        ),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.info(context, l10n.pipNotSupportedOnPlatform);
     }
   }
 
@@ -4426,9 +4450,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         try {
           _videoController = VideoController(
             _player!,
-            configuration: VideoControllerConfiguration(
-              enableHardwareAcceleration: _hardwareAcceleration,
-            ),
+            configuration: _buildVideoControllerConfig(),
           );
           debugPrint('Media Kit VideoController restored after route pop');
           if (mounted) {
@@ -4459,9 +4481,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       try {
         _videoController = VideoController(
           _player!,
-          configuration: VideoControllerConfiguration(
-            enableHardwareAcceleration: _hardwareAcceleration,
-          ),
+          configuration: _buildVideoControllerConfig(),
         );
       } catch (_) {}
     }

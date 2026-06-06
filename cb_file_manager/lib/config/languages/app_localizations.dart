@@ -81,6 +81,8 @@ abstract class AppLocalizations {
   String get viewModeGrid;
   String get viewModeDetails;
   String get viewModeGridPreview;
+  String get viewModeColumns;
+  String get viewModeTree;
 
   // Preview pane
   String get previewPaneTitle;
@@ -91,11 +93,19 @@ abstract class AppLocalizations {
   String get hidePreview;
 
   // Column names
+  String get columnName;
   String get columnSize;
   String get columnType;
   String get columnDateModified;
   String get columnDateCreated;
   String get columnAttributes;
+  String get columnDateAccessed;
+  String get columnExtension;
+  String get columnPath;
+  String get columnTags;
+  String get columnDimensions;
+  String get columnDuration;
+  String get columnItemCount;
 
   // Column descriptions
   String get columnSizeDescription;
@@ -103,9 +113,24 @@ abstract class AppLocalizations {
   String get columnDateModifiedDescription;
   String get columnDateCreatedDescription;
   String get columnAttributesDescription;
+  String get columnDateAccessedDescription;
+  String get columnExtensionDescription;
+  String get columnPathDescription;
+  String get columnTagsDescription;
+  String get columnDimensionsDescription;
+  String get columnDurationDescription;
+  String get columnItemCountDescription;
 
   // Column visibility dialog
   String get columnVisibilityInstructions;
+
+  // List field visibility
+  String get listFieldVisibilityTitle;
+  String get listFieldVisibilityInstructions;
+
+  // Metadata format strings
+  String dimensionsFormat(int width, int height);
+  String itemCountFormat(int count);
 
   // Grid size dialog
   String gridSizeLabel(int count);
@@ -113,6 +138,7 @@ abstract class AppLocalizations {
 
   // More options menu
   String get selectMultipleFiles;
+  String get selectMultipleTags;
   String get viewImageGallery;
   String get viewVideoGallery;
 
@@ -238,6 +264,8 @@ abstract class AppLocalizations {
   String get fileDeleteSuccess;
   String get folderDeleteSuccess;
   String get operationFailed;
+  String get failedToCreateAlbum;
+  String get failedToUpdateAlbum;
 
   // Tags
   String get tags;
@@ -281,6 +309,7 @@ abstract class AppLocalizations {
   String get sortByPopular;
   String get listViewMode;
   String get gridViewMode;
+  String get treeViewMode;
   String get previousPage;
   String get nextPage;
   String get page;
@@ -312,11 +341,21 @@ abstract class AppLocalizations {
   String get errorCreatingTag;
   String get tagsSavedSuccessfully;
   String get selectTagToRemove;
+  String get selectFilesToRemoveTags;
   String get doubleClickToRename;
   String get openingFolder;
   String get folderNotFound;
   String get refreshTags;
   String tagsRefreshed(int count);
+  String get tagManagementInfoTitle;
+  String get tagManagementInfoDescription;
+  String removeTagsFromFilesTitle(int count);
+  String get loadingTags;
+  String get noCommonTagsAcrossSelectedFiles;
+  String removeTagsSuccess(int removedTagCount, int fileCount);
+  String removeTagsError(String error);
+  String batchTagProcessingError(String error);
+  String searchError(String error);
 
   // Sorting
   String get sort;
@@ -324,6 +363,8 @@ abstract class AppLocalizations {
   String get sortByPopularity;
   String get sortByRecent;
   String get sortBySize;
+  String get viewModeFeatureComingSoon;
+  String get cannotCreateFileInThisLocation;
 
   // Bulk Selection
   String get bulkSelect;
@@ -402,6 +443,10 @@ abstract class AppLocalizations {
   String get syncFromCloud;
   String get cloudSyncEnabled;
   String get cloudSyncDisabled;
+  String get syncToCloudSuccess;
+  String get syncToCloudFailed;
+  String get syncFromCloudSuccess;
+  String get syncFromCloudFailed;
   String get enableDatabaseForCloud;
 
   // Database statistics
@@ -675,10 +720,25 @@ abstract class AppLocalizations {
   String get exitApplicationTitle;
   String get exitApplicationConfirm;
   String itemsSelected(int count);
+  String itemsCount(int count);
   String get noActiveTab;
   String get masonryLayoutName;
   String get undo;
   String errorWithMessage(String message);
+  String get referencedFile;
+  String referencedFiles(int count);
+  String pathsCopied(int count);
+  String get moveToTrashTitle;
+  String get imageMovedToTrash;
+  String get failedToMoveImageToTrash;
+  String failedToMoveImageToTrashWithError(String error);
+  String get copiedPathToClipboard;
+  String get unableToOpenWithExternalApp;
+  String failedToDisplayImageInformation(String error);
+  String removedFromAlbum(int count);
+  String get addingFilesInBackground;
+  String addedFilesProgress(int added, int total);
+  String get filesAddedSuccessfully;
 
   // File picker dialogs
   String get chooseBackupLocation;
@@ -817,6 +877,11 @@ abstract class AppLocalizations {
   String get showFileTagsToggleDescription;
   String get rememberTabWorkspace;
   String get rememberTabWorkspaceDescription;
+  String get tabInactiveThreshold;
+  String get tabInactiveThresholdDescription;
+  String get tabInactiveThresholdDisabled;
+  String get tabInactiveThresholdMinutesValue;
+  String get tabInactiveThresholdHoursValue;
   String get cacheManagement;
   String get cacheManagementDescription;
   String get cacheFolder;
@@ -985,7 +1050,19 @@ abstract class AppLocalizations {
   String get closeAllTabs;
   String get activeTab;
   String get closeTab;
+  String get closeOtherTabs;
+  String get markTabInactive;
   String get addNewTab;
+
+  /// Section 12: Refocus loading hint shown while an inactive tab is
+  /// being restored after the user clicks back into it.
+  String get restoringTab;
+
+  /// Section 13: Always-active tab pinning (right-click menu entries
+  /// + tab indicator tooltip).
+  String get keepTabAlwaysActive;
+  String get allowTabAutoSuspend;
+  String get tabAlwaysActiveTooltip;
 
   // Desktop windows (tabbed browsing)
   String get newWindow;
@@ -1026,6 +1103,12 @@ abstract class AppLocalizations {
   String get screenshotCannotOpenTab;
   String get screenshotErrorOpeningFolder;
   String get closeAction;
+  String get pipOverlayEnabled;
+  String get pipAndroidEnableFailed;
+  String pipError(String error);
+  String get pipNoSource;
+  String get pipOpenedInSeparateWindow;
+  String get pipNotSupportedOnPlatform;
 
   // Video library
   String get videoLibrary;
@@ -1081,6 +1164,22 @@ abstract class AppLocalizations {
   String get folderNameLabel;
   String get fileNameLabel;
   String errorCreatingFile(String error);
+  String get noFileSelectedForBenchmarking;
+  String benchmarkError(String error);
+  String benchmarkFailed(String error);
+  String get saveTagToLocalDatabaseFailed;
+  String saveTagFailed(String error);
+  String debugTagsSeeded(int savedCount, int requestedCount);
+  String debugTagsSeedFailed(String error);
+  String get debugTagsCleared;
+  String debugTagsClearFailed(String error);
+  String addFolderToAlbumFailed(String error);
+  String addFilesToAlbumFailed(String error);
+  String loadRulesFailed(String error);
+  String openTerminalFailed(String error);
+  String startCleanupFailed(String error);
+  String startFormatFailed(String error);
+  String foundResultsWithTag(int count, String tag);
 
   // AI Agent
   String get aiSearchAgent;
@@ -1165,6 +1264,26 @@ abstract class AppLocalizations {
   String get conversations;
   String get deleteConversation;
   String get noConversations;
+
+  // CB Agent rebrand
+  String get cbAgent;
+  String get cbAgentTitle;
+  String get cbAgentSubtitle;
+
+  // Disk Cleaner (CB Agent skill)
+  String get cbAgentCleanerTitle;
+  String get diskCleanerNotAvailable;
+  String get diskCleanerScanTitle;
+  String get diskCleanerScanRunning;
+  String get diskCleanerScanDone;
+  String get diskCleanerCleanTitle;
+  String get diskCleanerCleanDone;
+  String get diskCleanerAskAgent;
+  String get diskCleanerMoveToRecycleBin;
+  String get diskCleanerPermanentDelete;
+  String get diskCleanerSelectCategories;
+  String get diskCleanerSelectDrives;
+  String get diskCleanerScanAgain;
 
   // AI thinking / loading indicators
   String get aiThinking0;

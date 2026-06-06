@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -21,6 +22,8 @@ import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/widgets/miller_columns_view.dart';
+import 'package:cb_file_manager/ui/widgets/file_tree_view.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
@@ -54,6 +57,80 @@ class FileListViewBuilder {
     return factors[hash.abs() % factors.length];
   }
 
+  static List<String> _dragPayloadFor(
+    String path,
+    SelectionState selectionState,
+  ) {
+    if (selectionState.isPathSelected(path) &&
+        selectionState.allSelectedPaths.isNotEmpty) {
+      return selectionState.allSelectedPaths.toSet().toList(growable: false);
+    }
+    return <String>[path];
+  }
+
+  static Widget _wrapFileDragDrop({
+    required Widget child,
+    required bool isDesktopPlatform,
+    required bool isFolder,
+    required String path,
+    required SelectionState selectionState,
+    ValueChanged<List<String>>? onStartFileDrag,
+    Future<void> Function(List<String> sources, String destinationFolder)?
+        onMoveItemsToFolder,
+  }) {
+    if (!isDesktopPlatform) return child;
+
+    final payload = _dragPayloadFor(path, selectionState);
+    Widget wrapped = Draggable<List<String>>(
+      data: payload,
+      maxSimultaneousDrags: 1,
+      feedback: Material(
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Text(
+              payload.length == 1
+                  ? p.basename(payload.first)
+                  : '${payload.length} items',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.55, child: child),
+      onDragStarted: () => onStartFileDrag?.call(payload),
+      child: child,
+    );
+
+    if (!isFolder || onMoveItemsToFolder == null) return wrapped;
+
+    return DragTarget<List<String>>(
+      onWillAcceptWithDetails: (details) =>
+          details.data.isNotEmpty && !details.data.contains(path),
+      onAcceptWithDetails: (details) => onMoveItemsToFolder(details.data, path),
+      builder: (context, candidateData, rejectedData) {
+        if (candidateData.isEmpty) return wrapped;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: wrapped,
+        );
+      },
+    );
+  }
+
   /// Build the appropriate view based on the current view mode
   /// If [searchResults] is provided, it will be used instead of state.files and state.folders
   static Widget build({
@@ -71,6 +148,8 @@ class FileListViewBuilder {
     required bool showFileTags,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
+    Future<void> Function(BuildContext, File)? onDeleteFile,
+    Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
     required VoidCallback toggleSelectionMode,
     required ColumnVisibility columnVisibility,
     required Function(BuildContext, Offset) showContextMenu,
@@ -80,9 +159,15 @@ class FileListViewBuilder {
     required ValueChanged<double> onPreviewPaneWidthChanged,
     required ValueChanged<double> onPreviewPaneWidthCommitted,
     required VoidCallback onPreviewPaneToggled,
+    ScrollController? scrollController,
+    GlobalKey Function(String path)? itemKeyForPath,
     String? tabId,
     bool isMasonryLayout = false,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
+    ValueChanged<double?>? onGridItemMainAxisExtentChanged,
+    ValueChanged<List<String>>? onStartFileDrag,
+    Future<void> Function(List<String> sources, String destinationFolder)?
+        onMoveItemsToFolder,
     List<FileSystemEntity>? searchResults,
   }) {
     // Apply frame timing optimizations before heavy list/grid operations
@@ -123,6 +208,8 @@ class FileListViewBuilder {
         toggleSelectionMode: toggleSelectionMode,
         showDeleteTagDialog: showDeleteTagDialog,
         showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        onDeleteFiles: onDeleteFiles,
         isPreviewPaneVisible: isPreviewPaneVisible,
         previewPaneWidthListenable: previewPaneWidthListenable,
         onZoomLevelChanged: onZoomLevelChanged,
@@ -130,6 +217,11 @@ class FileListViewBuilder {
         onPreviewPaneWidthCommitted: onPreviewPaneWidthCommitted,
         onPreviewPaneToggled: onPreviewPaneToggled,
         onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+        onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+        onStartFileDrag: onStartFileDrag,
+        onMoveItemsToFolder: onMoveItemsToFolder,
+        scrollController: scrollController,
+        itemKeyForPath: itemKeyForPath,
       );
     }
 
@@ -149,8 +241,38 @@ class FileListViewBuilder {
         showContextMenu: showContextMenu,
         toggleSelectionMode: toggleSelectionMode,
         onZoomLevelChanged: onZoomLevelChanged,
+        showDeleteTagDialog: showDeleteTagDialog,
+        showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        onDeleteFiles: onDeleteFiles,
         isMasonryLayout: effectiveMasonryLayout,
         onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+        onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+        onStartFileDrag: onStartFileDrag,
+        onMoveItemsToFolder: onMoveItemsToFolder,
+        scrollController: scrollController,
+        itemKeyForPath: itemKeyForPath,
+      );
+    } else if (displayState.viewMode == ViewMode.columns && isDesktopPlatform) {
+      return MillerColumnsView(
+        state: displayState,
+        selectionState: selectionState,
+        isDesktopPlatform: isDesktopPlatform,
+        onNavigateToPath: onNavigateToPath,
+        onFileTap: onFileTap,
+        toggleFileSelection: toggleFileSelection,
+        toggleFolderSelection: toggleFolderSelection,
+        clearSelection: clearSelection,
+        dragSelectionController: dragSelectionController,
+        showFileTags: showFileTags,
+        showDeleteTagDialog: showDeleteTagDialog,
+        showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        onDeleteFiles: onDeleteFiles,
+        toggleSelectionMode: toggleSelectionMode,
+        showContextMenu: showContextMenu,
+        scrollController: scrollController,
+        itemKeyForPath: itemKeyForPath,
       );
     } else if (displayState.viewMode == ViewMode.details) {
       return _buildDetailsView(
@@ -164,9 +286,27 @@ class FileListViewBuilder {
         dragSelectionController: dragSelectionController,
         showDeleteTagDialog: showDeleteTagDialog,
         showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        onDeleteFiles: onDeleteFiles,
         toggleSelectionMode: toggleSelectionMode,
         columnVisibility: columnVisibility,
         showFileTags: showFileTags,
+        showContextMenu: showContextMenu,
+        scrollController: scrollController,
+        itemKeyForPath: itemKeyForPath,
+        onStartFileDrag: onStartFileDrag,
+        onMoveItemsToFolder: onMoveItemsToFolder,
+      );
+    } else if (displayState.viewMode == ViewMode.tree) {
+      return FileTreeView(
+        state: displayState,
+        selectionState: selectionState,
+        isDesktopPlatform: isDesktopPlatform,
+        onNavigateToPath: onNavigateToPath,
+        onFileTap: onFileTap,
+        toggleFileSelection: toggleFileSelection,
+        toggleFolderSelection: toggleFolderSelection,
+        clearSelection: clearSelection,
         showContextMenu: showContextMenu,
       );
     } else {
@@ -181,6 +321,15 @@ class FileListViewBuilder {
         clearSelection: clearSelection,
         dragSelectionController: dragSelectionController,
         showContextMenu: showContextMenu,
+        showFileTags: showFileTags,
+        showDeleteTagDialog: showDeleteTagDialog,
+        showAddTagToFileDialog: showAddTagToFileDialog,
+        onDeleteFile: onDeleteFile,
+        onDeleteFiles: onDeleteFiles,
+        onStartFileDrag: onStartFileDrag,
+        onMoveItemsToFolder: onMoveItemsToFolder,
+        scrollController: scrollController,
+        itemKeyForPath: itemKeyForPath,
       );
     }
   }
@@ -202,9 +351,21 @@ class FileListViewBuilder {
     required Function(BuildContext, Offset) showContextMenu,
     required VoidCallback toggleSelectionMode,
     required ValueChanged<int> onZoomLevelChanged,
+    required Function(BuildContext, String, List<String>) showDeleteTagDialog,
+    required Function(BuildContext, String) showAddTagToFileDialog,
+    Future<void> Function(BuildContext, File)? onDeleteFile,
+    Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
     required bool isMasonryLayout,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
+    ValueChanged<double?>? onGridItemMainAxisExtentChanged,
+    ValueChanged<List<String>>? onStartFileDrag,
+    Future<void> Function(List<String> sources, String destinationFolder)?
+        onMoveItemsToFolder,
+    ScrollController? scrollController,
+    GlobalKey Function(String path)? itemKeyForPath,
   }) {
+    final itemSelectionMode =
+        selectionState.isSelectionMode && !isDesktopPlatform;
     return Stack(
       key: dragSelectionController.stackKey,
       clipBehavior: Clip.none,
@@ -260,12 +421,11 @@ class FileListViewBuilder {
                       }
                     : null,
                 behavior: HitTestBehavior.translucent,
-                // Ctrl+scroll → zoom: use the canonical CtrlScrollZoom.
+                // Ctrl+scroll is handled by an outer CtrlScrollZoom wrapper
+                // (the unified view-spectrum handler). Disabled here to avoid
+                // two Listeners competing for the same pointer-signal event.
                 child: CtrlScrollZoom(
-                  onDelta: (state.viewMode == ViewMode.grid ||
-                          state.viewMode == ViewMode.gridPreview)
-                      ? (delta) => onZoomLevelChanged(delta)
-                      : null,
+                  onDelta: null,
                   child: RepaintBoundary(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
@@ -291,6 +451,8 @@ class FileListViewBuilder {
                         );
                         onGridCrossAxisCountChanged?.call(crossAxisCount);
                         final itemHeight = itemWidth / _gridAspectRatio;
+                        onGridItemMainAxisExtentChanged
+                            ?.call(itemHeight + _gridSpacing);
                         final folderIndexByPath = <String, int>{
                           for (var i = 0; i < state.folders.length; i++)
                             state.folders[i].path: i,
@@ -313,102 +475,127 @@ class FileListViewBuilder {
                           final bool isSelected =
                               selectionState.isPathSelected(itemPath);
 
-                          return KeyedSubtree(
-                            key: ValueKey(itemKey),
-                            child: LayoutBuilder(
-                              builder: (BuildContext context,
-                                  BoxConstraints constraints) {
-                                if (isDesktopPlatform) {
-                                  WidgetsBinding.instance
-                                      .addPostFrameCallback((_) {
-                                    try {
-                                      final RenderBox? renderBox = context
-                                          .findRenderObject() as RenderBox?;
-                                      if (renderBox != null &&
-                                          renderBox.hasSize &&
-                                          renderBox.attached) {
-                                        final position = renderBox
-                                            .localToGlobal(Offset.zero);
-                                        dragSelectionController
-                                            .registerItemPosition(
-                                                itemPath,
-                                                Rect.fromLTWH(
-                                                    position.dx,
-                                                    position.dy,
-                                                    renderBox.size.width,
-                                                    renderBox.size.height));
+                          return Container(
+                            key: itemKeyForPath?.call(itemPath),
+                            child: KeyedSubtree(
+                              key: ValueKey(itemKey),
+                              child: LayoutBuilder(
+                                builder: (BuildContext context,
+                                    BoxConstraints constraints) {
+                                  if (isDesktopPlatform) {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      try {
+                                        final RenderBox? renderBox = context
+                                            .findRenderObject() as RenderBox?;
+                                        if (renderBox != null &&
+                                            renderBox.hasSize &&
+                                            renderBox.attached) {
+                                          final position = renderBox
+                                              .localToGlobal(Offset.zero);
+                                          dragSelectionController
+                                              .registerItemPosition(
+                                                  itemPath,
+                                                  Rect.fromLTWH(
+                                                      position.dx,
+                                                      position.dy,
+                                                      renderBox.size.width,
+                                                      renderBox.size.height));
+                                        }
+                                      } catch (e) {
+                                        debugPrint(
+                                            'Layout error in grid view: $e');
                                       }
-                                    } catch (e) {
-                                      debugPrint(
-                                          'Layout error in grid view: $e');
-                                    }
-                                  });
-                                }
+                                    });
+                                  }
 
-                                if (index < state.folders.length) {
-                                  final folder =
-                                      state.folders[index] as Directory;
-                                  return Align(
-                                    alignment: Alignment.topCenter,
-                                    child: SizedBox(
-                                      width: itemWidth,
-                                      height: itemHeight,
-                                      child: RepaintBoundary(
-                                        child: folder_list_components
-                                            .FolderGridItem(
-                                          key: ValueKey(
-                                              'folder-grid-item-${folder.path}'),
-                                          folder: folder,
-                                          onNavigate: onNavigateToPath,
-                                          isSelected: isSelected,
-                                          toggleFolderSelection:
-                                              toggleFolderSelection,
-                                          isDesktopMode: isDesktopPlatform,
-                                          lastSelectedPath:
-                                              selectionState.lastSelectedPath,
-                                          clearSelectionMode: clearSelection,
+                                  if (index < state.folders.length) {
+                                    final folder =
+                                        state.folders[index] as Directory;
+                                    return _wrapFileDragDrop(
+                                      isDesktopPlatform: isDesktopPlatform,
+                                      isFolder: true,
+                                      path: folder.path,
+                                      selectionState: selectionState,
+                                      onStartFileDrag: onStartFileDrag,
+                                      onMoveItemsToFolder: onMoveItemsToFolder,
+                                      child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: SizedBox(
+                                          width: itemWidth,
+                                          height: itemHeight,
+                                          child: RepaintBoundary(
+                                            child: folder_list_components
+                                                .FolderGridItem(
+                                              key: ValueKey(
+                                                  'folder-grid-item-${folder.path}'),
+                                              folder: folder,
+                                              onNavigate: onNavigateToPath,
+                                              isSelected: isSelected,
+                                              toggleFolderSelection:
+                                                  toggleFolderSelection,
+                                              isDesktopMode: isDesktopPlatform,
+                                              lastSelectedPath: selectionState
+                                                  .lastSelectedPath,
+                                              clearSelectionMode:
+                                                  clearSelection,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                } else {
-                                  final file =
-                                      state.files[index - state.folders.length]
-                                          as File;
-                                  final masonryHeight = shouldUseMasonry
-                                      ? itemHeight *
-                                          _masonryHeightFactor(file.path)
-                                      : itemHeight;
-                                  return Align(
-                                    alignment: Alignment.topCenter,
-                                    child: SizedBox(
-                                      width: itemWidth,
-                                      height: masonryHeight,
-                                      child: RepaintBoundary(
-                                        child:
-                                            folder_list_components.FileGridItem(
-                                          key: ValueKey(
-                                              'file-grid-item-${file.path}'),
-                                          file: file,
-                                          state: state,
-                                          isSelectionMode:
-                                              selectionState.isSelectionMode,
-                                          isSelected: isSelected,
-                                          toggleFileSelection:
-                                              toggleFileSelection,
-                                          toggleSelectionMode:
-                                              toggleSelectionMode,
-                                          onFileTap: onFileTap,
-                                          isDesktopMode: isDesktopPlatform,
-                                          lastSelectedPath:
-                                              selectionState.lastSelectedPath,
-                                          showFileTags: showFileTags,
+                                    );
+                                  } else {
+                                    final file = state
+                                            .files[index - state.folders.length]
+                                        as File;
+                                    final masonryHeight = shouldUseMasonry
+                                        ? itemHeight *
+                                            _masonryHeightFactor(file.path)
+                                        : itemHeight;
+                                    return _wrapFileDragDrop(
+                                      isDesktopPlatform: isDesktopPlatform,
+                                      isFolder: false,
+                                      path: file.path,
+                                      selectionState: selectionState,
+                                      onStartFileDrag: onStartFileDrag,
+                                      child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: SizedBox(
+                                          width: itemWidth,
+                                          height: masonryHeight,
+                                          child: RepaintBoundary(
+                                            child: folder_list_components
+                                                .FileGridItem(
+                                              key: ValueKey(
+                                                  'file-grid-item-${file.path}'),
+                                              file: file,
+                                              state: state,
+                                              isSelectionMode:
+                                                  itemSelectionMode,
+                                              isSelected: isSelected,
+                                              toggleFileSelection:
+                                                  toggleFileSelection,
+                                              toggleSelectionMode:
+                                                  toggleSelectionMode,
+                                              onFileTap: onFileTap,
+                                              isDesktopMode: isDesktopPlatform,
+                                              lastSelectedPath: selectionState
+                                                  .lastSelectedPath,
+                                              showDeleteTagDialog:
+                                                  showDeleteTagDialog,
+                                              showAddTagToFileDialog:
+                                                  showAddTagToFileDialog,
+                                              onDeleteFile: onDeleteFile,
+                                              onDeleteFiles: onDeleteFiles,
+                                              showFileTags: showFileTags,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                }
-                              },
+                                    );
+                                  }
+                                },
+                              ),
                             ),
                           );
                         }
@@ -416,6 +603,7 @@ class FileListViewBuilder {
                         if (shouldUseMasonry) {
                           return ScrollVelocityListener(
                             child: MasonryGridView.count(
+                              controller: scrollController,
                               padding: const EdgeInsets.all(8.0),
                               physics: const ClampingScrollPhysics(),
                               cacheExtent: 400,
@@ -431,6 +619,7 @@ class FileListViewBuilder {
 
                         return ScrollVelocityListener(
                           child: GridView.builder(
+                            controller: scrollController,
                             padding: const EdgeInsets.all(8.0),
                             physics: const ClampingScrollPhysics(),
                             // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
@@ -495,11 +684,20 @@ class FileListViewBuilder {
     required TabbedFolderDragSelectionController dragSelectionController,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
+    Future<void> Function(BuildContext, File)? onDeleteFile,
+    Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
     required VoidCallback toggleSelectionMode,
     required ColumnVisibility columnVisibility,
     required bool showFileTags,
     required Function(BuildContext, Offset) showContextMenu,
+    ValueChanged<List<String>>? onStartFileDrag,
+    Future<void> Function(List<String> sources, String destinationFolder)?
+        onMoveItemsToFolder,
+    ScrollController? scrollController,
+    GlobalKey Function(String path)? itemKeyForPath,
   }) {
+    final itemSelectionMode =
+        selectionState.isSelectionMode && !isDesktopPlatform;
     return Stack(
       key: dragSelectionController.stackKey,
       clipBehavior: Clip.none,
@@ -560,19 +758,26 @@ class FileListViewBuilder {
                     files: state.files.whereType<File>().toList(),
                     folders: state.folders.whereType<Directory>().toList(),
                     state: state,
-                    isSelectionMode: selectionState.isSelectionMode,
+                    isSelectionMode: itemSelectionMode,
                     isGridView: false,
                     selectedFiles: selectionState.allSelectedPaths,
                     toggleFileSelection: toggleFileSelection,
                     toggleSelectionMode: toggleSelectionMode,
                     showDeleteTagDialog: showDeleteTagDialog,
                     showAddTagToFileDialog: showAddTagToFileDialog,
+                    onDeleteFile: onDeleteFile,
+                    onDeleteFiles: onDeleteFiles,
                     onFolderTap: onNavigateToPath,
                     onFileTap: onFileTap,
                     isDesktopMode: isDesktopPlatform,
                     lastSelectedPath: selectionState.lastSelectedPath,
                     columnVisibility: columnVisibility,
                     showFileTags: showFileTags,
+                    scrollController: scrollController,
+                    itemKeyForPath: itemKeyForPath,
+                    dragSelectionController: dragSelectionController,
+                    onStartFileDrag: onStartFileDrag,
+                    onMoveItemsToFolder: onMoveItemsToFolder,
                   ),
                 ),
               );
@@ -598,7 +803,19 @@ class FileListViewBuilder {
     required VoidCallback clearSelection,
     required TabbedFolderDragSelectionController dragSelectionController,
     required Function(BuildContext, Offset) showContextMenu,
+    required bool showFileTags,
+    required Function(BuildContext, String, List<String>) showDeleteTagDialog,
+    required Function(BuildContext, String) showAddTagToFileDialog,
+    Future<void> Function(BuildContext, File)? onDeleteFile,
+    Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
+    ValueChanged<List<String>>? onStartFileDrag,
+    Future<void> Function(List<String> sources, String destinationFolder)?
+        onMoveItemsToFolder,
+    ScrollController? scrollController,
+    GlobalKey Function(String path)? itemKeyForPath,
   }) {
+    final itemSelectionMode =
+        selectionState.isSelectionMode && !isDesktopPlatform;
     return Stack(
       key: dragSelectionController.stackKey,
       clipBehavior: Clip.none,
@@ -656,11 +873,14 @@ class FileListViewBuilder {
                 behavior: HitTestBehavior.translucent,
                 child: RepaintBoundary(
                   child: ListView.builder(
+                    controller: scrollController,
                     physics: const ClampingScrollPhysics(),
                     cacheExtent: 800,
                     addAutomaticKeepAlives: true,
                     addRepaintBoundaries: true,
                     addSemanticIndexes: false,
+                    // Extra bottom padding so users can drag-select in empty space below items
+                    padding: const EdgeInsets.only(bottom: 200.0),
                     itemCount: state.folders.length + state.files.length,
                     itemBuilder: (context, index) {
                       final String itemPath = index < state.folders.length
@@ -698,29 +918,38 @@ class FileListViewBuilder {
 
                         if (index < state.folders.length) {
                           final folder = state.folders[index] as Directory;
-                          return KeyedSubtree(
-                            key: ValueKey("folder-${folder.path}"),
-                            child: FluentBackground(
-                              enableBlur: isDesktopPlatform,
-                              blurAmount: 3.0,
-                              opacity: isSelected ? 0.7 : 0.0,
-                              backgroundColor: isSelected
-                                  ? Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer
-                                      .withValues(alpha: 0.6)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16.0),
-                              child: RepaintBoundary(
-                                child: folder_list_components.FolderItem(
-                                  key: ValueKey("folder-item-${folder.path}"),
-                                  folder: folder,
-                                  onTap: onNavigateToPath,
-                                  isSelected: isSelected,
-                                  toggleFolderSelection: toggleFolderSelection,
-                                  isDesktopMode: isDesktopPlatform,
-                                  lastSelectedPath:
-                                      selectionState.lastSelectedPath,
+                          return _wrapFileDragDrop(
+                            isDesktopPlatform: isDesktopPlatform,
+                            isFolder: true,
+                            path: folder.path,
+                            selectionState: selectionState,
+                            onStartFileDrag: onStartFileDrag,
+                            onMoveItemsToFolder: onMoveItemsToFolder,
+                            child: Container(
+                              key: itemKeyForPath?.call(folder.path),
+                              child: KeyedSubtree(
+                                key: ValueKey("folder-${folder.path}"),
+                                child: FluentBackground(
+                                  enableBlur: false,
+                                  blurAmount: 3.0,
+                                  opacity: 0.0,
+                                  backgroundColor: Colors.transparent,
+                                  borderRadius: BorderRadius.zero,
+                                  child: RepaintBoundary(
+                                    child: folder_list_components.FolderItem(
+                                      key: ValueKey(
+                                          "folder-item-${folder.path}"),
+                                      folder: folder,
+                                      onTap: onNavigateToPath,
+                                      isSelected: isSelected,
+                                      toggleFolderSelection:
+                                          toggleFolderSelection,
+                                      isDesktopMode: isDesktopPlatform,
+                                      lastSelectedPath:
+                                          selectionState.lastSelectedPath,
+                                      showItemBackground: false,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -728,36 +957,43 @@ class FileListViewBuilder {
                         } else {
                           final file =
                               state.files[index - state.folders.length] as File;
-                          return KeyedSubtree(
-                            key: ValueKey("file-${file.path}"),
-                            child: FluentBackground(
-                              enableBlur: isDesktopPlatform,
-                              blurAmount: 3.0,
-                              opacity: isSelected ? 0.7 : 0.0,
-                              backgroundColor: isSelected
-                                  ? Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer
-                                      .withValues(alpha: 0.6)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16.0),
-                              child: RepaintBoundary(
-                                child: folder_list_components.FileItem(
-                                  key: ValueKey("file-item-${file.path}"),
-                                  file: file,
-                                  state: state,
-                                  isSelectionMode:
-                                      selectionState.isSelectionMode,
-                                  isSelected: isSelected,
-                                  toggleFileSelection: toggleFileSelection,
-                                  showDeleteTagDialog:
-                                      (context, filePath, tags) {},
-                                  showAddTagToFileDialog:
-                                      (context, filePath) {},
-                                  onFileTap: onFileTap,
-                                  isDesktopMode: isDesktopPlatform,
-                                  lastSelectedPath:
-                                      selectionState.lastSelectedPath,
+                          return _wrapFileDragDrop(
+                            isDesktopPlatform: isDesktopPlatform,
+                            isFolder: false,
+                            path: file.path,
+                            selectionState: selectionState,
+                            onStartFileDrag: onStartFileDrag,
+                            child: Container(
+                              key: itemKeyForPath?.call(file.path),
+                              child: KeyedSubtree(
+                                key: ValueKey("file-${file.path}"),
+                                child: FluentBackground(
+                                  enableBlur: false,
+                                  blurAmount: 3.0,
+                                  opacity: 0.0,
+                                  backgroundColor: Colors.transparent,
+                                  borderRadius: BorderRadius.zero,
+                                  child: RepaintBoundary(
+                                    child: folder_list_components.FileItem(
+                                      key: ValueKey("file-item-${file.path}"),
+                                      file: file,
+                                      state: state,
+                                      isSelectionMode: itemSelectionMode,
+                                      isSelected: isSelected,
+                                      toggleFileSelection: toggleFileSelection,
+                                      showDeleteTagDialog: showDeleteTagDialog,
+                                      showAddTagToFileDialog:
+                                          showAddTagToFileDialog,
+                                      onDeleteFile: onDeleteFile,
+                                      onDeleteFiles: onDeleteFiles,
+                                      onFileTap: onFileTap,
+                                      isDesktopMode: isDesktopPlatform,
+                                      lastSelectedPath:
+                                          selectionState.lastSelectedPath,
+                                      showFileTags: showFileTags,
+                                      showItemBackground: false,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -793,6 +1029,8 @@ class FileListViewBuilder {
     required VoidCallback toggleSelectionMode,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
+    Future<void> Function(BuildContext, File)? onDeleteFile,
+    Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
     required bool isPreviewPaneVisible,
     required ValueListenable<double> previewPaneWidthListenable,
     required ValueChanged<int> onZoomLevelChanged,
@@ -800,6 +1038,12 @@ class FileListViewBuilder {
     required ValueChanged<double> onPreviewPaneWidthCommitted,
     required VoidCallback onPreviewPaneToggled,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
+    ValueChanged<double?>? onGridItemMainAxisExtentChanged,
+    ValueChanged<List<String>>? onStartFileDrag,
+    Future<void> Function(List<String> sources, String destinationFolder)?
+        onMoveItemsToFolder,
+    ScrollController? scrollController,
+    GlobalKey Function(String path)? itemKeyForPath,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -818,8 +1062,17 @@ class FileListViewBuilder {
             showContextMenu: showContextMenu,
             toggleSelectionMode: toggleSelectionMode,
             onZoomLevelChanged: onZoomLevelChanged,
+            showDeleteTagDialog: showDeleteTagDialog,
+            showAddTagToFileDialog: showAddTagToFileDialog,
+            onDeleteFile: onDeleteFile,
+            onDeleteFiles: onDeleteFiles,
             isMasonryLayout: false,
             onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+            onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+            onStartFileDrag: onStartFileDrag,
+            onMoveItemsToFolder: onMoveItemsToFolder,
+            scrollController: scrollController,
+            itemKeyForPath: itemKeyForPath,
           );
         }
 
@@ -847,8 +1100,17 @@ class FileListViewBuilder {
             showContextMenu: showContextMenu,
             toggleSelectionMode: toggleSelectionMode,
             onZoomLevelChanged: onZoomLevelChanged,
+            showDeleteTagDialog: showDeleteTagDialog,
+            showAddTagToFileDialog: showAddTagToFileDialog,
+            onDeleteFile: onDeleteFile,
+            onDeleteFiles: onDeleteFiles,
             isMasonryLayout: false,
             onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+            onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+            onStartFileDrag: onStartFileDrag,
+            onMoveItemsToFolder: onMoveItemsToFolder,
+            scrollController: scrollController,
+            itemKeyForPath: itemKeyForPath,
           );
         }
         final double effectiveMinPreviewWidth =
@@ -867,8 +1129,17 @@ class FileListViewBuilder {
           showContextMenu: showContextMenu,
           toggleSelectionMode: toggleSelectionMode,
           onZoomLevelChanged: onZoomLevelChanged,
+          showDeleteTagDialog: showDeleteTagDialog,
+          showAddTagToFileDialog: showAddTagToFileDialog,
+          onDeleteFile: onDeleteFile,
+          onDeleteFiles: onDeleteFiles,
           isMasonryLayout: false,
           onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+          onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
+          onStartFileDrag: onStartFileDrag,
+          onMoveItemsToFolder: onMoveItemsToFolder,
+          scrollController: scrollController,
+          itemKeyForPath: itemKeyForPath,
         );
 
         return _GridPreviewLayout(

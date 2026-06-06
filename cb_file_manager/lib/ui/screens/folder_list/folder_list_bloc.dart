@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
+import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -97,6 +100,21 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     _operationsBloc.close();
     _tagSearchBloc.close();
     return super.close();
+  }
+
+  /// Pause the underlying directory watcher subscription. Used by the tab
+  /// activity manager when the bloc's tab transitions to inactive so
+  /// background filesystem events don't trigger refresh work for a tab the
+  /// user is not actively using.
+  void pauseDirectoryWatching() {
+    _navigationBloc.pauseWatching();
+  }
+
+  /// Resume the underlying directory watcher subscription. Idempotent.
+  /// The actual filesystem watch handle is re-armed lazily on the next
+  /// `FolderListLoad` / `FolderListRefresh` event.
+  void resumeDirectoryWatching() {
+    _navigationBloc.resumeWatching();
   }
 
   // ── Forwarding handlers ───────────────────────────────────────────
@@ -290,7 +308,11 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   void _onSetSortOption(SetSortOption event, Emitter<FolderListState> emit) {
-    _navigationBloc.add(nav.FileNavigationSetSortOption(event.sortOption));
+    _navigationBloc.add(nav.FileNavigationSetSortOption(
+      event.sortOption,
+      persist: event.persist,
+      folderPath: event.folderPath,
+    ));
   }
 
   // ── External tag change listener ────────────────────────────────
@@ -307,6 +329,8 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onNavStateChanged(FileNavigationState navState) {
     if (isClosed) return;
+    final hasActiveTagSearch = state.currentSearchTag != null;
+
     // ignore: invalid_use_of_visible_for_testing_member
     emit(state.copyWith(
       isLoading: navState.isLoading,
@@ -315,20 +339,39 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       currentPath: navState.currentPath,
       folders: navState.folders,
       files: navState.files,
-      searchResults: navState.searchResults,
-      hasMoreSearchResults: navState.hasMoreSearchResults,
-      isLoadingMoreSearchResults: navState.isLoadingMoreSearchResults,
-      searchResultsTotal: navState.searchResultsTotal,
+      searchResults:
+          hasActiveTagSearch ? state.searchResults : navState.searchResults,
+      hasMoreSearchResults: hasActiveTagSearch
+          ? state.hasMoreSearchResults
+          : navState.hasMoreSearchResults,
+      isLoadingMoreSearchResults: hasActiveTagSearch
+          ? state.isLoadingMoreSearchResults
+          : navState.isLoadingMoreSearchResults,
+      searchResultsTotal: hasActiveTagSearch
+          ? state.searchResultsTotal
+          : navState.searchResultsTotal,
       filteredFiles: navState.filteredFiles,
       currentFilter: navState.currentFilter,
-      currentSearchQuery: navState.currentSearchQuery,
+      currentSearchQuery: hasActiveTagSearch
+          ? state.currentSearchQuery
+          : navState.currentSearchQuery,
       viewMode: navState.viewMode,
       sortOption: navState.sortOption,
       gridZoomLevel: navState.gridZoomLevel,
       fileStatsCache: navState.fileStatsCache,
-      isSearchByName: navState.isSearchByName,
+      isSearchByName:
+          hasActiveTagSearch ? state.isSearchByName : navState.isSearchByName,
       searchRecursive: navState.searchRecursive,
     ));
+
+    // Pre-warm extension icon cache when file listing arrives
+    if (!navState.isLoading && navState.files.isNotEmpty) {
+      final exts = navState.files
+          .map((f) => p.extension(f.path).toLowerCase())
+          .where((ext) => ext.isNotEmpty)
+          .toSet();
+      FileIconHelper.warmExtensionIcons(exts, size: 48);
+    }
   }
 
   void _onOpsStateChanged(FileOperationsState opsState) {
@@ -342,8 +385,18 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onTagStateChanged(TagSearchState tagState) {
     if (isClosed) return;
+    final searchResults = tagState.searchResultPaths
+        .map<FileSystemEntity>((path) => File(path))
+        .toList(growable: false);
+
     // ignore: invalid_use_of_visible_for_testing_member
     emit(state.copyWith(
+      isLoading: tagState.isLoading,
+      error: tagState.error,
+      searchResults: searchResults,
+      searchResultsTotal: tagState.searchResultsTotal,
+      currentSearchTag: tagState.currentSearchTag,
+      isGlobalSearch: tagState.isGlobalSearch,
       fileTags: tagState.fileTags,
       allUniqueTags: tagState.allUniqueTags,
     ));

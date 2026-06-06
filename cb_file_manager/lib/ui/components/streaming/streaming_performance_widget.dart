@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:async';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import '../../../services/network_browsing/optimized_smb_service.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 
 /// Widget to display streaming performance metrics
 class StreamingPerformanceWidget extends StatefulWidget {
@@ -60,11 +62,10 @@ class _StreamingPerformanceWidgetState
   }
 
   Future<void> _runBenchmark() async {
+    final l10n = AppLocalizations.of(context)!;
     if (widget.currentFilePath == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No file selected for benchmarking')),
-        );
+        AppToast.warning(context, l10n.noFileSelectedForBenchmarking);
       }
       return;
     }
@@ -83,9 +84,8 @@ class _StreamingPerformanceWidgetState
         });
 
         if (results['error'] != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Benchmark error: ${results['error']}')),
-          );
+          AppToast.error(
+              context, l10n.benchmarkError(results['error'].toString()));
         }
       }
     } catch (e) {
@@ -93,9 +93,7 @@ class _StreamingPerformanceWidgetState
         setState(() {
           _isBenchmarking = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Benchmark failed: $e')),
-        );
+        AppToast.error(context, l10n.benchmarkFailed(e.toString()));
       }
     }
   }

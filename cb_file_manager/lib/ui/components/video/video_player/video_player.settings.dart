@@ -53,6 +53,7 @@ abstract class _VideoPlayerSettingsHost extends _VideoPlayerVolumeHost {
   // Methods from main state that the mixin delegates to
   void _cancelSleepTimer();
   void _setSleepTimer(Duration duration);
+  VideoControllerConfiguration _buildVideoControllerConfig();
 }
 
 // ── Settings mixin ───────────────────────────────────────────────────────────
@@ -271,10 +272,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                           if (_player != null) {
                             _videoController = VideoController(
                               _player!,
-                              configuration: VideoControllerConfiguration(
-                                enableHardwareAcceleration:
-                                    _hardwareAcceleration,
-                              ),
+                              configuration: _buildVideoControllerConfig(),
                             );
                           }
                         });
@@ -320,10 +318,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                             if (_player != null) {
                               _videoController = VideoController(
                                 _player!,
-                                configuration: VideoControllerConfiguration(
-                                  enableHardwareAcceleration:
-                                      _hardwareAcceleration,
-                                ),
+                                configuration: _buildVideoControllerConfig(),
                               );
                             }
                           });
@@ -532,13 +527,37 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       final prefs = UserPreferences.instance;
       await prefs.init();
 
+      // One-time Windows migration: previous versions defaulted hardware
+      // acceleration ON, which crashes media_kit's D3D11 decoder path on some
+      // Windows GPUs/drivers ("Failed to create D3D11 Device" -> "Lost
+      // connection to device"). Force it OFF once on Windows so existing
+      // users get the safe default. The user can still re-enable it manually.
+      if (!kIsWeb && Platform.isWindows) {
+        final migrated = await prefs.getVideoPlayerBool(
+                'hw_accel_windows_migrated',
+                defaultValue: false) ??
+            false;
+        if (!migrated) {
+          await prefs.setVideoPlayerBool('hardware_acceleration', false);
+          await prefs.setVideoPlayerString('video_decoder', 'software');
+          await prefs.setVideoPlayerBool('hw_accel_windows_migrated', true);
+          debugPrint(
+              'VideoPlayer: applied one-time Windows HW-accel safety migration');
+        }
+      }
+
       _selectedCodec = await prefs.getVideoPlayerString('video_codec',
               defaultValue: 'auto') ??
           'auto';
+      // Default hardware acceleration OFF on Windows: media_kit's D3D11/ANGLE
+      // rendering path can fail to create a device (E_OUTOFMEMORY) on some
+      // GPUs/drivers and crash the engine ("Lost connection to device").
+      // Software decoding avoids that. Mirrors the desktop PiP windows.
+      final hwAccelDefault = kIsWeb ? true : !Platform.isWindows;
       _hardwareAcceleration = await prefs.getVideoPlayerBool(
               'hardware_acceleration',
-              defaultValue: true) ??
-          true;
+              defaultValue: hwAccelDefault) ??
+          hwAccelDefault;
       _videoDecoder = await prefs.getVideoPlayerString('video_decoder',
               defaultValue: 'auto') ??
           'auto';
@@ -575,7 +594,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
   void _resetSettings() {
     setState(() {
       _selectedCodec = 'auto';
-      _hardwareAcceleration = true;
+      _hardwareAcceleration = kIsWeb ? true : !Platform.isWindows;
       _videoDecoder = 'auto';
       _audioDecoder = 'auto';
       _bufferSize = 10;

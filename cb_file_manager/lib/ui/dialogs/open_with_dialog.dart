@@ -5,6 +5,7 @@ import 'package:cb_file_manager/helpers/files/windows_app_icon.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:file_picker/file_picker.dart';
@@ -210,8 +211,7 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                           ),
                           onTap: () async {
                             // Pre-extract context-dependent values before async gap
-                            final scaffoldMessenger =
-                                ScaffoldMessenger.of(context);
+                            final toast = AppToast.capture(context);
                             final navigator = Navigator.of(context);
                             final l10n = AppLocalizations.of(context)!;
 
@@ -221,24 +221,16 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                                   await WindowsAppIcon.setSelfAsDefaultForVideo(
                                       exe);
                               try {
-                                scaffoldMessenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(ok
-                                        ? 'CB File Hub is now the default for video files.'
-                                        : 'Could not set as default.'),
-                                  ),
-                                );
+                                toast.info(ok
+                                    ? 'CB File Hub is now the default for video files.'
+                                    : 'Could not set as default.');
                                 navigator.pop();
                               } catch (_) {}
                             } else if (Platform.isAndroid) {
                               await ExternalAppHelper.openDefaultAppSettings();
                               try {
-                                scaffoldMessenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(l10n
-                                        .setCoolBirdAsDefaultForVideosAndroidHint),
-                                  ),
-                                );
+                                toast.info(l10n
+                                    .setCoolBirdAsDefaultForVideosAndroidHint);
                                 navigator.pop();
                               } catch (_) {}
                             }

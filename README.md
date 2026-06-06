@@ -23,31 +23,31 @@ Instead of acting like a generic explorer, the app is designed to reduce browsin
 <table>
   <tr>
     <td colspan="4">
-      <img src="screenshots/promo/desktop/01_file_browser.jpg" alt="CB File Hub desktop file browser preview" />
+      <img src="screenshots/promo/desktop/01_file_browser.png" alt="CB File Hub desktop file browser preview" />
       <p align="center"><sub>Desktop file browsing with tabs, tags, and rich previews</sub></p>
     </td>
   </tr>
   <tr>
     <td colspan="4">
-      <img src="screenshots/promo/desktop/04_ai_search.jpg" alt="CB File Hub AI-assisted search preview" />
+      <img src="screenshots/promo/desktop/04_ai_search.png" alt="CB File Hub AI-assisted search preview" />
       <p align="center"><sub>AI-assisted search beside the file browser</sub></p>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/promo/mobile/01_mobile_home.jpg" alt="CB File Hub mobile home preview" width="220" />
+      <img src="screenshots/promo/mobile/01_mobile_home.png" alt="CB File Hub mobile home preview" width="220" />
       <p align="center"><sub>Mobile home</sub></p>
     </td>
     <td align="center">
-      <img src="screenshots/promo/mobile/02_mobile_grid.jpg" alt="CB File Hub mobile file grid preview" width="220" />
+      <img src="screenshots/promo/mobile/02_mobile_grid.png" alt="CB File Hub mobile file grid preview" width="220" />
       <p align="center"><sub>File grid</sub></p>
     </td>
     <td align="center">
-      <img src="screenshots/promo/mobile/03_mobile_tabs.jpg" alt="CB File Hub mobile tabs preview" width="220" />
+      <img src="screenshots/promo/mobile/03_mobile_tabs.png" alt="CB File Hub mobile tabs preview" width="220" />
       <p align="center"><sub>Tabs</sub></p>
     </td>
     <td align="center">
-      <img src="screenshots/promo/mobile/04_mobile_tags.jpg" alt="CB File Hub mobile tags preview" width="220" />
+      <img src="screenshots/promo/mobile/04_mobile_tags.png" alt="CB File Hub mobile tags preview" width="220" />
       <p align="center"><sub>Tags</sub></p>
     </td>
   </tr>
@@ -69,6 +69,8 @@ CB File Hub focuses on solving that workflow with a media-first file manager tha
 - **AI file agent**: Let an AI agent help search files, create files and folders, manage moves and cleanup, find suspicious or problematic files, organize messy folders, and automate more library work.
 - **Tabbed browsing on desktop and mobile**: Open multiple locations at once, switch contexts quickly, and keep parallel browsing flows alive on both Windows and Android.
 - **Tag files and search by tags**: Add tags to files, reuse popular tags, and search with single or multiple tags to narrow a large library fast.
+- **Parent/child tag hierarchy**: Organize tags into nested relationships (for example `Media → Movies → Action`) and browse them in a dedicated tree view.
+- **List, grid, and tree views**: Switch the tag manager and file browsers between a flat list, a visual grid, and an expandable tree using the same view-mode menu.
 - **Smart albums with dynamic rules**: Build albums that automatically collect matching files from selected source folders using filename-based rules.
 - **Choose the video thumbnail frame**: Control the extraction position used for video thumbnails so previews represent the part of the clip that actually matters.
 - **Watch videos over SMB and FTP**: Open and stream media from network locations without turning your workflow into manual copy-paste.
@@ -117,6 +119,14 @@ This positioning keeps the AI feature grounded in real file-management jobs inst
 - Search by tag using direct tag paths and multi-tag filtering.
 - Reuse recent and popular tags for faster tagging.
 - Display tags directly in file and gallery views for quick visual context.
+- Build a parent/child tag hierarchy and browse it as an expandable tree.
+- Filter and sort tags in the tag manager, and switch between list, grid, and tree layouts.
+
+### Tree view
+
+- Browse hierarchical data as a virtualised, expandable tree that stays smooth even with very large folders.
+- Available in the tag manager (parent/child tags), the local file browser, and network browsers (SMB/FTP).
+- Folders load their children on demand the first time they are expanded, then cache the result.
 
 ### Media workflow
 

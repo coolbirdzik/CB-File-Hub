@@ -19,6 +19,7 @@ import '../mobile/mobile_tab_view.dart'; // Import giao diện mobile kiểu Chr
 import 'package:cb_file_manager/config/languages/app_localizations.dart'; // Import AppLocalizations
 import 'package:cb_file_manager/config/translation_helper.dart'; // Import translation helper
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart'; // Import system screen router
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 // import 'package:cb_file_manager/widgets/test_native_streaming.dart'; // Test widget removed
 import '../../utils/route.dart';
 import '../../screens/home/home_screen.dart'; // Import home screen
@@ -30,6 +31,10 @@ import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
 import '../../screens/ai_chat/ai_side_panel.dart';
+import '../../components/common/operation_progress_overlay.dart';
+import '../components/tab_inactive_indicator.dart';
+import '../components/tab_always_active_indicator.dart';
+import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 // Create a custom scroll behavior that supports mouse wheel scrolling
 class TabBarMouseScrollBehavior extends MaterialScrollBehavior {
@@ -362,12 +367,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           final l10n = AppLocalizations.of(context)!;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.menuPinningOnlyLargeScreens),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          AppToast.warning(context, l10n.menuPinningOnlyLargeScreens);
         });
       }
     });
@@ -811,6 +811,70 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             },
                                             // Keep the add tab button functionality
                                             onAddTabPressed: _handleAddNewTab,
+                                            leadingCaptionActions: [
+                                              const StatusCenterToolbarButton(),
+                                              if (!isAiChatPath(
+                                                  state.activeTab?.path ?? ''))
+                                                ListenableBuilder(
+                                                  listenable:
+                                                      _aiPanelController,
+                                                  builder: (context, _) {
+                                                    final isOpen =
+                                                        _aiPanelController
+                                                            .isOpen;
+                                                    return Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              right: 4.0),
+                                                      child: IconButton(
+                                                        tooltip:
+                                                            context.tr.cbAgent,
+                                                        icon: Icon(
+                                                          PhosphorIconsLight
+                                                              .sparkle,
+                                                          color: isOpen
+                                                              ? theme
+                                                                  .colorScheme
+                                                                  .primary
+                                                              : theme
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                          size: 20,
+                                                        ),
+                                                        style: IconButton
+                                                            .styleFrom(
+                                                          shape:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        16.0),
+                                                          ),
+                                                          backgroundColor: isOpen
+                                                              ? theme
+                                                                  .colorScheme
+                                                                  .primary
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.12)
+                                                              : Colors
+                                                                  .transparent,
+                                                        ),
+                                                        onPressed: () {
+                                                          _aiPanelController
+                                                              .toggle(
+                                                            path: state
+                                                                .activeTab
+                                                                ?.path,
+                                                            tabId: state
+                                                                .activeTabId,
+                                                          );
+                                                        },
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                            ],
                                             tabs: [
                                               // Generate modern-style tabs from state.tabs
                                               ...state.tabs.map((tab) {
@@ -855,6 +919,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                     .ellipsis,
                                                           ),
                                                         ),
+                                                        const SizedBox(
+                                                            width: 4),
+                                                        TabAlwaysActiveIndicator(
+                                                          tabId: tab.id,
+                                                        ),
+                                                        TabInactiveIndicator(
+                                                          tabId: tab.id,
+                                                        ),
                                                       ],
                                                     ),
                                                   ),
@@ -865,55 +937,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                         ),
                                       ),
                                       actions: [
-                                        // AI Assistant button
-                                        if (!isAiChatPath(
-                                            state.activeTab?.path ?? ''))
-                                          ListenableBuilder(
-                                            listenable: _aiPanelController,
-                                            builder: (context, _) {
-                                              final isOpen =
-                                                  _aiPanelController.isOpen;
-                                              return Padding(
-                                                padding: const EdgeInsets.only(
-                                                    right: 4.0),
-                                                child: IconButton(
-                                                  tooltip: isOpen
-                                                      ? context.tr.aiChat
-                                                      : context.tr.aiChat,
-                                                  icon: Icon(
-                                                    PhosphorIconsLight.sparkle,
-                                                    color: isOpen
-                                                        ? theme
-                                                            .colorScheme.primary
-                                                        : theme.colorScheme
-                                                            .onSurfaceVariant,
-                                                    size: 20,
-                                                  ),
-                                                  style: IconButton.styleFrom(
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              16.0),
-                                                    ),
-                                                    backgroundColor: isOpen
-                                                        ? theme
-                                                            .colorScheme.primary
-                                                            .withValues(
-                                                                alpha: 0.12)
-                                                        : Colors.transparent,
-                                                  ),
-                                                  onPressed: () {
-                                                    _aiPanelController.toggle(
-                                                      path:
-                                                          state.activeTab?.path,
-                                                      tabId: state.activeTabId,
-                                                    );
-                                                  },
-                                                ),
-                                              );
-                                            },
-                                          ),
                                         // Modern menu button
                                         Padding(
                                           padding:
@@ -1057,13 +1080,18 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final cached = _tabContentCache[tab.id];
     if (cached != null &&
         cached.path == tab.path &&
-        cached.splitPanePath == tab.splitPanePath) {
+        cached.splitPanePath == tab.splitPanePath &&
+        cached.highlightedFileName == tab.highlightedFileName) {
       return cached.widget;
     }
 
     final widget = _createTabContent(tab);
     _tabContentCache[tab.id] = _CachedTabContent(
-        path: tab.path, splitPanePath: tab.splitPanePath, widget: widget);
+      path: tab.path,
+      splitPanePath: tab.splitPanePath,
+      highlightedFileName: tab.highlightedFileName,
+      widget: widget,
+    );
     return widget;
   }
 
@@ -1079,12 +1107,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         tabId: tab.id,
         leftPath: tab.path,
         rightPath: tab.splitPanePath!,
+        highlightedFileName: tab.highlightedFileName,
       );
     } else {
       content = TabbedFolderListScreen(
         key: ValueKey(tab.id),
         path: tab.path,
         tabId: tab.id,
+        highlightedFileName: tab.highlightedFileName,
       );
     }
 
@@ -1456,10 +1486,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
     if (others.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(context.tr.noOtherWindows)),
-      );
+      AppToast.warning(context, context.tr.noOtherWindows);
       return null;
     }
 
@@ -1507,10 +1534,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
     if (incomingTabs.isEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        // ignore: use_build_context_synchronously
-        SnackBar(content: Text(context.tr.noTabsOpen)),
-      );
+      AppToast.warning(context, context.tr.noTabsOpen);
       return;
     }
 
@@ -1549,6 +1573,33 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         ? '${context.tr.closeTab} ($selectionCount)'
         : context.tr.closeTab;
 
+    // Mark-as-inactive is offered only when the activity manager is available,
+    // the tab is not the focused/active one, and the tab is not already
+    // inactive. Multi-tab selection is treated as a single-tab action: the
+    // operation only applies to the right-clicked tab.
+    final activityManager = locator.isRegistered<TabActivityManager>()
+        ? locator<TabActivityManager>()
+        : null;
+    final isAlwaysActive =
+        activityManager != null && activityManager.isAlwaysActive(tab.id);
+    final canMarkInactive = activityManager != null &&
+        !isAlwaysActive &&
+        !activityManager.isInactive(tab.id) &&
+        activityManager.stateOf(tab.id) != TabActivityState.focused &&
+        // Defensive: also refuse the currently active tab even if the
+        // activity manager has not seen a focus event yet.
+        context.read<TabManagerBloc>().state.activeTabId != tab.id;
+
+    final canToggleAlwaysActive = activityManager != null;
+    final alwaysActiveLabel = isAlwaysActive
+        ? context.tr.allowTabAutoSuspend
+        : context.tr.keepTabAlwaysActive;
+
+    // "Close other tabs" only makes sense when there is at least one other
+    // tab to close.
+    final tabsCount = context.read<TabManagerBloc>().state.tabs.length;
+    final canCloseOthers = tabsCount > 1;
+
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     final size = overlay?.size ?? const Size(1, 1);
@@ -1570,6 +1621,22 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         PopupMenuItem(
           value: _DesktopTabAction.moveToWindow,
           child: Text(moveToWindowLabel),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: _DesktopTabAction.markInactive,
+          enabled: canMarkInactive,
+          child: Text(context.tr.markTabInactive),
+        ),
+        PopupMenuItem(
+          value: _DesktopTabAction.toggleAlwaysActive,
+          enabled: canToggleAlwaysActive,
+          child: Text(alwaysActiveLabel),
+        ),
+        PopupMenuItem(
+          value: _DesktopTabAction.closeOtherTabs,
+          enabled: canCloseOthers,
+          child: Text(context.tr.closeOtherTabs),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -1615,6 +1682,23 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
               bloc.add(CloseTab(id));
             }
           }
+          return;
+        }
+      case _DesktopTabAction.markInactive:
+        {
+          activityManager?.markInactive(tab.id);
+          return;
+        }
+      case _DesktopTabAction.toggleAlwaysActive:
+        {
+          if (activityManager == null) return;
+          final pinned = activityManager.isAlwaysActive(tab.id);
+          activityManager.setAlwaysActive(tab.id, !pinned);
+          return;
+        }
+      case _DesktopTabAction.closeOtherTabs:
+        {
+          bloc.add(CloseOtherTabs(tab.id));
           return;
         }
       case _DesktopTabAction.closeTab:
@@ -1856,18 +1940,23 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 enum _DesktopTabAction {
   moveToNewWindow,
   moveToWindow,
+  markInactive,
+  toggleAlwaysActive,
+  closeOtherTabs,
   closeTab,
 }
 
 class _CachedTabContent {
   final String path;
   final String? splitPanePath;
+  final String? highlightedFileName;
   final Widget widget;
 
   const _CachedTabContent({
     required this.path,
     required this.widget,
     this.splitPanePath,
+    this.highlightedFileName,
   });
 }
 

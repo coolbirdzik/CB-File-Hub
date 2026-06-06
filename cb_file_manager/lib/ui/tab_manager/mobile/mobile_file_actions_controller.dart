@@ -126,24 +126,56 @@ class MobileFileActionsController {
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildSortOption(
-                        context, SortOption.nameAsc, localizations.sortNameAsc),
-                    _buildSortOption(context, SortOption.nameDesc,
-                        localizations.sortNameDesc),
-                    const Divider(),
-                    _buildSortOption(context, SortOption.dateDesc,
-                        localizations.sortDateModifiedNewest),
-                    _buildSortOption(context, SortOption.dateAsc,
-                        localizations.sortDateModifiedOldest),
-                    const Divider(),
-                    _buildSortOption(context, SortOption.sizeDesc,
-                        localizations.sortSizeLargest),
-                    _buildSortOption(context, SortOption.sizeAsc,
-                        localizations.sortSizeSmallest),
+                      context,
+                      SortOption.nameAsc,
+                      localizations.sortNameAsc,
+                      PhosphorIconsLight.fileText,
+                    ),
+                    _buildSortOption(
+                      context,
+                      SortOption.nameDesc,
+                      localizations.sortNameDesc,
+                      PhosphorIconsLight.fileText,
+                    ),
                     const Divider(),
                     _buildSortOption(
-                        context, SortOption.typeAsc, localizations.sortTypeAsc),
-                    _buildSortOption(context, SortOption.typeDesc,
-                        localizations.sortTypeDesc),
+                      context,
+                      SortOption.dateDesc,
+                      localizations.sortDateModifiedNewest,
+                      PhosphorIconsLight.calendar,
+                    ),
+                    _buildSortOption(
+                      context,
+                      SortOption.dateAsc,
+                      localizations.sortDateModifiedOldest,
+                      PhosphorIconsLight.calendar,
+                    ),
+                    const Divider(),
+                    _buildSortOption(
+                      context,
+                      SortOption.sizeDesc,
+                      localizations.sortSizeLargest,
+                      PhosphorIconsLight.chartBar,
+                    ),
+                    _buildSortOption(
+                      context,
+                      SortOption.sizeAsc,
+                      localizations.sortSizeSmallest,
+                      PhosphorIconsLight.chartBar,
+                    ),
+                    const Divider(),
+                    _buildSortOption(
+                      context,
+                      SortOption.typeAsc,
+                      localizations.sortTypeAsc,
+                      PhosphorIconsLight.file,
+                    ),
+                    _buildSortOption(
+                      context,
+                      SortOption.typeDesc,
+                      localizations.sortTypeDesc,
+                      PhosphorIconsLight.file,
+                    ),
                   ],
                 ),
 
@@ -157,11 +189,19 @@ class MobileFileActionsController {
   }
 
   Widget _buildSortOption(
-      BuildContext context, SortOption option, String label) {
+    BuildContext context,
+    SortOption option,
+    String label,
+    IconData icon,
+  ) {
     final theme = Theme.of(context);
     final isSelected = currentSortOption == option;
 
     return ListTile(
+      leading: Icon(
+        icon,
+        color: isSelected ? theme.colorScheme.primary : null,
+      ),
       title: Text(
         label,
         style: TextStyle(
@@ -170,13 +210,40 @@ class MobileFileActionsController {
         ),
       ),
       trailing: isSelected
-          ? Icon(PhosphorIconsLight.check, color: theme.colorScheme.primary)
+          ? Icon(
+              _isAscendingSortOption(option)
+                  ? PhosphorIconsLight.arrowUp
+                  : PhosphorIconsLight.arrowDown,
+              color: theme.colorScheme.primary,
+              size: 18,
+            )
           : null,
       onTap: () {
         Navigator.pop(context);
         onSortOptionSelected?.call(option);
       },
     );
+  }
+
+  bool _isAscendingSortOption(SortOption option) {
+    switch (option) {
+      case SortOption.nameAsc:
+      case SortOption.dateAsc:
+      case SortOption.sizeAsc:
+      case SortOption.typeAsc:
+      case SortOption.dateCreatedAsc:
+      case SortOption.extensionAsc:
+      case SortOption.attributesAsc:
+        return true;
+      case SortOption.nameDesc:
+      case SortOption.dateDesc:
+      case SortOption.sizeDesc:
+      case SortOption.typeDesc:
+      case SortOption.dateCreatedDesc:
+      case SortOption.extensionDesc:
+      case SortOption.attributesDesc:
+        return false;
+    }
   }
 
   /// Show view mode options dialog
@@ -240,6 +307,8 @@ class MobileFileActionsController {
                   ),
                 _buildViewModeOption(context, ViewMode.details,
                     localizations.viewModeDetails, PhosphorIconsLight.rows),
+                _buildViewModeOption(context, ViewMode.tree,
+                    localizations.viewModeTree, PhosphorIconsLight.treeView),
 
                 const SizedBox(height: 16),
               ],
@@ -686,6 +755,10 @@ class MobileFileActionsController {
         return PhosphorIconsLight.rows;
       case ViewMode.gridPreview:
         return PhosphorIconsLight.layout;
+      case ViewMode.columns:
+        return PhosphorIconsLight.columns;
+      case ViewMode.tree:
+        return PhosphorIconsLight.treeView;
     }
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/theme_provider.dart';
@@ -14,6 +15,8 @@ import '../../../bloc/network_browsing/network_browsing_bloc.dart';
 import '../../components/common/operation_progress_overlay.dart';
 import '../../../core/service_locator.dart';
 import '../../../services/windowing/desktop_windowing_service.dart';
+import '../../../services/progress/desktop_app_icon_progress_service.dart';
+import '../../controllers/operation_progress_controller.dart';
 import '../../../services/windowing/window_startup_payload.dart';
 import '../../../services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'tab_manager.dart';
@@ -32,19 +35,14 @@ class TabMainScreen extends StatefulWidget {
 
   /// Static method to open the default path (e.g., documents directory)
   static Future<void> openDefaultPath(BuildContext context) async {
+    final tabBloc = context.read<TabManagerBloc>();
+    final l10n = AppLocalizations.of(context)!;
+    final toast = AppToast.capture(context);
     try {
       final directory = await getApplicationDocumentsDirectory();
-      if (context.mounted) {
-        openPath(context, directory.path);
-      }
+      tabBloc.add(AddTab(path: directory.path));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  '${AppLocalizations.of(context)!.errorAccessingDirectory}$e')),
-        );
-      }
+      toast.error('${l10n.errorAccessingDirectory}$e');
     }
   }
 
@@ -71,6 +69,9 @@ class _TabMainScreenState extends State<TabMainScreen> {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       _desktopWindowing = locator<DesktopWindowingService>();
       unawaited(_desktopWindowing!.attachTabBloc(_tabManagerBloc));
+      locator<DesktopAppIconProgressService>().start(
+        locator<OperationProgressController>(),
+      );
     }
     if (Platform.isWindows) {
       WindowsNativeTabDragDropService.isDragHoveringWindow
@@ -240,6 +241,13 @@ class _TabMainScreenState extends State<TabMainScreen> {
     _operationProgressOverlayEntry?.remove();
     _operationProgressOverlayEntry = null;
     unawaited(_desktopWindowing?.dispose());
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // Guard against locator already being reset during E2E teardown — the
+      // widget tree can still be unmounting when locator.reset() completes.
+      try {
+        unawaited(locator<DesktopAppIconProgressService>().stop());
+      } catch (_) {}
+    }
     _tabManagerBloc.close();
     _networkBrowsingBloc.close();
     super.dispose();

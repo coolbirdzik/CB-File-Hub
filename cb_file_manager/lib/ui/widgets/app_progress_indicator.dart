@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Custom progress indicator widget used throughout the app
@@ -200,6 +202,91 @@ class _AppProgressIndicatorBeautifulState
           ),
         );
       },
+    );
+  }
+}
+
+/// Reusable dot-bounce loader for indeterminate, inline loading states.
+///
+/// Renders 3 dots that bounce in a staggered wave — a compact "agent is
+/// thinking" indicator suitable for AI activity, toolbar states, action
+/// buttons, and any inline spot where a bar/circle spinner feels too heavy.
+class AppWaveLoader extends StatefulWidget {
+  final double size;
+  final Color? color;
+
+  const AppWaveLoader({
+    Key? key,
+    this.size = 24,
+    this.color,
+  }) : super(key: key);
+
+  @override
+  State<AppWaveLoader> createState() => _AppWaveLoaderState();
+}
+
+class _AppWaveLoaderState extends State<AppWaveLoader>
+    with SingleTickerProviderStateMixin {
+  static const _dotCount = 3;
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.color ?? Theme.of(context).colorScheme.primary;
+    final width = widget.size;
+    final height = widget.size;
+    final dotSize = math.max(3.0, width / 7.5);
+    final gap = math.max(2.0, width / 14);
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(_dotCount, (index) {
+              final staggerOffset = index / _dotCount;
+              final t = (_controller.value + staggerOffset) % 1.0;
+              final scale =
+                  0.4 + 0.6 * (math.sin(t * 2 * math.pi - math.pi / 2) + 1) / 2;
+              final alpha = 0.3 + 0.7 * scale;
+
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: gap / 2),
+                child: Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: dotSize,
+                    height: dotSize,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: alpha),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
+      ),
     );
   }
 }

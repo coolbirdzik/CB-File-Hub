@@ -11,6 +11,8 @@ import '../../components/video/thumbnail_strip.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:share_plus/share_plus.dart'; // Add import for Share Plus
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 // Add import for XFile
 import '../../utils/route.dart';
 import 'package:open_filex/open_filex.dart';
@@ -324,9 +326,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
   }
 
   void _showImageInfo(BuildContext context, File file) async {
-    // Pre-extract ScaffoldMessenger before async gap
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
+    final l10n = AppLocalizations.of(context)!;
+    final toast = AppToast.capture(context);
     try {
       final fileStat = await file.stat();
       final fileSize = _formatFileSize(fileStat.size);
@@ -374,9 +375,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
       debugPrint('Error showing image info: $e');
       if (mounted) {
         try {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(content: Text('Failed to display image information: $e')),
-          );
+          toast.error(l10n.failedToDisplayImageInformation(e.toString()));
         } catch (_) {}
       }
     }
@@ -384,22 +383,26 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
   Future<void> _deleteImage(BuildContext context) async {
     final file = _allImages[_currentIndex];
+    final l10n = AppLocalizations.of(context)!;
 
     final bool? confirm = await RouteUtils.showAcrylicDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Move to Trash'),
+        title: Text(l10n.moveToTrashTitle),
         content: Text(
-            'Are you sure you want to move "${pathlib.basename(file.path)}" to trash?'),
+          l10n.moveToTrashConfirmMessage(pathlib.basename(file.path)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('CANCEL'),
+            child: Text(l10n.cancel.toUpperCase()),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('MOVE TO TRASH',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(
+              l10n.moveToTrash.toUpperCase(),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -412,9 +415,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
         if (context.mounted) {
           if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Image moved to trash')),
-            );
+            AppToast.success(context, l10n.imageMovedToTrash);
 
             setState(() {
               _allImages.removeAt(_currentIndex);
@@ -429,15 +430,14 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
               }
             });
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to move image to trash')),
-            );
+            AppToast.error(context, l10n.failedToMoveImageToTrash);
           }
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to move image to trash: $e')),
+          AppToast.error(
+            context,
+            l10n.failedToMoveImageToTrashWithError(e.toString()),
           );
         }
       }
@@ -448,9 +448,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     final file = _allImages[_currentIndex];
     await Clipboard.setData(ClipboardData(text: file.path));
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied path to clipboard')),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.info(context, l10n.copiedPathToClipboard);
     }
   }
 
@@ -470,9 +469,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     }
 
     if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open with external app')),
-      );
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.error(context, l10n.unableToOpenWithExternalApp);
     }
   }
 
@@ -1310,12 +1308,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                       ElevatedButton.icon(
                         onPressed: () {
                           // TODO: Implement save functionality
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Save feature will be implemented soon'),
-                            ),
-                          );
+                          final l10n = AppLocalizations.of(context)!;
+                          AppToast.info(context, l10n.featureNotImplemented);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade800,

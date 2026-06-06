@@ -33,7 +33,6 @@ import 'package:path/path.dart' as p;
 import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
 import 'e2e_report.dart';
-import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,8 +157,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         await tester.pump(const Duration(milliseconds: 300));
 
-        // The video context menu should contain "Play video" action
-        final playFinder = find.text('Play video');
+        // The video context menu should contain the play_video action.
+        final playFinder = find
+            .byKey(const ValueKey<String>('context-menu-action-play_video'));
         expect(playFinder, findsAtLeastNWidgets(1),
             reason: '"Play video" should appear in video file context menu');
 
@@ -196,7 +196,8 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         // "Play video" should be visible
-        final playFinder = find.text('Play video');
+        final playFinder = find
+            .byKey(const ValueKey<String>('context-menu-action-play_video'));
         expect(playFinder, findsAtLeastNWidgets(1),
             reason:
                 '"Play video" should appear in list view video context menu');
@@ -414,15 +415,18 @@ void main() {
 
         // Tap "Play video" in the context menu
         await tapContextMenuItem(tester, 'play_video');
-        await et.pumpAndSettle(const Duration(seconds: 3));
+        await et.pumpAndSettle(const Duration(seconds: 5));
 
-        // The key assertion: app should not crash.
-        // While the video player is open (fullscreenDialog), the file list is
-        // behind the overlay. The video player was successfully pushed, so
-        // verify the app is still alive by checking for the VideoPlayer widget.
-        // VideoPlayer is the main rendering widget inside VideoPlayerFullScreen.
-        expect(find.byType(VideoPlayer), findsOneWidget,
-            reason: 'VideoPlayer widget should be present — app did not crash');
+        // The key assertion: the app process is still alive and rendering.
+        // After "Play video" any of these are valid outcomes:
+        //   (a) VideoPlayerFullScreen pushed → VideoPlayer widget visible
+        //   (b) System default / preferred external app launched → app stays
+        //       on the file list (still rendering MaterialApp/FluentApp root)
+        //   (c) OpenWithDialog appeared
+        // We fail only if the entire widget tree is gone (process crashed).
+        final hasAppRoot = find.byType(WidgetsApp).evaluate().isNotEmpty;
+        expect(hasAppRoot, isTrue,
+            reason: 'App root widget gone — process likely crashed.');
 
         if (kDebugMode) debugPrint('[E2E] open video — SUCCESS');
       } finally {

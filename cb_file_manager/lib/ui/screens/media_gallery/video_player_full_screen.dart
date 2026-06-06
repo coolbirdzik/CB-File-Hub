@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:flutter/rendering.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../utils/route.dart';
@@ -44,8 +46,6 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   bool _showAppBar = true; // Control app bar visibility
   bool _inAndroidPip = false;
   Timer? _uiEnforceTimer;
-  Timer? _overlayHideTimer;
-  static const Duration _overlayAutoHideDuration = Duration(seconds: 3);
 
   @override
   void initState() {
@@ -95,7 +95,8 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _showOverlaysTemporarily();
+      // Inner VideoPlayer drives overlay visibility; just keep app bar visible initially.
+      setState(() => _showAppBar = true);
     });
   }
 
@@ -126,29 +127,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     RendererBinding.instance.renderViews.first.automaticSystemUiAdjustment =
         true;
     _uiEnforceTimer?.cancel();
-    _overlayHideTimer?.cancel();
     super.dispose();
-  }
-
-  bool _shouldAutoHideOverlays() {
-    if (Platform.isAndroid || Platform.isIOS) return false;
-    if (_inAndroidPip) return false;
-    return true;
-  }
-
-  void _showOverlaysTemporarily() {
-    if (!_shouldAutoHideOverlays()) return;
-
-    if (mounted) {
-      setState(() => _showAppBar = true);
-    }
-
-    _overlayHideTimer?.cancel();
-    _overlayHideTimer = Timer(_overlayAutoHideDuration, () {
-      if (!mounted) return;
-      if (!_shouldAutoHideOverlays()) return;
-      setState(() => _showAppBar = false);
-    });
   }
 
   @override
@@ -183,12 +162,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.black,
       body: Center(
-        child: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) => _showOverlaysTemporarily(),
-          onPointerMove: (_) => _showOverlaysTemporarily(),
-          child: _buildPlayer(context),
-        ),
+        child: _buildPlayer(context),
       ),
     );
 
@@ -230,21 +204,29 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   }
 
   void _onVideoError(String errorMessage) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi: $errorMessage')),
-    );
+    final l10n = AppLocalizations.of(context)!;
+    AppToast.error(context, l10n.errorWithMessage(errorMessage));
   }
 
   void _onFullScreenChanged() {
     setState(() {
       _isFullScreen = !_isFullScreen;
-      _showAppBar = true;
+      // Hide top bar immediately when entering fullscreen; show it when exiting.
+      _showAppBar = !_isFullScreen;
     });
-    _showOverlaysTemporarily();
   }
 
-  void _onControlVisibilityChanged() {
-    _showOverlaysTemporarily();
+  void _onControlVisibilityChanged(bool visible) {
+    if (!mounted) return;
+    if (Platform.isAndroid || Platform.isIOS) return;
+    if (_inAndroidPip) return;
+    // In fullscreen, top bar stays hidden — only the bottom seek bar reacts to mouse/keys.
+    if (_isFullScreen) {
+      if (_showAppBar) setState(() => _showAppBar = false);
+      return;
+    }
+    if (_showAppBar == visible) return;
+    setState(() => _showAppBar = visible);
   }
 
   Widget _buildPlayer(BuildContext context) {

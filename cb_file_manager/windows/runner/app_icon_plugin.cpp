@@ -6,6 +6,7 @@
 #include <shlwapi.h>
 #include <shlobj.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -14,10 +15,55 @@
 #include <set>
 #include <winreg.h>
 
+// ---------------------------------------------------------------------------
+// Taskbar progress helpers (ITaskbarList3)
+// ---------------------------------------------------------------------------
+static ITaskbarList3* g_taskbar = nullptr;
+
+static void EnsureTaskbar() {
+  if (g_taskbar) return;
+  CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+  HRESULT hr = CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER,
+                   IID_ITaskbarList3,
+                   reinterpret_cast<void**>(&g_taskbar));
+  if (SUCCEEDED(hr) && g_taskbar) g_taskbar->HrInit();
+}
+
+static void SetTaskbarProgressImpl(HWND hwnd, double fraction,
+                                   bool indeterminate, bool error) {
+  EnsureTaskbar();
+  if (!g_taskbar || !hwnd) return;
+
+  if (indeterminate) {
+    g_taskbar->SetProgressState(hwnd, TBPF_INDETERMINATE);
+    return;
+  }
+  if (error) {
+    g_taskbar->SetProgressState(hwnd, TBPF_ERROR);
+    ULONGLONG completed = static_cast<ULONGLONG>(fraction * 1000.0);
+    g_taskbar->SetProgressValue(hwnd, completed, 1000ULL);
+    return;
+  }
+  if (fraction <= 0.0) {
+    g_taskbar->SetProgressState(hwnd, TBPF_NOPROGRESS);
+    return;
+  }
+  g_taskbar->SetProgressState(hwnd, TBPF_NORMAL);
+  ULONGLONG completed = static_cast<ULONGLONG>(fraction * 1000.0);
+  g_taskbar->SetProgressValue(hwnd, completed, 1000ULL);
+}
+
+static void ClearTaskbarProgressImpl(HWND hwnd) {
+  EnsureTaskbar();
+  if (!g_taskbar || !hwnd) return;
+  g_taskbar->SetProgressState(hwnd, TBPF_NOPROGRESS);
+}
+
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "ole32.lib")
 
 static std::string ParseExeFromCommand(const wchar_t* cmd);
 static std::string ResolveExeViaApplicationsKey(const std::string& exeName);
@@ -144,6 +190,55 @@ void AppIconPlugin::HandleMethodCall(
       }
     }
     result->Error("INVALID_ARGUMENTS", "Invalid or missing exePath");
+    return;
+  } else if (method_call.method_name().compare("extractIconsForExtensions") == 0) {
+    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (arguments) {
+      auto exts_it = arguments->find(flutter::EncodableValue("extensions"));
+      auto size_it = arguments->find(flutter::EncodableValue("iconSize"));
+      if (exts_it != arguments->end()) {
+        const auto& extList = std::get<flutter::EncodableList>(exts_it->second);
+        std::vector<std::string> extensions;
+        extensions.reserve(extList.size());
+        for (const auto& e : extList) {
+          extensions.push_back(std::get<std::string>(e));
+        }
+        int iconSize = 32;
+        if (size_it != arguments->end()) {
+          iconSize = std::get<int>(size_it->second);
+        }
+        ExtractIconsForExtensions(extensions, iconSize, std::move(result));
+        return;
+      }
+    }
+    result->Error("INVALID_ARGUMENTS", "Invalid or missing extensions list");
+    return;
+  } else if (method_call.method_name().compare("setTaskbarProgress") == 0) {
+    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    double fraction = 0.0;
+    bool indeterminate = false;
+    bool error = false;
+    if (arguments) {
+      auto it = arguments->find(flutter::EncodableValue("fraction"));
+      if (it != arguments->end()) {
+        if (std::holds_alternative<double>(it->second))
+          fraction = std::get<double>(it->second);
+      }
+      auto it2 = arguments->find(flutter::EncodableValue("indeterminate"));
+      if (it2 != arguments->end() && std::holds_alternative<bool>(it2->second))
+        indeterminate = std::get<bool>(it2->second);
+      auto it3 = arguments->find(flutter::EncodableValue("error"));
+      if (it3 != arguments->end() && std::holds_alternative<bool>(it3->second))
+        error = std::get<bool>(it3->second);
+    }
+    HWND hwnd = registrar_->GetView()->GetNativeWindow();
+    SetTaskbarProgressImpl(hwnd, fraction, indeterminate, error);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  } else if (method_call.method_name().compare("clearTaskbarProgress") == 0) {
+    HWND hwnd = registrar_->GetView()->GetNativeWindow();
+    ClearTaskbarProgressImpl(hwnd);
+    result->Success(flutter::EncodableValue(true));
     return;
   } else {
     result->NotImplemented();
@@ -627,4 +722,132 @@ static bool SetSelfAsDefaultForVideo(const std::string& exePath) {
     }
   }
   return true;
-} 
+}
+
+// ---------------------------------------------------------------------------
+// Batch extract file-type icons by extension using SHGetFileInfo +
+// SHGFI_USEFILEATTRIBUTES (no real file needed).
+// ---------------------------------------------------------------------------
+void AppIconPlugin::ExtractIconsForExtensions(
+    const std::vector<std::string>& extensions,
+    int iconSize,
+    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+
+  // We run the extraction synchronously on the platform thread since
+  // SHGetFileInfo with USEFILEATTRIBUTES is fast (no disk I/O).
+  flutter::EncodableMap responseMap;
+
+  for (const auto& ext : extensions) {
+    // Ensure extension starts with dot
+    std::string dotExt = ext;
+    if (!dotExt.empty() && dotExt[0] != '.') {
+      dotExt = "." + dotExt;
+    }
+
+    // Convert to wide string
+    int wideSize = MultiByteToWideChar(CP_UTF8, 0, dotExt.c_str(), -1, nullptr, 0);
+    if (wideSize == 0) {
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue();
+      continue;
+    }
+    std::vector<wchar_t> wExt(wideSize);
+    if (MultiByteToWideChar(CP_UTF8, 0, dotExt.c_str(), -1, wExt.data(), wideSize) == 0) {
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue();
+      continue;
+    }
+
+    // Use a fake filename with the extension — SHGFI_USEFILEATTRIBUTES means
+    // the file doesn't need to exist.
+    std::wstring fakeName = L"file" + std::wstring(wExt.data());
+
+    SHFILEINFOW fileInfo = { 0 };
+    UINT flags = SHGFI_ICON | SHGFI_USEFILEATTRIBUTES;
+    flags |= (iconSize > 32) ? SHGFI_LARGEICON : SHGFI_LARGEICON;
+
+    DWORD_PTR shResult = SHGetFileInfoW(
+        fakeName.c_str(),
+        FILE_ATTRIBUTE_NORMAL,
+        &fileInfo,
+        sizeof(fileInfo),
+        flags
+    );
+
+    if (shResult == 0 || !fileInfo.hIcon) {
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue();
+      continue;
+    }
+
+    // Get icon dimensions
+    ICONINFO iconInfo;
+    if (!GetIconInfo(fileInfo.hIcon, &iconInfo)) {
+      DestroyIcon(fileInfo.hIcon);
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue();
+      continue;
+    }
+
+    BITMAP bmp;
+    if (!GetObject(iconInfo.hbmColor, sizeof(BITMAP), &bmp)) {
+      DeleteObject(iconInfo.hbmMask);
+      DeleteObject(iconInfo.hbmColor);
+      DestroyIcon(fileInfo.hIcon);
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue();
+      continue;
+    }
+
+    int w = bmp.bmWidth;
+    int h = bmp.bmHeight;
+
+    // Create memory DC and extract BGRA pixels
+    HDC screenDC = GetDC(NULL);
+    HDC memDC = CreateCompatibleDC(screenDC);
+    HBITMAP hBitmap = CreateCompatibleBitmap(screenDC, w, h);
+    HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, hBitmap);
+
+    // Fill with transparent black
+    HBRUSH hBrush = CreateSolidBrush(RGB(0, 0, 0));
+    RECT rect = { 0, 0, w, h };
+    FillRect(memDC, &rect, hBrush);
+    DeleteObject(hBrush);
+
+    // Draw icon
+    DrawIconEx(memDC, 0, 0, fileInfo.hIcon, w, h, 0, NULL, DI_NORMAL);
+
+    // Read pixels
+    BITMAPINFOHEADER bmi = { 0 };
+    bmi.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.biWidth = w;
+    bmi.biHeight = -h; // top-down
+    bmi.biPlanes = 1;
+    bmi.biBitCount = 32;
+    bmi.biCompression = BI_RGB;
+
+    int stride = ((w * 32 + 31) / 32) * 4;
+    int imageSize = stride * h;
+    std::vector<uint8_t> pixels(imageSize);
+
+    bool ok = (GetDIBits(memDC, hBitmap, 0, h, pixels.data(),
+                         (BITMAPINFO*)&bmi, DIB_RGB_COLORS) != 0);
+
+    // Cleanup GDI
+    SelectObject(memDC, oldBitmap);
+    DeleteObject(hBitmap);
+    DeleteDC(memDC);
+    ReleaseDC(NULL, screenDC);
+    DeleteObject(iconInfo.hbmMask);
+    DeleteObject(iconInfo.hbmColor);
+    DestroyIcon(fileInfo.hIcon);
+
+    if (ok) {
+      // Return as map: {iconData: bytes, width: int, height: int}
+      flutter::EncodableMap iconMap;
+      iconMap[flutter::EncodableValue("iconData")] = flutter::EncodableValue(pixels);
+      iconMap[flutter::EncodableValue("width")] = flutter::EncodableValue(w);
+      iconMap[flutter::EncodableValue("height")] = flutter::EncodableValue(h);
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue(iconMap);
+    } else {
+      responseMap[flutter::EncodableValue(ext)] = flutter::EncodableValue();
+    }
+  }
+
+  result->Success(flutter::EncodableValue(responseMap));
+}

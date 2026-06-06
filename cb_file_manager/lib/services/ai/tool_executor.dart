@@ -6,6 +6,9 @@ import '../../helpers/files/trash_manager.dart';
 import '../../helpers/tags/tag_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
+import '../disk_cleaner/cleaner_models.dart';
+import '../disk_cleaner/disk_cleaner_service.dart';
+import 'disk_cleaner_skill.dart';
 import '../video_library_service.dart';
 
 /// Result of executing a tool.
@@ -31,6 +34,10 @@ class ToolCall {
 
 /// Executes tools requested by the AI agent.
 class ToolExecutor {
+  final String? ownerTabId;
+
+  ToolExecutor({this.ownerTabId});
+
   static const int _maxOutputLength = 8000;
   static const int maxToolCalls = 10;
   static const Duration _timeout = Duration(seconds: 15);
@@ -58,10 +65,21 @@ class ToolExecutor {
     'get_video_library_files',
     'list_albums',
     'get_album_files',
+    // Disk Cleaner skill
+    'list_disk_junk_categories',
+    'get_drive_space',
+    'scan_disk_junk',
+    'clean_disk_junk',
+    'get_pending_cleanup_review',
   };
 
   /// Tools that must always go through user approval before executing.
-  static const _dangerousTools = {'run_command', 'write_file', 'delete_file'};
+  static const _dangerousTools = {
+    'run_command',
+    'write_file',
+    'delete_file',
+    'clean_disk_junk',
+  };
 
   /// Public getter for the BLoC to check.
   static Set<String> get dangerousTools => _dangerousTools;
@@ -166,6 +184,17 @@ class ToolExecutor {
           return await _getAlbumFiles(call.arguments);
         case 'delete_file':
           return await _deleteFile(call.arguments);
+        // Disk Cleaner skill
+        case 'list_disk_junk_categories':
+          return await _listDiskJunkCategories(call.arguments);
+        case 'get_drive_space':
+          return await _getDriveSpace(call.arguments);
+        case 'scan_disk_junk':
+          return await _scanDiskJunk(call.arguments);
+        case 'clean_disk_junk':
+          return await _cleanDiskJunk(call.arguments);
+        case 'get_pending_cleanup_review':
+          return _getPendingCleanupReview(call.arguments);
         default:
           return ToolResult(
             toolName: call.name,
@@ -860,20 +889,29 @@ class ToolExecutor {
     final succeeded = <String>[];
     final failed = <String, String>{};
 
-    for (final path in paths) {
-      final type = FileSystemEntity.typeSync(path);
-
+    // Filter out paths that don't exist up front — SHFileOperationW would
+    // skip them anyway, but reporting "Not found" here keeps the response
+    // useful.
+    final existingPaths = <String>[];
+    for (final p in paths) {
+      final type = FileSystemEntity.typeSync(p);
       if (type == FileSystemEntityType.notFound) {
-        failed[path] = 'Not found';
-        continue;
-      }
-
-      // Move to recycle bin (not permanent delete)
-      final ok = await trashManager.moveToTrash(path);
-      if (ok) {
-        succeeded.add(path);
+        failed[p] = 'Not found';
       } else {
-        failed[path] = 'Failed to move to recycle bin';
+        existingPaths.add(p);
+      }
+    }
+
+    if (existingPaths.isNotEmpty) {
+      // Single batched native call — replaces the previous per-file loop
+      // that spawned PowerShell on Windows.
+      final ok = await trashManager.moveMultipleToTrashBatched(existingPaths);
+      for (final p in existingPaths) {
+        if (ok.contains(p)) {
+          succeeded.add(p);
+        } else {
+          failed[p] = 'Failed to move to recycle bin';
+        }
       }
     }
 
@@ -1116,6 +1154,427 @@ class ToolExecutor {
   }
 
   // ---------------------------------------------------------------------------
+  // Disk Cleaner skill tools
+  // ---------------------------------------------------------------------------
+
+  /// In-memory cache of scan results keyed by scan_id. LRU eviction at 5.
+  static final Map<String, _CachedScan> _scanCache = {};
+  static const int _maxScanCacheSize = 5;
+
+  Future<ToolResult> _listDiskJunkCategories(Map<String, dynamic> args) async {
+    if (!Platform.isWindows) {
+      return const ToolResult(
+        toolName: 'list_disk_junk_categories',
+        output: 'Error: Disk Cleaner is only available on Windows.',
+        success: false,
+      );
+    }
+
+    final service = DiskCleanerService.instance;
+    final categories = service.listCategories();
+    final buffer = StringBuffer('Available junk categories on Windows:\n');
+    for (final cat in categories) {
+      final safetyStr = cat.safety.name;
+      final defaultStr = cat.defaultEnabled ? 'default ON' : 'default OFF';
+      final adminStr = cat.requiresAdmin ? ', needs admin' : '';
+      buffer.writeln(
+          '- ${cat.id} ($safetyStr, $defaultStr$adminStr): ${cat.description}');
+    }
+    return ToolResult(
+      toolName: 'list_disk_junk_categories',
+      output: buffer.toString().trim(),
+    );
+  }
+
+  Future<ToolResult> _getDriveSpace(Map<String, dynamic> args) async {
+    if (!Platform.isWindows) {
+      return const ToolResult(
+        toolName: 'get_drive_space',
+        output: 'Error: Only available on Windows.',
+        success: false,
+      );
+    }
+
+    final service = DiskCleanerService.instance;
+    final drives = await service.getDriveSpace();
+    if (drives.isEmpty) {
+      return const ToolResult(
+        toolName: 'get_drive_space',
+        output: 'No fixed drives found.',
+        success: false,
+      );
+    }
+
+    final buffer = StringBuffer('Drive space (fixed drives):\n');
+    for (final d in drives) {
+      final label = d.label.isNotEmpty ? ' (${d.label})' : '';
+      buffer.writeln(
+          '- ${d.path}$label: ${_formatSize(d.usedBytes)} used / ${_formatSize(d.totalBytes)} total, ${_formatSize(d.freeBytes)} free');
+    }
+    return ToolResult(
+      toolName: 'get_drive_space',
+      output: buffer.toString().trim(),
+    );
+  }
+
+  Future<ToolResult> _scanDiskJunk(Map<String, dynamic> args) async {
+    if (!Platform.isWindows) {
+      return const ToolResult(
+        toolName: 'scan_disk_junk',
+        output: 'Error: Only available on Windows.',
+        success: false,
+      );
+    }
+
+    final service = DiskCleanerService.instance;
+    if (service.isScanning) {
+      return const ToolResult(
+        toolName: 'scan_disk_junk',
+        output:
+            'Error: A scan is already in progress. Wait for it to finish or cancel it.',
+        success: false,
+      );
+    }
+
+    // Parse arguments
+    final drivesArg = args['drives'];
+    final List<String> drives;
+    if (drivesArg is List) {
+      drives = drivesArg.map((e) => e.toString()).toList();
+    } else {
+      drives = const ['C:\\'];
+    }
+
+    final categoriesArg = args['categories'];
+    final List<String> categories;
+    if (categoriesArg is List) {
+      categories = categoriesArg.map((e) => e.toString()).toList();
+    } else {
+      categories = const [];
+    }
+
+    try {
+      service.emitAgentActivity(DiskCleanerAgentActivity(
+        type: DiskCleanerAgentActivityType.scanStarted,
+        ownerTabId: ownerTabId,
+        message: 'CB Agent is scanning junk files...',
+      ));
+      final report = await service.scanJunk(
+        drivePaths: drives,
+        categoryIds: categories,
+        onProgress: (progress) {
+          service.emitAgentActivity(DiskCleanerAgentActivity(
+            type: DiskCleanerAgentActivityType.scanProgress,
+            ownerTabId: ownerTabId,
+            message: 'CB Agent is scanning junk files...',
+            itemsFound: progress.itemsFound,
+            bytesFound: progress.bytesFound,
+            currentPath: progress.currentPath,
+          ));
+        },
+      );
+      service.emitAgentActivity(DiskCleanerAgentActivity(
+        type: DiskCleanerAgentActivityType.scanDone,
+        ownerTabId: ownerTabId,
+        message: 'CB Agent scan complete.',
+        itemsFound: report.totalCount,
+        bytesFound: report.totalBytes,
+        report: report,
+      ));
+
+      // Generate scan_id and cache the report
+      final scanId =
+          'sc_${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+      _cacheScan(scanId, report);
+
+      // Build output
+      final buffer = StringBuffer();
+      buffer.writeln('Scan complete. scan_id=$scanId');
+      buffer.writeln('Drives: ${report.drivesScanned.join(', ')}');
+      buffer.writeln(
+          'Total: ${report.totalCount} items, ${_formatSize(report.totalBytes)}');
+      buffer.writeln();
+      buffer.writeln('By category:');
+      for (final entry in report.itemsByCategory.entries) {
+        final items = entry.value;
+        final catBytes = items.fold<int>(0, (s, i) => s + i.sizeBytes);
+        final sample = items.isNotEmpty ? items.first.path : '';
+        buffer.writeln(
+            '- ${entry.key}: ${items.length} items, ${_formatSize(catBytes)}${sample.isNotEmpty ? ' (sample: $sample)' : ''}');
+      }
+
+      if (report.warnings.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln('Warnings:');
+        for (final w in report.warnings) {
+          buffer.writeln('- $w');
+        }
+      }
+
+      buffer.writeln();
+      buffer.writeln(
+          'To clean: call clean_disk_junk with scan_id="$scanId" and categories:[...] to clean specific categories.');
+
+      return ToolResult(
+        toolName: 'scan_disk_junk',
+        output: _truncate(buffer.toString().trim()),
+      );
+    } catch (e) {
+      service.emitAgentActivity(DiskCleanerAgentActivity(
+        type: DiskCleanerAgentActivityType.scanFailed,
+        ownerTabId: ownerTabId,
+        message: 'CB Agent scan failed: $e',
+      ));
+      return ToolResult(
+        toolName: 'scan_disk_junk',
+        output: 'Error: $e',
+        success: false,
+      );
+    }
+  }
+
+  Future<ToolResult> _cleanDiskJunk(Map<String, dynamic> args) async {
+    if (!Platform.isWindows) {
+      return const ToolResult(
+        toolName: 'clean_disk_junk',
+        output: 'Error: Only available on Windows.',
+        success: false,
+      );
+    }
+
+    final scanId = args['scan_id'] as String? ?? '';
+    if (scanId.isEmpty) {
+      return const ToolResult(
+        toolName: 'clean_disk_junk',
+        output: 'Error: "scan_id" argument required. Run scan_disk_junk first.',
+        success: false,
+      );
+    }
+
+    final cached = _scanCache[scanId];
+    if (cached == null) {
+      return const ToolResult(
+        toolName: 'clean_disk_junk',
+        output:
+            'Error: scan_id not found or expired. Run scan_disk_junk again.',
+        success: false,
+      );
+    }
+
+    // Filter by categories if specified
+    final categoriesArg = args['categories'];
+    final List<String>? filterCategories;
+    if (categoriesArg is List && categoriesArg.isNotEmpty) {
+      filterCategories = categoriesArg.map((e) => e.toString()).toList();
+    } else {
+      filterCategories = null;
+    }
+
+    final permanent = args['permanent'] as bool? ?? false;
+    final maxItems = args['max_items'] as int? ?? 10000;
+
+    // Collect items to clean
+    var items = cached.report.allItems;
+    if (filterCategories != null) {
+      final cats = filterCategories;
+      items = items.where((i) => cats.contains(i.categoryId)).toList();
+    }
+    if (items.length > maxItems) {
+      items = items.sublist(0, maxItems);
+    }
+
+    if (items.isEmpty) {
+      return const ToolResult(
+        toolName: 'clean_disk_junk',
+        output: 'No items to clean for the specified categories.',
+      );
+    }
+
+    try {
+      final service = DiskCleanerService.instance;
+      final report = await service.cleanJunk(
+        items: items,
+        permanent: permanent,
+      );
+
+      final buffer = StringBuffer();
+      buffer.writeln('Cleanup complete.');
+      buffer.writeln(
+          'Mode: ${report.wasPermanent ? "Permanent delete" : "Move to Recycle Bin"}');
+      buffer.writeln(
+          'Freed: ${_formatSize(report.freedBytes)} across ${report.successCount} items');
+      buffer.writeln('Succeeded: ${report.successCount}');
+      if (report.failureCount > 0) {
+        buffer.writeln(
+            'Failed: ${report.failureCount} (locked by other processes or permission denied)');
+        final examples = report.failed.entries.take(5);
+        buffer.writeln('Examples of failures:');
+        for (final e in examples) {
+          buffer.writeln('  - ${e.key} (${e.value})');
+        }
+      }
+      if (report.skippedInUse.isNotEmpty) {
+        buffer.writeln(
+            'Skipped (currently in use): ${report.skippedInUse.length}');
+      }
+      if (report.skippedUnsafe.isNotEmpty) {
+        buffer
+            .writeln('Skipped (unsafe paths): ${report.skippedUnsafe.length}');
+      }
+
+      // Remove from cache after successful clean
+      _scanCache.remove(scanId);
+
+      return ToolResult(
+        toolName: 'clean_disk_junk',
+        output: _truncate(buffer.toString().trim()),
+      );
+    } catch (e) {
+      return ToolResult(
+        toolName: 'clean_disk_junk',
+        output: 'Error: $e',
+        success: false,
+      );
+    }
+  }
+
+  ToolResult _getPendingCleanupReview(Map<String, dynamic> args) {
+    final service = DiskCleanerService.instance;
+    final items = service.pendingCleanupItems;
+    if (items == null || items.isEmpty) {
+      return const ToolResult(
+        toolName: 'get_pending_cleanup_review',
+        output:
+            'No pending cleanup items. The user has not selected anything to clean yet.',
+      );
+    }
+
+    // Pre-compute Windows known-folder shortcuts so paths can be displayed
+    // compactly (e.g. %TEMP% instead of C:\Users\...\AppData\Local\Temp).
+    final shortcuts = _knownFolderShortcuts();
+
+    final buffer = StringBuffer();
+    buffer.writeln('PENDING CLEANUP: ${items.length} items, '
+        '${_formatSize(service.pendingCleanupBytes)}');
+
+    final byCategory = <String, List<JunkItem>>{};
+    for (final item in items) {
+      byCategory.putIfAbsent(item.categoryId, () => []).add(item);
+    }
+
+    for (final entry in byCategory.entries) {
+      final catItems = entry.value;
+      final catBytes = catItems.fold<int>(0, (s, i) => s + i.sizeBytes);
+      buffer.writeln();
+      buffer.writeln('${entry.key}: ${catItems.length} items, '
+          '${_formatSize(catBytes)}');
+
+      // Aggregate by ROOT (top-3 distinct path prefixes after shortcut)
+      final byRoot = <String, _RootStat>{};
+      final extCounts = <String, int>{};
+      for (final f in catItems) {
+        final root = _shortenPath(_findRootPrefix(f.path, catItems), shortcuts);
+        final stat = byRoot.putIfAbsent(root, () => _RootStat());
+        stat.count++;
+        stat.bytes += f.sizeBytes;
+
+        // Extension stats (category-wide)
+        final dot = f.path.lastIndexOf('.');
+        final slash = f.path.lastIndexOf(RegExp(r'[\\/]'));
+        final ext = (dot > slash && dot > 0)
+            ? f.path.substring(dot).toLowerCase()
+            : '(no-ext)';
+        extCounts[ext] = (extCounts[ext] ?? 0) + 1;
+      }
+
+      // Roots: top 3 by size
+      final sortedRoots = byRoot.entries.toList()
+        ..sort((a, b) => b.value.bytes.compareTo(a.value.bytes));
+      final rootsLine = sortedRoots
+          .take(3)
+          .map((e) =>
+              '${e.key} (${e.value.count}, ${_formatSize(e.value.bytes)})')
+          .join('; ');
+      if (rootsLine.isNotEmpty) {
+        buffer.writeln('  roots: $rootsLine'
+            '${sortedRoots.length > 3 ? ' +${sortedRoots.length - 3} more' : ''}');
+      }
+
+      // Extensions: top 5
+      final sortedExts = extCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final extsLine =
+          sortedExts.take(5).map((e) => '${e.key} x${e.value}').join(', ');
+      if (extsLine.isNotEmpty) {
+        buffer.writeln('  exts: $extsLine'
+            '${sortedExts.length > 5 ? ', +${sortedExts.length - 5}' : ''}');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln('Review: are these safe to move to Recycle Bin? '
+        'Flag any risky categories or roots.');
+
+    return ToolResult(
+      toolName: 'get_pending_cleanup_review',
+      output: buffer.toString().trim(),
+    );
+  }
+
+  /// Resolves Windows known folders so paths in the review can be shown as
+  /// short shortcuts (`%TEMP%`, `%APPDATA%`, etc).
+  List<MapEntry<String, String>> _knownFolderShortcuts() {
+    if (!Platform.isWindows) return const [];
+    final env = Platform.environment;
+    final result = <MapEntry<String, String>>[];
+    void add(String name, String? path) {
+      if (path != null && path.isNotEmpty) {
+        result.add(MapEntry(path.toUpperCase(), '%$name%'));
+      }
+    }
+
+    add('TEMP', env['TEMP']);
+    add('LOCALAPPDATA', env['LOCALAPPDATA']);
+    add('APPDATA', env['APPDATA']);
+    add('USERPROFILE', env['USERPROFILE']);
+    add('PROGRAMDATA', env['PROGRAMDATA']);
+    add('WINDIR', env['WINDIR']);
+
+    // Sort by length descending so we match the most-specific path first.
+    result.sort((a, b) => b.key.length.compareTo(a.key.length));
+    return result;
+  }
+
+  String _shortenPath(String path, List<MapEntry<String, String>> shortcuts) {
+    final upper = path.toUpperCase();
+    for (final pair in shortcuts) {
+      if (upper.startsWith(pair.key)) {
+        final remainder = path.substring(pair.key.length);
+        return '${pair.value}$remainder';
+      }
+    }
+    return path;
+  }
+
+  /// Returns a "natural root" for a path within the given items: the deepest
+  /// shared directory prefix that contains the path. Falls back to the first
+  /// 3 path segments if there's no obvious shared root.
+  String _findRootPrefix(String path, List<JunkItem> peers) {
+    final segments =
+        path.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).toList();
+    if (segments.length <= 3) return path;
+    // Use first 3 segments as the root, e.g. C:\Users\ngtan
+    return '${segments[0]}\\${segments[1]}\\${segments[2]}';
+  }
+
+  static void _cacheScan(String scanId, ScanReport report) {
+    if (_scanCache.length >= _maxScanCacheSize) {
+      _scanCache.remove(_scanCache.keys.first);
+    }
+    _scanCache[scanId] = _CachedScan(report: report);
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
@@ -1137,7 +1596,7 @@ class ToolExecutor {
   static String get toolDefinitions => '''
 === CB FILE HUB KNOWLEDGE ===
 
-You are the AI assistant for **CB File Hub**, a cross-platform file manager app.
+You are **CB Agent**, the AI assistant built into CB File Hub. CB File Hub users call you CB Agent.
 CB File Hub has a powerful **tag system** that lets users tag files with custom labels (like #vacation, #work, #important). Tags are stored in a SQLite database and work across all drives.
 
 Key concepts:
@@ -1249,5 +1708,17 @@ To use a tool, respond with a <tool_call> block:
 - Always search in specific directories (user home, known paths), NOT entire drives.
 - You can call multiple tools in sequence. After each result, decide to continue or give a final answer.
 - When done, respond with normal text (NO tool_call blocks).
+${DiskCleanerSkill.isAvailable ? DiskCleanerSkill.skillBlock : ''}
 ''';
+}
+
+class _CachedScan {
+  final ScanReport report;
+  final DateTime cachedAt;
+  _CachedScan({required this.report}) : cachedAt = DateTime.now();
+}
+
+class _RootStat {
+  int count = 0;
+  int bytes = 0;
 }

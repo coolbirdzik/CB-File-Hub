@@ -27,6 +27,8 @@ class FolderContentBuilder {
     required Function(File, bool) onFileTap,
     required Function(String, {bool shiftSelect, bool ctrlSelect})
         toggleFileSelection,
+    required Function(String, {bool shiftSelect, bool ctrlSelect})
+        toggleFolderSelection,
     required VoidCallback toggleSelectionMode,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
@@ -80,12 +82,14 @@ class FolderContentBuilder {
         onNavigateToPath: onNavigateToPath,
         onFileTap: onFileTap,
         toggleFileSelection: toggleFileSelection,
+        toggleFolderSelection: toggleFolderSelection,
         toggleSelectionMode: toggleSelectionMode,
         showDeleteTagDialog: showDeleteTagDialog,
         showAddTagToFileDialog: showAddTagToFileDialog,
         onClearSearch: onClearSearch,
         onBackButtonPressed: onBackButtonPressed,
         onForwardButtonPressed: onForwardButtonPressed,
+        isDesktopPlatform: isDesktopPlatform,
         showFileTags: showFileTags,
         onZoomLevelChanged: onZoomLevelChanged,
       );

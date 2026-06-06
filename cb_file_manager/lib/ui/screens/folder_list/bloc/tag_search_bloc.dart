@@ -33,11 +33,11 @@ class TagSearchState extends Equatable {
     Map<String, List<String>>? fileTags,
     Set<String>? allUniqueTags,
     List<String>? searchResultPaths,
-    Object? currentSearchTag,
+    Object? currentSearchTag = _unset,
     bool? isGlobalSearch,
-    Object? searchResultsTotal,
+    Object? searchResultsTotal = _unset,
     bool? isLoading,
-    Object? error,
+    Object? error = _unset,
   }) {
     return TagSearchState(
       fileTags: fileTags ?? this.fileTags,
@@ -51,7 +51,7 @@ class TagSearchState extends Equatable {
           ? searchResultsTotal
           : (searchResultsTotal == _unset ? this.searchResultsTotal : null),
       isLoading: isLoading ?? this.isLoading,
-      error: error is String ? error : (error == _unset ? null : this.error),
+      error: error is String ? error : (error == _unset ? this.error : null),
     );
   }
 
@@ -111,11 +111,13 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   ) async {
     try {
       final tags = await TagManager.getTags(event.filePath);
-      if (tags.isNotEmpty) {
-        final updatedTags = Map<String, List<String>>.from(state.fileTags);
+      final updatedTags = Map<String, List<String>>.from(state.fileTags);
+      if (tags.isEmpty) {
+        updatedTags.remove(event.filePath);
+      } else {
         updatedTags[event.filePath] = tags;
-        emit(state.copyWith(fileTags: updatedTags));
       }
+      emit(state.copyWith(fileTags: updatedTags, error: null));
     } catch (e) {
       AppLogger.warning('Error loading tags for file: $e');
     }
@@ -129,7 +131,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     try {
       emit(state.copyWith(isLoading: true));
       final fileTags = await TagManager.getTagsForFiles(event.filePaths);
-      emit(state.copyWith(fileTags: fileTags, isLoading: false));
+      emit(state.copyWith(fileTags: fileTags, isLoading: false, error: null));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: 'Error loading tags: $e'));
     }
@@ -141,7 +143,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   ) async {
     try {
       final tags = await TagManager.getAllUniqueTags(event.directory);
-      emit(state.copyWith(allUniqueTags: tags));
+      emit(state.copyWith(allUniqueTags: tags, error: null));
     } catch (e) {
       AppLogger.warning('Error loading all tags: $e');
     }
@@ -236,7 +238,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         searchResultPaths: paths,
         currentSearchTag: event.tag,
         isGlobalSearch: false,
-        error: paths.isEmpty ? 'No files found with tag "${event.tag}"' : null,
+        error: null,
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -266,9 +268,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         currentSearchTag: event.tag,
         isGlobalSearch: true,
         searchResultsTotal: validPaths.length,
-        error: validPaths.isEmpty
-            ? 'No files found globally with tag "${event.tag}"'
-            : null,
+        error: null,
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -311,9 +311,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         searchResultPaths: paths,
         currentSearchTag: event.tags.join(', '),
         isGlobalSearch: false,
-        error: paths.isEmpty
-            ? 'No files found with tags "${event.tags.join(', ')}"'
-            : null,
+        error: null,
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -359,9 +357,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         currentSearchTag: event.tags.join(', '),
         isGlobalSearch: true,
         searchResultsTotal: validPaths.length,
-        error: validPaths.isEmpty
-            ? 'No files found globally with tags "${event.tags.join(', ')}"'
-            : null,
+        error: null,
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -380,6 +376,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       currentSearchTag: event.tagName,
       isGlobalSearch: event.isGlobal,
       searchResultsTotal: event.total,
+      error: null,
     ));
   }
 

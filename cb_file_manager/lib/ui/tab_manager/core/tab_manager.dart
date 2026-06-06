@@ -4,6 +4,8 @@ import 'dart:math';
 import 'tab_data.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/media/photo_thumbnail_helper.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 /// Events for the TabManager
 abstract class TabEvent {}
@@ -79,6 +81,13 @@ class AddToTabHistory extends TabEvent {
 
 /// Event to close all tabs
 class CloseAllTabs extends TabEvent {}
+
+/// Event to close every tab except [keepTabId].
+class CloseOtherTabs extends TabEvent {
+  final String keepTabId;
+
+  CloseOtherTabs(this.keepTabId);
+}
 
 /// Event to update tab thumbnail
 class UpdateTabThumbnail extends TabEvent {
@@ -173,11 +182,23 @@ class _SplitTabResolution {
 
 /// BLoC for managing tabs
 class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
+  /// Resolves the activity manager lazily so this bloc can be unit-tested
+  /// without a registered service locator.
+  TabActivityManager? get _activity {
+    if (!locator.isRegistered<TabActivityManager>()) return null;
+    try {
+      return locator<TabActivityManager>();
+    } catch (_) {
+      return null;
+    }
+  }
+
   TabManagerBloc() : super(TabManagerState(tabs: [])) {
     on<AddTab>(_onAddTab);
     on<SwitchToTab>(_onSwitchToTab);
     on<CloseTab>(_onCloseTab);
     on<CloseAllTabs>(_onCloseAllTabs);
+    on<CloseOtherTabs>(_onCloseOtherTabs);
     on<UpdateTabPath>(_onUpdateTabPath);
     on<UpdateTabName>(_onUpdateTabName);
     on<ToggleTabPin>(_onToggleTabPin);
@@ -196,6 +217,8 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     final newTabId =
         'tab_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(10000)}';
 
+    debugPrint(
+        'TabManagerBloc._onAddTab: path=${event.path}, highlightedFileName=${event.highlightedFileName}');
     final newTab = TabData(
       id: newTabId,
       name: event.name ?? _extractNameFromPath(event.path),
@@ -205,6 +228,17 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     );
 
     final tabs = List<TabData>.from(state.tabs)..add(newTab);
+
+    // Track newly opened tab in the activity manager. If the user is
+    // switching to it, mark it as focused; otherwise it starts as background.
+    final activity = _activity;
+    if (activity != null) {
+      if (event.switchToTab) {
+        activity.onTabFocused(newTabId, path: event.path);
+      } else {
+        activity.onTabInteraction(newTabId, path: event.path);
+      }
+    }
 
     emit(state.copyWith(
       tabs: tabs,
@@ -216,6 +250,11 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
 
   void _onSwitchToTab(SwitchToTab event, Emitter<TabManagerState> emit) {
     if (state.tabs.any((tab) => tab.id == event.tabId)) {
+      final activity = _activity;
+      if (activity != null) {
+        final tab = state.tabs.firstWhere((t) => t.id == event.tabId);
+        activity.onTabFocused(event.tabId, path: tab.path);
+      }
       emit(state.copyWith(activeTabId: event.tabId));
     }
   }
@@ -235,6 +274,10 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     final tabs = state.tabs.where((tab) => tab.id != event.tabId).toList();
     final selected =
         state.selectedTabIds.where((id) => id != event.tabId).toSet();
+
+    // Notify activity manager that this tab was closed so it can release
+    // any per-tab tracking and downstream caches.
+    _activity?.onTabClosed(event.tabId);
 
     // If we're closing the active tab, switch to another tab
     String? newActiveTabId;
@@ -261,10 +304,39 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
   }
 
   void _onCloseAllTabs(CloseAllTabs event, Emitter<TabManagerState> emit) {
+    final activity = _activity;
+    if (activity != null) {
+      for (final tab in state.tabs) {
+        activity.onTabClosed(tab.id);
+      }
+    }
     emit(state.copyWith(
       tabs: [],
       activeTabId: null,
       clearActiveTabId: true,
+      clearSelectedTabIds: true,
+    ));
+  }
+
+  void _onCloseOtherTabs(CloseOtherTabs event, Emitter<TabManagerState> emit) {
+    if (state.tabs.isEmpty) return;
+    if (!state.tabs.any((t) => t.id == event.keepTabId)) return;
+
+    final activity = _activity;
+    final closing =
+        state.tabs.where((tab) => tab.id != event.keepTabId).toList();
+    if (closing.isEmpty) return;
+
+    if (activity != null) {
+      for (final tab in closing) {
+        activity.onTabClosed(tab.id);
+      }
+    }
+
+    final keep = state.tabs.firstWhere((t) => t.id == event.keepTabId);
+    emit(state.copyWith(
+      tabs: <TabData>[keep],
+      activeTabId: keep.id,
       clearSelectedTabIds: true,
     ));
   }
@@ -400,6 +472,8 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     }).toList();
 
     debugPrint('BLOC_DEBUG: Emitting new state with updated tab path');
+    // Path navigation counts as interaction; keep activity manager in sync.
+    _activity?.onTabInteraction(event.tabId, path: event.newPath);
     emit(state.copyWith(tabs: tabs));
   }
 

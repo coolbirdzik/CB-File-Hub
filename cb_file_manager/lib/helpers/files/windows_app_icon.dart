@@ -10,6 +10,55 @@ class WindowsAppIcon {
   /// Cache for extracted icons
   static final Map<String, ui.Image> _iconCache = {};
 
+  /// Batch extract file-type icons for a list of extensions.
+  /// Uses SHGetFileInfo with SHGFI_USEFILEATTRIBUTES on native side —
+  /// no real file needed, just the extension string.
+  /// Returns a map of extension -> {iconData: Uint8List, width: int, height: int}
+  /// or null for extensions where extraction failed.
+  static Future<Map<String, Uint8List?>> extractIconsForExtensions(
+    List<String> extensions, {
+    int iconSize = 32,
+  }) async {
+    if (!Platform.isWindows || extensions.isEmpty) return {};
+
+    try {
+      final Map<dynamic, dynamic>? result = await _channel
+          .invokeMethod<Map<dynamic, dynamic>>('extractIconsForExtensions', {
+        'extensions': extensions,
+        'iconSize': iconSize,
+      });
+
+      if (result == null) return {};
+
+      final Map<String, Uint8List?> output = {};
+      for (final entry in result.entries) {
+        final ext = entry.key as String;
+        final value = entry.value;
+        if (value is Map) {
+          final iconData = value['iconData'];
+          if (iconData is Uint8List) {
+            // Convert BGRA to RGBA
+            final Uint8List rgbaData = Uint8List(iconData.length);
+            for (int i = 0; i < iconData.length; i += 4) {
+              rgbaData[i] = iconData[i + 2]; // R (from B)
+              rgbaData[i + 1] = iconData[i + 1]; // G
+              rgbaData[i + 2] = iconData[i]; // B (from R)
+              rgbaData[i + 3] = iconData[i + 3]; // A
+            }
+            output[ext] = rgbaData;
+          } else {
+            output[ext] = null;
+          }
+        } else {
+          output[ext] = null;
+        }
+      }
+      return output;
+    } catch (e) {
+      return {};
+    }
+  }
+
   /// Get the associated application for a file extension
   static Future<String?> getAssociatedAppPath(String extension) async {
     if (!Platform.isWindows) return null;

@@ -5,10 +5,13 @@
 #include <windows.h>
 #include <dwmapi.h>
 #include <ole2.h>
+#include <shellapi.h>
+#include <shlobj.h>
 
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstring>
 
 namespace
 {
@@ -21,6 +24,7 @@ namespace
   static bool g_ole_initialized = false;
   static UINT g_cf_tab_payload = 0;
   static UINT g_cf_tab_source_pid = 0;
+  static UINT g_cf_preferred_drop_effect = 0;
 
   typedef enum _WINDOWCOMPOSITIONATTRIB
   {
@@ -509,6 +513,74 @@ namespace
     return h;
   }
 
+  std::wstring Utf8ToWide(const std::string &value)
+  {
+    if (value.empty())
+      return std::wstring();
+    const int count = ::MultiByteToWideChar(
+        CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()),
+        nullptr, 0);
+    if (count <= 0)
+      return std::wstring();
+    std::wstring result(static_cast<size_t>(count), L'\0');
+    ::MultiByteToWideChar(
+        CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()),
+        result.data(), count);
+    return result;
+  }
+
+  std::string WideToUtf8(const std::wstring &value)
+  {
+    if (value.empty())
+      return std::string();
+    const int count = ::WideCharToMultiByte(
+        CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()),
+        nullptr, 0, nullptr, nullptr);
+    if (count <= 0)
+      return std::string();
+    std::string result(static_cast<size_t>(count), '\0');
+    ::WideCharToMultiByte(
+        CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()),
+        result.data(), count, nullptr, nullptr);
+    return result;
+  }
+
+  HGLOBAL CreateDropFilesHGlobal(const std::vector<std::wstring> &paths)
+  {
+    size_t chars = 1;
+    for (const auto &path : paths)
+      chars += path.size() + 1;
+
+    const SIZE_T bytes = sizeof(DROPFILES) + chars * sizeof(wchar_t);
+    HGLOBAL h = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, bytes);
+    if (!h)
+      return nullptr;
+
+    void *raw = ::GlobalLock(h);
+    if (!raw)
+    {
+      ::GlobalFree(h);
+      return nullptr;
+    }
+
+    auto *drop_files = reinterpret_cast<DROPFILES *>(raw);
+    drop_files->pFiles = sizeof(DROPFILES);
+    drop_files->fWide = TRUE;
+
+    wchar_t *cursor = reinterpret_cast<wchar_t *>(
+        reinterpret_cast<BYTE *>(raw) + sizeof(DROPFILES));
+    for (const auto &path : paths)
+    {
+      memcpy(cursor, path.c_str(), path.size() * sizeof(wchar_t));
+      cursor += path.size();
+      *cursor++ = L'\0';
+    }
+    *cursor = L'\0';
+
+    ::GlobalUnlock(h);
+    return h;
+  }
+
   class TabDataObject : public IDataObject
   {
   public:
@@ -632,6 +704,143 @@ namespace
     ULONG ref_count_ = 1;
   };
 
+  class FileDataObject : public IDataObject
+  {
+  public:
+    explicit FileDataObject(std::vector<std::wstring> paths)
+        : paths_(std::move(paths)), source_pid_(::GetCurrentProcessId()) {}
+
+    HRESULT __stdcall QueryInterface(REFIID riid,
+                                     void **ppvObject) override
+    {
+      if (!ppvObject)
+        return E_POINTER;
+      *ppvObject = nullptr;
+      if (riid == IID_IUnknown || riid == IID_IDataObject)
+      {
+        *ppvObject = static_cast<IDataObject *>(this);
+        AddRef();
+        return S_OK;
+      }
+      return E_NOINTERFACE;
+    }
+
+    ULONG __stdcall AddRef() override { return ++ref_count_; }
+
+    ULONG __stdcall Release() override
+    {
+      const ULONG count = --ref_count_;
+      if (count == 0)
+        delete this;
+      return count;
+    }
+
+    HRESULT __stdcall GetData(FORMATETC *pformatetcIn,
+                              STGMEDIUM *pmedium) override
+    {
+      if (!pformatetcIn || !pmedium)
+        return E_INVALIDARG;
+      if ((pformatetcIn->tymed & TYMED_HGLOBAL) == 0)
+        return DV_E_TYMED;
+
+      if (pformatetcIn->cfFormat == CF_HDROP)
+      {
+        HGLOBAL h = CreateDropFilesHGlobal(paths_);
+        if (!h)
+          return E_OUTOFMEMORY;
+        pmedium->tymed = TYMED_HGLOBAL;
+        pmedium->hGlobal = h;
+        pmedium->pUnkForRelease = nullptr;
+        return S_OK;
+      }
+
+      if (pformatetcIn->cfFormat ==
+          static_cast<CLIPFORMAT>(g_cf_preferred_drop_effect))
+      {
+        DWORD effect = DROPEFFECT_MOVE;
+        HGLOBAL h = CopyBytesToHGlobal(&effect, sizeof(effect));
+        if (!h)
+          return E_OUTOFMEMORY;
+        pmedium->tymed = TYMED_HGLOBAL;
+        pmedium->hGlobal = h;
+        pmedium->pUnkForRelease = nullptr;
+        return S_OK;
+      }
+
+      if (pformatetcIn->cfFormat ==
+          static_cast<CLIPFORMAT>(g_cf_tab_source_pid))
+      {
+        DWORD pid = source_pid_;
+        HGLOBAL h = CopyBytesToHGlobal(&pid, sizeof(pid));
+        if (!h)
+          return E_OUTOFMEMORY;
+        pmedium->tymed = TYMED_HGLOBAL;
+        pmedium->hGlobal = h;
+        pmedium->pUnkForRelease = nullptr;
+        return S_OK;
+      }
+
+      return DV_E_FORMATETC;
+    }
+
+    HRESULT __stdcall GetDataHere(FORMATETC *, STGMEDIUM *) override
+    {
+      return E_NOTIMPL;
+    }
+
+    HRESULT __stdcall QueryGetData(FORMATETC *pformatetc) override
+    {
+      if (!pformatetc)
+        return E_INVALIDARG;
+      if ((pformatetc->tymed & TYMED_HGLOBAL) == 0)
+        return DV_E_TYMED;
+
+      if (pformatetc->cfFormat == CF_HDROP ||
+          pformatetc->cfFormat ==
+              static_cast<CLIPFORMAT>(g_cf_preferred_drop_effect) ||
+          pformatetc->cfFormat == static_cast<CLIPFORMAT>(g_cf_tab_source_pid))
+      {
+        return S_OK;
+      }
+      return DV_E_FORMATETC;
+    }
+
+    HRESULT __stdcall GetCanonicalFormatEtc(FORMATETC *, FORMATETC *) override
+    {
+      return E_NOTIMPL;
+    }
+
+    HRESULT __stdcall SetData(FORMATETC *, STGMEDIUM *, BOOL) override
+    {
+      return E_NOTIMPL;
+    }
+
+    HRESULT __stdcall EnumFormatEtc(DWORD, IEnumFORMATETC **) override
+    {
+      return E_NOTIMPL;
+    }
+
+    HRESULT __stdcall DAdvise(FORMATETC *, DWORD, IAdviseSink *, DWORD *) override
+    {
+      return OLE_E_ADVISENOTSUPPORTED;
+    }
+
+    HRESULT __stdcall DUnadvise(DWORD) override
+    {
+      return OLE_E_ADVISENOTSUPPORTED;
+    }
+
+    HRESULT __stdcall EnumDAdvise(IEnumSTATDATA **) override
+    {
+      return OLE_E_ADVISENOTSUPPORTED;
+    }
+
+  private:
+    std::vector<std::wstring> paths_;
+    DWORD source_pid_;
+    ULONG ref_count_ = 1;
+  };
+
   class TabDropSource : public IDropSource
   {
   public:
@@ -682,6 +891,13 @@ namespace
   class TabDropTarget : public IDropTarget
   {
   public:
+    enum class DropKind
+    {
+      none,
+      tab,
+      file,
+    };
+
     explicit TabDropTarget(
         flutter::MethodChannel<flutter::EncodableValue> *channel)
         : channel_(channel), pid_(::GetCurrentProcessId()) {}
@@ -717,7 +933,8 @@ namespace
       if (!pdwEffect)
         return E_INVALIDARG;
       allow_drop_ = false;
-      if (!CanAccept(pDataObj))
+      drop_kind_ = GetDropKind(pDataObj);
+      if (drop_kind_ == DropKind::none)
       {
         NotifyHover(false);
         *pdwEffect = DROPEFFECT_NONE;
@@ -725,7 +942,8 @@ namespace
       }
 
       DWORD source_pid = 0;
-      if (GetSourcePid(pDataObj, &source_pid) && source_pid == pid_)
+      if (drop_kind_ == DropKind::tab &&
+          GetSourcePid(pDataObj, &source_pid) && source_pid == pid_)
       {
         NotifyHover(false);
         *pdwEffect = DROPEFFECT_NONE;
@@ -733,7 +951,7 @@ namespace
       }
 
       allow_drop_ = true;
-      NotifyHover(true);
+      NotifyHover(drop_kind_ == DropKind::tab);
       *pdwEffect = DROPEFFECT_MOVE;
       return S_OK;
     }
@@ -749,15 +967,64 @@ namespace
     HRESULT __stdcall DragLeave() override
     {
       NotifyHover(false);
+      drop_kind_ = DropKind::none;
+      allow_drop_ = false;
       return S_OK;
     }
 
-    HRESULT __stdcall Drop(IDataObject *pDataObj, DWORD, POINTL,
+    HRESULT __stdcall Drop(IDataObject *pDataObj, DWORD, POINTL pt,
                            DWORD *pdwEffect) override
     {
       if (!pdwEffect)
         return E_INVALIDARG;
       NotifyHover(false);
+
+      DropKind kind = drop_kind_;
+      if (kind == DropKind::none)
+        kind = GetDropKind(pDataObj);
+
+      if (kind == DropKind::file)
+      {
+        std::vector<std::wstring> paths;
+        if (!GetFilePaths(pDataObj, &paths) || paths.empty())
+        {
+          *pdwEffect = DROPEFFECT_NONE;
+          return S_OK;
+        }
+
+        if (channel_)
+        {
+          flutter::EncodableList encoded_paths;
+          encoded_paths.reserve(paths.size());
+          for (const auto &path : paths)
+            encoded_paths.emplace_back(WideToUtf8(path));
+
+          flutter::EncodableMap payload;
+          payload[flutter::EncodableValue("paths")] =
+              flutter::EncodableValue(encoded_paths);
+          payload[flutter::EncodableValue("globalX")] =
+              flutter::EncodableValue(static_cast<double>(pt.x));
+          payload[flutter::EncodableValue("globalY")] =
+              flutter::EncodableValue(static_cast<double>(pt.y));
+          payload[flutter::EncodableValue("effect")] =
+              flutter::EncodableValue("move");
+
+          channel_->InvokeMethod(
+              "onNativeFileDrop",
+              std::make_unique<flutter::EncodableValue>(payload));
+        }
+
+        *pdwEffect = DROPEFFECT_MOVE;
+        drop_kind_ = DropKind::none;
+        allow_drop_ = false;
+        return S_OK;
+      }
+
+      if (kind != DropKind::tab)
+      {
+        *pdwEffect = DROPEFFECT_NONE;
+        return S_OK;
+      }
 
       DWORD source_pid = 0;
       if (!GetSourcePid(pDataObj, &source_pid))
@@ -766,8 +1033,8 @@ namespace
         return S_OK;
       }
 
-      // Ignore drops originating from this process to avoid accidental dupes
-      // when users click-drag and release within the same window.
+      // Ignore tab drops originating from this process to avoid accidental
+      // duplicates when users click-drag and release within the same window.
       if (source_pid == pid_)
       {
         *pdwEffect = DROPEFFECT_NONE;
@@ -789,16 +1056,36 @@ namespace
       }
 
       *pdwEffect = DROPEFFECT_MOVE;
+      drop_kind_ = DropKind::none;
+      allow_drop_ = false;
       return S_OK;
     }
 
   private:
-    bool CanAccept(IDataObject *data)
+    DropKind GetDropKind(IDataObject *data)
+    {
+      if (HasTabPayload(data))
+        return DropKind::tab;
+      if (HasFileDrop(data))
+        return DropKind::file;
+      return DropKind::none;
+    }
+
+    bool HasTabPayload(IDataObject *data)
     {
       if (!data)
         return false;
       FORMATETC fmt = {static_cast<CLIPFORMAT>(g_cf_tab_payload), nullptr,
                        DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+      return data->QueryGetData(&fmt) == S_OK;
+    }
+
+    bool HasFileDrop(IDataObject *data)
+    {
+      if (!data)
+        return false;
+      FORMATETC fmt = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1,
+                       TYMED_HGLOBAL};
       return data->QueryGetData(&fmt) == S_OK;
     }
 
@@ -823,6 +1110,37 @@ namespace
         }
         if (p)
           ::GlobalUnlock(medium.hGlobal);
+      }
+      ::ReleaseStgMedium(&medium);
+      return ok;
+    }
+
+    bool GetFilePaths(IDataObject *data, std::vector<std::wstring> *out_paths)
+    {
+      if (!data || !out_paths)
+        return false;
+      FORMATETC fmt = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1,
+                       TYMED_HGLOBAL};
+      STGMEDIUM medium{};
+      if (data->GetData(&fmt, &medium) != S_OK)
+        return false;
+
+      bool ok = false;
+      if (medium.tymed == TYMED_HGLOBAL && medium.hGlobal)
+      {
+        HDROP drop = static_cast<HDROP>(medium.hGlobal);
+        const UINT count = ::DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+        for (UINT i = 0; i < count; ++i)
+        {
+          const UINT len = ::DragQueryFileW(drop, i, nullptr, 0);
+          if (len == 0)
+            continue;
+          std::wstring path(static_cast<size_t>(len) + 1, L'\0');
+          ::DragQueryFileW(drop, i, path.data(), len + 1);
+          path.resize(len);
+          out_paths->push_back(std::move(path));
+        }
+        ok = !out_paths->empty();
       }
       ::ReleaseStgMedium(&medium);
       return ok;
@@ -876,6 +1194,7 @@ namespace
     ULONG ref_count_ = 1;
     bool allow_drop_ = false;
     bool hover_notified_ = false;
+    DropKind drop_kind_ = DropKind::none;
   };
 
 } // namespace
@@ -948,6 +1267,11 @@ void WindowUtilsPlugin::EnsureDropTargetRegistered()
   {
     g_cf_tab_source_pid =
         ::RegisterClipboardFormatW(L"CB_FILE_MANAGER_TAB_SOURCE_PID");
+  }
+  if (g_cf_preferred_drop_effect == 0)
+  {
+    g_cf_preferred_drop_effect =
+        ::RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT);
   }
 
   HWND hwnd = GetTopLevelWindow(registrar_);
@@ -1170,6 +1494,70 @@ void WindowUtilsPlugin::HandleMethodCall(
     }
 
     IDataObject *data_object = new TabDataObject(*payload);
+    IDropSource *drop_source = new TabDropSource();
+    DWORD effect = DROPEFFECT_NONE;
+    const HRESULT hr = ::DoDragDrop(data_object, drop_source, DROPEFFECT_MOVE,
+                                    &effect);
+    drop_source->Release();
+    data_object->Release();
+
+    const bool moved = (hr == DRAGDROP_S_DROP) && ((effect & DROPEFFECT_MOVE) != 0);
+    result->Success(flutter::EncodableValue(moved ? "moved" : "canceled"));
+    return;
+  }
+
+  if (method == "startNativeFileDrag")
+  {
+    EnsureDropTargetRegistered();
+
+    const auto *arguments =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!arguments)
+    {
+      result->Error("INVALID_ARGUMENTS", "Missing arguments.");
+      return;
+    }
+
+    const auto paths_it = arguments->find(flutter::EncodableValue("paths"));
+    if (paths_it == arguments->end())
+    {
+      result->Error("INVALID_ARGUMENTS", "Missing paths.");
+      return;
+    }
+
+    const auto *encoded_paths =
+        std::get_if<flutter::EncodableList>(&paths_it->second);
+    if (!encoded_paths)
+    {
+      result->Error("INVALID_ARGUMENTS", "Paths must be a list.");
+      return;
+    }
+
+    std::vector<std::wstring> paths;
+    for (const auto &value : *encoded_paths)
+    {
+      if (const auto *path = std::get_if<std::string>(&value))
+      {
+        std::wstring wide_path = Utf8ToWide(*path);
+        if (!wide_path.empty())
+          paths.push_back(std::move(wide_path));
+      }
+    }
+
+    if (paths.empty())
+    {
+      result->Error("INVALID_ARGUMENTS", "No valid paths.");
+      return;
+    }
+
+    if (!g_ole_initialized || g_cf_tab_source_pid == 0 ||
+        g_cf_preferred_drop_effect == 0)
+    {
+      result->Error("OLE_NOT_INITIALIZED", "OLE drag-drop is not available.");
+      return;
+    }
+
+    IDataObject *data_object = new FileDataObject(std::move(paths));
     IDropSource *drop_source = new TabDropSource();
     DWORD effect = DROPEFFECT_NONE;
     const HRESULT hr = ::DoDragDrop(data_object, drop_source, DROPEFFECT_MOVE,

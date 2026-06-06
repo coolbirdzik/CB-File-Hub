@@ -31,6 +31,7 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart'; // Import Ta
 
 // Add imports for hardware acceleration
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
@@ -42,8 +43,10 @@ import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 import 'package:cb_file_manager/ui/widgets/value_listenable_builders.dart';
 import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
+import 'package:cb_file_manager/ui/components/common/browser_like_collection_view.dart';
 
 /// A screen for browsing network locations, with a UI consistent with TabbedFolderListScreen
 class NetworkBrowserScreen extends StatefulWidget {
@@ -109,6 +112,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       ValueNotifier<Offset?>(null);
   final ValueNotifier<Offset?> _dragCurrentPositionNotifier =
       ValueNotifier<Offset?>(null);
+  final GlobalKey _contentStackKey = GlobalKey();
 
   bool get _isDesktopMode => !Platform.isAndroid && !Platform.isIOS;
 
@@ -317,10 +321,16 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
 
-      final viewMode = await prefs.getViewMode();
+      final globalViewMode = await prefs.getViewMode();
+      final viewMode = await prefs.getNetworkBrowserViewMode(
+        fallback: globalViewMode,
+      );
       final effectiveViewMode =
           viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode;
-      final sortOption = await prefs.getSortOption();
+      final globalSortOption = await prefs.getSortOption();
+      final sortOption = await prefs.getNetworkBrowserSortOption(
+        fallback: globalSortOption,
+      );
       final gridZoomLevel = await prefs.getGridZoomLevel();
       final columnVisibility = await prefs.getColumnVisibility();
       final maxZoom = GridZoomConstraints.maxGridSizeForContext(
@@ -354,7 +364,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     try {
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
-      await prefs.setViewMode(mode);
+      await prefs.setNetworkBrowserViewMode(mode);
     } catch (e) {
       // Reduced debug logging
     }
@@ -364,7 +374,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     try {
       final UserPreferences prefs = UserPreferences.instance;
       await prefs.init();
-      await prefs.setSortOption(option);
+      await prefs.setNetworkBrowserSortOption(option);
     } catch (e) {
       // Reduced debug logging
     }
@@ -393,30 +403,119 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _selectionBloc.add(ToggleSelectionMode(forceValue: forceValue));
   }
 
+  List<String> _visiblePathsForState(NetworkBrowsingState state) {
+    final folders = (state.directories ?? const <FileSystemEntity>[])
+        .map((entity) => entity.path);
+    final files = (state.files ?? const <FileSystemEntity>[])
+        .map((entity) => entity.path);
+    return [...folders, ...files];
+  }
+
+  Set<String> _folderPathSetForState(NetworkBrowsingState state) {
+    return (state.directories ?? const <FileSystemEntity>[])
+        .map((entity) => entity.path)
+        .toSet();
+  }
+
   void _toggleFileSelection(String filePath,
       {bool shiftSelect = false, bool ctrlSelect = false}) {
-    // This logic would need the combined file/folder list from NetworkBrowsingState
-    // For now, implement simple toggle
-    _selectionBloc.add(ToggleFileSelection(
-      filePath,
-      shiftSelect: false,
-      ctrlSelect: ctrlSelect,
-    ));
+    if (!shiftSelect) {
+      _selectionBloc.add(ToggleFileSelection(
+        filePath,
+        shiftSelect: false,
+        ctrlSelect: ctrlSelect,
+      ));
+      return;
+    }
+
+    final browsingState = _networkBrowsingBloc.state;
+    final selectionState = _selectionBloc.state;
+    if (selectionState.lastSelectedPath == null) {
+      _selectionBloc.add(ToggleFileSelection(
+        filePath,
+        shiftSelect: false,
+        ctrlSelect: ctrlSelect,
+      ));
+      return;
+    }
+
+    final visiblePaths = _visiblePathsForState(browsingState);
+    final folderPaths = _folderPathSetForState(browsingState);
+    final currentIndex = visiblePaths.indexOf(filePath);
+    final lastIndex = visiblePaths.indexOf(selectionState.lastSelectedPath!);
+    if (currentIndex == -1 || lastIndex == -1) return;
+
+    final start = currentIndex < lastIndex ? currentIndex : lastIndex;
+    final end = currentIndex < lastIndex ? lastIndex : currentIndex;
+    final range = visiblePaths.sublist(start, end + 1);
+    _selectionBloc.add(
+      SelectItemsInRect(
+        folderPaths: range.where(folderPaths.contains).toSet(),
+        filePaths: range.where((path) => !folderPaths.contains(path)).toSet(),
+        isCtrlPressed: ctrlSelect,
+        isShiftPressed: true,
+        lastSelectedPath: filePath,
+      ),
+    );
   }
 
   void _toggleFolderSelection(String folderPath,
       {bool shiftSelect = false, bool ctrlSelect = false}) {
-    // This logic would need the combined file/folder list from NetworkBrowsingState
-    // For now, implement simple toggle
-    _selectionBloc.add(ToggleFolderSelection(
-      folderPath,
-      shiftSelect: false,
-      ctrlSelect: ctrlSelect,
-    ));
+    if (!shiftSelect) {
+      _selectionBloc.add(ToggleFolderSelection(
+        folderPath,
+        shiftSelect: false,
+        ctrlSelect: ctrlSelect,
+      ));
+      return;
+    }
+
+    final browsingState = _networkBrowsingBloc.state;
+    final selectionState = _selectionBloc.state;
+    if (selectionState.lastSelectedPath == null) {
+      _selectionBloc.add(ToggleFolderSelection(
+        folderPath,
+        shiftSelect: false,
+        ctrlSelect: ctrlSelect,
+      ));
+      return;
+    }
+
+    final visiblePaths = _visiblePathsForState(browsingState);
+    final folderPaths = _folderPathSetForState(browsingState);
+    final currentIndex = visiblePaths.indexOf(folderPath);
+    final lastIndex = visiblePaths.indexOf(selectionState.lastSelectedPath!);
+    if (currentIndex == -1 || lastIndex == -1) return;
+
+    final start = currentIndex < lastIndex ? currentIndex : lastIndex;
+    final end = currentIndex < lastIndex ? lastIndex : currentIndex;
+    final range = visiblePaths.sublist(start, end + 1);
+    _selectionBloc.add(
+      SelectItemsInRect(
+        folderPaths: range.where(folderPaths.contains).toSet(),
+        filePaths: range.where((path) => !folderPaths.contains(path)).toSet(),
+        isCtrlPressed: ctrlSelect,
+        isShiftPressed: true,
+        lastSelectedPath: folderPath,
+      ),
+    );
   }
 
   void _clearSelection() {
     _selectionBloc.add(ClearSelection());
+  }
+
+  void _selectAll(NetworkBrowsingState state) {
+    _selectionBloc.add(SelectAll(
+      allFilePaths: (state.files ?? const <FileSystemEntity>[])
+          .whereType<File>()
+          .map((file) => file.path)
+          .toList(),
+      allFolderPaths: (state.directories ?? const <FileSystemEntity>[])
+          .whereType<Directory>()
+          .map((directory) => directory.path)
+          .toList(),
+    ));
   }
 
   void _toggleViewMode() {
@@ -425,6 +524,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         _viewMode = ViewMode.grid;
       } else if (_viewMode == ViewMode.grid) {
         _viewMode = ViewMode.details;
+      } else if (_viewMode == ViewMode.details) {
+        _viewMode = ViewMode.tree;
       } else {
         _viewMode = ViewMode.list;
       }
@@ -504,6 +605,17 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     setState(() {
       _showSearchBar = true;
     });
+  }
+
+  void _toggleSearchBar(BuildContext context) {
+    if (_showSearchBar) {
+      setState(() {
+        _showSearchBar = false;
+      });
+      return;
+    }
+
+    _showSearchTip(context);
   }
 
   void _navigateToPath(String path) {
@@ -664,12 +776,16 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       BuildContext context, NetworkBrowsingState networkState) {
     return BlocBuilder<SelectionBloc, SelectionState>(
         builder: (context, selectionState) {
+      final bool visualSelectionMode = isDesktopPlatform
+          ? selectionState.selectedCount > 1
+          : selectionState.isSelectionMode;
       List<Widget> actions = [];
 
-      if (!selectionState.isSelectionMode) {
+      if (!visualSelectionMode) {
         actions.addAll(SharedActionBar.buildCommonActions(
           context: context,
-          onSearchPressed: () => _showSearchTip(context),
+          onSearchPressed: () => _toggleSearchBar(context),
+          isSearchActive: _showSearchBar,
           onSortOptionSelected: (SortOption option) {
             setState(() {
               _sortOption = option;
@@ -706,9 +822,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           IconButton(
             icon: const Icon(PhosphorIconsLight.checks),
             tooltip: AppLocalizations.of(context)!.selectAll,
-            onPressed: () {
-              // Implement select all logic
-            },
+            onPressed: () => _selectAll(networkState),
           ),
         ]);
       }
@@ -724,12 +838,12 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             : null,
         body: FileViewShell(
           viewMode: _viewMode,
-          onGridZoomDelta: (delta) =>
-              _handleGridZoomChange(_gridZoomLevel + delta),
+          onViewScaleDelta: _handleViewScaleDelta,
           onMouseBack: _handleBackButton,
           onMouseForward: _handleMouseForwardButton,
           onRefresh: _refreshFileList,
-          onEscape: selectionState.isSelectionMode
+          onSelectAll: () => _selectAll(networkState),
+          onEscape: selectionState.selectedCount > 0
               ? _clearSelection
               : _showSearchBar
                   ? () => setState(() {
@@ -761,15 +875,17 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
             prefixIcon:
                 const Icon(PhosphorIconsLight.magnifyingGlass, size: 20),
-            suffixIcon: IconButton(
-              icon: const Icon(PhosphorIconsLight.x),
-              onPressed: () {
-                setState(() {
-                  _showSearchBar = false;
-                  _searchController.clear();
-                });
-              },
-            ),
+            suffixIcon: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(PhosphorIconsLight.broom),
+                    tooltip: AppLocalizations.of(context)!.clearSearch,
+                    onPressed: () {
+                      setState(() {
+                        _searchController.clear();
+                      });
+                    },
+                  ),
           ),
         ),
       );
@@ -893,11 +1009,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           ),
         );
       } else {
-        final Widget contentView = _viewMode == ViewMode.grid
-            ? _buildGridView(folders, files, selectionState)
-            : _viewMode == ViewMode.details
-                ? _buildDetailsView(folders, files, selectionState)
-                : _buildListView(folders, files, selectionState);
+        final Widget contentView = _buildContentView(
+          folders: folders,
+          files: files,
+          selectionState: selectionState,
+        );
 
         content = Stack(
           clipBehavior: Clip.none,
@@ -908,7 +1024,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
               enableBlur: true,
               child: GestureDetector(
                 onTap: () {
-                  if (selectionState.isSelectionMode) {
+                  if (selectionState.selectedCount > 0) {
                     _clearSelection();
                   }
                 },
@@ -977,7 +1093,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             top: 0,
             child: LinearProgressIndicator(minHeight: 2.0),
           ),
-        if (selectionState.isSelectionMode && isDesktopPlatform)
+        if (selectionState.selectedCount > 1 && isDesktopPlatform)
           Positioned(
             bottom: 0,
             left: 0,
@@ -993,9 +1109,12 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     );
   }
 
-  // Build grid view
-  Widget _buildGridView(List<FileSystemEntity> folders,
-      List<FileSystemEntity> files, SelectionState selectionState) {
+  Widget _buildContentView({
+    required List<FileSystemEntity> folders,
+    required List<FileSystemEntity> files,
+    required SelectionState selectionState,
+  }) {
+    final items = <FileSystemEntity>[...folders, ...files];
     final maxZoom = GridZoomConstraints.maxGridSizeForContext(
       context,
       mode: GridSizeMode.columns,
@@ -1006,83 +1125,32 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           maxZoom,
         )
         .toInt();
-    return GridView.builder(
+    return BrowserLikeCollectionView<FileSystemEntity>(
+      viewMode: _viewMode,
+      items: items,
+      isDesktop: isDesktopPlatform,
+      stackKey: _contentStackKey,
+      onRefresh: () async => _refreshFileList(),
+      scrollController: _scrollController,
       padding: const EdgeInsets.all(8.0),
       physics: const ClampingScrollPhysics(),
-      cacheExtent: 1500,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.8,
-      ),
-      itemCount: folders.length + files.length,
-      itemBuilder: (context, index) {
-        final String itemPath = index < folders.length
-            ? folders[index].path
-            : files[index - folders.length].path;
-        final bool isSelected = selectionState.isPathSelected(itemPath);
-
-        return LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints constraints) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            try {
-              if (!context.mounted) return;
-              final RenderObject? renderObject = context.findRenderObject();
-              if (renderObject is RenderBox &&
-                  renderObject.hasSize &&
-                  renderObject.attached) {
-                final position = renderObject.localToGlobal(Offset.zero);
-                _registerItemPosition(
-                    itemPath,
-                    Rect.fromLTWH(position.dx, position.dy,
-                        renderObject.size.width, renderObject.size.height));
-              }
-            } catch (e) {
-              // Silently ignore layout errors to prevent crashes
-              debugPrint('Layout error in network browser grid view: $e');
-            }
-          });
-
-          if (index < folders.length) {
-            final folder = folders[index] as Directory;
-            return KeyedSubtree(
-              key: ValueKey('folder-grid-${folder.path}'),
-              child: _wrapNetworkItem(
-                isSelected,
-                folder_list_components.FolderGridItem(
-                  key: ValueKey('folder-grid-item-${folder.path}'),
-                  folder: folder,
-                  onNavigate: _navigateToPath,
-                  isSelected: isSelected,
-                  toggleFolderSelection: _toggleFolderSelection,
-                  isDesktopMode: _isDesktopMode,
-                  lastSelectedPath: selectionState.lastSelectedPath,
-                  clearSelectionMode: _clearSelection,
-                ),
-              ),
-            );
-          } else {
-            final file = files[index - folders.length] as File;
-            return KeyedSubtree(
-              key: ValueKey('file-grid-${file.path}'),
-              child: _wrapNetworkItem(
-                isSelected,
-                folder_list_components.FileGridItem(
-                  key: ValueKey('file-grid-item-${file.path}'),
-                  file: file,
-                  onFileTap: (file, _) => _handleFileOpen(context, file),
-                  isSelected: isSelected,
-                  toggleFileSelection: _toggleFileSelection,
-                  toggleSelectionMode: _toggleSelectionMode,
-                  isDesktopMode: _isDesktopMode,
-                  lastSelectedPath: selectionState.lastSelectedPath,
-                ),
-              ),
-            );
-          }
-        });
-      },
+      gridCacheExtent: 1500,
+      detailsCacheExtent: 800,
+      listCacheExtent: 1200,
+      itemIdentity: (item) => item.path,
+      registerItemPosition: _registerItemPosition,
+      dragSelectionOverlay: const SizedBox.shrink(),
+      gridCrossAxisCount: crossAxisCount,
+      listItemBuilder: (itemContext, item) =>
+          _buildListItem(itemContext, item, selectionState),
+      gridItemBuilder: (itemContext, item) =>
+          _buildGridItem(itemContext, item, selectionState),
+      detailsItemBuilder: (itemContext, item) =>
+          _buildDetailsItem(itemContext, item, selectionState),
+      treeIsLeaf: (item) => item is File,
+      treeChildrenLoader: _loadNetworkChildren,
+      treeItemBuilder: (itemContext, node, depth) =>
+          _buildNetworkTreeRow(itemContext, node, depth),
     );
   }
 
@@ -1119,6 +1187,32 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final clamped =
         newZoomLevel.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
     _saveGridZoomSetting(clamped);
+  }
+
+  /// Unified Ctrl+scroll spectrum handler: walks tree↔detail↔list↔grid and
+  /// adjusts grid item size. `+1` = more spacious, `-1` = denser.
+  void _handleViewScaleDelta(int delta) {
+    if (delta == 0) return;
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.columns,
+    );
+    final result = ViewModeSpectrum.step(
+      currentMode: _viewMode,
+      currentZoom: _gridZoomLevel,
+      // Network browser supports tree/details/list (no columns mode).
+      supported: const {ViewMode.tree, ViewMode.details, ViewMode.list},
+      delta: delta,
+      minZoom: UserPreferences.minGridZoomLevel,
+      maxZoom: maxZoom,
+    );
+
+    if (result.mode != _viewMode) {
+      _setViewMode(result.mode);
+    }
+    if (result.gridZoomLevel != _gridZoomLevel) {
+      _saveGridZoomSetting(result.gridZoomLevel);
+    }
   }
 
   void _showColumnVisibilityDialog(BuildContext context) {
@@ -1226,124 +1320,249 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     );
   }
 
-  Widget _buildDetailsView(List<FileSystemEntity> folders,
-      List<FileSystemEntity> files, SelectionState selectionState) {
-    debugPrint(
-        "NetworkBrowserScreen: Building details view with ${folders.length} folders and ${files.length} files");
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(8.0),
-      physics: const ClampingScrollPhysics(),
-      cacheExtent: 800,
-      itemCount: folders.length + files.length,
-      itemBuilder: (context, index) {
-        final String itemPath = index < folders.length
-            ? folders[index].path
-            : files[index - folders.length].path;
-        final bool isSelected = selectionState.isPathSelected(itemPath);
+  Widget _buildGridItem(
+    BuildContext itemContext,
+    FileSystemEntity item,
+    SelectionState selectionState,
+  ) {
+    final isSelected = selectionState.isPathSelected(item.path);
+    if (item is Directory) {
+      return KeyedSubtree(
+        key: ValueKey('folder-grid-${item.path}'),
+        child: _wrapNetworkItem(
+          isSelected,
+          folder_list_components.FolderGridItem(
+            key: ValueKey('folder-grid-item-${item.path}'),
+            folder: item,
+            onNavigate: _navigateToPath,
+            isSelected: isSelected,
+            toggleFolderSelection: _toggleFolderSelection,
+            isDesktopMode: _isDesktopMode,
+            lastSelectedPath: selectionState.lastSelectedPath,
+            clearSelectionMode: _clearSelection,
+          ),
+        ),
+      );
+    }
 
-        if (index < folders.length) {
-          final folder = folders[index] as Directory;
-          return KeyedSubtree(
-            key: ValueKey('folder-details-${folder.path}'),
-            child: _wrapNetworkItem(
-              isSelected,
-              folder_list_components.FolderDetailsItem(
-                key: ValueKey('folder-details-item-${folder.path}'),
-                folder: folder,
-                onTap: _navigateToPath,
-                isSelected: isSelected,
-                toggleFolderSelection: _toggleFolderSelection,
-                isDesktopMode: _isDesktopMode,
-                lastSelectedPath: selectionState.lastSelectedPath,
-                clearSelectionMode: _clearSelection,
-                columnVisibility: _columnVisibility,
-              ),
-            ),
-          );
-        } else {
-          final file = files[index - folders.length] as File;
-          return KeyedSubtree(
-            key: ValueKey('file-details-${file.path}'),
-            child: _wrapNetworkItem(
-              isSelected,
-              folder_list_components.FileDetailsItem(
-                key: ValueKey('file-details-item-${file.path}'),
-                file: file,
-                onTap: (file, _) => _handleFileOpen(context, file),
-                isSelected: isSelected,
-                toggleFileSelection: _toggleFileSelection,
-                state: FolderListState(widget.path),
-                showDeleteTagDialog: (_, __, ___) {},
-                showAddTagToFileDialog: (_, __) {},
-                isDesktopMode: _isDesktopMode,
-                lastSelectedPath: selectionState.lastSelectedPath,
-                columnVisibility: _columnVisibility,
-              ),
-            ),
-          );
-        }
-      },
+    final file = item as File;
+    return KeyedSubtree(
+      key: ValueKey('file-grid-${file.path}'),
+      child: _wrapNetworkItem(
+        isSelected,
+        folder_list_components.FileGridItem(
+          key: ValueKey('file-grid-item-${file.path}'),
+          file: file,
+          onFileTap: (openedFile, _) =>
+              _handleFileOpen(itemContext, openedFile),
+          isSelected: isSelected,
+          isSelectionMode: isDesktopPlatform
+              ? selectionState.selectedCount > 1
+              : selectionState.isSelectionMode,
+          toggleFileSelection: _toggleFileSelection,
+          toggleSelectionMode: _toggleSelectionMode,
+          isDesktopMode: _isDesktopMode,
+          lastSelectedPath: selectionState.lastSelectedPath,
+        ),
+      ),
     );
   }
 
-  Widget _buildListView(List<FileSystemEntity> folders,
-      List<FileSystemEntity> files, SelectionState selectionState) {
-    debugPrint(
-        "NetworkBrowserScreen: Building list view with ${folders.length} folders and ${files.length} files");
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(8.0),
-      physics: const ClampingScrollPhysics(),
-      cacheExtent: 1200,
-      itemCount: folders.length + files.length,
-      itemBuilder: (context, index) {
-        final String itemPath = index < folders.length
-            ? folders[index].path
-            : files[index - folders.length].path;
-        final bool isSelected = selectionState.isPathSelected(itemPath);
+  Widget _buildDetailsItem(
+    BuildContext itemContext,
+    FileSystemEntity item,
+    SelectionState selectionState,
+  ) {
+    final isSelected = selectionState.isPathSelected(item.path);
+    if (item is Directory) {
+      return KeyedSubtree(
+        key: ValueKey('folder-details-${item.path}'),
+        child: _wrapNetworkItem(
+          isSelected,
+          folder_list_components.FolderDetailsItem(
+            key: ValueKey('folder-details-item-${item.path}'),
+            folder: item,
+            onTap: _navigateToPath,
+            isSelected: isSelected,
+            toggleFolderSelection: _toggleFolderSelection,
+            isDesktopMode: _isDesktopMode,
+            lastSelectedPath: selectionState.lastSelectedPath,
+            clearSelectionMode: _clearSelection,
+            columnVisibility: _columnVisibility,
+          ),
+        ),
+      );
+    }
 
-        if (index < folders.length) {
-          final folder = folders[index] as Directory;
-          return KeyedSubtree(
-            key: ValueKey('folder-list-${folder.path}'),
-            child: _wrapNetworkItem(
-              isSelected,
-              folder_list_components.FolderItem(
-                key: ValueKey('folder-list-item-${folder.path}'),
-                folder: folder,
-                onTap: _navigateToPath,
-                isSelected: isSelected,
-                toggleFolderSelection: _toggleFolderSelection,
-                isDesktopMode: _isDesktopMode,
-                lastSelectedPath: selectionState.lastSelectedPath,
-                clearSelectionMode: _clearSelection,
-              ),
-            ),
-          );
-        } else {
-          final file = files[index - folders.length] as File;
-          return KeyedSubtree(
-            key: ValueKey('file-list-${file.path}'),
-            child: _wrapNetworkItem(
-              isSelected,
-              folder_list_components.FileItem(
-                key: ValueKey('file-list-item-${file.path}'),
-                file: file,
-                state: FolderListState(widget.path),
-                isSelectionMode: selectionState.isSelectionMode,
-                isSelected: isSelected,
-                toggleFileSelection: _toggleFileSelection,
-                showDeleteTagDialog: (_, __, ___) {},
-                showAddTagToFileDialog: (_, __) {},
-                onFileTap: (file, _) => _handleFileOpen(context, file),
-                isDesktopMode: _isDesktopMode,
-                lastSelectedPath: selectionState.lastSelectedPath,
-              ),
-            ),
-          );
+    final file = item as File;
+    return KeyedSubtree(
+      key: ValueKey('file-details-${file.path}'),
+      child: _wrapNetworkItem(
+        isSelected,
+        folder_list_components.FileDetailsItem(
+          key: ValueKey('file-details-item-${file.path}'),
+          file: file,
+          onTap: (openedFile, _) => _handleFileOpen(itemContext, openedFile),
+          isSelected: isSelected,
+          toggleFileSelection: _toggleFileSelection,
+          state: FolderListState(_currentPath),
+          showDeleteTagDialog: (_, __, ___) {},
+          showAddTagToFileDialog: (_, __) {},
+          isDesktopMode: _isDesktopMode,
+          lastSelectedPath: selectionState.lastSelectedPath,
+          columnVisibility: _columnVisibility,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListItem(
+    BuildContext itemContext,
+    FileSystemEntity item,
+    SelectionState selectionState,
+  ) {
+    final isSelected = selectionState.isPathSelected(item.path);
+    if (item is Directory) {
+      return KeyedSubtree(
+        key: ValueKey('folder-list-${item.path}'),
+        child: _wrapNetworkItem(
+          isSelected,
+          folder_list_components.FolderItem(
+            key: ValueKey('folder-list-item-${item.path}'),
+            folder: item,
+            onTap: _navigateToPath,
+            isSelected: isSelected,
+            toggleFolderSelection: _toggleFolderSelection,
+            isDesktopMode: _isDesktopMode,
+            lastSelectedPath: selectionState.lastSelectedPath,
+            clearSelectionMode: _clearSelection,
+          ),
+        ),
+      );
+    }
+
+    final file = item as File;
+    return KeyedSubtree(
+      key: ValueKey('file-list-${file.path}'),
+      child: _wrapNetworkItem(
+        isSelected,
+        folder_list_components.FileItem(
+          key: ValueKey('file-list-item-${file.path}'),
+          file: file,
+          state: FolderListState(_currentPath),
+          isSelectionMode: isDesktopPlatform
+              ? selectionState.selectedCount > 1
+              : selectionState.isSelectionMode,
+          isSelected: isSelected,
+          toggleFileSelection: _toggleFileSelection,
+          showDeleteTagDialog: (_, __, ___) {},
+          showAddTagToFileDialog: (_, __) {},
+          onFileTap: (openedFile, _) =>
+              _handleFileOpen(itemContext, openedFile),
+          isDesktopMode: _isDesktopMode,
+          lastSelectedPath: selectionState.lastSelectedPath,
+        ),
+      ),
+    );
+  }
+
+  /// Lazy children loader for the network tree view.
+  ///
+  /// Reuses the active connection's `NetworkServiceBase.listDirectory`
+  /// (the same call the navigation flow uses), then maps results into
+  /// `TreeNode<FileSystemEntity>` with folders first, then files.
+  Future<List<TreeNode<FileSystemEntity>>> _loadNetworkChildren(
+    TreeNode<FileSystemEntity> node,
+  ) async {
+    final entity = node.data;
+    if (entity is! Directory) return const [];
+    final service = _networkBrowsingBloc.state.currentService;
+    if (service == null) return const [];
+
+    try {
+      final contents = await service.listDirectory(entity.path);
+      final folders = contents.whereType<Directory>().toList()
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
+      final files = contents.whereType<File>().toList()
+        ..sort((a, b) => a.path
+            .split('/')
+            .last
+            .toLowerCase()
+            .compareTo(b.path.split('/').last.toLowerCase()));
+      return [
+        ...folders.map((d) => TreeNode<FileSystemEntity>(
+              id: d.path,
+              data: d,
+              isLeaf: false,
+            )),
+        ...files.map((f) => TreeNode<FileSystemEntity>(
+              id: f.path,
+              data: f,
+              isLeaf: true,
+            )),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Compact row for the network tree.
+  Widget _buildNetworkTreeRow(
+    BuildContext itemContext,
+    TreeNode<FileSystemEntity> node,
+    int depth,
+  ) {
+    final entity = node.data;
+    final isDir = entity is Directory;
+    final segments = entity.path
+        .split(RegExp(r'[\\/]+'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final name = segments.isEmpty ? entity.path : segments.last;
+    final theme = Theme.of(itemContext);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (isDir) {
+          _navigateToPath(entity.path);
         }
       },
+      onDoubleTap: () {
+        if (isDir) {
+          _navigateToPath(entity.path);
+        } else if (entity is File) {
+          _handleFileOpen(itemContext, entity);
+        }
+      },
+      child: Row(
+        children: [
+          Icon(
+            isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
+            size: 14,
+            color: isDir
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isDir ? FontWeight.w500 : FontWeight.normal,
+                color: theme.colorScheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

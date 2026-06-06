@@ -23,7 +23,7 @@ import 'ai_agent_state.dart';
 class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   final AiProviderService _providerService;
   final AiChatHistoryService? _historyService;
-  final ToolExecutor _toolExecutor = ToolExecutor();
+  final ToolExecutor _toolExecutor;
   static const _uuid = Uuid();
   static const int _softContextCharLimit = 24000;
   static const int _hardContextCharLimit = 14000;
@@ -36,11 +36,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   AiAgentBloc({
     required AiProviderService providerService,
     AiChatHistoryService? historyService,
+    String? ownerTabId,
     List<String> thinkingPhrases = const ['Thinking...'],
     String waitingApproval = 'Waiting for your approval...',
     String runningToolTemplate = 'Running {}...',
   })  : _providerService = providerService,
         _historyService = historyService,
+        _toolExecutor = ToolExecutor(ownerTabId: ownerTabId),
         super(AiAgentState(
           thinkingPhrases: thinkingPhrases,
           waitingApproval: waitingApproval,
@@ -67,6 +69,9 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     on<SwitchConversation>(_onSwitchConversation);
     on<DeleteConversation>(_onDeleteConversation);
     on<RefreshConversations>(_onRefreshConversations);
+    on<ClearError>((event, emit) {
+      emit(state.copyWith(clearError: true));
+    });
   }
 
   /// Auto-saves the current conversation whenever messages settle (not loading).
@@ -214,6 +219,16 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           systemPrompt: systemPrompt,
           activity: activity,
         );
+        // Capture raw payload for debug "View raw payload" inspection
+        emit(state.copyWith(
+          lastApiPayload: _buildPayloadSnapshot(
+            messages: preparedContext.messages,
+            systemPrompt: preparedContext.systemPrompt,
+            providerId: state.selectedProviderId,
+            modelName: state.selectedModelName,
+            stream: false,
+          ),
+        ));
         final result = await _providerService.chat(
           preparedContext.messages,
           systemPrompt: preparedContext.systemPrompt,
@@ -361,7 +376,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
             activity.add(
                 '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
-            emit(state.copyWith(toolActivity: List.of(activity)));
+            emit(state.copyWith(
+              toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls),
+            ));
 
             toolResultBuffer.writeln(
               '<tool_result name="${call.name}">\n${toolResult.output}\n</tool_result>',
@@ -388,7 +406,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
           activity.add(
               '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
-          emit(state.copyWith(toolActivity: List.of(activity)));
+          emit(state.copyWith(
+            toolActivity: List.of(activity),
+            currentToolCalls: List.of(allToolCalls),
+          ));
 
           toolResultBuffer.writeln(
             '<tool_result name="${call.name}">\n${toolResult.output}\n</tool_result>',
@@ -565,6 +586,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       activeProviderId:
           resolvedProviderId.isNotEmpty ? resolvedProviderId : null,
       clearThinking: true,
+      clearCurrentToolCalls: true,
       toolActivity: List.of(activity),
     ));
   }
@@ -600,6 +622,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           final fn = p.split(Platform.pathSeparator).last;
           buffer.writeln('MOVE TO RECYCLE BIN: $fn\n$p');
         }
+      } else if (call.name == 'clean_disk_junk') {
+        final scanId = call.arguments['scan_id'] as String? ?? '?';
+        final permanent = call.arguments['permanent'] as bool? ?? false;
+        final cats = call.arguments['categories'] as List?;
+        final catsStr = cats != null ? cats.join(', ') : 'all scanned';
+        buffer
+            .writeln('CLEAN DISK JUNK: scan_id=$scanId, categories=[$catsStr]');
+        buffer.writeln(
+            permanent ? 'Mode: PERMANENT DELETE' : 'Mode: Move to Recycle Bin');
       }
     }
 
@@ -620,6 +651,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         title = 'Agent wants to execute a command';
       } else if (name == 'delete_file') {
         title = 'Agent wants to move to recycle bin';
+      } else if (name == 'clean_disk_junk') {
+        title = 'Agent wants to clean disk junk';
       } else {
         title = 'Agent wants to perform an action';
       }
@@ -627,8 +660,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       title = 'Agent wants to perform ${calls.length} actions';
     }
 
-    final allDangerous =
-        calls.every((c) => c.name == 'run_command' || c.name == 'delete_file');
+    final allDangerous = calls.every((c) =>
+        c.name == 'run_command' ||
+        c.name == 'delete_file' ||
+        c.name == 'clean_disk_junk');
 
     final String confirmLabel;
     if (singleCall) {
@@ -641,6 +676,9 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           break;
         case 'delete_file':
           confirmLabel = 'Delete';
+          break;
+        case 'clean_disk_junk':
+          confirmLabel = 'Clean';
           break;
         default:
           confirmLabel = 'Confirm';
@@ -672,6 +710,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             : ApprovalActionType.createFile;
       case 'delete_file':
         return ApprovalActionType.deleteFile;
+      case 'clean_disk_junk':
+        return ApprovalActionType.cleanJunk;
       default:
         return ApprovalActionType.generic;
     }
@@ -700,7 +740,9 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       'list_directory|search_files|read_file|write_file|delete_file|'
       'get_file_info|run_command|search_by_tag|get_file_tags|'
       'list_all_tags|search_content|list_video_libraries|'
-      'get_video_library_files|list_albums|get_album_files';
+      'get_video_library_files|list_albums|get_album_files|'
+      'list_disk_junk_categories|get_drive_space|scan_disk_junk|clean_disk_junk|'
+      'get_pending_cleanup_review';
 
   /// Strips **complete** tool call blocks from text.
   /// Used for finished (non-streaming) responses.
@@ -1290,7 +1332,7 @@ RULES:
 
 CRITICAL - TOOL EXECUTION:
 - When you need to create, modify, or delete files, or run commands: CALL THE TOOL DIRECTLY. Do NOT ask the user for permission in text.
-- The system has a built-in approval mechanism. When you call a dangerous tool (write_file, delete_file, run_command), the system will AUTOMATICALLY show an approval dialog to the user BEFORE executing.
+- The system has a built-in approval mechanism. When you call a dangerous tool (write_file, delete_file, run_command, clean_disk_junk), the system will AUTOMATICALLY show an approval dialog to the user BEFORE executing.
 - You MUST call the tool and let the system handle approval. NEVER say things like "Do you want me to do this?" or "Should I proceed?" — just call the tool.
 - If you want to explain what you're about to do, write your explanation FIRST, then call the tool in the same response.
 - Example: "I'll create 3 test files in the temp directory." followed by the tool_call block.
@@ -1654,6 +1696,39 @@ Do NOT include the JSON block if no files match.
       messages: recentMessages,
       systemPrompt: compactedPrompt,
     );
+  }
+
+  /// Builds a JSON-serializable snapshot of what's about to be sent to the
+  /// provider. Used by the "View raw payload" debug action in the chat UI.
+  Map<String, dynamic> _buildPayloadSnapshot({
+    required List<AiMessage> messages,
+    required String systemPrompt,
+    required String? providerId,
+    required String? modelName,
+    required bool stream,
+  }) {
+    return {
+      'providerId': providerId ?? '(default)',
+      'modelName': modelName ?? '(default)',
+      'stream': stream,
+      'systemPrompt': systemPrompt,
+      'messages': messages
+          .map((m) => {
+                'role': m.role.toString().split('.').last,
+                'content': m.content,
+                if (m.toolCalls != null && m.toolCalls!.isNotEmpty)
+                  'toolCalls': m.toolCalls!
+                      .map((tc) => {
+                            'name': tc.toolName,
+                            'arguments': tc.arguments,
+                            'result': tc.result,
+                            'success': tc.success,
+                          })
+                      .toList(),
+              })
+          .toList(),
+      'capturedAt': DateTime.now().toIso8601String(),
+    };
   }
 
   int _estimateContextChars(List<AiMessage> messages, String systemPrompt) {

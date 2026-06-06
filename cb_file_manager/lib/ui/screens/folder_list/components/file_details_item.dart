@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:cb_file_manager/bloc/selection/selection_bloc.dart';
+import 'package:cb_file_manager/bloc/selection/selection_event.dart';
 import '../../../components/common/shared_file_context_menu.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -14,6 +17,9 @@ import 'package:cb_file_manager/helpers/network/streaming_helper.dart';
 import 'package:cb_file_manager/services/network_browsing/webdav_service.dart';
 import 'package:cb_file_manager/services/network_browsing/ftp_service.dart';
 import '../../../utils/item_interaction_style.dart';
+import 'package:cb_file_manager/services/file_metadata_service.dart';
+import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 class FileDetailsItem extends StatefulWidget {
   final File file;
@@ -25,6 +31,8 @@ class FileDetailsItem extends StatefulWidget {
       toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final bool showFileTags; // Add parameter to control tag display
@@ -39,6 +47,8 @@ class FileDetailsItem extends StatefulWidget {
     required this.toggleFileSelection,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
@@ -127,15 +137,39 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
       });
     }
 
+    final bool shouldCtrlSelect =
+        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
+
     // Call toggleFileSelection with appropriate parameters
     widget.toggleFileSelection(
       widget.file.path,
       shiftSelect: isShiftPressed,
-      ctrlSelect: isCtrlPressed,
+      ctrlSelect: shouldCtrlSelect,
     );
   }
 
   void _showFileContextMenu(BuildContext context, Offset globalPosition) {
+    try {
+      final selectionBloc = context.read<SelectionBloc>();
+      final selectionState = selectionBloc.state;
+
+      if (selectionState.allSelectedPaths.length > 1 &&
+          selectionState.allSelectedPaths.contains(widget.file.path)) {
+        showMultipleFilesContextMenu(
+          context: context,
+          selectedPaths: selectionState.allSelectedPaths,
+          globalPosition: globalPosition,
+          onDeleteFiles: widget.onDeleteFiles,
+          onClearSelection: () {
+            selectionBloc.add(ClearSelection());
+          },
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error checking selection state: $e');
+    }
+
     showFileContextMenu(
       context: context,
       file: widget.file,
@@ -143,6 +177,8 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
       isVideo: isVideo,
       isImage: isImage,
       showAddTagToFileDialog: widget.showAddTagToFileDialog,
+      onDeleteFile: widget.onDeleteFile,
+      showOpenFileLocation: widget.state.isSearchActive,
       globalPosition: globalPosition,
     );
   }
@@ -341,6 +377,105 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                           ),
                         ),
                       ),
+
+                    // Date Accessed column
+                    if (widget.columnVisibility.dateAccessed)
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: Text(
+                            _fileStat != null
+                                ? _fileStat!.accessed
+                                    .toString()
+                                    .split('.')
+                                    .first
+                                : 'Loading...',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Extension column
+                    if (widget.columnVisibility.extension)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: Text(
+                            path.extension(widget.file.path).toLowerCase(),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Path column
+                    if (widget.columnVisibility.path)
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: Text(
+                            widget.file.path,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Tags column
+                    if (widget.columnVisibility.tags)
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: Text(
+                            (widget.state.fileTags[widget.file.path] ?? [])
+                                .join(', '),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+
+                    // Dimensions column
+                    if (widget.columnVisibility.dimensions)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child:
+                              _AsyncDimensionsCell(filePath: widget.file.path),
+                        ),
+                      ),
+
+                    // Duration column
+                    if (widget.columnVisibility.duration)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: _AsyncDurationCell(filePath: widget.file.path),
+                        ),
+                      ),
+
+                    // Item Count column (empty for files)
+                    if (widget.columnVisibility.itemCount)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0, vertical: 10.0),
+                          child: const Text(
+                            '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -356,6 +491,7 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                   },
                   onDoubleTap: widget.isDesktopMode && widget.onTap != null
                       ? () {
+                          _handleFileSelection();
                           widget.onTap!(widget.file, true);
                         }
                       : null,
@@ -482,6 +618,127 @@ class _OptimizedFileIconState extends State<_OptimizedFileIcon>
       fallbackIcon: widget.icon,
       fallbackColor: widget.color,
       borderRadius: BorderRadius.circular(2),
+    );
+  }
+}
+
+/// Async widget that loads and displays image dimensions.
+class _AsyncDimensionsCell extends StatefulWidget {
+  final String filePath;
+
+  const _AsyncDimensionsCell({required this.filePath});
+
+  @override
+  State<_AsyncDimensionsCell> createState() => _AsyncDimensionsCellState();
+}
+
+class _AsyncDimensionsCellState extends State<_AsyncDimensionsCell> {
+  ImageDimensions? _dimensions;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDimensions();
+  }
+
+  @override
+  void didUpdateWidget(_AsyncDimensionsCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.filePath != oldWidget.filePath) {
+      _loaded = false;
+      _dimensions = null;
+      _loadDimensions();
+    }
+  }
+
+  Future<void> _loadDimensions() async {
+    try {
+      final service = locator<FileMetadataService>();
+      final dims = await service.getImageDimensions(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _dimensions = dims;
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Text('...', overflow: TextOverflow.ellipsis);
+    }
+    if (_dimensions == null) {
+      return const Text('\u2014', overflow: TextOverflow.ellipsis);
+    }
+    final l10n = AppLocalizations.of(context)!;
+    return Text(
+      l10n.dimensionsFormat(_dimensions!.width, _dimensions!.height),
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// Async widget that loads and displays media duration.
+class _AsyncDurationCell extends StatefulWidget {
+  final String filePath;
+
+  const _AsyncDurationCell({required this.filePath});
+
+  @override
+  State<_AsyncDurationCell> createState() => _AsyncDurationCellState();
+}
+
+class _AsyncDurationCellState extends State<_AsyncDurationCell> {
+  Duration? _duration;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDuration();
+  }
+
+  @override
+  void didUpdateWidget(_AsyncDurationCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.filePath != oldWidget.filePath) {
+      _loaded = false;
+      _duration = null;
+      _loadDuration();
+    }
+  }
+
+  Future<void> _loadDuration() async {
+    try {
+      final service = locator<FileMetadataService>();
+      final dur = await service.getMediaDuration(widget.filePath);
+      if (mounted) {
+        setState(() {
+          _duration = dur;
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Text('...', overflow: TextOverflow.ellipsis);
+    }
+    if (_duration == null) {
+      return const Text('\u2014', overflow: TextOverflow.ellipsis);
+    }
+    return Text(
+      FileMetadataService.formatDuration(_duration!),
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

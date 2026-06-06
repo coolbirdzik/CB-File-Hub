@@ -143,11 +143,17 @@ class SetViewMode extends FolderListEvent {
 
 class SetSortOption extends FolderListEvent {
   final SortOption sortOption;
+  final bool persist;
+  final String? folderPath;
 
-  const SetSortOption(this.sortOption);
+  const SetSortOption(
+    this.sortOption, {
+    this.persist = true,
+    this.folderPath,
+  });
 
   @override
-  List<Object> get props => [sortOption];
+  List<Object?> get props => [sortOption, persist, folderPath];
 }
 
 class SetGridZoom extends FolderListEvent {

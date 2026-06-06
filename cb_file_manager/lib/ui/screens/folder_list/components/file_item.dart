@@ -83,11 +83,14 @@ class FileItem extends StatefulWidget {
       toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
+  final Future<void> Function(BuildContext, File)? onDeleteFile;
+  final Future<void> Function(BuildContext, List<String>)? onDeleteFiles;
   final Function(File, bool)? onFileTap;
   final bool isDesktopMode;
   final String?
       lastSelectedPath; // Add parameter to track last selected file for shift-selection
   final bool showFileTags; // Add parameter to control tag display
+  final bool showItemBackground;
 
   const FileItem({
     Key? key,
@@ -98,10 +101,13 @@ class FileItem extends StatefulWidget {
     required this.toggleFileSelection,
     required this.showDeleteTagDialog,
     required this.showAddTagToFileDialog,
+    this.onDeleteFile,
+    this.onDeleteFiles,
     this.onFileTap,
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
+    this.showItemBackground = true,
   }) : super(key: key);
 
   @override
@@ -311,8 +317,9 @@ class _FileItemState extends State<FileItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    // Trong mobile mode, luôn sử dụng ctrlSelect để add to selection
-    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode
+        ? isCtrlPressed || (widget.isSelectionMode && !isShiftPressed)
+        : true;
 
     widget.toggleFileSelection(widget.file.path,
         shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
@@ -331,6 +338,7 @@ class _FileItemState extends State<FileItem> {
             context: context,
             selectedPaths: selectionState.allSelectedPaths,
             globalPosition: globalPosition,
+            onDeleteFiles: widget.onDeleteFiles,
             onClearSelection: () {
               selectionBloc.add(ClearSelection());
             },
@@ -351,6 +359,8 @@ class _FileItemState extends State<FileItem> {
         isVideo: isVideo,
         isImage: isImage,
         showAddTagToFileDialog: widget.showAddTagToFileDialog,
+        onDeleteFile: widget.onDeleteFile,
+        showOpenFileLocation: widget.state.isSearchActive,
         globalPosition: globalPosition,
       );
     } catch (e) {
@@ -364,6 +374,8 @@ class _FileItemState extends State<FileItem> {
           isVideo: false,
           isImage: false,
           showAddTagToFileDialog: widget.showAddTagToFileDialog,
+          onDeleteFile: widget.onDeleteFile,
+          showOpenFileLocation: widget.state.isSearchActive,
           globalPosition: globalPosition,
         );
       } catch (e2) {
@@ -394,6 +406,13 @@ class _FileItemState extends State<FileItem> {
               isSelected: isSelected,
               isHovering: isHovering,
             );
+            // When showItemBackground is false, still show selection/hover
+            // highlight but skip the rounded card styling (margin + radius).
+            final Color effectiveBackgroundColor = widget.showItemBackground
+                ? backgroundColor
+                : (isSelected || isHovering)
+                    ? backgroundColor
+                    : Colors.transparent;
 
             return RepaintBoundary(
               child: Opacity(
@@ -404,13 +423,20 @@ class _FileItemState extends State<FileItem> {
                   cursor: SystemMouseCursors.click,
                   child: Container(
                     margin: EdgeInsets.symmetric(
-                        horizontal: widget.isDesktopMode ? 8.0 : 0,
-                        vertical: widget.isDesktopMode ? 4.0 : 0),
+                        horizontal:
+                            widget.isDesktopMode && widget.showItemBackground
+                                ? 8.0
+                                : 0,
+                        vertical:
+                            widget.isDesktopMode && widget.showItemBackground
+                                ? 4.0
+                                : 0),
                     decoration: BoxDecoration(
-                      color: backgroundColor,
-                      borderRadius: widget.isDesktopMode
-                          ? BorderRadius.circular(16)
-                          : BorderRadius.zero,
+                      color: effectiveBackgroundColor,
+                      borderRadius:
+                          widget.isDesktopMode && widget.showItemBackground
+                              ? BorderRadius.circular(16)
+                              : BorderRadius.zero,
                     ),
                     child: Stack(
                       children: [
@@ -465,7 +491,10 @@ class _FileItemState extends State<FileItem> {
                                 _openFile(isVideo, isImage);
                               },
                               onDoubleTap: widget.isDesktopMode
-                                  ? () => _openFile(isVideo, isImage)
+                                  ? () {
+                                      _handleSelection();
+                                      _openFile(isVideo, isImage);
+                                    }
                                   : null,
                               onSecondaryTapUp: (details) {
                                 _showContextMenu(
@@ -481,7 +510,9 @@ class _FileItemState extends State<FileItem> {
                             ),
                           ),
                         // Selection indicator - only rebuilds when selection changes
-                        if (isSelected && !widget.isDesktopMode)
+                        if (isSelected &&
+                            (!widget.isDesktopMode ||
+                                !widget.showItemBackground))
                           Positioned(
                             left: 0,
                             top: 0,
