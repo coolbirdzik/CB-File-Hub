@@ -1,4 +1,4 @@
-package com.example.cb_file_manager
+package com.cbv.filehub
 
 import android.content.Context
 import android.content.Intent
@@ -22,7 +22,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
 import java.io.File
-import com.coolbird.cb_file_manager.MemoryManagementPlugin
+import com.cbv.filehub.MemoryManagementPlugin
 
 // Media3 / ExoPlayer for native PiP playback
 import androidx.media3.common.MediaItem

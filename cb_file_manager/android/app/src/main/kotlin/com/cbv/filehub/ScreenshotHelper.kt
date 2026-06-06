@@ -1,4 +1,4 @@
-package com.example.cb_file_manager
+package com.cbv.filehub
 
 import android.graphics.Bitmap
 import android.graphics.Canvas

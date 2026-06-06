@@ -1,4 +1,4 @@
-package com.example.cb_file_manager
+package com.cbv.filehub
 
 import android.app.ActivityManager
 import android.content.Context
@@ -330,4 +330,4 @@ class MemoryManagementPlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         private const val TAG = "MemoryManagementPlugin"
     }
-} 
+}

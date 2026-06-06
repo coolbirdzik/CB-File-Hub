@@ -10,6 +10,14 @@ on:
         description: "Release version (e.g., v1.0.0)"
         required: false
         default: ""
+      play_track:
+        description: "Google Play track to publish to"
+        required: false
+        default: "internal"
+      play_status:
+        description: "Google Play release status: completed, inProgress, halted, or draft"
+        required: false
+        default: "completed"
 
 env:
   FLUTTER_VERSION: "3.41.5"
@@ -421,6 +429,7 @@ jobs:
   build-android-aab:
     runs-on: ubuntu-latest
     needs: generate-release-notes
+    environment: Production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -442,7 +451,46 @@ jobs:
           cd ${{ env.PROJECT_DIR }}
           flutter pub get
 
+      - name: Validate Google Play release configuration
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+        run: |
+          missing=0
+          for name in \
+            ANDROID_KEYSTORE_BASE64 \
+            ANDROID_KEYSTORE_PASSWORD \
+            ANDROID_KEY_ALIAS \
+            ANDROID_KEY_PASSWORD \
+            GOOGLE_PLAY_SERVICE_ACCOUNT_JSON \
+            GOOGLE_PLAY_PACKAGE_NAME; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required Google Play release config: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Restore Android signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          KEYSTORE_PATH="$RUNNER_TEMP/android-upload-keystore.jks"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
       - name: Build AAB
+        env:
+          ANDROID_APPLICATION_ID: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd ${{ env.PROJECT_DIR }}
           flutter build appbundle --release --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.generate-release-notes.outputs.version_code }}
@@ -458,6 +506,16 @@ jobs:
         with:
           name: android-aab
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
+
+      - name: Submit AAB to Google Play
+        uses: r0adkll/upload-google-play@v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+          releaseFiles: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
+          tracks: ${{ github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal' }}
+          status: ${{ github.event.inputs.play_status || vars.GOOGLE_PLAY_STATUS || 'completed' }}
+          releaseName: ${{ needs.generate-release-notes.outputs.version_tag }}
 
   # Create GitHub Release
   create-release:

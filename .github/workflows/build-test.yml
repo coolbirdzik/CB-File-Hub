@@ -87,15 +87,10 @@ jobs:
         shell: cmd
         run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
 
-      - name: Run integration tests - showcase_screenshots_e2e_test
-        run: |
-          cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/showcase_screenshots_e2e_test.dart -d windows --dart-define=CB_E2E=true
-
-      - name: Stop stray cb_file_hub.exe (after showcase_screenshots)
-        if: always()
-        shell: cmd
-        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+      # showcase_screenshots_e2e_test is a marketing screenshot generator, not a
+      # functional test suite. It is intentionally skipped on CI -- run it
+      # locally with `flutter test integration_test/showcase_screenshots_e2e_test.dart`
+      # when refreshing marketing screenshots.
 
       - name: Run integration tests - video_thumbnails_e2e_test
         run: |
