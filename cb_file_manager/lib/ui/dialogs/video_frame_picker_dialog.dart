@@ -326,11 +326,9 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _seekButton(
-                        PhosphorIconsLight.skipBack, '-10s', -10),
+                    _seekButton(PhosphorIconsLight.skipBack, '-10s', -10),
                     const SizedBox(width: 4),
-                    _seekButton(
-                        PhosphorIconsLight.caretLeft, '-1s', -1),
+                    _seekButton(PhosphorIconsLight.caretLeft, '-1s', -1),
                     const SizedBox(width: 8),
                     // Play/pause
                     StreamBuilder<bool>(
@@ -351,11 +349,9 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                       },
                     ),
                     const SizedBox(width: 8),
-                    _seekButton(
-                        PhosphorIconsLight.caretRight, '+1s', 1),
+                    _seekButton(PhosphorIconsLight.caretRight, '+1s', 1),
                     const SizedBox(width: 4),
-                    _seekButton(
-                        PhosphorIconsLight.skipForward, '+10s', 10),
+                    _seekButton(PhosphorIconsLight.skipForward, '+10s', 10),
                   ],
                 ),
               ),
@@ -364,18 +360,20 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
             // Error message
             if (_error != null && _duration.inMilliseconds > 0)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Text(
                   _error!,
-                  style: TextStyle(
-                      color: theme.colorScheme.error, fontSize: 12),
+                  style:
+                      TextStyle(color: theme.colorScheme.error, fontSize: 12),
                 ),
               ),
 
             // Preview
             if (_previewBytes != null)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
                     ClipRRect(
@@ -408,8 +406,9 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed:
-                        _isExtracting ? null : () => Navigator.of(context).pop(null),
+                    onPressed: _isExtracting
+                        ? null
+                        : () => Navigator.of(context).pop(null),
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),
@@ -421,8 +420,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(PhosphorIconsLight.eye, size: 18),
                     label: const Text('Preview'),
@@ -436,8 +434,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(PhosphorIconsLight.check, size: 18),
                     label: const Text('Use this frame'),
@@ -456,9 +453,8 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
       icon: Icon(icon, size: 20),
       onPressed: () {
         final newPos = Duration(
-          milliseconds:
-              (_position.inMilliseconds + seconds * 1000)
-                  .clamp(0, _duration.inMilliseconds),
+          milliseconds: (_position.inMilliseconds + seconds * 1000)
+              .clamp(0, _duration.inMilliseconds),
         );
         _seekTo(newPos);
       },

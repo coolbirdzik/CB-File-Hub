@@ -402,8 +402,10 @@ String? _firstUserFrame(String text) {
   final pathOnlyPatterns = <RegExp>[
     RegExp(r'(integration_test/[^\s:"]+\.dart)'),
     RegExp(r'(package:cb_file_manager/[^\s:"]+\.dart)'),
-    RegExp(r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?integration_test[/\\][^\s:"]*?\.dart)'),
-    RegExp(r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?cb_file_manager[/\\][^\s:"]*?\.dart)'),
+    RegExp(
+        r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?integration_test[/\\][^\s:"]*?\.dart)'),
+    RegExp(
+        r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?cb_file_manager[/\\][^\s:"]*?\.dart)'),
   ];
   for (final p in pathOnlyPatterns) {
     for (final m in p.allMatches(text)) {
@@ -763,12 +765,13 @@ String generateHtml(TestReport report) {
               '<code>${_escapeHtml(userFrame)}</code>'
               '</div>');
         }
-        reasonBuf.writeln(
-            '<div class="reason-text">${_escapeHtml(t.error!)}</div>');
+        reasonBuf
+            .writeln('<div class="reason-text">${_escapeHtml(t.error!)}</div>');
         if (t.stackTrace != null &&
             t.stackTrace!.trim().isNotEmpty &&
             t.stackTrace != t.error) {
-          reasonBuf.writeln('<div class="reason-trace-label">Stack trace</div>');
+          reasonBuf
+              .writeln('<div class="reason-trace-label">Stack trace</div>');
           reasonBuf.writeln(
               '<pre class="reason-trace-pre">${_renderTrace(t.stackTrace!)}</pre>');
         }

@@ -238,8 +238,7 @@ class TagHierarchyManager {
 
   /// DFS: can we reach [target] starting from [current] by following
   /// parentToChildren edges?
-  bool _dfsReaches(
-      String current, String target, Set<String> visited) {
+  bool _dfsReaches(String current, String target, Set<String> visited) {
     if (current == target) return true;
     if (!visited.add(current)) return false; // already visited
 

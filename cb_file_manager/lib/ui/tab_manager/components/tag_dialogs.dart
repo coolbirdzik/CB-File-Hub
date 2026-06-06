@@ -206,12 +206,15 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
             final parts = childPart.split(',');
             final currentPart = parts.last.trim().toLowerCase();
 
-            filtered = children.where((c) {
-              final normalized = c.toLowerCase();
-              return !existingChildren.contains(normalized) &&
-                  !_containsTag(c) &&
-                  (currentPart.isEmpty || normalized.contains(currentPart));
-            }).take(10).toList(growable: false);
+            filtered = children
+                .where((c) {
+                  final normalized = c.toLowerCase();
+                  return !existingChildren.contains(normalized) &&
+                      !_containsTag(c) &&
+                      (currentPart.isEmpty || normalized.contains(currentPart));
+                })
+                .take(10)
+                .toList(growable: false);
           }
 
           if (!mounted) return;
@@ -227,9 +230,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
       if (!mounted) return;
 
       // Sort: parents first, then children (with context), then standalone
-      final sorted = suggestions
-          .where((tag) => !_containsTag(tag))
-          .toList();
+      final sorted = suggestions.where((tag) => !_containsTag(tag)).toList();
 
       // Move parents to front
       sorted.sort((a, b) {
@@ -495,8 +496,8 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
   /// Custom suggestion item with thumbnail (40x40), hierarchy context, and
   /// highlighted matching text.
-  Widget _buildSuggestionItem(
-      BuildContext context, String suggestion, bool isHighlighted, Color tagColor) {
+  Widget _buildSuggestionItem(BuildContext context, String suggestion,
+      bool isHighlighted, Color tagColor) {
     final theme = Theme.of(context);
     final thumbnailPath = _thumbnailManager.getThumbnailSync(suggestion);
     final parents = _hierarchyManager.getParents(suggestion);
@@ -522,7 +523,8 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                     color: tagColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Icon(PhosphorIconsLight.tag, size: 18, color: tagColor),
+                  child:
+                      Icon(PhosphorIconsLight.tag, size: 18, color: tagColor),
                 ),
               ),
             )
@@ -553,7 +555,8 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                   suggestion,
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight:
+                        isHighlighted ? FontWeight.w600 : FontWeight.w400,
                     color: theme.colorScheme.onSurface,
                   ),
                 ),

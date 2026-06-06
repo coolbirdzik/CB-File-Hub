@@ -52,7 +52,8 @@ class TagThumbnailManager {
       final all = await db.getAllTagThumbnails();
       _cache.addAll(all);
       _cacheLoaded = true;
-      AppLogger.info('[TagThumbnailManager] Loaded ${_cache.length} thumbnails');
+      AppLogger.info(
+          '[TagThumbnailManager] Loaded ${_cache.length} thumbnails');
     } catch (e) {
       AppLogger.error('[TagThumbnailManager] initialize failed', error: e);
     }

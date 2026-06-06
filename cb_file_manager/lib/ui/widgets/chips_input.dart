@@ -39,9 +39,8 @@ class ChipsInput<T> extends StatefulWidget {
 
   /// Custom builder for suggestion items. If null, uses default rendering.
   /// Parameters: context, suggestion string, isHighlighted, tagColor.
-  final Widget Function(
-      BuildContext context, String suggestion, bool isHighlighted, Color tagColor)?
-      suggestionBuilder;
+  final Widget Function(BuildContext context, String suggestion,
+      bool isHighlighted, Color tagColor)? suggestionBuilder;
 
   final Widget Function(BuildContext context, T data) chipBuilder;
 
@@ -223,8 +222,8 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                                       ? theme.colorScheme.primary
                                           .withValues(alpha: 0.1)
                                       : null,
-                                  child: widget.suggestionBuilder!(
-                                      context, suggestion, isHighlighted, tagColor),
+                                  child: widget.suggestionBuilder!(context,
+                                      suggestion, isHighlighted, tagColor),
                                 ),
                               );
                             }

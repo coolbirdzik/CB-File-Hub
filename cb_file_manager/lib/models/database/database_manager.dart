@@ -612,7 +612,8 @@ class DatabaseManager implements IDatabaseProvider {
   Future<bool> removeTagHierarchy(
       String parentNormalizedTag, String childNormalizedTag) async {
     await _ensureInitialized();
-    return _provider.removeTagHierarchy(parentNormalizedTag, childNormalizedTag);
+    return _provider.removeTagHierarchy(
+        parentNormalizedTag, childNormalizedTag);
   }
 
   @override

@@ -376,8 +376,7 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
               isFocused: focused,
               onToggleExpansion: () => _toggleExpansion(node),
               onTap: () {
-                if (widget.expandOnRowTap &&
-                    _nodeHasExpandableChildren(node)) {
+                if (widget.expandOnRowTap && _nodeHasExpandableChildren(node)) {
                   _toggleExpansion(node);
                 }
                 widget.onTap?.call(node);
