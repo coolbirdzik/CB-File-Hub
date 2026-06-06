@@ -458,7 +458,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
         run: |
           missing=0
           for name in \
@@ -487,7 +487,7 @@ jobs:
 
       - name: Build AAB
         env:
-          ANDROID_APPLICATION_ID: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+          ANDROID_APPLICATION_ID: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -511,7 +511,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME }}
+          packageName: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
           releaseFiles: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
           tracks: ${{ github.event.inputs.play_track || vars.GOOGLE_PLAY_TRACK || 'internal' }}
           status: ${{ github.event.inputs.play_status || vars.GOOGLE_PLAY_STATUS || 'completed' }}
