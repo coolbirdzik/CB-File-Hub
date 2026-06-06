@@ -157,8 +157,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         await tester.pump(const Duration(milliseconds: 300));
 
-        // The video context menu should contain "Play video" action
-        final playFinder = find.text('Play video');
+        // The video context menu should contain the play_video action.
+        final playFinder = find
+            .byKey(const ValueKey<String>('context-menu-action-play_video'));
         expect(playFinder, findsAtLeastNWidgets(1),
             reason: '"Play video" should appear in video file context menu');
 
@@ -195,7 +196,8 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         // "Play video" should be visible
-        final playFinder = find.text('Play video');
+        final playFinder = find
+            .byKey(const ValueKey<String>('context-menu-action-play_video'));
         expect(playFinder, findsAtLeastNWidgets(1),
             reason:
                 '"Play video" should appear in list view video context menu');

@@ -49,6 +49,10 @@ const _kWorkerBuildRoot = 'build/e2e_worker_builds';
 const _kMergedJsonl = 'build/e2e_report.jsonl';
 const _kMergedLog = 'build/e2e_last_run.log';
 const _kFailedTestsFile = 'build/e2e_failed_tests.txt';
+const _kAppE2ETestFile = 'integration_test/app_e2e_test.dart';
+const _kVideoThumbnailsE2ETestFile =
+    'integration_test/video_thumbnails_e2e_test.dart';
+const _kVideoThumbnailsGroup = 'Video Thumbnails';
 
 Future<void> main(List<String> args) async {
   // ---- Parse args ----
@@ -89,7 +93,7 @@ Future<void> main(List<String> args) async {
 
   // --file overrides the default test file (e.g. --file video_thumbnails_e2e_test)
   // When a file is specified, parallel mode is disabled — run in serial.
-  String testFile = 'integration_test/app_e2e_test.dart';
+  String testFile = _kAppE2ETestFile;
   bool fileMode = false;
   final fileIdx = args.indexOf('--file');
   if (fileIdx >= 0 && fileIdx + 1 < args.length) {
@@ -230,6 +234,9 @@ Future<void> main(List<String> args) async {
     await Future.wait(futures);
   }
 
+  await _retryInfrastructureFailures(results,
+      fullStartup: fullStartup, fullScreenshots: fullScreenshots);
+
   // ---- Print summary ----
   _printSummary(results);
 
@@ -243,6 +250,8 @@ Future<void> main(List<String> args) async {
 
   // ---- Save failed groups for RERUN ----
   await _saveFailedGroupsFromMerged(_kMergedJsonl);
+
+  final hasFailures = results.values.any((r) => !r.success);
 
   // ---- Generate dashboard (unless skipped) ----
   if (!noGenerate) {
@@ -276,14 +285,13 @@ Future<void> main(List<String> args) async {
       print('[Parallel E2E] Dashboard: file://$absPath');
       if (!noOpen) await _openInBrowser(absPath);
       await _killAllTestProcesses();
-      exit(0);
+      exit(hasFailures ? 1 : 0);
     } else {
       print(
           '[Parallel E2E] Dashboard generation failed (exit ${dash.exitCode}).');
     }
   }
 
-  final hasFailures = results.values.any((r) => !r.success);
   await _killAllTestProcesses();
   exit(hasFailures ? 1 : 0);
 }
@@ -345,14 +353,17 @@ Future<void> _runSingleFile({
   await logSink.close();
   stopwatch.stop();
 
-  final passed = _countInJsonl(await jsonlFile.readAsString(), 'success');
-  final failed = _countInJsonl(await jsonlFile.readAsString(), 'failure');
+  final stats = _statsInJsonl(await jsonlFile.readAsString());
+  final reason = exitCode == 0 ? null : await _failureReason(logFile);
 
   final status = exitCode == 0 ? 'PASS' : 'FAIL';
   final elapsed = _formatDuration(stopwatch.elapsed);
   final filename = testFile.split('/').last;
   print('[File:$filename] $status ($elapsed) — '
-      '$passed passed, $failed failed, ${passed + failed} total');
+      '${stats.passed} passed, ${stats.failed} failed, ${stats.total} total');
+  if (reason != null && reason.isNotEmpty) {
+    print('[File:$filename] Reason: $reason');
+  }
 
   // Generate the dashboard for the single-file results
   await _runPubGetOnce();
@@ -396,10 +407,11 @@ Future<_WorkerResult> _runWorker(
   final logOut = '$_kWorkersDir/$slug.log';
 
   final device = Platform.environment['E2E_DEVICE'] ?? 'windows';
+  final testFile = _testFileForGroup(group);
 
   final args = <String>[
     'test',
-    'integration_test/app_e2e_test.dart',
+    testFile,
     '--no-pub',
     '-d',
     device,
@@ -443,24 +455,36 @@ Future<_WorkerResult> _runWorker(
   await logSink.close();
   stopwatch.stop();
 
-  final passed = _countInJsonl(await jsonlFile.readAsString(), 'success');
-  final failed = _countInJsonl(await jsonlFile.readAsString(), 'failure');
+  final content = await jsonlFile.readAsString();
+  final stats = _statsInJsonl(content);
+  final reason = exitCode == 0 ? null : await _failureReason(logFile);
 
   final status = exitCode == 0 ? 'PASS' : 'FAIL';
   final elapsed = _formatDuration(stopwatch.elapsed);
   print('[Worker:$group] $status ($elapsed) — '
-      '$passed passed, $failed failed, ${passed + failed} total');
+      '${stats.passed} passed, ${stats.failed} failed, ${stats.total} total');
+  if (reason != null && reason.isNotEmpty) {
+    print('[Worker:$group] Reason: $reason');
+  }
 
   return _WorkerResult(
     group: group,
     success: exitCode == 0,
     exitCode: exitCode,
-    passed: passed,
-    failed: failed,
+    passed: stats.passed,
+    failed: stats.failed,
+    total: stats.total,
+    failureReason: reason,
     elapsedMs: stopwatch.elapsedMilliseconds,
     jsonlFile: jsonlOut,
     logFile: logOut,
   );
+}
+
+String _testFileForGroup(String group) {
+  return group == _kVideoThumbnailsGroup
+      ? _kVideoThumbnailsE2ETestFile
+      : _kAppE2ETestFile;
 }
 
 Future<void> _drain(Stream<List<int>> input, List<IOSink> sinks) async {
@@ -469,6 +493,41 @@ Future<void> _drain(Stream<List<int>> input, List<IOSink> sinks) async {
       sink.add(chunk);
     }
   }
+}
+
+Future<void> _retryInfrastructureFailures(
+  Map<String, _WorkerResult> results, {
+  required bool fullStartup,
+  required bool fullScreenshots,
+}) async {
+  final retryGroups = results.values
+      .where(_shouldRetryWorker)
+      .map((result) => result.group)
+      .toList();
+  if (retryGroups.isEmpty) return;
+
+  print('\n[Parallel E2E] Retrying ${retryGroups.length} infrastructure '
+      'failure(s) serially: ${retryGroups.join(", ")}');
+
+  for (final group in retryGroups) {
+    results[group] = await _runWorker(
+      group,
+      fullStartup: fullStartup,
+      fullScreenshots: fullScreenshots,
+    );
+  }
+}
+
+bool _shouldRetryWorker(_WorkerResult result) {
+  if (result.success) return false;
+  if (result.total > 0) return false;
+
+  final reason = result.failureReason?.toLowerCase() ?? '';
+  return reason.contains('build process failed') ||
+      reason.contains('lnk1104') ||
+      reason.contains('c1083') ||
+      reason.contains('msb8066') ||
+      reason.contains('no tests match');
 }
 
 Future<void> _runPubGetOnce() async {
@@ -711,7 +770,8 @@ List<String> _parseFailedTestsFromJson(String content) {
       final testID = decoded['testID'] as int?;
       final hidden = decoded['hidden'] as bool? ?? false;
       if (testID != null && result != null && result != 'success' && !hidden) {
-        failed.add(idToName[testID] ?? 'testId=$testID');
+        final name = idToName[testID] ?? 'testId=$testID';
+        if (!_isPseudoTestName(name)) failed.add(name);
       }
     }
   }
@@ -752,7 +812,9 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
       final hidden = decoded['hidden'] as bool? ?? false;
       if (testID != null && result != null && !hidden) {
         final name = idToName[testID];
-        if (name != null) testResults[name] = result == 'success';
+        if (name != null && !_isPseudoTestName(name)) {
+          testResults[name] = result == 'success';
+        }
       }
     }
   }
@@ -809,11 +871,15 @@ String _esc(String s) => s
     .replaceAll('\t', '\\t');
 
 // ---------------------------------------------------------------------------
-// Count helpers
+// Result helpers
 // ---------------------------------------------------------------------------
 
-int _countInJsonl(String content, String result) {
-  int count = 0;
+_TestStats _statsInJsonl(String content) {
+  final idToName = <int, String>{};
+  var passed = 0;
+  var failed = 0;
+  var total = 0;
+
   for (final line in content.split('\n')) {
     if (line.trim().isEmpty || !line.startsWith('{')) continue;
     dynamic decoded;
@@ -823,13 +889,78 @@ int _countInJsonl(String content, String result) {
       continue;
     }
     if (decoded is! Map) continue;
-    if (decoded['type'] == 'testDone' &&
-        decoded['result'] == result &&
-        !(decoded['hidden'] as bool? ?? false)) {
-      count++;
+
+    final type = decoded['type'] as String?;
+    if (type == 'testStart') {
+      final test = decoded['test'] as Map?;
+      final id = test?['id'] as int?;
+      final name = test?['name'] as String?;
+      if (id != null && name != null) idToName[id] = name;
+      continue;
+    }
+
+    if (type != 'testDone') continue;
+
+    final result = decoded['result'] as String?;
+    final testID = decoded['testID'] as int?;
+    final hidden = decoded['hidden'] as bool? ?? false;
+    if (result == null || testID == null || hidden) continue;
+
+    final name = idToName[testID] ?? '';
+    if (_isPseudoTestName(name)) continue;
+
+    total++;
+    if (result == 'success') {
+      passed++;
+    } else {
+      failed++;
     }
   }
-  return count;
+
+  return _TestStats(passed: passed, failed: failed, total: total);
+}
+
+bool _isPseudoTestName(String name) {
+  if (name.startsWith('loading ') && name.endsWith('.dart')) return true;
+  if (name.startsWith('(') && name.endsWith(')')) return true;
+  return false;
+}
+
+Future<String?> _failureReason(File logFile) async {
+  if (!await logFile.exists()) return null;
+
+  final lines = await logFile.readAsLines();
+  String? jsonError;
+  for (final line in lines) {
+    if (!line.trimLeft().startsWith('{')) continue;
+    try {
+      final decoded = jsonDecode(line);
+      if (decoded is Map && decoded['type'] == 'error') {
+        final error = decoded['error'] as String?;
+        if (error != null && error.trim().isNotEmpty) {
+          jsonError = error.trim();
+        }
+      }
+    } catch (_) {}
+  }
+
+  for (final line in lines) {
+    final clean = _cleanLogLine(line).trim();
+    final lower = clean.toLowerCase();
+    if (lower.contains('fatal error') ||
+        lower.contains(' error c') ||
+        lower.contains('error msb') ||
+        lower.contains('build process failed') ||
+        lower.contains('no tests match')) {
+      return clean;
+    }
+  }
+
+  return jsonError;
+}
+
+String _cleanLogLine(String line) {
+  return line.replaceAll(RegExp('\x1B\\[[0-?]*[ -/]*[@-~]'), '');
 }
 
 // ---------------------------------------------------------------------------
@@ -843,8 +974,8 @@ void _printSummary(Map<String, _WorkerResult> results) {
   print(divider);
 
   int totalPassed = 0;
-  int totalFailed = 0;
   int totalTests = 0;
+  int failedWorkers = 0;
   int maxMs = 0;
 
   final sorted = results.entries.toList()
@@ -855,24 +986,37 @@ void _printSummary(Map<String, _WorkerResult> results) {
     final elapsed = _formatDuration(Duration(milliseconds: r.elapsedMs));
     final status = r.success ? '\x1B[32mPASS\x1B[0m' : '\x1B[31mFAIL\x1B[0m';
     print('  [$status] ${r.group.padRight(30)} $elapsed  '
-        '${r.passed}/${r.passed + r.failed}');
+        '${r.passed}/${r.total}');
+    if (!r.success) {
+      failedWorkers++;
+      final reason = r.failureReason;
+      if (reason != null && reason.isNotEmpty) {
+        print('        ${_shorten(reason, 96)}');
+      }
+    }
     totalPassed += r.passed;
-    totalFailed += r.failed;
-    totalTests += r.passed + r.failed;
+    totalTests += r.total;
     if (r.elapsedMs > maxMs) {
       maxMs = r.elapsedMs;
     }
   }
 
-  final passRate =
-      totalTests > 0 ? ((totalTests - totalFailed) / totalTests * 100) : 0.0;
+  final passRate = totalTests > 0 ? (totalPassed / totalTests * 100) : 0.0;
+  final workerSuffix =
+      failedWorkers > 0 ? ', $failedWorkers worker failure(s)' : '';
 
   print(divider);
   print('  ${'[Parallel]'.padRight(30)} Combined: '
-      '$totalPassed/$totalTests (${passRate.toStringAsFixed(1)}%)');
+      '$totalPassed/$totalTests (${passRate.toStringAsFixed(1)}%)'
+      '$workerSuffix');
   print('  ${'Max group wall time:'.padRight(30)} '
       '${_formatDuration(Duration(milliseconds: maxMs))}');
   print('$divider\n');
+}
+
+String _shorten(String value, int maxChars) {
+  if (value.length <= maxChars) return value;
+  return '${value.substring(0, maxChars - 1)}…';
 }
 
 // ---------------------------------------------------------------------------
@@ -1002,6 +1146,8 @@ class _WorkerResult {
   final int exitCode;
   final int passed;
   final int failed;
+  final int total;
+  final String? failureReason;
   final int elapsedMs;
   final String jsonlFile;
   final String logFile;
@@ -1012,9 +1158,23 @@ class _WorkerResult {
     required this.exitCode,
     required this.passed,
     required this.failed,
+    required this.total,
+    required this.failureReason,
     required this.elapsedMs,
     required this.jsonlFile,
     required this.logFile,
+  });
+}
+
+class _TestStats {
+  final int passed;
+  final int failed;
+  final int total;
+
+  const _TestStats({
+    required this.passed,
+    required this.failed,
+    required this.total,
   });
 }
 

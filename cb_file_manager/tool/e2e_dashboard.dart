@@ -159,6 +159,7 @@ TestReport parseJsonLog(
   final idToName = <int, String>{};
   final idToError = <int, _ErrorInfo>{};
   final idToStatus = <int, String>{}; // raw `result` from testDone
+  final idToPrints = <int, List<String>>{};
   final hiddenIds = <int>{};
   final hiddenErrors = <_ErrorInfo>[];
 
@@ -185,6 +186,12 @@ TestReport parseJsonLog(
           idToName[id] = name;
         }
       }
+    } else if (type == 'print') {
+      final testID = decoded['testID'] as int?;
+      final message = decoded['message'] as String?;
+      if (testID != null && message != null) {
+        idToPrints.putIfAbsent(testID, () => <String>[]).add(message);
+      }
     } else if (type == 'error') {
       // Standalone error event — emitted by the JSON reporter when a suite
       // fails to load (e.g. a global key-state assertion bubbles out before
@@ -193,13 +200,16 @@ TestReport parseJsonLog(
       final testID = decoded['testID'] as int?;
       final message = decoded['error'] as String? ?? '';
       final trace = decoded['stackTrace'] as String? ?? '';
+      final errorInfo = _errorInfoFromJsonError(
+        testID: testID,
+        message: message,
+        trace: trace,
+        printsByTest: idToPrints,
+      );
       if (testID != null) {
-        idToError[testID] = _ErrorInfo(
-          message: message,
-          trace: trace,
-        );
+        idToError[testID] = errorInfo;
       } else {
-        hiddenErrors.add(_ErrorInfo(message: message, trace: trace));
+        hiddenErrors.add(errorInfo);
       }
     } else if (type == 'testDone') {
       final testID = decoded['testID'] as int?;
@@ -229,7 +239,12 @@ TestReport parseJsonLog(
       if (result != null && result != 'success') {
         final err = decoded['error'] as String?;
         if (err != null && err.isNotEmpty) {
-          idToError[testID] = _ErrorInfo(message: err, trace: '');
+          idToError[testID] = _errorInfoFromJsonError(
+            testID: testID,
+            message: err,
+            trace: decoded['stackTrace'] as String? ?? '',
+            printsByTest: idToPrints,
+          );
         }
       }
     }
@@ -320,6 +335,118 @@ class _ErrorInfo {
   final String message;
   final String trace;
   const _ErrorInfo({required this.message, required this.trace});
+}
+
+_ErrorInfo _errorInfoFromJsonError({
+  required int? testID,
+  required String message,
+  required String trace,
+  required Map<int, List<String>> printsByTest,
+}) {
+  if (testID == null || !_isGenericFlutterTestError(message)) {
+    return _ErrorInfo(message: message, trace: trace);
+  }
+
+  final extracted = _extractFailureFromPrints(printsByTest[testID] ?? const []);
+  if (extracted == null) {
+    return _ErrorInfo(message: message, trace: trace);
+  }
+
+  return extracted;
+}
+
+bool _isGenericFlutterTestError(String message) {
+  final lower = message.toLowerCase();
+  return lower.contains('see exception logs above') ||
+      lower.startsWith('test failed.');
+}
+
+_ErrorInfo? _extractFailureFromPrints(List<String> rawMessages) {
+  if (rawMessages.isEmpty) return null;
+
+  final lines = rawMessages
+      .map(_cleanLogLine)
+      .where((line) => line.trim().isNotEmpty || line.isEmpty)
+      .toList();
+  if (lines.isEmpty) return null;
+
+  var start = -1;
+  for (var i = lines.length - 1; i >= 0; i--) {
+    final line = lines[i];
+    if (line.contains('EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK') ||
+        line.contains('The following TestFailure was thrown') ||
+        line.startsWith('Flutter Error in ')) {
+      start = i;
+      break;
+    }
+  }
+  if (start < 0) return null;
+
+  for (var i = start - 1; i >= 0 && i >= start - 5; i--) {
+    if (lines[i].startsWith('Flutter Error in ')) {
+      start = i;
+      break;
+    }
+  }
+
+  final traceLines = lines.sublist(start);
+  final message = _extractFailureSummary(traceLines);
+  if (message == null || message.trim().isEmpty) return null;
+
+  return _ErrorInfo(
+    message: message,
+    trace: traceLines.join('\n').trimRight(),
+  );
+}
+
+String _cleanLogLine(String line) {
+  return line
+      .replaceAll(RegExp('\x1B\\[[0-?]*[ -/]*[@-~]'), '')
+      .replaceAll(RegExp(r'\s+$'), '');
+}
+
+String? _extractFailureSummary(List<String> lines) {
+  for (final line in lines) {
+    if (!line.startsWith('Flutter Error in ')) continue;
+    final marker = line.indexOf(': ');
+    if (marker >= 0 && marker + 2 < line.length) {
+      return line.substring(marker + 2).trim();
+    }
+  }
+
+  for (var i = 0; i < lines.length; i++) {
+    if (!lines[i].contains('The following TestFailure was thrown')) continue;
+    for (var j = i + 1; j < lines.length; j++) {
+      final candidate = lines[j].trim();
+      if (_isFailureSummaryCandidate(candidate)) return candidate;
+    }
+  }
+
+  for (final line in lines) {
+    final candidate = line.trim();
+    if (_isFailureSummaryCandidate(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+bool _isFailureSummaryCandidate(String line) {
+  if (line.isEmpty) return false;
+  if (line.startsWith('══') || line.startsWith('╞') || line.startsWith('═')) {
+    return false;
+  }
+  if (line.startsWith('#') ||
+      line.startsWith('<asynchronous suspension>') ||
+      line.startsWith('(elided ')) {
+    return false;
+  }
+  final lower = line.toLowerCase();
+  if (lower.startsWith('the following testfailure was thrown') ||
+      lower.startsWith('when the exception was thrown') ||
+      lower.startsWith('the test description was')) {
+    return false;
+  }
+  return true;
 }
 
 /// Renders a stack trace into HTML, highlighting frames that point at user

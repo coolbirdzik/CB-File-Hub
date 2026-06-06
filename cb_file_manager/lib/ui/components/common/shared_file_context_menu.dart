@@ -281,13 +281,16 @@ Widget _buildContextMenuActionRow(
     trailing = null;
   }
 
-  return Row(
-    children: [
-      icon,
-      const SizedBox(width: 12),
-      Expanded(child: text),
-      if (trailing != null) trailing,
-    ],
+  return KeyedSubtree(
+    key: ValueKey<String>('context-menu-action-${action.id}'),
+    child: Row(
+      children: [
+        icon,
+        const SizedBox(width: 12),
+        Expanded(child: text),
+        if (trailing != null) trailing,
+      ],
+    ),
   );
 }
 
@@ -389,6 +392,9 @@ class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
                           ),
                         for (final childAction in section.actions)
                           InkWell(
+                            key: ValueKey<String>(
+                              'context-menu-action-tap-${childAction.id}',
+                            ),
                             onTap: !childAction.isEnabled
                                 ? null
                                 : () async {
@@ -582,6 +588,7 @@ class _ContextMenuSheetActionTile extends StatelessWidget {
             : theme.colorScheme.onSurface;
 
     return ListTile(
+      key: ValueKey<String>('context-menu-action-tap-${action.id}'),
       enabled: action.isEnabled,
       minTileHeight: 44,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
