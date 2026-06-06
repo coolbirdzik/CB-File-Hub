@@ -36,13 +36,27 @@ import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 class FileViewShell extends StatefulWidget {
   final Widget child;
 
-  // ── Grid zoom ──────────────────────────────────────────────────────────────
-  /// Current view mode — Ctrl+scroll only activates in [ViewMode.grid].
+  // ── Grid zoom / view spectrum ───────────────────────────────────────────────
+  /// Current view mode — used to decide whether Ctrl+scroll adjusts zoom only
+  /// (legacy [onGridZoomDelta]) or walks the full view spectrum
+  /// ([onViewScaleDelta]).
   final ViewMode viewMode;
 
   /// Called with +1 (zoom in = fewer columns) or -1 (zoom out = more columns).
   /// The callback is responsible for clamping and persisting the new level.
+  ///
+  /// Legacy: only active in grid/gridPreview modes. Prefer [onViewScaleDelta]
+  /// for the unified tree↔column↔detail↔list↔grid spectrum.
   final void Function(int delta)? onGridZoomDelta;
+
+  /// Called for Ctrl+scroll in **any** view mode with a spectrum delta:
+  /// `+1` = more spacious (wider modes / bigger grid items),
+  /// `-1` = denser (narrower modes / smaller grid items).
+  ///
+  /// When provided this takes precedence over [onGridZoomDelta] and the
+  /// gesture is active in every view mode. The callback owns clamping,
+  /// mode-transition, and persistence (typically via `ViewModeSpectrum.step`).
+  final void Function(int delta)? onViewScaleDelta;
 
   // ── Mouse navigation ───────────────────────────────────────────────────────
   /// Called when mouse XButton1 (back) is pressed. Pass `null` to disable.
@@ -74,6 +88,7 @@ class FileViewShell extends StatefulWidget {
     required this.child,
     required this.viewMode,
     this.onGridZoomDelta,
+    this.onViewScaleDelta,
     this.onMouseBack,
     this.onMouseForward,
     this.onEscape,
@@ -140,14 +155,22 @@ class _FileViewShellState extends State<FileViewShell> {
 
   @override
   Widget build(BuildContext context) {
-    // Ctrl+scroll zoom is active only in grid/gridPreview modes.
-    final zoomDelta = (widget.viewMode == ViewMode.grid ||
-            widget.viewMode == ViewMode.gridPreview)
-        ? widget.onGridZoomDelta
-        : null;
+    // Unified view spectrum (Ctrl+scroll in every mode) takes precedence.
+    // CtrlScrollZoom emits +1 on scroll-down; the spectrum convention is
+    // +1 = more spacious (scroll-up), so invert the raw sign here.
+    final void Function(int delta)? scrollDelta;
+    if (widget.onViewScaleDelta != null) {
+      scrollDelta = (raw) => widget.onViewScaleDelta!(-raw);
+    } else {
+      // Legacy: Ctrl+scroll zoom is active only in grid/gridPreview modes.
+      scrollDelta = (widget.viewMode == ViewMode.grid ||
+              widget.viewMode == ViewMode.gridPreview)
+          ? widget.onGridZoomDelta
+          : null;
+    }
 
     return CtrlScrollZoom(
-      onDelta: zoomDelta,
+      onDelta: scrollDelta,
       child: Listener(
         onPointerDown:
             (widget.onMouseBack != null || widget.onMouseForward != null)

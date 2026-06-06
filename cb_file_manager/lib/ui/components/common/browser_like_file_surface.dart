@@ -35,6 +35,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
   final Widget? selectionModeFloatingActionButton;
 
   final void Function(int delta)? onGridZoomDelta;
+  final void Function(int delta)? onViewScaleDelta;
   final VoidCallback? onMouseBack;
   final VoidCallback? onMouseForward;
   final VoidCallback? onEscape;
@@ -87,6 +88,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
     this.floatingActionButton,
     this.selectionModeFloatingActionButton,
     this.onGridZoomDelta,
+    this.onViewScaleDelta,
     this.onMouseBack,
     this.onMouseForward,
     this.onEscape,
@@ -225,6 +227,7 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
       body: FileViewShell(
         viewMode: widget.viewMode,
         onGridZoomDelta: widget.onGridZoomDelta,
+        onViewScaleDelta: widget.onViewScaleDelta,
         onMouseBack: widget.onMouseBack,
         onMouseForward: widget.onMouseForward,
         onRefresh: widget.onRefresh,

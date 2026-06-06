@@ -34,6 +34,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/widgets/file_list_view_builder.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
@@ -241,6 +242,33 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (nextLevel == current) return;
     _bloc.add(FileNavigationSetGridZoom(nextLevel));
     _saveGridZoomLevel(nextLevel);
+  }
+
+  /// Unified Ctrl+scroll spectrum handler: walks detail↔list↔grid and adjusts
+  /// grid item size. `+1` = more spacious, `-1` = denser.
+  void _handleViewScaleDelta(int delta) {
+    if (delta == 0) return;
+    final state = _bloc.state;
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final result = ViewModeSpectrum.step(
+      currentMode: state.viewMode,
+      currentZoom: state.gridZoomLevel,
+      supported: const {ViewMode.details, ViewMode.list},
+      delta: delta,
+      minZoom: UserPreferences.minGridZoomLevel,
+      maxZoom: maxZoom,
+    );
+
+    if (result.mode != state.viewMode) {
+      _setViewMode(result.mode);
+    }
+    if (result.gridZoomLevel != state.gridZoomLevel) {
+      _bloc.add(FileNavigationSetGridZoom(result.gridZoomLevel));
+      _saveGridZoomLevel(result.gridZoomLevel);
+    }
   }
 
   void _setGridZoomLevel(int level) {
@@ -629,6 +657,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                     child: const Icon(PhosphorIconsLight.checkSquare),
                   ),
                   onGridZoomDelta: _handleGridZoomDelta,
+                  onViewScaleDelta: _handleViewScaleDelta,
                   onMouseBack: _handleBackButton,
                   onRefresh: _refresh,
                   onEscape: selectionState.isSelectionMode

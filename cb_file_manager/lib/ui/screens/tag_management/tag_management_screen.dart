@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
@@ -11,8 +12,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/soft_checkbox.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
@@ -29,10 +32,30 @@ import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
+import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import '../../utils/route.dart';
 
 /// Tag view modes (cycled by the toolbar icon button).
 enum _TagViewMode { list, grid, tree }
+
+class _TagTreeLayoutMetrics {
+  final double rowExtent;
+  final double thumbnailSize;
+  final double fontSize;
+  final double spacing;
+  final double indentPerDepth;
+
+  const _TagTreeLayoutMetrics({
+    required this.rowExtent,
+    required this.thumbnailSize,
+    required this.fontSize,
+    required this.spacing,
+    required this.indentPerDepth,
+  });
+}
 
 class TagManagementScreen extends StatefulWidget {
   final String startingDirectory;
@@ -97,7 +120,19 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   // View mode options
   _TagViewMode _viewMode = _TagViewMode.list;
 
-  // Cached tree roots — rebuilt only when tag data changes (not on every setState)
+  // Grid item-size zoom level (2 = biggest items / fewest columns,
+  // maxGridZoomLevel = smallest items / most columns). Persisted to
+  // UserPreferences with key 'tags_grid_zoom_level'.
+  int _tagGridZoomLevel = UserPreferences.defaultGridZoomLevel;
+
+  // Tree layout size level (0 = densest, 2 = default, 4 = most spacious).
+  // Kept in memory; only grid zoom has an existing tag preference today.
+  static const int _minTagTreeSizeLevel = 0;
+  static const int _defaultTagTreeSizeLevel = 2;
+  static const int _maxTagTreeSizeLevel = 4;
+  int _tagTreeSizeLevel = _defaultTagTreeSizeLevel;
+
+  // Cached tree roots ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â rebuilt only when tag data changes (not on every setState)
   List<TreeNode<String>> _cachedTreeRoots = const [];
   String? _treeRootsSignature;
 
@@ -207,6 +242,143 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     if (!mounted) return;
     final screenWidth = MediaQuery.of(context).size.width;
     _viewMode = screenWidth > 600 ? _TagViewMode.grid : _TagViewMode.list;
+    // Load persisted grid zoom level after the default view mode is set.
+    _loadTagGridZoom();
+  }
+
+  /// Loads the persisted tag-grid zoom level from SharedPreferences.
+  Future<void> _loadTagGridZoom() async {
+    try {
+      final prefs = UserPreferences.instance;
+      await prefs.init();
+      final loaded = await prefs.getTagsGridZoomLevel();
+      if (mounted) setState(() => _tagGridZoomLevel = loaded);
+    } catch (_) {}
+  }
+
+  /// Persists the tag-grid zoom level to SharedPreferences.
+  Future<void> _saveTagGridZoom(int level) async {
+    try {
+      final prefs = UserPreferences.instance;
+      await prefs.init();
+      await prefs.setTagsGridZoomLevel(level);
+    } catch (_) {}
+  }
+
+  /// Handles a Ctrl+scroll view-scale delta on the tags page.
+  ///
+  /// Maps the tags page's three-mode spectrum (tree ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ list ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ grid with zoom)
+  /// to the shared [ViewModeSpectrum] helper and applies the result.
+  void _handleTagViewScaleDelta(int delta) {
+    if (!_isDesktop) return;
+    if (_viewMode == _TagViewMode.tree) {
+      final nextTreeSize = (_tagTreeSizeLevel + delta)
+          .clamp(_minTagTreeSizeLevel, _maxTagTreeSizeLevel)
+          .toInt();
+      if (nextTreeSize != _tagTreeSizeLevel) {
+        setState(() => _tagTreeSizeLevel = nextTreeSize);
+        return;
+      }
+    }
+
+    // Convert _TagViewMode to the shared ViewMode for the spectrum helper.
+    ViewMode sharedMode;
+    switch (_viewMode) {
+      case _TagViewMode.tree:
+        sharedMode = ViewMode.tree;
+        break;
+      case _TagViewMode.list:
+        sharedMode = ViewMode.list;
+        break;
+      case _TagViewMode.grid:
+        sharedMode = ViewMode.grid;
+        break;
+    }
+
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+
+    final result = ViewModeSpectrum.step(
+      currentMode: sharedMode,
+      currentZoom: _tagGridZoomLevel,
+      // Explorer convention: scroll-up (delta = -1 from CtrlScrollZoom) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ bigger items.
+      // FileViewShell already inverts the sign, so delta here is already Explorer-signed.
+      delta: delta,
+      supported: const {ViewMode.tree, ViewMode.list, ViewMode.grid},
+      maxZoom: maxZoom,
+    );
+
+    // Convert result back to _TagViewMode.
+    _TagViewMode newTagMode;
+    switch (result.mode) {
+      case ViewMode.tree:
+        newTagMode = _TagViewMode.tree;
+        break;
+      case ViewMode.list:
+        newTagMode = _TagViewMode.list;
+        break;
+      default:
+        newTagMode = _TagViewMode.grid;
+        break;
+    }
+
+    if (newTagMode == _viewMode && result.gridZoomLevel == _tagGridZoomLevel) {
+      return;
+    }
+
+    setState(() {
+      _viewMode = newTagMode;
+      _tagGridZoomLevel = result.gridZoomLevel;
+    });
+    _saveTagGridZoom(result.gridZoomLevel);
+  }
+
+  _TagTreeLayoutMetrics get _tagTreeLayoutMetrics {
+    switch (_tagTreeSizeLevel) {
+      case 0:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 28,
+          thumbnailSize: 18,
+          fontSize: 12,
+          spacing: 6,
+          indentPerDepth: 14,
+        );
+      case 1:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 32,
+          thumbnailSize: 21,
+          fontSize: 12.5,
+          spacing: 7,
+          indentPerDepth: 15,
+        );
+      case 3:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 44,
+          thumbnailSize: 30,
+          fontSize: 14,
+          spacing: 10,
+          indentPerDepth: 17,
+        );
+      case 4:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 52,
+          thumbnailSize: 36,
+          fontSize: 15,
+          spacing: 12,
+          indentPerDepth: 18,
+        );
+      case _defaultTagTreeSizeLevel:
+      default:
+        return const _TagTreeLayoutMetrics(
+          rowExtent: 36,
+          thumbnailSize: 24,
+          fontSize: 13,
+          spacing: 8,
+          indentPerDepth: 16,
+        );
+    }
   }
 
   /// Builds a single tag view mode entry for the toolbar PopupMenuButton.
@@ -384,7 +556,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         break;
       case 'popularity':
       case 'recent':
-        // Defer to async sort — load data then re-sort
+        // Defer to async sort ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â load data then re-sort
         _loadSortDataForFilteredTags();
         break;
     }
@@ -729,7 +901,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final children = _tagHierarchyManager.getChildren(tag);
 
     if (children.isNotEmpty) {
-      // Parent tag — show hierarchy-aware delete dialog
+      // Parent tag ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â show hierarchy-aware delete dialog
       final result = await RouteUtils.showAcrylicDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
@@ -789,7 +961,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       return;
     }
 
-    // Non-parent tag — simple confirmation
+    // Non-parent tag ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â simple confirmation
     final bool result = await RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -931,7 +1103,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  // ── Selection methods ──
+  // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Selection methods ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
 
   void _toggleTagSelection(String tag) {
     setState(() {
@@ -1487,31 +1659,31 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           : () => _handleBack(context),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _isSearching && !showingTaggedFiles
-                      ? TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          textInputAction: TextInputAction.search,
-                          style: TextStyle(color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            hintText: localizations.searchTagsHint,
-                            hintStyle: TextStyle(
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.5)),
-                            border: InputBorder.none,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                          ),
-                        )
-                      : showingTaggedFiles
-                          ? _buildTaggedFilesHeaderTitle(theme, localizations)
-                          : Text(
-                              localizations.tagManagementTitle,
-                              style: const TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w500),
-                            ),
-                ),
+                if (_isSearching && !showingTaggedFiles)
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      textInputAction: TextInputAction.search,
+                      style: TextStyle(color: theme.colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        hintText: localizations.searchTagsHint,
+                        hintStyle: TextStyle(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.5),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+                  )
+                else if (showingTaggedFiles)
+                  Expanded(
+                    child: _buildTaggedFilesHeaderTitle(theme, localizations),
+                  )
+                else
+                  const Spacer(),
                 if (_selectedTags.isNotEmpty &&
                     !showingTaggedFiles &&
                     _isMobile) ...[
@@ -1635,7 +1807,80 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _buildFilterButton(theme, localizations),
       _buildSortMenuButton(theme, localizations),
       _buildViewModeMenuButton(theme, localizations),
+      if (_viewMode == _TagViewMode.grid)
+        _buildTagGridSizeButton(theme, localizations),
     ];
+  }
+
+  Widget _buildTagGridSizeButton(
+    ThemeData theme,
+    AppLocalizations localizations,
+  ) {
+    final dynamicMax = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final clampedMax = dynamicMax
+        .clamp(
+          UserPreferences.minGridZoomLevel,
+          UserPreferences.maxGridZoomLevel,
+        )
+        .toInt();
+    final clampedZoom = _tagGridZoomLevel
+        .clamp(
+          UserPreferences.minGridZoomLevel,
+          clampedMax,
+        )
+        .toInt();
+
+    if (_isMobile) {
+      return IconButton(
+        icon: Icon(
+          PhosphorIconsLight.squaresFour,
+          color: theme.colorScheme.onSurfaceVariant,
+          size: 20,
+        ),
+        tooltip: localizations.adjustGridSizeTooltip,
+        onPressed: () => SharedActionBar.showGridSizeDialog(
+          context,
+          currentGridSize: clampedZoom,
+          onApply: _setTagGridZoomLevel,
+        ),
+      );
+    }
+
+    return PopupMenuButton<void>(
+      icon: Icon(
+        PhosphorIconsLight.squaresFour,
+        color: theme.colorScheme.onSurfaceVariant,
+        size: 20,
+      ),
+      tooltip: localizations.adjustGridSizeTooltip,
+      offset: const Offset(0, 50),
+      itemBuilder: (context) => [
+        PopupMenuItem<void>(
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: GridSizeSliderMenu(
+            currentValue: clampedZoom,
+            minValue: UserPreferences.minGridZoomLevel,
+            maxValue: clampedMax,
+            onChanged: _setTagGridZoomLevel,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _setTagGridZoomLevel(int value) {
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final next = value.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    if (next == _tagGridZoomLevel) return;
+    setState(() => _tagGridZoomLevel = next);
+    _saveTagGridZoom(next);
   }
 
   Widget _buildSortMenuButton(
@@ -2637,6 +2882,48 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
   }
 
+  /// Edge-to-edge thumbnail for the grid card top area. Fills the available
+  /// space (cover) so the card reads like a media/tag card. Falls back to a
+  /// color-tinted panel with a centered icon when no thumbnail exists.
+  Widget _buildTagCardThumbnailFill(String tag, Color tagColor) {
+    final thumbnailPath = _tagThumbnailManager.getThumbnailSync(tag);
+    if (thumbnailPath != null) {
+      return Image.file(
+        File(thumbnailPath),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _buildTagCardThumbnailPlaceholder(
+          tagColor,
+          PhosphorIconsLight.image,
+        ),
+      );
+    }
+    return _buildTagCardThumbnailPlaceholder(tagColor, PhosphorIconsLight.tag);
+  }
+
+  Widget _buildTagCardThumbnailPlaceholder(Color tagColor, IconData icon) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            tagColor.withValues(alpha: 0.55),
+            tagColor.withValues(alpha: 0.22),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          icon,
+          color: Colors.white.withValues(alpha: 0.85),
+          size: 40,
+        ),
+      ),
+    );
+  }
+
   /// Builds a small hierarchy context label below the tag name.
   Widget _buildHierarchyContext(String tag, ThemeData theme,
       {bool centered = false}) {
@@ -2924,14 +3211,23 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   Widget _buildTagsContent() {
+    final Widget content;
     switch (_viewMode) {
       case _TagViewMode.list:
-        return _buildTagsListView();
+        content = _buildTagsListView();
+        break;
       case _TagViewMode.grid:
-        return _buildTagsGridView();
+        content = _buildTagsGridView();
+        break;
       case _TagViewMode.tree:
-        return _buildTagsTreeView();
+        content = _buildTagsTreeView();
+        break;
     }
+
+    return CtrlScrollZoom(
+      onDelta: _isDesktop ? (delta) => _handleTagViewScaleDelta(-delta) : null,
+      child: content,
+    );
   }
 
   /// Builds the tag tree.
@@ -2946,6 +3242,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   /// `_filteredTags` set.
   Widget _buildTagsTreeView() {
     final visibleSet = _filteredTags.toSet();
+    final treeLayout = _tagTreeLayoutMetrics;
 
     // The hierarchy manager stores tags NORMALIZED (lowercased + trimmed),
     // but _allTags / _filteredTags hold the original display case. Build a
@@ -3034,11 +3331,17 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       behavior: HitTestBehavior.translucent,
       child: GenericTreeView<String>(
         roots: _cachedTreeRoots,
-        itemExtent: 36,
+        itemExtent: treeLayout.rowExtent,
+        indentPerDepth: treeLayout.indentPerDepth,
+        expandOnRowTap: true,
         nodeFilter: (node) => showIds.contains(node.id),
         selectedIds: _selectedTags,
         focusedId: _focusedTag,
-        onTap: (node) => _handleTagTap(node.data),
+        // Tree rows: select immediately. The tree row shell does its own
+        // double-tap detection (fires onDoubleTap), so we must NOT route
+        // through _handleTagTap's 250ms timer here or a double-tap would
+        // both open and select.
+        onTap: (node) => _selectTag(node.data),
         onDoubleTap: (node) => _directTagSearch(node.data),
         onSecondary: (node, globalPosition) => _showTagOptions(
           node.data,
@@ -3061,6 +3364,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             child: _TagTreeRowContent(
               tag: tag,
               tagColor: tagColor,
+              thumbnailSize: treeLayout.thumbnailSize,
+              fontSize: treeLayout.fontSize,
+              spacing: treeLayout.spacing,
               buildThumbnail: (size) =>
                   _buildTagThumbnailOrDot(tag, tagColor, size: size),
             ),
@@ -3207,6 +3513,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     required VoidCallback onTap,
     required Color color,
     required double iconSize,
+    double padding = 7.0,
   }) {
     return Tooltip(
       message: tooltip,
@@ -3214,7 +3521,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20.0),
         child: Padding(
-          padding: const EdgeInsets.all(7.0),
+          padding: EdgeInsets.all(padding),
           child: Icon(icon, size: iconSize, color: color),
         ),
       ),
@@ -3225,8 +3532,17 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   ///
   /// Surfaces the three most-used actions (view files, rename, delete) plus an
   /// overflow button that opens the full tag context menu anchored to itself.
-  Widget _buildTagHoverToolbar(String tag, ThemeData theme, double iconSize) {
+  Widget _buildTagHoverToolbar(
+    String tag,
+    ThemeData theme,
+    double iconSize, {
+    required double maxWidth,
+  }) {
     final l10n = AppLocalizations.of(context)!;
+    final compact = maxWidth < 144;
+    final effectiveIconSize =
+        compact ? (iconSize - 2).clamp(14.0, 18.0) : iconSize;
+    final buttonPadding = compact ? 4.0 : 7.0;
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -3245,49 +3561,56 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           ],
         ),
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildTagToolbarButton(
-              icon: PhosphorIconsLight.folder,
-              tooltip: l10n.viewFilesWithTag,
-              onTap: () => _directTagSearch(tag),
-              color: theme.colorScheme.primary,
-              iconSize: iconSize,
-            ),
-            _buildTagToolbarButton(
-              icon: PhosphorIconsLight.pencilSimple,
-              tooltip: l10n.renameTag,
-              onTap: () => _startTagRename(tag),
-              color: theme.colorScheme.onSurfaceVariant,
-              iconSize: iconSize,
-            ),
-            _buildTagToolbarButton(
-              icon: PhosphorIconsLight.trash,
-              tooltip: l10n.deleteTag,
-              onTap: () => _confirmDeleteTag(tag),
-              color: theme.colorScheme.error.withValues(alpha: 0.85),
-              iconSize: iconSize,
-            ),
-            Builder(
-              builder: (btnContext) => _buildTagToolbarButton(
-                icon: PhosphorIconsLight.dotsThreeOutline,
-                tooltip: l10n.moreOptions,
-                onTap: () => _showTagOptions(
-                  tag,
-                  globalPosition: _anchorOf(btnContext),
-                ),
-                color: theme.colorScheme.onSurfaceVariant,
-                iconSize: iconSize,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth - 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTagToolbarButton(
+                icon: PhosphorIconsLight.folder,
+                tooltip: l10n.viewFilesWithTag,
+                onTap: () => _directTagSearch(tag),
+                color: theme.colorScheme.primary,
+                iconSize: effectiveIconSize,
+                padding: buttonPadding,
               ),
-            ),
-          ],
+              _buildTagToolbarButton(
+                icon: PhosphorIconsLight.pencilSimple,
+                tooltip: l10n.renameTag,
+                onTap: () => _startTagRename(tag),
+                color: theme.colorScheme.onSurfaceVariant,
+                iconSize: effectiveIconSize,
+                padding: buttonPadding,
+              ),
+              _buildTagToolbarButton(
+                icon: PhosphorIconsLight.trash,
+                tooltip: l10n.deleteTag,
+                onTap: () => _confirmDeleteTag(tag),
+                color: theme.colorScheme.error.withValues(alpha: 0.85),
+                iconSize: effectiveIconSize,
+                padding: buttonPadding,
+              ),
+              Builder(
+                builder: (btnContext) => _buildTagToolbarButton(
+                  icon: PhosphorIconsLight.dotsThreeOutline,
+                  tooltip: l10n.moreOptions,
+                  onTap: () => _showTagOptions(
+                    tag,
+                    globalPosition: _anchorOf(btnContext),
+                  ),
+                  color: theme.colorScheme.onSurfaceVariant,
+                  iconSize: effectiveIconSize,
+                  padding: buttonPadding,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// Overflow ("…") button used on mobile (and as the touch fallback) that
+  /// Overflow ("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦") button used on mobile (and as the touch fallback) that
   /// opens the full tag context menu.
   Widget _buildTagOverflowButton(String tag, ThemeData theme) {
     return Material(
@@ -3318,19 +3641,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   Widget _buildTagsGridView() {
     final theme = Theme.of(context);
-    final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = _isDesktop;
 
-    // Larger grid for desktop
-    final crossAxisCount = isDesktop
-        ? (screenWidth / 200).floor().clamp(4, 10)
-        : screenWidth > 1200
-            ? 8
-            : screenWidth > 900
-                ? 6
-                : screenWidth > 600
-                    ? 5
-                    : 3;
+    // Use zoom-level-driven column count (same math as the file browser).
+    // _tagGridZoomLevel is the number of columns at the 960 px reference width.
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final effectiveZoom = _tagGridZoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
+    final crossAxisCount = GridZoomConstraints.columnCountForZoom(
+      effectiveZoom,
+      MediaQuery.of(context).size.width,
+    ).clamp(1, 20);
 
     // Larger fonts and spacing for desktop
     final fontSize = isDesktop ? 14.0 : 12.0;
@@ -3342,7 +3667,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _clearTagPositions();
     });
 
-    // GridView with drag selection support (same as ListView)
+    // GridView with drag selection support (same as ListView).
+    // Ctrl+scroll is handled by _buildTagsContent so it works in all modes.
     return Stack(
       children: [
         GestureDetector(
@@ -3445,224 +3771,310 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelected || isFocused
-                                    ? theme.colorScheme.primary
-                                        .withValues(alpha: 0.15)
-                                    : tagColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(16.0),
-                                border: isEditing
-                                    ? Border.all(
-                                        color: theme.colorScheme.primary,
-                                        width: 2)
-                                    : isSelected || isFocused
-                                        ? Border.all(
-                                            color: theme.colorScheme.primary
-                                                .withValues(alpha: 0.5),
-                                            width: 1.5)
-                                        : null,
-                              ),
-                              child: Column(
-                                children: [
-                                  // Top area: thumbnail or color dot, with a
-                                  // hover toolbar (desktop) / overflow button
-                                  // (mobile) revealed over the bottom edge.
-                                  Expanded(
-                                    child: _HoverReveal(
-                                      enabled: isDesktop && !isEditing,
-                                      builder: (context, hovering) => Stack(
-                                        children: [
-                                          Center(
-                                            child: _buildTagThumbnailOrDot(
-                                                tag, tagColor,
-                                                size: isDesktop ? 58 : 48),
-                                          ),
-                                          // Desktop: floating action toolbar
-                                          // that slides up + fades in on hover.
-                                          if (isDesktop && !isEditing)
-                                            Positioned(
-                                              left: 0,
-                                              right: 0,
-                                              bottom: 8,
-                                              child: Center(
-                                                child: AnimatedSlide(
-                                                  offset: Offset(
-                                                      0, hovering ? 0 : 0.35),
-                                                  duration: const Duration(
-                                                      milliseconds: 160),
-                                                  curve: Curves.easeOutCubic,
-                                                  child: AnimatedOpacity(
-                                                    opacity:
-                                                        hovering ? 1.0 : 0.0,
-                                                    duration: const Duration(
-                                                        milliseconds: 160),
-                                                    child: IgnorePointer(
-                                                      ignoring: !hovering,
-                                                      child:
-                                                          _buildTagHoverToolbar(
-                                                              tag,
-                                                              theme,
-                                                              iconSize),
-                                                    ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16.0),
+                              child: BackdropFilter(
+                                filter:
+                                    ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: isSelected || isFocused
+                                          ? [
+                                              theme.colorScheme.primary
+                                                  .withValues(alpha: 0.26),
+                                              theme.colorScheme.primary
+                                                  .withValues(alpha: 0.16),
+                                            ]
+                                          : [
+                                              theme.colorScheme.surface
+                                                  .withValues(alpha: 0.34),
+                                              Color.alphaBlend(
+                                                tagColor.withValues(
+                                                    alpha: 0.10),
+                                                theme.colorScheme.surface
+                                                    .withValues(alpha: 0.22),
+                                              ),
+                                            ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(16.0),
+                                    border: Border.all(
+                                      color: isEditing
+                                          ? theme.colorScheme.primary
+                                          : isSelected || isFocused
+                                              ? theme.colorScheme.primary
+                                                  .withValues(alpha: 0.55)
+                                              : Colors.white
+                                                  .withValues(alpha: 0.14),
+                                      width: isEditing
+                                          ? 2
+                                          : isSelected || isFocused
+                                              ? 1.5
+                                              : 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.08),
+                                        blurRadius: 18,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      // Top area: thumbnail or color dot, with a
+                                      // hover toolbar (desktop) / overflow button
+                                      // (mobile) revealed over the bottom edge.
+                                      Expanded(
+                                        child: _HoverReveal(
+                                          enabled: isDesktop && !isEditing,
+                                          builder: (context, hovering) => Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Positioned.fill(
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      const BorderRadius
+                                                          .vertical(
+                                                    top: Radius.circular(16.0),
                                                   ),
+                                                  child:
+                                                      _buildTagCardThumbnailFill(
+                                                          tag, tagColor),
                                                 ),
                                               ),
-                                            ),
-                                          // Mobile: always-visible overflow
-                                          if (_isMobile && !isEditing)
-                                            Positioned(
-                                              top: 4,
-                                              right: 4,
-                                              child: _buildTagOverflowButton(
-                                                  tag, theme),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  // Bottom area: tag name
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      top: spacing,
-                                      left: isDesktop ? 8 : 6,
-                                      right: isDesktop ? 8 : 6,
-                                      bottom: isDesktop ? 8 : 6,
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        // Tag name or rename TextField
-                                        if (isEditing &&
-                                            _editingTagController != null)
-                                          SizedBox(
-                                            width: double.infinity,
-                                            child: Stack(
-                                              alignment: Alignment.center,
-                                              children: [
-                                                Opacity(
-                                                  opacity: 0,
-                                                  child: Text(
-                                                    tag,
-                                                    style: TextStyle(
-                                                        fontSize: fontSize,
-                                                        fontWeight:
-                                                            FontWeight.w600),
-                                                    textAlign: TextAlign.center,
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                                Positioned.fill(
-                                                  child: Focus(
-                                                    onKeyEvent: (node, event) =>
-                                                        _handleInlineRenameKey(
-                                                            node, event, tag),
-                                                    child: TextField(
-                                                      controller:
-                                                          _editingTagController,
-                                                      autofocus: true,
-                                                      textInputAction:
-                                                          TextInputAction.done,
-                                                      style: TextStyle(
-                                                          fontSize: fontSize,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: theme
-                                                              .colorScheme
-                                                              .onSurface),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      maxLines: 2,
-                                                      decoration:
-                                                          InputDecoration(
-                                                        isDense: true,
-                                                        contentPadding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                horizontal: 4,
-                                                                vertical: 2),
-                                                        border:
-                                                            OutlineInputBorder(
-                                                          borderSide: BorderSide(
-                                                              color: theme
-                                                                  .colorScheme
-                                                                  .primary,
-                                                              width: 2),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(2),
+                                              // Desktop: floating action toolbar
+                                              // that slides up + fades in on hover.
+                                              if (isDesktop && !isEditing)
+                                                Positioned(
+                                                  left: 0,
+                                                  right: 0,
+                                                  // Float over the bottom edge of
+                                                  // the full-bleed thumbnail.
+                                                  bottom: 6,
+                                                  child: Center(
+                                                    child: AnimatedSlide(
+                                                      offset: Offset(0,
+                                                          hovering ? 0 : 0.35),
+                                                      duration: const Duration(
+                                                          milliseconds: 160),
+                                                      curve:
+                                                          Curves.easeOutCubic,
+                                                      child: AnimatedOpacity(
+                                                        opacity: hovering
+                                                            ? 1.0
+                                                            : 0.0,
+                                                        duration:
+                                                            const Duration(
+                                                                milliseconds:
+                                                                    160),
+                                                        child: IgnorePointer(
+                                                          ignoring: !hovering,
+                                                          child: _buildTagHoverToolbar(
+                                                              tag,
+                                                              theme,
+                                                              iconSize,
+                                                              maxWidth:
+                                                                  constraints
+                                                                      .maxWidth),
                                                         ),
-                                                        enabledBorder:
-                                                            OutlineInputBorder(
-                                                          borderSide: BorderSide(
-                                                              color: theme
-                                                                  .colorScheme
-                                                                  .primary,
-                                                              width: 2),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(2),
-                                                        ),
-                                                        focusedBorder:
-                                                            OutlineInputBorder(
-                                                          borderSide: BorderSide(
-                                                              color: theme
-                                                                  .colorScheme
-                                                                  .primary,
-                                                              width: 2),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(2),
-                                                        ),
-                                                        filled: true,
-                                                        fillColor: theme
-                                                            .colorScheme
-                                                            .surface,
                                                       ),
-                                                      cursorColor: theme
-                                                          .colorScheme.primary,
-                                                      onEditingComplete: () =>
-                                                          _commitTagRename(tag),
-                                                      onSubmitted: (_) =>
-                                                          _commitTagRename(tag),
-                                                      onTapOutside: (_) =>
-                                                          _commitTagRename(tag),
                                                     ),
                                                   ),
                                                 ),
-                                              ],
-                                            ),
-                                          )
-                                        else
-                                          Tooltip(
-                                            message:
-                                                'Double click to open in new tab',
-                                            child: Column(
-                                              children: [
-                                                Text(
-                                                  tag,
-                                                  style: TextStyle(
-                                                      fontSize: fontSize,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: theme.colorScheme
-                                                          .onSurface),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                              // Mobile: always-visible overflow
+                                              if (_isMobile && !isEditing)
+                                                Positioned(
+                                                  top: 4,
+                                                  right: 4,
+                                                  child:
+                                                      _buildTagOverflowButton(
+                                                          tag, theme),
                                                 ),
-                                                _buildHierarchyContext(
-                                                    tag, theme,
-                                                    centered: true),
-                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      // Bottom area: tag name
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 1),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.surface
+                                              .withValues(alpha: 0.28),
+                                          border: Border(
+                                            top: BorderSide(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.12),
                                             ),
                                           ),
-                                      ],
-                                    ),
+                                        ),
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                            top: spacing,
+                                            left: isDesktop ? 8 : 6,
+                                            right: isDesktop ? 8 : 6,
+                                            bottom: isDesktop ? 8 : 6,
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              // Tag name or rename TextField
+                                              if (isEditing &&
+                                                  _editingTagController != null)
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: Stack(
+                                                    alignment: Alignment.center,
+                                                    children: [
+                                                      Opacity(
+                                                        opacity: 0,
+                                                        child: Text(
+                                                          tag,
+                                                          style: TextStyle(
+                                                              fontSize:
+                                                                  fontSize,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                      Positioned.fill(
+                                                        child: Focus(
+                                                          onKeyEvent: (node,
+                                                                  event) =>
+                                                              _handleInlineRenameKey(
+                                                                  node,
+                                                                  event,
+                                                                  tag),
+                                                          child: TextField(
+                                                            controller:
+                                                                _editingTagController,
+                                                            autofocus: true,
+                                                            textInputAction:
+                                                                TextInputAction
+                                                                    .done,
+                                                            style: TextStyle(
+                                                                fontSize:
+                                                                    fontSize,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: theme
+                                                                    .colorScheme
+                                                                    .onSurface),
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            maxLines: 2,
+                                                            decoration:
+                                                                InputDecoration(
+                                                              isDense: true,
+                                                              contentPadding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          4,
+                                                                      vertical:
+                                                                          2),
+                                                              border:
+                                                                  OutlineInputBorder(
+                                                                borderSide: BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                    width: 2),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2),
+                                                              ),
+                                                              enabledBorder:
+                                                                  OutlineInputBorder(
+                                                                borderSide: BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                    width: 2),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2),
+                                                              ),
+                                                              focusedBorder:
+                                                                  OutlineInputBorder(
+                                                                borderSide: BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .primary,
+                                                                    width: 2),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            2),
+                                                              ),
+                                                              filled: true,
+                                                              fillColor: theme
+                                                                  .colorScheme
+                                                                  .surface,
+                                                            ),
+                                                            cursorColor: theme
+                                                                .colorScheme
+                                                                .primary,
+                                                            onEditingComplete: () =>
+                                                                _commitTagRename(
+                                                                    tag),
+                                                            onSubmitted: (_) =>
+                                                                _commitTagRename(
+                                                                    tag),
+                                                            onTapOutside: (_) =>
+                                                                _commitTagRename(
+                                                                    tag),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              else
+                                                Tooltip(
+                                                  message:
+                                                      'Double click to open in new tab',
+                                                  child: Column(
+                                                    children: [
+                                                      Text(
+                                                        tag,
+                                                        style: TextStyle(
+                                                            fontSize: fontSize,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: theme
+                                                                .colorScheme
+                                                                .onSurface),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                      _buildHierarchyContext(
+                                                          tag, theme,
+                                                          centered: true),
+                                                    ],
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -4321,7 +4733,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Manage Hierarchy Dialog — a StatefulWidget shown in a dialog
+// Manage Hierarchy Dialog ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â a StatefulWidget shown in a dialog
 // ---------------------------------------------------------------------------
 
 class _ManageHierarchyDialog extends StatefulWidget {
@@ -4423,8 +4835,8 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content:
-                Text('Cannot add "$childName" — circular reference or error')),
+            content: Text(
+                'Cannot add "$childName" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error')),
       );
     }
   }
@@ -4456,7 +4868,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                'Cannot set "$parentName" as parent — circular reference or error')),
+                'Cannot set "$parentName" as parent ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error')),
       );
     }
   }
@@ -4491,7 +4903,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Parents section ──
+              // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Parents section ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
               Text('Parents',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
@@ -4545,7 +4957,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                       theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
               const SizedBox(height: 12),
 
-              // ── Children section ──
+              // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Children section ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
               Text('Children',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
@@ -4708,12 +5120,18 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
 class _TagTreeRowContent extends StatelessWidget {
   final String tag;
   final Color tagColor;
+  final double thumbnailSize;
+  final double fontSize;
+  final double spacing;
   final Widget Function(double size) buildThumbnail;
 
   const _TagTreeRowContent({
     Key? key,
     required this.tag,
     required this.tagColor,
+    required this.thumbnailSize,
+    required this.fontSize,
+    required this.spacing,
     required this.buildThumbnail,
   }) : super(key: key);
 
@@ -4722,13 +5140,13 @@ class _TagTreeRowContent extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        buildThumbnail(24),
-        const SizedBox(width: 8),
+        buildThumbnail(thumbnailSize),
+        SizedBox(width: spacing),
         Expanded(
           child: Text(
             tag,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: fontSize,
               fontWeight: FontWeight.w500,
               color: theme.colorScheme.onSurface,
             ),

@@ -20,6 +20,7 @@ import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
@@ -165,17 +166,38 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     }
   }
 
-  void _handleGridZoomDelta(int delta) {
+  /// Unified Ctrl+scroll spectrum handler: walks tree↔detail↔list↔grid and
+  /// adjusts grid item size. `+1` = more spacious, `-1` = denser.
+  void _handleViewScaleDelta(int delta) {
+    if (delta == 0) return;
     final maxZoom = GridZoomConstraints.maxGridSizeForContext(
       context,
       mode: GridSizeMode.columns,
     );
-    final next = (_gridZoomLevel + delta)
-        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
-        .toInt();
-    if (next == _gridZoomLevel) return;
-    setState(() => _gridZoomLevel = next);
-    UserPreferences.instance.setTrashGridZoomLevel(next);
+    final result = ViewModeSpectrum.step(
+      currentMode: _viewMode,
+      currentZoom: _gridZoomLevel,
+      supported: const {ViewMode.tree, ViewMode.details, ViewMode.list},
+      delta: delta,
+      minZoom: UserPreferences.minGridZoomLevel,
+      maxZoom: maxZoom,
+    );
+
+    if (result.mode != _viewMode) {
+      setState(() {
+        _isDraggingRect = false;
+        _dragStartPosition = null;
+        _dragCurrentPosition = null;
+        _viewMode = result.mode;
+      });
+      UserPreferences.instance.setTrashViewMode(result.mode);
+      _updateThumbnailDisplayIndex();
+    }
+    if (result.gridZoomLevel != _gridZoomLevel) {
+      setState(() => _gridZoomLevel = result.gridZoomLevel);
+      UserPreferences.instance.setTrashGridZoomLevel(result.gridZoomLevel);
+      _updateThumbnailDisplayIndex();
+    }
   }
 
   bool get _isDesktop =>
@@ -864,7 +886,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
           children: [
             FileViewShell(
               viewMode: _viewMode,
-              onGridZoomDelta: _handleGridZoomDelta,
+              onViewScaleDelta: _handleViewScaleDelta,
               onRefresh: _loadTrashItems,
               onSelectAll: _trashItems.isNotEmpty ? _selectAll : null,
               onDelete: ({required bool permanent}) async {

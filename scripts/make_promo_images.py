@@ -19,6 +19,17 @@ DEFAULT_OUTPUT = ROOT / "screenshots" / "promo"
 DESKTOP_SIZE = (2400, 1350)
 MOBILE_SIZE = (1440, 2560)
 
+DESKTOP_SOURCE_NAMES = [
+    "002_showcase_file_browser_result.png",
+    "004_showcase_gallery_hub_result.png",
+    "006_showcase_album_detail_result.png",
+    "008_showcase_ai_side_panel_search_result.png",
+    "010_showcase_ai_approval_result.png",
+    "012_showcase_ai_conversation_result.png",
+    "014_showcase_tag_management_result.png",
+    "018_showcase_tag_tree_result.png",
+]
+
 
 @dataclass(frozen=True)
 class PromoSpec:
@@ -36,7 +47,7 @@ DESKTOP_SPECS = [
     PromoSpec("ai_approval", "Stay in control", "Review assistant actions before anything changes in your files.", (255, 107, 107)),
     PromoSpec("ai_conversation", "Ask about your files", "Keep a file-aware conversation beside the workspace you are using.", (102, 217, 232)),
     PromoSpec("tag_management", "Tag and organize", "Build lightweight systems for projects, references, and media collections.", (255, 214, 102)),
-    PromoSpec("tagged_files", "Bring tagged files together", "Jump from tags to the exact files that matter right now.", (92, 219, 149)),
+    PromoSpec("tagged_files", "Navigate tag trees", "Build parent-child tag hierarchies and expand the exact branch you need.", (92, 219, 149)),
 ]
 
 MOBILE_SPECS = [
@@ -54,7 +65,7 @@ DESKTOP_SPECS_VI = [
     PromoSpec("duyet_thao_tac_ai", "Luôn có quyền kiểm soát", "Xem lại hành động của trợ lý trước khi bất kỳ thay đổi nào diễn ra.", (255, 107, 107)),
     PromoSpec("hoi_dap_ai", "Hỏi về tập tin của bạn", "Trò chuyện với trợ lý hiểu ngữ cảnh ngay bên cạnh workspace.", (102, 217, 232)),
     PromoSpec("quan_ly_tag", "Gắn tag để sắp xếp", "Tạo hệ thống nhẹ cho dự án, tài liệu tham khảo và bộ sưu tập media.", (255, 214, 102)),
-    PromoSpec("tap_tin_theo_tag", "Tập hợp tập tin theo tag", "Đi thẳng từ tag đến đúng những tập tin bạn cần lúc này.", (92, 219, 149)),
+    PromoSpec("tap_tin_theo_tag", "Duyệt cây tag", "Tạo phân cấp tag cha con và mở đúng nhánh bạn đang cần.", (92, 219, 149)),
 ]
 
 MOBILE_SPECS_VI = [
@@ -227,7 +238,11 @@ def create_mobile_promo(source: Path, output: Path, spec: PromoSpec) -> None:
 
 
 def discover_desktop_sources(path: Path) -> list[Path]:
-    return sorted(path.glob("*.png"))
+    sources = [path / name for name in DESKTOP_SOURCE_NAMES]
+    missing = [source.name for source in sources if not source.exists()]
+    if missing:
+        raise SystemExit(f"Missing desktop screenshots in {path}: {', '.join(missing)}")
+    return sources
 
 
 def discover_mobile_sources(path: Path) -> list[Path]:

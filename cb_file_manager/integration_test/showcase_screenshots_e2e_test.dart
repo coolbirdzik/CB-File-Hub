@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/services/featured_albums_service.dart';
@@ -19,9 +20,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
 import 'e2e_report.dart';
+import 'e2e_sandbox_paths.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // Isolate ALL app data (SQLite DB, tags, prefs-backed files, thumbnail
+  // caches, trash) into a throwaway sandbox so capturing screenshots never
+  // touches the real Documents/CBFileHub_v2 data of your debug/release build.
+  setUpAll(() async {
+    await E2ESandboxPaths.install();
+  });
+  tearDownAll(() async {
+    await E2ESandboxPaths.uninstall();
+  });
 
   group('Showcase', () {
     testWidgets('file browser', (WidgetTester tester) async {
@@ -266,6 +278,53 @@ void main() {
           await tester.pumpAndSettle(const Duration(seconds: 1));
           await tester.tap(tagFinder.first);
           await tester.pumpAndSettle(const Duration(seconds: 2));
+        }
+
+        await et.screenshot('result');
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // 9. Tag management — tree view (parent/child hierarchy)
+    // -------------------------------------------------------------------------
+    testWidgets('tag management tree', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_tagtree_');
+      final media = await seedShowcaseLibrary(dir);
+      await seedWallpaperBackdrop(dir);
+      await seedTagHierarchy(media.images);
+
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: [WindowTabPayload(path: '#tags')],
+      );
+
+      try {
+        await runCbFileApp();
+        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await et.init('showcase tag tree');
+
+        // Switch to tree view: open the "eye" view-mode menu, pick Tree.
+        final eyeIcon = find.byIcon(PhosphorIconsLight.eye);
+        if (eyeIcon.evaluate().isNotEmpty) {
+          await et.tap(eyeIcon.first, detail: 'view_mode_menu');
+          await tester.pumpAndSettle(const Duration(seconds: 1));
+          final treeIcon = find.byIcon(PhosphorIconsLight.treeView);
+          if (treeIcon.evaluate().isNotEmpty) {
+            await et.tap(treeIcon.last, detail: 'tree_mode');
+            await tester.pumpAndSettle(const Duration(seconds: 1));
+          }
+        }
+
+        // Expand the first few parent rows so the hierarchy is visible.
+        final caretIcons = find.byIcon(PhosphorIconsLight.caretRight);
+        final caretCount = caretIcons.evaluate().length;
+        for (var i = 0; i < caretCount && i < 3; i++) {
+          final caret = find.byIcon(PhosphorIconsLight.caretRight);
+          if (caret.evaluate().isEmpty) break;
+          await tester.tap(caret.first);
+          await tester.pumpAndSettle(const Duration(milliseconds: 400));
         }
 
         await et.screenshot('result');
@@ -575,6 +634,50 @@ Future<void> seedSingleTag(String filePath, String tag) async {
     await TagManager.addStandaloneTag(tag);
     await TagManager.addTag(filePath, tag);
   } catch (_) {}
+}
+
+/// Seeds a small parent/child tag hierarchy for the tree-view showcase.
+///
+/// Produces:
+///   Media
+///     ├─ Movies
+///     │    └─ Action
+///     └─ Photos
+///   Travel
+///     ├─ Beach
+///     └─ Mountains
+/// plus a couple of standalone tags so the tree shows mixed roots.
+Future<void> seedTagHierarchy(List<String> filePaths) async {
+  await TagManager.initialize();
+  final hierarchy = TagHierarchyManager.instance;
+  await hierarchy.initialize();
+
+  const relationships = <List<String>>[
+    ['Media', 'Movies'],
+    ['Media', 'Photos'],
+    ['Movies', 'Action'],
+    ['Travel', 'Beach'],
+    ['Travel', 'Mountains'],
+  ];
+
+  // Make sure every node exists as a tag first (standalone), then link them.
+  final allTags = <String>{
+    for (final pair in relationships) ...pair,
+    'Favorite',
+    'Archive',
+  };
+  for (final tag in allTags) {
+    await TagManager.addStandaloneTag(tag);
+  }
+  for (final pair in relationships) {
+    await hierarchy.addChild(pair[0], pair[1]);
+  }
+
+  // Attach a few leaf tags onto files so the library isn't empty.
+  for (final path in filePaths.take(3)) {
+    await TagManager.addTag(path, 'Beach');
+    await TagManager.addTag(path, 'Action');
+  }
 }
 
 Future<void> seedWallpaperBackdrop(Directory root) async {

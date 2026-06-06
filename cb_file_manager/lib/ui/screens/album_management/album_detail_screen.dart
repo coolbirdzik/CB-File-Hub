@@ -27,6 +27,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -620,14 +621,25 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (mounted) _loadAlbumFiles();
   }
 
-  void _handleGridZoomDelta(int delta) {
-    final next = FileViewShellHelpers.clampGridZoom(
+  /// Unified Ctrl+scroll spectrum handler. The album detail view is grid-only,
+  /// so the spectrum collapses to pure grid item-size zoom (no mode changes).
+  /// `+1` = more spacious (bigger items), `-1` = denser (smaller items).
+  void _handleViewScaleDelta(int delta) {
+    if (delta == 0) return;
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
       context,
-      _gridZoomLevel,
-      delta,
+      mode: GridSizeMode.referenceWidth,
     );
-    if (next == _gridZoomLevel) return;
-    _applyGridSize(next);
+    final result = ViewModeSpectrum.step(
+      currentMode: ViewMode.grid,
+      currentZoom: _gridZoomLevel,
+      supported: const {},
+      delta: delta,
+      minZoom: UserPreferences.minGridZoomLevel,
+      maxZoom: maxZoom,
+    );
+    if (result.gridZoomLevel == _gridZoomLevel) return;
+    _applyGridSize(result.gridZoomLevel);
   }
 
   Future<void> _applyGridSize(int size) async {
@@ -1008,7 +1020,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 : _buildNormalActions(context, sel, isDesktop),
             body: FileViewShell(
               viewMode: ViewMode.grid,
-              onGridZoomDelta: _handleGridZoomDelta,
+              onViewScaleDelta: _handleViewScaleDelta,
               onEscape: inSel ? _clearSelection : null,
               onSelectAll: _selectAll,
               child: Stack(

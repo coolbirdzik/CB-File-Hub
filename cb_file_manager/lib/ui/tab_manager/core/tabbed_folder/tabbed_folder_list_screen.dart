@@ -64,6 +64,7 @@ import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 
 // Import extracted view layer components
 import 'package:cb_file_manager/ui/widgets/file_list_view_builder.dart';
+import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:cb_file_manager/ui/controllers/dialog_manager.dart';
 import 'package:cb_file_manager/ui/widgets/folder_content_builder.dart';
 import 'package:cb_file_manager/ui/widgets/refreshable_file_list_view.dart';
@@ -1746,55 +1747,62 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           builder: (context, _) {
             return InlineRenameScope(
               controller: _inlineRenameController,
-              child: FileListViewBuilder.build(
-                state: state,
-                selectionState: selectionState,
-                isDesktopPlatform: isDesktopPlatform,
-                onNavigateToPath: _navigateToPath,
-                onFileTap: _onFileTap,
-                toggleFileSelection: _toggleFileSelection,
-                toggleFolderSelection: _toggleFolderSelection,
-                clearSelection: _clearSelection,
-                dragSelectionController: _dragSelectionController,
-                showFileTags: showFileTags,
-                showDeleteTagDialog: _showDeleteTagDialog,
-                showAddTagToFileDialog: _showAddTagToFileDialog,
-                toggleSelectionMode: _toggleSelectionMode,
-                columnVisibility: columnVisibility,
-                showContextMenu: _showContextMenu,
-                isPreviewPaneVisible: isPreviewPaneVisible,
-                previewPaneWidthListenable: _previewPaneWidthNotifier,
-                onZoomLevelChanged: handleZoomLevelChange,
-                onPreviewPaneWidthChanged: _updatePreviewPaneWidth,
-                onPreviewPaneWidthCommitted: _commitPreviewPaneWidth,
-                onPreviewPaneToggled: _togglePreviewPane,
-                scrollController: _keyboardController.scrollController,
-                itemKeyForPath: _keyboardController.itemKeyForPath,
-                tabId: widget.tabId,
-                isMasonryLayout: _isMasonryLayout,
-                onGridCrossAxisCountChanged: (c) {
-                  // Defer setState to after build — this callback runs from LayoutBuilder during build.
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && _gridCrossAxisCount != c) {
-                      setState(() => _gridCrossAxisCount = c);
-                    }
-                  });
-                },
-                onGridItemMainAxisExtentChanged: (extent) {
-                  if (extent == null || extent <= 0) {
-                    return;
-                  }
-                  _gridItemMainAxisExtent = extent;
-                  if (_pendingHighlightedFileName != null) {
+              // Ctrl+scroll walks the full view spectrum (tree↔column↔
+              // detail↔list↔grid) in every mode. CtrlScrollZoom emits +1 on
+              // scroll-down; spectrum convention is +1 = more spacious
+              // (scroll-up), so invert the raw sign here.
+              child: CtrlScrollZoom(
+                onDelta: (raw) => handleViewScaleChange(-raw),
+                child: FileListViewBuilder.build(
+                  state: state,
+                  selectionState: selectionState,
+                  isDesktopPlatform: isDesktopPlatform,
+                  onNavigateToPath: _navigateToPath,
+                  onFileTap: _onFileTap,
+                  toggleFileSelection: _toggleFileSelection,
+                  toggleFolderSelection: _toggleFolderSelection,
+                  clearSelection: _clearSelection,
+                  dragSelectionController: _dragSelectionController,
+                  showFileTags: showFileTags,
+                  showDeleteTagDialog: _showDeleteTagDialog,
+                  showAddTagToFileDialog: _showAddTagToFileDialog,
+                  toggleSelectionMode: _toggleSelectionMode,
+                  columnVisibility: columnVisibility,
+                  showContextMenu: _showContextMenu,
+                  isPreviewPaneVisible: isPreviewPaneVisible,
+                  previewPaneWidthListenable: _previewPaneWidthNotifier,
+                  onZoomLevelChanged: handleZoomLevelChange,
+                  onPreviewPaneWidthChanged: _updatePreviewPaneWidth,
+                  onPreviewPaneWidthCommitted: _commitPreviewPaneWidth,
+                  onPreviewPaneToggled: _togglePreviewPane,
+                  scrollController: _keyboardController.scrollController,
+                  itemKeyForPath: _keyboardController.itemKeyForPath,
+                  tabId: widget.tabId,
+                  isMasonryLayout: _isMasonryLayout,
+                  onGridCrossAxisCountChanged: (c) {
+                    // Defer setState to after build — this callback runs from LayoutBuilder during build.
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        _maybeScrollToHighlightedFile(_folderListBloc.state);
+                      if (mounted && _gridCrossAxisCount != c) {
+                        setState(() => _gridCrossAxisCount = c);
                       }
                     });
-                  }
-                },
-                onStartFileDrag: _startFileDrag,
-                onMoveItemsToFolder: _moveDroppedItemsToFolder,
+                  },
+                  onGridItemMainAxisExtentChanged: (extent) {
+                    if (extent == null || extent <= 0) {
+                      return;
+                    }
+                    _gridItemMainAxisExtent = extent;
+                    if (_pendingHighlightedFileName != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          _maybeScrollToHighlightedFile(_folderListBloc.state);
+                        }
+                      });
+                    }
+                  },
+                  onStartFileDrag: _startFileDrag,
+                  onMoveItemsToFolder: _moveDroppedItemsToFolder,
+                ),
               ),
             );
           },

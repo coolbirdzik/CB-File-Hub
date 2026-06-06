@@ -43,6 +43,7 @@ import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 import 'package:cb_file_manager/ui/widgets/value_listenable_builders.dart';
 import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_collection_view.dart';
@@ -837,8 +838,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             : null,
         body: FileViewShell(
           viewMode: _viewMode,
-          onGridZoomDelta: (delta) =>
-              _handleGridZoomChange(_gridZoomLevel + delta),
+          onViewScaleDelta: _handleViewScaleDelta,
           onMouseBack: _handleBackButton,
           onMouseForward: _handleMouseForwardButton,
           onRefresh: _refreshFileList,
@@ -1187,6 +1187,32 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final clamped =
         newZoomLevel.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
     _saveGridZoomSetting(clamped);
+  }
+
+  /// Unified Ctrl+scroll spectrum handler: walks tree↔detail↔list↔grid and
+  /// adjusts grid item size. `+1` = more spacious, `-1` = denser.
+  void _handleViewScaleDelta(int delta) {
+    if (delta == 0) return;
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.columns,
+    );
+    final result = ViewModeSpectrum.step(
+      currentMode: _viewMode,
+      currentZoom: _gridZoomLevel,
+      // Network browser supports tree/details/list (no columns mode).
+      supported: const {ViewMode.tree, ViewMode.details, ViewMode.list},
+      delta: delta,
+      minZoom: UserPreferences.minGridZoomLevel,
+      maxZoom: maxZoom,
+    );
+
+    if (result.mode != _viewMode) {
+      _setViewMode(result.mode);
+    }
+    if (result.gridZoomLevel != _gridZoomLevel) {
+      _saveGridZoomSetting(result.gridZoomLevel);
+    }
   }
 
   void _showColumnVisibilityDialog(BuildContext context) {

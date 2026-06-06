@@ -20,11 +20,13 @@
   - `features/04-split-pane-view.md`
   - `features/05-ai-agent.md` - AI Agent chat, providers, tools, approval, and side panel
   - `features/06-tag-management.md`
+  - `features/07-tab-inactive-management.md` — Auto-suspend idle tabs to reclaim RAM
 - **UI Patterns**
   - `ui-patterns/01-operation-progress.md`
   - `ui-patterns/02-file-folder-listing.md`
   - `ui-patterns/03-skeleton-loading.md`
   - `ui-patterns/04-tree-view.md` — Generic tree view component + tag/file/network integrations
+  - `ui-patterns/05-scroll-optimizations.md` — Scroll velocity tracking + Ctrl+scroll zoom
 - **Coding Rules**
   - `coding-rules/01-theme-styling-guide.md`
   - `coding-rules/02-i18n-internationalization-guide.md`

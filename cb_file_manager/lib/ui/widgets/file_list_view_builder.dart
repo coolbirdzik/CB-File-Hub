@@ -421,12 +421,11 @@ class FileListViewBuilder {
                       }
                     : null,
                 behavior: HitTestBehavior.translucent,
-                // Ctrl+scroll → zoom: use the canonical CtrlScrollZoom.
+                // Ctrl+scroll is handled by an outer CtrlScrollZoom wrapper
+                // (the unified view-spectrum handler). Disabled here to avoid
+                // two Listeners competing for the same pointer-signal event.
                 child: CtrlScrollZoom(
-                  onDelta: (state.viewMode == ViewMode.grid ||
-                          state.viewMode == ViewMode.gridPreview)
-                      ? (delta) => onZoomLevelChanged(delta)
-                      : null,
+                  onDelta: null,
                   child: RepaintBoundary(
                     child: LayoutBuilder(
                       builder: (context, constraints) {

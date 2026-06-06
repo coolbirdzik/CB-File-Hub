@@ -85,11 +85,13 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               child: Slider(
-                value: currentGridZoomLevel.toDouble(),
+                // Invert: right = larger items (fewer columns).
+                // display = (2 + 5) - zoom; convert back on change.
+                value: (7 - currentGridZoomLevel).toDouble(),
                 min: 2,
                 max: 5,
                 divisions: 3,
-                onChanged: (value) => setGridZoomLevel(value.toInt()),
+                onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
               ),
             ),
           ),
@@ -166,11 +168,12 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                     const RoundSliderOverlayShape(overlayRadius: 14.0),
               ),
               child: Slider(
-                value: currentGridZoomLevel.toDouble(),
+                // Invert: right = larger items (fewer columns).
+                value: (7 - currentGridZoomLevel).toDouble(),
                 min: 2,
                 max: 5,
                 divisions: 3,
-                onChanged: (value) => setGridZoomLevel(value.toInt()),
+                onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
               ),
             ),
           ),

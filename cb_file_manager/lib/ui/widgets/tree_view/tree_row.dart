@@ -70,6 +70,25 @@ class TreeRowShell<T> extends StatefulWidget {
 
 class _TreeRowShellState<T> extends State<TreeRowShell<T>> {
   bool _hovering = false;
+  DateTime? _lastTapAt;
+
+  static const Duration _doubleTapWindow = Duration(milliseconds: 280);
+
+  void _handleTapUp(TapUpDetails _) {
+    final now = DateTime.now();
+    final last = _lastTapAt;
+    // Manual double-tap detection so the single tap can fire immediately
+    // (the built-in onTap+onDoubleTap combo waits ~300ms on every tap).
+    if (widget.onDoubleTap != null &&
+        last != null &&
+        now.difference(last) <= _doubleTapWindow) {
+      _lastTapAt = null;
+      widget.onDoubleTap!();
+      return;
+    }
+    _lastTapAt = now;
+    widget.onTap?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,8 +109,9 @@ class _TreeRowShellState<T> extends State<TreeRowShell<T>> {
       onExit: (_) => setState(() => _hovering = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        onDoubleTap: widget.onDoubleTap,
+        onTapUp: (widget.onTap == null && widget.onDoubleTap == null)
+            ? null
+            : _handleTapUp,
         onSecondaryTapUp: widget.onSecondary == null
             ? null
             : (details) => widget.onSecondary!(details.globalPosition),
@@ -110,12 +130,15 @@ class _TreeRowShellState<T> extends State<TreeRowShell<T>> {
                     ? GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: widget.onToggleExpansion,
-                        child: Icon(
-                          widget.node.isExpanded
-                              ? PhosphorIconsLight.caretDown
-                              : PhosphorIconsLight.caretRight,
-                          size: 12,
-                          color: theme.colorScheme.onSurfaceVariant,
+                        child: AnimatedRotation(
+                          turns: widget.node.isExpanded ? 0.25 : 0.0,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          child: Icon(
+                            PhosphorIconsLight.caretRight,
+                            size: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       )
                     : const SizedBox.shrink(),

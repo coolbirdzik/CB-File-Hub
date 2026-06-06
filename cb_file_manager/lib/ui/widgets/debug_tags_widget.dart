@@ -204,7 +204,6 @@ Popular Tags: $popularTags
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Debug Tags'),
         actions: [
           if (_isSeeding)
             const Padding(

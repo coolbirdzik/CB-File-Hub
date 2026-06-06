@@ -86,6 +86,7 @@ class UserPreferences {
   static const String _trashViewModeKey = 'trash_view_mode';
   static const String _trashSortOptionKey = 'trash_sort_option';
   static const String _trashGridZoomLevelKey = 'trash_grid_zoom_level';
+  static const String _tagsGridZoomLevelKey = 'tags_grid_zoom_level';
   static const String _videoLibraryViewModePrefix = 'video_library_view_mode_';
   static const String _videoLibrarySortOptionPrefix =
       'video_library_sort_option_';
@@ -810,6 +811,19 @@ class UserPreferences {
   Future<bool> setTrashGridZoomLevel(int level) async {
     final valid = level.clamp(minGridZoomLevel, maxGridZoomLevel);
     return await _savePreference<int>(_trashGridZoomLevelKey, valid);
+  }
+
+  /// Get tag management screen grid zoom level preference
+  Future<int> getTagsGridZoomLevel() async {
+    final raw = await _getPreference<int>(_tagsGridZoomLevelKey);
+    return (raw ?? defaultGridZoomLevel)
+        .clamp(minGridZoomLevel, maxGridZoomLevel);
+  }
+
+  /// Save tag management screen grid zoom level preference
+  Future<bool> setTagsGridZoomLevel(int level) async {
+    final valid = level.clamp(minGridZoomLevel, maxGridZoomLevel);
+    return await _savePreference<int>(_tagsGridZoomLevelKey, valid);
   }
 
   /// Get drawer section expansion state

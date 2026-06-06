@@ -122,7 +122,9 @@ class SharedActionBar {
                 ),
               ),
               const Divider(height: 1),
-              for (int i = minGridSize; i <= clampedMax; i++)
+              // List from largest items (low zoom) to smallest (high zoom) so
+              // the first row always means "bigger items" – mirrors the slider.
+              for (int i = clampedMax; i >= minGridSize; i--)
                 ListTile(
                   leading: Icon(
                     PhosphorIconsLight.squaresFour,
@@ -992,12 +994,31 @@ class GridSizeSliderMenu extends StatefulWidget {
 }
 
 class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
-  late int _value;
+  // Internal storage is the raw gridZoomLevel (higher = more columns = smaller
+  // items). The slider is displayed in "item-size space" where the mapping is
+  // inverted: displayValue = minValue + maxValue - gridZoomLevel so that
+  // dragging RIGHT increases item size (fewer columns).
+  late int _zoomValue;
+
+  int get _displayValue => widget.minValue + widget.maxValue - _zoomValue;
+
+  int _displayToZoom(int display) =>
+      widget.minValue + widget.maxValue - display;
 
   @override
   void initState() {
     super.initState();
-    _value = widget.currentValue.clamp(widget.minValue, widget.maxValue);
+    _zoomValue =
+        widget.currentValue.clamp(widget.minValue, widget.maxValue).toInt();
+  }
+
+  @override
+  void didUpdateWidget(GridSizeSliderMenu oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentValue != oldWidget.currentValue) {
+      _zoomValue =
+          widget.currentValue.clamp(widget.minValue, widget.maxValue).toInt();
+    }
   }
 
   @override
@@ -1005,6 +1026,7 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final divisions = math.max(1, widget.maxValue - widget.minValue);
+    final displayVal = _displayValue;
 
     return SizedBox(
       width: 260,
@@ -1014,7 +1036,7 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: icon + current value
+            // Header: icon + current display value (bigger number = bigger items)
             Row(
               children: [
                 Icon(PhosphorIconsLight.squaresFour,
@@ -1037,7 +1059,7 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '$_value',
+                    '$displayVal',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -1048,7 +1070,7 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
               ],
             ),
             const SizedBox(height: 4),
-            // Horizontal slider with min/max icons
+            // Slider: left = smallest items (many columns), right = largest items (few columns).
             Row(
               children: [
                 Icon(PhosphorIconsLight.minus,
@@ -1063,15 +1085,17 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
                           const RoundSliderOverlayShape(overlayRadius: 14),
                     ),
                     child: Slider(
-                      value: _value.toDouble(),
+                      // Slider operates in display-space (higher = bigger items).
+                      value: displayVal.toDouble(),
                       min: widget.minValue.toDouble(),
                       max: widget.maxValue.toDouble(),
                       divisions: divisions,
                       onChanged: (v) {
-                        final newVal = v.round();
-                        if (newVal != _value) {
-                          setState(() => _value = newVal);
-                          widget.onChanged(newVal);
+                        final newDisplay = v.round();
+                        if (newDisplay != displayVal) {
+                          final newZoom = _displayToZoom(newDisplay);
+                          setState(() => _zoomValue = newZoom);
+                          widget.onChanged(newZoom);
                         }
                       },
                     ),

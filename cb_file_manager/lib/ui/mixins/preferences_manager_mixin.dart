@@ -7,6 +7,7 @@ import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 
 /// Mixin for managing user preferences related to folder list display
 ///
@@ -232,6 +233,52 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     if (newZoom != currentZoom) {
       folderListBloc.add(SetGridZoom(newZoom));
       saveGridZoomSetting(newZoom);
+    }
+  }
+
+  /// Supported non-grid view modes for the unified Ctrl+scroll spectrum.
+  /// Mobile drops `columns` (and `gridPreview` is always excluded from the
+  /// spectrum). Override in a host widget if a screen supports fewer modes.
+  Set<ViewMode> get spectrumSupportedModes => isDesktopPlatform
+      ? const {
+          ViewMode.tree,
+          ViewMode.columns,
+          ViewMode.details,
+          ViewMode.list,
+        }
+      : const {
+          ViewMode.tree,
+          ViewMode.details,
+          ViewMode.list,
+        };
+
+  /// Handle a unified "view scale" delta from Ctrl+scroll.
+  ///
+  /// [delta] - `+1` moves toward the spacious end (wider modes / bigger grid
+  /// items), `-1` toward the dense end. Walks the full
+  /// tree↔column↔detail↔list↔grid spectrum, transitioning view mode and/or
+  /// adjusting the grid zoom level as needed.
+  void handleViewScaleChange(int delta) {
+    if (delta == 0) return;
+    final maxZoom = GridZoomConstraints.maxGridSizeForContext(
+      context,
+      mode: GridSizeMode.referenceWidth,
+    );
+    final result = ViewModeSpectrum.step(
+      currentMode: viewMode,
+      currentZoom: gridZoomLevel,
+      supported: spectrumSupportedModes,
+      delta: delta,
+      minZoom: UserPreferences.minGridZoomLevel,
+      maxZoom: maxZoom,
+    );
+
+    if (result.mode != viewMode) {
+      setViewMode(result.mode);
+    }
+    if (result.gridZoomLevel != gridZoomLevel) {
+      folderListBloc.add(SetGridZoom(result.gridZoomLevel));
+      saveGridZoomSetting(result.gridZoomLevel);
     }
   }
 
