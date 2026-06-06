@@ -22,6 +22,7 @@ on:
 env:
   FLUTTER_VERSION: "3.41.5"
   PROJECT_DIR: "cb_file_manager"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # Generate release notes from commits
@@ -34,7 +35,7 @@ jobs:
       version_tag: ${{ steps.version.outputs.version_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Fetch all history for changelog
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -131,12 +132,12 @@ jobs:
           if [ -z "$PREV_TAG" ]; then
             echo "Initial release" >> release_notes.md
             echo "" >> release_notes.md
-            COMMITS=$(git log "$CURRENT_REF" --reverse --pretty=format:"- %s (%h)" || true)
+            COMMITS=$(git log "$CURRENT_REF" --reverse --no-merges --pretty=format:"- %s (%h)" || true)
           else
             echo "Changes from \`$PREV_TAG\` to \`$CURRENT_TAG\`." >> release_notes.md
             echo "" >> release_notes.md
             RANGE="$PREV_TAG..$CURRENT_REF"
-            COMMITS=$(git log "$RANGE" --reverse --pretty=format:"- %s (%h)" || true)
+            COMMITS=$(git log "$RANGE" --reverse --no-merges --pretty=format:"- %s (%h)" || true)
           fi
 
           if [ -z "$COMMITS" ]; then
@@ -190,7 +191,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Upload release notes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: release_notes.md
@@ -201,7 +202,7 @@ jobs:
     needs: generate-release-notes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -243,7 +244,7 @@ jobs:
           fi
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-build
           path: ${{ env.PROJECT_DIR }}/build/windows/portable/*.zip
@@ -254,7 +255,7 @@ jobs:
     needs: generate-release-notes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -302,7 +303,7 @@ jobs:
           fi
 
       - name: Upload MSI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msi
           path: ${{ env.PROJECT_DIR }}/build/windows/installer/*.msi
@@ -314,7 +315,7 @@ jobs:
     environment: Production
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -369,7 +370,7 @@ jobs:
         run: ./scripts/build.sh windows-msix
 
       - name: Upload MSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msix
           path: ${{ env.PROJECT_DIR }}/build/windows/msix/*.msix
@@ -380,7 +381,7 @@ jobs:
     needs: generate-release-notes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -420,7 +421,7 @@ jobs:
           done
 
       - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-apk
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/*.apk
@@ -432,7 +433,7 @@ jobs:
     environment: Production
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -502,7 +503,7 @@ jobs:
           mv app-release.aab "CBFileHub-$VERSION.aab"
 
       - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-aab
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
@@ -531,7 +532,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
@@ -539,7 +540,7 @@ jobs:
         run: ls -R artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.generate-release-notes.outputs.version_tag }}
           name: CB File Hub ${{ needs.generate-release-notes.outputs.version_tag }}
