@@ -409,10 +409,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_vlc_player
-      sha256: c2554ae0de8133ff5c6d174381f8097f482cdb51ea5aa75d03ee139b71490b53
+      sha256: "32c0109cc191a97246df759a8804a1051c4ca6909597833506f13587cb3bf1be"
       url: "https://pub.dev"
     source: hosted
-    version: "7.4.3"
+    version: "7.4.4"
   flutter_vlc_player_platform_interface:
     dependency: transitive
     description:
@@ -656,10 +656,10 @@ packages:
     dependency: "direct main"
     description:
       name: media_kit_libs_android_video
-      sha256: adff9b571b8ead0867f9f91070f8df39562078c0eb3371d88b9029a2d547d7b7
+      sha256: "3f6274e5ab2de512c286a25c327288601ee445ed8ac319e0ef0b66148bd8f76c"
       url: "https://pub.dev"
     source: hosted
-    version: "1.3.7"
+    version: "1.3.8"
   media_kit_libs_windows_video:
     dependency: "direct main"
     description:

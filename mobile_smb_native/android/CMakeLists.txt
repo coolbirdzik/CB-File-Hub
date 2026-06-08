@@ -27,6 +27,10 @@ target_link_libraries(smb_bridge
     # or built from source for Android
 )
 
+if(ANDROID)
+    target_link_options(smb_bridge PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
+
 # LibVLC support removed - now using flutter_vlc_player
 
 # Set library properties

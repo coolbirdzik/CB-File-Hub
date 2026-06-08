@@ -32,7 +32,7 @@ val hasReleaseSigningConfig = listOf(
 android {
     namespace = "com.cbv.filehub"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -52,6 +52,18 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        ndk {
+            abiFilters.clear()
+            abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+        }
+    }
+
+    packaging {
+        jniLibs {
+            excludes += "**/armeabi-v7a/**"
+            useLegacyPackaging = false
+        }
     }
 
     signingConfigs {

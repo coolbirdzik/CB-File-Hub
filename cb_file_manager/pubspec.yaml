@@ -12,7 +12,7 @@ publish_to: none
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.1.0+3
+version: 1.1.0+0
 
 environment:
   sdk: ">=2.15.0 <=3.32.1"
@@ -61,11 +61,11 @@ dependencies:
   media_kit_video: ^1.3.1 # Video widget (1.3.1 fixes Windows crash: notify VideoOutput.Resize on platform thread)
   media_kit_native_event_loop: ^1.0.9 # Support for platforms
   media_kit_libs_windows_video: ^1.0.11 # Windows video support
-  media_kit_libs_android_video: ^1.3.7 # Android video support
+  media_kit_libs_android_video: ^1.3.8 # Android video support
   # media_kit_libs_ios_video: ^1.1.4 # Uncomment if you need iOS support
   # Pin to 7.4.3: 7.4.4 has a Pigeon channel name mismatch that breaks Android initialization
   # (PlatformException(channel-error, Unable to establish connection on channel.)).
-  flutter_vlc_player: 7.4.3
+  flutter_vlc_player: 7.4.4
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
