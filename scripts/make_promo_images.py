@@ -18,6 +18,8 @@ DEFAULT_OUTPUT = ROOT / "screenshots" / "promo"
 
 DESKTOP_SIZE = (2400, 1350)
 MOBILE_SIZE = (1440, 2560)
+TABLET7_SIZE = (1200, 1920)
+FEATURE_SIZE = (1024, 500)
 
 DESKTOP_SOURCE_NAMES = [
     "002_showcase_file_browser_result.png",
@@ -57,6 +59,13 @@ MOBILE_SPECS = [
     PromoSpec("mobile_tags", "Tags on the go", "Group files into workflows wherever you are.", (92, 219, 149)),
 ]
 
+TABLET7_SPECS = [
+    PromoSpec("tablet7_home", "Your file hub on tablets", "Browse and organize files on a roomy 7-inch layout.", (54, 166, 255)),
+    PromoSpec("tablet7_grid", "Scan large libraries faster", "A wider file grid keeps media collections easy to browse.", (250, 169, 64)),
+    PromoSpec("tablet7_tabs", "Keep more context open", "Switch tabs and folders without losing your place.", (138, 112, 255)),
+    PromoSpec("tablet7_tags", "Organize from the couch", "Use tags to group files into clearer tablet workflows.", (92, 219, 149)),
+]
+
 DESKTOP_SPECS_VI = [
     PromoSpec("duyet_tap_tin", "Duyệt mọi thư mục", "Tập tin cục bộ, tab, tag và xem trước nhanh trong một không gian gọn gàng.", (54, 166, 255)),
     PromoSpec("thu_vien_anh", "Thư viện lớn vẫn dễ xem", "Quét album, thư mục media và bộ sưu tập hình ảnh mà không mất ngữ cảnh.", (250, 169, 64)),
@@ -73,6 +82,13 @@ MOBILE_SPECS_VI = [
     PromoSpec("mobile_luoi_file", "Thư viện lớn vẫn nhanh", "Lưới tập tin vẫn gọn gàng và dễ quét trên màn hình nhỏ.", (250, 169, 64)),
     PromoSpec("mobile_tab", "Tab đi cùng bạn", "Chuyển qua lại giữa các chế độ xem mà không mất vị trí đang duyệt.", (138, 112, 255)),
     PromoSpec("mobile_tag", "Gắn tag mọi nơi", "Gom tập tin thành các workflow rõ ràng ngay trên điện thoại.", (92, 219, 149)),
+]
+
+TABLET7_SPECS_VI = [
+    PromoSpec("tablet7_trang_chu", "File hub trên máy tính bảng", "Duyệt và sắp xếp tập tin trên giao diện 7 inch rộng rãi.", (54, 166, 255)),
+    PromoSpec("tablet7_luoi_file", "Quét thư viện lớn nhanh hơn", "Lưới tập tin rộng giúp bộ sưu tập media dễ duyệt hơn.", (250, 169, 64)),
+    PromoSpec("tablet7_tab", "Giữ nhiều ngữ cảnh đang mở", "Chuyển tab và thư mục mà không mất vị trí đang duyệt.", (138, 112, 255)),
+    PromoSpec("tablet7_tag", "Sắp xếp thoải mái hơn", "Dùng tag để gom tập tin thành workflow rõ ràng trên tablet.", (92, 219, 149)),
 ]
 
 
@@ -221,6 +237,90 @@ def draw_mobile_frame(base: Image.Image, screenshot: Image.Image, spec: PromoSpe
     draw_text_block(draw, (112, 150), spec.title, spec.subtitle, 1220, 88)
 
 
+def draw_tablet7_frame(base: Image.Image, screenshot: Image.Image, spec: PromoSpec) -> None:
+    tablet_w, tablet_h = 900, 1200
+    tablet_x = (TABLET7_SIZE[0] - tablet_w) // 2
+    tablet_y = 560
+    draw_shadow(base, (tablet_x - 42, tablet_y - 28, tablet_x + tablet_w + 42, tablet_y + tablet_h + 52), 70, 42, 150)
+    draw = ImageDraw.Draw(base)
+    draw.rounded_rectangle((tablet_x, tablet_y, tablet_x + tablet_w, tablet_y + tablet_h), radius=58, fill=(18, 24, 38, 255), outline=(108, 122, 142, 170), width=4)
+    screen_margin = 28
+    screen_box = (tablet_x + screen_margin, tablet_y + screen_margin, tablet_w - screen_margin * 2, tablet_h - screen_margin * 2)
+    screen_background = Image.new("RGBA", (screen_box[2], screen_box[3]), (10, 15, 24, 255))
+    screen = contain_resize(screenshot, (screen_box[2], screen_box[3]))
+    screen_x = (screen_background.width - screen.width) // 2
+    screen_y = (screen_background.height - screen.height) // 2
+    screen_background.alpha_composite(screen, (screen_x, screen_y))
+    paste_rounded(base, screen_background, (screen_box[0], screen_box[1]), 40)
+    camera_r = 7
+    camera_x = tablet_x + tablet_w // 2
+    camera_y = tablet_y + 14
+    draw.ellipse((camera_x - camera_r, camera_y - camera_r, camera_x + camera_r, camera_y + camera_r), fill=(10, 15, 24, 255))
+    draw_text_block(draw, (92, 120), spec.title, spec.subtitle, 1010, 76)
+
+
+def draw_feature_text(draw: ImageDraw.ImageDraw, title: str, subtitle: str, detail: str) -> None:
+    title_font = load_font(62, bold=True)
+    subtitle_font = load_font(34, bold=True)
+    detail_font = load_font(22)
+    eyebrow_font = load_font(17, bold=True)
+    x, y = 64, 70
+    draw.text((x, y), "CB FILE HUB", font=eyebrow_font, fill=(147, 197, 253, 255))
+    y += 38
+    draw.multiline_text((x, y), wrap_text(title, title_font, 440), font=title_font, fill=(248, 250, 252, 255), spacing=6)
+    title_bbox = draw.multiline_textbbox((x, y), wrap_text(title, title_font, 440), font=title_font, spacing=6)
+    y = title_bbox[3] + 26
+    draw.multiline_text((x, y), wrap_text(subtitle, subtitle_font, 450), font=subtitle_font, fill=(226, 232, 240, 255), spacing=6)
+    subtitle_bbox = draw.multiline_textbbox((x, y), wrap_text(subtitle, subtitle_font, 450), font=subtitle_font, spacing=6)
+    y = subtitle_bbox[3] + 24
+    draw.multiline_text((x, y), wrap_text(detail, detail_font, 410), font=detail_font, fill=(203, 213, 225, 255), spacing=6)
+
+
+def draw_feature_phone(base: Image.Image, screenshot: Image.Image, xy: tuple[int, int], size: tuple[int, int], tilt: int = 0) -> None:
+    phone_w, phone_h = size
+    phone = Image.new("RGBA", (phone_w + 80, phone_h + 80), (0, 0, 0, 0))
+    offset = 40
+    draw = ImageDraw.Draw(phone)
+    draw_shadow(phone, (offset - 8, offset - 6, offset + phone_w + 8, offset + phone_h + 12), 42, 20, 120)
+    draw.rounded_rectangle((offset, offset, offset + phone_w, offset + phone_h), radius=42, fill=(18, 24, 38, 255), outline=(108, 122, 142, 170), width=2)
+    screen_margin = 15
+    screen_size = (phone_w - screen_margin * 2, phone_h - screen_margin * 2)
+    screen = cover_resize(screenshot, screen_size)
+    paste_rounded(phone, screen, (offset + screen_margin, offset + screen_margin), 30)
+    notch_w, notch_h = 78, 18
+    notch_x = offset + (phone_w - notch_w) // 2
+    draw.rounded_rectangle((notch_x, offset + 10, notch_x + notch_w, offset + 10 + notch_h), radius=9, fill=(10, 15, 24, 255))
+    if tilt:
+        phone = phone.rotate(tilt, resample=Image.Resampling.BICUBIC, expand=True)
+    base.alpha_composite(phone, xy)
+
+
+def create_feature_graphic(sources: list[Path], output: Path, title: str, subtitle: str, detail: str) -> None:
+    screenshots = [Image.open(source).convert("RGBA") for source in sources[:3]]
+    if not screenshots:
+        raise SystemExit("At least one mobile screenshot is required for the feature graphic")
+
+    image = create_background(FEATURE_SIZE, (54, 166, 255))
+    overlay = Image.new("RGBA", FEATURE_SIZE, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    draw.rounded_rectangle((570, 42, 984, 458), radius=42, fill=(15, 23, 42, 128), outline=(96, 165, 250, 70), width=2)
+    draw.ellipse((760, -120, 1180, 300), fill=(54, 166, 255, 40))
+    draw.ellipse((470, 310, 830, 640), fill=(92, 219, 149, 28))
+    image = Image.alpha_composite(image, overlay)
+    draw = ImageDraw.Draw(image)
+    draw_feature_text(draw, title, subtitle, detail)
+
+    first = screenshots[0]
+    second = screenshots[1] if len(screenshots) > 1 else first
+    third = screenshots[2] if len(screenshots) > 2 else second
+    draw_feature_phone(image, second, (690, 100), (186, 392), tilt=7)
+    draw_feature_phone(image, third, (790, 88), (176, 372), tilt=-6)
+    draw_feature_phone(image, first, (560, 58), (218, 460), tilt=-2)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.convert("RGB").save(output, optimize=True)
+
+
 def create_desktop_promo(source: Path, output: Path, spec: PromoSpec) -> None:
     screenshot = Image.open(source).convert("RGBA")
     image = create_background(DESKTOP_SIZE, spec.accent)
@@ -233,6 +333,14 @@ def create_mobile_promo(source: Path, output: Path, spec: PromoSpec) -> None:
     screenshot = Image.open(source).convert("RGBA")
     image = create_background(MOBILE_SIZE, spec.accent)
     draw_mobile_frame(image, screenshot, spec)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.convert("RGB").save(output, optimize=True)
+
+
+def create_tablet7_promo(source: Path, output: Path, spec: PromoSpec) -> None:
+    screenshot = Image.open(source).convert("RGBA")
+    image = create_background(TABLET7_SIZE, spec.accent)
+    draw_tablet7_frame(image, screenshot, spec)
     output.parent.mkdir(parents=True, exist_ok=True)
     image.convert("RGB").save(output, optimize=True)
 
@@ -275,8 +383,10 @@ def main() -> None:
 
     desktop_output = args.output / "desktop"
     mobile_output = args.output / "mobile"
+    tablet7_output = args.output / "tablet7"
     desktop_vi_output = args.output / "vi" / "desktop"
     mobile_vi_output = args.output / "vi" / "mobile"
+    tablet7_vi_output = args.output / "vi" / "tablet7"
 
     for index, source in enumerate(desktop_sources):
         spec = DESKTOP_SPECS[index % len(DESKTOP_SPECS)]
@@ -287,13 +397,35 @@ def main() -> None:
     for index, source in enumerate(mobile_sources):
         spec = MOBILE_SPECS[index % len(MOBILE_SPECS)]
         create_mobile_promo(source, mobile_output / f"{index + 1:02d}_{spec.stem}.png", spec)
+        tablet_spec = TABLET7_SPECS[index % len(TABLET7_SPECS)]
+        create_tablet7_promo(source, tablet7_output / f"{index + 1:02d}_{tablet_spec.stem}.png", tablet_spec)
         vi_spec = MOBILE_SPECS_VI[index % len(MOBILE_SPECS_VI)]
         create_mobile_promo(source, mobile_vi_output / f"{index + 1:02d}_{vi_spec.stem}.png", vi_spec)
+        tablet_vi_spec = TABLET7_SPECS_VI[index % len(TABLET7_SPECS_VI)]
+        create_tablet7_promo(source, tablet7_vi_output / f"{index + 1:02d}_{tablet_vi_spec.stem}.png", tablet_vi_spec)
+
+    create_feature_graphic(
+        mobile_sources,
+        args.output / "feature_graphic.png",
+        "Your file hub anywhere",
+        "Browse, play, and organize media anywhere",
+        "Tabs, tags, thumbnails, SMB, and FTP in one focused app.",
+    )
+    create_feature_graphic(
+        mobile_sources,
+        args.output / "vi" / "feature_graphic.png",
+        "File hub trên mọi màn hình",
+        "Duyệt, phát và sắp xếp media mọi nơi",
+        "Tab, tag, thumbnail, SMB và FTP trong một ứng dụng gọn gàng.",
+    )
 
     print(f"Created {len(desktop_sources)} desktop promo images in {desktop_output}")
     print(f"Created {len(mobile_sources)} mobile promo images in {mobile_output}")
+    print(f"Created {len(mobile_sources)} 7-inch tablet promo images in {tablet7_output}")
     print(f"Created {len(desktop_sources)} Vietnamese desktop promo images in {desktop_vi_output}")
     print(f"Created {len(mobile_sources)} Vietnamese mobile promo images in {mobile_vi_output}")
+    print(f"Created {len(mobile_sources)} Vietnamese 7-inch tablet promo images in {tablet7_vi_output}")
+    print(f"Created feature graphics in {args.output} and {args.output / 'vi'}")
 
 
 if __name__ == "__main__":

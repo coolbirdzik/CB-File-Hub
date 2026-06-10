@@ -8,11 +8,20 @@
   <img src="cb_file_manager/assets/images/logo_circle.png" alt="CB File Hub logo" width="180" />
 </p>
 
-<p align="center">
-<a href="https://apps.microsoft.com/detail/9nchpzkc4m5c?referrer=appbadge&mode=full" target="_blank"  rel="noopener noreferrer">
-	<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
-</a>
-</p>
+<table align="center">
+  <tr>
+    <td align="center" valign="middle">
+      <a href="https://apps.microsoft.com/detail/9nchpzkc4m5c?referrer=appbadge&mode=full" target="_blank" rel="noopener noreferrer">
+        <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Download from Microsoft Store" width="200" />
+      </a>
+    </td>
+    <td align="center" valign="middle">
+      <a href="https://play.google.com/store/apps/details?id=com.cbv.filehub" target="_blank" rel="noopener noreferrer">
+        <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="220" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 CB File Hub is a cross-platform file manager focused on large personal media libraries. It is built for the situation where movies, photos, clips, and folders keep growing until finding the right thing to watch feels harder than watching it.
 
