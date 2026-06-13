@@ -2981,7 +2981,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerAnalyzingDisk => 'Analyzing disk usage...';
   @override
-  String get diskCleanerPieChartPending => 'Pie chart will appear after scan completes.';
+  String get diskCleanerPieChartPending =>
+      'Pie chart will appear after scan completes.';
   @override
   String get diskCleanerPieEmpty => 'Empty';
   @override
@@ -2989,9 +2990,11 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCleaning => 'Cleaning...';
   @override
-  String get diskCleanerScanningSelectedDirs => 'Scanning selected directories...';
+  String get diskCleanerScanningSelectedDirs =>
+      'Scanning selected directories...';
   @override
-  String get diskCleanerDeletingJunkHint => 'Deleting selected items. If a file fails, you can skip it or try again.';
+  String get diskCleanerDeletingJunkHint =>
+      'Deleting selected items. If a file fails, you can skip it or try again.';
   @override
   String get diskCleanerPermanentDeleteLabel => 'Permanent delete';
   @override
@@ -3011,9 +3014,11 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerWaitingDecision => 'Waiting for your decision...';
   @override
-  String get diskCleanerFileInUse => 'This file appears to be in use by another application.';
+  String get diskCleanerFileInUse =>
+      'This file appears to be in use by another application.';
   @override
-  String get diskCleanerRetryInUseHint => 'Retrying now will usually fail again until the app or process using this file is closed.';
+  String get diskCleanerRetryInUseHint =>
+      'Retrying now will usually fail again until the app or process using this file is closed.';
   @override
   String get diskCleanerBlockedBy => 'Blocked by:';
   @override
@@ -3037,15 +3042,20 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerColumnCategory => 'Category';
   @override
-  String get diskCleanerRecycleBinEmpty => 'No items are currently in the Recycle Bin.';
+  String get diskCleanerRecycleBinEmpty =>
+      'No items are currently in the Recycle Bin.';
   @override
-  String diskCleanerItemsInRecycleBin(int count, String size) => '$count items in Recycle Bin ($size)';
+  String diskCleanerItemsInRecycleBin(int count, String size) =>
+      '$count items in Recycle Bin ($size)';
   @override
-  String diskCleanerSkippedInUseSnack(int count) => 'Skipped $count file(s) currently in use. Details were logged.';
+  String diskCleanerSkippedInUseSnack(int count) =>
+      'Skipped $count file(s) currently in use. Details were logged.';
   @override
-  String diskCleanerSkippedAfterFailureSnack(int count) => 'Skipped $count file(s) after delete failed.';
+  String diskCleanerSkippedAfterFailureSnack(int count) =>
+      'Skipped $count file(s) after delete failed.';
   @override
-  String diskCleanerFreedBadge(String size, int count) => 'Freed $size  •  $count items';
+  String diskCleanerFreedBadge(String size, int count) =>
+      'Freed $size  •  $count items';
   @override
   String diskCleanerFailedBadge(int count) => '$count failed';
   @override
@@ -3053,23 +3063,29 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String diskCleanerSkippedBadge(int count) => '$count skipped';
   @override
-  String diskCleanerSkippedInUseBanner(int count) => 'Skipped $count file(s) currently in use. See logs for the full path list.';
+  String diskCleanerSkippedInUseBanner(int count) =>
+      'Skipped $count file(s) currently in use. See logs for the full path list.';
   @override
-  String diskCleanerSkippedByUserBanner(int count) => 'Skipped $count file(s) after delete failed because you chose Skip.';
+  String diskCleanerSkippedByUserBanner(int count) =>
+      'Skipped $count file(s) after delete failed because you chose Skip.';
   @override
-  String diskCleanerDeletedPermanentlyBody(int count) => 'Deleted $count items permanently.';
+  String diskCleanerDeletedPermanentlyBody(int count) =>
+      'Deleted $count items permanently.';
   @override
   String diskCleanerFreedSpace(String size) => 'Freed $size';
   @override
-  String diskCleanerPermanentDeleteFinished(int count) => 'Permanent delete finished for $count items.';
+  String diskCleanerPermanentDeleteFinished(int count) =>
+      'Permanent delete finished for $count items.';
   @override
-  String diskCleanerPermanentDeletingProgress(int done, int total) => 'Permanently deleting... $done / $total';
+  String diskCleanerPermanentDeletingProgress(int done, int total) =>
+      'Permanently deleting... $done / $total';
   @override
   String get diskCleanerDeletingLabel => 'Deleting...';
   @override
   String get diskCleanerRemaining => 'remaining';
   @override
-  String diskCleanerDriveFree(String label, String size) => '$label  $size free';
+  String diskCleanerDriveFree(String label, String size) =>
+      '$label  $size free';
   @override
   String diskCleanerFilesCount(int count) => '$count files';
   @override
@@ -3077,27 +3093,33 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get diskCleanerStarting => 'Starting...';
   @override
-  String diskCleanerDriveSummary(String path, String size, int count) => '$path  $size  •  $count files';
+  String diskCleanerDriveSummary(String path, String size, int count) =>
+      '$path  $size  •  $count files';
   @override
   String diskCleanerAgentPath(String path) => 'CB Agent: $path';
   @override
-  String diskCleanerItemsBytes(int count, String size) => '$count items • $size';
+  String diskCleanerItemsBytes(int count, String size) =>
+      '$count items • $size';
   @override
   String diskCleanerSizeFiles(String size, int files) => '$size • $files files';
   @override
-  String diskCleanerScannedProgress(String size, int files) => '$size scanned • $files files';
+  String diskCleanerScannedProgress(String size, int files) =>
+      '$size scanned • $files files';
   @override
-  String get diskCleanerPieChartPendingScan => 'Pie chart will appear as soon as scan completes';
+  String get diskCleanerPieChartPendingScan =>
+      'Pie chart will appear as soon as scan completes';
   @override
   String diskCleanerScanningPath(String path) => 'Scanning $path';
   @override
-  String diskCleanerProcessedCount(int done, int total) => '$done / $total processed';
+  String diskCleanerProcessedCount(int done, int total) =>
+      '$done / $total processed';
   @override
   String diskCleanerJunkSummary(String size) => 'Junk: $size';
   @override
   String get diskCleanerContinue => 'Continue';
   @override
-  String get diskCleanerAiPanelUnavailable => 'AI panel not available in this context';
+  String get diskCleanerAiPanelUnavailable =>
+      'AI panel not available in this context';
   @override
   String get diskCleanerAskAgentAboutThis => 'Ask CB Agent about this';
   @override
@@ -3130,28 +3152,37 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String diskCleanerCleanupFailedMsg(String error) => 'Cleanup failed: $error';
   @override
-  String diskCleanerPermanentDeleteFailedMsg(String error) => 'Permanent delete failed: $error';
+  String diskCleanerPermanentDeleteFailedMsg(String error) =>
+      'Permanent delete failed: $error';
   @override
-  String diskCleanerAgentFoundJunk(int count, String size) => 'CB Agent found $count junk items ($size)';
+  String diskCleanerAgentFoundJunk(int count, String size) =>
+      'CB Agent found $count junk items ($size)';
   @override
   String diskCleanerAndMoreItems(int count) => '... and $count more items';
   @override
-  String diskCleanerSelectedBytes(String size, String total) => 'Selected: $size / $total';
+  String diskCleanerSelectedBytes(String size, String total) =>
+      'Selected: $size / $total';
   @override
-  String diskCleanerReviewModeSelected(String size) => 'Review mode • Selected: $size';
+  String diskCleanerReviewModeSelected(String size) =>
+      'Review mode • Selected: $size';
   @override
-  String diskCleanerDeletePermanentlyButton(String size) => 'Delete $size permanently';
+  String diskCleanerDeletePermanentlyButton(String size) =>
+      'Delete $size permanently';
   @override
-  String diskCleanerMoveToRecycleBinButton(String size) => 'Move $size to Recycle Bin';
+  String diskCleanerMoveToRecycleBinButton(String size) =>
+      'Move $size to Recycle Bin';
   @override
   String diskCleanerReviewAndClean(String size) => 'Review $size & clean';
   @override
-  String diskCleanerPermanentDeletedSuccess(int count, String size) => 'Permanently deleted $count items ($size)';
+  String diskCleanerPermanentDeletedSuccess(int count, String size) =>
+      'Permanently deleted $count items ($size)';
   @override
-  String diskCleanerPermanentDeletedWithInUse(int count, String size, int skipped) =>
+  String diskCleanerPermanentDeletedWithInUse(
+          int count, String size, int skipped) =>
       'Permanently deleted $count items ($size). Skipped $skipped in-use file(s); details were logged.';
   @override
-  String diskCleanerPermanentDeletedWithSkipped(int count, String size, int skipped) =>
+  String diskCleanerPermanentDeletedWithSkipped(
+          int count, String size, int skipped) =>
       'Permanently deleted $count items ($size). Skipped $skipped file(s) after delete failed.';
 
   @override

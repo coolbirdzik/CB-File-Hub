@@ -261,14 +261,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     ),
                     DiskTreeNode(
                       name: 'GPUCache',
-                      fullPath: 'C:\\Users\\ngtan\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\GPUCache',
+                      fullPath:
+                          'C:\\Users\\ngtan\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\GPUCache',
                       sizeBytes: 1200 * 1024 * 1024,
                       fileCount: 3420,
                       junkCategoryId: 'browser_cache',
                     ),
                     DiskTreeNode(
                       name: 'Code Cache',
-                      fullPath: 'C:\\Users\\ngtan\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Code Cache',
+                      fullPath:
+                          'C:\\Users\\ngtan\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Code Cache',
                       sizeBytes: 860 * 1024 * 1024,
                       fileCount: 1880,
                       junkCategoryId: 'browser_cache',
@@ -392,7 +394,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _phase = _Phase.setup;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerScanFailedMsg('$e'))),
+          SnackBar(
+              content: Text(AppLocalizations.of(context)!
+                  .diskCleanerScanFailedMsg('$e'))),
         );
       }
     }
@@ -443,7 +447,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     final controller = AiPanelScope.maybeOf(context);
     if (controller == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerAiPanelUnavailable)),
+        SnackBar(
+            content: Text(
+                AppLocalizations.of(context)!.diskCleanerAiPanelUnavailable)),
       );
       return;
     }
@@ -761,11 +767,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                             ),
                           ),
                           Text(
-                            l.diskCleanerFilesCount(_lastProgress!.filesScanned),
+                            l.diskCleanerFilesCount(
+                                _lastProgress!.filesScanned),
                             style: theme.textTheme.bodySmall,
                           ),
                           Text(
-                            l.diskCleanerDirsCount(_lastProgress!.directoriesScanned),
+                            l.diskCleanerDirsCount(
+                                _lastProgress!.directoriesScanned),
                             style: theme.textTheme.bodySmall,
                           ),
                         ] else
@@ -913,7 +921,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                           if (_agentItemsFound > 0) ...[
                             const SizedBox(width: 8),
                             Text(
-                              l.diskCleanerItemsBytes(_agentItemsFound, _fmt(_agentBytesFound)),
+                              l.diskCleanerItemsBytes(
+                                  _agentItemsFound, _fmt(_agentBytesFound)),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -988,8 +997,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   : PhosphorIconsLight.arrowCounterClockwise,
               size: 16,
             ),
-            label:
-                Text(_isScanningFullDisk ? l.diskCleanerCancel : l.diskCleanerScanAgain),
+            label: Text(_isScanningFullDisk
+                ? l.diskCleanerCancel
+                : l.diskCleanerScanAgain),
           ),
         ],
       ),
@@ -1000,7 +1010,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Tree panel (left)
   // ---------------------------------------------------------------------------
 
-  Widget _buildTreePanel(ThemeData theme, AppLocalizations l, DiskTreeNode root) {
+  Widget _buildTreePanel(
+      ThemeData theme, AppLocalizations l, DiskTreeNode root) {
     // Flatten the visible tree into a list for ListView.builder (lazy render).
     final flatRows = <_FlatRow>[];
     void flatten(DiskTreeNode node, int depth, int parentSize) {
@@ -1136,7 +1147,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Pie chart panel (right)
   // ---------------------------------------------------------------------------
 
-  Widget _buildPiePanel(ThemeData theme, AppLocalizations l, DiskTreeNode node) {
+  Widget _buildPiePanel(
+      ThemeData theme, AppLocalizations l, DiskTreeNode node) {
     if (_isScanningFullDisk) {
       return Center(
         child: Padding(
@@ -1370,7 +1382,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                             isPreparing
                                 ? (snap.currentPath.isEmpty
                                     ? l.diskCleanerScanningSelectedDirs
-                                    : l.diskCleanerScanningPath(snap.currentPath))
+                                    : l.diskCleanerScanningPath(
+                                        snap.currentPath))
                                 : (snap.currentPath.isEmpty
                                     ? l.diskCleanerDeletingJunkHint
                                     : snap.currentPath),
@@ -1392,7 +1405,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                     _buildProgressStatChip(
+                    _buildProgressStatChip(
                       theme: theme,
                       icon: _selectedCleanMode == _CleanDeleteMode.permanent
                           ? PhosphorIconsLight.trash
@@ -1471,7 +1484,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 ? (_cleanStatus.isEmpty ? l.diskCleanerCleaning : _cleanStatus)
                 : _reviewMode
                     ? l.diskCleanerReviewModeSelected(_fmt(selectedBytes))
-                    : l.diskCleanerSelectedBytes(_fmt(selectedBytes), _fmt(junkBytes)),
+                    : l.diskCleanerSelectedBytes(
+                        _fmt(selectedBytes), _fmt(junkBytes)),
             style: theme.textTheme.bodyMedium
                 ?.copyWith(fontWeight: FontWeight.w500),
           ),
@@ -1711,8 +1725,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       // Prune deleted paths from the in-memory tree so returning to the
       // results view shows the freed space without a re-scan.
       if (_rootNode != null && succeededSet.isNotEmpty) {
-        final deletedUpper =
-            succeededSet.map((p) => p.toUpperCase()).toSet();
+        final deletedUpper = succeededSet.map((p) => p.toUpperCase()).toSet();
         _pruneDeletedPaths(_rootNode!, deletedUpper);
         // If the currently-viewed pie node was deleted, fall back to root.
         if (_selectedNode != null &&
@@ -1750,8 +1763,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              AppLocalizations.of(context)!
-                  .diskCleanerSkippedAfterFailureSnack(result.skippedByUserCount),
+              AppLocalizations.of(context)!.diskCleanerSkippedAfterFailureSnack(
+                  result.skippedByUserCount),
             ),
           ),
         );
@@ -1763,7 +1776,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _cleanStatus = '';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerCleanupFailedMsg('$e'))),
+        SnackBar(
+            content: Text(AppLocalizations.of(context)!
+                .diskCleanerCleanupFailedMsg('$e'))),
       );
     }
   }
@@ -1834,13 +1849,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result.skippedInUseCount > 0
-              ? AppLocalizations.of(context)!.diskCleanerPermanentDeletedWithInUse(
-                  result.successCount, _fmt(result.freedBytes), result.skippedInUseCount)
+              ? AppLocalizations.of(context)!
+                  .diskCleanerPermanentDeletedWithInUse(result.successCount,
+                      _fmt(result.freedBytes), result.skippedInUseCount)
               : result.skippedByUserCount > 0
-                  ? AppLocalizations.of(context)!.diskCleanerPermanentDeletedWithSkipped(
-                      result.successCount, _fmt(result.freedBytes), result.skippedByUserCount)
-                  : AppLocalizations.of(context)!.diskCleanerPermanentDeletedSuccess(
-                      result.successCount, _fmt(result.freedBytes))),
+                  ? AppLocalizations.of(context)!
+                      .diskCleanerPermanentDeletedWithSkipped(
+                          result.successCount,
+                          _fmt(result.freedBytes),
+                          result.skippedByUserCount)
+                  : AppLocalizations.of(context)!
+                      .diskCleanerPermanentDeletedSuccess(
+                          result.successCount, _fmt(result.freedBytes))),
         ),
       );
     } catch (e) {
@@ -1849,7 +1869,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _isPermanentDeleting = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerPermanentDeleteFailedMsg('$e'))),
+        SnackBar(
+            content: Text(AppLocalizations.of(context)!
+                .diskCleanerPermanentDeleteFailedMsg('$e'))),
       );
     }
   }
@@ -2035,7 +2057,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  l.diskCleanerFreedBadge(_fmt(_cleanedFreedBytes), successCount),
+                  l.diskCleanerFreedBadge(
+                      _fmt(_cleanedFreedBytes), successCount),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -2164,7 +2187,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l.diskCleanerSkippedByUserBanner(_cleanedSkippedByUserCount),
+                    l.diskCleanerSkippedByUserBanner(
+                        _cleanedSkippedByUserCount),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
@@ -2369,8 +2393,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 const SizedBox(width: 8),
                 Text(
                   _isPermanentDeleting
-                      ? l.diskCleanerPermanentDeletingProgress(_permanentDone, _permanentTotal)
-                      : l.diskCleanerItemsInRecycleBin(_cleanedItems.length, _fmt(_cleanedFreedBytes)),
+                      ? l.diskCleanerPermanentDeletingProgress(
+                          _permanentDone, _permanentTotal)
+                      : l.diskCleanerItemsInRecycleBin(
+                          _cleanedItems.length, _fmt(_cleanedFreedBytes)),
                   style: theme.textTheme.bodyMedium,
                 ),
                 if (_isPermanentDeleting) ...[
@@ -2661,7 +2687,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     final isImage = node.isFile && FileTypeUtils.isImageFile(node.fullPath);
     final isVideo = node.isFile && FileTypeUtils.isVideoFile(node.fullPath);
     final canShowShellMenu = Platform.isWindows &&
-        FileSystemEntity.typeSync(node.fullPath) != FileSystemEntityType.notFound;
+        FileSystemEntity.typeSync(node.fullPath) !=
+            FileSystemEntityType.notFound;
     final sections = <ContextMenuSection>[
       ContextMenuSection(
         title: l10n.open,
@@ -2680,24 +2707,24 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               id: 'play_video',
               label: l10n.playVideo,
               icon: PhosphorIconsLight.playCircle,
-              onSelected: (_) =>
-                  ExternalAppHelper.openFileWithApp(node.fullPath, 'shell_open'),
+              onSelected: (_) => ExternalAppHelper.openFileWithApp(
+                  node.fullPath, 'shell_open'),
             ),
           if (node.isFile && isImage)
             ContextMenuAction(
               id: 'view_image',
               label: l10n.viewImage,
               icon: PhosphorIconsLight.image,
-              onSelected: (_) =>
-                  ExternalAppHelper.openFileWithApp(node.fullPath, 'shell_open'),
+              onSelected: (_) => ExternalAppHelper.openFileWithApp(
+                  node.fullPath, 'shell_open'),
             ),
           if (node.isFile)
             ContextMenuAction(
               id: 'open',
               label: l10n.open,
               icon: PhosphorIconsLight.file,
-              onSelected: (_) =>
-                  ExternalAppHelper.openFileWithApp(node.fullPath, 'shell_open'),
+              onSelected: (_) => ExternalAppHelper.openFileWithApp(
+                  node.fullPath, 'shell_open'),
             ),
           if (node.isFile && isDesktopPlatform)
             ContextMenuAction(
@@ -2769,15 +2796,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             id: 'copy',
             label: l10n.copy,
             icon: PhosphorIconsLight.copy,
-            onSelected: (_) =>
-                FileOperationsHandler.copyToClipboard(context: context, entity: entity),
+            onSelected: (_) => FileOperationsHandler.copyToClipboard(
+                context: context, entity: entity),
           ),
           ContextMenuAction(
             id: 'cut',
             label: l10n.cut,
             icon: PhosphorIconsLight.scissors,
-            onSelected: (_) =>
-                FileOperationsHandler.cutToClipboard(context: context, entity: entity),
+            onSelected: (_) => FileOperationsHandler.cutToClipboard(
+                context: context, entity: entity),
           ),
           if (!node.isFile)
             ContextMenuAction(
@@ -2930,9 +2957,10 @@ class _TreeRowState extends State<_TreeRow> {
               }
               widget.onSelect(node);
             },
-            onSecondaryTapUp: widget.onShowContextMenu == null || node.fullPath.isEmpty
-                ? null
-                : (d) => widget.onShowContextMenu!(node, d.globalPosition),
+            onSecondaryTapUp:
+                widget.onShowContextMenu == null || node.fullPath.isEmpty
+                    ? null
+                    : (d) => widget.onShowContextMenu!(node, d.globalPosition),
             child: Container(
               color: isJunk
                   ? Colors.orange.withValues(alpha: 0.06)
@@ -3116,7 +3144,8 @@ class _TreeRowState extends State<_TreeRow> {
     if (hiddenCount > 0) {
       rows.add(_TreeRow(
         node: DiskTreeNode(
-          name: AppLocalizations.of(context)!.diskCleanerAndMoreItems(hiddenCount),
+          name: AppLocalizations.of(context)!
+              .diskCleanerAndMoreItems(hiddenCount),
           fullPath: '',
           isFile: true,
           sizeBytes: 0,
@@ -3335,9 +3364,10 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        onSecondaryTapUp: widget.onShowContextMenu == null || node.fullPath.isEmpty
-            ? null
-            : (d) => widget.onShowContextMenu!(node, d.globalPosition),
+        onSecondaryTapUp:
+            widget.onShowContextMenu == null || node.fullPath.isEmpty
+                ? null
+                : (d) => widget.onShowContextMenu!(node, d.globalPosition),
         child: Container(
           color: _hovering
               ? theme.colorScheme.primary.withValues(alpha: 0.06)

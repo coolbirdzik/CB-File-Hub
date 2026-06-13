@@ -1464,8 +1464,10 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     final entity = item.isFolder
         ? Directory(item.actualFilePath)
         : File(item.actualFilePath);
-    final isImage = !item.isFolder && FileTypeUtils.isImageFile(item.actualFilePath);
-    final isVideo = !item.isFolder && FileTypeUtils.isVideoFile(item.actualFilePath);
+    final isImage =
+        !item.isFolder && FileTypeUtils.isImageFile(item.actualFilePath);
+    final isVideo =
+        !item.isFolder && FileTypeUtils.isVideoFile(item.actualFilePath);
     return [
       ContextMenuSection(
         title: l10n.open,
@@ -1475,24 +1477,24 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
               id: 'play_video',
               label: l10n.playVideo,
               icon: PhosphorIconsLight.playCircle,
-              onSelected: (_) =>
-                  ExternalAppHelper.openFileWithApp(item.actualFilePath, 'shell_open'),
+              onSelected: (_) => ExternalAppHelper.openFileWithApp(
+                  item.actualFilePath, 'shell_open'),
             ),
           if (!item.isFolder && isImage)
             ContextMenuAction(
               id: 'view_image',
               label: l10n.viewImage,
               icon: PhosphorIconsLight.image,
-              onSelected: (_) =>
-                  ExternalAppHelper.openFileWithApp(item.actualFilePath, 'shell_open'),
+              onSelected: (_) => ExternalAppHelper.openFileWithApp(
+                  item.actualFilePath, 'shell_open'),
             ),
           if (!item.isFolder)
             ContextMenuAction(
               id: 'open',
               label: l10n.open,
               icon: PhosphorIconsLight.file,
-              onSelected: (_) =>
-                  ExternalAppHelper.openFileWithApp(item.actualFilePath, 'shell_open'),
+              onSelected: (_) => ExternalAppHelper.openFileWithApp(
+                  item.actualFilePath, 'shell_open'),
             ),
           if (!item.isFolder && isDesktopPlatform)
             ContextMenuAction(
@@ -1565,15 +1567,15 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
             id: 'copy',
             label: l10n.copy,
             icon: PhosphorIconsLight.copy,
-            onSelected: (_) =>
-                FileOperationsHandler.copyToClipboard(context: context, entity: entity),
+            onSelected: (_) => FileOperationsHandler.copyToClipboard(
+                context: context, entity: entity),
           ),
           ContextMenuAction(
             id: 'cut',
             label: l10n.cut,
             icon: PhosphorIconsLight.scissors,
-            onSelected: (_) =>
-                FileOperationsHandler.cutToClipboard(context: context, entity: entity),
+            onSelected: (_) => FileOperationsHandler.cutToClipboard(
+                context: context, entity: entity),
           ),
           if (item.isFolder)
             ContextMenuAction(
@@ -1598,8 +1600,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
             id: 'tags',
             label: l10n.manageTags,
             icon: PhosphorIconsLight.tag,
-            onSelected: (_) =>
-                tag_dialogs.showAddTagToFileDialog(context, item.actualFilePath),
+            onSelected: (_) => tag_dialogs.showAddTagToFileDialog(
+                context, item.actualFilePath),
           ),
         ],
       ),
@@ -1657,9 +1659,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       await showContextMenuSheet(
         context: context,
         title: item.displayNameValue,
-        icon: item.isFolder
-            ? PhosphorIconsLight.folder
-            : PhosphorIconsLight.file,
+        icon:
+            item.isFolder ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
         subtitle: item.originalPath,
         sections: sections,
       );

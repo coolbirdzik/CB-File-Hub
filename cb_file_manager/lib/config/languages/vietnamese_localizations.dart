@@ -2978,7 +2978,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerAnalyzingDisk => 'Đang phân tích dung lượng ổ đĩa...';
   @override
-  String get diskCleanerPieChartPending => 'Biểu đồ sẽ xuất hiện sau khi quét xong.';
+  String get diskCleanerPieChartPending =>
+      'Biểu đồ sẽ xuất hiện sau khi quét xong.';
   @override
   String get diskCleanerPieEmpty => 'Trống';
   @override
@@ -2986,9 +2987,11 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCleaning => 'Đang dọn dẹp...';
   @override
-  String get diskCleanerScanningSelectedDirs => 'Đang quét các thư mục đã chọn...';
+  String get diskCleanerScanningSelectedDirs =>
+      'Đang quét các thư mục đã chọn...';
   @override
-  String get diskCleanerDeletingJunkHint => 'Đang xóa các mục đã chọn. Nếu tệp bị lỗi, bạn có thể bỏ qua hoặc thử lại.';
+  String get diskCleanerDeletingJunkHint =>
+      'Đang xóa các mục đã chọn. Nếu tệp bị lỗi, bạn có thể bỏ qua hoặc thử lại.';
   @override
   String get diskCleanerPermanentDeleteLabel => 'Xóa vĩnh viễn';
   @override
@@ -3008,9 +3011,11 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerWaitingDecision => 'Đang chờ quyết định của bạn...';
   @override
-  String get diskCleanerFileInUse => 'Tệp này đang được sử dụng bởi ứng dụng khác.';
+  String get diskCleanerFileInUse =>
+      'Tệp này đang được sử dụng bởi ứng dụng khác.';
   @override
-  String get diskCleanerRetryInUseHint => 'Thử lại ngay thường sẽ thất bại cho đến khi ứng dụng đang dùng tệp này được đóng.';
+  String get diskCleanerRetryInUseHint =>
+      'Thử lại ngay thường sẽ thất bại cho đến khi ứng dụng đang dùng tệp này được đóng.';
   @override
   String get diskCleanerBlockedBy => 'Bị chặn bởi:';
   @override
@@ -3034,15 +3039,20 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerColumnCategory => 'Danh mục';
   @override
-  String get diskCleanerRecycleBinEmpty => 'Hiện không có mục nào trong Thùng rác.';
+  String get diskCleanerRecycleBinEmpty =>
+      'Hiện không có mục nào trong Thùng rác.';
   @override
-  String diskCleanerItemsInRecycleBin(int count, String size) => '$count mục trong Thùng rác ($size)';
+  String diskCleanerItemsInRecycleBin(int count, String size) =>
+      '$count mục trong Thùng rác ($size)';
   @override
-  String diskCleanerSkippedInUseSnack(int count) => 'Đã bỏ qua $count tệp đang được sử dụng. Chi tiết đã được ghi nhật ký.';
+  String diskCleanerSkippedInUseSnack(int count) =>
+      'Đã bỏ qua $count tệp đang được sử dụng. Chi tiết đã được ghi nhật ký.';
   @override
-  String diskCleanerSkippedAfterFailureSnack(int count) => 'Đã bỏ qua $count tệp do xóa thất bại.';
+  String diskCleanerSkippedAfterFailureSnack(int count) =>
+      'Đã bỏ qua $count tệp do xóa thất bại.';
   @override
-  String diskCleanerFreedBadge(String size, int count) => 'Đã giải phóng $size  •  $count mục';
+  String diskCleanerFreedBadge(String size, int count) =>
+      'Đã giải phóng $size  •  $count mục';
   @override
   String diskCleanerFailedBadge(int count) => '$count thất bại';
   @override
@@ -3050,23 +3060,29 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String diskCleanerSkippedBadge(int count) => '$count đã bỏ qua';
   @override
-  String diskCleanerSkippedInUseBanner(int count) => 'Đã bỏ qua $count tệp đang được sử dụng. Xem nhật ký để biết danh sách đầy đủ.';
+  String diskCleanerSkippedInUseBanner(int count) =>
+      'Đã bỏ qua $count tệp đang được sử dụng. Xem nhật ký để biết danh sách đầy đủ.';
   @override
-  String diskCleanerSkippedByUserBanner(int count) => 'Đã bỏ qua $count tệp do xóa thất bại vì bạn chọn Bỏ qua.';
+  String diskCleanerSkippedByUserBanner(int count) =>
+      'Đã bỏ qua $count tệp do xóa thất bại vì bạn chọn Bỏ qua.';
   @override
-  String diskCleanerDeletedPermanentlyBody(int count) => 'Đã xóa vĩnh viễn $count mục.';
+  String diskCleanerDeletedPermanentlyBody(int count) =>
+      'Đã xóa vĩnh viễn $count mục.';
   @override
   String diskCleanerFreedSpace(String size) => 'Đã giải phóng $size';
   @override
-  String diskCleanerPermanentDeleteFinished(int count) => 'Đã xóa vĩnh viễn $count mục.';
+  String diskCleanerPermanentDeleteFinished(int count) =>
+      'Đã xóa vĩnh viễn $count mục.';
   @override
-  String diskCleanerPermanentDeletingProgress(int done, int total) => 'Đang xóa vĩnh viễn... $done / $total';
+  String diskCleanerPermanentDeletingProgress(int done, int total) =>
+      'Đang xóa vĩnh viễn... $done / $total';
   @override
   String get diskCleanerDeletingLabel => 'Đang xóa...';
   @override
   String get diskCleanerRemaining => 'còn lại';
   @override
-  String diskCleanerDriveFree(String label, String size) => '$label  còn trống $size';
+  String diskCleanerDriveFree(String label, String size) =>
+      '$label  còn trống $size';
   @override
   String diskCleanerFilesCount(int count) => '$count tệp';
   @override
@@ -3074,7 +3090,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerStarting => 'Đang bắt đầu...';
   @override
-  String diskCleanerDriveSummary(String path, String size, int count) => '$path  $size  •  $count tệp';
+  String diskCleanerDriveSummary(String path, String size, int count) =>
+      '$path  $size  •  $count tệp';
   @override
   String diskCleanerAgentPath(String path) => 'CB Agent: $path';
   @override
@@ -3082,19 +3099,23 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String diskCleanerSizeFiles(String size, int files) => '$size • $files tệp';
   @override
-  String diskCleanerScannedProgress(String size, int files) => 'Đã quét $size • $files tệp';
+  String diskCleanerScannedProgress(String size, int files) =>
+      'Đã quét $size • $files tệp';
   @override
-  String get diskCleanerPieChartPendingScan => 'Biểu đồ sẽ xuất hiện ngay khi quét xong';
+  String get diskCleanerPieChartPendingScan =>
+      'Biểu đồ sẽ xuất hiện ngay khi quét xong';
   @override
   String diskCleanerScanningPath(String path) => 'Đang quét $path';
   @override
-  String diskCleanerProcessedCount(int done, int total) => '$done / $total đã xử lý';
+  String diskCleanerProcessedCount(int done, int total) =>
+      '$done / $total đã xử lý';
   @override
   String diskCleanerJunkSummary(String size) => 'Rác: $size';
   @override
   String get diskCleanerContinue => 'Xem tiếp';
   @override
-  String get diskCleanerAiPanelUnavailable => 'Bảng AI không khả dụng trong ngữ cảnh này';
+  String get diskCleanerAiPanelUnavailable =>
+      'Bảng AI không khả dụng trong ngữ cảnh này';
   @override
   String get diskCleanerAskAgentAboutThis => 'Hỏi CB Agent về mục này';
   @override
@@ -3118,37 +3139,48 @@ class VietnameseLocalizations implements AppLocalizations {
   String diskCleanerAiCategoryMarkedJunk(String category) =>
       'Danh mục: $category (được đánh dấu là rác)';
   @override
-  String get diskCleanerAiNotMarkedAsJunk => 'Mục này không được quy tắc đánh dấu là rác.';
+  String get diskCleanerAiNotMarkedAsJunk =>
+      'Mục này không được quy tắc đánh dấu là rác.';
   @override
   String get diskCleanerAiDeleteAnalysisQuestion =>
       'Hãy giải thích mục này có khả năng dùng để làm gì, có an toàn để xóa không, những rủi ro tôi cần cân nhắc, và đưa ra khuyến nghị rõ ràng: xóa, giữ lại, hoặc tự xem xét thêm.';
   @override
   String diskCleanerScanFailedMsg(String error) => 'Quét thất bại: $error';
   @override
-  String diskCleanerCleanupFailedMsg(String error) => 'Dọn dẹp thất bại: $error';
+  String diskCleanerCleanupFailedMsg(String error) =>
+      'Dọn dẹp thất bại: $error';
   @override
-  String diskCleanerPermanentDeleteFailedMsg(String error) => 'Xóa vĩnh viễn thất bại: $error';
+  String diskCleanerPermanentDeleteFailedMsg(String error) =>
+      'Xóa vĩnh viễn thất bại: $error';
   @override
-  String diskCleanerAgentFoundJunk(int count, String size) => 'CB Agent tìm thấy $count mục rác ($size)';
+  String diskCleanerAgentFoundJunk(int count, String size) =>
+      'CB Agent tìm thấy $count mục rác ($size)';
   @override
   String diskCleanerAndMoreItems(int count) => '... và $count mục khác';
   @override
-  String diskCleanerSelectedBytes(String size, String total) => 'Đã chọn: $size / $total';
+  String diskCleanerSelectedBytes(String size, String total) =>
+      'Đã chọn: $size / $total';
   @override
-  String diskCleanerReviewModeSelected(String size) => 'Chế độ xem lại • Đã chọn: $size';
+  String diskCleanerReviewModeSelected(String size) =>
+      'Chế độ xem lại • Đã chọn: $size';
   @override
-  String diskCleanerDeletePermanentlyButton(String size) => 'Xóa vĩnh viễn $size';
+  String diskCleanerDeletePermanentlyButton(String size) =>
+      'Xóa vĩnh viễn $size';
   @override
-  String diskCleanerMoveToRecycleBinButton(String size) => 'Chuyển $size vào Thùng rác';
+  String diskCleanerMoveToRecycleBinButton(String size) =>
+      'Chuyển $size vào Thùng rác';
   @override
   String diskCleanerReviewAndClean(String size) => 'Xem lại $size & dọn dẹp';
   @override
-  String diskCleanerPermanentDeletedSuccess(int count, String size) => 'Đã xóa vĩnh viễn $count mục ($size)';
+  String diskCleanerPermanentDeletedSuccess(int count, String size) =>
+      'Đã xóa vĩnh viễn $count mục ($size)';
   @override
-  String diskCleanerPermanentDeletedWithInUse(int count, String size, int skipped) =>
+  String diskCleanerPermanentDeletedWithInUse(
+          int count, String size, int skipped) =>
       'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp đang dùng; chi tiết đã được ghi nhật ký.';
   @override
-  String diskCleanerPermanentDeletedWithSkipped(int count, String size, int skipped) =>
+  String diskCleanerPermanentDeletedWithSkipped(
+          int count, String size, int skipped) =>
       'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp sau khi xóa thất bại.';
 
   @override

@@ -1381,8 +1381,10 @@ abstract class AppLocalizations {
   String diskCleanerMoveToRecycleBinButton(String size);
   String diskCleanerReviewAndClean(String size);
   String diskCleanerPermanentDeletedSuccess(int count, String size);
-  String diskCleanerPermanentDeletedWithInUse(int count, String size, int skipped);
-  String diskCleanerPermanentDeletedWithSkipped(int count, String size, int skipped);
+  String diskCleanerPermanentDeletedWithInUse(
+      int count, String size, int skipped);
+  String diskCleanerPermanentDeletedWithSkipped(
+      int count, String size, int skipped);
 
   // AI thinking / loading indicators
   String get aiThinking0;
