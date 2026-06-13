@@ -35,16 +35,6 @@ CB File Hub is a cross-platform file manager for large media libraries. It combi
 
 ## Preview
 
-### Disk Cleaner
-
-<p align="center">
-  <img src="screenshots/promo/desktop/10_disk_cleaner.png" alt="CB File Hub disk cleaner scan results" width="960" />
-</p>
-
-Scan a drive, inspect bulky folders and junk candidates, then ask CB Agent for a risk-aware review before cleaning anything uncertain.
-
-### Core Views
-
 <table>
   <tr>
     <td colspan="4">
@@ -56,6 +46,12 @@ Scan a drive, inspect bulky folders and junk candidates, then ask CB Agent for a
     <td colspan="4">
       <img src="screenshots/promo/desktop/04_ai_search.png" alt="CB File Hub AI-assisted search preview" />
       <p align="center"><sub>AI-assisted search beside the file browser</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="4">
+      <img src="screenshots/promo/desktop/10_disk_cleaner.png" alt="CB File Hub disk cleaner scan results" />
+      <p align="center"><sub>Disk cleanup with scan results, category review, and CB Agent guidance</sub></p>
     </td>
   </tr>
   <tr>
@@ -81,6 +77,10 @@ Scan a drive, inspect bulky folders and junk candidates, then ask CB Agent for a
 ### AI Agent
 
 The AI side panel sits beside the file browser. Ask it to find files, clean up duplicates, or organize folders — it shows results inline and asks for approval before making any changes.
+
+### Disk Cleaner
+
+Scan a drive, inspect bulky folders and junk candidates, then ask CB Agent for a risk-aware review before cleaning anything uncertain.
 
 ### AI-guided cleanup review
 
