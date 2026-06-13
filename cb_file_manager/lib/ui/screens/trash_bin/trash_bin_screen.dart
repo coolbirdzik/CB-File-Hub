@@ -14,19 +14,29 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_collection_view.dart';
+import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:cb_file_manager/ui/controllers/file_operations_handler.dart';
+import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/tag_dialogs.dart'
+    as tag_dialogs;
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
+import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
 import 'widgets/widgets.dart';
 
 /// Trash Bin screen - displays deleted items with restore/delete functionality.
@@ -1359,57 +1369,307 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     return dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
   }
 
-  void _showContextMenu(BuildContext context, TrashItem item, Offset position) {
+  Future<void> _togglePinnedPath(String path) async {
     final l10n = AppLocalizations.of(context)!;
-    showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-          position.dx, position.dy, position.dx + 1, position.dy + 1),
-      items: [
-        if (item.isFolder)
-          PopupMenuItem<String>(
-            value: 'open',
-            child: Row(
+    final toast = AppToast.capture(context);
+    final prefs = UserPreferences.instance;
+    await prefs.init();
+
+    final isPinned = await prefs.isPathPinnedToSidebar(path);
+    if (isPinned) {
+      await prefs.removeSidebarPinnedPath(path);
+    } else {
+      await prefs.addSidebarPinnedPath(path);
+    }
+
+    toast.info(isPinned ? l10n.removedFromSidebar : l10n.pinnedToSidebar);
+  }
+
+  Future<void> _showTrashItemProperties(TrashItem item) async {
+    final l10n = AppLocalizations.of(context)!;
+    final entity = item.isFolder
+        ? Directory(item.actualFilePath)
+        : File(item.actualFilePath);
+    try {
+      final stat = await entity.stat();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.properties),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(PhosphorIconsLight.folderOpen, size: 20),
-                const SizedBox(width: 10),
-                Text(l10n.openFolder),
+                _propertyRow(l10n.fileName, item.displayNameValue),
+                const Divider(),
+                _propertyRow(l10n.filePath, item.actualFilePath),
+                const Divider(),
+                _propertyRow(l10n.columnOriginalPath, item.originalPath),
+                const Divider(),
+                _propertyRow(l10n.columnSize, _formatFileSize(item.size)),
+                const Divider(),
+                _propertyRow(
+                  l10n.fileModified,
+                  stat.modified.toString().split('.').first,
+                ),
               ],
             ),
           ),
-        PopupMenuItem<String>(
-          value: 'restore',
-          child: Row(
-            children: [
-              const Icon(PhosphorIconsLight.arrowsClockwise, size: 20),
-              const SizedBox(width: 10),
-              Text(l10n.restoreTooltip),
-            ],
-          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.close.toUpperCase()),
+            ),
+          ],
         ),
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(PhosphorIconsLight.trash,
-                  size: 20, color: Theme.of(context).colorScheme.error),
-              const SizedBox(width: 10),
-              Text(
-                l10n.deletePermanentlyTooltip,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.toString());
+    }
+  }
+
+  Widget _propertyRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  List<ContextMenuSection> _buildTrashContextMenuSections(
+    BuildContext context,
+    TrashItem item,
+    Offset globalPosition,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final canShowShellMenu = Platform.isWindows &&
+        FileSystemEntity.typeSync(item.actualFilePath) !=
+            FileSystemEntityType.notFound;
+    final entity = item.isFolder
+        ? Directory(item.actualFilePath)
+        : File(item.actualFilePath);
+    final isImage = !item.isFolder && FileTypeUtils.isImageFile(item.actualFilePath);
+    final isVideo = !item.isFolder && FileTypeUtils.isVideoFile(item.actualFilePath);
+    return [
+      ContextMenuSection(
+        title: l10n.open,
+        actions: [
+          if (!item.isFolder && isVideo)
+            ContextMenuAction(
+              id: 'play_video',
+              label: l10n.playVideo,
+              icon: PhosphorIconsLight.playCircle,
+              onSelected: (_) =>
+                  ExternalAppHelper.openFileWithApp(item.actualFilePath, 'shell_open'),
+            ),
+          if (!item.isFolder && isImage)
+            ContextMenuAction(
+              id: 'view_image',
+              label: l10n.viewImage,
+              icon: PhosphorIconsLight.image,
+              onSelected: (_) =>
+                  ExternalAppHelper.openFileWithApp(item.actualFilePath, 'shell_open'),
+            ),
+          if (!item.isFolder)
+            ContextMenuAction(
+              id: 'open',
+              label: l10n.open,
+              icon: PhosphorIconsLight.file,
+              onSelected: (_) =>
+                  ExternalAppHelper.openFileWithApp(item.actualFilePath, 'shell_open'),
+            ),
+          if (!item.isFolder && isDesktopPlatform)
+            ContextMenuAction(
+              id: 'open_file_location',
+              label: 'Open file location',
+              icon: PhosphorIconsLight.folderOpen,
+              onSelected: (_) => EntityOpenActions.openInNewTab(
+                context,
+                sourcePath: item.actualFilePath,
+                preferredTabName: p.basename(p.dirname(item.actualFilePath)),
               ),
-            ],
+            ),
+          if (isDesktopPlatform)
+            ContextMenuAction(
+              id: 'open_in_new_tab',
+              label: l10n.openInNewTab,
+              icon: PhosphorIconsLight.squaresFour,
+              onSelected: (_) => EntityOpenActions.openInNewTab(
+                context,
+                sourcePath: item.actualFilePath,
+                preferredTabName: item.displayNameValue,
+              ),
+            ),
+          if (isDesktopPlatform)
+            ContextMenuAction(
+              id: 'open_in_new_window',
+              label: '${l10n.open} ${l10n.newWindow.toLowerCase()}',
+              icon: PhosphorIconsLight.appWindow,
+              onSelected: (_) => EntityOpenActions.openInNewWindow(
+                context,
+                sourcePath: item.actualFilePath,
+                preferredTabName: item.displayNameValue,
+              ),
+            ),
+          if (!item.isFolder)
+            ContextMenuAction(
+              id: 'open_with',
+              label: l10n.openWith,
+              icon: PhosphorIconsLight.arrowSquareOut,
+              onSelected: (_) => RouteUtils.showAcrylicDialog(
+                context: context,
+                builder: (_) => OpenWithDialog(filePath: item.actualFilePath),
+              ),
+            ),
+          if (!item.isFolder)
+            ContextMenuAction(
+              id: 'choose_default_app',
+              label: l10n.chooseDefaultApp,
+              icon: PhosphorIconsLight.appWindow,
+              onSelected: (_) => RouteUtils.showAcrylicDialog(
+                context: context,
+                builder: (_) => OpenWithDialog(
+                  filePath: item.actualFilePath,
+                  saveAsDefaultOnSelect: true,
+                ),
+              ),
+            ),
+          ContextMenuAction(
+            id: 'toggle_pin_sidebar',
+            label: l10n.pinToSidebar,
+            icon: PhosphorIconsLight.pushPin,
+            onSelected: (_) => _togglePinnedPath(item.actualFilePath),
           ),
-        ),
-      ],
-    ).then((value) {
-      if (value == 'open') {
-        _openFolder(item);
-      } else if (value == 'restore') {
-        _restoreItem(item);
-      } else if (value == 'delete') {
-        _deleteItem(item);
-      }
-    });
+        ],
+      ),
+      ContextMenuSection(
+        title: l10n.copy,
+        actions: [
+          ContextMenuAction(
+            id: 'copy',
+            label: l10n.copy,
+            icon: PhosphorIconsLight.copy,
+            onSelected: (_) =>
+                FileOperationsHandler.copyToClipboard(context: context, entity: entity),
+          ),
+          ContextMenuAction(
+            id: 'cut',
+            label: l10n.cut,
+            icon: PhosphorIconsLight.scissors,
+            onSelected: (_) =>
+                FileOperationsHandler.cutToClipboard(context: context, entity: entity),
+          ),
+          if (item.isFolder)
+            ContextMenuAction(
+              id: 'paste',
+              label: l10n.pasteHere,
+              icon: PhosphorIconsLight.clipboard,
+              onSelected: (_) => FileOperationsHandler.pasteFromClipboard(
+                context: context,
+                destinationPath: item.actualFilePath,
+              ),
+            ),
+          ContextMenuAction(
+            id: 'rename',
+            label: l10n.rename,
+            icon: PhosphorIconsLight.pencilSimple,
+            onSelected: (_) => FileOperationsHandler.showRenameDialog(
+              context: context,
+              entity: entity,
+            ),
+          ),
+          ContextMenuAction(
+            id: 'tags',
+            label: l10n.manageTags,
+            icon: PhosphorIconsLight.tag,
+            onSelected: (_) =>
+                tag_dialogs.showAddTagToFileDialog(context, item.actualFilePath),
+          ),
+        ],
+      ),
+      ContextMenuSection(
+        title: l10n.moreOptions,
+        actions: [
+          ContextMenuAction(
+            id: 'refresh',
+            label: l10n.refresh,
+            icon: PhosphorIconsLight.arrowsClockwise,
+            onSelected: (_) => _loadTrashItems(),
+          ),
+          ContextMenuAction(
+            id: 'restore',
+            label: l10n.restoreTooltip,
+            icon: PhosphorIconsLight.arrowCounterClockwise,
+            onSelected: (_) => _restoreItem(item),
+          ),
+          ContextMenuAction(
+            id: 'delete',
+            label: l10n.deletePermanentlyTooltip,
+            icon: PhosphorIconsLight.trash,
+            isDestructive: true,
+            onSelected: (_) => _deleteItem(item),
+          ),
+          ContextMenuAction(
+            id: 'properties',
+            label: l10n.properties,
+            icon: PhosphorIconsLight.info,
+            onSelected: (_) => _showTrashItemProperties(item),
+          ),
+          if (canShowShellMenu)
+            ContextMenuAction(
+              id: 'more_options',
+              label: l10n.moreOptions,
+              icon: PhosphorIconsLight.dotsThreeVertical,
+              onSelected: (_) => WindowsShellContextMenu.showForPaths(
+                paths: [item.actualFilePath],
+                globalPosition: globalPosition,
+                devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+              ),
+            ),
+        ],
+      ),
+    ];
+  }
+
+  Future<void> _showContextMenu(
+    BuildContext context,
+    TrashItem item,
+    Offset position,
+  ) async {
+    final sections = _buildTrashContextMenuSections(context, item, position);
+    if (Platform.isAndroid || Platform.isIOS) {
+      await showContextMenuSheet(
+        context: context,
+        title: item.displayNameValue,
+        icon: item.isFolder
+            ? PhosphorIconsLight.folder
+            : PhosphorIconsLight.file,
+        subtitle: item.originalPath,
+        sections: sections,
+      );
+      return;
+    }
+
+    await showContextMenuPopup(
+      context: context,
+      sections: sections,
+      globalPosition: position,
+    );
   }
 }

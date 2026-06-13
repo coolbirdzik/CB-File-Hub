@@ -332,6 +332,32 @@ void main() {
         await e2eTearDown(tester, dir);
       }
     });
+
+    // -------------------------------------------------------------------------
+    // 10. Disk cleaner — scan results
+    // -------------------------------------------------------------------------
+    testWidgets('disk cleaner', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_cleaner_');
+      await seedShowcaseLibrary(dir);
+      await seedWallpaperBackdrop(dir);
+
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: [WindowTabPayload(path: '#cb-agent-cleaner')],
+      );
+
+      try {
+        await runCbFileApp();
+        await tester.pump(const Duration(seconds: 5));
+        await et.init('showcase disk cleaner results');
+        await tester.pump(const Duration(seconds: 2));
+
+        await et.screenshot('result');
+        await et.pass();
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
   });
 }
 

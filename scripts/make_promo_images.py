@@ -30,6 +30,7 @@ DESKTOP_SOURCE_NAMES = [
     "012_showcase_ai_conversation_result.png",
     "014_showcase_tag_management_result.png",
     "018_showcase_tag_tree_result.png",
+    "020_showcase_disk_cleaner_result.png",
 ]
 
 
@@ -50,6 +51,7 @@ DESKTOP_SPECS = [
     PromoSpec("ai_conversation", "Ask about your files", "Keep a file-aware conversation beside the workspace you are using.", (102, 217, 232)),
     PromoSpec("tag_management", "Tag and organize", "Build lightweight systems for projects, references, and media collections.", (255, 214, 102)),
     PromoSpec("tagged_files", "Navigate tag trees", "Build parent-child tag hierarchies and expand the exact branch you need.", (92, 219, 149)),
+    PromoSpec("disk_cleaner", "Clean with confidence", "Scan bulky folders, review junk candidates, and ask CB Agent before deleting.", (255, 149, 0)),
 ]
 
 MOBILE_SPECS = [
@@ -75,6 +77,7 @@ DESKTOP_SPECS_VI = [
     PromoSpec("hoi_dap_ai", "Hỏi về tập tin của bạn", "Trò chuyện với trợ lý hiểu ngữ cảnh ngay bên cạnh workspace.", (102, 217, 232)),
     PromoSpec("quan_ly_tag", "Gắn tag để sắp xếp", "Tạo hệ thống nhẹ cho dự án, tài liệu tham khảo và bộ sưu tập media.", (255, 214, 102)),
     PromoSpec("tap_tin_theo_tag", "Duyệt cây tag", "Tạo phân cấp tag cha con và mở đúng nhánh bạn đang cần.", (92, 219, 149)),
+    PromoSpec("don_dep_o_dia", "Dọn dẹp tự tin hơn", "Quét thư mục nặng, xem lại tệp rác và hỏi CB Agent trước khi xóa.", (255, 149, 0)),
 ]
 
 MOBILE_SPECS_VI = [
@@ -345,6 +348,12 @@ def create_tablet7_promo(source: Path, output: Path, spec: PromoSpec) -> None:
     image.convert("RGB").save(output, optimize=True)
 
 
+def desktop_promo_filename(index: int, spec: PromoSpec) -> str:
+    if spec.stem in {"disk_cleaner", "don_dep_o_dia"}:
+        return f"10_{spec.stem}.png"
+    return f"{index + 1:02d}_{spec.stem}.png"
+
+
 def discover_desktop_sources(path: Path) -> list[Path]:
     sources = [path / name for name in DESKTOP_SOURCE_NAMES]
     missing = [source.name for source in sources if not source.exists()]
@@ -390,9 +399,9 @@ def main() -> None:
 
     for index, source in enumerate(desktop_sources):
         spec = DESKTOP_SPECS[index % len(DESKTOP_SPECS)]
-        create_desktop_promo(source, desktop_output / f"{index + 1:02d}_{spec.stem}.png", spec)
+        create_desktop_promo(source, desktop_output / desktop_promo_filename(index, spec), spec)
         vi_spec = DESKTOP_SPECS_VI[index % len(DESKTOP_SPECS_VI)]
-        create_desktop_promo(source, desktop_vi_output / f"{index + 1:02d}_{vi_spec.stem}.png", vi_spec)
+        create_desktop_promo(source, desktop_vi_output / desktop_promo_filename(index, vi_spec), vi_spec)
 
     for index, source in enumerate(mobile_sources):
         spec = MOBILE_SPECS[index % len(MOBILE_SPECS)]

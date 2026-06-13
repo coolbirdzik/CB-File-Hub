@@ -383,8 +383,13 @@ class DiskCleanerService {
     for (final item in expandedItems) {
       final isBinItem =
           item.isRecycleBinItem || item.categoryId == 'recycle_bin';
-      if (!CleanerPathSafety.isPathSafeToDelete(item.path,
-          recycleBinItem: isBinItem)) {
+      final safeByRule = CleanerPathSafety.isPathSafeToDelete(
+        item.path,
+        recycleBinItem: isBinItem,
+      );
+      // Allow paths the user explicitly selected from the disk tree. Keep the
+      // stricter allowlist for scanner rules and AI-driven cleanup.
+      if (!safeByRule && !item.isUserSelected) {
         skippedUnsafe.add(item.path);
         continue;
       }
@@ -893,6 +898,14 @@ class DiskCleanerService {
 
       final type = FileSystemEntity.typeSync(item.path, followLinks: false);
       if (type != FileSystemEntityType.directory) {
+        expanded.add(item);
+        continue;
+      }
+
+      // Explicit user-selected directories should be deleted as directories.
+      // Only scanner rules marked as container-only should expand to their
+      // descendant files while preserving the folder itself.
+      if (!item.isContainerOnly) {
         expanded.add(item);
         continue;
       }

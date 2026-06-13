@@ -169,7 +169,7 @@ verify_windows_release_bundle() {
 
 # Get current version
 get_version_line() {
-    grep "^version:" "$PUBSPEC" | sed 's/version: //'
+    grep "^version:" "$PUBSPEC" | sed 's/version: //' | tr -d '\r'
 }
 
 get_version_name() {
@@ -186,6 +186,21 @@ get_version_code() {
     else
         echo "0"
     fi
+}
+
+get_windows_version_code() {
+    local build_number
+    build_number=$(get_version_code)
+    build_number=${build_number:-0}
+
+    # Windows package versions are zero-based for each release build:
+    # pubspec +1 is the first release build and becomes Windows build 0.
+    build_number=$((build_number - 1))
+    if [ "$build_number" -lt 0 ]; then
+        build_number=0
+    fi
+
+    echo "$build_number"
 }
 
 get_version() {
@@ -211,18 +226,17 @@ get_msi_version() {
     local msi_build
     local msi_build_formatted
     version_name=$(get_version_name)
-    build_number=$(get_version_code)
 
     # MSI ProductVersion should use 3 numeric parts (major.minor.build).
     # Encode pubspec patch/build-number into the third field to keep upgrade ordering:
-    #   1.0.0+1 -> 1.0.0001
-    #   1.0.0+2 -> 1.0.0002
-    #   1.2.3+4 -> 1.2.3004
+    #   1.0.0+1 -> 1.0.0000
+    #   1.0.0+2 -> 1.0.0001
+    #   1.2.3+4 -> 1.2.3003
     IFS='.' read -r major minor patch <<< "$version_name"
     major=${major:-0}
     minor=${minor:-0}
     patch=${patch:-0}
-    build_number=${build_number:-0}
+    build_number=$(get_windows_version_code)
     msi_build=$((patch * 1000 + build_number))
 
     if [ "$msi_build" -gt 65535 ]; then
@@ -239,12 +253,11 @@ get_display_version() {
     local build_number
     local major minor patch
     version_name=$(get_version_name)
-    build_number=$(get_version_code)
+    build_number=$(get_windows_version_code)
     IFS='.' read -r major minor patch <<< "$version_name"
     major=${major:-0}
     minor=${minor:-0}
     patch=${patch:-0}
-    build_number=${build_number:-0}
     echo "$major.$patch.$minor.$build_number"
 }
 
@@ -254,17 +267,12 @@ get_msix_version() {
     local msix_build
     local major minor patch
     version_name=$(get_version_name)
-    build_number=$(get_version_code)
+    build_number=$(get_windows_version_code)
     IFS='.' read -r major minor patch <<< "$version_name"
     major=${major:-0}
     minor=${minor:-0}
     patch=${patch:-0}
-    build_number=${build_number:-0}
-    # MSIX requires first build number to be 0, so subtract 1 from pubspec build number
-    msix_build=$((build_number - 1))
-    if [ "$msix_build" -lt 0 ]; then
-        msix_build=0
-    fi
+    msix_build=${build_number:-0}
     echo "$major.$minor.$patch.$msix_build"
 }
 
@@ -425,7 +433,7 @@ build_windows_portable() {
     local VERSION_NAME
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
-    VERSION_CODE=$(get_version_code)
+    VERSION_CODE=$(get_windows_version_code)
     if ! flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" 2>&1 | tee /tmp/flutter_build.log; then
         # Check if it's the known CMake/VS race condition error
         if grep -q "MSB3073\|CMake.*failed\|Visual Studio" /tmp/flutter_build.log 2>/dev/null; then

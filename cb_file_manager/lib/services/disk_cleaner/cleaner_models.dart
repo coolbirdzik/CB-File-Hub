@@ -171,6 +171,12 @@ class JunkItem {
   /// (display only).
   final String? originalPath;
 
+  /// True when the item came from an explicit user selection in the disk tree,
+  /// not from a predefined cleaner rule. This allows the cleaner UI to delete
+  /// arbitrary user-selected paths while keeping rule/AI cleanup on the
+  /// stricter junk-prefix allowlist.
+  final bool isUserSelected;
+
   const JunkItem({
     required this.path,
     required this.sizeBytes,
@@ -179,6 +185,7 @@ class JunkItem {
     this.isContainerOnly = false,
     this.isRecycleBinItem = false,
     this.originalPath,
+    this.isUserSelected = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -189,6 +196,7 @@ class JunkItem {
         'isContainerOnly': isContainerOnly,
         'isRecycleBinItem': isRecycleBinItem,
         'originalPath': originalPath,
+        'isUserSelected': isUserSelected,
       };
 
   static JunkItem fromJson(Map<String, dynamic> json) => JunkItem(
@@ -201,6 +209,7 @@ class JunkItem {
         isContainerOnly: json['isContainerOnly'] as bool? ?? false,
         isRecycleBinItem: json['isRecycleBinItem'] as bool? ?? false,
         originalPath: json['originalPath'] as String?,
+        isUserSelected: json['isUserSelected'] as bool? ?? false,
       );
 }
 

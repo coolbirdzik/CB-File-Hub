@@ -1,8 +1,7 @@
-# CB File Hub - Smart AI File & Content Manager
+# CB File Hub
 
 [![Build and Test](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml)
 [![Release](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 <p align="center">
   <img src="cb_file_manager/assets/images/logo_circle.png" alt="CB File Hub logo" width="180" />
@@ -23,11 +22,28 @@
   </tr>
 </table>
 
-CB File Hub is a cross-platform file manager focused on large personal media libraries. It is built for the situation where movies, photos, clips, and folders keep growing until finding the right thing to watch feels harder than watching it.
+CB File Hub is a cross-platform file manager for large media libraries. It combines fast visual browsing, tabs, tags, network access, disk cleanup, and an AI assistant so photos, videos, downloads, and messy folders are easier to search, review, and maintain.
 
-Instead of acting like a generic explorer, the app is designed to reduce browsing fatigue: faster visual scanning, tag-based organization, tabbed navigation on both desktop and mobile, network playback, and albums that can organize themselves with rules.
+## Key Highlights
+
+- **AI-assisted file management**: Search, organize, review suspicious files, and guide cleanup workflows with CB Agent.
+- **Disk cleaner with AI review**: Scan large drives, inspect junk candidates, and ask CB Agent before deleting uncertain files or folders.
+- **Media-first browsing**: Use thumbnails, gallery views, and video previews designed for photo and video heavy folders.
+- **Tabbed workflow on desktop and mobile**: Keep multiple locations open and switch contexts quickly.
+- **Tags, smart albums, and discovery tools**: Organize large libraries beyond folder names.
+- **Local and network access**: Browse local storage, SMB shares, and FTP in one workflow.
 
 ## Preview
+
+### Disk Cleaner
+
+<p align="center">
+  <img src="screenshots/promo/desktop/10_disk_cleaner.png" alt="CB File Hub disk cleaner scan results" width="960" />
+</p>
+
+Scan a drive, inspect bulky folders and junk candidates, then ask CB Agent for a risk-aware review before cleaning anything uncertain.
+
+### Core Views
 
 <table>
   <tr>
@@ -66,27 +82,9 @@ Instead of acting like a generic explorer, the app is designed to reduce browsin
 
 The AI side panel sits beside the file browser. Ask it to find files, clean up duplicates, or organize folders — it shows results inline and asks for approval before making any changes.
 
-## Why This App Exists
+### AI-guided cleanup review
 
-This project started from a very personal problem: a movie and photo collection that became too large to browse comfortably. File names were not enough, folder trees became noisy, and searching for something to watch or review took too much effort.
-
-CB File Hub focuses on solving that workflow with a media-first file manager that helps you browse visually, organize flexibly, and jump back into your library without losing context.
-
-## Highlights
-
-- **Media-first file management**: Browse local folders with layouts that work better for photos, videos, and mixed libraries than a plain file list.
-- **AI file agent**: Let an AI agent help search files, create files and folders, manage moves and cleanup, find suspicious or problematic files, organize messy folders, and automate more library work.
-- **Tabbed browsing on desktop and mobile**: Open multiple locations at once, switch contexts quickly, and keep parallel browsing flows alive on both Windows and Android.
-- **Tag files and search by tags**: Add tags to files, reuse popular tags, and search with single or multiple tags to narrow a large library fast.
-- **Parent/child tag hierarchy**: Organize tags into nested relationships (for example `Media → Movies → Action`) and browse them in a dedicated tree view.
-- **List, grid, and tree views**: Switch the tag manager and file browsers between a flat list, a visual grid, and an expandable tree using the same view-mode menu.
-- **Smart albums with dynamic rules**: Build albums that automatically collect matching files from selected source folders using filename-based rules.
-- **Choose the video thumbnail frame**: Control the extraction position used for video thumbnails so previews represent the part of the clip that actually matters.
-- **Watch videos over SMB and FTP**: Open and stream media from network locations without turning your workflow into manual copy-paste.
-- **Fast thumbnails for local and network media**: Generate thumbnails for images, videos, folders, and supported network files with caching to keep browsing responsive.
-- **Pinned places and workspace memory**: Pin important folders in the sidebar and restore the last tab workspace with per-tab drawer state.
-- **Built-in galleries for photos and videos**: Move from raw folder browsing into image and video focused views when you want to scan a collection visually.
-- **Cross-platform foundation**: Built with Flutter and currently targeting Windows, Android, Linux, and macOS.
+In the disk cleaner, you can right-click any file or folder and ask CB Agent whether it should be deleted. The agent receives the current path, type, size, file count, and junk classification, then explains what the item is likely used for, the risks of deleting it, and gives a clear recommendation to delete, keep, or review it manually.
 
 ## Main Features
 
@@ -107,20 +105,13 @@ CB File Hub focuses on solving that workflow with a media-first file manager tha
 - Sort messy downloads, recordings, photos, and videos into clearer folder structures.
 - Assist with larger cleanup workflows while keeping file operations visible and controllable.
 
-## AI Agent Workflow
+### Disk cleaner
 
-CB File Hub is designed to be a strong base for an AI-assisted file workflow, especially when a library becomes too large to manage manually.
-
-The AI agent can be introduced in the product and project documentation as a practical file operations assistant that helps users:
-
-- Search for files and folders with natural-language requests.
-- Create files or folders for repetitive setup tasks.
-- Manage file operations such as rename, move, copy, delete, and batch cleanup.
-- Detect files that may have issues, such as broken media, missing thumbnails, duplicates, unexpected names, or misplaced content.
-- Sort and reorganize cluttered folders into cleaner structures.
-- Assist with broader maintenance workflows across large personal media libraries.
-
-This positioning keeps the AI feature grounded in real file-management jobs instead of vague chatbot behavior.
+- Scan Windows drives for large folders, temporary files, browser caches, recycle-bin content, and other cleanup candidates.
+- Browse scan results in a virtualised tree that remains responsive with large directory counts.
+- Select cleanup candidates manually or by category.
+- Review selected files and folders with CB Agent before deleting.
+- Move supported cleanup targets to the Recycle Bin instead of deleting blindly.
 
 ### Tagging and discovery
 
@@ -210,10 +201,24 @@ cd bundle
 
 ## Development
 
+This repository is a workspace, not a single Flutter package:
+
+```text
+cb_file_manager/   main Flutter app
+mobile_smb_native/ local SMB/CIFS FFI plugin
+scripts/           build, screenshot, version, and CI helpers
+installer/         Windows installer configuration
+justfile           primary developer command runner
+```
+
+Run `just` recipes from the repository root. Run direct `flutter` and `dart` commands from `cb_file_manager/`.
+
 ### Prerequisites
 
-- Flutter SDK 3.41.5 or later
-- Dart SDK 2.15.0 or later
+- Flutter SDK 3.41.5 stable
+- Dart SDK bundled with that Flutter SDK
+- `just`
+- Git Bash on Windows, used by the repository `justfile`
 - Visual Studio 2022 with C++ tools for Windows builds
 - Android SDK and JDK 17+ for Android builds
 - GTK3 development libraries for Linux builds
@@ -223,8 +228,9 @@ cd bundle
 
 ```bash
 git clone https://github.com/coolbirdzik/cb-file-hub.git
-cd cb-file-hub/cb_file_manager
-flutter pub get
+cd cb-file-hub
+just deps
+cd cb_file_manager
 flutter run
 ```
 
@@ -234,40 +240,37 @@ Enable the developer overlay only for local development:
 flutter run --dart-define=CB_SHOW_DEV_OVERLAY=true
 ```
 
+### Common commands
+
+```bash
+# From the repository root
+just              # list recipes
+just deps         # install dependencies
+just verify       # format check + analyze
+just test         # unit and widget tests
+just e2e-parallel # Windows E2E tests
+just clean
+```
+
 ### Build commands
 
 ```bash
-# Windows
-flutter build windows --release
-
-# Android APK
-flutter build apk --release --split-per-abi
-
-# Android AAB
-flutter build appbundle --release
-
-# Linux
-flutter build linux --release
-
-# macOS
-flutter build macos --release
+just windows
+just windows-msi
+just android
+just android-aab
+just linux
+just macos
 ```
 
-You can also use the helper scripts:
+Direct Flutter commands are also valid when run inside `cb_file_manager/`:
 
 ```bash
-chmod +x scripts/build.sh
-./scripts/build.sh
-```
-
-Or use `make` targets:
-
-```bash
-make help
-make windows
-make android
-make linux
-make all
+flutter pub get
+flutter test
+flutter analyze
+dart format --output=none --set-exit-if-changed .
+flutter test integration_test -d windows --dart-define=CB_E2E=true
 ```
 
 ### Screenshot automation
@@ -315,40 +318,40 @@ Generate promotional artwork from the captured screenshots:
 python scripts\make_promo_images.py
 ```
 
-The generated artwork is written to `screenshots/promo/desktop/`, `screenshots/promo/mobile/`, `screenshots/promo/vi/desktop/`, and `screenshots/promo/vi/mobile/`.
+The generated artwork is written to `screenshots/promo/desktop/`, `screenshots/promo/mobile/`, `screenshots/promo/tablet7/`, and the matching Vietnamese folders under `screenshots/promo/vi/`.
 
 ## Testing
 
 ```bash
-flutter test
-flutter analyze
-dart format --output=none --set-exit-if-changed .
+just verify
+just test
+just e2e-parallel
 ```
 
 ## Project Structure
 
 ```text
 cb_file_manager/
-├── lib/
-├── assets/
-├── test/
+├── lib/                Flutter application source
+├── test/               Unit and widget tests
+├── integration_test/   E2E and showcase screenshot tests
+├── tool/               E2E runner, dashboard, and reporting tools
 └── pubspec.yaml
+
+mobile_smb_native/      Local SMB/CIFS FFI plugin
+scripts/                Build, screenshot, release, and CI scripts
+installer/              Windows installer definitions
+docs/                   Feature and UI implementation notes
 ```
 
 ## Documentation
 
-- [Quick Start Guide](QUICK_START.md)
-- [Build Instructions](scripts/README.md)
-- [Windows Setup Guide](WINDOWS_SETUP.md)
-- [Windows Build Fix Notes](WINDOWS_BUILD_FIX.md)
-- [Release Guide](RELEASE_GUIDE.md)
-- [Contributing](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
+- [Project agent instructions](AGENTS.md)
+- [Feature notes](docs/features/)
+- [UI pattern notes](docs/ui-patterns/)
+- [Build script](scripts/build.sh)
+- [Version helper](scripts/version.sh)
 
 ## Contributing
 
 Contributions are welcome. Open an issue for bugs or feature requests, or submit a pull request if you want to improve the app.
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

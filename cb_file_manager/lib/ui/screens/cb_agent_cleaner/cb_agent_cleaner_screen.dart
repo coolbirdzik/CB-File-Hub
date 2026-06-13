@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -6,9 +7,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:path/path.dart' as p;
+import '../../../e2e/cb_e2e_config.dart';
 
 import '../../../bloc/ai_agent/ai_agent_event.dart';
 import '../../../config/languages/app_localizations.dart';
+import '../../../helpers/files/external_app_helper.dart';
+import '../../../helpers/files/windows_shell_context_menu.dart';
+import '../../../ui/controllers/file_operations_handler.dart';
+import '../../../ui/dialogs/open_with_dialog.dart';
+import '../../../ui/components/common/shared_file_context_menu.dart';
+import '../../../ui/tab_manager/components/tag_dialogs.dart' as tag_dialogs;
+import '../../../ui/utils/entity_open_actions.dart';
+import '../../../ui/utils/file_type_utils.dart';
+import '../../../ui/utils/route.dart';
 import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/disk_cleaner/cleaner_models.dart';
 import '../../../services/disk_cleaner/disk_cleaner_service.dart';
@@ -88,6 +100,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   DiskTreeNode? _selectedNode; // node shown in pie chart
   bool _showCleanableOnly = false;
   bool _reviewMode = false; // when true, tree shows only selected items
+  bool _isRefreshingNode = false;
 
   // Agent activity (when CB Agent triggers scan_disk_junk from AI panel)
   StreamSubscription<DiskCleanerAgentActivity>? _agentActivitySub;
@@ -164,8 +177,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                'CB Agent found ${event.itemsFound} junk items (${_fmt(event.bytesFound)})'),
+            content: Text(AppLocalizations.of(context)!
+                .diskCleanerAgentFoundJunk(
+                    event.itemsFound, _fmt(event.bytesFound))),
           ),
         );
         break;
@@ -183,6 +197,22 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   }
 
   Future<void> _loadSetup() async {
+    if (kCbE2E) {
+      _drives = const [
+        DriveSpace(
+          path: 'C:\\',
+          label: 'System',
+          totalBytes: 512 * 1024 * 1024 * 1024,
+          freeBytes: 184 * 1024 * 1024 * 1024,
+        ),
+      ];
+      _selectedDrive = _drives.first.path;
+      _aiAvailable = true;
+      _seedE2EResultsDemo();
+      if (mounted) setState(() {});
+      return;
+    }
+
     _drives = await _service.getDriveSpace();
     if (_drives.isNotEmpty) _selectedDrive = _drives.first.path;
     try {
@@ -191,6 +221,110 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       _aiAvailable = providers.isNotEmpty;
     } catch (_) {}
     if (mounted) setState(() {});
+  }
+
+  void _seedE2EResultsDemo() {
+    final root = DiskTreeNode(
+      name: 'C:\\',
+      fullPath: 'C:\\',
+      sizeBytes: 128 * 1024 * 1024 * 1024,
+      fileCount: 186420,
+      isExpanded: true,
+      children: [
+        DiskTreeNode(
+          name: 'Users',
+          fullPath: 'C:\\Users',
+          sizeBytes: 54 * 1024 * 1024 * 1024,
+          fileCount: 84210,
+          isExpanded: true,
+          children: [
+            DiskTreeNode(
+              name: 'ngtan',
+              fullPath: 'C:\\Users\\ngtan',
+              sizeBytes: 37 * 1024 * 1024 * 1024,
+              fileCount: 51240,
+              isExpanded: true,
+              children: [
+                DiskTreeNode(
+                  name: 'AppData',
+                  fullPath: 'C:\\Users\\ngtan\\AppData',
+                  sizeBytes: 14 * 1024 * 1024 * 1024,
+                  fileCount: 26100,
+                  isExpanded: true,
+                  children: [
+                    DiskTreeNode(
+                      name: 'Temp',
+                      fullPath: 'C:\\Users\\ngtan\\AppData\\Local\\Temp',
+                      sizeBytes: 6 * 1024 * 1024 * 1024,
+                      fileCount: 14820,
+                      junkCategoryId: 'windows_temp',
+                    ),
+                    DiskTreeNode(
+                      name: 'GPUCache',
+                      fullPath: 'C:\\Users\\ngtan\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\GPUCache',
+                      sizeBytes: 1200 * 1024 * 1024,
+                      fileCount: 3420,
+                      junkCategoryId: 'browser_cache',
+                    ),
+                    DiskTreeNode(
+                      name: 'Code Cache',
+                      fullPath: 'C:\\Users\\ngtan\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Code Cache',
+                      sizeBytes: 860 * 1024 * 1024,
+                      fileCount: 1880,
+                      junkCategoryId: 'browser_cache',
+                    ),
+                  ],
+                ),
+                DiskTreeNode(
+                  name: 'Downloads',
+                  fullPath: 'C:\\Users\\ngtan\\Downloads',
+                  sizeBytes: 8 * 1024 * 1024 * 1024,
+                  fileCount: 2740,
+                ),
+              ],
+            ),
+          ],
+        ),
+        DiskTreeNode(
+          name: 'Windows',
+          fullPath: 'C:\\Windows',
+          sizeBytes: 29 * 1024 * 1024 * 1024,
+          fileCount: 62100,
+          isExpanded: true,
+          children: [
+            DiskTreeNode(
+              name: 'SoftwareDistribution',
+              fullPath: 'C:\\Windows\\SoftwareDistribution\\Download',
+              sizeBytes: 4200 * 1024 * 1024,
+              fileCount: 940,
+              junkCategoryId: 'windows_update_cache',
+            ),
+            DiskTreeNode(
+              name: 'Prefetch',
+              fullPath: 'C:\\Windows\\Prefetch',
+              sizeBytes: 380 * 1024 * 1024,
+              fileCount: 512,
+              junkCategoryId: 'prefetch',
+            ),
+          ],
+        ),
+        DiskTreeNode(
+          name: '4Recycle.Bin',
+          fullPath: 'C:\\4Recycle.Bin',
+          sizeBytes: 3100 * 1024 * 1024,
+          fileCount: 126,
+          junkCategoryId: 'recycle_bin',
+        ),
+      ],
+    );
+
+    setState(() {
+      _phase = _Phase.results;
+      _isScanningFullDisk = false;
+      _rootNode = root;
+      _selectedNode = root.children.first;
+      _showCleanableOnly = false;
+    });
   }
 
   Future<void> _startScan() async {
@@ -258,7 +392,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _phase = _Phase.setup;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Scan failed: $e')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerScanFailedMsg('$e'))),
         );
       }
     }
@@ -269,18 +403,28 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   }
 
   void _askAiAboutNode(DiskTreeNode node) {
+    final l10n = AppLocalizations.of(context)!;
     final msg = StringBuffer();
-    msg.writeln('I want to know if I can safely delete this:');
-    msg.writeln('Path: ${node.fullPath}');
-    msg.writeln('Size: ${_fmt(node.sizeBytes)}');
-    msg.writeln('Files: ${node.fileCount}');
+    msg.writeln(l10n.diskCleanerAiDeleteAnalysisIntro);
+    msg.writeln('${l10n.diskCleanerAiLabelPath}: ${node.fullPath}');
+    msg.writeln(
+      '${l10n.diskCleanerAiLabelType}: '
+      '${node.isFile ? l10n.diskCleanerAiTypeFile : l10n.diskCleanerAiTypeFolder}',
+    );
+    msg.writeln('${l10n.diskCleanerAiLabelName}: ${node.name}');
+    msg.writeln('${l10n.diskCleanerAiLabelSize}: ${_fmt(node.sizeBytes)}');
+    msg.writeln('${l10n.diskCleanerAiLabelFiles}: ${node.fileCount}');
     if (node.isJunk) {
-      msg.writeln('Category: ${node.junkCategoryId} (marked as junk)');
+      msg.writeln(
+        l10n.diskCleanerAiCategoryMarkedJunk(
+          node.junkCategoryId ?? 'unknown',
+        ),
+      );
     } else {
-      msg.writeln('Not marked as junk by rules.');
+      msg.writeln(l10n.diskCleanerAiNotMarkedAsJunk);
     }
     msg.writeln();
-    msg.writeln('Is it safe to delete? What is this folder/file used for?');
+    msg.writeln(l10n.diskCleanerAiDeleteAnalysisQuestion);
     _sendToAi(msg.toString());
   }
 
@@ -299,7 +443,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     final controller = AiPanelScope.maybeOf(context);
     if (controller == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('AI panel not available in this context')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerAiPanelUnavailable)),
       );
       return;
     }
@@ -351,7 +495,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   /// Whether this node OR any descendant has been ticked for deletion.
   /// Used by review mode to keep ancestor folders visible in the tree.
   bool _subtreeHasSelection(DiskTreeNode node) {
-    if (node.isSelectedForDeletion && node.junkCategoryId != null) return true;
+    if (node.isSelectedForDeletion && node.fullPath.isNotEmpty) return true;
     for (final c in node.children) {
       if (_subtreeHasSelection(c)) return true;
     }
@@ -362,7 +506,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     if (node == null) return 0;
     int count = 0;
     void walk(DiskTreeNode n) {
-      if (n.isJunk) {
+      if (n.fullPath.isNotEmpty) {
         count++;
       }
       for (final c in n.children) {
@@ -377,7 +521,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   void _setAllCleanableChecked(DiskTreeNode? node, bool checked) {
     if (node == null) return;
     void walk(DiskTreeNode n) {
-      if (n.isJunk) {
+      if (n.fullPath.isNotEmpty) {
         n.isSelectedForDeletion = checked;
       }
       for (final c in n.children) {
@@ -409,6 +553,56 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     for (final child in node.children) {
       _applyExpandedPaths(child, paths);
     }
+  }
+
+  /// Remove nodes whose path was successfully deleted from the in-memory tree,
+  /// and subtract their size/fileCount from all ancestors so the results view
+  /// reflects the cleanup without requiring a re-scan.
+  ///
+  /// Returns the number of bytes pruned from [node]'s subtree.
+  int _pruneDeletedPaths(DiskTreeNode node, Set<String> deletedUpper) {
+    int prunedBytes = 0;
+    int prunedFiles = 0;
+    final survivors = <DiskTreeNode>[];
+
+    for (final child in node.children) {
+      if (deletedUpper.contains(child.fullPath.toUpperCase())) {
+        // Whole subtree was deleted.
+        prunedBytes += child.sizeBytes;
+        prunedFiles += child.fileCount;
+        continue;
+      }
+      // Recurse: a descendant may have been deleted even if the child wasn't.
+      prunedBytes += _pruneDeletedPaths(child, deletedUpper);
+      survivors.add(child);
+    }
+
+    if (survivors.length != node.children.length) {
+      node.children
+        ..clear()
+        ..addAll(survivors);
+    }
+
+    node.sizeBytes = (node.sizeBytes - prunedBytes).clamp(0, node.sizeBytes);
+    node.fileCount = (node.fileCount - prunedFiles).clamp(0, node.fileCount);
+
+    // Clear selection on whatever remains so stale checkboxes don't linger.
+    node.isSelectedForDeletion = false;
+
+    return prunedBytes;
+  }
+
+  /// Drop pending-clean state and return to the results tree without re-scanning.
+  void _continueToResults() {
+    setState(() {
+      _cleanedItems = [];
+      _cleanedSkippedInUseCount = 0;
+      _cleanedSkippedByUserCount = 0;
+      _cleanedFailureCount = 0;
+      _reviewMode = false;
+      _phase = _rootNode != null ? _Phase.results : _Phase.setup;
+    });
+    if (_rootNode == null) _startScan();
   }
 
   @override
@@ -461,7 +655,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               final label =
                   d.label.isNotEmpty ? '${d.path} (${d.label})' : d.path;
               return ChoiceChip(
-                label: Text('$label  ${_fmt(d.freeBytes)} free'),
+                label: Text(l.diskCleanerDriveFree(label, _fmt(d.freeBytes))),
                 selected: selected,
                 onSelected: (_) => setState(() => _selectedDrive = d.path),
               );
@@ -567,15 +761,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                             ),
                           ),
                           Text(
-                            '${_lastProgress!.filesScanned} files',
+                            l.diskCleanerFilesCount(_lastProgress!.filesScanned),
                             style: theme.textTheme.bodySmall,
                           ),
                           Text(
-                            '${_lastProgress!.directoriesScanned} dirs',
+                            l.diskCleanerDirsCount(_lastProgress!.directoriesScanned),
                             style: theme.textTheme.bodySmall,
                           ),
                         ] else
-                          Text('Starting...',
+                          Text(l.diskCleanerStarting,
                               style: theme.textTheme.bodyMedium),
                       ],
                     ),
@@ -604,7 +798,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _buildAcrylicChip(
             theme: theme,
             icon: Icons.stop_rounded,
-            label: 'Cancel',
+            label: l.diskCleanerCancel,
             onTap: () {
               _service.cancelFullDiskScan();
               _scanRingController.stop();
@@ -636,13 +830,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               // Left: tree view (~65%)
               Expanded(
                 flex: 65,
-                child: _buildTreePanel(theme, root),
+                child: _buildTreePanel(theme, l, root),
               ),
               const VerticalDivider(width: 1),
               // Right: pie chart (~35%)
               Expanded(
                 flex: 35,
-                child: _buildPiePanel(theme, viewNode),
+                child: _buildPiePanel(theme, l, viewNode),
               ),
             ],
           ),
@@ -666,7 +860,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
           Text(
-            '${root.fullPath}  ${_fmt(root.sizeBytes)}  •  ${root.fileCount} files',
+            l.diskCleanerDriveSummary(
+                root.fullPath, _fmt(root.sizeBytes), root.fileCount),
             style: theme.textTheme.titleSmall
                 ?.copyWith(fontWeight: FontWeight.w600),
           ),
@@ -679,7 +874,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                       Expanded(
                         child: Text(
                           _lastProgress == null
-                              ? 'Scanning...'
+                              ? l.diskCleanerScanRunning
                               : _lastProgress!.currentPath,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -705,9 +900,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                             child: Text(
                               _agentCurrentPath.isEmpty
                                   ? (_agentStatus.isEmpty
-                                      ? 'CB Agent is scanning...'
+                                      ? l.diskCleanerScanRunning
                                       : _agentStatus)
-                                  : 'CB Agent: $_agentCurrentPath',
+                                  : l.diskCleanerAgentPath(_agentCurrentPath),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.tertiary,
                               ),
@@ -718,7 +913,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                           if (_agentItemsFound > 0) ...[
                             const SizedBox(width: 8),
                             Text(
-                              '$_agentItemsFound items • ${_fmt(_agentBytesFound)}',
+                              l.diskCleanerItemsBytes(_agentItemsFound, _fmt(_agentBytesFound)),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -738,7 +933,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              'Junk: ${_fmt(junkBytes)}',
+              l.diskCleanerJunkSummary(_fmt(junkBytes)),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -749,9 +944,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           const SizedBox(width: 8),
           // Filter cleanable-only
           Tooltip(
-            message: 'Show cleanable only',
+            message: l.diskCleanerShowCleanableOnly,
             child: FilterChip(
-              label: Text('Cleanable only ($cleanableCount)'),
+              label: Text(l.diskCleanerCleanableOnlyChip(cleanableCount)),
               selected: _showCleanableOnly,
               onSelected: (v) => setState(() => _showCleanableOnly = v),
             ),
@@ -760,11 +955,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           // Quick check actions
           TextButton(
             onPressed: () => _setAllCleanableChecked(_rootNode, true),
-            child: const Text('Check all cleanable'),
+            child: Text(l.diskCleanerCheckAllCleanable),
           ),
           TextButton(
             onPressed: () => _setAllCleanableChecked(_rootNode, false),
-            child: const Text('Uncheck all'),
+            child: Text(l.diskCleanerUncheckAll),
           ),
           const SizedBox(width: 8),
           if (_aiAvailable)
@@ -794,7 +989,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               size: 16,
             ),
             label:
-                Text(_isScanningFullDisk ? 'Cancel' : l.diskCleanerScanAgain),
+                Text(_isScanningFullDisk ? l.diskCleanerCancel : l.diskCleanerScanAgain),
           ),
         ],
       ),
@@ -805,7 +1000,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Tree panel (left)
   // ---------------------------------------------------------------------------
 
-  Widget _buildTreePanel(ThemeData theme, DiskTreeNode root) {
+  Widget _buildTreePanel(ThemeData theme, AppLocalizations l, DiskTreeNode root) {
     // Flatten the visible tree into a list for ListView.builder (lazy render).
     final flatRows = <_FlatRow>[];
     void flatten(DiskTreeNode node, int depth, int parentSize) {
@@ -835,13 +1030,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               const SizedBox(width: 20), // expand arrow space
               Expanded(
                 flex: 4,
-                child: Text('Name',
+                child: Text(l.diskCleanerColumnName,
                     style: theme.textTheme.labelSmall
                         ?.copyWith(fontWeight: FontWeight.w700)),
               ),
               SizedBox(
                 width: 80,
-                child: Text('Size',
+                child: Text(l.diskCleanerColumnSize,
                     style: theme.textTheme.labelSmall
                         ?.copyWith(fontWeight: FontWeight.w700),
                     textAlign: TextAlign.right),
@@ -849,13 +1044,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               const SizedBox(width: 10),
               SizedBox(
                 width: 90,
-                child: Text('% of Parent',
+                child: Text(l.diskCleanerColumnPercentOfParent,
                     style: theme.textTheme.labelSmall
                         ?.copyWith(fontWeight: FontWeight.w700)),
               ),
               SizedBox(
                 width: 60,
-                child: Text('Files',
+                child: Text(l.diskCleanerColumnFiles,
                     style: theme.textTheme.labelSmall
                         ?.copyWith(fontWeight: FontWeight.w700),
                     textAlign: TextAlign.right),
@@ -877,14 +1072,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                       const SizedBox(height: 16),
                       Text(
                         _isScanningFullDisk
-                            ? 'Building disk tree...'
-                            : 'No files found',
+                            ? l.diskCleanerBuildingTree
+                            : l.diskCleanerNoFilesFound,
                         style: theme.textTheme.titleSmall,
                       ),
                       if (_lastProgress != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                          '${_fmt(_lastProgress!.bytesScanned)} • ${_lastProgress!.filesScanned} files',
+                          l.diskCleanerSizeFiles(
+                              _fmt(_lastProgress!.bytesScanned),
+                              _lastProgress!.filesScanned),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -913,6 +1110,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                       }),
                       onAskAi:
                           _aiAvailable ? () => _askAiAboutNode(row.node) : null,
+                      onShowContextMenu: _showNodeContextMenu,
                     );
                   },
                 ),
@@ -923,7 +1121,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   void _applyCheckRecursiveGlobal(DiskTreeNode node, bool checked) {
     void walk(DiskTreeNode n) {
-      if (n.isJunk) {
+      if (n.fullPath.isNotEmpty) {
         n.isSelectedForDeletion = checked;
       }
       for (final c in n.children) {
@@ -938,7 +1136,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Pie chart panel (right)
   // ---------------------------------------------------------------------------
 
-  Widget _buildPiePanel(ThemeData theme, DiskTreeNode node) {
+  Widget _buildPiePanel(ThemeData theme, AppLocalizations l, DiskTreeNode node) {
     if (_isScanningFullDisk) {
       return Center(
         child: Padding(
@@ -952,7 +1150,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               ),
               const SizedBox(height: 18),
               Text(
-                'Analyzing disk usage...',
+                l.diskCleanerAnalyzingDisk,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -960,8 +1158,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               const SizedBox(height: 8),
               Text(
                 _lastProgress == null
-                    ? 'Pie chart will appear after scan completes.'
-                    : '${_fmt(_lastProgress!.bytesScanned)} scanned • ${_lastProgress!.filesScanned} files',
+                    ? l.diskCleanerPieChartPending
+                    : l.diskCleanerScannedProgress(
+                        _fmt(_lastProgress!.bytesScanned),
+                        _lastProgress!.filesScanned),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -999,8 +1199,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             const SizedBox(height: 12),
             Text(
               _isScanningFullDisk
-                  ? 'Pie chart will appear as soon as scan completes'
-                  : 'Empty',
+                  ? l.diskCleanerPieChartPendingScan
+                  : l.diskCleanerPieEmpty,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -1157,9 +1357,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                         children: [
                           Text(
                             isPreparing
-                                ? 'Preparing files...'
+                                ? l.diskCleanerPreparingFiles
                                 : (snap.status.isEmpty
-                                    ? 'Cleaning...'
+                                    ? l.diskCleanerCleaning
                                     : snap.status),
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
@@ -1169,10 +1369,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                           Text(
                             isPreparing
                                 ? (snap.currentPath.isEmpty
-                                    ? 'Scanning selected directories...'
-                                    : 'Scanning ${snap.currentPath}')
+                                    ? l.diskCleanerScanningSelectedDirs
+                                    : l.diskCleanerScanningPath(snap.currentPath))
                                 : (snap.currentPath.isEmpty
-                                    ? 'Deleting selected junk items. If a file fails, you can skip it or try again.'
+                                    ? l.diskCleanerDeletingJunkHint
                                     : snap.currentPath),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
@@ -1192,19 +1392,19 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _buildProgressStatChip(
+                     _buildProgressStatChip(
                       theme: theme,
                       icon: _selectedCleanMode == _CleanDeleteMode.permanent
                           ? PhosphorIconsLight.trash
                           : PhosphorIconsLight.recycle,
                       label: _selectedCleanMode == _CleanDeleteMode.permanent
-                          ? 'Permanent delete'
-                          : 'Recycle Bin',
+                          ? l.diskCleanerPermanentDeleteLabel
+                          : l.diskCleanerRecycleBinLabel,
                     ),
                     _buildProgressStatChip(
                       theme: theme,
                       icon: PhosphorIconsLight.chartBar,
-                      label: '${snap.done} / ${snap.total} processed',
+                      label: l.diskCleanerProcessedCount(snap.done, snap.total),
                     ),
                     _buildProgressStatChip(
                       theme: theme,
@@ -1232,15 +1432,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   children: [
                     Text(
                       progressPercent == null
-                          ? 'Deleting items...'
-                          : '$progressPercent% complete',
+                          ? l.diskCleanerDeletingItems
+                          : '$progressPercent% ${l.diskCleanerCleaning}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const Spacer(),
                     Text(
-                      '${snap.total - snap.done} remaining',
+                      '${snap.total - snap.done} ${l.diskCleanerRemaining}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -1268,10 +1468,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           const SizedBox(width: 8),
           Text(
             _isCleaningJunk
-                ? (_cleanStatus.isEmpty ? 'Cleaning...' : _cleanStatus)
+                ? (_cleanStatus.isEmpty ? l.diskCleanerCleaning : _cleanStatus)
                 : _reviewMode
-                    ? 'Review mode • Selected: ${_fmt(selectedBytes)}'
-                    : 'Selected: ${_fmt(selectedBytes)} / ${_fmt(junkBytes)}',
+                    ? l.diskCleanerReviewModeSelected(_fmt(selectedBytes))
+                    : l.diskCleanerSelectedBytes(_fmt(selectedBytes), _fmt(junkBytes)),
             style: theme.textTheme.bodyMedium
                 ?.copyWith(fontWeight: FontWeight.w500),
           ),
@@ -1280,14 +1480,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             OutlinedButton.icon(
               onPressed: () => setState(() => _reviewMode = false),
               icon: const Icon(PhosphorIconsLight.arrowLeft, size: 14),
-              label: const Text('Back to results'),
+              label: Text(l.diskCleanerBackToResults),
             ),
             const SizedBox(width: 8),
             if (_aiAvailable)
               OutlinedButton.icon(
                 onPressed: _askAiReviewPending,
                 icon: const Icon(PhosphorIconsLight.sparkle, size: 14),
-                label: const Text('Review by CB Agent'),
+                label: Text(l.diskCleanerReviewByAgent),
               ),
             const SizedBox(width: 8),
             SegmentedButton<_CleanDeleteMode>(
@@ -1327,8 +1527,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               ),
               label: Text(
                 _selectedCleanMode == _CleanDeleteMode.permanent
-                    ? 'Delete ${_fmt(selectedBytes)} permanently'
-                    : 'Move ${_fmt(selectedBytes)} to Recycle Bin',
+                    ? l.diskCleanerDeletePermanentlyButton(_fmt(selectedBytes))
+                    : l.diskCleanerMoveToRecycleBinButton(_fmt(selectedBytes)),
               ),
             ),
           ] else
@@ -1340,8 +1540,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   ? const AppWaveLoader(size: 24, color: Colors.white)
                   : const Icon(PhosphorIconsLight.eye, size: 18),
               label: Text(_isCleaningJunk
-                  ? 'Cleaning...'
-                  : 'Review ${_fmt(selectedBytes)} & clean'),
+                  ? l.diskCleanerCleaning
+                  : l.diskCleanerReviewAndClean(_fmt(selectedBytes))),
             ),
         ],
       ),
@@ -1384,7 +1584,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     if (root == null) return 0;
     int total = 0;
     void walk(DiskTreeNode n) {
-      if (n.isSelectedForDeletion && n.junkCategoryId != null) {
+      if (n.isSelectedForDeletion && n.fullPath.isNotEmpty) {
         total += n.sizeBytes;
         return; // top-most selected node already covers the subtree
       }
@@ -1403,12 +1603,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     // flag — no separate page, no rebuild.
     final items = <JunkItem>[];
     void walk(DiskTreeNode n) {
-      if (n.isSelectedForDeletion && n.junkCategoryId != null) {
+      if (n.isSelectedForDeletion && n.fullPath.isNotEmpty) {
         items.add(JunkItem(
           path: n.fullPath,
           sizeBytes: n.sizeBytes,
-          categoryId: n.junkCategoryId!,
-          isContainerOnly: !n.isFile,
+          categoryId: n.junkCategoryId ?? 'selected_item',
+          // Tree selections are explicit user choices, so deleting a selected
+          // directory should delete the directory itself, not only its
+          // contents. `isContainerOnly` is reserved for scanner rules such as
+          // empty-only cache folders.
+          isContainerOnly: false,
+          isUserSelected: true,
         ));
         return;
       }
@@ -1447,13 +1652,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   Future<void> _cleanJunk({required bool permanent}) async {
     if (_isCleaningJunk || _pendingCleanItems.isEmpty) return;
+    final l = AppLocalizations.of(context)!;
     setState(() {
       _isCleaningJunk = true;
       _cleanedSkippedInUseCount = 0;
       _cleanedSkippedByUserCount = 0;
       _skipAllDeleteFailures = false;
-      _cleanStatus =
-          permanent ? 'Permanently deleting...' : 'Moving to Recycle Bin...';
+      _cleanStatus = permanent
+          ? l.diskCleanerPermanentlyDeleting
+          : l.diskCleanerMovingToRecycleBin;
     });
 
     // Let Flutter paint the initial progress UI before the first native
@@ -1462,8 +1669,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     await WidgetsBinding.instance.endOfFrame;
     _lastCleanProgressUiUpdate = DateTime.fromMillisecondsSinceEpoch(0);
     _cleanProgress.value = _CleanProgressSnapshot(
-      status:
-          permanent ? 'Permanently deleting...' : 'Moving to Recycle Bin...',
+      status: permanent
+          ? l.diskCleanerPermanentlyDeleting
+          : l.diskCleanerMovingToRecycleBin,
     );
 
     try {
@@ -1489,8 +1697,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             total: total,
             currentPath: currentPath ?? '',
             status: permanent
-                ? 'Permanently deleting...'
-                : 'Moving to Recycle Bin...',
+                ? l.diskCleanerPermanentlyDeleting
+                : l.diskCleanerMovingToRecycleBin,
           );
         },
       );
@@ -1499,6 +1707,19 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       final succeededSet = result.succeeded.toSet();
       final cleanedItems =
           items.where((i) => succeededSet.contains(i.path)).toList();
+
+      // Prune deleted paths from the in-memory tree so returning to the
+      // results view shows the freed space without a re-scan.
+      if (_rootNode != null && succeededSet.isNotEmpty) {
+        final deletedUpper =
+            succeededSet.map((p) => p.toUpperCase()).toSet();
+        _pruneDeletedPaths(_rootNode!, deletedUpper);
+        // If the currently-viewed pie node was deleted, fall back to root.
+        if (_selectedNode != null &&
+            deletedUpper.contains(_selectedNode!.fullPath.toUpperCase())) {
+          _selectedNode = _rootNode;
+        }
+      }
 
       setState(() {
         _isCleaningJunk = false;
@@ -1520,7 +1741,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Skipped ${result.skippedInUseCount} file(s) currently in use. Details were logged.',
+              AppLocalizations.of(context)!
+                  .diskCleanerSkippedInUseSnack(result.skippedInUseCount),
             ),
           ),
         );
@@ -1528,7 +1750,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Skipped ${result.skippedByUserCount} file(s) after delete failed.',
+              AppLocalizations.of(context)!
+                  .diskCleanerSkippedAfterFailureSnack(result.skippedByUserCount),
             ),
           ),
         );
@@ -1540,7 +1763,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _cleanStatus = '';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cleanup failed: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerCleanupFailedMsg('$e'))),
       );
     }
   }
@@ -1611,10 +1834,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result.skippedInUseCount > 0
-              ? 'Permanently deleted ${result.successCount} items (${_fmt(result.freedBytes)}). Skipped ${result.skippedInUseCount} in-use file(s); details were logged.'
+              ? AppLocalizations.of(context)!.diskCleanerPermanentDeletedWithInUse(
+                  result.successCount, _fmt(result.freedBytes), result.skippedInUseCount)
               : result.skippedByUserCount > 0
-                  ? 'Permanently deleted ${result.successCount} items (${_fmt(result.freedBytes)}). Skipped ${result.skippedByUserCount} file(s) after delete failed.'
-                  : 'Permanently deleted ${result.successCount} items (${_fmt(result.freedBytes)})'),
+                  ? AppLocalizations.of(context)!.diskCleanerPermanentDeletedWithSkipped(
+                      result.successCount, _fmt(result.freedBytes), result.skippedByUserCount)
+                  : AppLocalizations.of(context)!.diskCleanerPermanentDeletedSuccess(
+                      result.successCount, _fmt(result.freedBytes))),
         ),
       );
     } catch (e) {
@@ -1623,7 +1849,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _isPermanentDeleting = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Permanent delete failed: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.diskCleanerPermanentDeleteFailedMsg('$e'))),
       );
     }
   }
@@ -1633,27 +1859,25 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     required int bytes,
     required bool fromRecycleBin,
   }) {
+    final l = AppLocalizations.of(context)!;
     final content = fromRecycleBin
-        ? 'This will permanently delete $itemCount items '
-            '(${_fmt(bytes)}) from your Recycle Bin. '
-            'They cannot be restored after this.'
-        : 'This will permanently delete $itemCount selected items '
-            '(${_fmt(bytes)}). They cannot be restored after this.';
+        ? l.diskCleanerPermanentDeleteFromBinContent(itemCount, _fmt(bytes))
+        : l.diskCleanerPermanentDeleteSelectedContent(itemCount, _fmt(bytes));
 
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Permanent delete?'),
+        title: Text(l.diskCleanerPermanentDeleteConfirmTitle),
         content: Text(content),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Permanent delete'),
+            child: Text(l.diskCleanerPermanentDeleteLabel),
           ),
         ],
       ),
@@ -1668,20 +1892,21 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
     // Reflect "waiting for decision" state in the progress notifier so the
     // bottom bar updates without rebuilding the whole screen.
+    final l = AppLocalizations.of(context)!;
     final prev = _cleanProgress.value;
     _cleanProgress.value = _CleanProgressSnapshot(
       done: prev.done,
       total: prev.total,
       currentPath: details.item.path,
-      status: 'Waiting for your decision...',
+      status: l.diskCleanerWaitingDecision,
     );
 
     final fileName = _fileBasename(details.item.path);
-    final actionLabel =
-        details.permanent ? 'permanently delete' : 'move to Recycle Bin';
-    final reasonText = details.isInUse
-        ? 'This file appears to be in use by another application.'
-        : details.reason;
+    final actionLabel = details.permanent
+        ? l.diskCleanerPermanentDeleteLabel
+        : l.diskCleanerRecycleBinLabel;
+    final reasonText =
+        details.isInUse ? l.diskCleanerFileInUse : details.reason;
 
     var skipAll = false;
     final action = await showDialog<CleanFailureAction>(
@@ -1689,7 +1914,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           barrierDismissible: false,
           builder: (ctx) => StatefulBuilder(
             builder: (ctx, setDialogState) => AlertDialog(
-              title: Text('Could not $actionLabel'),
+              title: Text('${l.delete}: $actionLabel'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1706,7 +1931,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   if (details.isInUse) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Retrying now will usually fail again until the app or process using this file is closed.',
+                      l.diskCleanerRetryInUseHint,
                       style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                             color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                           ),
@@ -1716,7 +1941,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                       details.blockedPath != details.item.path) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Blocked by: ${details.blockedPath}',
+                      '${l.diskCleanerBlockedBy} ${details.blockedPath}',
                       style: Theme.of(ctx).textTheme.bodySmall,
                     ),
                   ],
@@ -1729,7 +1954,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     onChanged: (value) {
                       setDialogState(() => skipAll = value ?? false);
                     },
-                    title: const Text('Skip all remaining items'),
+                    title: Text(l.diskCleanerSkipAllRemaining),
                   ),
                 ],
               ),
@@ -1743,13 +1968,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     }
                     Navigator.of(ctx).pop(CleanFailureAction.skip);
                   },
-                  child: const Text('Skip'),
+                  child: Text(l.diskCleanerSkip),
                 ),
                 if (!details.isInUse)
                   FilledButton(
                     onPressed: () =>
                         Navigator.of(ctx).pop(CleanFailureAction.retry),
-                    child: const Text('Try again'),
+                    child: Text(l.diskCleanerTryAgain),
                   ),
               ],
             ),
@@ -1771,8 +1996,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         total: prev.total,
         currentPath: prev.currentPath,
         status: details.permanent
-            ? 'Permanently deleting...'
-            : 'Moving to Recycle Bin...',
+            ? l.diskCleanerPermanentlyDeleting
+            : l.diskCleanerMovingToRecycleBin,
       );
     }
 
@@ -1810,7 +2035,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'Freed ${_fmt(_cleanedFreedBytes)}  •  $successCount items',
+                  l.diskCleanerFreedBadge(_fmt(_cleanedFreedBytes), successCount),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1828,7 +2053,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '$_cleanedFailureCount failed',
+                    l.diskCleanerFailedBadge(_cleanedFailureCount),
                     style: TextStyle(fontSize: 11, color: Colors.red.shade700),
                   ),
                 ),
@@ -1843,7 +2068,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '$_cleanedSkippedInUseCount in use',
+                    l.diskCleanerInUseBadge(_cleanedSkippedInUseCount),
                     style:
                         TextStyle(fontSize: 11, color: Colors.orange.shade800),
                   ),
@@ -1859,7 +2084,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '$_cleanedSkippedByUserCount skipped',
+                    l.diskCleanerSkippedBadge(_cleanedSkippedByUserCount),
                     style: TextStyle(
                       fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -1868,6 +2093,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 ),
               ],
               const Spacer(),
+              if (_rootNode != null) ...[
+                FilledButton.tonalIcon(
+                  onPressed: _continueToResults,
+                  icon: const Icon(PhosphorIconsLight.arrowLeft, size: 16),
+                  label: Text(l.diskCleanerContinue),
+                ),
+                const SizedBox(width: 8),
+              ],
               OutlinedButton.icon(
                 onPressed: () {
                   setState(() {
@@ -1904,7 +2137,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Skipped $_cleanedSkippedInUseCount file(s) currently in use. See logs for the full path list.',
+                    l.diskCleanerSkippedInUseBanner(_cleanedSkippedInUseCount),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.orange.shade900,
                       fontWeight: FontWeight.w600,
@@ -1931,7 +2164,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Skipped $_cleanedSkippedByUserCount file(s) after delete failed because you chose Skip.',
+                    l.diskCleanerSkippedByUserBanner(_cleanedSkippedByUserCount),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
@@ -1953,12 +2186,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                       size: 48, color: Colors.red.shade700),
                   const SizedBox(height: 12),
                   Text(
-                    'Deleted $successCount items permanently.',
+                    l.diskCleanerDeletedPermanentlyBody(successCount),
                     style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Freed ${_fmt(_cleanedFreedBytes)}',
+                    l.diskCleanerFreedSpace(_fmt(_cleanedFreedBytes)),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1980,7 +2213,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     size: 18, color: theme.colorScheme.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Text(
-                  'Permanent delete finished for $successCount items.',
+                  l.diskCleanerPermanentDeleteFinished(successCount),
                   style: theme.textTheme.bodyMedium,
                 ),
               ],
@@ -1996,19 +2229,19 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               children: [
                 Expanded(
                   flex: 3,
-                  child: Text('File name',
+                  child: Text(l.diskCleanerColumnFileName,
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
                 Expanded(
                   flex: 4,
-                  child: Text('Path',
+                  child: Text(l.diskCleanerColumnPath,
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
                 SizedBox(
                   width: 80,
-                  child: Text('Size',
+                  child: Text(l.diskCleanerColumnSize,
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                       textAlign: TextAlign.right),
@@ -2016,7 +2249,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 const SizedBox(width: 12),
                 SizedBox(
                   width: 100,
-                  child: Text('Category',
+                  child: Text(l.diskCleanerColumnCategory,
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
@@ -2034,7 +2267,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                         const Icon(PhosphorIconsLight.checkCircle,
                             size: 48, color: Colors.green),
                         const SizedBox(height: 12),
-                        Text('No items are currently in the Recycle Bin.',
+                        Text(l.diskCleanerRecycleBinEmpty,
                             style: theme.textTheme.titleSmall),
                       ],
                     ),
@@ -2136,8 +2369,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 const SizedBox(width: 8),
                 Text(
                   _isPermanentDeleting
-                      ? 'Permanently deleting... $_permanentDone / $_permanentTotal'
-                      : '${_cleanedItems.length} items in Recycle Bin (${_fmt(_cleanedFreedBytes)})',
+                      ? l.diskCleanerPermanentDeletingProgress(_permanentDone, _permanentTotal)
+                      : l.diskCleanerItemsInRecycleBin(_cleanedItems.length, _fmt(_cleanedFreedBytes)),
                   style: theme.textTheme.bodyMedium,
                 ),
                 if (_isPermanentDeleting) ...[
@@ -2172,8 +2405,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                         ? const AppWaveLoader(size: 22, color: Colors.white)
                         : const Icon(PhosphorIconsLight.trash, size: 16),
                     label: Text(_isPermanentDeleting
-                        ? 'Deleting...'
-                        : 'Permanent delete'),
+                        ? l.diskCleanerDeletingLabel
+                        : l.diskCleanerPermanentDeleteLabel),
                   ),
               ],
             ),
@@ -2258,6 +2491,352 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
+
+  Future<void> _refreshNodeSubtree(DiskTreeNode node) async {
+    if (_isRefreshingNode || node.fullPath.isEmpty) return;
+
+    final root = _rootNode;
+    if (root == null) return;
+
+    setState(() {
+      _isRefreshingNode = true;
+    });
+
+    try {
+      final expandedPaths = _collectExpandedPaths(node);
+      final selectedPaths = _collectSelectedPaths(node);
+      final handle = await _service.scanFullDisk(drivePath: node.fullPath);
+      final result = await handle.future;
+      _service.markJunkNodes(result.root);
+      _applyExpandedPaths(result.root, expandedPaths);
+      _applySelectedPaths(result.root, selectedPaths);
+
+      if (!mounted) return;
+
+      setState(() {
+        _copyNodeData(node, result.root);
+        _recalculateTreeStats(root);
+        _service.markJunkNodes(root);
+        if (_selectedNode?.fullPath == node.fullPath) {
+          _selectedNode = node;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Refresh failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingNode = false;
+        });
+      }
+    }
+  }
+
+  Set<String> _collectSelectedPaths(DiskTreeNode node) {
+    final paths = <String>{};
+
+    void visit(DiskTreeNode current) {
+      if (current.isSelectedForDeletion && current.fullPath.isNotEmpty) {
+        paths.add(current.fullPath.toUpperCase());
+      }
+      for (final child in current.children) {
+        visit(child);
+      }
+    }
+
+    visit(node);
+    return paths;
+  }
+
+  void _applySelectedPaths(DiskTreeNode node, Set<String> paths) {
+    node.isSelectedForDeletion = paths.contains(node.fullPath.toUpperCase());
+    for (final child in node.children) {
+      _applySelectedPaths(child, paths);
+    }
+  }
+
+  void _copyNodeData(DiskTreeNode target, DiskTreeNode source) {
+    target.sizeBytes = source.sizeBytes;
+    target.fileCount = source.fileCount;
+    target.junkCategoryId = source.junkCategoryId;
+    target.isSelectedForDeletion = source.isSelectedForDeletion;
+    target.children
+      ..clear()
+      ..addAll(source.children);
+  }
+
+  void _recalculateTreeStats(DiskTreeNode node) {
+    if (node.isFile) return;
+
+    var totalBytes = 0;
+    var totalFiles = 0;
+    for (final child in node.children) {
+      if (!child.isFile) {
+        _recalculateTreeStats(child);
+      }
+      totalBytes += child.sizeBytes;
+      totalFiles += child.fileCount;
+    }
+    node.sizeBytes = totalBytes;
+    node.fileCount = totalFiles;
+  }
+
+  Future<void> _showNodeProperties(DiskTreeNode node) async {
+    final l10n = AppLocalizations.of(context)!;
+    final entity = node.isFile ? File(node.fullPath) : Directory(node.fullPath);
+
+    try {
+      final stat = await entity.stat();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.properties),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _nodePropertyRow(l10n.fileName, node.name),
+                const Divider(),
+                _nodePropertyRow(l10n.filePath, node.fullPath),
+                const Divider(),
+                _nodePropertyRow(l10n.columnSize, _fmt(node.sizeBytes)),
+                const Divider(),
+                _nodePropertyRow(l10n.files, '${node.fileCount}'),
+                const Divider(),
+                _nodePropertyRow(
+                  l10n.fileModified,
+                  stat.modified.toString().split('.').first,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.close.toUpperCase()),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load properties: $e')),
+      );
+    }
+  }
+
+  Widget _nodePropertyRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  /// Show the cleaner-specific context menu for a disk tree node.
+  void _showNodeContextMenu(DiskTreeNode node, Offset globalPosition) {
+    if (node.fullPath.isEmpty) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final entity = node.isFile ? File(node.fullPath) : Directory(node.fullPath);
+    final isDesktopPlatform =
+        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+    final isImage = node.isFile && FileTypeUtils.isImageFile(node.fullPath);
+    final isVideo = node.isFile && FileTypeUtils.isVideoFile(node.fullPath);
+    final canShowShellMenu = Platform.isWindows &&
+        FileSystemEntity.typeSync(node.fullPath) != FileSystemEntityType.notFound;
+    final sections = <ContextMenuSection>[
+      ContextMenuSection(
+        title: l10n.open,
+        actions: [
+          if (_aiAvailable)
+            ContextMenuAction(
+              id: 'ask_cb_agent',
+              label: node.isFile
+                  ? l10n.askCbAgentAboutThisFile
+                  : l10n.askCbAgentAboutThisFolder,
+              icon: PhosphorIconsLight.sparkle,
+              onSelected: (_) => _askAiAboutNode(node),
+            ),
+          if (node.isFile && isVideo)
+            ContextMenuAction(
+              id: 'play_video',
+              label: l10n.playVideo,
+              icon: PhosphorIconsLight.playCircle,
+              onSelected: (_) =>
+                  ExternalAppHelper.openFileWithApp(node.fullPath, 'shell_open'),
+            ),
+          if (node.isFile && isImage)
+            ContextMenuAction(
+              id: 'view_image',
+              label: l10n.viewImage,
+              icon: PhosphorIconsLight.image,
+              onSelected: (_) =>
+                  ExternalAppHelper.openFileWithApp(node.fullPath, 'shell_open'),
+            ),
+          if (node.isFile)
+            ContextMenuAction(
+              id: 'open',
+              label: l10n.open,
+              icon: PhosphorIconsLight.file,
+              onSelected: (_) =>
+                  ExternalAppHelper.openFileWithApp(node.fullPath, 'shell_open'),
+            ),
+          if (node.isFile && isDesktopPlatform)
+            ContextMenuAction(
+              id: 'open_file_location',
+              label: 'Open file location',
+              icon: PhosphorIconsLight.folderOpen,
+              onSelected: (_) => EntityOpenActions.openInNewTab(
+                context,
+                sourcePath: node.fullPath,
+                preferredTabName: p.basename(p.dirname(node.fullPath)),
+              ),
+            ),
+          if (isDesktopPlatform)
+            ContextMenuAction(
+              id: 'open_in_new_tab',
+              label: l10n.openInNewTab,
+              icon: PhosphorIconsLight.squaresFour,
+              onSelected: (_) => EntityOpenActions.openInNewTab(
+                context,
+                sourcePath: node.fullPath,
+              ),
+            ),
+          if (isDesktopPlatform)
+            ContextMenuAction(
+              id: 'open_in_new_window',
+              label: '${l10n.open} ${l10n.newWindow.toLowerCase()}',
+              icon: PhosphorIconsLight.appWindow,
+              onSelected: (_) => EntityOpenActions.openInNewWindow(
+                context,
+                sourcePath: node.fullPath,
+              ),
+            ),
+          if (node.isFile)
+            ContextMenuAction(
+              id: 'open_with',
+              label: l10n.openWith,
+              icon: PhosphorIconsLight.arrowSquareOut,
+              onSelected: (_) => RouteUtils.showAcrylicDialog(
+                context: context,
+                builder: (_) => OpenWithDialog(filePath: node.fullPath),
+              ),
+            ),
+          if (node.isFile)
+            ContextMenuAction(
+              id: 'choose_default_app',
+              label: l10n.chooseDefaultApp,
+              icon: PhosphorIconsLight.appWindow,
+              onSelected: (_) => RouteUtils.showAcrylicDialog(
+                context: context,
+                builder: (_) => OpenWithDialog(
+                  filePath: node.fullPath,
+                  saveAsDefaultOnSelect: true,
+                ),
+              ),
+            ),
+          ContextMenuAction(
+            id: 'refresh_subtree',
+            label: l10n.refresh,
+            icon: PhosphorIconsLight.arrowsClockwise,
+            isEnabled: !_isRefreshingNode,
+            onSelected: (_) => _refreshNodeSubtree(node),
+          ),
+        ],
+      ),
+      ContextMenuSection(
+        title: l10n.copy,
+        actions: [
+          ContextMenuAction(
+            id: 'copy',
+            label: l10n.copy,
+            icon: PhosphorIconsLight.copy,
+            onSelected: (_) =>
+                FileOperationsHandler.copyToClipboard(context: context, entity: entity),
+          ),
+          ContextMenuAction(
+            id: 'cut',
+            label: l10n.cut,
+            icon: PhosphorIconsLight.scissors,
+            onSelected: (_) =>
+                FileOperationsHandler.cutToClipboard(context: context, entity: entity),
+          ),
+          if (!node.isFile)
+            ContextMenuAction(
+              id: 'paste',
+              label: l10n.pasteHere,
+              icon: PhosphorIconsLight.clipboard,
+              onSelected: (_) => FileOperationsHandler.pasteFromClipboard(
+                context: context,
+                destinationPath: node.fullPath,
+              ),
+            ),
+          ContextMenuAction(
+            id: 'rename',
+            label: l10n.rename,
+            icon: PhosphorIconsLight.pencilSimple,
+            onSelected: (_) => FileOperationsHandler.showRenameDialog(
+              context: context,
+              entity: entity,
+            ),
+          ),
+          ContextMenuAction(
+            id: 'tags',
+            label: l10n.manageTags,
+            icon: PhosphorIconsLight.tag,
+            onSelected: (_) =>
+                tag_dialogs.showAddTagToFileDialog(context, node.fullPath),
+          ),
+        ],
+      ),
+      ContextMenuSection(
+        title: l10n.properties,
+        actions: [
+          ContextMenuAction(
+            id: 'properties',
+            label: l10n.properties,
+            icon: PhosphorIconsLight.info,
+            onSelected: (_) => _showNodeProperties(node),
+          ),
+          if (canShowShellMenu)
+            ContextMenuAction(
+              id: 'more_options',
+              label: l10n.moreOptions,
+              icon: PhosphorIconsLight.dotsThreeVertical,
+              onSelected: (_) => WindowsShellContextMenu.showForPaths(
+                paths: [node.fullPath],
+                globalPosition: globalPosition,
+                devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+              ),
+            ),
+        ],
+      ),
+    ];
+
+    showContextMenuPopup(
+      context: context,
+      globalPosition: globalPosition,
+      sections: sections,
+    );
+  }
 }
 
 // =============================================================================
@@ -2272,6 +2851,7 @@ class _TreeRow extends StatefulWidget {
   final ValueChanged<DiskTreeNode> onSelect;
   final void Function(DiskTreeNode, bool?) onToggleJunk;
   final ValueChanged<DiskTreeNode>? onAskAi;
+  final void Function(DiskTreeNode, Offset)? onShowContextMenu;
   final bool Function(DiskTreeNode)? nodeFilter;
 
   const _TreeRow({
@@ -2282,6 +2862,7 @@ class _TreeRow extends StatefulWidget {
     required this.onSelect,
     required this.onToggleJunk,
     this.onAskAi,
+    this.onShowContextMenu,
     this.nodeFilter,
   });
 
@@ -2292,16 +2873,8 @@ class _TreeRow extends StatefulWidget {
 class _TreeRowState extends State<_TreeRow> {
   bool _isHovering = false;
 
-  bool _subtreeHasJunk(DiskTreeNode node) {
-    if (node.isJunk) return true;
-    for (final c in node.children) {
-      if (_subtreeHasJunk(c)) return true;
-    }
-    return false;
-  }
-
   int _countJunkNodes(DiskTreeNode node) {
-    int count = node.isJunk ? 1 : 0;
+    int count = node.fullPath.isNotEmpty ? 1 : 0;
     for (final c in node.children) {
       count += _countJunkNodes(c);
     }
@@ -2309,7 +2882,7 @@ class _TreeRowState extends State<_TreeRow> {
   }
 
   int _countCheckedJunkNodes(DiskTreeNode node) {
-    int count = node.isJunk && node.isSelectedForDeletion ? 1 : 0;
+    int count = node.fullPath.isNotEmpty && node.isSelectedForDeletion ? 1 : 0;
     for (final c in node.children) {
       count += _countCheckedJunkNodes(c);
     }
@@ -2321,17 +2894,12 @@ class _TreeRowState extends State<_TreeRow> {
     if (total == 0) return false;
     final checked = _countCheckedJunkNodes(node);
     if (checked == 0) return false;
-    // If this folder itself is not a cleanable target, but descendants are
-    // selected, keep the parent as indeterminate. This makes it clear that
-    // only cleanable children (e.g. Logs) are selected, not the surrounding
-    // parent folder.
-    if (!node.isJunk) return null;
     if (checked == total) return true;
     return null; // indeterminate (dash)
   }
 
   void _applyCheckRecursive(DiskTreeNode node, bool checked) {
-    if (node.isJunk) {
+    if (node.fullPath.isNotEmpty) {
       node.isSelectedForDeletion = checked;
     }
     for (final c in node.children) {
@@ -2362,6 +2930,9 @@ class _TreeRowState extends State<_TreeRow> {
               }
               widget.onSelect(node);
             },
+            onSecondaryTapUp: widget.onShowContextMenu == null || node.fullPath.isEmpty
+                ? null
+                : (d) => widget.onShowContextMenu!(node, d.globalPosition),
             child: Container(
               color: isJunk
                   ? Colors.orange.withValues(alpha: 0.06)
@@ -2370,27 +2941,25 @@ class _TreeRowState extends State<_TreeRow> {
                   left: 12 + indent, right: 12, top: 4, bottom: 4),
               child: Row(
                 children: [
-                  // Junk checkbox (only for junk nodes)
+                  // Selection checkbox
                   SizedBox(
                     width: 28,
-                    child: _subtreeHasJunk(node)
-                        ? Checkbox(
-                            tristate: true,
-                            value: _checkboxState(node),
-                            onChanged: (v) {
-                              // Flutter tristate cycles true -> null -> false.
-                              // For cleaner UX, clicking a fully checked node
-                              // unchecks the whole subtree; clicking partial or
-                              // unchecked nodes checks the subtree.
-                              final target = _checkboxState(node) != true;
-                              setState(() {
-                                _applyCheckRecursive(node, target);
-                              });
-                              widget.onToggleJunk(node, target);
-                            },
-                            visualDensity: VisualDensity.compact,
-                          )
-                        : const SizedBox.shrink(),
+                    child: Checkbox(
+                      tristate: true,
+                      value: _checkboxState(node),
+                      onChanged: (v) {
+                        // Flutter tristate cycles true -> null -> false.
+                        // For cleaner UX, clicking a fully checked node
+                        // unchecks the whole subtree; clicking partial or
+                        // unchecked nodes checks the subtree.
+                        final target = _checkboxState(node) != true;
+                        setState(() {
+                          _applyCheckRecursive(node, target);
+                        });
+                        widget.onToggleJunk(node, target);
+                      },
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                   // Expand arrow
                   SizedBox(
@@ -2465,7 +3034,8 @@ class _TreeRowState extends State<_TreeRow> {
                               borderRadius: BorderRadius.circular(10),
                               onTap: () => widget.onAskAi!(node),
                               child: Tooltip(
-                                message: 'Ask CB Agent about this',
+                                message: AppLocalizations.of(context)!
+                                    .diskCleanerAskAgentAboutThis,
                                 child: Icon(
                                   PhosphorIconsLight.sparkle,
                                   size: 14,
@@ -2538,6 +3108,7 @@ class _TreeRowState extends State<_TreeRow> {
               onSelect: widget.onSelect,
               onToggleJunk: widget.onToggleJunk,
               onAskAi: widget.onAskAi,
+              onShowContextMenu: widget.onShowContextMenu,
               nodeFilter: widget.nodeFilter,
             ))
         .toList();
@@ -2545,7 +3116,7 @@ class _TreeRowState extends State<_TreeRow> {
     if (hiddenCount > 0) {
       rows.add(_TreeRow(
         node: DiskTreeNode(
-          name: '... and $hiddenCount more items',
+          name: AppLocalizations.of(context)!.diskCleanerAndMoreItems(hiddenCount),
           fullPath: '',
           isFile: true,
           sizeBytes: 0,
@@ -2730,6 +3301,7 @@ class _FlatTreeRowWidget extends StatefulWidget {
   final VoidCallback onTap;
   final ValueChanged<bool> onToggleJunk;
   final VoidCallback? onAskAi;
+  final void Function(DiskTreeNode, Offset)? onShowContextMenu;
 
   const _FlatTreeRowWidget({
     required this.row,
@@ -2737,6 +3309,7 @@ class _FlatTreeRowWidget extends StatefulWidget {
     required this.onTap,
     required this.onToggleJunk,
     this.onAskAi,
+    this.onShowContextMenu,
   });
 
   @override
@@ -2762,6 +3335,9 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
+        onSecondaryTapUp: widget.onShowContextMenu == null || node.fullPath.isEmpty
+            ? null
+            : (d) => widget.onShowContextMenu!(node, d.globalPosition),
         child: Container(
           color: _hovering
               ? theme.colorScheme.primary.withValues(alpha: 0.06)
@@ -2774,23 +3350,23 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
               // Checkbox
               SizedBox(
                 width: 28,
-                child: (node.isJunk || node.hasJunkChildren)
-                    ? GestureDetector(
-                        onTap: () {
-                          final current = _checkState(node);
-                          widget.onToggleJunk(current != true);
-                        },
-                        child: Icon(
-                          _checkState(node) == true
-                              ? Icons.check_box
-                              : _checkState(node) == null
-                                  ? Icons.indeterminate_check_box
-                                  : Icons.check_box_outline_blank,
-                          size: 18,
-                          color: Colors.orange.shade700,
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+                child: GestureDetector(
+                  onTap: () {
+                    final current = _checkState(node);
+                    widget.onToggleJunk(current != true);
+                  },
+                  child: Icon(
+                    _checkState(node) == true
+                        ? Icons.check_box
+                        : _checkState(node) == null
+                            ? Icons.indeterminate_check_box
+                            : Icons.check_box_outline_blank,
+                    size: 18,
+                    color: node.isJunk
+                        ? Colors.orange.shade700
+                        : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ),
               // Expand arrow
               SizedBox(
@@ -2909,7 +3485,7 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
     int total = 0;
     int checked = 0;
     void walk(DiskTreeNode n) {
-      if (n.isJunk) {
+      if (n.fullPath.isNotEmpty) {
         total++;
         if (n.isSelectedForDeletion) checked++;
       }
@@ -2921,7 +3497,6 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
     walk(node);
     if (total == 0) return false;
     if (checked == 0) return false;
-    if (!node.isJunk && checked > 0) return null;
     if (checked == total) return true;
     return null;
   }

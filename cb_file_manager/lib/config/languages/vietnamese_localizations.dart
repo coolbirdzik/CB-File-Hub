@@ -1836,6 +1836,10 @@ class VietnameseLocalizations implements AppLocalizations {
   String get columnDateDeleted => 'Ngày xóa';
   @override
   String get columnOriginalPath => 'Đường dẫn gốc';
+  @override
+  String get askCbAgentAboutThisFile => 'Hỏi CB Agent về tệp này';
+  @override
+  String get askCbAgentAboutThisFolder => 'Hỏi CB Agent về thư mục này';
 
   // Misc helper labels
   @override
@@ -2947,6 +2951,205 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerSelectDrives => 'Chọn ổ đĩa';
   @override
   String get diskCleanerScanAgain => 'Quét lại';
+
+  // Disk Cleaner — extended UI strings
+  @override
+  String get diskCleanerCancel => 'Hủy';
+  @override
+  String get diskCleanerShowCleanableOnly => 'Chỉ hiển thị mục có thể dọn';
+  @override
+  String diskCleanerCleanableOnlyChip(int count) => 'Có thể dọn ($count)';
+  @override
+  String get diskCleanerCheckAllCleanable => 'Chọn tất cả có thể dọn';
+  @override
+  String get diskCleanerUncheckAll => 'Bỏ chọn tất cả';
+  @override
+  String get diskCleanerColumnName => 'Tên';
+  @override
+  String get diskCleanerColumnSize => 'Kích thước';
+  @override
+  String get diskCleanerColumnPercentOfParent => '% thư mục cha';
+  @override
+  String get diskCleanerColumnFiles => 'Tệp';
+  @override
+  String get diskCleanerBuildingTree => 'Đang xây dựng cây thư mục...';
+  @override
+  String get diskCleanerNoFilesFound => 'Không tìm thấy tệp nào';
+  @override
+  String get diskCleanerAnalyzingDisk => 'Đang phân tích dung lượng ổ đĩa...';
+  @override
+  String get diskCleanerPieChartPending => 'Biểu đồ sẽ xuất hiện sau khi quét xong.';
+  @override
+  String get diskCleanerPieEmpty => 'Trống';
+  @override
+  String get diskCleanerPreparingFiles => 'Đang chuẩn bị tệp...';
+  @override
+  String get diskCleanerCleaning => 'Đang dọn dẹp...';
+  @override
+  String get diskCleanerScanningSelectedDirs => 'Đang quét các thư mục đã chọn...';
+  @override
+  String get diskCleanerDeletingJunkHint => 'Đang xóa các mục đã chọn. Nếu tệp bị lỗi, bạn có thể bỏ qua hoặc thử lại.';
+  @override
+  String get diskCleanerPermanentDeleteLabel => 'Xóa vĩnh viễn';
+  @override
+  String get diskCleanerRecycleBinLabel => 'Thùng rác';
+  @override
+  String get diskCleanerDeletingItems => 'Đang xóa các mục...';
+  @override
+  String get diskCleanerReviewMode => 'Chế độ xem lại';
+  @override
+  String get diskCleanerBackToResults => 'Quay lại kết quả';
+  @override
+  String get diskCleanerReviewByAgent => 'Xem lại bằng CB Agent';
+  @override
+  String get diskCleanerPermanentlyDeleting => 'Đang xóa vĩnh viễn...';
+  @override
+  String get diskCleanerMovingToRecycleBin => 'Đang chuyển vào Thùng rác...';
+  @override
+  String get diskCleanerWaitingDecision => 'Đang chờ quyết định của bạn...';
+  @override
+  String get diskCleanerFileInUse => 'Tệp này đang được sử dụng bởi ứng dụng khác.';
+  @override
+  String get diskCleanerRetryInUseHint => 'Thử lại ngay thường sẽ thất bại cho đến khi ứng dụng đang dùng tệp này được đóng.';
+  @override
+  String get diskCleanerBlockedBy => 'Bị chặn bởi:';
+  @override
+  String get diskCleanerSkipAllRemaining => 'Bỏ qua tất cả các mục còn lại';
+  @override
+  String get diskCleanerSkip => 'Bỏ qua';
+  @override
+  String get diskCleanerTryAgain => 'Thử lại';
+  @override
+  String get diskCleanerPermanentDeleteConfirmTitle => 'Xóa vĩnh viễn?';
+  @override
+  String diskCleanerPermanentDeleteFromBinContent(int count, String size) =>
+      'Thao tác này sẽ xóa vĩnh viễn $count mục ($size) khỏi Thùng rác. Chúng không thể được khôi phục.';
+  @override
+  String diskCleanerPermanentDeleteSelectedContent(int count, String size) =>
+      'Thao tác này sẽ xóa vĩnh viễn $count mục đã chọn ($size). Chúng không thể được khôi phục.';
+  @override
+  String get diskCleanerColumnFileName => 'Tên tệp';
+  @override
+  String get diskCleanerColumnPath => 'Đường dẫn';
+  @override
+  String get diskCleanerColumnCategory => 'Danh mục';
+  @override
+  String get diskCleanerRecycleBinEmpty => 'Hiện không có mục nào trong Thùng rác.';
+  @override
+  String diskCleanerItemsInRecycleBin(int count, String size) => '$count mục trong Thùng rác ($size)';
+  @override
+  String diskCleanerSkippedInUseSnack(int count) => 'Đã bỏ qua $count tệp đang được sử dụng. Chi tiết đã được ghi nhật ký.';
+  @override
+  String diskCleanerSkippedAfterFailureSnack(int count) => 'Đã bỏ qua $count tệp do xóa thất bại.';
+  @override
+  String diskCleanerFreedBadge(String size, int count) => 'Đã giải phóng $size  •  $count mục';
+  @override
+  String diskCleanerFailedBadge(int count) => '$count thất bại';
+  @override
+  String diskCleanerInUseBadge(int count) => '$count đang dùng';
+  @override
+  String diskCleanerSkippedBadge(int count) => '$count đã bỏ qua';
+  @override
+  String diskCleanerSkippedInUseBanner(int count) => 'Đã bỏ qua $count tệp đang được sử dụng. Xem nhật ký để biết danh sách đầy đủ.';
+  @override
+  String diskCleanerSkippedByUserBanner(int count) => 'Đã bỏ qua $count tệp do xóa thất bại vì bạn chọn Bỏ qua.';
+  @override
+  String diskCleanerDeletedPermanentlyBody(int count) => 'Đã xóa vĩnh viễn $count mục.';
+  @override
+  String diskCleanerFreedSpace(String size) => 'Đã giải phóng $size';
+  @override
+  String diskCleanerPermanentDeleteFinished(int count) => 'Đã xóa vĩnh viễn $count mục.';
+  @override
+  String diskCleanerPermanentDeletingProgress(int done, int total) => 'Đang xóa vĩnh viễn... $done / $total';
+  @override
+  String get diskCleanerDeletingLabel => 'Đang xóa...';
+  @override
+  String get diskCleanerRemaining => 'còn lại';
+  @override
+  String diskCleanerDriveFree(String label, String size) => '$label  còn trống $size';
+  @override
+  String diskCleanerFilesCount(int count) => '$count tệp';
+  @override
+  String diskCleanerDirsCount(int count) => '$count thư mục';
+  @override
+  String get diskCleanerStarting => 'Đang bắt đầu...';
+  @override
+  String diskCleanerDriveSummary(String path, String size, int count) => '$path  $size  •  $count tệp';
+  @override
+  String diskCleanerAgentPath(String path) => 'CB Agent: $path';
+  @override
+  String diskCleanerItemsBytes(int count, String size) => '$count mục • $size';
+  @override
+  String diskCleanerSizeFiles(String size, int files) => '$size • $files tệp';
+  @override
+  String diskCleanerScannedProgress(String size, int files) => 'Đã quét $size • $files tệp';
+  @override
+  String get diskCleanerPieChartPendingScan => 'Biểu đồ sẽ xuất hiện ngay khi quét xong';
+  @override
+  String diskCleanerScanningPath(String path) => 'Đang quét $path';
+  @override
+  String diskCleanerProcessedCount(int done, int total) => '$done / $total đã xử lý';
+  @override
+  String diskCleanerJunkSummary(String size) => 'Rác: $size';
+  @override
+  String get diskCleanerContinue => 'Xem tiếp';
+  @override
+  String get diskCleanerAiPanelUnavailable => 'Bảng AI không khả dụng trong ngữ cảnh này';
+  @override
+  String get diskCleanerAskAgentAboutThis => 'Hỏi CB Agent về mục này';
+  @override
+  String get diskCleanerAiDeleteAnalysisIntro =>
+      'Hãy phân tích xem tôi có nên xóa tệp hoặc thư mục này không:';
+  @override
+  String get diskCleanerAiLabelPath => 'Đường dẫn';
+  @override
+  String get diskCleanerAiLabelType => 'Loại';
+  @override
+  String get diskCleanerAiLabelName => 'Tên';
+  @override
+  String get diskCleanerAiLabelSize => 'Dung lượng';
+  @override
+  String get diskCleanerAiLabelFiles => 'Số tệp';
+  @override
+  String get diskCleanerAiTypeFile => 'Tệp';
+  @override
+  String get diskCleanerAiTypeFolder => 'Thư mục';
+  @override
+  String diskCleanerAiCategoryMarkedJunk(String category) =>
+      'Danh mục: $category (được đánh dấu là rác)';
+  @override
+  String get diskCleanerAiNotMarkedAsJunk => 'Mục này không được quy tắc đánh dấu là rác.';
+  @override
+  String get diskCleanerAiDeleteAnalysisQuestion =>
+      'Hãy giải thích mục này có khả năng dùng để làm gì, có an toàn để xóa không, những rủi ro tôi cần cân nhắc, và đưa ra khuyến nghị rõ ràng: xóa, giữ lại, hoặc tự xem xét thêm.';
+  @override
+  String diskCleanerScanFailedMsg(String error) => 'Quét thất bại: $error';
+  @override
+  String diskCleanerCleanupFailedMsg(String error) => 'Dọn dẹp thất bại: $error';
+  @override
+  String diskCleanerPermanentDeleteFailedMsg(String error) => 'Xóa vĩnh viễn thất bại: $error';
+  @override
+  String diskCleanerAgentFoundJunk(int count, String size) => 'CB Agent tìm thấy $count mục rác ($size)';
+  @override
+  String diskCleanerAndMoreItems(int count) => '... và $count mục khác';
+  @override
+  String diskCleanerSelectedBytes(String size, String total) => 'Đã chọn: $size / $total';
+  @override
+  String diskCleanerReviewModeSelected(String size) => 'Chế độ xem lại • Đã chọn: $size';
+  @override
+  String diskCleanerDeletePermanentlyButton(String size) => 'Xóa vĩnh viễn $size';
+  @override
+  String diskCleanerMoveToRecycleBinButton(String size) => 'Chuyển $size vào Thùng rác';
+  @override
+  String diskCleanerReviewAndClean(String size) => 'Xem lại $size & dọn dẹp';
+  @override
+  String diskCleanerPermanentDeletedSuccess(int count, String size) => 'Đã xóa vĩnh viễn $count mục ($size)';
+  @override
+  String diskCleanerPermanentDeletedWithInUse(int count, String size, int skipped) =>
+      'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp đang dùng; chi tiết đã được ghi nhật ký.';
+  @override
+  String diskCleanerPermanentDeletedWithSkipped(int count, String size, int skipped) =>
+      'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp sau khi xóa thất bại.';
 
   @override
   String get aiThinking0 => 'Đang suy nghĩ...';

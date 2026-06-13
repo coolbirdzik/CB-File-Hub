@@ -670,7 +670,28 @@ class TrashManager {
 
       if (ok) {
         succeeded.addAll(chunk);
-      } else if (chunk.length > 1 && permanent) {
+      } else {
+        // Native IFileOperation can occasionally time out even though the path
+        // has already disappeared from its original location. This applies to
+        // both permanent delete and move-to-Recycle-Bin, because the original
+        // path is gone in both success cases.
+        final gone = chunk.where(_isPathGoneAfterDelete).toSet();
+        if (gone.isNotEmpty) {
+          succeeded.addAll(gone);
+          AppLogger.warning(
+            '[TrashManager] Native $action reported failure but ${gone.length}/${chunk.length} path(s) were already gone from the source location; treating them as success | first=${gone.first}',
+          );
+        }
+        if (gone.length == chunk.length) {
+          onChunkDone?.call(end, total);
+          if (end < total) {
+            await Future<void>.delayed(Duration.zero);
+          }
+          continue;
+        }
+      }
+
+      if (!ok && chunk.length > 1 && permanent) {
         AppLogger.warning(
           '[TrashManager] Native $action batch failed; retrying per item | range=${start + 1}-$end/$total | first=${chunk.first}',
         );
@@ -691,9 +712,11 @@ class TrashManager {
           AppLogger.info(
             '[TrashManager] Finished single-path native $action | ok=$single | elapsedMs=${singleStopwatch.elapsedMilliseconds} | path=$p',
           );
-          if (single) succeeded.add(p);
+          if (single || _isPathGoneAfterDelete(p)) {
+            succeeded.add(p);
+          }
         }
-      } else {
+      } else if (!ok) {
         AppLogger.warning(
           '[TrashManager] Native $action failed | range=${start + 1}-$end/$total | first=${chunk.first}',
         );
@@ -709,6 +732,18 @@ class TrashManager {
     }
 
     return succeeded;
+  }
+
+  bool _isPathGoneAfterDelete(String path) {
+    try {
+      return FileSystemEntity.typeSync(path, followLinks: false) ==
+          FileSystemEntityType.notFound;
+    } catch (_) {
+      // If the shell/native layer deleted the path while metadata/stat calls are
+      // racing, err on the side of considering it gone rather than surfacing a
+      // false delete failure.
+      return true;
+    }
   }
 
   /// Move multiple files to trash
