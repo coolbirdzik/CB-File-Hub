@@ -350,6 +350,11 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
 
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
       - name: Restore MSIX signing certificate
         shell: pwsh
         run: |
@@ -383,6 +388,19 @@ jobs:
           "MSIX_CERT_PATH=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "MSIX_CERT_SUBJECT=$actualPublisher" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Resolve Microsoft Store MSIX version
+        shell: bash
+        env:
+          PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+          PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+          PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+          PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
+          MSIX_VERSION_NAME: ${{ needs.generate-release-notes.outputs.version_name }}
+        run: |
+          MSIX_VERSION="$(node scripts/partner_center_msix.mjs resolve-version)"
+          echo "MSIX_VERSION=$MSIX_VERSION" >> "$GITHUB_ENV"
+          echo "Microsoft Store MSIX version resolved to $MSIX_VERSION"
+
       - name: Ensure build script is executable
         shell: bash
         run: chmod +x scripts/build.sh
@@ -390,17 +408,50 @@ jobs:
       - name: Build MSIX
         shell: bash
         env:
-          MSIX_CERT_PATH: ${{ env.MSIX_CERT_PATH }}
           MSIX_CERT_PASSWORD: ${{ secrets.MSIX_CERT_PASSWORD }}
-          MSIX_PUBLISHER: ${{ env.MSIX_CERT_SUBJECT }}
           MSIX_REQUIRE_SIGNING: "true"
-        run: ./scripts/build.sh windows-msix
+        run: MSIX_PUBLISHER="$MSIX_CERT_SUBJECT" MSIX_VERSION_OVERRIDE="$MSIX_VERSION" ./scripts/build.sh windows-msix
 
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v7
         with:
           name: windows-msix
           path: ${{ env.PROJECT_DIR }}/build/windows/msix/*.msix
+
+      - name: Create Partner Center submission archive
+        shell: pwsh
+        run: |
+          $version = "${{ needs.generate-release-notes.outputs.version_name }}"
+          $msixVersion = $env:MSIX_VERSION
+          $source = Get-ChildItem "${{ env.PROJECT_DIR }}/build/windows/msix" -Filter "*.msix" | Select-Object -First 1
+          if (-not $source) {
+            throw "MSIX package not found in ${{ env.PROJECT_DIR }}/build/windows/msix"
+          }
+
+          $stageDir = Join-Path $env:RUNNER_TEMP "msix-store-submit"
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+          $packageFileName = "CBFileHub-$version-$msixVersion.msix"
+          $storePackagePath = Join-Path $stageDir $packageFileName
+          Copy-Item -LiteralPath $source.FullName -Destination $storePackagePath -Force
+
+          $archivePath = Join-Path $env:RUNNER_TEMP "CBFileHub-$version-$msixVersion-store.zip"
+          Compress-Archive -LiteralPath $storePackagePath -DestinationPath $archivePath -Force
+
+          "PARTNER_CENTER_PACKAGE_ARCHIVE=$archivePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PARTNER_CENTER_PACKAGE_FILE_NAME=$packageFileName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Submit MSIX to Microsoft Partner Center
+        shell: bash
+        env:
+          PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+          PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+          PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+          PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
+          PARTNER_CENTER_TARGET_PUBLISH_MODE: ${{ vars.PARTNER_CENTER_TARGET_PUBLISH_MODE }}
+        run: |
+          SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
+          echo "Partner Center submission committed: $SUBMISSION_ID"
 
   # Build Android APK
   build-android-apk:
