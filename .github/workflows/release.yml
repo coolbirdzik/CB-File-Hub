@@ -196,6 +196,33 @@ jobs:
           name: release-notes
           path: release_notes.md
 
+  # Resolve Android versionCode against Google Play before building Android artifacts
+  resolve-android-version-code:
+    runs-on: ubuntu-latest
+    needs: generate-release-notes
+    environment: Production
+    outputs:
+      version_code: ${{ steps.android_version.outputs.version_code }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Resolve Android versionCode
+        id: android_version
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_PLAY_PACKAGE_NAME: ${{ vars.GOOGLE_PLAY_PACKAGE_NAME || 'com.cbv.filehub' }}
+          MIN_ANDROID_VERSION_CODE: ${{ needs.generate-release-notes.outputs.version_code }}
+        run: |
+          VERSION_CODE="$(node scripts/google_play_next_version_code.mjs)"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Android versionCode resolved to $VERSION_CODE"
+
   # Build Windows
   build-windows:
     runs-on: windows-latest
@@ -378,7 +405,9 @@ jobs:
   # Build Android APK
   build-android-apk:
     runs-on: ubuntu-latest
-    needs: generate-release-notes
+    needs:
+      - generate-release-notes
+      - resolve-android-version-code
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -403,7 +432,7 @@ jobs:
       - name: Build APK
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter build apk --release --split-per-abi --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.generate-release-notes.outputs.version_code }}
+          flutter build apk --release --split-per-abi --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.resolve-android-version-code.outputs.version_code }}
 
       - name: Rename APK files
         run: |
@@ -429,7 +458,9 @@ jobs:
   # Build Android AAB
   build-android-aab:
     runs-on: ubuntu-latest
-    needs: generate-release-notes
+    needs:
+      - generate-release-notes
+      - resolve-android-version-code
     environment: Production
     steps:
       - name: Checkout code
@@ -494,7 +525,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter build appbundle --release --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.generate-release-notes.outputs.version_code }}
+          flutter build appbundle --release --build-name ${{ needs.generate-release-notes.outputs.version_name }} --build-number ${{ needs.resolve-android-version-code.outputs.version_code }}
 
       - name: Rename AAB file
         run: |
