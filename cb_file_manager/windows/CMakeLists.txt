@@ -15,6 +15,10 @@ if(POLICY CMP0175)
     cmake_policy(SET CMP0175 OLD)  # Allow legacy add_custom_command behavior
 endif()
 
+# Force minimum policy version for legacy plugin CMake projects.
+# Needed for dependencies that still declare very old cmake_minimum_required values.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 if(POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)  # Allow deprecated FetchContent_Populate
 endif()
