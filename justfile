@@ -270,10 +270,9 @@ retag tag remote="origin":
     git tag -f -a "{{tag}}" -m "Rebuild {{tag}} - auto-incremented build number"
     git push "{{remote}}" "{{tag}}" -f
 
-# Retag hint
-retag-one:
-    @echo "Usage: just retag v1.2.3"
-    @echo "   or: bash scripts/retag.sh v1.2.3"
+# Retag with interactive remote selection (lists available remotes)
+retag-one tag:
+    bash scripts/retag.sh {{tag}}
 
 # =============================================================================
 # Git shortcuts
