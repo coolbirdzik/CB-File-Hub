@@ -9,7 +9,7 @@ function requiredEnv(name) {
   if (!value || value.trim() === '') {
     throw new Error(`Missing required environment variable: ${name}`);
   }
-  return value;
+  return value.trim();
 }
 
 function optionalEnv(name) {
