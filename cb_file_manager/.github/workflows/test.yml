@@ -111,7 +111,7 @@ jobs:
         shell: pwsh
         run: |
           $pdfxDir = "windows/flutter/ephemeral/.plugin_symlinks/pdfx/windows"
-          Get-ChildItem -Path $pdfxDir -Filter "*.cmake","*.txt","*.in" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+          Get-ChildItem -Path $pdfxDir -Include "*.cmake","*.txt","*.in" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
             (Get-Content $_.FullName) -replace 'cmake_minimum_required\(VERSION [0-9.]+\)', 'cmake_minimum_required(VERSION 3.14)' | Set-Content $_.FullName
           }
 
