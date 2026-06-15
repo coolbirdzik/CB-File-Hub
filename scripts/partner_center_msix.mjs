@@ -228,17 +228,35 @@ async function submitPackage() {
   }
 
   const accessToken = await getAccessToken();
-  const submission = await apiRequest(
+  const app = await apiRequest(
     accessToken,
-    'POST',
-    `/applications/${encodeURIComponent(appId)}/submissions`,
+    'GET',
+    `/applications/${encodeURIComponent(appId)}`,
   );
+  const pendingSubmission = await getSubmission(
+    accessToken,
+    appId,
+    app.pendingApplicationSubmission,
+  );
+  const submission =
+    pendingSubmission ||
+    (await apiRequest(
+      accessToken,
+      'POST',
+      `/applications/${encodeURIComponent(appId)}/submissions`,
+    ));
+
   if (!submission?.id) {
     throw new Error('Partner Center did not return a submission id');
   }
   if (!submission.fileUploadUrl) {
     throw new Error('Partner Center submission did not include fileUploadUrl');
   }
+  console.error(
+    pendingSubmission
+      ? `Using existing pending Partner Center submission: ${submission.id}`
+      : `Created Partner Center submission: ${submission.id}`,
+  );
 
   const publishMode = optionalEnv('PARTNER_CENTER_TARGET_PUBLISH_MODE');
   if (publishMode) {
