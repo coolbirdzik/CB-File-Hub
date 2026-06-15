@@ -354,13 +354,20 @@ async function submitPackage() {
     submission,
   );
   await uploadSubmissionArchive(submission.fileUploadUrl, archivePath);
-  await apiRequest(
-    accessToken,
-    'POST',
-    `/applications/${encodeURIComponent(appId)}/submissions/${encodeURIComponent(
-      submission.id,
-    )}/commit`,
-  );
+  if (optionalEnv('PARTNER_CENTER_COMMIT_SUBMISSION') === 'true') {
+    await apiRequest(
+      accessToken,
+      'POST',
+      `/applications/${encodeURIComponent(appId)}/submissions/${encodeURIComponent(
+        submission.id,
+      )}/commit`,
+    );
+    console.error(`Partner Center submission committed: ${submission.id}`);
+  } else {
+    console.error(
+      `Partner Center draft prepared without commit: ${submission.id}`,
+    );
+  }
 
   console.log(submission.id);
 }

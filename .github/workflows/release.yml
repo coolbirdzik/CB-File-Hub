@@ -441,17 +441,18 @@ jobs:
           "PARTNER_CENTER_PACKAGE_ARCHIVE=$archivePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PARTNER_CENTER_PACKAGE_FILE_NAME=$packageFileName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Submit MSIX to Microsoft Partner Center
+      - name: Create Microsoft Partner Center MSIX draft
         shell: bash
         env:
           PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
           PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
           PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
           PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
+          PARTNER_CENTER_COMMIT_SUBMISSION: ${{ vars.PARTNER_CENTER_COMMIT_SUBMISSION }}
           PARTNER_CENTER_TARGET_PUBLISH_MODE: ${{ vars.PARTNER_CENTER_TARGET_PUBLISH_MODE }}
         run: |
           SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
-          echo "Partner Center submission committed: $SUBMISSION_ID"
+          echo "Partner Center draft prepared: $SUBMISSION_ID"
 
   # Build Android APK
   build-android-apk:
