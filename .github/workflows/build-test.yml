@@ -65,6 +65,14 @@ jobs:
           cd ${{ env.PROJECT_DIR }}
           flutter pub get
 
+      - name: Patch pdfx CMake compatibility
+        shell: pwsh
+        run: |
+          $pdfxDir = "${{ env.PROJECT_DIR }}/windows/flutter/ephemeral/.plugin_symlinks/pdfx/windows"
+          Get-ChildItem -Path $pdfxDir -Filter "*.cmake","*.txt","*.in" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            (Get-Content $_.FullName) -replace 'cmake_minimum_required\(VERSION [0-9.]+\)', 'cmake_minimum_required(VERSION 3.14)' | Set-Content $_.FullName
+          }
+
       - name: Stop stray cb_file_hub.exe
         shell: cmd
         run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
@@ -121,6 +129,14 @@ jobs:
         run: |
           cd ${{ env.PROJECT_DIR }}
           flutter pub get
+
+      - name: Patch pdfx CMake compatibility
+        shell: pwsh
+        run: |
+          $pdfxDir = "${{ env.PROJECT_DIR }}/windows/flutter/ephemeral/.plugin_symlinks/pdfx/windows"
+          Get-ChildItem -Path $pdfxDir -Filter "*.cmake","*.txt","*.in" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            (Get-Content $_.FullName) -replace 'cmake_minimum_required\(VERSION [0-9.]+\)', 'cmake_minimum_required(VERSION 3.14)' | Set-Content $_.FullName
+          }
 
       - name: Build Windows
         run: |
