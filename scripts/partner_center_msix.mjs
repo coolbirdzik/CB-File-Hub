@@ -91,6 +91,43 @@ async function apiRequest(accessToken, method, relativePath, body = undefined) {
   return payload;
 }
 
+async function createSubmission(accessToken, appId) {
+  return apiRequest(
+    accessToken,
+    'POST',
+    `/applications/${encodeURIComponent(appId)}/submissions`,
+  );
+}
+
+async function deleteSubmission(accessToken, appId, submissionId) {
+  return apiRequest(
+    accessToken,
+    'DELETE',
+    `/applications/${encodeURIComponent(appId)}/submissions/${encodeURIComponent(
+      submissionId,
+    )}`,
+  );
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function createSubmissionWithRetry(accessToken, appId) {
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await createSubmission(accessToken, appId);
+    } catch (error) {
+      if (attempt === maxAttempts || !error.message.includes('Conflict')) {
+        throw error;
+      }
+      await sleep(5000 * attempt);
+    }
+  }
+  throw new Error('Failed to create Partner Center submission');
+}
+
 function submissionPath(appId, submissionRef) {
   if (!submissionRef?.id && !submissionRef?.resourceLocation) {
     return '';
@@ -238,24 +275,46 @@ async function submitPackage() {
     appId,
     app.pendingApplicationSubmission,
   );
-  const submission =
-    pendingSubmission ||
-    (await apiRequest(
-      accessToken,
-      'POST',
-      `/applications/${encodeURIComponent(appId)}/submissions`,
-    ));
+  let submissionOrigin = pendingSubmission
+    ? 'existing pending'
+    : 'newly created';
+  let submission = pendingSubmission || (await createSubmission(accessToken, appId));
 
   if (!submission?.id) {
     throw new Error('Partner Center did not return a submission id');
   }
   if (!submission.fileUploadUrl) {
-    throw new Error('Partner Center submission did not include fileUploadUrl');
+    const replacePending =
+      optionalEnv('PARTNER_CENTER_REPLACE_PENDING_WITHOUT_UPLOAD_URL') !==
+      'false';
+    const canDeletePending = ['PendingCommit', 'CommitFailed'].includes(
+      submission.status,
+    );
+    if (!pendingSubmission || !replacePending || !canDeletePending) {
+      throw new Error(
+        `Partner Center submission ${submission.id} did not include fileUploadUrl. Delete the pending submission in Partner Center and rerun, or set PARTNER_CENTER_REPLACE_PENDING_WITHOUT_UPLOAD_URL=true for a PendingCommit/CommitFailed draft.`,
+      );
+    }
+
+    console.error(
+      `Deleting pending Partner Center submission without fileUploadUrl: ${submission.id} (${submission.status})`,
+    );
+    await deleteSubmission(accessToken, appId, submission.id);
+    submission = await createSubmissionWithRetry(accessToken, appId);
+    submissionOrigin = 'replacement';
+    if (!submission?.id) {
+      throw new Error('Partner Center did not return a replacement submission id');
+    }
+    if (!submission.fileUploadUrl) {
+      throw new Error(
+        `Replacement Partner Center submission ${submission.id} did not include fileUploadUrl`,
+      );
+    }
   }
   console.error(
-    pendingSubmission
+    submissionOrigin === 'existing pending'
       ? `Using existing pending Partner Center submission: ${submission.id}`
-      : `Created Partner Center submission: ${submission.id}`,
+      : `Created ${submissionOrigin} Partner Center submission: ${submission.id}`,
   );
 
   const publishMode = optionalEnv('PARTNER_CENTER_TARGET_PUBLISH_MODE');
