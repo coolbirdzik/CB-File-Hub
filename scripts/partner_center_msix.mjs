@@ -228,6 +228,7 @@ async function resolveVersion() {
 
 function packageForDeletion(appPackage) {
   return {
+    id: appPackage.id,
     fileName: appPackage.fileName,
     fileStatus: 'PendingDelete',
     minimumDirectXVersion: appPackage.minimumDirectXVersion || 'None',
@@ -299,7 +300,16 @@ async function submitPackage() {
     console.error(
       `Deleting pending Partner Center submission without fileUploadUrl: ${submission.id} (${submission.status})`,
     );
-    await deleteSubmission(accessToken, appId, submission.id);
+    try {
+      await deleteSubmission(accessToken, appId, submission.id);
+    } catch (error) {
+      if (error.message.includes('created through the API')) {
+        throw new Error(
+          `Partner Center has an in-progress submission (${submission.id}) that was created outside the API. Delete or cancel that pending submission in Partner Center, then rerun this workflow so CI can create the next submission through the API.`,
+        );
+      }
+      throw error;
+    }
     submission = await createSubmissionWithRetry(accessToken, appId);
     submissionOrigin = 'replacement';
     if (!submission?.id) {
