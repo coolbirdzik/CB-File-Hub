@@ -247,6 +247,18 @@ next-major:
 update-version new_version:
     bash scripts/version.sh set-version {{new_version}}
 
+# Bump patch version in pubspec.yaml (no commit or tag)
+bump-patch:
+    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1\".\"\$2\".\"\$3+1}"); echo "Bumping patch version to $NEW_VER"; bash scripts/version.sh set-version $NEW_VER'
+
+# Bump minor version in pubspec.yaml (no commit or tag)
+bump-minor:
+    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1\".\"\$2+1\".0\"}"); echo "Bumping minor version to $NEW_VER"; bash scripts/version.sh set-version $NEW_VER'
+
+# Bump major version in pubspec.yaml (no commit or tag)
+bump-major:
+    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1+1\".0.0\"}"); echo "Bumping major version to $NEW_VER"; bash scripts/version.sh set-version $NEW_VER'
+
 # Bump build number (runs verify first)
 bump-build: verify
     bash scripts/version.sh bump
