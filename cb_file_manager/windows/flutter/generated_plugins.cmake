@@ -4,6 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
+  flutter_gemma
+  flutter_secure_storage_windows
   gal
   media_kit_libs_windows_video
   media_kit_video

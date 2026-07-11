@@ -511,6 +511,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
               defaultLabel: l.defaultModel,
               loadingLabel: l.loadingModels,
               emptyLabel: l.noModelConfigured,
+              searchHint: l.modelSearchHint,
+              noMatchesLabel: l.noModelsFound,
               compact: true,
               onSelected: (value) {
                 _bloc.add(

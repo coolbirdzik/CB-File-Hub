@@ -101,9 +101,13 @@ dependencies:
   shelf: ^1.4.1
   shelf_router: ^1.1.4
   shelf_cors_headers: ^0.1.5
-  mime: ^1.0.4
+  http: ^1.4.0
+  mime: ^2.0.0
   desktop_drop: ^0.4.4 # OS-level file drag-and-drop support
   flutter_markdown: ^0.7.7+1
+  flutter_secure_storage: ^10.3.1 # Secure token storage for local AI advisor
+  flutter_gemma: 1.0.0-rc.1
+  flutter_gemma_litertlm: 1.0.0-rc.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

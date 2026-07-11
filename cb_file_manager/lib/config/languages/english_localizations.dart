@@ -2908,6 +2908,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get selectModel => 'Select a model';
   @override
+  String get modelSearchHint => 'Search models...';
+  @override
   String fetchModelsError(String error) => 'Failed to fetch models: $error';
   @override
   String get newConversation => 'New Chat';
@@ -3197,4 +3199,62 @@ class EnglishLocalizations implements AppLocalizations {
   String get aiWaitingApproval => 'Waiting for your approval...';
   @override
   String aiRunningTool(String toolName) => 'Running $toolName...';
+
+  // Local AI Advisor
+  @override
+  String get localAiAdvisor => 'Local AI Advisor';
+  @override
+  String get localAiAdvisorDescription =>
+      'On-device cleanup suggestions with your own Gemma 4 model';
+  @override
+  String get huggingFaceToken => 'Hugging Face Token';
+  @override
+  String get huggingFaceTokenHint =>
+      'Optional: For private models or extended catalog access';
+  @override
+  String get pasteToken => 'Paste Token';
+  @override
+  String get tokenSaved => 'Token saved securely';
+  @override
+  String get clearToken => 'Clear Token';
+  @override
+  String get browseModels => 'Browse Models';
+  @override
+  String get installedModels => 'Installed Models';
+  @override
+  String get noModelsInstalled => 'No models installed yet';
+  @override
+  String get installModel => 'Install';
+  @override
+  String get uninstallModel => 'Uninstall';
+  @override
+  String get selectActiveModel => 'Set Active';
+  @override
+  String get modelInstalling => 'Installing model...';
+  @override
+  String get modelInstalled => 'Model installed successfully';
+  @override
+  String get modelUninstalled => 'Model uninstalled';
+  @override
+  String get downloadProgress => 'Download progress';
+  @override
+  String get noTokenSet => 'No token set';
+  @override
+  String get setTokenFirst => 'Set your Hugging Face token first';
+  @override
+  String get openLocation => 'Open Location';
+  @override
+  String get localAiIncompatibleArtifact =>
+      'This model file is not compatible with on-device chat. Reinstall the LiteRT-LM version to enable local chat.';
+  @override
+  String get localAiReinstallCompatible => 'Reinstall compatible model';
+  @override
+  String get localAiContextWindow => 'Context window';
+  @override
+  String get localAiContextWindowHint =>
+      'Maximum tokens per chat (prompt + reply). Higher values handle larger files and longer conversations but use more memory.';
+  @override
+  String get localAiTokensSuffix => 'tokens';
+  @override
+  String get localAiInvalidTokenCount => 'Please enter a valid number';
 }

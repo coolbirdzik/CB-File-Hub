@@ -856,8 +856,15 @@ class FileNavigationBloc
         .toList();
     if (videoPaths.isEmpty) return;
     VideoThumbnailHelper.setCurrentDirectory(dirPath);
-    VideoThumbnailHelper.proactiveGenerateAll(videoPaths,
-        directoryPath: dirPath);
+    // Use optimizedBatchPreload instead of proactiveGenerateAll to avoid
+    // blocking the event loop with per-item getFromCache() file I/O on large
+    // directories. optimizedBatchPreload stages the queue in priority groups
+    // and does not perform synchronous file existence checks inline.
+    VideoThumbnailHelper.optimizedBatchPreload(
+      videoPaths,
+      maxConcurrent: 2,
+      visibleCount: 10,
+    );
   }
 
   void _emitPermissionError(

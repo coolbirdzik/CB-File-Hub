@@ -893,9 +893,20 @@ namespace fc_native_video_thumbnail
     // Signal shutdown
     shutdown_ = true;
 
-    // Clear all pending requests to prevent processing during shutdown
+    // Clear all pending requests to prevent processing during shutdown.
+    // Each queued request still owns an unanswered MethodResult; destroying it
+    // without responding makes the Flutter engine log
+    // "Failed to respond to a message. This is a memory leak."
+    // Respond to each one before dropping it.
     {
       std::lock_guard<std::mutex> lock(queueMutex_);
+      for (auto &request : requestQueue_)
+      {
+        if (request && request->result)
+        {
+          request->result->Success(flutter::EncodableValue(false));
+        }
+      }
       requestQueue_.clear();
     }
 
@@ -1048,11 +1059,18 @@ namespace fc_native_video_thumbnail
                                            return req->priority == ThumbnailPriority::NORMAL;
                                          });
 
-          // Cleanup active requests for removed items
+          // Cleanup active requests for removed items and respond to their
+          // pending MethodResult so the engine doesn't report a leaked message.
           for (auto it = removeIt; it != requestQueue_.end(); ++it)
           {
-            std::lock_guard<std::mutex> activeLock(activeRequestsMutex_);
-            activeRequests_.erase((*it)->requestId);
+            {
+              std::lock_guard<std::mutex> activeLock(activeRequestsMutex_);
+              activeRequests_.erase((*it)->requestId);
+            }
+            if (*it && (*it)->result)
+            {
+              (*it)->result->Success(flutter::EncodableValue(false));
+            }
           }
 
           requestQueue_.erase(removeIt, requestQueue_.end());

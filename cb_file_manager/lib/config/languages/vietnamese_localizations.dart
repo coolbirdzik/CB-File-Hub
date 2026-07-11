@@ -2905,6 +2905,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get selectModel => 'Chọn mô hình';
   @override
+  String get modelSearchHint => 'Tìm mô hình...';
+  @override
   String fetchModelsError(String error) =>
       'Không thể lấy danh sách mô hình: $error';
   @override
@@ -3195,4 +3197,62 @@ class VietnameseLocalizations implements AppLocalizations {
   String get aiWaitingApproval => 'Đang chờ bạn phê duyệt...';
   @override
   String aiRunningTool(String toolName) => 'Đang chạy $toolName...';
+
+  // Local AI Advisor
+  @override
+  String get localAiAdvisor => 'Trợ lý AI nội bộ';
+  @override
+  String get localAiAdvisorDescription =>
+      'Gợi ý dọn dẹp trên thiết bị với mô hình Gemma 4 của bạn';
+  @override
+  String get huggingFaceToken => 'Token Hugging Face';
+  @override
+  String get huggingFaceTokenHint =>
+      'Tùy chọn: Cho mô hình riêng tư hoặc truy cập catalog mở rộng';
+  @override
+  String get pasteToken => 'Dán Token';
+  @override
+  String get tokenSaved => 'Token đã lưu an toàn';
+  @override
+  String get clearToken => 'Xóa Token';
+  @override
+  String get browseModels => 'Duyệt mô hình';
+  @override
+  String get installedModels => 'Mô hình đã cài đặt';
+  @override
+  String get noModelsInstalled => 'Chưa cài đặt mô hình nào';
+  @override
+  String get installModel => 'Cài đặt';
+  @override
+  String get uninstallModel => 'Gỡ cài đặt';
+  @override
+  String get selectActiveModel => 'Đặt làm mặc định';
+  @override
+  String get modelInstalling => 'Đang cài đặt mô hình...';
+  @override
+  String get modelInstalled => 'Đã cài đặt mô hình thành công';
+  @override
+  String get modelUninstalled => 'Đã gỡ cài đặt mô hình';
+  @override
+  String get downloadProgress => 'Tiến trình tải xuống';
+  @override
+  String get noTokenSet => 'Chưa đặt token';
+  @override
+  String get setTokenFirst => 'Đặt token Hugging Face trước';
+  @override
+  String get openLocation => 'Mở vị trí';
+  @override
+  String get localAiIncompatibleArtifact =>
+      'Tệp mô hình này không tương thích với trò chuyện trên thiết bị. Cài đặt lại phiên bản LiteRT-LM để bật trò chuyện cục bộ.';
+  @override
+  String get localAiReinstallCompatible => 'Cài đặt lại mô hình tương thích';
+  @override
+  String get localAiContextWindow => 'Cửa sổ ngữ cảnh';
+  @override
+  String get localAiContextWindowHint =>
+      'Số token tối đa mỗi lượt trò chuyện (câu hỏi + trả lời). Giá trị cao xử lý được tệp lớn và hội thoại dài hơn nhưng tốn nhiều bộ nhớ hơn.';
+  @override
+  String get localAiTokensSuffix => 'token';
+  @override
+  String get localAiInvalidTokenCount => 'Vui lòng nhập số hợp lệ';
 }

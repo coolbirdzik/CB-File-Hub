@@ -9,6 +9,7 @@ import '../../../bloc/ai_agent/ai_agent_event.dart';
 import '../../../services/ai/ai_chat_history_service.dart';
 import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/ai/file_context_builder.dart';
+import '../../../services/local_ai/local_ai_advisor_service.dart';
 
 /// Controller for the AI side panel.
 ///
@@ -77,6 +78,7 @@ class AiPanelController extends ChangeNotifier {
       final bloc = AiAgentBloc(
         providerService: GetIt.instance<AiProviderService>(),
         historyService: GetIt.instance<AiChatHistoryService>(),
+        localAiService: _getLocalAiService(),
         ownerTabId: tabId,
         thinkingPhrases: thinkingPhrases,
         waitingApproval: waitingApproval,
@@ -90,6 +92,12 @@ class AiPanelController extends ChangeNotifier {
       _tabBlocs[tabId] = bloc;
     }
     return _tabBlocs[tabId]!;
+  }
+
+  LocalAiAdvisorService? _getLocalAiService() {
+    final getIt = GetIt.instance;
+    if (!getIt.isRegistered<LocalAiAdvisorService>()) return null;
+    return getIt<LocalAiAdvisorService>();
   }
 
   void open({String? path, String? tabId}) {

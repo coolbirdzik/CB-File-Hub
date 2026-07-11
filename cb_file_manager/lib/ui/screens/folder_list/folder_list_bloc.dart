@@ -124,7 +124,28 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   void _onLoad(FolderListLoad event, Emitter<FolderListState> emit) {
-    _navigationBloc.add(nav.FileNavigationLoad(event.path));
+    // Emit a loading state synchronously here (in addition to the one
+    // FileNavigationBloc emits) so the UI shows a skeleton immediately.
+    // Without this, there is a multi-hop async gap — FolderListLoad forwards
+    // to FileNavigationBloc, which emits isLoading:true on its own event
+    // queue, which then propagates back via the stream subscription. During
+    // that gap the UI can rebuild with the previous (non-loading, possibly
+    // empty) state and briefly flash "empty folder" until the scan finishes.
+    //
+    // Skip virtual paths (e.g. #video-library/...) which are owned by
+    // specialized blocs and don't go through this listing path.
+    final path = event.path;
+    if (!path.startsWith('#')) {
+      emit(state.copyWith(
+        isLoading: true,
+        isRefreshing: false,
+        error: null,
+        folders: const [],
+        files: const [],
+        filteredFiles: const [],
+      ));
+    }
+    _navigationBloc.add(nav.FileNavigationLoad(path));
   }
 
   void _onRefresh(FolderListRefresh event, Emitter<FolderListState> emit) {

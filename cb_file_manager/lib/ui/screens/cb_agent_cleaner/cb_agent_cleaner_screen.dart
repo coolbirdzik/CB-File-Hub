@@ -3,7 +3,9 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -16,6 +18,7 @@ import '../../../helpers/files/external_app_helper.dart';
 import '../../../helpers/files/windows_shell_context_menu.dart';
 import '../../../ui/controllers/file_operations_handler.dart';
 import '../../../ui/dialogs/open_with_dialog.dart';
+import '../../../ui/components/common/browser_like_keyboard_shortcuts.dart';
 import '../../../ui/components/common/shared_file_context_menu.dart';
 import '../../../ui/tab_manager/components/tag_dialogs.dart' as tag_dialogs;
 import '../../../ui/utils/entity_open_actions.dart';
@@ -98,6 +101,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Results
   DiskTreeNode? _rootNode;
   DiskTreeNode? _selectedNode; // node shown in pie chart
+  DiskTreeNode? _chartNode;
+  Timer? _chartUpdateTimer;
+  final Set<String> _selectedTreePaths = <String>{};
+  final ValueNotifier<Set<String>> _selectedTreePathListenable =
+      ValueNotifier<Set<String>>(const <String>{});
+  String? _selectionAnchorPath;
+  int _selectionMutationVersion = 0;
+  String? _publishedCleanerContextTabId;
   bool _showCleanableOnly = false;
   bool _reviewMode = false; // when true, tree shows only selected items
   bool _isRefreshingNode = false;
@@ -109,6 +120,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   int _agentItemsFound = 0;
   int _agentBytesFound = 0;
   String _agentCurrentPath = '';
+
+  final FocusNode _resultsFocusNode = FocusNode(debugLabel: 'cbCleanerResults');
 
   @override
   void initState() {
@@ -128,9 +141,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   @override
   void dispose() {
     _agentActivitySub?.cancel();
+    if (_publishedCleanerContextTabId != null) {
+      _service.clearCleanerScanContext(_publishedCleanerContextTabId!);
+    }
+    _chartUpdateTimer?.cancel();
+    _selectedTreePathListenable.dispose();
     _cleanProgress.dispose();
     _pulseController.dispose();
     _scanRingController.dispose();
+    _resultsFocusNode.dispose();
     super.dispose();
   }
 
@@ -159,6 +178,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _agentBytesFound = 0;
           _agentCurrentPath = '';
         });
+        _publishCleanerScanContext();
         break;
       case DiskCleanerAgentActivityType.scanProgress:
         setState(() {
@@ -168,6 +188,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _agentBytesFound = event.bytesFound;
           _agentCurrentPath = event.currentPath;
         });
+        _publishCleanerScanContext();
         break;
       case DiskCleanerAgentActivityType.scanDone:
         setState(() {
@@ -175,6 +196,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _agentStatus = '';
           _agentCurrentPath = '';
         });
+        _publishCleanerScanContext();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context)!
@@ -189,6 +211,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _agentStatus = '';
           _agentCurrentPath = '';
         });
+        _publishCleanerScanContext();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(event.message)),
         );
@@ -325,7 +348,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       _isScanningFullDisk = false;
       _rootNode = root;
       _selectedNode = root.children.first;
+      _chartNode = root.children.first;
+      _selectedTreePaths.clear();
+      _publishTreeSelection();
+      _selectionAnchorPath = root.children.first.fullPath;
       _showCleanableOnly = false;
+      _cachedFlatRoot = null;
+      _flatRowsValid = false;
     });
   }
 
@@ -345,6 +374,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         isExpanded: true,
       );
       _selectedNode = _rootNode;
+      _chartNode = _rootNode;
+      _selectedTreePaths.clear();
+      _publishTreeSelection();
+      _selectionAnchorPath = null;
     });
     _scanRingController.repeat();
 
@@ -361,6 +394,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             _rootNode?.sizeBytes = p.bytesScanned;
             _rootNode?.fileCount = p.filesScanned;
           });
+          _publishCleanerScanContext();
         }
       });
       handle.treeSnapshots.listen((root) {
@@ -371,6 +405,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         setState(() {
           _rootNode = root;
           _selectedNode = root;
+          _chartNode = root;
+          _selectedTreePaths.clear();
+          _publishTreeSelection();
+          _selectionAnchorPath = null;
+          _cachedFlatRoot = null;
+          _flatRowsValid = false;
         });
       });
       final result = await handle.future;
@@ -383,7 +423,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _isScanningFullDisk = false;
           _rootNode = result.root;
           _selectedNode = result.root;
+          _chartNode = result.root;
           _phase = _Phase.results;
+          _selectedTreePaths.clear();
+          _publishTreeSelection();
+          _selectionAnchorPath = null;
+          _cachedFlatRoot = null;
+          _flatRowsValid = false;
         });
       }
     } catch (e) {
@@ -458,6 +504,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     final tabId = tabState.activeTabId;
     if (tabId == null) return;
 
+    _publishCleanerScanContext();
     controller.open(path: '#cb-agent-cleaner', tabId: tabId);
     final bloc = controller.blocForTab(
       tabId,
@@ -472,6 +519,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     final root = _rootNode;
     if (root == null) return 'Please scan my disk for junk files.';
     final buffer = StringBuffer();
+    buffer.writeln(
+        'Please inspect the current CB Agent Cleaner scan. Call get_current_cleaner_scan first, then give cleanup recommendations.');
+    buffer.writeln();
     buffer.writeln('I scanned drive ${root.fullPath}:');
     buffer.writeln('Total: ${_fmt(root.sizeBytes)}, ${root.fileCount} files');
     buffer.writeln('Junk found: ${_fmt(root.junkBytes)}');
@@ -529,6 +579,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     void walk(DiskTreeNode n) {
       if (n.fullPath.isNotEmpty) {
         n.isSelectedForDeletion = checked;
+        if (checked) {
+          _selectedTreePaths.add(n.fullPath);
+        } else {
+          _selectedTreePaths.remove(n.fullPath);
+        }
       }
       for (final c in n.children) {
         walk(c);
@@ -536,6 +591,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
 
     walk(node);
+    _publishTreeSelection();
     setState(() {});
   }
 
@@ -822,36 +878,311 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Results phase — 2-panel: tree (left) + pie chart (right)
   // ---------------------------------------------------------------------------
 
+  Future<void> _deleteCurrentSelectionImmediately({
+    required bool permanent,
+  }) async {
+    if (_isCleaningJunk) return;
+
+    final nodes = _selectedTreeNodes();
+    if (nodes.isEmpty) return;
+
+    final l = AppLocalizations.of(context)!;
+    final totalBytes = nodes.fold<int>(0, (sum, node) => sum + node.sizeBytes);
+
+    // Confirm before deleting.
+    if (permanent) {
+      final confirmed = await _showPermanentDeleteDialog(
+        itemCount: nodes.length,
+        bytes: totalBytes,
+        fromRecycleBin: false,
+      );
+      if (confirmed != true) return;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l.diskCleanerMoveToRecycleBin),
+          content: Text(
+            '${nodes.length == 1 ? nodes.first.name : '${nodes.length} items'}\n${_fmt(totalBytes)}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.diskCleanerMoveToRecycleBin),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    if (!mounted) return;
+
+    final items = nodes
+        .map((node) => JunkItem(
+              path: node.fullPath,
+              sizeBytes: node.sizeBytes,
+              categoryId: node.junkCategoryId ?? 'selected_item',
+              isContainerOnly: false,
+              isUserSelected: true,
+            ))
+        .toList();
+
+    setState(() {
+      _pendingCleanItems = items;
+      _pendingCleanBytes = totalBytes;
+      _selectedCleanMode =
+          permanent ? _CleanDeleteMode.permanent : _CleanDeleteMode.recycleBin;
+      _reviewMode = false;
+    });
+
+    _service.pendingCleanupItems = items;
+    _service.pendingCleanupBytes = totalBytes;
+
+    await _cleanJunk(permanent: permanent);
+  }
+
+  List<DiskTreeNode> _selectedTreeNodes() {
+    final root = _rootNode;
+    if (root == null) return const [];
+    final nodes = <DiskTreeNode>[];
+    void walk(DiskTreeNode node) {
+      if (node.fullPath.isNotEmpty && node.isSelectedForDeletion) {
+        nodes.add(node);
+        return;
+      }
+      for (final child in node.children) {
+        walk(child);
+      }
+    }
+
+    walk(root);
+    return nodes;
+  }
+
+  void _publishTreeSelection() {
+    _selectedTreePathListenable.value = Set<String>.unmodifiable(
+      _selectedTreePaths,
+    );
+    _publishCleanerScanContext();
+  }
+
+  String? _activeTabId() {
+    try {
+      return context.read<TabManagerBloc>().state.activeTabId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _publishCleanerScanContext() {
+    if (!mounted) return;
+    final tabId = _activeTabId();
+    if (tabId == null || tabId.isEmpty) return;
+    _publishedCleanerContextTabId = tabId;
+    _service.publishCleanerScanContext(
+      ownerTabId: tabId,
+      root: _rootNode,
+      selectedPath: _selectedNode?.fullPath,
+      chartPath: _chartNode?.fullPath,
+      isScanning: _isScanningFullDisk || _agentScanning,
+    );
+  }
+
+  void _setCleanSelectedRecursive(DiskTreeNode node, bool selected) {
+    if (node.fullPath.isNotEmpty) {
+      node.isSelectedForDeletion = selected;
+      if (selected) {
+        _selectedTreePaths.add(node.fullPath);
+      } else {
+        _selectedTreePaths.remove(node.fullPath);
+      }
+    }
+    for (final child in node.children) {
+      _setCleanSelectedRecursive(child, selected);
+    }
+  }
+
+  void _applyCleanSelectionAfterPaint(
+    Iterable<DiskTreeNode> nodes,
+    bool selected,
+  ) {
+    final version = ++_selectionMutationVersion;
+    final targets = List<DiskTreeNode>.of(nodes, growable: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || version != _selectionMutationVersion) return;
+      for (final target in targets) {
+        _setCleanSelectedRecursive(target, selected);
+      }
+      _publishTreeSelection();
+      setState(() {});
+    });
+  }
+
+  void _selectTreeRow(DiskTreeNode node, List<_FlatRow> visibleRows) {
+    if (node.fullPath.isEmpty) return;
+    _resultsFocusNode.requestFocus();
+
+    final keyboard = HardwareKeyboard.instance;
+    final isCtrl = keyboard.isControlPressed || keyboard.isMetaPressed;
+    final isShift = keyboard.isShiftPressed;
+    final path = node.fullPath;
+
+    _selectedNode = node;
+
+    if (isShift && _selectionAnchorPath != null) {
+      final anchorIndex = visibleRows.indexWhere(
+        (row) => row.node.fullPath == _selectionAnchorPath,
+      );
+      final currentIndex = visibleRows.indexWhere(
+        (row) => row.node.fullPath == path,
+      );
+      if (anchorIndex >= 0 && currentIndex >= 0) {
+        final start = math.min(anchorIndex, currentIndex);
+        final end = math.max(anchorIndex, currentIndex);
+        final checked = !node.isSelectedForDeletion;
+        node.isSelectedForDeletion = checked;
+        if (checked) {
+          _selectedTreePaths.add(path);
+        } else {
+          _selectedTreePaths.remove(path);
+        }
+        _publishTreeSelection();
+        for (var i = start; i <= end; i++) {
+          visibleRows[i].node.isSelectedForDeletion = checked;
+          final rowPath = visibleRows[i].node.fullPath;
+          if (rowPath.isEmpty) continue;
+          if (checked) {
+            _selectedTreePaths.add(rowPath);
+          } else {
+            _selectedTreePaths.remove(rowPath);
+          }
+        }
+        _publishTreeSelection();
+        _applyCleanSelectionAfterPaint(
+          visibleRows.sublist(start, end + 1).map((row) => row.node),
+          checked,
+        );
+        _scheduleChartNodeUpdate(node);
+        return;
+      }
+    }
+
+    if (isCtrl) {
+      final checked = !node.isSelectedForDeletion;
+      node.isSelectedForDeletion = checked;
+      if (checked) {
+        _selectedTreePaths.add(path);
+      } else {
+        _selectedTreePaths.remove(path);
+      }
+      _selectionAnchorPath = path;
+      _publishTreeSelection();
+      _applyCleanSelectionAfterPaint([node], checked);
+      _scheduleChartNodeUpdate(node);
+      return;
+    }
+
+    final checked = !node.isSelectedForDeletion;
+    node.isSelectedForDeletion = checked;
+    if (checked) {
+      _selectedTreePaths.add(path);
+    } else {
+      _selectedTreePaths.remove(path);
+    }
+    _selectionAnchorPath = path;
+    _publishTreeSelection();
+    _applyCleanSelectionAfterPaint([node], checked);
+
+    _scheduleChartNodeUpdate(node);
+  }
+
+  void _scheduleChartNodeUpdate(DiskTreeNode node) {
+    _chartUpdateTimer?.cancel();
+    _chartUpdateTimer = Timer(const Duration(milliseconds: 80), () {
+      if (!mounted || _chartNode == node) return;
+      setState(() => _chartNode = node);
+      _publishCleanerScanContext();
+    });
+  }
+
+  KeyEventResult _handleResultsKeyEvent(FocusNode node, KeyEvent event) {
+    if (_isCleaningJunk || _rootNode == null) return KeyEventResult.ignored;
+    if (BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
+      return KeyEventResult.ignored;
+    }
+
+    final isKeyDown = event is KeyDownEvent || event is KeyRepeatEvent;
+    if (!isKeyDown) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+    final isShift = HardwareKeyboard.instance.isShiftPressed;
+
+    if (isCtrl && key == LogicalKeyboardKey.keyA) {
+      final rows = _cachedFlatRows ?? const <_FlatRow>[];
+      setState(() {
+        for (final row in rows) {
+          _setCleanSelectedRecursive(row.node, true);
+        }
+        if (rows.isNotEmpty) {
+          _selectedNode = rows.last.node;
+          _selectionAnchorPath = rows.first.node.fullPath;
+          _scheduleChartNodeUpdate(rows.last.node);
+        }
+        _publishTreeSelection();
+      });
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.delete) {
+      unawaited(_deleteCurrentSelectionImmediately(permanent: isShift));
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
   Widget _buildResults(ThemeData theme, AppLocalizations l) {
     final root = _rootNode!;
-    final viewNode = _selectedNode ?? root;
-    return Column(
-      key: const ValueKey('results'),
-      children: [
-        // Top toolbar
-        _buildResultsToolbar(theme, l, root),
-        const Divider(height: 1),
-        // 2-panel body
-        Expanded(
-          child: Row(
-            children: [
-              // Left: tree view (~65%)
-              Expanded(
-                flex: 65,
-                child: _buildTreePanel(theme, l, root),
-              ),
-              const VerticalDivider(width: 1),
-              // Right: pie chart (~35%)
-              Expanded(
-                flex: 35,
-                child: _buildPiePanel(theme, l, viewNode),
-              ),
-            ],
+    final viewNode = _chartNode ?? _selectedNode ?? root;
+    return Focus(
+      focusNode: _resultsFocusNode,
+      autofocus: true,
+      onKeyEvent: _handleResultsKeyEvent,
+      child: Column(
+        key: const ValueKey('results'),
+        children: [
+          // Top toolbar
+          _buildResultsToolbar(theme, l, root),
+          const Divider(height: 1),
+          // 2-panel body
+          Expanded(
+            child: Row(
+              children: [
+                // Left: tree view (~65%)
+                Expanded(
+                  flex: 65,
+                  child: _buildTreePanel(theme, l, root),
+                ),
+                const VerticalDivider(width: 1),
+                // Right: pie chart (~35%)
+                Expanded(
+                  flex: 35,
+                  child: _buildPiePanel(theme, l, viewNode),
+                ),
+              ],
+            ),
           ),
-        ),
-        // Bottom action bar
-        _buildBottomBar(theme, l),
-      ],
+          // Bottom action bar
+          _buildBottomBar(theme, l),
+        ],
+      ),
     );
   }
 
@@ -859,149 +1190,250 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       ThemeData theme, AppLocalizations l, DiskTreeNode root) {
     final junkBytes = root.junkBytes;
     final cleanableCount = _countCleanableNodes(root);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+    final driveSummary = l.diskCleanerDriveSummary(
+        root.fullPath, _fmt(root.sizeBytes), root.fileCount);
+    final hasStatus = _isScanningFullDisk || _agentScanning;
+
+    Widget buildDriveInfo() {
+      return Row(
         children: [
-          // Left: drive info (fixed)
           Icon(PhosphorIconsLight.hardDrive,
               size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
-          Text(
-            l.diskCleanerDriveSummary(
-                root.fullPath, _fmt(root.sizeBytes), root.fileCount),
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 16),
-          // Middle: scanning status (takes remaining space, keeps buttons fixed)
           Expanded(
-            child: _isScanningFullDisk
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _lastProgress == null
-                              ? l.diskCleanerScanRunning
-                              : _lastProgress!.currentPath,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  )
-                : _agentScanning
-                    ? Row(
-                        children: [
-                          AppWaveLoader(
-                            size: 22,
-                            color: theme.colorScheme.tertiary,
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(PhosphorIconsLight.sparkle,
-                              size: 14, color: theme.colorScheme.tertiary),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              _agentCurrentPath.isEmpty
-                                  ? (_agentStatus.isEmpty
-                                      ? l.diskCleanerScanRunning
-                                      : _agentStatus)
-                                  : l.diskCleanerAgentPath(_agentCurrentPath),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.tertiary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (_agentItemsFound > 0) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              l.diskCleanerItemsBytes(
-                                  _agentItemsFound, _fmt(_agentBytesFound)),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      )
-                    : const SizedBox.shrink(),
-          ),
-          const SizedBox(width: 12),
-          // Right: badges + buttons (fixed position)
-          // Junk summary badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-            ),
             child: Text(
-              l.diskCleanerJunkSummary(_fmt(junkBytes)),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.orange.shade700,
-              ),
+              driveSummary,
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(width: 8),
-          // Filter cleanable-only
-          Tooltip(
-            message: l.diskCleanerShowCleanableOnly,
-            child: FilterChip(
-              label: Text(l.diskCleanerCleanableOnlyChip(cleanableCount)),
-              selected: _showCleanableOnly,
-              onSelected: (v) => setState(() => _showCleanableOnly = v),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Quick check actions
-          TextButton(
-            onPressed: () => _setAllCleanableChecked(_rootNode, true),
-            child: Text(l.diskCleanerCheckAllCleanable),
-          ),
-          TextButton(
-            onPressed: () => _setAllCleanableChecked(_rootNode, false),
-            child: Text(l.diskCleanerUncheckAll),
-          ),
-          const SizedBox(width: 8),
-          if (_aiAvailable)
-            FilledButton.tonalIcon(
-              onPressed: _openAiPanel,
-              icon: const Icon(PhosphorIconsLight.sparkle, size: 16),
-              label: Text(l.diskCleanerAskAgent),
-            ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: () {
-              if (_isScanningFullDisk) {
-                _service.cancelFullDiskScan();
-                _scanRingController.stop();
-              }
-              setState(() {
-                _phase = _Phase.setup;
-                _isScanningFullDisk = false;
-                _rootNode = null;
-                _selectedNode = null;
-              });
-            },
-            icon: Icon(
-              _isScanningFullDisk
-                  ? Icons.stop_rounded
-                  : PhosphorIconsLight.arrowCounterClockwise,
-              size: 16,
-            ),
-            label: Text(_isScanningFullDisk
-                ? l.diskCleanerCancel
-                : l.diskCleanerScanAgain),
           ),
         ],
+      );
+    }
+
+    Widget buildStatus() {
+      if (_isScanningFullDisk) {
+        return Text(
+          _lastProgress == null
+              ? l.diskCleanerScanRunning
+              : _lastProgress!.currentPath,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
+      }
+
+      if (_agentScanning) {
+        return Row(
+          children: [
+            AppWaveLoader(
+              size: 22,
+              color: theme.colorScheme.tertiary,
+            ),
+            const SizedBox(width: 6),
+            Icon(PhosphorIconsLight.sparkle,
+                size: 14, color: theme.colorScheme.tertiary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _agentCurrentPath.isEmpty
+                    ? (_agentStatus.isEmpty
+                        ? l.diskCleanerScanRunning
+                        : _agentStatus)
+                    : l.diskCleanerAgentPath(_agentCurrentPath),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.tertiary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (_agentItemsFound > 0) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  l.diskCleanerItemsBytes(
+                      _agentItemsFound, _fmt(_agentBytesFound)),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        );
+      }
+
+      return const SizedBox.shrink();
+    }
+
+    Widget boundedAction(Widget child, {double maxWidth = 220}) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      );
+    }
+
+    final actions = <Widget>[
+      // Junk summary badge
+      boundedAction(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            l.diskCleanerJunkSummary(_fmt(junkBytes)),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.orange.shade700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      // Filter cleanable-only
+      boundedAction(
+        Tooltip(
+          message: l.diskCleanerShowCleanableOnly,
+          child: FilterChip(
+            label: Text(
+              l.diskCleanerCleanableOnlyChip(cleanableCount),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            selected: _showCleanableOnly,
+            onSelected: (v) => setState(() {
+              _showCleanableOnly = v;
+              _flatRowsValid = false;
+            }),
+          ),
+        ),
+      ),
+      // Quick check actions
+      boundedAction(
+        TextButton(
+          onPressed: () => _setAllCleanableChecked(_rootNode, true),
+          child: Text(
+            l.diskCleanerCheckAllCleanable,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      boundedAction(
+        TextButton(
+          onPressed: () => _setAllCleanableChecked(_rootNode, false),
+          child: Text(
+            l.diskCleanerUncheckAll,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      if (_aiAvailable)
+        boundedAction(
+          FilledButton.tonalIcon(
+            onPressed: _openAiPanel,
+            icon: const Icon(PhosphorIconsLight.sparkle, size: 16),
+            label: Text(
+              l.diskCleanerAskAgent,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      boundedAction(
+        OutlinedButton.icon(
+          onPressed: () {
+            if (_isScanningFullDisk) {
+              _service.cancelFullDiskScan();
+              _scanRingController.stop();
+            }
+            setState(() {
+              _phase = _Phase.setup;
+              _isScanningFullDisk = false;
+              _rootNode = null;
+              _selectedNode = null;
+              _chartNode = null;
+              _selectedTreePaths.clear();
+              _publishTreeSelection();
+              _selectionAnchorPath = null;
+              _cachedFlatRoot = null;
+              _flatRowsValid = false;
+            });
+          },
+          icon: Icon(
+            _isScanningFullDisk
+                ? Icons.stop_rounded
+                : PhosphorIconsLight.arrowCounterClockwise,
+            size: 16,
+          ),
+          label: Text(
+            _isScanningFullDisk ? l.diskCleanerCancel : l.diskCleanerScanAgain,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+    ];
+    final spacedActions = <Widget>[
+      for (final action in actions) ...[
+        action,
+        const SizedBox(width: 8),
+      ],
+    ]..removeLast();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 1120;
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                buildDriveInfo(),
+                if (hasStatus) ...[
+                  const SizedBox(height: 6),
+                  buildStatus(),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: actions,
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: buildDriveInfo(),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: buildStatus(),
+              ),
+              const SizedBox(width: 12),
+              ...spacedActions,
+            ],
+          );
+        },
       ),
     );
   }
@@ -1010,23 +1442,35 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Tree panel (left)
   // ---------------------------------------------------------------------------
 
+  // Cached flattened rows for the tree view
+  List<_FlatRow>? _cachedFlatRows;
+  DiskTreeNode? _cachedFlatRoot;
+  bool _flatRowsValid = false;
+
   Widget _buildTreePanel(
       ThemeData theme, AppLocalizations l, DiskTreeNode root) {
-    // Flatten the visible tree into a list for ListView.builder (lazy render).
-    final flatRows = <_FlatRow>[];
-    void flatten(DiskTreeNode node, int depth, int parentSize) {
-      if (!_passesTreeFilter(node)) return;
-      flatRows.add(_FlatRow(node: node, depth: depth, parentSize: parentSize));
-      if (node.isExpanded && !node.isFile) {
-        for (final child in node.children) {
-          flatten(child, depth + 1, node.sizeBytes);
+    // Re-flatten only when cache is invalid or the root object changed.
+    if (!_flatRowsValid || _cachedFlatRows == null || _cachedFlatRoot != root) {
+      final rows = <_FlatRow>[];
+      void flatten(DiskTreeNode node, int depth, int parentSize) {
+        if (!_passesTreeFilter(node)) return;
+        rows.add(_FlatRow(node: node, depth: depth, parentSize: parentSize));
+        if (node.isExpanded && !node.isFile) {
+          for (final child in node.children) {
+            flatten(child, depth + 1, node.sizeBytes);
+          }
         }
       }
+
+      for (final child in root.children) {
+        flatten(child, 0, root.sizeBytes);
+      }
+      _cachedFlatRows = rows;
+      _cachedFlatRoot = root;
+      _flatRowsValid = true;
     }
 
-    for (final child in root.children) {
-      flatten(child, 0, root.sizeBytes);
-    }
+    final flatRows = _cachedFlatRows!;
 
     return Column(
       children: [
@@ -1037,7 +1481,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              const SizedBox(width: 28), // checkbox space
               const SizedBox(width: 20), // expand arrow space
               Expanded(
                 flex: 4,
@@ -1109,15 +1552,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                     return _FlatTreeRowWidget(
                       row: row,
                       theme: theme,
-                      onTap: () {
-                        if (!row.node.isFile) {
-                          setState(
-                              () => row.node.isExpanded = !row.node.isExpanded);
-                        }
-                        _selectedNode = row.node;
-                      },
-                      onToggleJunk: (target) => setState(() {
-                        _applyCheckRecursiveGlobal(row.node, target);
+                      selectedPaths: _selectedTreePathListenable,
+                      onTap: () => _selectTreeRow(row.node, flatRows),
+                      onExpandToggle: row.node.isFile
+                          ? null
+                          : () => setState(() {
+                                row.node.isExpanded = !row.node.isExpanded;
+                                _flatRowsValid = false;
+                              }),
+                      onToggleJunk: (node, target) => setState(() {
+                        _applyCheckRecursiveGlobal(node, target);
                       }),
                       onAskAi:
                           _aiAvailable ? () => _askAiAboutNode(row.node) : null,
@@ -1134,6 +1578,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     void walk(DiskTreeNode n) {
       if (n.fullPath.isNotEmpty) {
         n.isSelectedForDeletion = checked;
+        if (checked) {
+          _selectedTreePaths.add(n.fullPath);
+        } else {
+          _selectedTreePaths.remove(n.fullPath);
+        }
       }
       for (final c in n.children) {
         walk(c);
@@ -1141,6 +1590,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
 
     walk(node);
+    _publishTreeSelection();
   }
 
   // ---------------------------------------------------------------------------
@@ -1223,6 +1673,19 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       );
     }
 
+    final topChildren = children.take(10).toList(growable: false);
+    final segments = <_PieSegment>[];
+    for (var i = 0; i < topChildren.length; i++) {
+      final child = topChildren[i];
+      segments.add(_PieSegment(
+        value: child.sizeBytes.toDouble(),
+        color: child.isJunk || child.hasJunkChildren
+            ? Colors.orange
+            : _pieColor(i),
+        label: child.name,
+      ));
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1247,16 +1710,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             child: CustomPaint(
               size: Size.infinite,
               painter: _PieChartPainter(
-                segments: children
-                    .take(10)
-                    .map((c) => _PieSegment(
-                          value: c.sizeBytes.toDouble(),
-                          color: c.isJunk || c.hasJunkChildren
-                              ? Colors.orange
-                              : _pieColor(children.indexOf(c)),
-                          label: c.name,
-                        ))
-                    .toList(),
+                segments: segments,
                 total: node.sizeBytes.toDouble(),
               ),
             ),
@@ -1265,8 +1719,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           // Legend
           Expanded(
             child: ListView(
-              children: children.take(10).map((c) {
-                final idx = children.indexOf(c);
+              children: topChildren.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final c = entry.value;
                 final color = c.isJunk || c.hasJunkChildren
                     ? Colors.orange
                     : _pieColor(idx);
@@ -1659,7 +2114,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       );
       if (confirmed != true) return;
     }
-    setState(() => _reviewMode = false);
+    setState(() {
+      _reviewMode = false;
+      _flatRowsValid = false;
+    });
     await _cleanJunk(
         permanent: _selectedCleanMode == _CleanDeleteMode.permanent);
   }
@@ -1731,6 +2189,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         if (_selectedNode != null &&
             deletedUpper.contains(_selectedNode!.fullPath.toUpperCase())) {
           _selectedNode = _rootNode;
+          _chartNode = _rootNode;
+        }
+        _selectedTreePaths.removeWhere(
+          (path) => deletedUpper.contains(path.toUpperCase()),
+        );
+        _publishTreeSelection();
+        if (_selectionAnchorPath != null &&
+            deletedUpper.contains(_selectionAnchorPath!.toUpperCase())) {
+          _selectionAnchorPath = null;
         }
       }
 
@@ -1747,6 +2214,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _lastCleanSuccessCount = result.successCount;
         _lastCleanWasPermanent = permanent;
         _phase = _Phase.cleaned;
+        _cachedFlatRoot = null;
+        _flatRowsValid = false;
       });
       _service.pendingCleanupItems = const [];
       _service.pendingCleanupBytes = 0;
@@ -2480,8 +2949,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 children: [
                   Icon(icon, size: 16, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),
-                  Text(label,
-                      style: TextStyle(color: theme.colorScheme.primary)),
+                  Text(
+                    label,
+                    style: TextStyle(color: theme.colorScheme.primary),
+                  ),
                 ],
               ),
             ),
@@ -3302,7 +3773,19 @@ class _PieChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PieChartPainter old) => true;
+  bool shouldRepaint(_PieChartPainter old) {
+    if (old.total != total || old.segments.length != segments.length) {
+      return true;
+    }
+    for (var i = 0; i < segments.length; i++) {
+      final a = segments[i];
+      final b = old.segments[i];
+      if (a.value != b.value || a.color != b.color || a.label != b.label) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 // =============================================================================
@@ -3327,15 +3810,19 @@ class _FlatRow {
 class _FlatTreeRowWidget extends StatefulWidget {
   final _FlatRow row;
   final ThemeData theme;
+  final ValueListenable<Set<String>> selectedPaths;
   final VoidCallback onTap;
-  final ValueChanged<bool> onToggleJunk;
+  final VoidCallback? onExpandToggle;
+  final void Function(DiskTreeNode, bool) onToggleJunk;
   final VoidCallback? onAskAi;
   final void Function(DiskTreeNode, Offset)? onShowContextMenu;
 
   const _FlatTreeRowWidget({
     required this.row,
     required this.theme,
+    required this.selectedPaths,
     required this.onTap,
+    this.onExpandToggle,
     required this.onToggleJunk,
     this.onAskAi,
     this.onShowContextMenu,
@@ -3347,6 +3834,38 @@ class _FlatTreeRowWidget extends StatefulWidget {
 
 class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
   bool _hovering = false;
+  String? _lastTapPath;
+  DateTime? _lastTapAt;
+  bool? _tapSequenceWasSelected;
+
+  void _handleTap(bool hasChildren) {
+    final path = widget.row.node.fullPath;
+    final now = DateTime.now();
+    final lastTapAt = _lastTapAt;
+    final wasSelected = widget.selectedPaths.value.contains(path);
+    final isDoubleTap = _lastTapPath == path &&
+        lastTapAt != null &&
+        now.difference(lastTapAt) <= const Duration(milliseconds: 300);
+
+    if (isDoubleTap) {
+      if (_tapSequenceWasSelected == true && !wasSelected) {
+        widget.onTap();
+      }
+      final onExpandToggle = widget.onExpandToggle;
+      if (hasChildren && onExpandToggle != null) {
+        onExpandToggle();
+      }
+      _lastTapPath = null;
+      _lastTapAt = null;
+      _tapSequenceWasSelected = null;
+      return;
+    }
+
+    _lastTapPath = path;
+    _lastTapAt = now;
+    _tapSequenceWasSelected = wasSelected;
+    widget.onTap();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3358,177 +3877,145 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
     final categoryId = node.junkCategoryId;
     final theme = widget.theme;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        onSecondaryTapUp:
-            widget.onShowContextMenu == null || node.fullPath.isEmpty
-                ? null
-                : (d) => widget.onShowContextMenu!(node, d.globalPosition),
-        child: Container(
-          color: _hovering
-              ? theme.colorScheme.primary.withValues(alpha: 0.06)
-              : isJunk
-                  ? Colors.orange.withValues(alpha: 0.04)
-                  : Colors.transparent,
-          padding: EdgeInsets.only(left: 12 + indent, right: 12),
-          child: Row(
-            children: [
-              // Checkbox
-              SizedBox(
-                width: 28,
-                child: GestureDetector(
-                  onTap: () {
-                    final current = _checkState(node);
-                    widget.onToggleJunk(current != true);
-                  },
-                  child: Icon(
-                    _checkState(node) == true
-                        ? Icons.check_box
-                        : _checkState(node) == null
-                            ? Icons.indeterminate_check_box
-                            : Icons.check_box_outline_blank,
-                    size: 18,
-                    color: node.isJunk
-                        ? Colors.orange.shade700
-                        : Theme.of(context).colorScheme.primary,
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: widget.selectedPaths,
+      builder: (context, selectedPaths, _) {
+        final isSelected = selectedPaths.contains(node.fullPath);
+        return MouseRegion(
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _handleTap(hasChildren),
+            onSecondaryTapUp:
+                widget.onShowContextMenu == null || node.fullPath.isEmpty
+                    ? null
+                    : (d) => widget.onShowContextMenu!(node, d.globalPosition),
+            child: Container(
+              color: isSelected
+                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                  : _hovering
+                      ? theme.colorScheme.primary.withValues(alpha: 0.06)
+                      : isJunk
+                          ? Colors.orange.withValues(alpha: 0.04)
+                          : Colors.transparent,
+              padding: EdgeInsets.only(left: 12 + indent, right: 12),
+              child: Row(
+                children: [
+                  const SizedBox(width: 28),
+                  SizedBox(
+                    width: 20,
+                    child: hasChildren
+                        ? GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: widget.onExpandToggle,
+                            child: Icon(
+                              node.isExpanded
+                                  ? PhosphorIconsLight.caretDown
+                                  : PhosphorIconsLight.caretRight,
+                              size: 12,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
                   ),
-                ),
-              ),
-              // Expand arrow
-              SizedBox(
-                width: 20,
-                child: hasChildren
-                    ? Icon(
-                        node.isExpanded
-                            ? PhosphorIconsLight.caretDown
-                            : PhosphorIconsLight.caretRight,
-                        size: 12,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              // Icon + Name + badge
-              Expanded(
-                flex: 4,
-                child: Row(
-                  children: [
-                    Icon(
-                      node.isFile
-                          ? PhosphorIconsLight.file
-                          : PhosphorIconsLight.folder,
-                      size: 14,
-                      color: node.isJunk
-                          ? Colors.orange
-                          : node.isFile
-                              ? theme.colorScheme.onSurfaceVariant
-                              : theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        node.name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              node.isFile ? FontWeight.normal : FontWeight.w500,
+                  Expanded(
+                    flex: 4,
+                    child: Row(
+                      children: [
+                        Icon(
+                          node.isFile
+                              ? PhosphorIconsLight.file
+                              : PhosphorIconsLight.folder,
+                          size: 14,
                           color: node.isJunk
-                              ? Colors.orange.shade800
-                              : theme.colorScheme.onSurface,
+                              ? Colors.orange
+                              : node.isFile
+                                  ? theme.colorScheme.onSurfaceVariant
+                                  : theme.colorScheme.primary,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            node.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: node.isFile
+                                  ? FontWeight.normal
+                                  : FontWeight.w500,
+                              color: node.isJunk
+                                  ? Colors.orange.shade800
+                                  : theme.colorScheme.onSurface,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (categoryId != null)
+                          Container(
+                            margin: const EdgeInsets.only(left: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              _junkLabel(categoryId),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange.shade800,
+                              ),
+                            ),
+                          ),
+                        if (widget.onAskAi != null && _hovering)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: GestureDetector(
+                              onTap: widget.onAskAi,
+                              child: Icon(
+                                PhosphorIconsLight.sparkle,
+                                size: 12,
+                                color: theme.colorScheme.tertiary,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    if (categoryId != null)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          _junkLabel(categoryId),
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.orange.shade800,
-                          ),
-                        ),
-                      ),
-                    if (widget.onAskAi != null && _hovering)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: GestureDetector(
-                          onTap: widget.onAskAi,
-                          child: Icon(
-                            PhosphorIconsLight.sparkle,
-                            size: 12,
-                            color: theme.colorScheme.tertiary,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              // Size
-              SizedBox(
-                width: 80,
-                child: Text(
-                  _CbAgentCleanerScreenState._fmt(node.sizeBytes),
-                  style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.right,
-                ),
-              ),
-              const SizedBox(width: 10),
-              // % bar
-              SizedBox(
-                width: 90,
-                child: _PercentBar(percent: percent, isJunk: node.isJunk),
-              ),
-              // File count
-              SizedBox(
-                width: 60,
-                child: Text(
-                  node.isFile ? '' : '${node.fileCount}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  textAlign: TextAlign.right,
-                ),
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      _CbAgentCleanerScreenState._fmt(node.sizeBytes),
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 90,
+                    child: _PercentBar(percent: percent, isJunk: node.isJunk),
+                  ),
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      node.isFile ? '' : '${node.fileCount}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  }
-
-  bool? _checkState(DiskTreeNode node) {
-    int total = 0;
-    int checked = 0;
-    void walk(DiskTreeNode n) {
-      if (n.fullPath.isNotEmpty) {
-        total++;
-        if (n.isSelectedForDeletion) checked++;
-      }
-      for (final c in n.children) {
-        walk(c);
-      }
-    }
-
-    walk(node);
-    if (total == 0) return false;
-    if (checked == 0) return false;
-    if (checked == total) return true;
-    return null;
   }
 
   static String _junkLabel(String categoryId) {

@@ -24,6 +24,7 @@ import 'package:intl/intl.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
+import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_section.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
@@ -377,6 +378,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildCacheManagementSection(),
                         const SizedBox(height: 24),
                         AiSettingsSection(
+                          buildSectionCard: ({
+                            required String title,
+                            required IconData icon,
+                            required List<Widget> children,
+                          }) =>
+                              _buildSectionCard(
+                            title: title,
+                            icon: icon,
+                            children: children,
+                          ),
+                          buildCompactSettingTile: ({
+                            required String title,
+                            required String subtitle,
+                            required IconData icon,
+                            Widget? trailing,
+                            VoidCallback? onTap,
+                          }) =>
+                              _buildCompactSettingTile(
+                            title: title,
+                            subtitle: subtitle,
+                            icon: icon,
+                            trailing: trailing,
+                            onTap: onTap,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        LocalAiAdvisorSettingsSection(
                           buildSectionCard: ({
                             required String title,
                             required IconData icon,

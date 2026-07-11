@@ -4,6 +4,8 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
+  flutter_gemma
+  flutter_secure_storage_linux
   media_kit_video
   mobile_smb_native
   screen_retriever_linux

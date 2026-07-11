@@ -8,6 +8,7 @@ import '../../utils/app_logger.dart';
 import '../album_service.dart';
 import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
+import '../disk_cleaner/disk_tree_node.dart';
 import 'disk_cleaner_skill.dart';
 import '../video_library_service.dart';
 
@@ -71,6 +72,11 @@ class ToolExecutor {
     'scan_disk_junk',
     'clean_disk_junk',
     'get_pending_cleanup_review',
+    'get_current_cleaner_scan',
+  };
+
+  static const _toolAliases = {
+    'get_current_clean_cleaner_scan': 'get_current_cleaner_scan',
   };
 
   /// Tools that must always go through user approval before executing.
@@ -90,6 +96,7 @@ class ToolExecutor {
   /// 1. `<tool_call>{"name":"...","arguments":{...}}</tool_call>`
   /// 2. ```json {"name":"...","arguments":{...}} ```
   /// 3. Bare JSON object with "name" and "arguments" keys
+  /// 4. Gemma-style `<|tool_call>call:tool_call{name: "..."}<tool_call|>`
   static List<ToolCall> parseToolCalls(String text) {
     final calls = <ToolCall>[];
 
@@ -99,6 +106,27 @@ class ToolExecutor {
     ).allMatches(text);
     for (final match in tagMatches) {
       _tryParseCall(match.group(1), calls);
+    }
+
+    if (calls.isNotEmpty) return calls;
+
+    // Format 1b: Gemma/LiteRT style:
+    // <|tool_call>call:tool_call{name: "tool", "arg": true}<tool_call|>
+    final gemmaMatches = RegExp(
+      r'<\|tool_call>\s*call:tool_call\s*\{([\s\S]*?)\}\s*<tool_call\|>',
+    ).allMatches(text);
+    for (final match in gemmaMatches) {
+      _tryParseGemmaCall(match.group(1), calls);
+    }
+
+    if (calls.isNotEmpty) return calls;
+
+    // Format 1c: bare Gemma call without sentinel tokens.
+    final bareGemmaMatches = RegExp(
+      r'call:tool_call\s*\{([\s\S]*?)\}',
+    ).allMatches(text);
+    for (final match in bareGemmaMatches) {
+      _tryParseGemmaCall(match.group(1), calls);
     }
 
     if (calls.isNotEmpty) return calls;
@@ -128,7 +156,7 @@ class ToolExecutor {
     if (jsonStr == null) return;
     try {
       final json = jsonDecode(jsonStr.trim()) as Map<String, dynamic>;
-      final name = json['name'] as String? ?? '';
+      final name = _canonicalToolName(json['name'] as String? ?? '');
       if (_knownTools.contains(name)) {
         calls.add(ToolCall(
           name: name,
@@ -140,9 +168,48 @@ class ToolExecutor {
     }
   }
 
+  static void _tryParseGemmaCall(String? body, List<ToolCall> calls) {
+    if (body == null) return;
+    final nameMatch = RegExp(
+      r'(?:"name"|name)\s*:\s*"([^"]+)"',
+    ).firstMatch(body);
+    final name = _canonicalToolName(nameMatch?.group(1) ?? '');
+    if (!_knownTools.contains(name)) return;
+
+    final args = <String, dynamic>{};
+    final fields = RegExp(
+      r'(?:"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*:\s*("[^"]*"|true|false|null|-?\d+(?:\.\d+)?)',
+    ).allMatches(body);
+    for (final field in fields) {
+      final key = field.group(1) ?? field.group(2) ?? '';
+      if (key.isEmpty || key == 'name') continue;
+      args[key] = _parseScalarValue(field.group(3) ?? '');
+    }
+
+    calls.add(ToolCall(name: name, arguments: args));
+  }
+
+  static dynamic _parseScalarValue(String value) {
+    final trimmed = value.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      return trimmed.substring(1, trimmed.length - 1);
+    }
+    if (trimmed == 'true') return true;
+    if (trimmed == 'false') return false;
+    if (trimmed == 'null') return null;
+    return num.tryParse(trimmed) ?? trimmed;
+  }
+
+  static String _canonicalToolName(String name) {
+    return _toolAliases[name] ?? name;
+  }
+
   /// Returns true if the text likely contains a tool call.
   static bool hasToolCalls(String text) {
     if (text.contains('<tool_call>')) return true;
+    if (text.contains('<|tool_call>') || text.contains('call:tool_call')) {
+      return true;
+    }
     // Check for JSON with a known tool name
     for (final tool in _knownTools) {
       if (text.contains('"name"') && text.contains('"$tool"')) return true;
@@ -195,6 +262,8 @@ class ToolExecutor {
           return await _cleanDiskJunk(call.arguments);
         case 'get_pending_cleanup_review':
           return _getPendingCleanupReview(call.arguments);
+        case 'get_current_cleaner_scan':
+          return _getCurrentCleanerScan(call.arguments);
         default:
           return ToolResult(
             toolName: call.name,
@@ -1521,6 +1590,139 @@ class ToolExecutor {
     );
   }
 
+  ToolResult _getCurrentCleanerScan(Map<String, dynamic> args) {
+    final service = DiskCleanerService.instance;
+    final context = service.getCleanerScanContext(ownerTabId: ownerTabId);
+    if (context == null) {
+      return const ToolResult(
+        toolName: 'get_current_cleaner_scan',
+        output:
+            'No current Cleaner scan context is available for this tab. Ask the user to open CB Agent from the Cleaner screen or run a scan first.',
+      );
+    }
+
+    final maxItems = (args['max_items'] as int?)?.clamp(5, 50) ?? 20;
+    final includeSelected = args['include_selected'] as bool? ?? true;
+    final root = context.root;
+    final selectedNode = context.selectedPath == null
+        ? null
+        : _findDiskTreeNode(root, context.selectedPath!);
+    final chartNode = context.chartPath == null
+        ? null
+        : _findDiskTreeNode(root, context.chartPath!);
+
+    final junkNodes = <DiskTreeNode>[];
+    final selectedNodes = <DiskTreeNode>[];
+    var selectedBytes = 0;
+    var selectedCount = 0;
+
+    void collect(DiskTreeNode node) {
+      if (node.fullPath.isNotEmpty && node.isSelectedForDeletion) {
+        selectedNodes.add(node);
+        selectedBytes += node.sizeBytes;
+        selectedCount++;
+      }
+      if (node.fullPath.isNotEmpty && (node.isJunk || node.hasJunkChildren)) {
+        junkNodes.add(node);
+      }
+      for (final child in node.children) {
+        collect(child);
+      }
+    }
+
+    collect(root);
+    junkNodes.sort((a, b) => b.junkBytes.compareTo(a.junkBytes));
+    selectedNodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+
+    final topChildren = root.children.toList()
+      ..sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+
+    final buffer = StringBuffer();
+    buffer.writeln('CURRENT CLEANER SCAN');
+    buffer.writeln('Owner tab: ${context.ownerTabId}');
+    buffer.writeln('Updated: ${context.updatedAt.toIso8601String()}');
+    buffer.writeln('Status: ${context.isScanning ? "scanning" : "ready"}');
+    buffer.writeln(
+        'Root: ${root.fullPath} (${_formatSize(root.sizeBytes)}, ${root.fileCount} files)');
+    buffer.writeln('Junk marked: ${_formatSize(root.junkBytes)}');
+    buffer.writeln(
+        'Selected for cleanup: $selectedCount items, ${_formatSize(selectedBytes)}');
+
+    if (selectedNode != null) {
+      buffer.writeln();
+      buffer.writeln('Selected node: ${_formatDiskTreeNode(selectedNode)}');
+    }
+    if (chartNode != null && chartNode.fullPath != selectedNode?.fullPath) {
+      buffer.writeln('Chart node: ${_formatDiskTreeNode(chartNode)}');
+    }
+
+    buffer.writeln();
+    buffer.writeln('Top directories by size:');
+    if (topChildren.isEmpty) {
+      buffer.writeln('  (none)');
+    } else {
+      for (final node in topChildren.take(maxItems)) {
+        buffer.writeln('  - ${_formatDiskTreeNode(node)}');
+      }
+      if (topChildren.length > maxItems) {
+        buffer.writeln('  ... ${topChildren.length - maxItems} more');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln('Top junk candidates:');
+    if (junkNodes.isEmpty) {
+      buffer.writeln('  (none marked as junk)');
+    } else {
+      for (final node in junkNodes.take(maxItems)) {
+        buffer.writeln('  - ${_formatDiskTreeNode(node)}');
+      }
+      if (junkNodes.length > maxItems) {
+        buffer.writeln('  ... ${junkNodes.length - maxItems} more');
+      }
+    }
+
+    if (includeSelected) {
+      buffer.writeln();
+      buffer.writeln('Selected cleanup items:');
+      if (selectedNodes.isEmpty) {
+        buffer.writeln('  (none selected)');
+      } else {
+        for (final node in selectedNodes.take(maxItems)) {
+          buffer.writeln('  - ${_formatDiskTreeNode(node)}');
+        }
+        if (selectedNodes.length > maxItems) {
+          buffer.writeln('  ... ${selectedNodes.length - maxItems} more');
+        }
+      }
+    }
+
+    return ToolResult(
+      toolName: 'get_current_cleaner_scan',
+      output: _truncate(buffer.toString().trim()),
+    );
+  }
+
+  DiskTreeNode? _findDiskTreeNode(DiskTreeNode root, String path) {
+    if (root.fullPath == path) return root;
+    for (final child in root.children) {
+      final match = _findDiskTreeNode(child, path);
+      if (match != null) return match;
+    }
+    return null;
+  }
+
+  String _formatDiskTreeNode(DiskTreeNode node) {
+    final type = node.isFile ? 'file' : 'folder';
+    final junk = node.isJunk
+        ? ', junk=${node.junkCategoryId}'
+        : (node.hasJunkChildren
+            ? ', junk_children=${_formatSize(node.junkBytes)}'
+            : '');
+    final selected = node.isSelectedForDeletion ? ', selected' : '';
+    return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, ${node.fileCount} files$junk$selected]';
+  }
+
   /// Resolves Windows known folders so paths in the review can be shown as
   /// short shortcuts (`%TEMP%`, `%APPDATA%`, etc).
   List<MapEntry<String, String>> _knownFolderShortcuts() {
@@ -1611,6 +1813,9 @@ To use a tool, respond with a <tool_call> block:
 <tool_call>
 {"name": "tool_name", "arguments": {"arg1": "value1"}}
 </tool_call>
+
+Use that exact XML-style wrapper and valid JSON only. Do not use <|tool_call>,
+call:tool_call, unquoted keys, or invented tool names.
 
 **File System Tools:**
 

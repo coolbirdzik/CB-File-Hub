@@ -1261,6 +1261,7 @@ abstract class AppLocalizations {
   String get noModelsFound;
   String get noModelConfigured;
   String get selectModel;
+  String get modelSearchHint;
   String fetchModelsError(String error);
   String get newConversation;
   String get conversations;
@@ -1393,4 +1394,32 @@ abstract class AppLocalizations {
   String get aiThinking3;
   String get aiWaitingApproval;
   String aiRunningTool(String toolName);
+
+  // Local AI Advisor
+  String get localAiAdvisor;
+  String get localAiAdvisorDescription;
+  String get huggingFaceToken;
+  String get huggingFaceTokenHint;
+  String get pasteToken;
+  String get tokenSaved;
+  String get clearToken;
+  String get browseModels;
+  String get installedModels;
+  String get noModelsInstalled;
+  String get installModel;
+  String get uninstallModel;
+  String get selectActiveModel;
+  String get modelInstalling;
+  String get modelInstalled;
+  String get modelUninstalled;
+  String get downloadProgress;
+  String get noTokenSet;
+  String get setTokenFirst;
+  String get openLocation;
+  String get localAiIncompatibleArtifact;
+  String get localAiReinstallCompatible;
+  String get localAiContextWindow;
+  String get localAiContextWindowHint;
+  String get localAiTokensSuffix;
+  String get localAiInvalidTokenCount;
 }

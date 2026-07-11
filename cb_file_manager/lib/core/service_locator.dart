@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../helpers/core/user_preferences.dart';
 import '../models/database/database_manager.dart';
 import '../services/album_service.dart';
@@ -16,6 +17,7 @@ import '../services/windowing/desktop_windowing_service.dart';
 import '../services/progress/desktop_app_icon_progress_service.dart';
 import '../services/ai/ai_provider_service.dart';
 import '../services/ai/ai_chat_history_service.dart';
+import '../services/local_ai/local_ai_advisor_service.dart';
 import '../services/disk_cleaner/disk_cleaner_service.dart';
 import '../services/tab_activity/tab_activity_manager.dart';
 import '../services/tab_activity/tab_cache_release_helper.dart';
@@ -126,6 +128,14 @@ Future<void> setupServiceLocator() async {
   // Register AiChatHistoryService for persisting conversation history
   locator.registerLazySingleton<AiChatHistoryService>(
     () => AiChatHistoryService(),
+  );
+
+  // Register LocalAiAdvisorService for on-device cleanup suggestions.
+  // SharedPreferences is loaded here so consumers can resolve the service
+  // synchronously during widget/bloc creation.
+  final sharedPreferences = await SharedPreferences.getInstance();
+  locator.registerLazySingleton<LocalAiAdvisorService>(
+    () => LocalAiAdvisorService(prefs: sharedPreferences),
   );
 
   // File metadata service — provides cached image dimensions, video duration,
