@@ -27,6 +27,7 @@ class BrowserLikeKeyboardShortcuts {
     VoidCallback? onCut,
     VoidCallback? onPaste,
     VoidCallback? onRename,
+    VoidCallback? onSearch,
   }) {
     if (!isDesktop || event == null || isTextInputFocused()) {
       return KeyEventResult.ignored;
@@ -55,6 +56,11 @@ class BrowserLikeKeyboardShortcuts {
 
     if (isCtrl && key == LogicalKeyboardKey.keyA && onSelectAll != null) {
       onSelectAll();
+      return KeyEventResult.handled;
+    }
+
+    if (isCtrl && key == LogicalKeyboardKey.keyF && onSearch != null) {
+      onSearch();
       return KeyEventResult.handled;
     }
 
@@ -110,12 +116,22 @@ class BrowserLikeKeyboardShortcuts {
     VoidCallback? onPaste,
     VoidCallback? onRename,
     VoidCallback? onRefresh,
+    VoidCallback? onSearch,
     void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
         onScrollToIndex,
     KeyEvent? event,
   }) {
     if (!isDesktop || event == null || isTextInputFocused()) {
       return KeyEventResult.ignored;
+    }
+
+    // Handle Ctrl+F for search before delegating to keyboard controller.
+    if (onSearch != null &&
+        event is KeyDownEvent &&
+        HardwareKeyboard.instance.isControlPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyF) {
+      onSearch();
+      return KeyEventResult.handled;
     }
 
     return keyboardController.handleKeyEvent(

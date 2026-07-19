@@ -87,6 +87,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int? _videoLibraryFiles;
   int? _tempFilesBytes;
   int? _tempFilesCount;
+  int? _tagThumbnailBytes;
+  int? _tagThumbnailFiles;
 
   @override
   void initState() {
@@ -277,9 +279,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final networkStats = await NetworkThumbnailHelper().getCacheStats();
       final videoDir = await AppPathHelper.getVideoCacheDir();
       final tempDir = await AppPathHelper.getTempFilesDir();
+      final tagThumbDir = await AppPathHelper.getTagThumbnailDir();
 
       final videoStats = await _directoryStats(videoDir);
       final tempStats = await _directoryStats(tempDir);
+      final tagThumbStats = await _directoryStats(tagThumbDir);
 
       // Video library cache stats
       final videoLibDir =
@@ -301,6 +305,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         _tempFilesBytes = tempStats.totalBytes;
         _tempFilesCount = tempStats.fileCount;
+
+        _tagThumbnailBytes = tagThumbStats.totalBytes;
+        _tagThumbnailFiles = tagThumbStats.fileCount;
       });
     } catch (e) {
       debugPrint('Error loading cache info: $e');
@@ -754,14 +761,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final totalBytes = (_networkThumbnailBytes ?? 0) +
         (_videoThumbnailBytes ?? 0) +
         (_videoLibraryBytes ?? 0) +
-        (_tempFilesBytes ?? 0);
+        (_tempFilesBytes ?? 0) +
+        (_tagThumbnailBytes ?? 0);
     final totalFiles = (_networkThumbnailFiles ?? 0) +
         (_videoThumbnailFiles ?? 0) +
         (_videoLibraryFiles ?? 0) +
-        (_tempFilesCount ?? 0);
+        (_tempFilesCount ?? 0) +
+        (_tagThumbnailFiles ?? 0);
 
     return _buildSectionCard(
-      title: AppLocalizations.of(context)!.cacheManagement,
+      title: AppLocalizations.of(context)!.appDataManagement,
       icon: PhosphorIconsLight.broom,
       children: [
         Padding(
@@ -803,7 +812,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Cache overview',
+                                AppLocalizations.of(context)!.appDataManagement,
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -811,7 +820,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 AppLocalizations.of(context)!
-                                    .cacheManagementDescription,
+                                    .appDataManagementDescription,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -910,7 +919,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               PhosphorIconsLight.slidersHorizontal,
                               size: 16,
                             ),
-                            label: const Text('Manage cache'),
+                            label: Text(AppLocalizations.of(context)!.manage),
                           ),
                         ),
                       ],

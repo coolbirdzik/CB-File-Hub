@@ -2,11 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../components/common/shared_file_context_menu.dart';
+import '../../../tab_manager/components/tag_context_menu.dart';
 import '../../../../bloc/selection/selection_bloc.dart';
 import '../../../../bloc/selection/selection_event.dart';
 import 'folder_thumbnail.dart';
@@ -43,6 +45,13 @@ class _FolderGridItemState extends State<FolderGridItem> {
   bool _isHovering = false;
   bool _visuallySelected = false;
 
+  /// Tag name when this "folder" is actually a child tag (path `#search?tag=`),
+  /// otherwise null. A tag behaves like a folder in the results grid.
+  String? get _tagName => UriUtils.extractTagFromSearchPath(widget.folder.path);
+
+  /// Display label: the tag name for tag "folders", else the folder basename.
+  String get _displayName => _tagName ?? widget.folder.basename();
+
   @override
   void initState() {
     super.initState();
@@ -67,8 +76,12 @@ class _FolderGridItemState extends State<FolderGridItem> {
     final bool isShiftPressed = keyboard.isShiftPressed;
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
+    // On desktop, a plain click selects only the clicked folder (clearing the
+    // previous selection); Ctrl+click adds/toggles it. Using
+    // `lastSelectedPath != null` made every click after the first behave like a
+    // Ctrl+click, so the old selection was never cleared.
     final bool shouldCtrlSelect =
-        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
+        widget.isDesktopMode ? isCtrlPressed : true;
 
     // Visual update depends on the selection type
     if (!isShiftPressed) {
@@ -172,7 +185,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
                   padding:
                       const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
                   child: Text(
-                    widget.folder.basename(),
+                    _displayName,
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -336,6 +349,13 @@ class _FolderGridItemState extends State<FolderGridItem> {
   }
 
   void _showFolderContextMenu(BuildContext context, Offset? globalPosition) {
+    // A tag rendered as a folder card gets the tag-specific context menu.
+    final tagName = _tagName;
+    if (tagName != null) {
+      showTagContextMenu(context, tagName, globalPosition: globalPosition);
+      return;
+    }
+
     // Check for multiple selection
     try {
       final selectionBloc = context.read<SelectionBloc>();
@@ -374,7 +394,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
         renameController.renamingPath == widget.folder.path;
 
     final textWidget = Text(
-      widget.folder.basename(),
+      _displayName,
       textAlign: TextAlign.center,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,

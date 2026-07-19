@@ -164,8 +164,6 @@ class DatabaseManager implements IDatabaseProvider {
   /// Finds all files tagged with a specific tag
   @override
   Future<List<String>> findFilesByTag(String tag) async {
-    debugPrint('DatabaseManager: Finding files with tag: "$tag"');
-
     // Trim và lowercase tag để tìm kiếm chính xác hơn
     final normalizedTag = tag.trim().toLowerCase();
 
@@ -178,17 +176,8 @@ class DatabaseManager implements IDatabaseProvider {
       final List<String> results =
           await _provider.findFilesByTag(normalizedTag);
 
-      debugPrint(
-          'DatabaseManager: Found ${results.length} files with tag "$normalizedTag"');
-
-      // In ra thông tin chi tiết về các file được tìm thấy
-      for (final path in results) {
-        debugPrint('DatabaseManager: Found file: $path');
-      }
-
       return results;
     } catch (e) {
-      debugPrint('DatabaseManager: Error finding files by tag: $e');
       return [];
     }
   }
@@ -668,13 +657,10 @@ class DatabaseManager implements IDatabaseProvider {
       if (_provider is SqliteDatabaseProvider) {
         dbPath = SqliteDatabaseProvider.getDatabasePathSync();
       } else {
-        debugPrint('exportAsSqlite: Provider is not SqliteDatabaseProvider');
         return null;
       }
 
       if (dbPath.isEmpty) {
-        debugPrint(
-            'exportAsSqlite: Database path not available (not opened yet)');
         return null;
       }
 
@@ -692,7 +678,6 @@ class DatabaseManager implements IDatabaseProvider {
       // Copy the live DB file to destination
       final sourceFile = File(dbPath);
       await sourceFile.copy(destPath);
-      debugPrint('exportAsSqlite: Copied DB from $dbPath to $destPath');
 
       // Open destination DB and write preferences table
       final dbFactory = _provider is SqliteDatabaseProvider
@@ -748,14 +733,10 @@ class DatabaseManager implements IDatabaseProvider {
         }
 
         await backupDb.close();
-        debugPrint(
-            'exportAsSqlite: Preferences written, file saved at $destPath');
       }
 
       return destPath;
-    } catch (e, stackTrace) {
-      debugPrint('exportAsSqlite error: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (_) {
       return null;
     }
   }
@@ -845,8 +826,7 @@ class DatabaseManager implements IDatabaseProvider {
           onRestorePreferences(prefsMap);
           prefsCount = prefsMap.length;
         }
-      } catch (e) {
-        debugPrint('_importSqlite: No preferences table or error: $e');
+      } catch (_) {
       }
 
       // Restore tags from file_tags table
@@ -872,8 +852,7 @@ class DatabaseManager implements IDatabaseProvider {
             failedCount++;
           }
         }
-      } catch (e) {
-        debugPrint('_importSqlite: No file_tags table: $e');
+      } catch (_) {
       }
 
       await importedDb.close();
@@ -885,9 +864,7 @@ class DatabaseManager implements IDatabaseProvider {
         'preferencesCount': prefsCount,
         'format': 'sqlite',
       };
-    } catch (e, stackTrace) {
-      debugPrint('_importSqlite error: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (_) {
       return null;
     }
   }

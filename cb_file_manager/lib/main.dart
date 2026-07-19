@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/tab_manager/core/tab_main_screen.dart';
 import 'helpers/tags/tag_manager.dart';
+import 'helpers/tags/tag_hierarchy_manager.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 import 'ui/components/video/pip_window/desktop_pip_window.dart';
@@ -444,6 +445,9 @@ Future<void> runCbFileApp() async {
 
       await BatchTagManager.initialize();
       await TagManager.initialize();
+      // Load the tag hierarchy cache so the tag results view can show a tag's
+      // child tags even before the tag management screens are opened.
+      await TagHierarchyManager.instance.initialize();
       debugPrint('Data and tag services initialized successfully');
     } catch (e) {
       debugPrint('Error during data/tag initialization: $e');

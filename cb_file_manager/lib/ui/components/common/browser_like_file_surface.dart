@@ -69,6 +69,9 @@ class BrowserLikeFileSurface extends StatefulWidget {
     KeyEvent event,
   )? onKeyEvent;
 
+  /// `Ctrl+F` — open / toggle the search bar.
+  final VoidCallback? onSearch;
+
   const BrowserLikeFileSurface({
     Key? key,
     required this.selectionState,
@@ -109,6 +112,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
     this.onRename,
     this.onScrollToIndex,
     this.onKeyEvent,
+    this.onSearch,
   }) : super(key: key);
 
   @override
@@ -136,13 +140,14 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
       return KeyEventResult.ignored;
     }
 
-    final escapeResult = BrowserLikeKeyboardShortcuts.handleBasic(
-      isDesktop: widget.isDesktop,
-      event: event,
-      onEscape: widget.onEscape,
-    );
-    if (escapeResult != KeyEventResult.ignored) {
-      return escapeResult;
+    // Escape is always the highest-priority shortcut, handled before anything else.
+    if (widget.onEscape != null) {
+      final escResult = BrowserLikeKeyboardShortcuts.handleBasic(
+        isDesktop: widget.isDesktop,
+        event: event,
+        onEscape: widget.onEscape,
+      );
+      if (escResult != KeyEventResult.ignored) return escResult;
     }
 
     final folderListState = widget.keyboardFolderListState;
@@ -153,7 +158,8 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
         widget.selectRange != null &&
         widget.activateEntity != null &&
         widget.onDelete != null) {
-      final commonResult = BrowserLikeKeyboardShortcuts.handle(
+      // Full keyboard handling — folder navigation + all shortcuts.
+      final result = BrowserLikeKeyboardShortcuts.handle(
         isDesktop: widget.isDesktop,
         keyboardController: _keyboardController,
         folderListState: folderListState,
@@ -178,35 +184,34 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
         onPaste: widget.onPaste,
         onRename: widget.onRename,
         onRefresh: widget.onRefresh,
+        onSearch: widget.onSearch,
         onScrollToIndex: widget.onScrollToIndex,
         event: event,
       );
-      if (commonResult != KeyEventResult.ignored) {
-        return commonResult;
-      }
-    }
-
-    final basicResult = BrowserLikeKeyboardShortcuts.handleBasic(
-      isDesktop: widget.isDesktop,
-      event: event,
-      onRefresh: widget.onRefresh,
-      onSelectAll: widget.onSelectAll,
-      onDelete: widget.onDelete == null
-          ? null
-          : (permanent) {
-              unawaited(
-                Future<void>.sync(
-                  () => widget.onDelete!(_keyboardController, permanent),
-                ),
-              );
-            },
-      onCopy: widget.onCopy,
-      onCut: widget.onCut,
-      onPaste: widget.onPaste,
-      onRename: widget.onRename,
-    );
-    if (basicResult != KeyEventResult.ignored) {
-      return basicResult;
+      if (result != KeyEventResult.ignored) return result;
+    } else {
+      // Basic shortcuts only — no folder navigation.
+      final result = BrowserLikeKeyboardShortcuts.handleBasic(
+        isDesktop: widget.isDesktop,
+        event: event,
+        onRefresh: widget.onRefresh,
+        onSelectAll: widget.onSelectAll,
+        onDelete: widget.onDelete == null
+            ? null
+            : (permanent) {
+                unawaited(
+                  Future<void>.sync(
+                    () => widget.onDelete!(_keyboardController, permanent),
+                  ),
+                );
+              },
+        onCopy: widget.onCopy,
+        onCut: widget.onCut,
+        onPaste: widget.onPaste,
+        onRename: widget.onRename,
+        onSearch: widget.onSearch,
+      );
+      if (result != KeyEventResult.ignored) return result;
     }
 
     final customResult = widget.onKeyEvent?.call(_keyboardController, event);

@@ -843,6 +843,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           onMouseForward: _handleMouseForwardButton,
           onRefresh: _refreshFileList,
           onSelectAll: () => _selectAll(networkState),
+          onSearch: () => _toggleSearchBar(context),
           onEscape: selectionState.selectedCount > 0
               ? _clearSelection
               : _showSearchBar

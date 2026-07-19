@@ -41,6 +41,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  int _selectedSecond = 0;
   bool _isLoading = true;
   bool _isExtracting = false;
   String? _error;
@@ -62,7 +63,10 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
       // Listen for duration
       _player.stream.duration.listen((d) {
         if (mounted && d.inMilliseconds > 0) {
-          setState(() => _duration = d);
+          setState(() {
+            _duration = d;
+            _selectedSecond = _selectedSecond.clamp(0, d.inSeconds);
+          });
         }
       });
 
@@ -110,7 +114,14 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
   }
 
   Future<void> _seekTo(Duration position) async {
-    await _player.seek(position);
+    final second = position.inSeconds.clamp(0, _duration.inSeconds);
+    if (mounted) {
+      setState(() {
+        _selectedSecond = second;
+        _position = Duration(seconds: second);
+      });
+    }
+    await _player.seek(Duration(seconds: second));
     // Clear preview when seeking
     if (mounted) {
       setState(() => _previewBytes = null);
@@ -140,47 +151,51 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
     setState(() => _isExtracting = true);
 
     try {
-      final cacheDir = await AppPathHelper.getSubDir('tag_thumbnails');
+      final cacheDir = await AppPathHelper.getTagThumbnailDir();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final outputPath = p.join(cacheDir.path, 'tag_video_$timestamp.jpg');
 
       String? savedPath;
 
-      // Strategy 1: Try native plugin (Windows) — extract at specific time
-      if (Platform.isWindows) {
+      // Strategy 1 (WYSIWYG): capture exactly the frame media_kit is currently
+      // showing. The player and the native extractor seek independently, so
+      // re-seeking natively can land on a different (earlier) keyframe than the
+      // one on screen. Screenshotting the displayed frame guarantees the saved
+      // image matches what the user picked.
+      final bytes = await _player.screenshot();
+      if (bytes != null && bytes.isNotEmpty) {
+        // Decode and re-encode as JPEG for consistent file format
+        final decoded = img.decodeImage(bytes);
+        if (decoded != null) {
+          final jpeg = img.encodeJpg(decoded, quality: 95);
+          final file = File(outputPath);
+          await file.writeAsBytes(jpeg);
+          if (await file.exists() && await file.length() > 0) {
+            savedPath = outputPath;
+          }
+        } else {
+          // Raw bytes might already be usable — write directly
+          final file = File(outputPath);
+          await file.writeAsBytes(bytes);
+          if (await file.exists() && await file.length() > 0) {
+            savedPath = outputPath;
+          }
+        }
+      }
+
+      // Strategy 2 (fallback): if the screenshot failed, extract natively using
+      // the player's actual current position (not just the slider value) so we
+      // stay as close as possible to the displayed frame.
+      if (savedPath == null && Platform.isWindows) {
         final posSeconds = _position.inSeconds;
         savedPath = await FcNativeVideoThumbnail.generateThumbnail(
           videoPath: widget.videoPath,
           outputPath: outputPath,
           width: 1024,
           format: 'jpg',
-          timeSeconds: posSeconds > 0 ? posSeconds : null,
+          timeSeconds: posSeconds,
           quality: 95,
         );
-      }
-
-      // Strategy 2: Fallback — use media_kit screenshot
-      if (savedPath == null) {
-        final bytes = await _player.screenshot();
-        if (bytes != null && bytes.isNotEmpty) {
-          // Decode and re-encode as JPEG for consistent file format
-          final decoded = img.decodeImage(bytes);
-          if (decoded != null) {
-            final jpeg = img.encodeJpg(decoded, quality: 95);
-            final file = File(outputPath);
-            await file.writeAsBytes(jpeg);
-            if (await file.exists() && await file.length() > 0) {
-              savedPath = outputPath;
-            }
-          } else {
-            // Raw bytes might already be usable — write directly
-            final file = File(outputPath);
-            await file.writeAsBytes(bytes);
-            if (await file.exists() && await file.length() > 0) {
-              savedPath = outputPath;
-            }
-          }
-        }
       }
 
       if (savedPath != null && mounted) {
@@ -290,7 +305,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                 child: Row(
                   children: [
                     Text(
-                      _formatDuration(_position),
+                      _formatDuration(Duration(seconds: _selectedSecond)),
                       style: TextStyle(
                         fontSize: 12,
                         fontFamily: 'monospace',
@@ -299,12 +314,16 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                     ),
                     Expanded(
                       child: Slider(
-                        value: _position.inMilliseconds
+                        // Use one discrete tick per second so the selected
+                        // frame always maps to an exact second position.
+                        value: _selectedSecond
                             .toDouble()
-                            .clamp(0, _duration.inMilliseconds.toDouble()),
-                        max: _duration.inMilliseconds.toDouble(),
+                            .clamp(0, _duration.inSeconds.toDouble()),
+                        max: _duration.inSeconds.toDouble(),
+                        divisions:
+                            _duration.inSeconds > 0 ? _duration.inSeconds : 1,
                         onChanged: (value) {
-                          _seekTo(Duration(milliseconds: value.round()));
+                          _seekTo(Duration(seconds: value.round()));
                         },
                       ),
                     ),
@@ -452,10 +471,9 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
     return IconButton(
       icon: Icon(icon, size: 20),
       onPressed: () {
-        final newPos = Duration(
-          milliseconds: (_position.inMilliseconds + seconds * 1000)
-              .clamp(0, _duration.inMilliseconds),
-        );
+        final newSecond =
+            (_selectedSecond + seconds).clamp(0, _duration.inSeconds);
+        final newPos = Duration(seconds: newSecond);
         _seekTo(newPos);
       },
       tooltip: tooltip,

@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
@@ -406,9 +408,27 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onTagStateChanged(TagSearchState tagState) {
     if (isClosed) return;
-    final searchResults = tagState.searchResultPaths
+
+    // Child tags are surfaced as virtual folders at the front of the results so
+    // opening a parent tag lists its sub-tags (as folders) alongside its own
+    // files, mirroring how tags behave like folders on the tag screen.
+    final childTagFolders = <FileSystemEntity>[];
+    final currentTag = tagState.currentSearchTag;
+    if (currentTag != null && currentTag.isNotEmpty) {
+      for (final child
+          in TagHierarchyManager.instance.getChildren(currentTag)) {
+        childTagFolders.add(Directory(UriUtils.buildTagSearchPath(child)));
+      }
+    }
+
+    final fileResults = tagState.searchResultPaths
         .map<FileSystemEntity>((path) => File(path))
         .toList(growable: false);
+
+    final searchResults = <FileSystemEntity>[
+      ...childTagFolders,
+      ...fileResults,
+    ];
 
     // ignore: invalid_use_of_visible_for_testing_member
     emit(state.copyWith(

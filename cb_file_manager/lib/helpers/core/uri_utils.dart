@@ -25,6 +25,14 @@ class UriUtils {
     return '#search?tag=${safeEncodeComponent(tag)}';
   }
 
+  /// Returns `true` when [path] is a tag-search path (`#search?tag=...`).
+  ///
+  /// A tag is conceptually a folder in this app, so tag-search paths are used
+  /// both to open a tag tab and to represent a child tag as a virtual folder
+  /// inside a parent tag's result grid.
+  static bool isTagSearchPath(String path) =>
+      extractTagFromSearchPath(path) != null;
+
   /// Extract the tag from a #search?tag=... path, if present.
   /// Returns null when the path doesn't contain a valid tag.
   static String? extractTagFromSearchPath(String path) {

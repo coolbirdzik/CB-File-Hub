@@ -1,7 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import '../../../components/common/shared_file_context_menu.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../bloc/selection/selection_bloc.dart';
@@ -9,6 +13,7 @@ import '../../../../bloc/selection/selection_event.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../components/common/optimized_interaction_handler.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/tag_context_menu.dart';
 import '../../../utils/item_interaction_style.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
@@ -49,6 +54,10 @@ class _FolderItemState extends State<FolderItem> {
   static final Map<String, FileStat> _folderStatCache = <String, FileStat>{};
   static const int _maxCacheSize = 100;
 
+  /// Tag name when this "folder" is actually a child tag (path `#search?tag=`),
+  /// otherwise null. A tag behaves like a folder in the results grid/list.
+  String? get _tagName => UriUtils.extractTagFromSearchPath(widget.folder.path);
+
   @override
   void initState() {
     super.initState();
@@ -72,9 +81,9 @@ class _FolderItemState extends State<FolderItem> {
   Future<FileStat> _getFolderStatLazy() async {
     final path = widget.folder.path;
 
-    // Skip stat for virtual network paths to prevent errors and jank
-    if (path.startsWith('#network/')) {
-      return Future.error('Network folder - no stat needed');
+    // Skip stat for virtual network / tag paths to prevent errors and jank
+    if (path.startsWith('#network/') || path.startsWith('#search')) {
+      return Future.error('Virtual folder - no stat needed');
     }
 
     // Serve from cache if available
@@ -93,6 +102,71 @@ class _FolderItemState extends State<FolderItem> {
     return stat;
   }
 
+  /// Leading icon: for a child-tag "folder" show its thumbnail (or a
+  /// color-tinted tag placeholder); otherwise the standard folder icon.
+  Widget _buildLeadingIcon(BuildContext context) {
+    final tagName = _tagName;
+    if (tagName != null) {
+      final tagColor = TagColorManager.instance.getTagColor(tagName);
+      final thumbnailPath =
+          TagThumbnailManager.instance.getThumbnailSync(tagName);
+      if (thumbnailPath != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16.0),
+          child: Image.file(
+            File(thumbnailPath),
+            width: 48,
+            height: 48,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildTagIconPlaceholder(tagColor),
+          ),
+        );
+      }
+      return _buildTagIconPlaceholder(tagColor);
+    }
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16.0),
+      ),
+      child: Center(
+        child: Icon(
+          PhosphorIconsLight.folder,
+          color: Theme.of(context).colorScheme.primary,
+          size: 28,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTagIconPlaceholder(Color tagColor) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            tagColor.withValues(alpha: 0.55),
+            tagColor.withValues(alpha: 0.22),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16.0),
+      ),
+      child: Center(
+        child: Icon(
+          PhosphorIconsLight.tag,
+          color: Colors.white.withValues(alpha: 0.85),
+          size: 26,
+        ),
+      ),
+    );
+  }
+
   void _handleFolderSelection() {
     if (widget.toggleFolderSelection == null) return;
 
@@ -102,9 +176,12 @@ class _FolderItemState extends State<FolderItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    final bool shouldCtrlSelect = widget.isDesktopMode
-        ? isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed)
-        : true;
+    // On desktop, a plain click selects only the clicked item (clearing the
+    // previous selection); Ctrl+click adds/toggles it. Mirror the file item
+    // behavior here — using `lastSelectedPath != null` made every click after
+    // the first behave like a Ctrl+click, so the old selection was never
+    // cleared.
+    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
     // Call toggleFolderSelection with appropriate parameters
     widget.toggleFolderSelection!(widget.folder.path,
@@ -112,6 +189,18 @@ class _FolderItemState extends State<FolderItem> {
   }
 
   void _showFolderContextMenu(BuildContext context, Offset? globalPosition) {
+    // A tag rendered as a folder-like card uses the tag context menu, not the
+    // filesystem folder menu.
+    final tagName = _tagName;
+    if (tagName != null) {
+      showTagContextMenu(
+        context,
+        tagName,
+        globalPosition: globalPosition,
+      );
+      return;
+    }
+
     // Check for multiple selection
     try {
       final selectionBloc = context.read<SelectionBloc>();
@@ -194,24 +283,7 @@ class _FolderItemState extends State<FolderItem> {
                           vertical: 12.0, horizontal: 16.0),
                       child: Row(
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(16.0),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                PhosphorIconsLight.folder,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 28,
-                              ),
-                            ),
-                          ),
+                          _buildLeadingIcon(context),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
@@ -235,7 +307,7 @@ class _FolderItemState extends State<FolderItem> {
                                         maxLines: 1,
                                       )
                                     : Text(
-                                        widget.folder.basename(),
+                                        _tagName ?? widget.folder.basename(),
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleMedium
@@ -246,28 +318,55 @@ class _FolderItemState extends State<FolderItem> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                 const SizedBox(height: 4),
-                                FutureBuilder<FileStat>(
-                                  future: _folderStatFuture,
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData) {
+                                if (_tagName != null)
+                                  Text(
+                                    AppLocalizations.of(context)!.tagPrefix,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.7),
+                                        ),
+                                  )
+                                else
+                                  FutureBuilder<FileStat>(
+                                    future: _folderStatFuture,
+                                    builder: (context, snapshot) {
+                                      if (snapshot.hasData) {
+                                        return Text(
+                                          snapshot.data!.modified
+                                              .toString()
+                                              .split('.')[0],
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.7),
+                                              ),
+                                        );
+                                      } else if (snapshot.hasError) {
+                                        // For network folders or stat errors
+                                        return Text(
+                                          '—',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withValues(alpha: 0.5),
+                                              ),
+                                        );
+                                      }
                                       return Text(
-                                        snapshot.data!.modified
-                                            .toString()
-                                            .split('.')[0],
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.7),
-                                            ),
-                                      );
-                                    } else if (snapshot.hasError) {
-                                      // For network folders or stat errors
-                                      return Text(
-                                        '—',
+                                        'Loading...',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall
@@ -278,21 +377,8 @@ class _FolderItemState extends State<FolderItem> {
                                                   .withValues(alpha: 0.5),
                                             ),
                                       );
-                                    }
-                                    return Text(
-                                      'Loading...',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.5),
-                                          ),
-                                    );
-                                  },
-                                ),
+                                    },
+                                  ),
                               ],
                             ),
                           ),

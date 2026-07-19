@@ -7,8 +7,7 @@ import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/file_details_screen.dart';
-import 'package:cb_file_manager/ui/dialogs/video_frame_picker_dialog.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:cb_file_manager/ui/dialogs/thumbnail_browser_dialog.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
@@ -20,6 +19,7 @@ import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -95,6 +95,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   // Focused tag - for visual selection highlight (click to select)
   String? _focusedTag;
+
+  // Drill-down navigation (list/grid views only). Empty = root level, where
+  // only tags without a parent are shown. Each entry is the display-cased name
+  // of a parent tag the user has navigated into. Search ignores this scope and
+  // shows all matching tags across the hierarchy.
+  final List<String> _drillPath = [];
 
   // Search functionality
   final TextEditingController _searchController = TextEditingController();
@@ -208,17 +214,46 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   bool _onKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      // Still track modifier state on any event type.
+      setState(() {
+        _isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
+        _isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+      });
+      return false;
+    }
+
     final isCtrlOrMetaPressed = HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
-    final isSelectAll = event is KeyDownEvent &&
-        isCtrlOrMetaPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyA;
 
-    if (isSelectAll &&
+    // Ctrl+A — select all tags.
+    if (isCtrlOrMetaPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyA &&
         _selectedTagForFiles == null &&
         _editingTag == null &&
         !_isTextInputFocused()) {
       _selectAllFilteredTags();
+      return true;
+    }
+
+    // Ctrl+F — toggle search bar.
+    if (isCtrlOrMetaPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyF &&
+        _selectedTagForFiles == null &&
+        !_isTextInputFocused()) {
+      _toggleSearch();
+      return true;
+    }
+
+    // F5 / Ctrl+R — refresh tags.
+    final isRefresh = event.logicalKey == LogicalKeyboardKey.f5 ||
+        (isCtrlOrMetaPressed && event.logicalKey == LogicalKeyboardKey.keyR);
+    if (isRefresh && !_isTextInputFocused()) {
+      if (_selectedTagForFiles == null) {
+        _refreshTags();
+      } else {
+        _refreshSelectedTagFiles();
+      }
       return true;
     }
 
@@ -328,10 +363,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       return;
     }
 
+    final modeChanged = newTagMode != _viewMode;
     setState(() {
       _viewMode = newTagMode;
       _tagGridZoomLevel = result.gridZoomLevel;
     });
+    // Switching to/from tree changes whether the drill scope applies.
+    if (modeChanged) _filterTags();
     _saveTagGridZoom(result.gridZoomLevel);
   }
 
@@ -442,7 +480,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _tagThumbnailManager.initialize(),
       _tagHierarchyManager.initialize(),
     ]);
-    if (mounted) setState(() {});
+    if (mounted) {
+      // Re-filter now that the hierarchy is known: the root drill scope hides
+      // child tags, which requires the hierarchy to be loaded.
+      _filterTags();
+    }
   }
 
   Future<void> _initializeDatabase() async {
@@ -494,6 +536,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
+  /// Refresh tags with loading indicator — called by the toolbar button and F5.
+  Future<void> _refreshTags() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    await _loadAllTags();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
   void _filterTags() {
     if (!mounted) return;
 
@@ -503,8 +553,16 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       // Step 1: Text search
       List<String> result;
       if (query.isEmpty) {
-        result = List.from(_allTags);
+        // No search: apply the drill-down scope so only the current level is
+        // shown (root tags, or the children of the tag we drilled into). The
+        // tree view has its own scoping and always sees the full set.
+        if (_drillPath.isNotEmpty) _pruneDrillPath();
+        result = _viewMode == _TagViewMode.tree
+            ? List.from(_allTags)
+            : _tagsInCurrentDrillScope();
       } else {
+        // Searching ignores the drill scope and matches across the whole
+        // hierarchy so children are always findable.
         result =
             _allTags.where((tag) => tag.toLowerCase().contains(query)).toList();
       }
@@ -540,6 +598,81 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _sortTags();
       _updatePagination();
     });
+  }
+
+  /// Returns the tags that belong to the current drill-down level (used by the
+  /// list/grid views when not searching).
+  ///
+  /// * At the root ([_drillPath] empty): every tag that has no parent, i.e.
+  ///   root parents plus standalone tags.
+  /// * Inside a parent: the direct children of the deepest tag in [_drillPath],
+  ///   mapped back to their display-cased names.
+  List<String> _tagsInCurrentDrillScope() {
+    if (_drillPath.isEmpty) {
+      return _allTags
+          .where((t) => !_tagHierarchyManager.isChild(t))
+          .toList();
+    }
+
+    final parent = _drillPath.last;
+    final displayMap = _normalizedToDisplay;
+    return _tagHierarchyManager
+        .getChildren(parent)
+        .map((normalized) => displayMap[normalized] ?? normalized)
+        .toList();
+  }
+
+  /// Drops any drill-path entries that no longer exist as tags or are no longer
+  /// parents (e.g. after a rename, delete, or hierarchy change). Truncates at
+  /// the first invalid segment so the remaining path stays consistent. Does not
+  /// call setState — meant to run inside an existing rebuild.
+  void _pruneDrillPath() {
+    final known = _allTags.map((t) => t.toLowerCase()).toSet();
+    var validCount = 0;
+    for (final tag in _drillPath) {
+      if (!known.contains(tag.toLowerCase()) ||
+          !_tagHierarchyManager.isParent(tag)) {
+        break;
+      }
+      validCount++;
+    }
+    if (validCount < _drillPath.length) {
+      _drillPath.removeRange(validCount, _drillPath.length);
+    }
+  }
+
+  /// Navigate into [tag]'s children (list/grid drill-down). Only meaningful for
+  /// a parent tag; callers should check [TagHierarchyManager.isParent] first.
+  void _drillIntoTag(String tag) {
+    _drillPath.add(tag);
+    _selectedTags.clear();
+    _focusedTag = null;
+    _currentPage = 0;
+    // Clear any active search so the drilled level is visible. Clearing the
+    // controller fires _filterTags via its listener; otherwise call it
+    // directly. _filterTags wraps its work in setState.
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+    } else {
+      _filterTags();
+    }
+  }
+
+  /// Navigate up one drill-down level (or to a specific breadcrumb index when
+  /// [toIndex] is given; -1 means the root).
+  void _drillUp({int? toIndex}) {
+    if (toIndex == null) {
+      if (_drillPath.isNotEmpty) _drillPath.removeLast();
+    } else {
+      final keep = toIndex + 1;
+      if (keep < _drillPath.length) {
+        _drillPath.removeRange(keep, _drillPath.length);
+      }
+    }
+    _selectedTags.clear();
+    _focusedTag = null;
+    _currentPage = 0;
+    _filterTags();
   }
 
   /// Sort the filtered tags based on the current sort criteria.
@@ -668,7 +801,62 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     });
   }
 
+  /// Handles a double-click / activation on a tag in the list or grid views.
+  ///
+  /// * Parent tag (has children): drill into its children in the current view.
+  /// * Leaf / standalone tag: open the files with that tag (existing behavior).
+  ///
+  /// While searching, drilling is disabled — activation always opens files so
+  /// results stay actionable.
+  void _activateTag(String tag) {
+    if (_searchController.text.isEmpty && _tagHierarchyManager.isParent(tag)) {
+      _drillIntoTag(tag);
+    } else {
+      _directTagSearch(tag);
+    }
+  }
+
+  /// Opens the files for [tag] in the CURRENT tab, navigating in place just
+  /// like browsing into a folder. The active tab (which hosts this tag screen)
+  /// has its path updated to the tag-search path, so its content swaps to the
+  /// results and the navigation history/back button work as usual.
+  ///
+  /// Falls back to adding a tab only when there is no active tab, or when the
+  /// screen is used outside the tab system (via [widget.onTagSelected]).
   Future<void> _directTagSearch(String tag) async {
+    try {
+      // When embedded outside the tab system, defer to the host callback.
+      if (widget.onTagSelected != null) {
+        widget.onTagSelected!(tag);
+        return;
+      }
+
+      final tabManagerBloc = BlocProvider.of<TabManagerBloc>(context);
+      final tagSearchPath = UriUtils.buildTagSearchPath(tag);
+      final activeTabId = tabManagerBloc.state.activeTabId;
+
+      if (activeTabId != null && activeTabId.isNotEmpty) {
+        // Navigate the current tab in place, like opening a folder.
+        tabManagerBloc.add(UpdateTabPath(activeTabId, tagSearchPath));
+        tabManagerBloc.add(UpdateTabName(activeTabId, 'Tag: $tag'));
+      } else {
+        // No active tab to reuse: open one.
+        tabManagerBloc.add(
+          AddTab(
+            path: tagSearchPath,
+            name: 'Tag: $tag',
+            switchToTab: true,
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.warning('Error opening tag in current tab: $e');
+    }
+  }
+
+  /// Opens the files for [tag] in a NEW tab (explicit "Open in New Tab" action
+  /// and middle-click). If a tab already shows this tag, switches to it.
+  Future<void> _openTagInNewTab(String tag) async {
     try {
       final tabManagerBloc = BlocProvider.of<TabManagerBloc>(context);
       final tagSearchPath = UriUtils.buildTagSearchPath(tag);
@@ -697,12 +885,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   /// Handle a single tap on a tag with double-click detection.
   ///
   /// On desktop: schedules a delayed `_selectTag()` call. If a second tap comes
-  /// within 250ms, the timer is cancelled and `_directTagSearch()` runs instead.
+  /// within 250ms, the timer is cancelled and `_activateTag()` runs instead
+  /// (drill into a parent, or open files for a leaf).
   ///
-  /// On mobile: tap immediately opens the tag (no double-tap on touch).
+  /// On mobile: tap immediately activates the tag (no double-tap on touch).
   void _handleTagTap(String tag) {
     if (!_isDesktop) {
-      _directTagSearch(tag);
+      _activateTag(tag);
       return;
     }
 
@@ -710,7 +899,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     if (_singleTapTimer?.isActive == true && _pendingSingleTapTag == tag) {
       _singleTapTimer!.cancel();
       _pendingSingleTapTag = null;
-      _directTagSearch(tag);
+      _activateTag(tag);
       return;
     }
 
@@ -1408,15 +1597,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   onPressed: () => Navigator.of(context).pop(null),
                   child: Text(AppLocalizations.of(context)!.cancel),
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).pop('video'),
-                  icon: const Icon(PhosphorIconsLight.filmSlate, size: 18),
-                  label: const Text('From Video'),
-                ),
                 ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).pop('image'),
+                  onPressed: () => Navigator.of(context).pop('browse'),
                   icon: const Icon(PhosphorIconsLight.folderOpen, size: 18),
-                  label: const Text('Browse Image'),
+                  label: Text(AppLocalizations.of(context)!.browse),
                 ),
               ],
             );
@@ -1425,10 +1609,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       },
     );
 
-    if (result == 'image') {
-      await _pickThumbnailImage(tag);
-    } else if (result == 'video') {
-      await _pickThumbnailFromVideo(tag);
+    if (result == 'browse') {
+      await _pickThumbnailFromBrowser(tag);
     } else if (result == 'remove') {
       await _tagThumbnailManager.deleteThumbnail(tag);
       if (mounted) {
@@ -1438,20 +1620,18 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  Future<void> _pickThumbnailImage(String tag) async {
+  /// Opens the shared thumbnail browser (folders + tag search, with inline
+  /// video-frame extraction) and applies the chosen image as the tag thumbnail.
+  Future<void> _pickThumbnailFromBrowser(String tag) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-        dialogTitle: 'Choose thumbnail for "$tag"',
+      final imagePath = await showThumbnailBrowserDialog(
+        context,
+        title: '${AppLocalizations.of(context)!.setThumbnail}: "$tag"',
+        initialTagQuery: tag,
       );
+      if (imagePath == null) return;
 
-      if (result == null || result.files.isEmpty) return;
-
-      final filePath = result.files.single.path;
-      if (filePath == null) return;
-
-      final ok = await _tagThumbnailManager.setThumbnail(tag, filePath);
+      final ok = await _tagThumbnailManager.setThumbnail(tag, imagePath);
       if (mounted) {
         if (ok) {
           AppToast.success(context, 'Thumbnail set for "$tag"');
@@ -1462,45 +1642,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       }
     } catch (e) {
       AppLogger.error('Error picking thumbnail: $e');
-      if (mounted) {
-        AppToast.error(context, 'Error: $e');
-      }
-    }
-  }
-
-  /// Pick a video file, then open the video frame picker to extract a frame.
-  Future<void> _pickThumbnailFromVideo(String tag) async {
-    try {
-      // Step 1: Pick a video file
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.video,
-        allowMultiple: false,
-        dialogTitle: 'Choose video for "$tag" thumbnail',
-      );
-
-      if (result == null || result.files.isEmpty) return;
-
-      final videoPath = result.files.single.path;
-      if (videoPath == null) return;
-
-      // Step 2: Open video frame picker dialog
-      if (!mounted) return;
-      final framePath = await VideoFramePickerDialog.show(context, videoPath);
-
-      if (framePath == null) return;
-
-      // Step 3: Set the extracted frame as thumbnail
-      final ok = await _tagThumbnailManager.setThumbnail(tag, framePath);
-      if (mounted) {
-        if (ok) {
-          AppToast.success(context, 'Video frame thumbnail set for "$tag"');
-          setState(() {});
-        } else {
-          AppToast.error(context, 'Failed to set video frame thumbnail');
-        }
-      }
-    } catch (e) {
-      AppLogger.error('Error picking video thumbnail: $e');
       if (mounted) {
         AppToast.error(context, 'Error: $e');
       }
@@ -1638,9 +1779,26 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       body = _buildTagsList();
     }
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
+    // Intercept back so drilling and in-screen state unwind one level at a
+    // time. canPop is false while there is in-screen state to step out of, so
+    // gesture/hardware back is routed to _handleBack; otherwise the tab may
+    // close normally. The Listener adds the desktop mouse back button (8).
+    final bool canPopTab = !_hasInScreenBackState();
+    return PopScope(
+      canPop: canPopTab,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack(context);
+      },
+      child: Listener(
+        onPointerDown: (event) {
+          if (event.buttons == kBackMouseButton) {
+            _handleBack(context);
+          }
+        },
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Column(
         children: [
           // Header bar aligned with the mobile file management layout.
           Container(
@@ -1704,11 +1862,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         ? null
                         : showingTaggedFiles
                             ? _refreshSelectedTagFiles
-                            : () async {
-                                setState(() => _isLoading = true);
-                                await _loadAllTags();
-                                if (mounted) setState(() => _isLoading = false);
-                              },
+                            : _refreshTags,
                     tooltip: localizations.refresh,
                   ),
                 ],
@@ -1778,6 +1932,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               ),
             )
           : null,
+        ),
+      ),
     );
   }
 
@@ -1951,6 +2107,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       onSelected: (mode) {
         if (mode != _viewMode) {
           setState(() => _viewMode = mode);
+          // Tree shows the whole hierarchy; list/grid honor the drill scope.
+          // Recompute the visible set for the new mode.
+          _filterTags();
         }
       },
     );
@@ -2060,6 +2219,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     },
             ),
             ListTile(
+              leading: const Icon(PhosphorIconsLight.pencilSimple),
+              title: Text(localizations.renameTag),
+              onTap: _selectedTagForFiles == null
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      if (_isDesktop) {
+                        _startTagRename(_selectedTagForFiles!);
+                      } else {
+                        _showRenameDialog(_selectedTagForFiles!);
+                      }
+                    },
+            ),
+            ListTile(
               leading: const Icon(PhosphorIconsLight.palette),
               title: Text(localizations.changeColor),
               onTap: _selectedTagForFiles == null
@@ -2070,6 +2243,26 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     },
             ),
             ListTile(
+              leading: const Icon(PhosphorIconsLight.image),
+              title: Text(localizations.setThumbnail),
+              onTap: _selectedTagForFiles == null
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _showThumbnailPicker(_selectedTagForFiles!);
+                    },
+            ),
+            ListTile(
+              leading: const Icon(PhosphorIconsLight.treeStructure),
+              title: Text(localizations.manageHierarchy),
+              onTap: _selectedTagForFiles == null
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _showManageHierarchyDialog(_selectedTagForFiles!);
+                    },
+            ),
+            ListTile(
               leading: const Icon(PhosphorIconsLight.arrowsClockwise),
               title: Text(localizations.refresh),
               onTap: () {
@@ -2077,6 +2270,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 _refreshSelectedTagFiles();
               },
             ),
+            ListTile(
+              leading: Icon(PhosphorIconsLight.trash,
+                  color: theme.colorScheme.error),
+              title: Text(
+                localizations.deleteTagFromAllFiles,
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+              onTap: _selectedTagForFiles == null
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _confirmDeleteTag(_selectedTagForFiles!);
+                    },
+            ),
+            const Divider(height: 1),
             ListTile(
               leading: const Icon(PhosphorIconsLight.arrowLeft),
               title: Text(localizations.backToAllTags),
@@ -2103,6 +2311,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   /// Handle back navigation - close tab or pop navigator
   void _handleBack(BuildContext context) {
+    // Step out of any in-screen state one level at a time before leaving the
+    // tab, so back behaves consistently whether triggered by the header button,
+    // the mouse back button, or a gesture/hardware back.
+    if (_stepBackWithinScreen()) return;
+
     // Try to get TabManagerBloc
     TabManagerBloc? tabBloc;
     try {
@@ -2122,6 +2335,53 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     // Fallback to navigator pop
     Navigator.of(context).pop();
+  }
+
+  /// Whether there is any in-screen state that back should unwind before the
+  /// tab is allowed to close. Mirrors the conditions in [_stepBackWithinScreen].
+  bool _hasInScreenBackState() {
+    final bool showingTaggedFiles = _selectedTagForFiles != null;
+    if (_isSearching && !showingTaggedFiles) return true;
+    if (_selectedTags.isNotEmpty && !showingTaggedFiles) return true;
+    if (showingTaggedFiles) return true;
+    if (_drillPath.isNotEmpty) return true;
+    return false;
+  }
+
+  /// Unwinds one level of in-screen navigation state. Returns true when it
+  /// handled the back action (so the caller should not close the tab / pop).
+  ///
+  /// Order mirrors what the user sees, from most transient to most persistent:
+  /// an open search, an active selection, the tagged-files view, and finally a
+  /// drill-down level inside a parent tag.
+  bool _stepBackWithinScreen() {
+    final bool showingTaggedFiles = _selectedTagForFiles != null;
+
+    // Close an open inline search first.
+    if (_isSearching && !showingTaggedFiles) {
+      _toggleSearch();
+      return true;
+    }
+
+    // Clear a multi-select before anything else navigational.
+    if (_selectedTags.isNotEmpty && !showingTaggedFiles) {
+      _deselectAllTags();
+      return true;
+    }
+
+    // Leave the tagged-files view back to the tag list.
+    if (showingTaggedFiles) {
+      _clearTagSelection();
+      return true;
+    }
+
+    // Drill up one level inside a parent tag.
+    if (_drillPath.isNotEmpty) {
+      _drillUp();
+      return true;
+    }
+
+    return false;
   }
 
   Future<void> _showTagOptions(String tag, {Offset? globalPosition}) async {
@@ -2158,13 +2418,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             icon: PhosphorIconsLight.folder,
             onSelected: (_) => _directTagSearch(tag),
           ),
-          if (widget.onTagSelected == null)
-            ContextMenuAction(
-              id: 'open_tab',
-              label: l10n.openInNewTab,
-              icon: PhosphorIconsLight.appWindow,
-              onSelected: (_) => _directTagSearch(tag),
-            ),
+          ContextMenuAction(
+            id: 'open_tab',
+            label: l10n.openInNewTab,
+            icon: PhosphorIconsLight.appWindow,
+            onSelected: (_) => _openTagInNewTab(tag),
+          ),
         ],
       ),
       ContextMenuSection(
@@ -2368,6 +2627,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         if (_hierarchyFilter != 'all' || _thumbnailFilter != 'all')
           _buildActiveFiltersBar(theme),
 
+        // Drill-down breadcrumb (list/grid only, when inside a parent tag)
+        if (_drillPath.isNotEmpty &&
+            _viewMode != _TagViewMode.tree &&
+            _searchController.text.isEmpty)
+          _buildDrillBreadcrumb(theme),
+
         // Tags list, grid or tree
         Expanded(
           child: _buildTagsContent(),
@@ -2480,6 +2745,81 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Breadcrumb for drill-down navigation: "All Tags › parent › child".
+  /// Tapping a segment jumps to that level; tapping "All Tags" returns to root.
+  Widget _buildDrillBreadcrumb(ThemeData theme) {
+    final l10n = AppLocalizations.of(context)!;
+
+    final segments = <Widget>[];
+
+    Widget crumb(String label, VoidCallback? onTap, {required bool isLast}) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
+              color: isLast
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.primary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+
+    Widget separator() => Icon(
+          PhosphorIconsLight.caretRight,
+          size: 14,
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+        );
+
+    // Root crumb ("All Tags").
+    segments.add(crumb(
+      l10n.allTags,
+      _drillPath.isEmpty ? null : () => _drillUp(toIndex: -1),
+      isLast: _drillPath.isEmpty,
+    ));
+
+    for (var i = 0; i < _drillPath.length; i++) {
+      final isLast = i == _drillPath.length - 1;
+      segments.add(separator());
+      segments.add(crumb(
+        _drillPath[i],
+        isLast ? null : () => _drillUp(toIndex: i),
+        isLast: isLast,
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(PhosphorIconsLight.arrowLeft, size: 20),
+            tooltip: l10n.back,
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _drillUp(),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(children: segments),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -3014,7 +3354,15 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           }
         });
 
-        return GestureDetector(
+        return Listener(
+          onPointerDown: isEditing
+              ? null
+              : (event) {
+                  if (event.buttons == kMiddleMouseButton) {
+                    _openTagInNewTab(tag);
+                  }
+                },
+          child: GestureDetector(
           onSecondaryTapUp: isEditing
               ? null
               : (details) =>
@@ -3204,6 +3552,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 ),
               ],
             ),
+          ),
           ),
         );
       },
@@ -3753,13 +4102,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     }
                   });
 
-                  return Material(
+                  return Listener(
+                    onPointerDown: isEditing
+                        ? null
+                        : (event) {
+                            if (event.buttons == kMiddleMouseButton) {
+                              _openTagInNewTab(tag);
+                            }
+                          },
+                    child: Material(
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16.0),
                       onTap: isEditing ? null : () => _handleTagTap(tag),
-                      onDoubleTap:
-                          isEditing ? null : () => _directTagSearch(tag),
+                      onDoubleTap: isEditing ? null : () => _activateTag(tag),
                       onLongPress:
                           isEditing ? null : () => _showTagOptions(tag),
                       onSecondaryTapUp: isEditing
@@ -4043,8 +4399,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                 )
                                               else
                                                 Tooltip(
-                                                  message:
-                                                      'Double click to open in new tab',
+                                                  message: _tagHierarchyManager
+                                                          .isParent(tag)
+                                                      ? 'Double click to open child tags'
+                                                      : 'Double click to open files',
                                                   child: Column(
                                                     children: [
                                                       Text(
@@ -4081,6 +4439,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         ],
                       ),
                     ),
+                  ),
                   );
                 },
               );

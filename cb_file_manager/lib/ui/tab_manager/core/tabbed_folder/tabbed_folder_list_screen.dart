@@ -1286,6 +1286,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             onPaste: _handlePaste,
             onRename: _handleRename,
             onRefresh: _refreshFileList,
+            onSearch: () => unawaited(_toggleSearchBar(context)),
             onScrollToIndex: _scrollToIndex,
             event: event,
           );

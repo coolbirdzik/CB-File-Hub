@@ -63,6 +63,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get pasteHere => 'Dán vào đây';
   @override
+  String get manage => 'Quản lý';
+  @override
   String get manageTags => 'Quản lý thẻ';
   @override
   String get moveToTrash => 'Chuyển vào thùng rác';
@@ -643,6 +645,10 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get viewFilesWithTag => 'Xem tệp với thẻ';
   @override
+  String get setThumbnail => 'Đặt ảnh thu nhỏ';
+  @override
+  String get manageHierarchy => 'Quản lý phân cấp';
+  @override
   String get renameTag => 'Đổi tên thẻ';
   @override
   String tagRenamed(String oldTag, String newTag) =>
@@ -1125,6 +1131,14 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get chooseThumbnail => 'Chọn thumbnail';
   @override
+  String get cropImage => 'Cắt ảnh';
+  @override
+  String get applyCrop => 'Áp dụng';
+  @override
+  String get useOriginal => 'Dùng ảnh gốc';
+  @override
+  String get aspectFree => 'Tự do';
+  @override
   String get clearThumbnail => 'Xóa thumbnail';
   @override
   String get thumbnailAuto => 'Tự động (video/ảnh đầu tiên)';
@@ -1604,6 +1618,36 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cacheManagementDescription =>
       'Xóa dữ liệu cache để giải phóng bộ nhớ';
+
+  @override
+  String get appDataManagement => 'Quản lý dữ liệu ứng dụng';
+
+  @override
+  String get appDataManagementDescription =>
+      'Xem và xóa dữ liệu cache và dữ liệu đã lưu của ứng dụng';
+
+  @override
+  String get documentsData => 'Dữ liệu đã lưu';
+
+  @override
+  String get documentsDataDescription =>
+      'Các tệp lưu bền trong Documents, không bị xóa khi dọn cache';
+
+  @override
+  String get tagThumbnails => 'Ảnh thu nhỏ của thẻ';
+
+  @override
+  String get tagThumbnailsDescription =>
+      'Ảnh bạn chọn làm ảnh thu nhỏ cho thẻ (khung hình trích từ video)';
+
+  @override
+  String get clearTagThumbnails => 'Xóa ảnh thu nhỏ của thẻ';
+
+  @override
+  String get tagThumbnailsCleared => 'Đã xóa ảnh thu nhỏ của thẻ';
+
+  @override
+  String get documentsRoot => 'Thư mục Documents';
 
   @override
   String get cacheFolder => 'Thư mục cache:';
@@ -2442,6 +2486,9 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get quickAccess => 'Truy cập nhanh';
+
+  @override
+  String get thisPC => 'Máy tính này';
 
   @override
   String get browseAllYourPictures => 'Duyệt tất cả hình ảnh của bạn';

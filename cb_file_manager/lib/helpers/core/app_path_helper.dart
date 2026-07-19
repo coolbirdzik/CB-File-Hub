@@ -13,6 +13,9 @@ class AppPathHelper {
   // Cached root directory instance
   static Directory? _rootDirectory;
 
+  // Cached persistent (non-temp) root directory instance
+  static Directory? _persistentRootDirectory;
+
   /// Return the platform-appropriate base cache directory (temp/support).
   static Future<Directory> _getPlatformCacheBase() async {
     // For mobile platforms we prefer application cache directory to avoid
@@ -52,6 +55,25 @@ class AppPathHelper {
   /// Synchronously return root directory path if already initialized, else null.
   static String? get rootPath => _rootPath;
 
+  /// Get/create the persistent root directory: <appDocuments>/cb_file_hub.
+  ///
+  /// Unlike [getRootDir] (which lives under the OS temp/cache directory and may
+  /// be wiped by the OS or a cleaner), this lives under the application
+  /// documents directory so its contents survive across sessions. Use it for
+  /// data that must not disappear, e.g. tag thumbnails the user has chosen.
+  static Future<Directory> getPersistentRootDir() async {
+    if (_persistentRootDirectory != null) return _persistentRootDirectory!;
+
+    final baseDir = await getApplicationDocumentsDirectory();
+    final rootPath = p.join(baseDir.path, 'cb_file_hub');
+    final rootDir = Directory(rootPath);
+    if (!await rootDir.exists()) {
+      await rootDir.create(recursive: true);
+    }
+    _persistentRootDirectory = rootDir;
+    return rootDir;
+  }
+
   /// Ensure and return a sub-folder inside the root directory.
   static Future<Directory> _subDir(String name) async {
     final root = await getRootDir();
@@ -62,11 +84,25 @@ class AppPathHelper {
     return dir;
   }
 
+  /// Ensure and return a sub-folder inside the persistent root directory.
+  static Future<Directory> _persistentSubDir(String name) async {
+    final root = await getPersistentRootDir();
+    final dir = Directory(p.join(root.path, name));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
   /// Directory for video thumbnails
   static Future<Directory> getVideoCacheDir() => _subDir('video_thumbnails');
 
-  /// Directory for tag thumbnails (extracted from video frames, etc.)
-  static Future<Directory> getTagThumbnailDir() => _subDir('tag_thumbnails');
+  /// Directory for tag thumbnails (extracted from video frames, etc.).
+  ///
+  /// Stored under the persistent (documents) root rather than the temp/cache
+  /// root, since a user-chosen tag thumbnail must survive OS cache cleanup.
+  static Future<Directory> getTagThumbnailDir() =>
+      _persistentSubDir('tag_thumbnails');
 
   /// Ensure and return a named sub-folder inside the root directory.
   static Future<Directory> getSubDir(String name) => _subDir(name);

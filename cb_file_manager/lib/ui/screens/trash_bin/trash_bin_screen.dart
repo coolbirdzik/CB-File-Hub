@@ -753,16 +753,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   List<Widget> _buildNormalActions(AppLocalizations l10n) {
     return SharedActionBar.buildCommonActions(
       context: context,
-      onSearchPressed: () {
-        setState(() {
-          _showSearch = !_showSearch;
-          if (!_showSearch) {
-            _searchQuery = '';
-            _searchController.clear();
-            _recomputeDisplayItems();
-          }
-        });
-      },
+      onSearchPressed: _toggleSearch,
       isSearchActive: _showSearch,
       onSortOptionSelected: (option) {
         setState(() {
@@ -905,6 +896,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
                 }
                 await _deleteSelectedItems();
               },
+              onSearch: _toggleSearch,
               onEscape: _showSearch || _selectionBloc.state.selectedCount > 0
                   ? _handleEscape
                   : null,
@@ -947,6 +939,16 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       _searchController.clear();
       _recomputeDisplayItems();
     });
+  }
+
+  void _toggleSearch() {
+    if (_showSearch) {
+      _closeSearch();
+    } else {
+      setState(() {
+        _showSearch = true;
+      });
+    }
   }
 
   String _getErrorMessage(AppLocalizations l10n) {

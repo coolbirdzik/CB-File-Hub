@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/media/folder_thumbnail_service.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
+import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/material.dart';
@@ -72,7 +75,13 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
       }
     });
 
-    _loadFromCacheOrFetch();
+    // Tag "folders" render synchronously in build(); skip the folder
+    // thumbnail service entirely.
+    if (UriUtils.extractTagFromSearchPath(widget.folder.path) == null) {
+      _loadFromCacheOrFetch();
+    } else {
+      _isLoading = false;
+    }
     _videoThumbnailReadySubscription =
         VideoThumbnailHelper.onThumbnailReady.listen((readyVideoPath) async {
       if (_videoPath == null || readyVideoPath != _videoPath) {
@@ -261,6 +270,13 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
   Widget _buildThumbnailContent(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
+    // Tag "folders" (path #search?tag=...) render a tag thumbnail or a
+    // color-tinted placeholder, mirroring the tag management screen.
+    final tagName = UriUtils.extractTagFromSearchPath(widget.folder.path);
+    if (tagName != null) {
+      return _buildTagThumbnail(context, tagName);
+    }
+
     if (_isLoading) {
       return _buildLoadingPlaceholder();
     }
@@ -393,6 +409,49 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
         PhosphorIconsLight.folder,
         size: widget.size * 0.7,
         color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
+  /// Renders the thumbnail for a tag "folder": the tag's custom thumbnail if
+  /// present, otherwise a color-tinted placeholder with a tag icon.
+  Widget _buildTagThumbnail(BuildContext context, String tagName) {
+    final tagColor = TagColorManager.instance.getTagColor(tagName);
+    final thumbnailPath =
+        TagThumbnailManager.instance.getThumbnailSync(tagName);
+
+    if (thumbnailPath != null && File(thumbnailPath).existsSync()) {
+      return SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Image.file(
+          File(thumbnailPath),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildTagPlaceholder(tagColor),
+        ),
+      );
+    }
+    return _buildTagPlaceholder(tagColor);
+  }
+
+  Widget _buildTagPlaceholder(Color tagColor) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            tagColor.withValues(alpha: 0.55),
+            tagColor.withValues(alpha: 0.22),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          PhosphorIconsLight.tag,
+          size: widget.size * 0.5,
+          color: Colors.white.withValues(alpha: 0.85),
+        ),
       ),
     );
   }

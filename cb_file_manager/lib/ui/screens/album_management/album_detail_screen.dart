@@ -351,7 +351,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   }
 
   Future<void> _loadAlbumFiles({bool initial = false}) async {
-    if (initial) setState(() => _isLoading = true);
+    if (initial || !_isLoading) setState(() => _isLoading = true);
     // Gate: pause thumbnail work while loading album file list.
     ThumbnailLoader.setListingReady(false);
     try {
@@ -1023,6 +1023,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               onViewScaleDelta: _handleViewScaleDelta,
               onEscape: inSel ? _clearSelection : null,
               onSelectAll: _selectAll,
+              onRefresh: _loadAlbumFiles,
               child: Stack(
                 key: _dragController.stackKey,
                 children: [

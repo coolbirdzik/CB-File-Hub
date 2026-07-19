@@ -342,37 +342,37 @@ namespace fc_native_video_thumbnail
       return "SetCurrentPosition failed with " + HRESULTToString(hr);
     }
 
-    // Try to find a keyframe by reading multiple samples if needed
+    // SetCurrentPosition snaps to the nearest keyframe at or before the
+    // requested position, so we must decode forward until we reach the frame
+    // at the requested time. We keep the most recently read sample and stop as
+    // soon as its presentation timestamp reaches the target. This makes the
+    // saved frame match the second the user picked instead of an earlier
+    // keyframe.
+    const LONGLONG targetHns = static_cast<LONGLONG>(timeSeconds) * 10000000LL;
     IMFSample *pSample = NULL;
     bool foundGoodFrame = false;
-    int maxAttempts = 30; // Try reading more frames to find a better one
+    const int maxAttempts = 600; // enough to walk a long GOP forward to target
 
     for (int attempt = 0; attempt < maxAttempts; attempt++)
     {
-      // Get the next sample
-      DWORD streamIndex, flags;
-      LONGLONG timestamp;
-
-      if (pSample)
-      {
-        pSample->Release();
-        pSample = NULL;
-      }
+      DWORD streamIndex = 0, flags = 0;
+      LONGLONG timestamp = 0;
+      IMFSample *pCurrent = NULL;
 
       hr = pReader->ReadSample((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM,
-                               0, &streamIndex, &flags, &timestamp, &pSample);
+                               0, &streamIndex, &flags, &timestamp, &pCurrent);
 
-      if (!SUCCEEDED(hr) || !pSample)
+      if (!SUCCEEDED(hr))
       {
-        // If we can't read any more samples but already found one, use what we have
+        // Reading failed: fall back to the last good frame if we have one.
         if (foundGoodFrame)
         {
           break;
         }
 
-        if (pSample)
+        if (pCurrent)
         {
-          pSample->Release();
+          pCurrent->Release();
         }
         pReader->Release();
         MFShutdown();
@@ -380,11 +380,32 @@ namespace fc_native_video_thumbnail
         return "ReadSample failed with " + HRESULTToString(hr);
       }
 
-      // Check if this is a good frame (not a repeat frame or too dark)
+      // End of stream: use the last good frame we decoded.
+      if (flags & MF_SOURCE_READERF_ENDOFSTREAM)
+      {
+        if (pCurrent)
+        {
+          pCurrent->Release();
+        }
+        break;
+      }
+
+      // No sample on this call (e.g. stream tick / format change) — keep going.
+      if (!pCurrent)
+      {
+        continue;
+      }
+
+      // Adopt this sample as the current best, releasing the previous one.
+      if (pSample)
+      {
+        pSample->Release();
+      }
+      pSample = pCurrent;
       foundGoodFrame = true;
 
-      // If we've gone too far past our target time, stop
-      if (attempt > 0 && timestamp > (timeSeconds + 2) * 10000000LL)
+      // Stop once we've reached (or passed) the requested position.
+      if (timestamp >= targetHns)
       {
         break;
       }

@@ -95,6 +95,7 @@ dependencies:
   mobile_smb_native:
     path: ../mobile_smb_native # Local path to mobile SMB plugin
   image: ^4.5.4
+  crop_your_image: ^2.0.0
   vector_math: ^2.1.4
   pdfx: ^2.0.0
   # HTTP server for streaming files from SMB
