@@ -688,11 +688,11 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         // executed in a previous round, the model is not making progress.
         // Break out and force a final answer instead of repeating up to the
         // maxToolCalls limit (which floods the UI with duplicate tool cards).
-        final roundSignature = calls
-            .map((c) => '${c.name}(${jsonEncode(c.arguments)})')
-            .join('|');
+        final roundSignature =
+            calls.map((c) => '${c.name}(${jsonEncode(c.arguments)})').join('|');
         if (!seenToolSignatures.add(roundSignature)) {
-          activity.add('> Repeated tool call detected; requesting final answer');
+          activity
+              .add('> Repeated tool call detected; requesting final answer');
           emit(state.copyWith(toolActivity: List.of(activity)));
           apiMessages.add(AiMessage(
             id: _uuid.v4(),

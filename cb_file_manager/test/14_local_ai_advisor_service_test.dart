@@ -166,7 +166,9 @@ void main() {
       expect(models.first.localPath, installed.localPath);
     });
 
-    test('14.09 flags .safetensors artifacts as not runnable, allows .litertlm and .gguf', () {
+    test(
+        '14.09 flags .safetensors artifacts as not runnable, allows .litertlm and .gguf',
+        () {
       final safetensors = InstalledLocalModel(
         catalogId: 'legacy/model',
         displayName: 'Legacy',

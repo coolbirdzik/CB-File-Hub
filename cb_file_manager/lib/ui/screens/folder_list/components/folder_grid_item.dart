@@ -80,8 +80,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
     // previous selection); Ctrl+click adds/toggles it. Using
     // `lastSelectedPath != null` made every click after the first behave like a
     // Ctrl+click, so the old selection was never cleared.
-    final bool shouldCtrlSelect =
-        widget.isDesktopMode ? isCtrlPressed : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
     // Visual update depends on the selection type
     if (!isShiftPressed) {

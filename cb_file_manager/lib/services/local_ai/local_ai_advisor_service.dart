@@ -86,8 +86,7 @@ class LocalAiAdvisorService {
         _prefs = prefs,
         _httpClient = httpClient ?? http.Client(),
         _chatRuntime = chatRuntime ?? const GemmaLiteRtLocalAiChatRuntime(),
-        _ggufChatRuntime =
-            ggufChatRuntime ?? GgufLlamaCppLocalAiChatRuntime(),
+        _ggufChatRuntime = ggufChatRuntime ?? GgufLlamaCppLocalAiChatRuntime(),
         _documentsDirectoryProvider =
             documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 

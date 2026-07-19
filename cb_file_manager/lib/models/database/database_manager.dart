@@ -826,8 +826,7 @@ class DatabaseManager implements IDatabaseProvider {
           onRestorePreferences(prefsMap);
           prefsCount = prefsMap.length;
         }
-      } catch (_) {
-      }
+      } catch (_) {}
 
       // Restore tags from file_tags table
       try {
@@ -852,8 +851,7 @@ class DatabaseManager implements IDatabaseProvider {
             failedCount++;
           }
         }
-      } catch (_) {
-      }
+      } catch (_) {}
 
       await importedDb.close();
 

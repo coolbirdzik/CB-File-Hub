@@ -116,8 +116,7 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
     // previous selection); Ctrl+click adds/toggles it. Using
     // `lastSelectedPath != null` made every click after the first behave like a
     // Ctrl+click, so the old selection was never cleared.
-    final bool shouldCtrlSelect =
-        widget.isDesktopMode ? isCtrlPressed : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
     // Call toggleFolderSelection with appropriate parameters
     widget.toggleFolderSelection!(

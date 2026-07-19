@@ -609,9 +609,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   ///   mapped back to their display-cased names.
   List<String> _tagsInCurrentDrillScope() {
     if (_drillPath.isEmpty) {
-      return _allTags
-          .where((t) => !_tagHierarchyManager.isChild(t))
-          .toList();
+      return _allTags.where((t) => !_tagHierarchyManager.isChild(t)).toList();
     }
 
     final parent = _drillPath.last;
@@ -1799,139 +1797,141 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Column(
-        children: [
-          // Header bar aligned with the mobile file management layout.
-          Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(_selectedTags.isNotEmpty && !showingTaggedFiles
-                      ? PhosphorIconsLight.x
-                      : PhosphorIconsLight.arrowLeft),
-                  onPressed: _selectedTags.isNotEmpty && !showingTaggedFiles
-                      ? _deselectAllTags
-                      : showingTaggedFiles
-                          ? _clearTagSelection
-                          : () => _handleBack(context),
-                ),
-                const SizedBox(width: 8),
-                if (_isSearching && !showingTaggedFiles)
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      autofocus: true,
-                      textInputAction: TextInputAction.search,
-                      style: TextStyle(color: theme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        hintText: localizations.searchTagsHint,
-                        hintStyle: TextStyle(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12),
-                      ),
+            children: [
+              // Header bar aligned with the mobile file management layout.
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(_selectedTags.isNotEmpty && !showingTaggedFiles
+                          ? PhosphorIconsLight.x
+                          : PhosphorIconsLight.arrowLeft),
+                      onPressed: _selectedTags.isNotEmpty && !showingTaggedFiles
+                          ? _deselectAllTags
+                          : showingTaggedFiles
+                              ? _clearTagSelection
+                              : () => _handleBack(context),
                     ),
-                  )
-                else if (showingTaggedFiles)
-                  Expanded(
-                    child: _buildTaggedFilesHeaderTitle(theme, localizations),
-                  )
-                else
-                  const Spacer(),
-                if (_selectedTags.isNotEmpty &&
-                    !showingTaggedFiles &&
-                    _isMobile) ...[
-                  IconButton(
-                    icon: const Icon(PhosphorIconsLight.trash),
-                    onPressed: _selectedTags.isNotEmpty
-                        ? _confirmBulkDeleteTags
-                        : null,
-                    tooltip: localizations.deleteSelected,
-                  ),
-                ],
-                if (!showingTaggedFiles)
-                  ..._buildTagToolbarActions(theme, localizations),
-                if (!showingTaggedFiles || !_isMobile) ...[
-                  IconButton(
-                    icon: const Icon(PhosphorIconsLight.arrowsClockwise),
-                    onPressed: _isLoading
-                        ? null
-                        : showingTaggedFiles
-                            ? _refreshSelectedTagFiles
-                            : _refreshTags,
-                    tooltip: localizations.refresh,
-                  ),
-                ],
-                if (!showingTaggedFiles)
-                  IconButton(
-                    icon: Icon(_isSearching
-                        ? PhosphorIconsLight.x
-                        : PhosphorIconsLight.magnifyingGlass),
-                    onPressed: _toggleSearch,
-                    tooltip: localizations.searchTags,
-                  ),
-                if (!showingTaggedFiles)
-                  PopupMenuButton<String>(
-                    icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
-                    tooltip: localizations.moreOptionsTooltip,
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'select_all':
-                          _selectAllFilteredTags();
-                          break;
-                        case 'new_tag':
-                          _showCreateTagDialog();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem<String>(
-                        value: 'select_all',
-                        child: Row(
-                          children: [
-                            const Icon(PhosphorIconsLight.checks, size: 20),
-                            const SizedBox(width: 10),
-                            Text(localizations.selectAllTags),
-                          ],
+                    const SizedBox(width: 8),
+                    if (_isSearching && !showingTaggedFiles)
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          autofocus: true,
+                          textInputAction: TextInputAction.search,
+                          style: TextStyle(color: theme.colorScheme.onSurface),
+                          decoration: InputDecoration(
+                            hintText: localizations.searchTagsHint,
+                            hintStyle: TextStyle(
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.5),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
+                          ),
                         ),
-                      ),
-                      const PopupMenuDivider(),
-                      PopupMenuItem<String>(
-                        value: 'new_tag',
-                        child: Row(
-                          children: [
-                            const Icon(PhosphorIconsLight.plus, size: 20),
-                            const SizedBox(width: 10),
-                            Text(localizations.createNewTagButton),
-                          ],
-                        ),
+                      )
+                    else if (showingTaggedFiles)
+                      Expanded(
+                        child:
+                            _buildTaggedFilesHeaderTitle(theme, localizations),
+                      )
+                    else
+                      const Spacer(),
+                    if (_selectedTags.isNotEmpty &&
+                        !showingTaggedFiles &&
+                        _isMobile) ...[
+                      IconButton(
+                        icon: const Icon(PhosphorIconsLight.trash),
+                        onPressed: _selectedTags.isNotEmpty
+                            ? _confirmBulkDeleteTags
+                            : null,
+                        tooltip: localizations.deleteSelected,
                       ),
                     ],
-                  ),
-              ],
-            ),
-          ),
-          if (showingTaggedFiles && _isMobile) _buildMobileTaggedFilesToolbar(),
-          Expanded(child: body),
-        ],
-      ),
-      floatingActionButton: _selectedTagForFiles == null
-          ? FloatingActionButton(
-              heroTag: null,
-              onPressed: _showCreateTagDialog,
-              backgroundColor: theme.colorScheme.primary,
-              tooltip: localizations.newTagTooltip,
-              child: Icon(
-                PhosphorIconsLight.plus,
-                color: theme.colorScheme.onPrimary,
-                size: 24,
+                    if (!showingTaggedFiles)
+                      ..._buildTagToolbarActions(theme, localizations),
+                    if (!showingTaggedFiles || !_isMobile) ...[
+                      IconButton(
+                        icon: const Icon(PhosphorIconsLight.arrowsClockwise),
+                        onPressed: _isLoading
+                            ? null
+                            : showingTaggedFiles
+                                ? _refreshSelectedTagFiles
+                                : _refreshTags,
+                        tooltip: localizations.refresh,
+                      ),
+                    ],
+                    if (!showingTaggedFiles)
+                      IconButton(
+                        icon: Icon(_isSearching
+                            ? PhosphorIconsLight.x
+                            : PhosphorIconsLight.magnifyingGlass),
+                        onPressed: _toggleSearch,
+                        tooltip: localizations.searchTags,
+                      ),
+                    if (!showingTaggedFiles)
+                      PopupMenuButton<String>(
+                        icon: const Icon(PhosphorIconsLight.dotsThreeVertical),
+                        tooltip: localizations.moreOptionsTooltip,
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'select_all':
+                              _selectAllFilteredTags();
+                              break;
+                            case 'new_tag':
+                              _showCreateTagDialog();
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem<String>(
+                            value: 'select_all',
+                            child: Row(
+                              children: [
+                                const Icon(PhosphorIconsLight.checks, size: 20),
+                                const SizedBox(width: 10),
+                                Text(localizations.selectAllTags),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'new_tag',
+                            child: Row(
+                              children: [
+                                const Icon(PhosphorIconsLight.plus, size: 20),
+                                const SizedBox(width: 10),
+                                Text(localizations.createNewTagButton),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            )
-          : null,
+              if (showingTaggedFiles && _isMobile)
+                _buildMobileTaggedFilesToolbar(),
+              Expanded(child: body),
+            ],
+          ),
+          floatingActionButton: _selectedTagForFiles == null
+              ? FloatingActionButton(
+                  heroTag: null,
+                  onPressed: _showCreateTagDialog,
+                  backgroundColor: theme.colorScheme.primary,
+                  tooltip: localizations.newTagTooltip,
+                  child: Icon(
+                    PhosphorIconsLight.plus,
+                    color: theme.colorScheme.onPrimary,
+                    size: 24,
+                  ),
+                )
+              : null,
         ),
       ),
     );
@@ -3363,196 +3363,198 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   }
                 },
           child: GestureDetector(
-          onSecondaryTapUp: isEditing
-              ? null
-              : (details) =>
-                  _showTagOptions(tag, globalPosition: details.globalPosition),
-          child: ListTile(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-              side: isEditing
-                  ? BorderSide(color: theme.colorScheme.primary, width: 2)
-                  : isSelected || isFocused
-                      ? BorderSide(
-                          color:
-                              theme.colorScheme.primary.withValues(alpha: 0.5),
-                          width: 1.5)
-                      : BorderSide.none,
-            ),
-            tileColor: isSelected || isFocused
-                ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                : tagColor.withValues(alpha: 0.08),
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isSelected) ...[
-                  SoftCheckbox(
-                    value: isSelected,
-                    onChanged: (_) => _toggleTagSelection(tag),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
+            onSecondaryTapUp: isEditing
+                ? null
+                : (details) => _showTagOptions(tag,
+                    globalPosition: details.globalPosition),
+            child: ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.0),
+                side: isEditing
+                    ? BorderSide(color: theme.colorScheme.primary, width: 2)
+                    : isSelected || isFocused
+                        ? BorderSide(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.5),
+                            width: 1.5)
+                        : BorderSide.none,
+              ),
+              tileColor: isSelected || isFocused
+                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                  : tagColor.withValues(alpha: 0.08),
+              leading: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSelected) ...[
+                    SoftCheckbox(
+                      value: isSelected,
+                      onChanged: (_) => _toggleTagSelection(tag),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  _buildTagThumbnailOrDot(tag, tagColor, size: 40),
                 ],
-                _buildTagThumbnailOrDot(tag, tagColor, size: 40),
-              ],
-            ),
-            title: isEditing && _editingTagController != null
-                ? Focus(
-                    onKeyEvent: (node, event) =>
-                        _handleInlineRenameKey(node, event, tag),
-                    child: TextField(
-                      controller: _editingTagController,
-                      autofocus: true,
-                      textInputAction: TextInputAction.done,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: theme.colorScheme.onSurface,
+              ),
+              title: isEditing && _editingTagController != null
+                  ? Focus(
+                      onKeyEvent: (node, event) =>
+                          _handleInlineRenameKey(node, event, tag),
+                      child: TextField(
+                        controller: _editingTagController,
+                        autofocus: true,
+                        textInputAction: TextInputAction.done,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: theme.colorScheme.primary, width: 2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: theme.colorScheme.primary, width: 2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                                color: theme.colorScheme.primary, width: 2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surface,
+                        ),
+                        cursorColor: theme.colorScheme.primary,
+                        onEditingComplete: () => _commitTagRename(tag),
+                        onSubmitted: (_) => _commitTagRename(tag),
+                        onTapOutside: (_) => _commitTagRename(tag),
                       ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 2),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: theme.colorScheme.primary, width: 2),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: theme.colorScheme.primary, width: 2),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: theme.colorScheme.primary, width: 2),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surface,
-                      ),
-                      cursorColor: theme.colorScheme.primary,
-                      onEditingComplete: () => _commitTagRename(tag),
-                      onSubmitted: (_) => _commitTagRename(tag),
-                      onTapOutside: (_) => _commitTagRename(tag),
-                    ),
-                  )
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                tag,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: theme.colorScheme.onSurface,
+                    )
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            if (isDesktop) ...[
-                              const SizedBox(width: 4),
-                              Tooltip(
-                                message: AppLocalizations.of(context)!
-                                    .doubleClickToRename,
-                                child: Icon(PhosphorIconsLight.pencilSimple,
-                                    size: 14,
-                                    color: theme.colorScheme.onSurfaceVariant
-                                        .withValues(alpha: 0.5)),
-                              ),
+                              if (isDesktop) ...[
+                                const SizedBox(width: 4),
+                                Tooltip(
+                                  message: AppLocalizations.of(context)!
+                                      .doubleClickToRename,
+                                  child: Icon(PhosphorIconsLight.pencilSimple,
+                                      size: 14,
+                                      color: theme.colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.5)),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        _buildHierarchyContext(tag, theme),
-                      ],
+                          ),
+                          _buildHierarchyContext(tag, theme),
+                        ],
+                      ),
                     ),
+              onTap: isEditing ? null : () => _handleTagTap(tag),
+              onLongPress: isEditing ? null : () => _showTagOptions(tag),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(PhosphorIconsLight.pencilSimple,
+                        size: 20,
+                        color: isEditing
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : theme.colorScheme.onSurfaceVariant),
+                    onPressed: isEditing
+                        ? null
+                        : () {
+                            if (isDesktop) {
+                              _startTagRename(tag);
+                            } else {
+                              _showRenameDialog(tag);
+                            }
+                          },
+                    tooltip: AppLocalizations.of(context)!.renameTag,
+                    visualDensity: VisualDensity.compact,
                   ),
-            onTap: isEditing ? null : () => _handleTagTap(tag),
-            onLongPress: isEditing ? null : () => _showTagOptions(tag),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(PhosphorIconsLight.pencilSimple,
-                      size: 20,
-                      color: isEditing
-                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                          : theme.colorScheme.onSurfaceVariant),
-                  onPressed: isEditing
-                      ? null
-                      : () {
-                          if (isDesktop) {
-                            _startTagRename(tag);
-                          } else {
-                            _showRenameDialog(tag);
-                          }
-                        },
-                  tooltip: AppLocalizations.of(context)!.renameTag,
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: Icon(PhosphorIconsLight.folder,
-                      size: 20,
-                      color: isEditing
-                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                          : theme.colorScheme.primary),
-                  onPressed: isEditing ? null : () => _directTagSearch(tag),
-                  tooltip: AppLocalizations.of(context)!.viewFilesWithTag,
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: Icon(PhosphorIconsLight.palette,
-                      size: 20,
-                      color: isEditing
-                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                          : theme.colorScheme.onSurfaceVariant),
-                  onPressed:
-                      isEditing ? null : () => _showColorPickerDialog(tag),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: Icon(PhosphorIconsLight.image,
-                      size: 20,
-                      color: isEditing
-                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                          : theme.colorScheme.onSurfaceVariant),
-                  onPressed: isEditing ? null : () => _showThumbnailPicker(tag),
-                  tooltip: 'Set thumbnail',
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: Icon(PhosphorIconsLight.treeStructure,
-                      size: 20,
-                      color: isEditing
-                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                          : (_tagHierarchyManager.isParent(tag) ||
-                                  _tagHierarchyManager.isChild(tag)
-                              ? theme.colorScheme.tertiary
-                              : theme.colorScheme.onSurfaceVariant)),
-                  onPressed:
-                      isEditing ? null : () => _showManageHierarchyDialog(tag),
-                  tooltip: 'Manage hierarchy (parent/child)',
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  icon: Icon(PhosphorIconsLight.trash,
-                      size: 20,
-                      color: isEditing
-                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                          : theme.colorScheme.error.withValues(alpha: 0.7)),
-                  onPressed: isEditing ? null : () => _confirmDeleteTag(tag),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(PhosphorIconsLight.folder,
+                        size: 20,
+                        color: isEditing
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : theme.colorScheme.primary),
+                    onPressed: isEditing ? null : () => _directTagSearch(tag),
+                    tooltip: AppLocalizations.of(context)!.viewFilesWithTag,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: Icon(PhosphorIconsLight.palette,
+                        size: 20,
+                        color: isEditing
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : theme.colorScheme.onSurfaceVariant),
+                    onPressed:
+                        isEditing ? null : () => _showColorPickerDialog(tag),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: Icon(PhosphorIconsLight.image,
+                        size: 20,
+                        color: isEditing
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : theme.colorScheme.onSurfaceVariant),
+                    onPressed:
+                        isEditing ? null : () => _showThumbnailPicker(tag),
+                    tooltip: 'Set thumbnail',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: Icon(PhosphorIconsLight.treeStructure,
+                        size: 20,
+                        color: isEditing
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : (_tagHierarchyManager.isParent(tag) ||
+                                    _tagHierarchyManager.isChild(tag)
+                                ? theme.colorScheme.tertiary
+                                : theme.colorScheme.onSurfaceVariant)),
+                    onPressed: isEditing
+                        ? null
+                        : () => _showManageHierarchyDialog(tag),
+                    tooltip: 'Manage hierarchy (parent/child)',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    icon: Icon(PhosphorIconsLight.trash,
+                        size: 20,
+                        color: isEditing
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                            : theme.colorScheme.error.withValues(alpha: 0.7)),
+                    onPressed: isEditing ? null : () => _confirmDeleteTag(tag),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
             ),
-          ),
           ),
         );
       },
@@ -4111,335 +4113,349 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                             }
                           },
                     child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16.0),
-                      onTap: isEditing ? null : () => _handleTagTap(tag),
-                      onDoubleTap: isEditing ? null : () => _activateTag(tag),
-                      onLongPress:
-                          isEditing ? null : () => _showTagOptions(tag),
-                      onSecondaryTapUp: isEditing
-                          ? null
-                          : (details) => _showTagOptions(
-                                tag,
-                                globalPosition: details.globalPosition,
-                              ),
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16.0),
-                              child: BackdropFilter(
-                                filter:
-                                    ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: isSelected || isFocused
-                                          ? [
-                                              theme.colorScheme.primary
-                                                  .withValues(alpha: 0.26),
-                                              theme.colorScheme.primary
-                                                  .withValues(alpha: 0.16),
-                                            ]
-                                          : [
-                                              theme.colorScheme.surface
-                                                  .withValues(alpha: 0.34),
-                                              Color.alphaBlend(
-                                                tagColor.withValues(
-                                                    alpha: 0.10),
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16.0),
+                        onTap: isEditing ? null : () => _handleTagTap(tag),
+                        onDoubleTap: isEditing ? null : () => _activateTag(tag),
+                        onLongPress:
+                            isEditing ? null : () => _showTagOptions(tag),
+                        onSecondaryTapUp: isEditing
+                            ? null
+                            : (details) => _showTagOptions(
+                                  tag,
+                                  globalPosition: details.globalPosition,
+                                ),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16.0),
+                                child: BackdropFilter(
+                                  filter:
+                                      ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: isSelected || isFocused
+                                            ? [
+                                                theme.colorScheme.primary
+                                                    .withValues(alpha: 0.26),
+                                                theme.colorScheme.primary
+                                                    .withValues(alpha: 0.16),
+                                              ]
+                                            : [
                                                 theme.colorScheme.surface
-                                                    .withValues(alpha: 0.22),
-                                              ),
-                                            ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(16.0),
-                                    border: Border.all(
-                                      color: isEditing
-                                          ? theme.colorScheme.primary
-                                          : isSelected || isFocused
-                                              ? theme.colorScheme.primary
-                                                  .withValues(alpha: 0.55)
-                                              : Colors.white
-                                                  .withValues(alpha: 0.14),
-                                      width: isEditing
-                                          ? 2
-                                          : isSelected || isFocused
-                                              ? 1.5
-                                              : 1,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.08),
-                                        blurRadius: 18,
-                                        offset: const Offset(0, 8),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      // Top area: thumbnail or color dot, with a
-                                      // hover toolbar (desktop) / overflow button
-                                      // (mobile) revealed over the bottom edge.
-                                      Expanded(
-                                        child: _HoverReveal(
-                                          enabled: isDesktop && !isEditing,
-                                          builder: (context, hovering) => Stack(
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Positioned.fill(
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      const BorderRadius
-                                                          .vertical(
-                                                    top: Radius.circular(16.0),
-                                                  ),
-                                                  child:
-                                                      _buildTagCardThumbnailFill(
-                                                          tag, tagColor),
+                                                    .withValues(alpha: 0.34),
+                                                Color.alphaBlend(
+                                                  tagColor.withValues(
+                                                      alpha: 0.10),
+                                                  theme.colorScheme.surface
+                                                      .withValues(alpha: 0.22),
                                                 ),
-                                              ),
-                                              // Desktop: floating action toolbar
-                                              // that slides up + fades in on hover.
-                                              if (isDesktop && !isEditing)
-                                                Positioned(
-                                                  left: 0,
-                                                  right: 0,
-                                                  // Float over the bottom edge of
-                                                  // the full-bleed thumbnail.
-                                                  bottom: 6,
-                                                  child: Center(
-                                                    child: AnimatedSlide(
-                                                      offset: Offset(0,
-                                                          hovering ? 0 : 0.35),
-                                                      duration: const Duration(
-                                                          milliseconds: 160),
-                                                      curve:
-                                                          Curves.easeOutCubic,
-                                                      child: AnimatedOpacity(
-                                                        opacity: hovering
-                                                            ? 1.0
-                                                            : 0.0,
+                                              ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(16.0),
+                                      border: Border.all(
+                                        color: isEditing
+                                            ? theme.colorScheme.primary
+                                            : isSelected || isFocused
+                                                ? theme.colorScheme.primary
+                                                    .withValues(alpha: 0.55)
+                                                : Colors.white
+                                                    .withValues(alpha: 0.14),
+                                        width: isEditing
+                                            ? 2
+                                            : isSelected || isFocused
+                                                ? 1.5
+                                                : 1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.08),
+                                          blurRadius: 18,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        // Top area: thumbnail or color dot, with a
+                                        // hover toolbar (desktop) / overflow button
+                                        // (mobile) revealed over the bottom edge.
+                                        Expanded(
+                                          child: _HoverReveal(
+                                            enabled: isDesktop && !isEditing,
+                                            builder: (context, hovering) =>
+                                                Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                Positioned.fill(
+                                                  child: ClipRRect(
+                                                    borderRadius:
+                                                        const BorderRadius
+                                                            .vertical(
+                                                      top:
+                                                          Radius.circular(16.0),
+                                                    ),
+                                                    child:
+                                                        _buildTagCardThumbnailFill(
+                                                            tag, tagColor),
+                                                  ),
+                                                ),
+                                                // Desktop: floating action toolbar
+                                                // that slides up + fades in on hover.
+                                                if (isDesktop && !isEditing)
+                                                  Positioned(
+                                                    left: 0,
+                                                    right: 0,
+                                                    // Float over the bottom edge of
+                                                    // the full-bleed thumbnail.
+                                                    bottom: 6,
+                                                    child: Center(
+                                                      child: AnimatedSlide(
+                                                        offset: Offset(
+                                                            0,
+                                                            hovering
+                                                                ? 0
+                                                                : 0.35),
                                                         duration:
                                                             const Duration(
                                                                 milliseconds:
                                                                     160),
-                                                        child: IgnorePointer(
-                                                          ignoring: !hovering,
-                                                          child: _buildTagHoverToolbar(
-                                                              tag,
-                                                              theme,
-                                                              iconSize,
-                                                              maxWidth:
-                                                                  constraints
-                                                                      .maxWidth),
+                                                        curve:
+                                                            Curves.easeOutCubic,
+                                                        child: AnimatedOpacity(
+                                                          opacity: hovering
+                                                              ? 1.0
+                                                              : 0.0,
+                                                          duration:
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      160),
+                                                          child: IgnorePointer(
+                                                            ignoring: !hovering,
+                                                            child: _buildTagHoverToolbar(
+                                                                tag,
+                                                                theme,
+                                                                iconSize,
+                                                                maxWidth:
+                                                                    constraints
+                                                                        .maxWidth),
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                              // Mobile: always-visible overflow
-                                              if (_isMobile && !isEditing)
-                                                Positioned(
-                                                  top: 4,
-                                                  right: 4,
-                                                  child:
-                                                      _buildTagOverflowButton(
-                                                          tag, theme),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      // Bottom area: tag name
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 1),
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.surface
-                                              .withValues(alpha: 0.28),
-                                          border: Border(
-                                            top: BorderSide(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.12),
+                                                // Mobile: always-visible overflow
+                                                if (_isMobile && !isEditing)
+                                                  Positioned(
+                                                    top: 4,
+                                                    right: 4,
+                                                    child:
+                                                        _buildTagOverflowButton(
+                                                            tag, theme),
+                                                  ),
+                                              ],
                                             ),
                                           ),
                                         ),
-                                        child: Padding(
-                                          padding: EdgeInsets.only(
-                                            top: spacing,
-                                            left: isDesktop ? 8 : 6,
-                                            right: isDesktop ? 8 : 6,
-                                            bottom: isDesktop ? 8 : 6,
+                                        // Bottom area: tag name
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 1),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.surface
+                                                .withValues(alpha: 0.28),
+                                            border: Border(
+                                              top: BorderSide(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.12),
+                                              ),
+                                            ),
                                           ),
-                                          child: Column(
-                                            children: [
-                                              // Tag name or rename TextField
-                                              if (isEditing &&
-                                                  _editingTagController != null)
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  child: Stack(
-                                                    alignment: Alignment.center,
-                                                    children: [
-                                                      Opacity(
-                                                        opacity: 0,
-                                                        child: Text(
+                                          child: Padding(
+                                            padding: EdgeInsets.only(
+                                              top: spacing,
+                                              left: isDesktop ? 8 : 6,
+                                              right: isDesktop ? 8 : 6,
+                                              bottom: isDesktop ? 8 : 6,
+                                            ),
+                                            child: Column(
+                                              children: [
+                                                // Tag name or rename TextField
+                                                if (isEditing &&
+                                                    _editingTagController !=
+                                                        null)
+                                                  SizedBox(
+                                                    width: double.infinity,
+                                                    child: Stack(
+                                                      alignment:
+                                                          Alignment.center,
+                                                      children: [
+                                                        Opacity(
+                                                          opacity: 0,
+                                                          child: Text(
+                                                            tag,
+                                                            style: TextStyle(
+                                                                fontSize:
+                                                                    fontSize,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600),
+                                                            textAlign: TextAlign
+                                                                .center,
+                                                            maxLines: 2,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                        Positioned.fill(
+                                                          child: Focus(
+                                                            onKeyEvent: (node,
+                                                                    event) =>
+                                                                _handleInlineRenameKey(
+                                                                    node,
+                                                                    event,
+                                                                    tag),
+                                                            child: TextField(
+                                                              controller:
+                                                                  _editingTagController,
+                                                              autofocus: true,
+                                                              textInputAction:
+                                                                  TextInputAction
+                                                                      .done,
+                                                              style: TextStyle(
+                                                                  fontSize:
+                                                                      fontSize,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  color: theme
+                                                                      .colorScheme
+                                                                      .onSurface),
+                                                              textAlign:
+                                                                  TextAlign
+                                                                      .center,
+                                                              maxLines: 2,
+                                                              decoration:
+                                                                  InputDecoration(
+                                                                isDense: true,
+                                                                contentPadding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                        horizontal:
+                                                                            4,
+                                                                        vertical:
+                                                                            2),
+                                                                border:
+                                                                    OutlineInputBorder(
+                                                                  borderSide: BorderSide(
+                                                                      color: theme
+                                                                          .colorScheme
+                                                                          .primary,
+                                                                      width: 2),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              2),
+                                                                ),
+                                                                enabledBorder:
+                                                                    OutlineInputBorder(
+                                                                  borderSide: BorderSide(
+                                                                      color: theme
+                                                                          .colorScheme
+                                                                          .primary,
+                                                                      width: 2),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              2),
+                                                                ),
+                                                                focusedBorder:
+                                                                    OutlineInputBorder(
+                                                                  borderSide: BorderSide(
+                                                                      color: theme
+                                                                          .colorScheme
+                                                                          .primary,
+                                                                      width: 2),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              2),
+                                                                ),
+                                                                filled: true,
+                                                                fillColor: theme
+                                                                    .colorScheme
+                                                                    .surface,
+                                                              ),
+                                                              cursorColor: theme
+                                                                  .colorScheme
+                                                                  .primary,
+                                                              onEditingComplete:
+                                                                  () =>
+                                                                      _commitTagRename(
+                                                                          tag),
+                                                              onSubmitted: (_) =>
+                                                                  _commitTagRename(
+                                                                      tag),
+                                                              onTapOutside: (_) =>
+                                                                  _commitTagRename(
+                                                                      tag),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  )
+                                                else
+                                                  Tooltip(
+                                                    message: _tagHierarchyManager
+                                                            .isParent(tag)
+                                                        ? 'Double click to open child tags'
+                                                        : 'Double click to open files',
+                                                    child: Column(
+                                                      children: [
+                                                        Text(
                                                           tag,
                                                           style: TextStyle(
                                                               fontSize:
                                                                   fontSize,
                                                               fontWeight:
                                                                   FontWeight
-                                                                      .w600),
+                                                                      .w600,
+                                                              color: theme
+                                                                  .colorScheme
+                                                                  .onSurface),
                                                           textAlign:
                                                               TextAlign.center,
                                                           maxLines: 2,
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                         ),
-                                                      ),
-                                                      Positioned.fill(
-                                                        child: Focus(
-                                                          onKeyEvent: (node,
-                                                                  event) =>
-                                                              _handleInlineRenameKey(
-                                                                  node,
-                                                                  event,
-                                                                  tag),
-                                                          child: TextField(
-                                                            controller:
-                                                                _editingTagController,
-                                                            autofocus: true,
-                                                            textInputAction:
-                                                                TextInputAction
-                                                                    .done,
-                                                            style: TextStyle(
-                                                                fontSize:
-                                                                    fontSize,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                                color: theme
-                                                                    .colorScheme
-                                                                    .onSurface),
-                                                            textAlign: TextAlign
-                                                                .center,
-                                                            maxLines: 2,
-                                                            decoration:
-                                                                InputDecoration(
-                                                              isDense: true,
-                                                              contentPadding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                      horizontal:
-                                                                          4,
-                                                                      vertical:
-                                                                          2),
-                                                              border:
-                                                                  OutlineInputBorder(
-                                                                borderSide: BorderSide(
-                                                                    color: theme
-                                                                        .colorScheme
-                                                                        .primary,
-                                                                    width: 2),
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                            2),
-                                                              ),
-                                                              enabledBorder:
-                                                                  OutlineInputBorder(
-                                                                borderSide: BorderSide(
-                                                                    color: theme
-                                                                        .colorScheme
-                                                                        .primary,
-                                                                    width: 2),
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                            2),
-                                                              ),
-                                                              focusedBorder:
-                                                                  OutlineInputBorder(
-                                                                borderSide: BorderSide(
-                                                                    color: theme
-                                                                        .colorScheme
-                                                                        .primary,
-                                                                    width: 2),
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                            2),
-                                                              ),
-                                                              filled: true,
-                                                              fillColor: theme
-                                                                  .colorScheme
-                                                                  .surface,
-                                                            ),
-                                                            cursorColor: theme
-                                                                .colorScheme
-                                                                .primary,
-                                                            onEditingComplete: () =>
-                                                                _commitTagRename(
-                                                                    tag),
-                                                            onSubmitted: (_) =>
-                                                                _commitTagRename(
-                                                                    tag),
-                                                            onTapOutside: (_) =>
-                                                                _commitTagRename(
-                                                                    tag),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
+                                                        _buildHierarchyContext(
+                                                            tag, theme,
+                                                            centered: true),
+                                                      ],
+                                                    ),
                                                   ),
-                                                )
-                                              else
-                                                Tooltip(
-                                                  message: _tagHierarchyManager
-                                                          .isParent(tag)
-                                                      ? 'Double click to open child tags'
-                                                      : 'Double click to open files',
-                                                  child: Column(
-                                                    children: [
-                                                      Text(
-                                                        tag,
-                                                        style: TextStyle(
-                                                            fontSize: fontSize,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurface),
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                      _buildHierarchyContext(
-                                                          tag, theme,
-                                                          centered: true),
-                                                    ],
-                                                  ),
-                                                ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                   );
                 },
               );

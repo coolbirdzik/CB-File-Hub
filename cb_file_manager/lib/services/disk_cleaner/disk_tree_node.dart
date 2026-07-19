@@ -77,19 +77,19 @@ class DiskTreeNode {
   /// Uses caching to avoid O(n²) repeated traversal during tree filtering.
   bool get hasSelectionInSubtree {
     if (_hasSelectionInSubtree != null) return _hasSelectionInSubtree!;
-    
+
     if (isSelectedForDeletion && fullPath.isNotEmpty) {
       _hasSelectionInSubtree = true;
       return true;
     }
-    
+
     for (final child in children) {
       if (child.hasSelectionInSubtree) {
         _hasSelectionInSubtree = true;
         return true;
       }
     }
-    
+
     _hasSelectionInSubtree = false;
     return false;
   }

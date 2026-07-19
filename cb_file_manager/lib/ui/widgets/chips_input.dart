@@ -296,9 +296,9 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   /// Replaces the currently-typed text with "<parent>:" so the user can keep
   /// typing/autocompleting the child tag.
   void _promoteToParent(String parent) {
-    final String chipChars =
-        String.fromCharCode(ChipsInputEditingController.kObjectReplacementChar) *
-            widget.values.length;
+    final String chipChars = String.fromCharCode(
+            ChipsInputEditingController.kObjectReplacementChar) *
+        widget.values.length;
     final String newTyped = '$parent:';
     controller.value = TextEditingValue(
       text: '$chipChars$newTyped',

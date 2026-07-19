@@ -155,11 +155,16 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
     final process = await Process.start(
       serverPath,
       <String>[
-        '-m', modelPath,
-        '--host', '127.0.0.1',
-        '--port', '$port',
-        '-c', '$maxTokens',
-        '-ngl', '$nGpuLayers',
+        '-m',
+        modelPath,
+        '--host',
+        '127.0.0.1',
+        '--port',
+        '$port',
+        '-c',
+        '$maxTokens',
+        '-ngl',
+        '$nGpuLayers',
         '--no-ui',
       ],
       workingDirectory: serverDir,
@@ -267,9 +272,8 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
     }
 
     // Server-Sent Events: lines like `data: {json}` separated by blank lines.
-    final lines = response
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
+    final lines =
+        response.transform(utf8.decoder).transform(const LineSplitter());
 
     await for (final line in lines) {
       if (line.isEmpty) continue;

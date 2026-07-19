@@ -123,8 +123,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     try {
       await db.rawQuery('PRAGMA journal_mode = WAL');
       await db.rawQuery('PRAGMA synchronous = NORMAL');
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<void> _createSchema(DatabaseExecutor db) async {
@@ -437,7 +436,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_child ON tag_hierarchy(child_normalized_tag)',
       );
     }
-
   }
 
   Future<Map<String, Object?>?> _getPreferenceRow(String key) async {

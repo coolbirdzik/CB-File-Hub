@@ -1002,8 +1002,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
         hierarchyManager, parsed.parentName, parsed.childNames);
 
     AppLogger.info('[ManageTags][BatchDialog] Hierarchy tags added',
-        error:
-            'parent=${parsed.parentName} children=${parsed.childNames}');
+        error: 'parent=${parsed.parentName} children=${parsed.childNames}');
     return true;
   }
 
@@ -1121,13 +1120,14 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                           enableColonAutocomplete: true,
                           onSuggestionSelected: (tag) {
                             setState(() {
-                              addTag(resolvePickedSuggestion(draftTagText, tag));
+                              addTag(
+                                  resolvePickedSuggestion(draftTagText, tag));
                               tagSuggestions = [];
                             });
                           },
-                          suggestionBuilder: (context, suggestion,
-                                  isHighlighted, tagColor) =>
-                              buildTagSuggestionItem(
+                          suggestionBuilder:
+                              (context, suggestion, isHighlighted, tagColor) =>
+                                  buildTagSuggestionItem(
                             context,
                             suggestion,
                             isHighlighted,
@@ -1231,111 +1231,116 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                     onPressed: isSaving
                         ? null
                         : () async {
-                      AppLogger.info('[ManageTags][BatchDialog] Save pressed',
-                          error:
-                              'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText');
-                      final l10n = AppLocalizations.of(context)!;
-                      // Persistence happens through TagManager; UI refresh is
-                      // driven by the coalesced tag-change notification fired in
-                      // refreshParentUIBatch(). No bloc lookup is needed here.
-                      final toast = AppToast.capture(context);
-                      final navigator = Navigator.of(context);
+                            AppLogger.info(
+                                '[ManageTags][BatchDialog] Save pressed',
+                                error:
+                                    'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText');
+                            final l10n = AppLocalizations.of(context)!;
+                            // Persistence happens through TagManager; UI refresh is
+                            // driven by the coalesced tag-change notification fired in
+                            // refreshParentUIBatch(). No bloc lookup is needed here.
+                            final toast = AppToast.capture(context);
+                            final navigator = Navigator.of(context);
 
-                      try {
-                        setState(() {
-                          commitDraftTag();
-                          isSaving = true;
-                        });
-                        try {
-                          toast.info(l10n.applyingChanges);
-                        } catch (_) {}
+                            try {
+                              setState(() {
+                                commitDraftTag();
+                                isSaving = true;
+                              });
+                              try {
+                                toast.info(l10n.applyingChanges);
+                              } catch (_) {}
 
-                        TagManager.clearCache();
+                              TagManager.clearCache();
 
-                        final commonTags =
-                            await batchTagManager.findCommonTags(selectedFiles);
+                              final commonTags = await batchTagManager
+                                  .findCommonTags(selectedFiles);
 
-                        int tagsAdded = 0;
-                        int tagsRemoved = 0;
+                              int tagsAdded = 0;
+                              int tagsRemoved = 0;
 
-                        // Read every file's existing tags in a single batched
-                        // round-trip instead of awaiting getTags() one file at
-                        // a time — the per-file await was a big part of the UI
-                        // stall on large selections.
-                        final existingTagsByFile =
-                            await TagManager.getTagsForFiles(selectedFiles);
+                              // Read every file's existing tags in a single batched
+                              // round-trip instead of awaiting getTags() one file at
+                              // a time — the per-file await was a big part of the UI
+                              // stall on large selections.
+                              final existingTagsByFile =
+                                  await TagManager.getTagsForFiles(
+                                      selectedFiles);
 
-                        final Set<String> currentTagsSet =
-                            Set<String>.from(selectedTags);
-                        final Set<String> commonTagsSet =
-                            Set<String>.from(commonTags);
-                        final commonTagsToRemove =
-                            commonTagsSet.difference(currentTagsSet);
+                              final Set<String> currentTagsSet =
+                                  Set<String>.from(selectedTags);
+                              final Set<String> commonTagsSet =
+                                  Set<String>.from(commonTags);
+                              final commonTagsToRemove =
+                                  commonTagsSet.difference(currentTagsSet);
 
-                        for (final filePath in selectedFiles) {
-                          final existingTags =
-                              existingTagsByFile[filePath] ?? const <String>[];
+                              for (final filePath in selectedFiles) {
+                                final existingTags =
+                                    existingTagsByFile[filePath] ??
+                                        const <String>[];
 
-                          final Set<String> originalTagsSet =
-                              Set<String>.from(existingTags);
-                          final updatedTags = Set<String>.from(originalTagsSet);
+                                final Set<String> originalTagsSet =
+                                    Set<String>.from(existingTags);
+                                final updatedTags =
+                                    Set<String>.from(originalTagsSet);
 
-                          updatedTags.removeAll(commonTagsToRemove);
-                          tagsRemoved += originalTagsSet
-                              .intersection(commonTagsToRemove)
-                              .length;
+                                updatedTags.removeAll(commonTagsToRemove);
+                                tagsRemoved += originalTagsSet
+                                    .intersection(commonTagsToRemove)
+                                    .length;
 
-                          final tagsToAdd =
-                              currentTagsSet.difference(originalTagsSet);
-                          updatedTags.addAll(tagsToAdd);
-                          tagsAdded += tagsToAdd.length;
+                                final tagsToAdd =
+                                    currentTagsSet.difference(originalTagsSet);
+                                updatedTags.addAll(tagsToAdd);
+                                tagsAdded += tagsToAdd.length;
 
-                          // Suppress the per-file tag-change event; a single
-                          // coalesced refresh is fired below via
-                          // refreshParentUIBatch(). Otherwise each file would
-                          // trigger a full folder-list reload.
-                          await TagManager.setTags(
-                              filePath, updatedTags.toList(),
-                              notify: false);
-                        }
+                                // Suppress the per-file tag-change event; a single
+                                // coalesced refresh is fired below via
+                                // refreshParentUIBatch(). Otherwise each file would
+                                // trigger a full folder-list reload.
+                                await TagManager.setTags(
+                                    filePath, updatedTags.toList(),
+                                    notify: false);
+                              }
 
-                        refreshParentUIBatch();
-                        AppLogger.info(
-                            '[ManageTags][BatchDialog] Save completed',
-                            error:
-                                'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved');
+                              refreshParentUIBatch();
+                              AppLogger.info(
+                                  '[ManageTags][BatchDialog] Save completed',
+                                  error:
+                                      'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved');
 
-                        try {
-                          toast.success(
-                            l10n.tagsUpdated(
-                              selectedFiles.length,
-                              tagsAdded,
-                              tagsRemoved,
-                            ),
-                          );
-                          navigator.pop();
-                        } catch (_) {}
-                      } catch (e) {
-                        AppLogger.error(
-                          '[ManageTags][BatchDialog] Save failed',
-                          error: 'selectedFiles=$selectedFiles error=$e',
-                        );
-                        AppLogger.warning('Error processing batch tags: $e');
-                        try {
-                          toast.error(
-                            l10n.batchTagProcessingError(e.toString()),
-                          );
-                        } catch (_) {}
-                      } finally {
-                        // Reset the saving flag only if the dialog is still
-                        // open (the success path pops it and unmounts).
-                        if (context.mounted) {
-                          setState(() {
-                            isSaving = false;
-                          });
-                        }
-                      }
-                    },
+                              try {
+                                toast.success(
+                                  l10n.tagsUpdated(
+                                    selectedFiles.length,
+                                    tagsAdded,
+                                    tagsRemoved,
+                                  ),
+                                );
+                                navigator.pop();
+                              } catch (_) {}
+                            } catch (e) {
+                              AppLogger.error(
+                                '[ManageTags][BatchDialog] Save failed',
+                                error: 'selectedFiles=$selectedFiles error=$e',
+                              );
+                              AppLogger.warning(
+                                  'Error processing batch tags: $e');
+                              try {
+                                toast.error(
+                                  l10n.batchTagProcessingError(e.toString()),
+                                );
+                              } catch (_) {}
+                            } finally {
+                              // Reset the saving flag only if the dialog is still
+                              // open (the success path pops it and unmounts).
+                              if (context.mounted) {
+                                setState(() {
+                                  isSaving = false;
+                                });
+                              }
+                            }
+                          },
                     style: ElevatedButton.styleFrom(
                       textStyle: const TextStyle(fontSize: 16),
                       padding: const EdgeInsets.symmetric(

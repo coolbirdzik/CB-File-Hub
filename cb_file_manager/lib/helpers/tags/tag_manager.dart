@@ -719,7 +719,8 @@ class TagManager {
 
       // Track newly added tags as "recent" so the recent-tags list reflects
       // tags applied through this dialog path (setTags replaces the whole set).
-      final previousTags = (await getTags(filePath)).map((t) => t.trim()).toSet();
+      final previousTags =
+          (await getTags(filePath)).map((t) => t.trim()).toSet();
       for (final tag in validTags) {
         final trimmed = tag.trim();
         if (trimmed.isNotEmpty && !previousTags.contains(trimmed)) {

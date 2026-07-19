@@ -77,8 +77,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     final theme = Theme.of(context);
     final renderBox = context.findRenderObject() as RenderBox?;
     final buttonSize = renderBox?.size ?? Size.zero;
-    final buttonTopLeft =
-        renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+    final buttonTopLeft = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
 
     const double gap = 6;
     const double margin = 8;
@@ -105,7 +104,8 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
         if (left < margin) left = margin;
 
         // Vertical: prefer below the button; flip above if there isn't room.
-        final spaceBelow = screen.height - (buttonTopLeft.dy + buttonSize.height);
+        final spaceBelow =
+            screen.height - (buttonTopLeft.dy + buttonSize.height);
         final spaceAbove = buttonTopLeft.dy;
         final opensUp = spaceBelow < 220 && spaceAbove > spaceBelow;
         final maxHeight = (opensUp ? spaceAbove : spaceBelow) - gap - margin;
@@ -368,63 +368,63 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
       child: GestureDetector(
         onTap: _toggleOverlay,
         child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 120),
-            opacity: _isEnabled || widget.isLoading ? 1 : 0.6,
-            child: Container(
-              constraints: BoxConstraints(
-                minWidth: widget.compact ? 0 : 150,
-                maxWidth: widget.compact ? 180 : 280,
-                minHeight: 30,
-              ),
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.compact ? 8 : 10,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.isLoading)
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    Icon(
-                      PhosphorIconsLight.cpu,
-                      size: widget.compact ? 14 : 15,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      selectedLabel,
-                      style: TextStyle(
-                        fontSize: widget.compact ? 11 : 12,
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
+          duration: const Duration(milliseconds: 120),
+          opacity: _isEnabled || widget.isLoading ? 1 : 0.6,
+          child: Container(
+            constraints: BoxConstraints(
+              minWidth: widget.compact ? 0 : 150,
+              maxWidth: widget.compact ? 180 : 280,
+              minHeight: 30,
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.compact ? 8 : 10,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.isLoading)
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
                   Icon(
-                    PhosphorIconsLight.caretDown,
-                    size: widget.compact ? 12 : 13,
+                    PhosphorIconsLight.cpu,
+                    size: widget.compact ? 14 : 15,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ],
-              ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    selectedLabel,
+                    style: TextStyle(
+                      fontSize: widget.compact ? 11 : 12,
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  PhosphorIconsLight.caretDown,
+                  size: widget.compact ? 12 : 13,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 
   AiProviderModelCatalog? _findSelectedCatalog() {
