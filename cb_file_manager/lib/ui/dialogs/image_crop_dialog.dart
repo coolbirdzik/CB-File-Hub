@@ -184,16 +184,46 @@ class _ImageCropDialogState extends State<_ImageCropDialog> {
             // Aspect ratio presets
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ratioChip(l10n.aspectFree, null),
-                  _ratioChip('1:1', 1),
-                  _ratioChip('4:3', 4 / 3),
-                  _ratioChip('16:9', 16 / 9),
-                  _ratioChip('3:4', 3 / 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          PhosphorIconsLight.info,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.tagGridCropRecommendation,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _ratioChip(l10n.aspectFree, null),
+                      _ratioChip('1:1', 1),
+                      _ratioChip('4:3', 4 / 3),
+                      _ratioChip(l10n.tagGridAspectPreset, 16 / 9),
+                      _ratioChip('3:4', 3 / 4),
+                    ],
+                  ),
                 ],
               ),
             ),

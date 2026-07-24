@@ -55,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Show file tags setting
   bool _showFileTags = true;
+  TagThumbnailFitMode _tagThumbnailFitMode = TagThumbnailFitMode.contain;
   bool _rememberTabWorkspace = false;
   // Tab inactive threshold (in minutes). 0 means auto-suspend disabled.
   int _tabInactiveThresholdMinutes =
@@ -121,6 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final thumbnailMode = await _preferences.getThumbnailMode();
       final maxConcurrency = await _preferences.getMaxThumbnailConcurrency();
       final showFileTags = await _preferences.getShowFileTags();
+      final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
       final rememberTabWorkspace =
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
@@ -136,6 +138,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _thumbnailMode = thumbnailMode;
           _maxConcurrency = maxConcurrency;
           _showFileTags = showFileTags;
+          _tagThumbnailFitMode = tagThumbnailFitMode;
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
@@ -221,6 +224,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context,
         showTags ? l10n.fileTagsEnabled : l10n.fileTagsDisabled,
       );
+    }
+  }
+
+  Future<void> _updateTagThumbnailFitMode(TagThumbnailFitMode mode) async {
+    final saved = await _preferences.setTagThumbnailFitMode(mode);
+    if (saved && mounted) {
+      setState(() {
+        _tagThumbnailFitMode = mode;
+      });
     }
   }
 
@@ -485,6 +497,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: Switch(
             value: _showFileTags,
             onChanged: _updateShowFileTags,
+          ),
+        ),
+        _buildCompactSettingTile(
+          title: AppLocalizations.of(context)!.tagThumbnailFit,
+          subtitle: AppLocalizations.of(context)!.tagThumbnailFitDescription,
+          icon: PhosphorIconsLight.image,
+          trailing: DropdownButton<TagThumbnailFitMode>(
+            value: _tagThumbnailFitMode,
+            onChanged: (mode) {
+              if (mode != null) {
+                _updateTagThumbnailFitMode(mode);
+              }
+            },
+            items: [
+              DropdownMenuItem(
+                value: TagThumbnailFitMode.contain,
+                child: Text(AppLocalizations.of(context)!.thumbnailFitContain),
+              ),
+              DropdownMenuItem(
+                value: TagThumbnailFitMode.cover,
+                child: Text(AppLocalizations.of(context)!.thumbnailFitCover),
+              ),
+            ],
           ),
         ),
         _buildCompactSettingTile(

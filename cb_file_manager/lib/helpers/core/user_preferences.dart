@@ -17,6 +17,11 @@ enum ThemePreference {
   dark // Force dark theme
 }
 
+enum TagThumbnailFitMode {
+  contain,
+  cover,
+}
+
 /// A class to manage user preferences for the application
 class UserPreferences {
   // Singleton instance with getter
@@ -33,6 +38,9 @@ class UserPreferences {
   // Stream controller for theme changes
   final StreamController<ThemeMode> _themeChangeController =
       StreamController<ThemeMode>.broadcast();
+
+  final ValueNotifier<TagThumbnailFitMode> tagThumbnailFitMode =
+      ValueNotifier<TagThumbnailFitMode>(TagThumbnailFitMode.contain);
 
   // Stream that can be listened to for theme changes
   Stream<ThemeMode> get themeChangeStream => _themeChangeController.stream;
@@ -93,6 +101,7 @@ class UserPreferences {
   static const String _networkBrowserViewModeKey = 'network_browser_view_mode';
   static const String _networkBrowserSortOptionKey =
       'network_browser_sort_option';
+  static const String _tagThumbnailFitModeKey = 'tag_thumbnail_fit_mode';
 
   // Constants for grid zoom level
   static const int minGridZoomLevel = 2; // Largest thumbnails (2 per row)
@@ -156,6 +165,16 @@ class UserPreferences {
       _useDatabaseStorage = false;
     } finally {
       _initialized = true;
+    }
+
+    try {
+      final stored = await _databaseManager?.getStringPreference(
+        _tagThumbnailFitModeKey,
+        defaultValue: TagThumbnailFitMode.contain.name,
+      );
+      tagThumbnailFitMode.value = _parseTagThumbnailFitMode(stored);
+    } catch (_) {
+      tagThumbnailFitMode.value = TagThumbnailFitMode.contain;
     }
   }
 
@@ -1215,6 +1234,34 @@ class UserPreferences {
     final validMode =
         (mode == 'fast' || mode == 'custom') ? mode : defaultThumbnailMode;
     return await _savePreference<String>(_thumbnailModeKey, validMode);
+  }
+
+  Future<TagThumbnailFitMode> getTagThumbnailFitMode() async {
+    final stored = await _getPreference<String>(
+      _tagThumbnailFitModeKey,
+      defaultValue: TagThumbnailFitMode.contain.name,
+    );
+    final mode = _parseTagThumbnailFitMode(stored);
+    tagThumbnailFitMode.value = mode;
+    return mode;
+  }
+
+  Future<bool> setTagThumbnailFitMode(TagThumbnailFitMode mode) async {
+    final saved = await _savePreference<String>(
+      _tagThumbnailFitModeKey,
+      mode.name,
+    );
+    if (saved) {
+      tagThumbnailFitMode.value = mode;
+    }
+    return saved;
+  }
+
+  TagThumbnailFitMode _parseTagThumbnailFitMode(String? value) {
+    return TagThumbnailFitMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => TagThumbnailFitMode.contain,
+    );
   }
 
   /// Get max thumbnail generation concurrency

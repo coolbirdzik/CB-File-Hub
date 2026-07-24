@@ -1139,6 +1139,11 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get aspectFree => 'Tự do';
   @override
+  String get tagGridCropRecommendation =>
+      'Gợi ý cho card tag dạng grid: 16:9, tối thiểu 1280 × 720 px';
+  @override
+  String get tagGridAspectPreset => '16:9 · Grid tag';
+  @override
   String get clearThumbnail => 'Xóa thumbnail';
   @override
   String get thumbnailAuto => 'Tự động (video/ảnh đầu tiên)';
@@ -1588,6 +1593,19 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get showFileTagsToggleDescription =>
       'Bật/tắt hiển thị tag bên ngoài danh sách file';
+
+  @override
+  String get tagThumbnailFit => 'Cách hiển thị thumbnail tag';
+
+  @override
+  String get tagThumbnailFitDescription =>
+      'Chọn hiển thị toàn bộ ảnh hoặc phủ đầy khung thumbnail tag';
+
+  @override
+  String get thumbnailFitContain => 'Hiển thị toàn bộ ảnh';
+
+  @override
+  String get thumbnailFitCover => 'Phủ đầy khung';
 
   @override
   String get rememberTabWorkspace => 'Ghi nhớ không gian làm việc tab';

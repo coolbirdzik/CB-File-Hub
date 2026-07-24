@@ -1128,6 +1128,11 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get aspectFree => 'Free';
   @override
+  String get tagGridCropRecommendation =>
+      'Recommended for tag grid cards: 16:9, at least 1280 × 720 px';
+  @override
+  String get tagGridAspectPreset => '16:9 · Tag grid';
+  @override
   String get clearThumbnail => 'Clear thumbnail';
   @override
   String get thumbnailAuto => 'Auto (first video/image)';
@@ -1588,6 +1593,19 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get showFileTagsToggleDescription =>
       'Enable/disable showing tags outside file list';
+
+  @override
+  String get tagThumbnailFit => 'Tag thumbnail display';
+
+  @override
+  String get tagThumbnailFitDescription =>
+      'Choose whether tag thumbnails show the full image or fill the frame';
+
+  @override
+  String get thumbnailFitContain => 'Show full image';
+
+  @override
+  String get thumbnailFitCover => 'Fill frame';
 
   @override
   String get rememberTabWorkspace => 'Remember tab workspace';

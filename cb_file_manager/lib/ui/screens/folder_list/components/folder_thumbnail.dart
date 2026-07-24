@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/media/folder_thumbnail_service.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
@@ -424,10 +425,15 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
       return SizedBox(
         width: double.infinity,
         height: double.infinity,
-        child: Image.file(
-          File(thumbnailPath),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildTagPlaceholder(tagColor),
+        child: ValueListenableBuilder<TagThumbnailFitMode>(
+          valueListenable: UserPreferences.instance.tagThumbnailFitMode,
+          builder: (context, fitMode, _) => Image.file(
+            File(thumbnailPath),
+            fit: fitMode == TagThumbnailFitMode.contain
+                ? BoxFit.contain
+                : BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildTagPlaceholder(tagColor),
+          ),
         ),
       );
     }

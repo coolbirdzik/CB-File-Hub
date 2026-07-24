@@ -605,6 +605,8 @@ abstract class AppLocalizations {
   String get applyCrop;
   String get useOriginal;
   String get aspectFree;
+  String get tagGridCropRecommendation;
+  String get tagGridAspectPreset;
   String get clearThumbnail;
   String get thumbnailAuto;
   String get folderThumbnailSet;
@@ -885,6 +887,10 @@ abstract class AppLocalizations {
   String get showFileTagsDescription;
   String get showFileTagsToggle;
   String get showFileTagsToggleDescription;
+  String get tagThumbnailFit;
+  String get tagThumbnailFitDescription;
+  String get thumbnailFitContain;
+  String get thumbnailFitCover;
   String get rememberTabWorkspace;
   String get rememberTabWorkspaceDescription;
   String get tabInactiveThreshold;

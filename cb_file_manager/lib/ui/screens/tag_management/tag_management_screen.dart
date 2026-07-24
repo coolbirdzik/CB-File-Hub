@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageFilter;
 
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
@@ -3222,20 +3223,23 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
   }
 
-  /// Edge-to-edge thumbnail for the grid card top area. Fills the available
-  /// space (cover) so the card reads like a media/tag card. Falls back to a
-  /// color-tinted panel with a centered icon when no thumbnail exists.
+  /// Thumbnail for the grid card top area using the user's preferred fit.
   Widget _buildTagCardThumbnailFill(String tag, Color tagColor) {
     final thumbnailPath = _tagThumbnailManager.getThumbnailSync(tag);
     if (thumbnailPath != null) {
-      return Image.file(
-        File(thumbnailPath),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (_, __, ___) => _buildTagCardThumbnailPlaceholder(
-          tagColor,
-          PhosphorIconsLight.image,
+      return ValueListenableBuilder<TagThumbnailFitMode>(
+        valueListenable: UserPreferences.instance.tagThumbnailFitMode,
+        builder: (context, fitMode, _) => Image.file(
+          File(thumbnailPath),
+          fit: fitMode == TagThumbnailFitMode.contain
+              ? BoxFit.contain
+              : BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => _buildTagCardThumbnailPlaceholder(
+            tagColor,
+            PhosphorIconsLight.image,
+          ),
         ),
       );
     }
