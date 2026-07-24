@@ -254,10 +254,16 @@ class LocalAiAdvisorService {
   }
 
   String _normalizeLocalPath(String path) {
-    if (Platform.isWindows) {
+    // Normalize based on the path's own shape rather than the host OS so
+    // legacy metadata written on a different platform (and tests running on a
+    // non-Windows CI) resolve deterministically. A drive-letter prefix or any
+    // backslash marks a Windows path.
+    final looksWindows =
+        RegExp(r'^[A-Za-z]:').hasMatch(path) || path.contains(r'\');
+    if (Platform.isWindows || looksWindows) {
       return path.replaceAll('/', r'\');
     }
-    return path.replaceAll(r'\', Platform.pathSeparator);
+    return path.replaceAll(r'\', '/');
   }
 
   /// Returns the currently selected (active) model, or null.
