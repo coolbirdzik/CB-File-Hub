@@ -12,37 +12,256 @@ import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/helpers/tags/batch_tag_manager.dart';
-import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import '../../utils/route.dart';
-import '../core/tab_manager.dart';
-import '../core/tab_data.dart';
 
-/// Opens a new tab with search results for the selected tag
-void _openTagSearchTab(BuildContext context, String tag) {
-  final searchSystemId = UriUtils.buildTagSearchPath(tag);
-  final tabName = 'Tag: $tag';
+// ─────────────────────────────────────────────────────────────────────────
+// Shared tag-hierarchy helpers (parent:child syntax + autocomplete)
+//
+// These top-level helpers are used by both the single-file dialog
+// (_SingleFileTagDialog) and the batch dialog (showBatchAddTagDialog) so the
+// "type parent:child to create a new tag under a parent" behavior stays
+// consistent across both flows.
+// ─────────────────────────────────────────────────────────────────────────
 
-  final tabBloc = BlocProvider.of<TabManagerBloc>(context);
+/// Result of parsing a "parent:child1,child2" style input.
+class ParsedHierarchyInput {
+  const ParsedHierarchyInput(this.parentName, this.childNames);
+  final String parentName;
+  final List<String> childNames;
 
-  final existingTab = tabBloc.state.tabs.firstWhere(
-    (tab) => tab.path == searchSystemId,
-    orElse: () => TabData(id: '', name: '', path: ''),
-  );
+  bool get isValid => parentName.isNotEmpty && childNames.isNotEmpty;
+}
 
-  if (existingTab.id.isNotEmpty) {
-    tabBloc.add(SwitchToTab(existingTab.id));
-  } else {
-    tabBloc.add(
-      AddTab(
-        path: searchSystemId,
-        name: tabName,
-        switchToTab: true,
-      ),
-    );
+/// Parses "parent:child1, child2" input into a parent name and its children.
+/// Returns null when there is no colon (not a hierarchy input).
+ParsedHierarchyInput? parseHierarchyInput(String input) {
+  final colonIndex = input.indexOf(':');
+  if (colonIndex < 0) return null;
+
+  final parentName = input.substring(0, colonIndex).trim();
+  final childrenPart = input.substring(colonIndex + 1).trim();
+
+  final childNames = childrenPart
+      .split(',')
+      .map((c) => c.trim())
+      .where((c) => c.isNotEmpty)
+      .toList(growable: false);
+
+  return ParsedHierarchyInput(parentName, childNames);
+}
+
+/// Computes autocomplete suggestions for a tag input, honoring the
+/// "parent:child" hierarchy syntax.
+///
+/// - When the query contains ":", suggests existing children of the typed
+///   parent (filtered by the partial child being typed, comma-aware).
+/// - Otherwise runs a regular tag search with parents ordered first.
+///
+/// [isSelected] excludes tags already chosen. Results are capped at 10.
+Future<List<String>> computeTagSuggestions(
+  String query, {
+  required TagHierarchyManager hierarchyManager,
+  required bool Function(String tag) isSelected,
+}) async {
+  final trimmed = query.trim();
+  if (trimmed.isEmpty) return const <String>[];
+
+  // parent:child context — suggest existing children of the parent.
+  final colonIndex = trimmed.indexOf(':');
+  if (colonIndex >= 0) {
+    final parentPart = trimmed.substring(0, colonIndex).trim();
+    final childPart = trimmed.substring(colonIndex + 1).trim();
+
+    if (parentPart.isNotEmpty) {
+      final children = hierarchyManager.getChildren(parentPart);
+
+      if (childPart.isEmpty) {
+        return children
+            .where((c) => !isSelected(c))
+            .take(10)
+            .toList(growable: false);
+      }
+
+      // Comma-separated: only match the partial entry being typed now.
+      final existingChildren = childPart
+          .split(',')
+          .map((c) => c.trim().toLowerCase())
+          .where((c) => c.isNotEmpty)
+          .toSet();
+      final currentPart = childPart.split(',').last.trim().toLowerCase();
+
+      return children
+          .where((c) {
+            final normalized = c.toLowerCase();
+            return !existingChildren.contains(normalized) &&
+                !isSelected(c) &&
+                (currentPart.isEmpty || normalized.contains(currentPart));
+          })
+          .take(10)
+          .toList(growable: false);
+    }
   }
+
+  // Regular search with hierarchy-aware ordering (parents first).
+  final suggestions = await TagManager.instance.searchTags(trimmed);
+  final sorted = suggestions.where((tag) => !isSelected(tag)).toList();
+  sorted.sort((a, b) {
+    final aIsParent = hierarchyManager.isParent(a);
+    final bIsParent = hierarchyManager.isParent(b);
+    if (aIsParent && !bIsParent) return -1;
+    if (!aIsParent && bIsParent) return 1;
+    return a.toLowerCase().compareTo(b.toLowerCase());
+  });
+  return sorted.take(10).toList(growable: false);
+}
+
+/// Given the current draft text and a picked suggestion, reconstructs the full
+/// text that should be added.
+///
+/// In "parent:child" context the suggestion is the child tag, so the parent
+/// prefix (and any earlier comma-separated children) are preserved. Otherwise
+/// the suggestion is returned as-is.
+String resolvePickedSuggestion(String draftText, String suggestion) {
+  final colonIndex = draftText.indexOf(':');
+  if (colonIndex >= 0) {
+    final parentPart = draftText.substring(0, colonIndex).trim();
+    final childrenPart = draftText.substring(colonIndex + 1);
+    if (parentPart.isNotEmpty) {
+      final commaIndex = childrenPart.lastIndexOf(',');
+      final prefix =
+          commaIndex >= 0 ? childrenPart.substring(0, commaIndex + 1) : '';
+      return '$parentPart:$prefix${suggestion.trim()}';
+    }
+  }
+  return suggestion;
+}
+
+/// Persists a parent:child hierarchy: ensures both tags exist and links them.
+/// Fire-and-forget friendly (awaited internally but errors are logged).
+Future<void> createHierarchyRelationships(
+  TagHierarchyManager hierarchyManager,
+  String parentName,
+  List<String> childNames,
+) async {
+  await TagManager.addStandaloneTag(parentName);
+  for (final childName in childNames) {
+    await TagManager.addStandaloneTag(childName);
+    final ok = await hierarchyManager.addChild(parentName, childName);
+    if (!ok) {
+      AppLogger.warning(
+        '[ManageTags] Failed to create hierarchy',
+        error: 'parent=$parentName child=$childName',
+      );
+    }
+  }
+}
+
+/// Shared suggestion list item with thumbnail (40x40), hierarchy context, and
+/// highlighting. Used by both the single-file and batch tag dialogs.
+Widget buildTagSuggestionItem(
+  BuildContext context,
+  String suggestion,
+  bool isHighlighted,
+  Color tagColor, {
+  required TagThumbnailManager thumbnailManager,
+  required TagHierarchyManager hierarchyManager,
+}) {
+  final theme = Theme.of(context);
+  final thumbnailPath = thumbnailManager.getThumbnailSync(suggestion);
+  final parents = hierarchyManager.getParents(suggestion);
+  final children = hierarchyManager.getChildren(suggestion);
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: Row(
+      children: [
+        if (thumbnailPath != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.file(
+              File(thumbnailPath),
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: tagColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(PhosphorIconsLight.tag, size: 18, color: tagColor),
+              ),
+            ),
+          )
+        else
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: tagColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              hierarchyManager.isParent(suggestion)
+                  ? PhosphorIconsLight.treeStructure
+                  : PhosphorIconsLight.tag,
+              size: 18,
+              color: tagColor,
+            ),
+          ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                suggestion,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w400,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              if (parents.isNotEmpty)
+                Text(
+                  'Parent: ${parents.join(", ")}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              if (children.isNotEmpty)
+                Text(
+                  '${children.length} child${children.length > 1 ? "ren" : ""}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.7),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        ),
+        if (isHighlighted)
+          Icon(
+            PhosphorIconsLight.arrowRight,
+            size: 14,
+            color: theme.colorScheme.primary,
+          ),
+      ],
+    ),
+  );
 }
 
 /// Dialog for adding a tag to a file
@@ -178,71 +397,14 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
     // Debounce 100ms
     _debounceTimer = Timer(const Duration(milliseconds: 100), () async {
-      // Handle parent:child format — show children of the parent
-      if (query.contains(':')) {
-        final colonIndex = query.indexOf(':');
-        final parentPart = query.substring(0, colonIndex).trim();
-        final childPart = query.substring(colonIndex + 1).trim();
-
-        if (parentPart.isNotEmpty) {
-          final children = _hierarchyManager.getChildren(parentPart);
-          List<String> filtered;
-
-          if (childPart.isEmpty) {
-            // Show all children of this parent
-            filtered = children
-                .where((c) => !_containsTag(c))
-                .take(10)
-                .toList(growable: false);
-          } else {
-            // Handle comma-separated: show remaining children
-            final existingChildren = childPart
-                .split(',')
-                .map((c) => c.trim().toLowerCase())
-                .where((c) => c.isNotEmpty)
-                .toSet();
-
-            // Get the last partial entry (what user is currently typing)
-            final parts = childPart.split(',');
-            final currentPart = parts.last.trim().toLowerCase();
-
-            filtered = children
-                .where((c) {
-                  final normalized = c.toLowerCase();
-                  return !existingChildren.contains(normalized) &&
-                      !_containsTag(c) &&
-                      (currentPart.isEmpty || normalized.contains(currentPart));
-                })
-                .take(10)
-                .toList(growable: false);
-          }
-
-          if (!mounted) return;
-          setState(() {
-            _tagSuggestions = filtered;
-          });
-          return;
-        }
-      }
-
-      // Regular search with hierarchy-aware ordering
-      final suggestions = await TagManager.instance.searchTags(query);
+      final suggestions = await computeTagSuggestions(
+        query,
+        hierarchyManager: _hierarchyManager,
+        isSelected: _containsTag,
+      );
       if (!mounted) return;
-
-      // Sort: parents first, then children (with context), then standalone
-      final sorted = suggestions.where((tag) => !_containsTag(tag)).toList();
-
-      // Move parents to front
-      sorted.sort((a, b) {
-        final aIsParent = _hierarchyManager.isParent(a);
-        final bIsParent = _hierarchyManager.isParent(b);
-        if (aIsParent && !bIsParent) return -1;
-        if (!aIsParent && bIsParent) return 1;
-        return a.toLowerCase().compareTo(b.toLowerCase());
-      });
-
       setState(() {
-        _tagSuggestions = sorted.take(10).toList(growable: false);
+        _tagSuggestions = suggestions;
       });
     });
   }
@@ -252,6 +414,16 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     return _selectedTags.any((selectedTag) {
       return selectedTag.trim().toLowerCase() == normalizedTag;
     });
+  }
+
+  /// Handles picking a suggestion from the autocomplete overlay.
+  ///
+  /// When the user is typing in "parent:child" context (the draft already has a
+  /// colon), the suggestion is the child tag — reconstruct the full
+  /// "parent:child" input so the hierarchy relationship is created. Otherwise
+  /// add the suggestion as-is.
+  void _onSuggestionSelected(String suggestion) {
+    _addTag(resolvePickedSuggestion(_draftTagText, suggestion));
   }
 
   void _addTag(String rawTag) {
@@ -284,32 +456,20 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   /// Parse and add tags in parent:child format.
   /// Creates hierarchy relationships and adds all tags to the selection.
   void _addHierarchyTags(String input) {
-    final colonIndex = input.indexOf(':');
-    final parentName = input.substring(0, colonIndex).trim();
-    final childrenPart = input.substring(colonIndex + 1).trim();
+    final parsed = parseHierarchyInput(input);
+    if (parsed == null || !parsed.isValid) return;
 
-    if (parentName.isEmpty || childrenPart.isEmpty) return;
+    final parentName = parsed.parentName;
+    final childNames = parsed.childNames;
 
-    final childNames = childrenPart
-        .split(',')
-        .map((c) => c.trim())
-        .where((c) => c.isNotEmpty)
-        .toList();
-
-    if (childNames.isEmpty) return;
-
-    // Add parent tag if not already selected
-    final tagsToAdd = <String>[];
-    if (!_containsTag(parentName)) {
-      tagsToAdd.add(parentName);
-    }
-
-    // Add child tags
-    for (final child in childNames) {
-      if (!_containsTag(child)) {
-        tagsToAdd.add(child);
-      }
-    }
+    // Only add child tags to the file's tag list.
+    // The parent tag is created/ensured in the tag store via
+    // createHierarchyRelationships but is NOT automatically assigned to the
+    // file — the user typed "parent:child" to create a child under a parent,
+    // not to assign the parent itself.
+    final tagsToAdd = childNames
+        .where((child) => !_containsTag(child))
+        .toList(growable: false);
 
     if (tagsToAdd.isEmpty) {
       _draftTagText = '';
@@ -323,28 +483,11 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     });
 
     // Create hierarchy relationships asynchronously (fire and forget)
-    _createHierarchyRelationships(parentName, childNames);
+    createHierarchyRelationships(_hierarchyManager, parentName, childNames);
 
     AppLogger.info('[ManageTags][Dialog] Hierarchy tags added',
         error:
             'filePath=${widget.filePath} parent=$parentName children=$childNames');
-  }
-
-  Future<void> _createHierarchyRelationships(
-      String parentName, List<String> childNames) async {
-    // Ensure parent tag exists in standalone
-    await TagManager.addStandaloneTag(parentName);
-
-    for (final childName in childNames) {
-      await TagManager.addStandaloneTag(childName);
-      final ok = await _hierarchyManager.addChild(parentName, childName);
-      if (!ok) {
-        AppLogger.warning(
-          '[ManageTags][Dialog] Failed to create hierarchy',
-          error: 'parent=$parentName child=$childName',
-        );
-      }
-    }
   }
 
   void _removeTag(String tag) {
@@ -429,14 +572,16 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     return _buildSectionCard(
       icon: PhosphorIconsLight.pencilSimpleLine,
       title: l10n.addTag,
-      subtitle: 'Type a tag, or use parent:child for hierarchy',
+      subtitle:
+          'Type a tag, or use parent:child. Press ":" on a suggestion to make it the parent.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ChipsInput<String>(
             values: _selectedTags,
             suggestions: _tagSuggestions,
-            onSuggestionSelected: _addTag,
+            enableColonAutocomplete: true,
+            onSuggestionSelected: _onSuggestionSelected,
             suggestionBuilder: _buildSuggestionItem,
             decoration: InputDecoration(
               border: OutlineInputBorder(
@@ -498,102 +643,13 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   /// highlighted matching text.
   Widget _buildSuggestionItem(BuildContext context, String suggestion,
       bool isHighlighted, Color tagColor) {
-    final theme = Theme.of(context);
-    final thumbnailPath = _thumbnailManager.getThumbnailSync(suggestion);
-    final parents = _hierarchyManager.getParents(suggestion);
-    final children = _hierarchyManager.getChildren(suggestion);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          // Thumbnail or tag icon
-          if (thumbnailPath != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.file(
-                File(thumbnailPath),
-                width: 40,
-                height: 40,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: tagColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child:
-                      Icon(PhosphorIconsLight.tag, size: 18, color: tagColor),
-                ),
-              ),
-            )
-          else
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: tagColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(
-                _hierarchyManager.isParent(suggestion)
-                    ? PhosphorIconsLight.treeStructure
-                    : PhosphorIconsLight.tag,
-                size: 18,
-                color: tagColor,
-              ),
-            ),
-          const SizedBox(width: 10),
-          // Tag name + hierarchy context
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  suggestion,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight:
-                        isHighlighted ? FontWeight.w600 : FontWeight.w400,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                if (parents.isNotEmpty)
-                  Text(
-                    'Parent: ${parents.join(", ")}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.7),
-                      fontStyle: FontStyle.italic,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (children.isNotEmpty)
-                  Text(
-                    '${children.length} child${children.length > 1 ? "ren" : ""}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.7),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          if (isHighlighted)
-            Icon(
-              PhosphorIconsLight.arrowRight,
-              size: 14,
-              color: theme.colorScheme.primary,
-            ),
-        ],
-      ),
+    return buildTagSuggestionItem(
+      context,
+      suggestion,
+      isHighlighted,
+      tagColor,
+      thumbnailManager: _thumbnailManager,
+      hierarchyManager: _hierarchyManager,
     );
   }
 
@@ -904,6 +960,11 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   List<String> tagSuggestions = [];
   List<String> selectedTags = [];
   String draftTagText = '';
+  bool isSaving = false;
+
+  final thumbnailManager = TagThumbnailManager.instance;
+  final hierarchyManager = TagHierarchyManager.instance;
+  Future.wait([thumbnailManager.initialize(), hierarchyManager.initialize()]);
 
   final Size screenSize = MediaQuery.of(context).size;
   final double dialogWidth = screenSize.width * 0.5;
@@ -912,21 +973,50 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
       error: 'selectedFiles=$selectedFiles');
 
   void updateTagSuggestions(String text) async {
-    if (text.isEmpty) {
-      tagSuggestions = [];
-      return;
-    }
+    tagSuggestions = await computeTagSuggestions(
+      text,
+      hierarchyManager: hierarchyManager,
+      isSelected: selectedTags.contains,
+    );
+  }
 
-    final suggestions = await TagManager.instance.searchTags(text);
-    tagSuggestions =
-        suggestions.where((tag) => !selectedTags.contains(tag)).toList();
+  /// Handles "parent:child1,child2" input by adding the parent + children to
+  /// the selection and creating the hierarchy relationships in the background.
+  /// Returns true when the input was hierarchy input (and was handled).
+  bool addHierarchyTags(String input) {
+    final parsed = parseHierarchyInput(input);
+    if (parsed == null || !parsed.isValid) return false;
+
+    // Only add child tags to the selection; the parent is ensured in the
+    // tag store via createHierarchyRelationships but NOT auto-assigned.
+    final tagsToAdd = parsed.childNames
+        .where((child) => !selectedTags.contains(child))
+        .toList(growable: false);
+
+    selectedTags.addAll(tagsToAdd);
+    textController.clear();
+    draftTagText = '';
+    tagSuggestions = [];
+
+    createHierarchyRelationships(
+        hierarchyManager, parsed.parentName, parsed.childNames);
+
+    AppLogger.info('[ManageTags][BatchDialog] Hierarchy tags added',
+        error: 'parent=${parsed.parentName} children=${parsed.childNames}');
+    return true;
   }
 
   void addTag(String tag) {
-    if (tag.trim().isEmpty) return;
+    final trimmed = tag.trim();
+    if (trimmed.isEmpty) return;
 
-    if (!selectedTags.contains(tag.trim())) {
-      selectedTags.add(tag.trim());
+    // parent:child syntax — create hierarchy instead of a flat tag.
+    if (trimmed.contains(':')) {
+      if (addHierarchyTags(trimmed)) return;
+    }
+
+    if (!selectedTags.contains(trimmed)) {
+      selectedTags.add(trimmed);
       textController.clear();
       draftTagText = '';
     }
@@ -985,8 +1075,15 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
             }
 
             void handleTagSelected(String tag) {
-              RouteUtils.safePopDialog(context);
-              _openTagSearchTab(context, tag);
+              // In the batch dialog, tapping a popular/recent tag should add it
+              // to the input (like the single-file dialog), not open a search
+              // tab. Opening a search tab here is unexpected for the user.
+              setState(() {
+                addTag(tag);
+                tagSuggestions = [];
+              });
+              AppLogger.info('[ManageTags][BatchDialog] Quick tag added',
+                  error: 'selectedFiles=$selectedFiles tag=$tag');
             }
 
             return AlertDialog(
@@ -1020,12 +1117,24 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                         child: ChipsInput<String>(
                           values: selectedTags,
                           suggestions: tagSuggestions,
+                          enableColonAutocomplete: true,
                           onSuggestionSelected: (tag) {
                             setState(() {
-                              addTag(tag);
+                              addTag(
+                                  resolvePickedSuggestion(draftTagText, tag));
                               tagSuggestions = [];
                             });
                           },
+                          suggestionBuilder:
+                              (context, suggestion, isHighlighted, tagColor) =>
+                                  buildTagSuggestionItem(
+                            context,
+                            suggestion,
+                            isHighlighted,
+                            tagColor,
+                            thumbnailManager: thumbnailManager,
+                            hierarchyManager: hierarchyManager,
+                          ),
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16.0),
@@ -1103,9 +1212,11 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
               actions: [
                 TextFieldTapRegion(
                   child: TextButton(
-                    onPressed: () {
-                      RouteUtils.safePopDialog(context);
-                    },
+                    onPressed: isSaving
+                        ? null
+                        : () {
+                            RouteUtils.safePopDialog(context);
+                          },
                     style: TextButton.styleFrom(
                       textStyle: const TextStyle(fontSize: 16),
                       padding: const EdgeInsets.symmetric(
@@ -1117,108 +1228,132 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                 ),
                 TextFieldTapRegion(
                   child: ElevatedButton(
-                    onPressed: () async {
-                      AppLogger.info('[ManageTags][BatchDialog] Save pressed',
-                          error:
-                              'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText');
-                      final l10n = AppLocalizations.of(context)!;
-                      final bloc = BlocProvider.of<FolderListBloc>(context,
-                          listen: false);
-                      final toast = AppToast.capture(context);
-                      final navigator = Navigator.of(context);
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            AppLogger.info(
+                                '[ManageTags][BatchDialog] Save pressed',
+                                error:
+                                    'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText');
+                            final l10n = AppLocalizations.of(context)!;
+                            // Persistence happens through TagManager; UI refresh is
+                            // driven by the coalesced tag-change notification fired in
+                            // refreshParentUIBatch(). No bloc lookup is needed here.
+                            final toast = AppToast.capture(context);
+                            final navigator = Navigator.of(context);
 
-                      try {
-                        setState(() {
-                          commitDraftTag();
-                        });
-                        try {
-                          toast.info(l10n.applyingChanges);
-                        } catch (_) {}
+                            try {
+                              setState(() {
+                                commitDraftTag();
+                                isSaving = true;
+                              });
+                              try {
+                                toast.info(l10n.applyingChanges);
+                              } catch (_) {}
 
-                        TagManager.clearCache();
+                              TagManager.clearCache();
 
-                        final commonTags =
-                            await batchTagManager.findCommonTags(selectedFiles);
+                              final commonTags = await batchTagManager
+                                  .findCommonTags(selectedFiles);
 
-                        int tagsAdded = 0;
-                        int tagsRemoved = 0;
+                              int tagsAdded = 0;
+                              int tagsRemoved = 0;
 
-                        for (final filePath in selectedFiles) {
-                          AppLogger.info(
-                              '[ManageTags][BatchDialog] Processing file',
-                              error:
-                                  'filePath=$filePath selectedTags=$selectedTags commonTags=$commonTags');
-                          final existingTags =
-                              await TagManager.getTags(filePath);
+                              // Read every file's existing tags in a single batched
+                              // round-trip instead of awaiting getTags() one file at
+                              // a time — the per-file await was a big part of the UI
+                              // stall on large selections.
+                              final existingTagsByFile =
+                                  await TagManager.getTagsForFiles(
+                                      selectedFiles);
 
-                          final Set<String> originalTagsSet =
-                              Set.from(existingTags);
-                          final Set<String> currentTagsSet =
-                              Set.from(selectedTags);
-                          final Set<String> commonTagsSet =
-                              Set.from(commonTags);
+                              final Set<String> currentTagsSet =
+                                  Set<String>.from(selectedTags);
+                              final Set<String> commonTagsSet =
+                                  Set<String>.from(commonTags);
+                              final commonTagsToRemove =
+                                  commonTagsSet.difference(currentTagsSet);
 
-                          final updatedTags = Set<String>.from(originalTagsSet);
+                              for (final filePath in selectedFiles) {
+                                final existingTags =
+                                    existingTagsByFile[filePath] ??
+                                        const <String>[];
 
-                          final commonTagsToRemove =
-                              commonTagsSet.difference(currentTagsSet);
-                          updatedTags.removeAll(commonTagsToRemove);
-                          tagsRemoved += commonTagsToRemove.length;
+                                final Set<String> originalTagsSet =
+                                    Set<String>.from(existingTags);
+                                final updatedTags =
+                                    Set<String>.from(originalTagsSet);
 
-                          final tagsToAdd =
-                              currentTagsSet.difference(originalTagsSet);
-                          updatedTags.addAll(tagsToAdd);
-                          tagsAdded += tagsToAdd.length;
+                                updatedTags.removeAll(commonTagsToRemove);
+                                tagsRemoved += originalTagsSet
+                                    .intersection(commonTagsToRemove)
+                                    .length;
 
-                          await TagManager.setTags(
-                              filePath, updatedTags.toList());
+                                final tagsToAdd =
+                                    currentTagsSet.difference(originalTagsSet);
+                                updatedTags.addAll(tagsToAdd);
+                                tagsAdded += tagsToAdd.length;
 
-                          try {
-                            for (String tag in commonTagsToRemove) {
-                              bloc.add(RemoveTagFromFile(filePath, tag));
+                                // Suppress the per-file tag-change event; a single
+                                // coalesced refresh is fired below via
+                                // refreshParentUIBatch(). Otherwise each file would
+                                // trigger a full folder-list reload.
+                                await TagManager.setTags(
+                                    filePath, updatedTags.toList(),
+                                    notify: false);
+                              }
+
+                              refreshParentUIBatch();
+                              AppLogger.info(
+                                  '[ManageTags][BatchDialog] Save completed',
+                                  error:
+                                      'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved');
+
+                              try {
+                                toast.success(
+                                  l10n.tagsUpdated(
+                                    selectedFiles.length,
+                                    tagsAdded,
+                                    tagsRemoved,
+                                  ),
+                                );
+                                navigator.pop();
+                              } catch (_) {}
+                            } catch (e) {
+                              AppLogger.error(
+                                '[ManageTags][BatchDialog] Save failed',
+                                error: 'selectedFiles=$selectedFiles error=$e',
+                              );
+                              AppLogger.warning(
+                                  'Error processing batch tags: $e');
+                              try {
+                                toast.error(
+                                  l10n.batchTagProcessingError(e.toString()),
+                                );
+                              } catch (_) {}
+                            } finally {
+                              // Reset the saving flag only if the dialog is still
+                              // open (the success path pops it and unmounts).
+                              if (context.mounted) {
+                                setState(() {
+                                  isSaving = false;
+                                });
+                              }
                             }
-                            for (String tag in tagsToAdd) {
-                              bloc.add(AddTagToFile(filePath, tag));
-                            }
-                          } catch (_) {}
-                        }
-
-                        refreshParentUIBatch();
-                        AppLogger.info(
-                            '[ManageTags][BatchDialog] Save completed',
-                            error:
-                                'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved');
-
-                        try {
-                          toast.success(
-                            l10n.tagsUpdated(
-                              selectedFiles.length,
-                              tagsAdded,
-                              tagsRemoved,
-                            ),
-                          );
-                          navigator.pop();
-                        } catch (_) {}
-                      } catch (e) {
-                        AppLogger.error(
-                          '[ManageTags][BatchDialog] Save failed',
-                          error: 'selectedFiles=$selectedFiles error=$e',
-                        );
-                        AppLogger.warning('Error processing batch tags: $e');
-                        try {
-                          toast.error(
-                            l10n.batchTagProcessingError(e.toString()),
-                          );
-                        } catch (_) {}
-                      }
-                    },
+                          },
                     style: ElevatedButton.styleFrom(
                       textStyle: const TextStyle(fontSize: 16),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                     ),
-                    child:
-                        Text(AppLocalizations.of(context)!.save.toUpperCase()),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            AppLocalizations.of(context)!.save.toUpperCase()),
                   ),
                 ),
               ],

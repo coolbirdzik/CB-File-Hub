@@ -7,6 +7,7 @@ enum AiApiType { openaiCompatible, anthropic }
 enum AiProviderAuthMode {
   apiKey,
   codexOAuth,
+  none,
 }
 
 String aiApiTypeToDbString(AiApiType type) {
@@ -44,11 +45,15 @@ String aiProviderAuthModeToDbString(AiProviderAuthMode mode) {
       return 'api_key';
     case AiProviderAuthMode.codexOAuth:
       return 'codex_oauth';
+    case AiProviderAuthMode.none:
+      return 'none';
   }
 }
 
 AiProviderAuthMode aiProviderAuthModeFromDbString(String? value) {
   switch (value) {
+    case 'none':
+      return AiProviderAuthMode.none;
     case 'codex_oauth':
       return AiProviderAuthMode.codexOAuth;
     case 'api_key':
@@ -63,6 +68,8 @@ String aiProviderAuthModeDisplayName(AiProviderAuthMode mode) {
       return 'API Key';
     case AiProviderAuthMode.codexOAuth:
       return 'Codex OAuth';
+    case AiProviderAuthMode.none:
+      return 'None';
   }
 }
 

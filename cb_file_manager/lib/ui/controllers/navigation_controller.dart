@@ -106,6 +106,19 @@ class NavigationController {
     VideoThumbnailHelper.stopAllProcessing();
     final l10n = AppLocalizations.of(context)!;
 
+    // Tag-search paths (#search?tag=...) behave like folders: tapping a child
+    // tag drills into that tag in the same tab instead of loading a directory.
+    final tagForPath = UriUtils.extractTagFromSearchPath(path);
+    if (tagForPath != null) {
+      clearKeyboardFocus(path);
+      pathController.text = tagForPath;
+      tabManagerBloc.add(UpdateTabPath(tabId, path));
+      onPathChanged(path);
+      folderListBloc.add(SearchByTagGlobally(tagForPath));
+      tabManagerBloc.add(UpdateTabName(tabId, 'Tag: $tagForPath'));
+      return;
+    }
+
     // Clear keyboard focus
     clearKeyboardFocus(path);
 
@@ -225,13 +238,21 @@ class NavigationController {
       final folderListState = folderListBloc.state;
       if (folderListState.isSearchActive) {
         if (currentPath.startsWith('#search?tag=')) {
-          tabManagerBloc.add(CloseTab(tabId));
-          return false;
+          // A tag search reached by drilling in from the tag list has back
+          // history: walk it, matching the UI back button. Only close the tab
+          // when the search is the tab's first entry (opened directly via
+          // "Open in New Tab" / middle-click).
+          if (!tabManagerBloc.canTabNavigateBack(tabId)) {
+            tabManagerBloc.add(CloseTab(tabId));
+            return false;
+          }
+          // Fall through to the shared history-back logic below.
+        } else {
+          // Clear search results and reload current directory
+          folderListBloc.add(const ClearSearchAndFilters());
+          folderListBloc.add(FolderListLoad(currentPath));
+          return false; // Don't exit app, we cleared the search
         }
-        // Clear search results and reload current directory
-        folderListBloc.add(const ClearSearchAndFilters());
-        folderListBloc.add(FolderListLoad(currentPath));
-        return false; // Don't exit app, we cleared the search
       }
 
       // Check if we can navigate back in the folder hierarchy
@@ -252,11 +273,10 @@ class NavigationController {
         debugPrint('Back navigation result: $newPath');
         if (newPath != null) {
           debugPrint('Successfully navigating back to: $newPath');
+          // Tab title is kept in sync by backNavigationToPath itself.
           if (newPath.isEmpty || isDrivesPath(newPath)) {
             onPathChanged(newPath);
             pathController.text = '';
-            tabManagerBloc.add(
-                UpdateTabName(tabId, AppLocalizations.of(context)!.drivesTab));
             return false;
           }
           onPathChanged(newPath);
@@ -413,29 +433,31 @@ class NavigationController {
     final folderListState = folderListBloc.state;
     if (folderListState.isSearchActive) {
       if (currentPath.startsWith('#search?tag=')) {
-        tabManagerBloc.add(CloseTab(tabId));
-        return;
+        // A tag search reached by drilling in from the tag list (or any other
+        // in-place navigation) has back history: walk it, matching the UI back
+        // button. Only close the tab when the search is the tab's first entry
+        // (opened directly via "Open in New Tab" / middle-click).
+        if (!tabManagerBloc.canTabNavigateBack(tabId)) {
+          tabManagerBloc.add(CloseTab(tabId));
+          return;
+        }
+        // Fall through to the shared history-back logic below.
+      } else {
+        // Clear search results and reload current directory
+        folderListBloc.add(const ClearSearchAndFilters());
+        folderListBloc.add(FolderListLoad(currentPath));
+        return; // Don't navigate back, we're just clearing the search
       }
-      // Clear search results and reload current directory
-      folderListBloc.add(const ClearSearchAndFilters());
-      folderListBloc.add(FolderListLoad(currentPath));
-      return; // Don't navigate back, we're just clearing the search
     }
 
     if (tabManagerBloc.canTabNavigateBack(tabId)) {
       final actualPath = tabManagerBloc.backNavigationToPath(tabId);
       if (actualPath == null) return;
 
-      if (actualPath.isEmpty) {
+      // Tab title is kept in sync by backNavigationToPath itself.
+      if (actualPath.isEmpty || isDrivesPath(actualPath)) {
         onPathChanged(actualPath);
         pathController.text = '';
-        tabManagerBloc
-            .add(UpdateTabName(tabId, AppLocalizations.of(context)!.drivesTab));
-      } else if (isDrivesPath(actualPath)) {
-        onPathChanged(actualPath);
-        pathController.text = '';
-        tabManagerBloc
-            .add(UpdateTabName(tabId, AppLocalizations.of(context)!.drivesTab));
       } else {
         onPathChanged(actualPath);
         pathController.text = actualPath;
@@ -462,11 +484,10 @@ class NavigationController {
       final String? actualPath = tabManagerBloc.forwardNavigationToPath(tabId);
       if (actualPath == null) return;
 
+      // Tab title is kept in sync by forwardNavigationToPath itself.
       if (actualPath.isEmpty || isDrivesPath(actualPath)) {
         onPathChanged(actualPath);
         pathController.text = '';
-        tabManagerBloc
-            .add(UpdateTabName(tabId, AppLocalizations.of(context)!.drivesTab));
         return;
       }
 

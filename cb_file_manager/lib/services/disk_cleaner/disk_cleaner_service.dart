@@ -46,6 +46,24 @@ class DiskCleanerAgentActivity {
   });
 }
 
+class CleanerScanContext {
+  final String ownerTabId;
+  final DiskTreeNode root;
+  final String? selectedPath;
+  final String? chartPath;
+  final bool isScanning;
+  final DateTime updatedAt;
+
+  const CleanerScanContext({
+    required this.ownerTabId,
+    required this.root,
+    this.selectedPath,
+    this.chartPath,
+    this.isScanning = false,
+    required this.updatedAt,
+  });
+}
+
 /// Public façade for the Disk Cleaner skill.
 ///
 /// All scan and clean operations route through this single service so the AI
@@ -71,11 +89,49 @@ class DiskCleanerService {
   List<JunkItem>? pendingCleanupItems;
   int pendingCleanupBytes = 0;
 
+  final Map<String, CleanerScanContext> _cleanerScanContexts = {};
+
   CleanerScanHandle? _activeScan;
 
   /// Returns true while a scan is running. Used by callers that want to fail
   /// fast instead of throwing.
   bool get isScanning => _activeScan != null;
+
+  void publishCleanerScanContext({
+    required String ownerTabId,
+    required DiskTreeNode? root,
+    String? selectedPath,
+    String? chartPath,
+    bool isScanning = false,
+  }) {
+    if (root == null) {
+      _cleanerScanContexts.remove(ownerTabId);
+      return;
+    }
+
+    _cleanerScanContexts[ownerTabId] = CleanerScanContext(
+      ownerTabId: ownerTabId,
+      root: root,
+      selectedPath: selectedPath,
+      chartPath: chartPath,
+      isScanning: isScanning,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  CleanerScanContext? getCleanerScanContext({String? ownerTabId}) {
+    if (ownerTabId != null && ownerTabId.isNotEmpty) {
+      return _cleanerScanContexts[ownerTabId];
+    }
+    if (_cleanerScanContexts.isEmpty) return null;
+    return _cleanerScanContexts.values.reduce(
+      (a, b) => a.updatedAt.isAfter(b.updatedAt) ? a : b,
+    );
+  }
+
+  void clearCleanerScanContext(String ownerTabId) {
+    _cleanerScanContexts.remove(ownerTabId);
+  }
 
   /// Lists every category the cleaner knows about.
   ///

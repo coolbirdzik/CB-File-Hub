@@ -2,8 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
+import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
+import 'package:cb_file_manager/helpers/platform_paths.dart';
+import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
+import 'package:cb_file_manager/ui/dialogs/video_frame_picker_dialog.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
@@ -52,6 +57,27 @@ class MediaPickerConfig {
   final bool showFolders;
   final bool showFiles;
 
+  /// When true, the modal shows a mode toggle that lets the user browse the
+  /// filesystem or search files by tag. Selecting a tagged file returns its
+  /// path just like a browsed file.
+  final bool enableTagSearch;
+
+  /// When set (and [enableTagSearch] is true), the picker opens directly in tag
+  /// search mode with this tag pre-filled and searched, so the user immediately
+  /// sees the files carrying that tag instead of the folder browser.
+  final String? initialTagQuery;
+
+  /// When true, choosing a video file opens the [VideoFramePickerDialog] so the
+  /// user can pick a specific frame; the modal then returns the extracted
+  /// frame's path instead of the video path. Non-video selections are returned
+  /// as-is.
+  final bool extractVideoFrame;
+
+  /// When true (desktop only), shows a Windows-Explorer-style left rail listing
+  /// quick-access folders and drives ("This PC"). Ignored when [restrictToRoot]
+  /// is set, since browsing is sandboxed to a single folder in that case.
+  final bool showSidebar;
+
   const MediaPickerConfig({
     required this.initialPath,
     this.rootPath,
@@ -69,6 +95,34 @@ class MediaPickerConfig {
     this.showHidden = false,
     this.showFolders = true,
     this.showFiles = true,
+    this.enableTagSearch = false,
+    this.initialTagQuery,
+    this.extractVideoFrame = false,
+    this.showSidebar = true,
+  });
+}
+
+/// The two browsing modes the picker can operate in.
+enum MediaPickerMode {
+  /// Navigate the filesystem folder by folder.
+  browse,
+
+  /// Search files across the device by tag.
+  tags,
+}
+
+/// A single entry in the picker's left rail (quick-access folder or drive).
+class _SidebarEntry {
+  final String label;
+  final String path;
+  final IconData icon;
+  final bool requiresAdmin;
+
+  const _SidebarEntry({
+    required this.label,
+    required this.path,
+    required this.icon,
+    this.requiresAdmin = false,
   });
 }
 
@@ -127,12 +181,37 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
   List<Directory> _directories = [];
   List<File> _files = [];
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _pathController = TextEditingController();
+  final FocusNode _pathFocusNode = FocusNode();
   String? _rootPath;
+
+  // Tag-search mode state.
+  MediaPickerMode _mode = MediaPickerMode.browse;
+  final TextEditingController _tagController = TextEditingController();
+  final FocusNode _tagFocusNode = FocusNode();
+  List<String> _allTags = [];
+  bool _tagGlobalSearch = true;
+  String? _activeTagQuery;
+  bool _isTagSearching = false;
+  List<File> _tagResults = [];
+  bool _extractingFrame = false;
+
+  // Sidebar (Windows-Explorer-style left rail) state.
+  List<_SidebarEntry> _quickAccess = [];
+  List<_SidebarEntry> _drives = [];
+
+  /// Whether the left rail should be shown. Only on desktop, when enabled by
+  /// config, and when not sandboxed to a single root folder.
+  bool get _showSidebar =>
+      widget.config.showSidebar &&
+      !_restrictToRoot &&
+      (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
 
   @override
   void initState() {
     super.initState();
     _currentPath = path.normalize(widget.config.initialPath);
+    _pathController.text = _currentPath;
     _rootPath = widget.config.rootPath != null
         ? path.normalize(widget.config.rootPath!)
         : null;
@@ -143,11 +222,141 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
           widget.config.initialFilterId ?? widget.config.filters.first.id;
     }
     _loadEntries();
+    if (widget.config.enableTagSearch) {
+      _loadAllTags();
+      final initialTag = widget.config.initialTagQuery?.trim();
+      if (initialTag != null && initialTag.isNotEmpty) {
+        // Open directly in tag search mode showing the given tag's files.
+        _mode = MediaPickerMode.tags;
+        _tagController.text = initialTag;
+        _performTagSearch(initialTag);
+      }
+    }
+    if (_showSidebar) {
+      _loadSidebar();
+    }
+  }
+
+  Future<void> _loadSidebar() async {
+    // Quick-access folders (best-effort; skip any that don't resolve).
+    final quick = <_SidebarEntry>[];
+    Future<void> addQuick(
+      String label,
+      IconData icon,
+      Future<String> Function() resolve,
+    ) async {
+      try {
+        final p = await resolve();
+        if (p.isNotEmpty && Directory(p).existsSync()) {
+          quick.add(_SidebarEntry(
+            label: label,
+            path: path.normalize(p),
+            icon: icon,
+          ));
+        }
+      } catch (_) {
+        // Ignore unresolved quick-access entries.
+      }
+    }
+
+    final home =
+        Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+
+    void addHomeChild(String folder, String label, IconData icon) {
+      if (home == null || home.isEmpty) return;
+      final p = path.join(home, folder);
+      if (Directory(p).existsSync()) {
+        quick.add(_SidebarEntry(
+          label: label,
+          path: path.normalize(p),
+          icon: icon,
+        ));
+      }
+    }
+
+    if (home != null && home.isNotEmpty && Directory(home).existsSync()) {
+      quick.add(_SidebarEntry(
+        label: 'Home',
+        path: path.normalize(home),
+        icon: PhosphorIconsLight.house,
+      ));
+    }
+    addHomeChild('Desktop', 'Desktop', PhosphorIconsLight.desktop);
+    addHomeChild('Documents', 'Documents', PhosphorIconsLight.fileText);
+    await addQuick(
+      'Downloads',
+      PhosphorIconsLight.downloadSimple,
+      PlatformPaths.getDownloadsPath,
+    );
+    await addQuick(
+      'Pictures',
+      PhosphorIconsLight.image,
+      PlatformPaths.getPicturesPath,
+    );
+    addHomeChild('Videos', 'Videos', PhosphorIconsLight.filmSlate);
+    addHomeChild('Music', 'Music', PhosphorIconsLight.musicNotes);
+
+    // Drives / storage volumes.
+    List<_SidebarEntry> drives = [];
+    try {
+      final locations = await getAllStorageLocations();
+      drives = locations.map((dir) {
+        return _SidebarEntry(
+          label: _driveLabel(dir),
+          path: dir.path,
+          icon: _driveIcon(dir),
+          requiresAdmin: dir.requiresAdmin,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('MediaPickerDialog: failed to load drives: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _quickAccess = quick;
+      _drives = drives;
+    });
+  }
+
+  String _driveLabel(Directory drive) {
+    var p = drive.path;
+    if (p.length > 1 && p.endsWith(Platform.pathSeparator)) {
+      p = p.substring(0, p.length - 1);
+    }
+    if (Platform.isWindows && p.contains(':')) {
+      final letter = p.split(r'\')[0];
+      return p.startsWith('C:') ? '$letter (System)' : '$letter (Drive)';
+    }
+    return p;
+  }
+
+  IconData _driveIcon(Directory drive) {
+    if (Platform.isWindows && drive.path.startsWith('C:')) {
+      return PhosphorIconsLight.desktop;
+    }
+    return PhosphorIconsLight.hardDrives;
+  }
+
+  Future<void> _loadAllTags() async {
+    try {
+      final tags = await TagManager.getAllUniqueTags('');
+      if (!mounted) return;
+      setState(() {
+        _allTags = tags.toList()..sort();
+      });
+    } catch (e) {
+      debugPrint('MediaPickerDialog: failed to load tags: $e');
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tagController.dispose();
+    _tagFocusNode.dispose();
+    _pathController.dispose();
+    _pathFocusNode.dispose();
     super.dispose();
   }
 
@@ -192,6 +401,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     }
     setState(() {
       _currentPath = normalized;
+      _pathController.text = normalized;
     });
     _loadEntries();
   }
@@ -201,6 +411,63 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       return;
     }
     _navigateToDirectory(path.dirname(_currentPath));
+  }
+
+  /// Navigate to a path typed/pasted into the path bar. Trims surrounding
+  /// quotes and whitespace so paths pasted from Windows Explorer (which wraps
+  /// them in quotes) work. A typed file path is treated as selecting that file;
+  /// a typed folder path navigates into it.
+  Future<void> _submitTypedPath(String value) async {
+    var trimmed = value.trim();
+    if (trimmed.startsWith('"') &&
+        trimmed.endsWith('"') &&
+        trimmed.length >= 2) {
+      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    if (trimmed.isEmpty) {
+      _pathController.text = _currentPath;
+      return;
+    }
+
+    final normalized = path.normalize(trimmed);
+    final type = FileSystemEntity.typeSync(normalized);
+
+    void reject() {
+      if (!mounted) return;
+      setState(() {
+        _pathController.text = _currentPath;
+        _errorMessage = AppLocalizations.of(context)!.pathNotAccessible;
+      });
+    }
+
+    // A typed file path: honor it like selecting the file.
+    if (type == FileSystemEntityType.file) {
+      final filter = widget.config.fileFilter;
+      if (filter != null && !filter(normalized)) {
+        reject();
+        return;
+      }
+      if (_restrictToRoot && !_isWithinRoot(path.dirname(normalized))) {
+        reject();
+        return;
+      }
+      _pathFocusNode.unfocus();
+      await _selectFile(File(normalized));
+      return;
+    }
+
+    if (type != FileSystemEntityType.directory) {
+      reject();
+      return;
+    }
+
+    if (_restrictToRoot && !_isWithinRoot(normalized)) {
+      reject();
+      return;
+    }
+
+    _pathFocusNode.unfocus();
+    _navigateToDirectory(normalized);
   }
 
   Future<void> _loadEntries() async {
@@ -328,6 +595,91 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     return filter.matches(file.path);
   }
 
+  Future<void> _performTagSearch(String tag) async {
+    final query = tag.trim();
+    if (query.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isTagSearching = true;
+      _activeTagQuery = query;
+      _errorMessage = null;
+    });
+
+    try {
+      final entities = _tagGlobalSearch
+          ? await TagManager.findFilesByTagGlobally(query)
+          : await TagManager.findFilesByTag(_currentPath, query);
+
+      final files = <File>[];
+      for (final entity in entities) {
+        if (entity is File) {
+          final f = entity;
+          final filter = widget.config.fileFilter;
+          if (filter != null && !filter(f.path)) {
+            continue;
+          }
+          if (!_matchesFilter(f)) {
+            continue;
+          }
+          files.add(f);
+        }
+      }
+
+      files.sort((a, b) => path
+          .basename(a.path)
+          .toLowerCase()
+          .compareTo(path.basename(b.path).toLowerCase()));
+
+      if (!mounted) return;
+      setState(() {
+        _tagResults = files;
+        _isTagSearching = false;
+      });
+    } catch (e) {
+      debugPrint('MediaPickerDialog: tag search failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _tagResults = [];
+        _isTagSearching = false;
+      });
+    }
+  }
+
+  /// Handles a file selection. When [MediaPickerConfig.extractVideoFrame] is on
+  /// and the file is a video, opens the frame picker and returns the extracted
+  /// frame path instead of the video path.
+  Future<void> _selectFile(File file) async {
+    final filePath = file.path;
+
+    if (widget.config.extractVideoFrame &&
+        VideoThumbnailHelper.isSupportedVideoFormat(filePath)) {
+      if (_extractingFrame) return;
+      setState(() => _extractingFrame = true);
+      try {
+        final framePath = await VideoFramePickerDialog.show(context, filePath);
+        if (!mounted) return;
+        setState(() => _extractingFrame = false);
+        if (framePath == null) {
+          // User cancelled the frame picker; keep the browser open.
+          return;
+        }
+        if (mounted) {
+          Navigator.pop(context, framePath);
+        }
+      } catch (e) {
+        debugPrint('MediaPickerDialog: frame extraction failed: $e');
+        if (mounted) {
+          setState(() => _extractingFrame = false);
+        }
+      }
+      return;
+    }
+
+    Navigator.pop(context, filePath);
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleDirs =
@@ -345,32 +697,161 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                 ? 3
                 : 4;
 
-        return Column(
+        final inTagMode = _mode == MediaPickerMode.tags;
+        // Show the rail only in browse mode and when there is room for it.
+        final showSidebar = _showSidebar && !inTagMode && width >= 640;
+
+        final mainArea = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildPathBar(context),
-            const SizedBox(height: 8),
-            _buildToolbar(context),
+            if (widget.config.enableTagSearch) ...[
+              _buildModeToggle(context),
+              const SizedBox(height: 8),
+            ],
+            if (inTagMode)
+              _buildTagToolbar(context)
+            else ...[
+              _buildPathBar(context),
+              const SizedBox(height: 8),
+              _buildToolbar(context),
+            ],
             const SizedBox(height: 8),
             Expanded(
-              child: _isLoading
-                  ? Skeleton(
-                      type: _viewMode == MediaPickerViewMode.grid
-                          ? SkeletonType.grid
-                          : SkeletonType.list,
-                      crossAxisCount: crossAxisCount,
-                      itemCount: 12,
-                    )
-                  : _buildContent(
-                      context,
-                      visibleDirs,
-                      visibleFiles,
-                      crossAxisCount,
-                    ),
+              child: inTagMode
+                  ? _buildTagContent(context, crossAxisCount)
+                  : _isLoading
+                      ? Skeleton(
+                          type: _viewMode == MediaPickerViewMode.grid
+                              ? SkeletonType.grid
+                              : SkeletonType.list,
+                          crossAxisCount: crossAxisCount,
+                          itemCount: 12,
+                        )
+                      : _buildContent(
+                          context,
+                          visibleDirs,
+                          visibleFiles,
+                          crossAxisCount,
+                        ),
             ),
           ],
         );
+
+        if (!showSidebar) {
+          return mainArea;
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 220,
+              child: _buildSidebar(context),
+            ),
+            const SizedBox(width: 12),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 12),
+            Expanded(child: mainArea),
+          ],
+        );
       },
+    );
+  }
+
+  Widget _buildModeToggle(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return SegmentedButton<MediaPickerMode>(
+      segments: [
+        ButtonSegment(
+          value: MediaPickerMode.browse,
+          icon: const Icon(PhosphorIconsLight.folder, size: 18),
+          label: Text(l10n.browseFiles),
+        ),
+        ButtonSegment(
+          value: MediaPickerMode.tags,
+          icon: const Icon(PhosphorIconsLight.tag, size: 18),
+          label: Text(l10n.searchByTags),
+        ),
+      ],
+      selected: {_mode},
+      showSelectedIcon: false,
+      onSelectionChanged: (selection) {
+        setState(() {
+          _mode = selection.first;
+        });
+      },
+    );
+  }
+
+  /// Windows-Explorer-style left rail: quick-access folders + drives.
+  Widget _buildSidebar(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 200,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.only(right: 8),
+        children: [
+          if (_quickAccess.isNotEmpty) ...[
+            _SectionHeader(label: l10n.quickAccess),
+            ..._quickAccess.map(_buildSidebarTile),
+            const SizedBox(height: 8),
+          ],
+          _SectionHeader(label: l10n.thisPC),
+          if (_drives.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                l10n.loading,
+                style: theme.textTheme.bodySmall,
+              ),
+            )
+          else
+            ..._drives.map(_buildSidebarTile),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarTile(_SidebarEntry entry) {
+    final selected = _normalizePath(entry.path) == _normalizePath(_currentPath);
+    final theme = Theme.of(context);
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      selected: selected,
+      selectedTileColor:
+          theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+      leading: Icon(entry.icon, size: 20),
+      title: Text(
+        entry.label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 13),
+      ),
+      subtitle: entry.requiresAdmin
+          ? Text(
+              AppLocalizations.of(context)!.requiresAdminPrivileges,
+              style: TextStyle(
+                fontSize: 10,
+                color: theme.colorScheme.error,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            )
+          : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      onTap: () => _navigateToDirectory(entry.path),
     );
   }
 
@@ -384,20 +865,28 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
           icon: const Icon(PhosphorIconsLight.arrowUp),
         ),
         Expanded(
-          child: Tooltip(
-            message: _currentPath,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Text(
-                _currentPath,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontFamily: 'monospace',
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+          child: TextField(
+            controller: _pathController,
+            focusNode: _pathFocusNode,
+            style: const TextStyle(
+              fontSize: 13,
+              fontFamily: 'monospace',
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              hintText: _currentPath,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              suffixIcon: IconButton(
+                onPressed: () => _submitTypedPath(_pathController.text),
+                tooltip: l10n.open,
+                icon: const Icon(PhosphorIconsLight.arrowRight, size: 18),
               ),
             ),
+            onSubmitted: _submitTypedPath,
           ),
         ),
         IconButton(
@@ -585,7 +1074,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                       final file = files[index];
                       return _FileGridTile(
                         file: file,
-                        onTap: () => Navigator.pop(context, file.path),
+                        onTap: () => _selectFile(file),
                       );
                     },
                     childCount: files.length,
@@ -597,13 +1086,266 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                       final file = files[index];
                       return _FileListTile(
                         file: file,
-                        onTap: () => Navigator.pop(context, file.path),
+                        onTap: () => _selectFile(file),
                       );
                     },
                     childCount: files.length,
                   ),
                 ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildTagToolbar(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final suggestions = _tagController.text.trim().isEmpty
+        ? _allTags
+        : _allTags
+            .where((tag) => tag
+                .toLowerCase()
+                .contains(_tagController.text.trim().toLowerCase()))
+            .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: RawAutocomplete<String>(
+                textEditingController: _tagController,
+                focusNode: _tagFocusNode,
+                optionsBuilder: (value) {
+                  final query = value.text.trim().toLowerCase();
+                  if (query.isEmpty) {
+                    return _allTags;
+                  }
+                  return _allTags
+                      .where((tag) => tag.toLowerCase().contains(query));
+                },
+                onSelected: (selection) {
+                  _tagController.text = selection;
+                  _performTagSearch(selection);
+                },
+                fieldViewBuilder:
+                    (context, controller, focusNode, onFieldSubmitted) {
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      hintText: l10n.searchByTags,
+                      prefixIcon: const Icon(PhosphorIconsLight.tag),
+                      suffixIcon: controller.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                controller.clear();
+                                setState(() {
+                                  _activeTagQuery = null;
+                                  _tagResults = [];
+                                });
+                              },
+                              icon: const Icon(PhosphorIconsLight.x),
+                            ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16.0),
+                      ),
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (value) => _performTagSearch(value),
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  final items = options.toList();
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxHeight: 240, maxWidth: 360),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            final option = items[index];
+                            return ListTile(
+                              dense: true,
+                              leading:
+                                  const Icon(PhosphorIconsLight.tag, size: 18),
+                              title: Text(option),
+                              onTap: () => onSelected(option),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              tooltip: l10n.search,
+              onPressed: () => _performTagSearch(_tagController.text),
+              icon: const Icon(PhosphorIconsLight.magnifyingGlass),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(l10n.searchInSubfolders),
+                value: _tagGlobalSearch,
+                onChanged: (value) {
+                  setState(() {
+                    _tagGlobalSearch = value;
+                  });
+                  if (_activeTagQuery != null) {
+                    _performTagSearch(_activeTagQuery!);
+                  }
+                },
+              ),
+            ),
+            if (widget.config.showViewToggle)
+              ToggleButtons(
+                isSelected: [
+                  _viewMode == MediaPickerViewMode.grid,
+                  _viewMode == MediaPickerViewMode.list,
+                ],
+                onPressed: (index) {
+                  setState(() {
+                    _viewMode = index == 0
+                        ? MediaPickerViewMode.grid
+                        : MediaPickerViewMode.list;
+                  });
+                },
+                borderRadius: BorderRadius.circular(16.0),
+                constraints: const BoxConstraints(minHeight: 36, minWidth: 44),
+                children: const [
+                  Icon(PhosphorIconsLight.squaresFour),
+                  Icon(PhosphorIconsLight.listBullets),
+                ],
+              ),
+          ],
+        ),
+        if (_activeTagQuery == null && suggestions.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          _SectionHeader(label: l10n.suggestedTags),
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: suggestions.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final tag = suggestions[index];
+                return ActionChip(
+                  avatar: const Icon(PhosphorIconsLight.tag, size: 16),
+                  label: Text(tag),
+                  onPressed: () {
+                    _tagController.text = tag;
+                    _performTagSearch(tag);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTagContent(BuildContext context, int crossAxisCount) {
+    final l10n = AppLocalizations.of(context)!;
+
+    if (_isTagSearching) {
+      return Skeleton(
+        type: _viewMode == MediaPickerViewMode.grid
+            ? SkeletonType.grid
+            : SkeletonType.list,
+        crossAxisCount: crossAxisCount,
+        itemCount: 12,
+      );
+    }
+
+    if (_activeTagQuery == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsLight.tag,
+              size: 48,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _allTags.isEmpty ? l10n.noMatchingTags : l10n.searchByTags,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_tagResults.isEmpty) {
+      return Center(
+        child: Text(
+          l10n.noFilesWithTag,
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    final files = _tagResults;
+    return CustomScrollView(
+      cacheExtent: 600,
+      slivers: [
+        SliverToBoxAdapter(
+          child: _SectionHeader(
+            label: '${l10n.files} · ${files.length} ${l10n.results}',
+          ),
+        ),
+        _viewMode == MediaPickerViewMode.grid
+            ? SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 0.86,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final file = files[index];
+                    return _FileGridTile(
+                      file: file,
+                      onTap: () => _selectFile(file),
+                    );
+                  },
+                  childCount: files.length,
+                ),
+              )
+            : SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final file = files[index];
+                    return _FileListTile(
+                      file: file,
+                      onTap: () => _selectFile(file),
+                    );
+                  },
+                  childCount: files.length,
+                ),
+              ),
       ],
     );
   }

@@ -33,6 +33,11 @@
 # Web related
 lib/generated_plugin_registrant.dart
 
+# Local AI: bundled llama.cpp runtime (Vulkan DLLs + llama-server.exe).
+# These large binaries (~69MB) are downloaded at build time by
+# scripts/fetch_llama_runtime.sh, not committed to git.
+/windows/llama/
+
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 .kilo

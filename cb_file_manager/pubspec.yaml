@@ -12,7 +12,7 @@ publish_to: none
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.1.1+9
+version: 1.1.2+1
 
 environment:
   sdk: ">=2.15.0 <=3.32.1"
@@ -95,15 +95,20 @@ dependencies:
   mobile_smb_native:
     path: ../mobile_smb_native # Local path to mobile SMB plugin
   image: ^4.5.4
+  crop_your_image: ^2.0.0
   vector_math: ^2.1.4
   pdfx: ^2.0.0
   # HTTP server for streaming files from SMB
   shelf: ^1.4.1
   shelf_router: ^1.1.4
   shelf_cors_headers: ^0.1.5
-  mime: ^1.0.4
+  http: ^1.4.0
+  mime: ^2.0.0
   desktop_drop: ^0.4.4 # OS-level file drag-and-drop support
   flutter_markdown: ^0.7.7+1
+  flutter_secure_storage: ^10.3.1 # Secure token storage for local AI advisor
+  flutter_gemma: 1.0.0-rc.1
+  flutter_gemma_litertlm: 1.0.0-rc.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

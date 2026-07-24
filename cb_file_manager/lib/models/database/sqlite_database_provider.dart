@@ -1,13 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:cb_file_manager/utils/app_logger.dart';
-
 import 'database_provider.dart';
 
 /// Shared SQLite provider for the application data store.
@@ -90,12 +87,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
     final databasePath = path.join(databaseDirectory.path, _databaseFileName);
     final databaseFactory = _resolveDatabaseFactory();
-    AppLogger.info(
-      '[SQLite] Opening database',
-      error:
-          'path=$databasePath platform=${Platform.operatingSystem} factory=${databaseFactory.runtimeType}',
-    );
-
     return databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
@@ -132,14 +123,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     try {
       await db.rawQuery('PRAGMA journal_mode = WAL');
       await db.rawQuery('PRAGMA synchronous = NORMAL');
-      AppLogger.info('[SQLite] Database pragmas configured');
-    } catch (error, stackTrace) {
-      AppLogger.warning(
-        '[SQLite] Failed to apply optional pragmas',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
+    } catch (_) {}
   }
 
   Future<void> _createSchema(DatabaseExecutor db) async {
@@ -380,9 +364,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   /// higher [version] than it was originally created with.
   Future<void> _onUpgrade(
       DatabaseExecutor db, int oldVersion, int newVersion) async {
-    AppLogger.info('[SQLite] Upgrading database',
-        error: 'oldVersion=$oldVersion newVersion=$newVersion');
-
     if (oldVersion < 2) {
       // v2: tag_metadata (thumbnails) and tag_hierarchy (parent-child)
       // Drop first in case partially-created tables exist from development.
@@ -455,9 +436,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_child ON tag_hierarchy(child_normalized_tag)',
       );
     }
-
-    AppLogger.info('[SQLite] Database upgrade complete',
-        error: 'newVersion=$newVersion');
   }
 
   Future<Map<String, Object?>?> _getPreferenceRow(String key) async {
@@ -501,7 +479,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       );
       return true;
     } catch (error) {
-      debugPrint('Error saving preference "$key": $error');
       return false;
     }
   }
@@ -545,7 +522,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       );
       return true;
     } catch (error) {
-      debugPrint('Error adding tag to file: $error');
       return false;
     }
   }
@@ -561,7 +537,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       );
       return true;
     } catch (error) {
-      debugPrint('Error removing tag from file: $error');
       return false;
     }
   }
@@ -582,7 +557,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           .whereType<String>()
           .toList(growable: false);
     } catch (error) {
-      debugPrint('Error getting tags for file: $error');
       return <String>[];
     }
   }
@@ -597,19 +571,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       }
       uniqueTags[_normalizeTag(trimmed)] = trimmed;
     }
-    debugPrint(
-        '[SQLite] setTagsForFile START filePath=$filePath incomingTags=$tags uniqueTags=${uniqueTags.values.toList()}');
-    AppLogger.info('[SQLite] setTagsForFile START',
-        error:
-            'filePath=$filePath incomingTags=$tags uniqueTags=${uniqueTags.values.toList()}');
-
     try {
       final database = await getDatabase();
       await database.transaction((txn) async {
-        AppLogger.debug('[SQLite] setTagsForFile deleting existing tags',
-            error: 'filePath=$filePath');
-        debugPrint(
-            '[SQLite] setTagsForFile deleting existing tags filePath=$filePath');
         await txn.delete(
           'file_tags',
           where: 'file_path = ?',
@@ -617,11 +581,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         );
 
         for (final entry in uniqueTags.entries) {
-          AppLogger.debug('[SQLite] setTagsForFile inserting tag',
-              error:
-                  'filePath=$filePath tag=${entry.value} normalized=${entry.key}');
-          debugPrint(
-              '[SQLite] setTagsForFile inserting filePath=$filePath tag=${entry.value} normalized=${entry.key}');
           await txn.insert(
             'file_tags',
             <String, Object?>{
@@ -633,15 +592,8 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           );
         }
       });
-      AppLogger.info('[SQLite] setTagsForFile DONE',
-          error: 'filePath=$filePath');
-      debugPrint('[SQLite] setTagsForFile DONE filePath=$filePath');
       return true;
     } catch (error) {
-      AppLogger.error('[SQLite] setTagsForFile ERROR',
-          error: 'filePath=$filePath error=$error');
-      debugPrint(
-          '[SQLite] setTagsForFile ERROR filePath=$filePath error=$error');
       return false;
     }
   }
@@ -670,7 +622,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           .whereType<String>()
           .toList(growable: false);
     } catch (error) {
-      debugPrint('Error finding files by tag: $error');
       return <String>[];
     }
   }
@@ -689,7 +640,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       );
       return rows.map((row) => row['tag']).whereType<String>().toSet();
     } catch (error) {
-      debugPrint('Error getting all unique tags: $error');
       return <String>{};
     }
   }
@@ -699,18 +649,14 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     try {
       final database = await getDatabase();
       await _createSchema(database);
-      AppLogger.debug('[SQLite] Reading standalone tags');
       final rows = await database.query(
         'standalone_tags',
         columns: <String>['tag'],
         orderBy: 'tag COLLATE NOCASE ASC',
       );
-      AppLogger.debug('[SQLite] Loaded standalone tags count=${rows.length}');
       return rows.map((row) => row['tag']).whereType<String>().toSet();
     } catch (error) {
       _lastErrorMessage = error.toString();
-      AppLogger.error('[SQLite] Failed to read standalone tags', error: error);
-      debugPrint('Error getting standalone tags: $error');
       return <String>{};
     }
   }
@@ -729,11 +675,6 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     try {
       final database = await getDatabase();
       await _createSchema(database);
-      AppLogger.info(
-        '[SQLite] Replacing standalone tags',
-        error:
-            'incoming=${tags.length} unique=${uniqueTags.length} sample=${uniqueTags.values.take(3).join(", ")}',
-      );
       await database.transaction((txn) async {
         await txn.delete('standalone_tags');
 
@@ -748,19 +689,10 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           );
         }
       });
-      final verifyRows = await database.rawQuery(
-        'SELECT COUNT(*) AS count FROM standalone_tags',
-      );
-      final savedCount = (verifyRows.first['count'] as int?) ?? 0;
-      AppLogger.info('[SQLite] Replaced standalone tags successfully',
-          error: 'savedCount=$savedCount');
       _lastErrorMessage = null;
       return true;
     } catch (error) {
       _lastErrorMessage = error.toString();
-      AppLogger.error('[SQLite] Failed to replace standalone tags',
-          error: error);
-      debugPrint('Error replacing standalone tags: $error');
       return false;
     }
   }
@@ -785,8 +717,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       return true;
-    } catch (error) {
-      debugPrint('Error setting tag thumbnail: $error');
+    } catch (_) {
       return false;
     }
   }
@@ -804,8 +735,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       );
       if (rows.isEmpty) return null;
       return rows.first['thumbnail_path'] as String?;
-    } catch (error) {
-      debugPrint('Error getting tag thumbnail: $error');
+    } catch (_) {
       return null;
     }
   }
@@ -820,8 +750,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         whereArgs: [normalizedTag],
       );
       return true;
-    } catch (error) {
-      debugPrint('Error deleting tag thumbnail: $error');
+    } catch (_) {
       return false;
     }
   }
@@ -843,8 +772,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         }
       }
       return result;
-    } catch (error) {
-      debugPrint('Error getting all tag thumbnails: $error');
+    } catch (_) {
       return <String, String>{};
     }
   }
@@ -868,8 +796,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
       return true;
-    } catch (error) {
-      debugPrint('Error setting tag hierarchy: $error');
+    } catch (_) {
       return false;
     }
   }
@@ -885,8 +812,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         whereArgs: [parentNormalizedTag, childNormalizedTag],
       );
       return true;
-    } catch (error) {
-      debugPrint('Error removing tag hierarchy: $error');
+    } catch (_) {
       return false;
     }
   }
@@ -905,8 +831,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           .map((row) => row['child_normalized_tag'])
           .whereType<String>()
           .toList(growable: false);
-    } catch (error) {
-      debugPrint('Error getting child tags: $error');
+    } catch (_) {
       return <String>[];
     }
   }
@@ -925,8 +850,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
           .map((row) => row['parent_normalized_tag'])
           .whereType<String>()
           .toList(growable: false);
-    } catch (error) {
-      debugPrint('Error getting parent tags: $error');
+    } catch (_) {
       return <String>[];
     }
   }
@@ -949,8 +873,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         }
       }
       return result;
-    } catch (error) {
-      debugPrint('Error getting all tag hierarchy: $error');
+    } catch (_) {
       return <String, List<String>>{};
     }
   }
@@ -967,8 +890,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         );
       });
       return true;
-    } catch (error) {
-      debugPrint('Error removing all hierarchy for tag: $error');
+    } catch (_) {
       return false;
     }
   }
@@ -1074,8 +996,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         whereArgs: [key],
       );
       return true;
-    } catch (error) {
-      debugPrint('Error deleting preference "$key": $error');
+    } catch (_) {
       return false;
     }
   }
@@ -1129,8 +1050,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
                 'timestamp': row['timestamp'],
               })
           .toList(growable: false);
-    } catch (error) {
-      debugPrint('Error loading raw preferences: $error');
+    } catch (_) {
       return <Map<String, dynamic>>[];
     }
   }
@@ -1159,8 +1079,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
                 'timestamp': row['timestamp'],
               })
           .toList(growable: false);
-    } catch (error) {
-      debugPrint('Error loading raw preferences page: $error');
+    } catch (_) {
       return <Map<String, dynamic>>[];
     }
   }
@@ -1172,8 +1091,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       final result =
           await database.rawQuery('SELECT COUNT(*) AS count FROM preferences');
       return (result.first['count'] as int?) ?? 0;
-    } catch (error) {
-      debugPrint('Error counting raw preferences: $error');
+    } catch (_) {
       return 0;
     }
   }
@@ -1195,8 +1113,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
                 'createdAt': row['created_at'],
               })
           .toList(growable: false);
-    } catch (error) {
-      debugPrint('Error loading raw file tags: $error');
+    } catch (_) {
       return <Map<String, dynamic>>[];
     }
   }
@@ -1223,8 +1140,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
                 'createdAt': row['created_at'],
               })
           .toList(growable: false);
-    } catch (error) {
-      debugPrint('Error loading raw file tags page: $error');
+    } catch (_) {
       return <Map<String, dynamic>>[];
     }
   }
@@ -1236,8 +1152,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
       final result =
           await database.rawQuery('SELECT COUNT(*) AS count FROM file_tags');
       return (result.first['count'] as int?) ?? 0;
-    } catch (error) {
-      debugPrint('Error counting raw file tags: $error');
+    } catch (_) {
       return 0;
     }
   }
@@ -1251,8 +1166,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         'SELECT COUNT(DISTINCT file_path) AS count FROM file_tags',
       );
       return (result.first['count'] as int?) ?? 0;
-    } catch (error) {
-      debugPrint('Error counting unique tagged files: $error');
+    } catch (_) {
       return 0;
     }
   }

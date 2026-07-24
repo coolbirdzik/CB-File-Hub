@@ -32,6 +32,10 @@ class DiskTreeNode {
   /// Whether this node is expanded in the UI.
   bool isExpanded;
 
+  /// Cached flag: true if this node or any descendant is selected for deletion.
+  /// Reset to null when selection changes to force recalculation.
+  bool? _hasSelectionInSubtree;
+
   DiskTreeNode({
     required this.name,
     required this.fullPath,
@@ -67,6 +71,36 @@ class DiskTreeNode {
       total += child.junkBytes;
     }
     return total;
+  }
+
+  /// Whether this node or any descendant has been selected for deletion.
+  /// Uses caching to avoid O(n²) repeated traversal during tree filtering.
+  bool get hasSelectionInSubtree {
+    if (_hasSelectionInSubtree != null) return _hasSelectionInSubtree!;
+
+    if (isSelectedForDeletion && fullPath.isNotEmpty) {
+      _hasSelectionInSubtree = true;
+      return true;
+    }
+
+    for (final child in children) {
+      if (child.hasSelectionInSubtree) {
+        _hasSelectionInSubtree = true;
+        return true;
+      }
+    }
+
+    _hasSelectionInSubtree = false;
+    return false;
+  }
+
+  /// Invalidate the selection cache for this node and all ancestors.
+  /// Call this after modifying isSelectedForDeletion.
+  void invalidateSelectionCache() {
+    _hasSelectionInSubtree = null;
+    for (final child in children) {
+      child.invalidateSelectionCache();
+    }
   }
 
   /// Sort children by size descending (recursive).

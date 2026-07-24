@@ -27,6 +27,11 @@ class FileNavigationBloc
       DirectoryWatcherService.instance;
   int _activeSortRequestId = 0;
 
+  /// Paths with an in-flight disk scan (load or refresh). Used to dedupe the
+  /// multiple folder-load events that tab activation, path sync and the tab
+  /// refocus pipeline can enqueue for the same folder within a few frames.
+  final Set<String> _inFlightScans = <String>{};
+
   static const int _searchResultsPageSize = 200;
   List<FileSystemEntity> _pendingSearchResults = [];
 
@@ -160,6 +165,29 @@ class FileNavigationBloc
       return;
     }
 
+    // Dedupe concurrent loads/refreshes for the same folder. Tab activation,
+    // path sync and the refocus pipeline can each enqueue a load for this path
+    // within a few frames; without this guard bloc runs every one as a separate
+    // full stat-scan in parallel, which is the main cause of the file list
+    // staying empty for a long time on large folders.
+    if (_inFlightScans.contains(event.path)) {
+      AppLogger.perf(
+          'Load skipped — scan already in flight path=${event.path}');
+      return;
+    }
+    _inFlightScans.add(event.path);
+    try {
+      await _performLoad(event, emit, totalSw);
+    } finally {
+      _inFlightScans.remove(event.path);
+    }
+  }
+
+  Future<void> _performLoad(
+    FileNavigationLoad event,
+    Emitter<FileNavigationState> emit,
+    Stopwatch totalSw,
+  ) async {
     emit(state.copyWith(
       isLoading: true,
       isRefreshing: false,
@@ -241,7 +269,7 @@ class FileNavigationBloc
         final sortNeedsStats = _sortOptionNeedsStats(sortOption);
         if (sortNeedsStats && cacheResult.stats.isEmpty) {
           AppLogger.perf(
-              'Dir listing CACHE BYPASS "$event.path" — sort needs stats');
+              'Dir listing CACHE BYPASS "${event.path}" — sort needs stats');
         } else {
           final sortedFolders = await FileSystemSorter.sortDirectories(
             cacheResult.folders,
@@ -261,7 +289,7 @@ class FileNavigationBloc
             sortOption: sortOption,
           ));
           AppLogger.perf(
-              'Dir listing CACHE HIT "$event.path" (${sortedFiles.length} files)');
+              'Dir listing CACHE HIT "${event.path}" (${sortedFiles.length} files)');
           ThumbnailLoader.updateDisplayIndexMap(
               sortedFiles.map((f) => f.path).toList());
           ThumbnailLoader.clearFileExistsCache();
@@ -272,7 +300,7 @@ class FileNavigationBloc
           return;
         }
       }
-      AppLogger.perf('Dir listing CACHE MISS "$event.path" — scanning disk');
+      AppLogger.perf('Dir listing CACHE MISS "${event.path}" — scanning disk');
 
       // ── Offload scan + stat + sort to background isolate ────────────────────
       // With 5000+ files, stat + sort on the main isolate causes UI jank.
@@ -350,18 +378,40 @@ class FileNavigationBloc
     FileNavigationRefresh event,
     Emitter<FileNavigationState> emit,
   ) async {
+    // Skip virtual paths — handled by specialized blocs
+    if (event.isVirtualPath || _isDrivesPath(event.path)) {
+      emit(state.copyWith(isRefreshing: false));
+      return;
+    }
+
+    // Dedupe against an in-flight load/refresh for the same folder. The tab
+    // refocus pipeline fires a refresh at the same time tab activation fires a
+    // load; without this guard both run a full stat-scan in parallel and
+    // contend for disk I/O, delaying the listing. The in-flight scan already
+    // produces fresh data, so skipping this refresh is safe.
+    if (_inFlightScans.contains(event.path)) {
+      AppLogger.perf(
+          'Refresh skipped — scan already in flight path=${event.path}');
+      return;
+    }
+    _inFlightScans.add(event.path);
+    try {
+      await _performRefresh(event, emit);
+    } finally {
+      _inFlightScans.remove(event.path);
+    }
+  }
+
+  Future<void> _performRefresh(
+    FileNavigationRefresh event,
+    Emitter<FileNavigationState> emit,
+  ) async {
     // Use isRefreshing instead of isLoading so the existing file list
     // is not cleared/rebuilt — only the status bar indicator changes.
     emit(state.copyWith(isRefreshing: true));
 
     // Invalidate cache so refresh always hits disk (user explicitly wants fresh data).
     DirectoryListingCacheService.instance.invalidate(event.path);
-
-    // Skip virtual paths — handled by specialized blocs
-    if (event.isVirtualPath || _isDrivesPath(event.path)) {
-      emit(state.copyWith(isRefreshing: false));
-      return;
-    }
 
     try {
       final directory = Directory(event.path);
@@ -856,8 +906,15 @@ class FileNavigationBloc
         .toList();
     if (videoPaths.isEmpty) return;
     VideoThumbnailHelper.setCurrentDirectory(dirPath);
-    VideoThumbnailHelper.proactiveGenerateAll(videoPaths,
-        directoryPath: dirPath);
+    // Use optimizedBatchPreload instead of proactiveGenerateAll to avoid
+    // blocking the event loop with per-item getFromCache() file I/O on large
+    // directories. optimizedBatchPreload stages the queue in priority groups
+    // and does not perform synchronous file existence checks inline.
+    VideoThumbnailHelper.optimizedBatchPreload(
+      videoPaths,
+      maxConcurrent: 2,
+      visibleCount: 10,
+    );
   }
 
   void _emitPermissionError(

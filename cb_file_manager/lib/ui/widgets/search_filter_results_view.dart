@@ -189,20 +189,10 @@ class SearchFilterResultsView extends StatelessWidget {
             ),
           ),
         ),
-        Expanded(
+        const Expanded(
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(PhosphorIconsLight.magnifyingGlass,
-                    size: 64, color: Colors.grey),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.emptyFolder,
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ],
-            ),
+            child: Icon(PhosphorIconsLight.magnifyingGlass,
+                size: 64, color: Colors.grey),
           ),
         ),
       ],

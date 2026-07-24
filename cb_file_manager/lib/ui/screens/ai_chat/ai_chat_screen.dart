@@ -14,6 +14,7 @@ import 'components/approval_card.dart';
 import '../../../services/ai/ai_chat_history_service.dart';
 import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/ai/file_context_builder.dart';
+import '../../../services/local_ai/local_ai_advisor_service.dart';
 import '../../tab_manager/core/tab_data.dart';
 import '../../tab_manager/core/tab_manager.dart';
 import '../../tab_manager/core/tab_paths.dart';
@@ -50,9 +51,13 @@ class AiChatScreen extends StatelessWidget {
         final l = AppLocalizations.of(ctx)!;
         return BlocProvider<AiAgentBloc>(
           create: (_) {
+            final getIt = GetIt.instance;
             final bloc = AiAgentBloc(
-              providerService: GetIt.instance<AiProviderService>(),
-              historyService: GetIt.instance<AiChatHistoryService>(),
+              providerService: getIt<AiProviderService>(),
+              historyService: getIt<AiChatHistoryService>(),
+              localAiService: getIt.isRegistered<LocalAiAdvisorService>()
+                  ? getIt<LocalAiAdvisorService>()
+                  : null,
               thinkingPhrases: [
                 l.aiThinking0,
                 l.aiThinking1,
@@ -390,6 +395,8 @@ class _AiChatBodyState extends State<_AiChatBody> {
               defaultLabel: l.defaultModel,
               loadingLabel: l.loadingModels,
               emptyLabel: l.noModelConfigured,
+              searchHint: l.modelSearchHint,
+              noMatchesLabel: l.noModelsFound,
               onSelected: (value) {
                 context.read<AiAgentBloc>().add(
                       SelectChatModel(

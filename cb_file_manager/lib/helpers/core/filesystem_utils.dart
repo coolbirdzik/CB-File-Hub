@@ -60,15 +60,19 @@ Future<List<FileSystemEntity>> getFoldersAndFiles(String path,
   try {
     files = await dir.list(recursive: recursive).toList();
 
-    // Create a new list to avoid type issues
+    // Create a new list to avoid type issues.
+    // Reuse the runtime type reported by dir.list() (Directory/File/Link)
+    // instead of calling FileSystemEntity.isDirectorySync() per entry, which
+    // performs a synchronous stat() on the main thread and freezes the UI on
+    // large/recursive directories.
     List<FileSystemEntity> typedFiles = [];
 
     for (var fsEntity in files) {
-      String fsPath = fsEntity.path.toString();
-      if (FileSystemEntity.isDirectorySync(fsPath)) {
-        typedFiles.add(Directory(fsEntity.absolute.path.toString()));
+      final String absPath = fsEntity.absolute.path.toString();
+      if (fsEntity is Directory) {
+        typedFiles.add(Directory(absPath));
       } else {
-        typedFiles.add(File(fsEntity.absolute.path.toString()));
+        typedFiles.add(File(absPath));
       }
     }
 
@@ -231,10 +235,10 @@ Future<List<FileSystemEntity>> sort(List<FileSystemEntity> elements, Sorting by,
         if (!reverse) {
           return elements
             ..sort((f1, f2) {
-              bool isDir1 =
-                  FileSystemEntity.isDirectorySync(f1.path.toString());
-              bool isDir2 =
-                  FileSystemEntity.isDirectorySync(f2.path.toString());
+              // Use the runtime type instead of isDirectorySync() to avoid a
+              // synchronous stat() per comparison (O(n log n) blocking calls).
+              final bool isDir1 = f1 is Directory;
+              final bool isDir2 = f2 is Directory;
               return isDir1 == isDir2 ? 0 : (isDir1 ? -1 : 1);
             });
         } else {

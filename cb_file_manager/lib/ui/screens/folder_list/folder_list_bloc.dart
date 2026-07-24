@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
@@ -124,7 +126,28 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   void _onLoad(FolderListLoad event, Emitter<FolderListState> emit) {
-    _navigationBloc.add(nav.FileNavigationLoad(event.path));
+    // Emit a loading state synchronously here (in addition to the one
+    // FileNavigationBloc emits) so the UI shows a skeleton immediately.
+    // Without this, there is a multi-hop async gap — FolderListLoad forwards
+    // to FileNavigationBloc, which emits isLoading:true on its own event
+    // queue, which then propagates back via the stream subscription. During
+    // that gap the UI can rebuild with the previous (non-loading, possibly
+    // empty) state and briefly flash "empty folder" until the scan finishes.
+    //
+    // Skip virtual paths (e.g. #video-library/...) which are owned by
+    // specialized blocs and don't go through this listing path.
+    final path = event.path;
+    if (!path.startsWith('#')) {
+      emit(state.copyWith(
+        isLoading: true,
+        isRefreshing: false,
+        error: null,
+        folders: const [],
+        files: const [],
+        filteredFiles: const [],
+      ));
+    }
+    _navigationBloc.add(nav.FileNavigationLoad(path));
   }
 
   void _onRefresh(FolderListRefresh event, Emitter<FolderListState> emit) {
@@ -385,9 +408,27 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onTagStateChanged(TagSearchState tagState) {
     if (isClosed) return;
-    final searchResults = tagState.searchResultPaths
+
+    // Child tags are surfaced as virtual folders at the front of the results so
+    // opening a parent tag lists its sub-tags (as folders) alongside its own
+    // files, mirroring how tags behave like folders on the tag screen.
+    final childTagFolders = <FileSystemEntity>[];
+    final currentTag = tagState.currentSearchTag;
+    if (currentTag != null && currentTag.isNotEmpty) {
+      for (final child
+          in TagHierarchyManager.instance.getChildren(currentTag)) {
+        childTagFolders.add(Directory(UriUtils.buildTagSearchPath(child)));
+      }
+    }
+
+    final fileResults = tagState.searchResultPaths
         .map<FileSystemEntity>((path) => File(path))
         .toList(growable: false);
+
+    final searchResults = <FileSystemEntity>[
+      ...childTagFolders,
+      ...fileResults,
+    ];
 
     // ignore: invalid_use_of_visible_for_testing_member
     emit(state.copyWith(

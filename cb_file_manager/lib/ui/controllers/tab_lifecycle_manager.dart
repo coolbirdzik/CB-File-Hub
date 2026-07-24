@@ -68,6 +68,9 @@ class TabLifecycleManager {
       if (shouldReload) {
         debugPrint(
             '🟡 [TabLifecycleManager] Scheduling reload for path: $currentPath');
+        // Enter loading immediately so startup does not render the empty-folder
+        // state while the delayed FolderListLoad waits for path synchronization.
+        folderListBloc.add(const FolderListInit());
         // Add a small delay to ensure proper state synchronization
         Future.delayed(const Duration(milliseconds: 50), () {
           if (isMounted) {

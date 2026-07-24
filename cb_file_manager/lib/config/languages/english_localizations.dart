@@ -63,6 +63,9 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get pasteHere => 'Paste Here';
   @override
+  String get manage => 'Manage';
+
+  @override
   String get manageTags => 'Manage Tags';
   @override
   String get moveToTrash => 'Move to Trash';
@@ -647,6 +650,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get viewFilesWithTag => 'View Files with Tag';
   @override
+  String get setThumbnail => 'Set Thumbnail';
+  @override
+  String get manageHierarchy => 'Manage Hierarchy';
+  @override
   String get renameTag => 'Rename Tag';
   @override
   String tagRenamed(String oldTag, String newTag) =>
@@ -1113,6 +1120,19 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get chooseThumbnail => 'Choose thumbnail';
   @override
+  String get cropImage => 'Crop image';
+  @override
+  String get applyCrop => 'Apply';
+  @override
+  String get useOriginal => 'Use original';
+  @override
+  String get aspectFree => 'Free';
+  @override
+  String get tagGridCropRecommendation =>
+      'Recommended for tag grid cards: 16:9, at least 1280 × 720 px';
+  @override
+  String get tagGridAspectPreset => '16:9 · Tag grid';
+  @override
   String get clearThumbnail => 'Clear thumbnail';
   @override
   String get thumbnailAuto => 'Auto (first video/image)';
@@ -1575,6 +1595,19 @@ class EnglishLocalizations implements AppLocalizations {
       'Enable/disable showing tags outside file list';
 
   @override
+  String get tagThumbnailFit => 'Tag thumbnail display';
+
+  @override
+  String get tagThumbnailFitDescription =>
+      'Choose whether tag thumbnails show the full image or fill the frame';
+
+  @override
+  String get thumbnailFitContain => 'Show full image';
+
+  @override
+  String get thumbnailFitCover => 'Fill frame';
+
+  @override
   String get rememberTabWorkspace => 'Remember tab workspace';
 
   @override
@@ -1602,6 +1635,36 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get cacheManagementDescription => 'Clear cache data to free up memory';
+
+  @override
+  String get appDataManagement => 'App Data Management';
+
+  @override
+  String get appDataManagementDescription =>
+      'Review and clear cached and stored app data';
+
+  @override
+  String get documentsData => 'Stored data';
+
+  @override
+  String get documentsDataDescription =>
+      'Persistent files kept in Documents that survive cache cleanup';
+
+  @override
+  String get tagThumbnails => 'Tag thumbnails';
+
+  @override
+  String get tagThumbnailsDescription =>
+      'Images you chose as tag thumbnails (extracted video frames)';
+
+  @override
+  String get clearTagThumbnails => 'Clear tag thumbnails';
+
+  @override
+  String get tagThumbnailsCleared => 'Tag thumbnails cleared';
+
+  @override
+  String get documentsRoot => 'Documents root';
 
   @override
   String get cacheFolder => 'Cache folder:';
@@ -2448,6 +2511,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get quickAccess => 'Quick Access';
 
   @override
+  String get thisPC => 'This PC';
+
+  @override
   String get browseAllYourPictures => 'Browse all your pictures';
 
   @override
@@ -2908,6 +2974,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get selectModel => 'Select a model';
   @override
+  String get modelSearchHint => 'Search models...';
+  @override
   String fetchModelsError(String error) => 'Failed to fetch models: $error';
   @override
   String get newConversation => 'New Chat';
@@ -3197,4 +3265,62 @@ class EnglishLocalizations implements AppLocalizations {
   String get aiWaitingApproval => 'Waiting for your approval...';
   @override
   String aiRunningTool(String toolName) => 'Running $toolName...';
+
+  // Local AI Advisor
+  @override
+  String get localAiAdvisor => 'Local AI Advisor';
+  @override
+  String get localAiAdvisorDescription =>
+      'On-device cleanup suggestions with your own Gemma 4 model';
+  @override
+  String get huggingFaceToken => 'Hugging Face Token';
+  @override
+  String get huggingFaceTokenHint =>
+      'Optional: For private models or extended catalog access';
+  @override
+  String get pasteToken => 'Paste Token';
+  @override
+  String get tokenSaved => 'Token saved securely';
+  @override
+  String get clearToken => 'Clear Token';
+  @override
+  String get browseModels => 'Browse Models';
+  @override
+  String get installedModels => 'Installed Models';
+  @override
+  String get noModelsInstalled => 'No models installed yet';
+  @override
+  String get installModel => 'Install';
+  @override
+  String get uninstallModel => 'Uninstall';
+  @override
+  String get selectActiveModel => 'Set Active';
+  @override
+  String get modelInstalling => 'Installing model...';
+  @override
+  String get modelInstalled => 'Model installed successfully';
+  @override
+  String get modelUninstalled => 'Model uninstalled';
+  @override
+  String get downloadProgress => 'Download progress';
+  @override
+  String get noTokenSet => 'No token set';
+  @override
+  String get setTokenFirst => 'Set your Hugging Face token first';
+  @override
+  String get openLocation => 'Open Location';
+  @override
+  String get localAiIncompatibleArtifact =>
+      'This model file is not compatible with on-device chat. Reinstall the LiteRT-LM version to enable local chat.';
+  @override
+  String get localAiReinstallCompatible => 'Reinstall compatible model';
+  @override
+  String get localAiContextWindow => 'Context window';
+  @override
+  String get localAiContextWindowHint =>
+      'Maximum tokens per chat (prompt + reply). Higher values handle larger files and longer conversations but use more memory.';
+  @override
+  String get localAiTokensSuffix => 'tokens';
+  @override
+  String get localAiInvalidTokenCount => 'Please enter a valid number';
 }

@@ -120,7 +120,8 @@ class _SearchResultsViewState extends State<SearchResultsView> {
             ),
           ),
 
-          // Results list
+          // Results list. Child tags are injected as virtual folders at the
+          // front of the results, so they render inline with the files.
           Expanded(child: _buildResultsView(isDesktop)),
         ],
       ),

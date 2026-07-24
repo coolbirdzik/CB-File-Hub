@@ -121,6 +121,33 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+set(LLAMA_CPP_BUNDLED_LIBRARIES
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/ggml-base.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/ggml-cpu-x64.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/ggml-vulkan.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/ggml.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/libomp140.x86_64.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/llama-common.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/llama.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/llama-server-impl.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/llama/mtmd.dll")
+# The llama.cpp runtime is installed into its own "llama" subfolder rather than
+# next to the app exe. The app bundle ships Flutter's own vulkan-1.dll (from
+# ANGLE/media_kit) whose ABI differs from the system Vulkan loader. Because the
+# Windows loader prefers a DLL sitting next to the launched exe, launching
+# llama-server.exe from the app root would load Flutter's vulkan-1.dll and
+# segfault (0xC0000005) inside ggml-vulkan during device enumeration. Isolating
+# the server in a subfolder (which has no vulkan-1.dll) makes the loader fall
+# back to the real System32 Vulkan loader, so GPU offload works.
+set(INSTALL_BUNDLE_LLAMA_DIR "${INSTALL_BUNDLE_LIB_DIR}/llama")
+install(FILES ${LLAMA_CPP_BUNDLED_LIBRARIES}
+  DESTINATION "${INSTALL_BUNDLE_LLAMA_DIR}"
+  COMPONENT Runtime)
+
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/llama/llama-server.exe"
+  DESTINATION "${INSTALL_BUNDLE_LLAMA_DIR}"
+  COMPONENT Runtime)
+
 # Copy the native assets provided by the build.dart from all packages.
 # This directory may not exist if there are no native assets for the platform.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}/native_assets/windows")

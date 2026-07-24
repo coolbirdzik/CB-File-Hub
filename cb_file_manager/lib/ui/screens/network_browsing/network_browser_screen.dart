@@ -843,6 +843,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           onMouseForward: _handleMouseForwardButton,
           onRefresh: _refreshFileList,
           onSelectAll: () => _selectAll(networkState),
+          onSearch: () => _toggleSearchBar(context),
           onEscape: selectionState.selectedCount > 0
               ? _clearSelection
               : _showSearchBar
@@ -984,29 +985,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       final List<FileSystemEntity> folders = List.from(state.directories ?? []);
       final List<FileSystemEntity> files = List.from(state.files ?? []);
 
-      if (folders.isEmpty && files.isEmpty) {
+      if (folders.isEmpty && files.isEmpty && !state.isLoading) {
+        // An empty folder simply shows nothing — no "empty folder" label.
         content = FluentBackground.container(
           context: context,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(PhosphorIconsLight.folderOpen,
-                    size: 64, color: Colors.grey),
-                const SizedBox(height: 16),
-                Text(
-                  AppLocalizations.of(context)!.emptyFolder,
-                  style: const TextStyle(fontSize: 18),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  icon: const Icon(PhosphorIconsLight.arrowsClockwise),
-                  label: Text(AppLocalizations.of(context)!.refresh),
-                  onPressed: _refreshFileList,
-                ),
-              ],
-            ),
-          ),
+          child: const SizedBox.shrink(),
         );
       } else {
         final Widget contentView = _buildContentView(

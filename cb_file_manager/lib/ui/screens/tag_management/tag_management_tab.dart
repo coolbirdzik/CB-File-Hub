@@ -4,7 +4,6 @@ import 'package:cb_file_manager/ui/screens/system_screen.dart';
 import 'package:cb_file_manager/ui/screens/tag_management/tag_management_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
-import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 
 /// A tab component for the tag management screen
@@ -32,33 +31,19 @@ class TagManagementTab extends StatelessWidget {
     );
   }
 
-  /// Opens a new tab with search results for the selected tag
+  /// Opens the search results for the selected tag in the CURRENT tab,
+  /// navigating in place like browsing into a folder. This tab (which hosts the
+  /// tag screen) has its path swapped to the tag-search path, so its content
+  /// changes to the results and the back button returns to the tag list.
   void _openTagSearchTab(BuildContext context, String tag) {
     final searchSystemId = UriUtils.buildTagSearchPath(tag);
-
-    // Create a tab name that's user-friendly
     final tabName = 'Tag: $tag';
 
-    // Check if this tab already exists
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
-    final existingTab = tabBloc.state.tabs.firstWhere(
-      (tab) => tab.path == searchSystemId,
-      orElse: () => TabData(id: '', name: '', path: ''),
-    );
 
-    if (existingTab.id.isNotEmpty) {
-      // If tab exists, switch to it
-      tabBloc.add(SwitchToTab(existingTab.id));
-    } else {
-      // Otherwise, create a new tab for this tag search
-      tabBloc.add(
-        AddTab(
-          path: searchSystemId,
-          name: tabName,
-          switchToTab: true,
-        ),
-      );
-    }
+    // Navigate this tab in place instead of spawning a new one.
+    tabBloc.add(UpdateTabPath(tabId, searchSystemId));
+    tabBloc.add(UpdateTabName(tabId, tabName));
   }
 
   /// Static method to open the tag management tab

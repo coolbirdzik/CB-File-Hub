@@ -24,6 +24,7 @@ import 'package:intl/intl.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
+import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_section.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
@@ -54,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Show file tags setting
   bool _showFileTags = true;
+  TagThumbnailFitMode _tagThumbnailFitMode = TagThumbnailFitMode.contain;
   bool _rememberTabWorkspace = false;
   // Tab inactive threshold (in minutes). 0 means auto-suspend disabled.
   int _tabInactiveThresholdMinutes =
@@ -86,6 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int? _videoLibraryFiles;
   int? _tempFilesBytes;
   int? _tempFilesCount;
+  int? _tagThumbnailBytes;
+  int? _tagThumbnailFiles;
 
   @override
   void initState() {
@@ -118,6 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final thumbnailMode = await _preferences.getThumbnailMode();
       final maxConcurrency = await _preferences.getMaxThumbnailConcurrency();
       final showFileTags = await _preferences.getShowFileTags();
+      final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
       final rememberTabWorkspace =
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
@@ -133,6 +138,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _thumbnailMode = thumbnailMode;
           _maxConcurrency = maxConcurrency;
           _showFileTags = showFileTags;
+          _tagThumbnailFitMode = tagThumbnailFitMode;
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
@@ -221,6 +227,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _updateTagThumbnailFitMode(TagThumbnailFitMode mode) async {
+    final saved = await _preferences.setTagThumbnailFitMode(mode);
+    if (saved && mounted) {
+      setState(() {
+        _tagThumbnailFitMode = mode;
+      });
+    }
+  }
+
   Future<void> _updateRememberTabWorkspace(bool enabled) async {
     await _preferences.setRememberTabWorkspaceEnabled(enabled);
     if (!enabled) {
@@ -276,9 +291,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final networkStats = await NetworkThumbnailHelper().getCacheStats();
       final videoDir = await AppPathHelper.getVideoCacheDir();
       final tempDir = await AppPathHelper.getTempFilesDir();
+      final tagThumbDir = await AppPathHelper.getTagThumbnailDir();
 
       final videoStats = await _directoryStats(videoDir);
       final tempStats = await _directoryStats(tempDir);
+      final tagThumbStats = await _directoryStats(tagThumbDir);
 
       // Video library cache stats
       final videoLibDir =
@@ -300,6 +317,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         _tempFilesBytes = tempStats.totalBytes;
         _tempFilesCount = tempStats.fileCount;
+
+        _tagThumbnailBytes = tagThumbStats.totalBytes;
+        _tagThumbnailFiles = tagThumbStats.fileCount;
       });
     } catch (e) {
       debugPrint('Error loading cache info: $e');
@@ -403,6 +423,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
+                        LocalAiAdvisorSettingsSection(
+                          buildSectionCard: ({
+                            required String title,
+                            required IconData icon,
+                            required List<Widget> children,
+                          }) =>
+                              _buildSectionCard(
+                            title: title,
+                            icon: icon,
+                            children: children,
+                          ),
+                          buildCompactSettingTile: ({
+                            required String title,
+                            required String subtitle,
+                            required IconData icon,
+                            Widget? trailing,
+                            VoidCallback? onTap,
+                          }) =>
+                              _buildCompactSettingTile(
+                            title: title,
+                            subtitle: subtitle,
+                            icon: icon,
+                            trailing: trailing,
+                            onTap: onTap,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                         _buildDatabaseSection(),
                       ],
                     ),
@@ -450,6 +497,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: Switch(
             value: _showFileTags,
             onChanged: _updateShowFileTags,
+          ),
+        ),
+        _buildCompactSettingTile(
+          title: AppLocalizations.of(context)!.tagThumbnailFit,
+          subtitle: AppLocalizations.of(context)!.tagThumbnailFitDescription,
+          icon: PhosphorIconsLight.image,
+          trailing: DropdownButton<TagThumbnailFitMode>(
+            value: _tagThumbnailFitMode,
+            onChanged: (mode) {
+              if (mode != null) {
+                _updateTagThumbnailFitMode(mode);
+              }
+            },
+            items: [
+              DropdownMenuItem(
+                value: TagThumbnailFitMode.contain,
+                child: Text(AppLocalizations.of(context)!.thumbnailFitContain),
+              ),
+              DropdownMenuItem(
+                value: TagThumbnailFitMode.cover,
+                child: Text(AppLocalizations.of(context)!.thumbnailFitCover),
+              ),
+            ],
           ),
         ),
         _buildCompactSettingTile(
@@ -726,14 +796,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final totalBytes = (_networkThumbnailBytes ?? 0) +
         (_videoThumbnailBytes ?? 0) +
         (_videoLibraryBytes ?? 0) +
-        (_tempFilesBytes ?? 0);
+        (_tempFilesBytes ?? 0) +
+        (_tagThumbnailBytes ?? 0);
     final totalFiles = (_networkThumbnailFiles ?? 0) +
         (_videoThumbnailFiles ?? 0) +
         (_videoLibraryFiles ?? 0) +
-        (_tempFilesCount ?? 0);
+        (_tempFilesCount ?? 0) +
+        (_tagThumbnailFiles ?? 0);
 
     return _buildSectionCard(
-      title: AppLocalizations.of(context)!.cacheManagement,
+      title: AppLocalizations.of(context)!.appDataManagement,
       icon: PhosphorIconsLight.broom,
       children: [
         Padding(
@@ -775,7 +847,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Cache overview',
+                                AppLocalizations.of(context)!.appDataManagement,
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -783,7 +855,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 AppLocalizations.of(context)!
-                                    .cacheManagementDescription,
+                                    .appDataManagementDescription,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -882,7 +954,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               PhosphorIconsLight.slidersHorizontal,
                               size: 16,
                             ),
-                            label: const Text('Manage cache'),
+                            label: Text(AppLocalizations.of(context)!.manage),
                           ),
                         ),
                       ],

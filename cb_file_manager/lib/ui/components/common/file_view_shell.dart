@@ -81,6 +81,10 @@ class FileViewShell extends StatefulWidget {
   final VoidCallback? onCut;
   final VoidCallback? onPaste;
   final VoidCallback? onRename;
+
+  /// `Ctrl+F` — open / toggle the search bar.
+  final VoidCallback? onSearch;
+
   final bool enableKeyboardShortcuts;
 
   const FileViewShell({
@@ -99,6 +103,7 @@ class FileViewShell extends StatefulWidget {
     this.onCut,
     this.onPaste,
     this.onRename,
+    this.onSearch,
     this.enableKeyboardShortcuts = true,
   }) : super(key: key);
 
@@ -150,6 +155,7 @@ class _FileViewShellState extends State<FileViewShell> {
       onCut: widget.onCut,
       onPaste: widget.onPaste,
       onRename: widget.onRename,
+      onSearch: widget.onSearch,
     );
   }
 

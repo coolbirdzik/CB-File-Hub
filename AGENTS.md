@@ -12,6 +12,11 @@ scripts/           ← build, version, and CI helper scripts (bash)
 installer/         ← Windows installer configs (Inno Setup, WiX)
 ```
 
+The `cb_file_manager/windows/llama/` directory holds the bundled llama.cpp
+runtime (Vulkan DLLs + `llama-server.exe`, ~69MB). These binaries are **not
+committed to git** — they are downloaded at build time (see Local AI runtime
+below).
+
 **All `flutter` and `dart` commands must be run from `cb_file_manager/`**, not the repo root.
 
 ## Flutter version
@@ -26,6 +31,7 @@ Run from repo root via `just` (requires Git Bash on Windows):
 |------|---------|
 | Show all recipes | `just` |
 | Install deps | `just deps` |
+| Fetch llama.cpp runtime | `just fetch-llama` |
 | Unit/widget tests | `just test` |
 | E2E tests (parallel) | `just e2e-parallel` |
 | E2E single suite | `just e2e Navigation` |
@@ -89,9 +95,41 @@ Passed via `--dart-define=FLAG=value`:
 - **No code generation** — `build_runner` is a dev dependency (for MSIX packaging) but there is no `build.yaml` and no generated Dart code to worry about.
 - **Entry point for tests:** unit/widget tests in `cb_file_manager/test/`, E2E in `cb_file_manager/integration_test/`. E2E tooling (parallel runner, Allure adapter, dashboard) lives in `cb_file_manager/tool/`.
 
+## Local AI runtime (llama.cpp)
+
+CB Agent can run local GGUF models on-device via a bundled llama.cpp runtime.
+
+- **Subprocess, not FFI:** the app launches the official `llama-server.exe` as a
+  separate OS process and talks to it over HTTP (`lib/services/local_ai/gguf_llama_cpp_runtime.dart`).
+  Calling llama.cpp through FFI inside a Dart isolate crashed during GPU tensor
+  upload, so the subprocess model is used instead.
+- **Binaries are not in git:** the runtime (Vulkan DLLs + `llama-server.exe`,
+  ~69MB) lives in `cb_file_manager/windows/llama/`, which is git-ignored. It is
+  downloaded at build time by `scripts/fetch_llama_runtime.sh` (pinned to
+  llama.cpp release `b9874`, `win-vulkan-x64`). The script is idempotent and
+  skips the download when all files are already present (`--force` to redownload).
+- **Fetch before building:** every Windows build path runs the fetch script
+  first — `scripts/build.sh` (release), the `build-windows` and `e2e-windows` CI
+  jobs, and the `just windows` recipe (`just fetch-llama`). If you run
+  `flutter build windows` or `flutter run -d windows` directly on a clean
+  checkout, run `just fetch-llama` (or `bash scripts/fetch_llama_runtime.sh`)
+  once first, or CMake's INSTALL step fails with a missing-file error.
+- **Subfolder isolation (`vulkan-1.dll`):** CMake installs the runtime into a
+  `llama/` subfolder next to the app exe, not the app root. The app bundle ships
+  Flutter's own `vulkan-1.dll` (ANGLE/media_kit) whose ABI differs from the
+  system Vulkan loader; since Windows prefers a DLL next to the launched exe,
+  launching `llama-server.exe` from the app root loads that `vulkan-1.dll` and
+  segfaults (`0xC0000005`) inside `ggml-vulkan`. The subfolder has no
+  `vulkan-1.dll`, so the loader falls back to the real System32 loader.
+- **Orphan protection:** the server is attached to a Windows Job Object with
+  `KILL_ON_JOB_CLOSE` (`lib/services/local_ai/windows_process_reaper.dart`), so
+  the OS reaps it if the app dies for any reason. `dispose()` handles the
+  graceful path (model/context change).
+
 ## Windows build gotchas
 
 - If Windows build fails with `MSB3073` / `cmake_install` / `INSTALL.vcxproj`: run `just e2e-clean` (or `just deep-clean` then `just deps`).
+- If Windows build fails with a missing `windows/llama/*.dll` at the INSTALL step: run `just fetch-llama` (or `bash scripts/fetch_llama_runtime.sh`) to download the llama.cpp runtime.
 - The `scripts/build.sh` auto-retries CMake race conditions and patches pdfx CMake compatibility.
 - MSI builds require WiX Toolset. MSIX signing requires `MSIX_CERT_BASE64` and `MSIX_CERT_PASSWORD` secrets.
 

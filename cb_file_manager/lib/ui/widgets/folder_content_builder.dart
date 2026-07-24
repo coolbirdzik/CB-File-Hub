@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
@@ -134,12 +133,8 @@ class FolderContentBuilder {
   /// Builds the empty folder view
   static Widget _buildEmptyFolder(
       BuildContext context, bool isDesktopPlatform) {
-    return Center(
-      child: Text(
-        AppLocalizations.of(context)!.emptyFolder,
-        style: const TextStyle(fontSize: 18),
-      ),
-    );
+    // An empty folder simply shows nothing — no "empty folder" label.
+    return const SizedBox.shrink();
   }
 
   /// Handles the go back action from error view

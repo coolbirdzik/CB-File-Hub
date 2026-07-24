@@ -23,6 +23,7 @@ import '../helpers/media/video_thumbnail_helper.dart';
 import '../helpers/media/media_kit_audio_helper.dart';
 import '../helpers/tags/batch_tag_manager.dart';
 import '../helpers/tags/tag_manager.dart';
+import '../helpers/tags/tag_hierarchy_manager.dart';
 import '../core/service_locator.dart';
 import '../models/database/database_manager.dart';
 import '../services/network_credentials_service.dart';
@@ -202,6 +203,9 @@ Future<void> initializeDataAndTags() async {
     await locator<NetworkCredentialsService>().init();
     await BatchTagManager.initialize();
     await TagManager.initialize();
+    // Load the tag hierarchy cache so tag-search views can show child tags of
+    // the opened parent tag.
+    await TagHierarchyManager.instance.initialize();
     debugPrint('Data and tag services initialized successfully');
   } catch (e) {
     debugPrint('Error during data/tag initialization: $e');

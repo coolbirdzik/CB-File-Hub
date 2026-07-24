@@ -8,7 +8,6 @@ const List<String> debugLogAllowList = <String>[
   'SEED_DIRECT',
   '[DevTools]',
   '[TagManager]',
-  '[SQLite]',
 ];
 
 // Patterns to suppress (Flutter engine / Windows AXTree noise).

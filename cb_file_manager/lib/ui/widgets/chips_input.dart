@@ -18,6 +18,7 @@ class ChipsInput<T> extends StatefulWidget {
     this.suggestions = const [],
     this.onSuggestionSelected,
     this.suggestionBuilder,
+    this.enableColonAutocomplete = false,
   }) : super(key: key);
 
   final List<T> values;
@@ -41,6 +42,12 @@ class ChipsInput<T> extends StatefulWidget {
   /// Parameters: context, suggestion string, isHighlighted, tagColor.
   final Widget Function(BuildContext context, String suggestion,
       bool isHighlighted, Color tagColor)? suggestionBuilder;
+
+  /// When true, pressing ":" while a suggestion is highlighted promotes that
+  /// suggestion into a "parent:" prefix in the input, so the user can keep
+  /// typing/autocompleting the child tag. Used for the parent:child hierarchy
+  /// syntax in the tag dialog.
+  final bool enableColonAutocomplete;
 
   final Widget Function(BuildContext context, T data) chipBuilder;
 
@@ -286,6 +293,23 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     _focusNode.requestFocus();
   }
 
+  /// Replaces the currently-typed text with "<parent>:" so the user can keep
+  /// typing/autocompleting the child tag.
+  void _promoteToParent(String parent) {
+    final String chipChars = String.fromCharCode(
+            ChipsInputEditingController.kObjectReplacementChar) *
+        widget.values.length;
+    final String newTyped = '$parent:';
+    controller.value = TextEditingValue(
+      text: '$chipChars$newTyped',
+      selection: TextSelection.collapsed(
+        offset: chipChars.length + newTyped.length,
+      ),
+    );
+    _focusNode.requestFocus();
+    widget.onTextChanged?.call(newTyped);
+  }
+
   // ── Key handling (Tab / Arrow navigation) ──
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -294,6 +318,21 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     }
 
     final suggestions = widget.suggestions;
+
+    // Promote the highlighted suggestion into a "parent:" prefix when the user
+    // presses ":". Lets the user autocomplete the parent tag, then keep typing
+    // the child tag (parent:child hierarchy syntax).
+    if (widget.enableColonAutocomplete &&
+        event.character == ':' &&
+        suggestions.isNotEmpty) {
+      final typed = controller.textWithoutReplacements;
+      if (!typed.contains(':')) {
+        final index = _highlightedIndex.clamp(0, suggestions.length - 1);
+        _promoteToParent(suggestions[index]);
+        return KeyEventResult.handled;
+      }
+    }
+
     if (suggestions.isEmpty) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {

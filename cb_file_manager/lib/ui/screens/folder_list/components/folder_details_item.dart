@@ -2,12 +2,14 @@ import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 import '../../../components/common/shared_file_context_menu.dart';
+import '../../../tab_manager/components/tag_context_menu.dart';
 import '../../../components/common/optimized_interaction_handler.dart';
 import '../../../utils/item_interaction_style.dart';
 import 'package:cb_file_manager/services/file_metadata_service.dart';
@@ -45,6 +47,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
   bool _visuallySelected = false;
   FileStat? _fileStat;
 
+  /// Tag name when this "folder" is actually a child tag (`#search?tag=`).
+  String? get _tagName => UriUtils.extractTagFromSearchPath(widget.folder.path);
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +72,8 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
   }
 
   Future<void> _loadFolderStats() async {
+    // Tag "folders" are virtual (path #search?tag=...) and have no real stat.
+    if (_tagName != null) return;
     try {
       final stat = await widget.folder.stat();
       if (mounted) {
@@ -105,8 +112,11 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
       });
     }
 
-    final bool shouldCtrlSelect =
-        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
+    // On desktop, a plain click selects only the clicked folder (clearing the
+    // previous selection); Ctrl+click adds/toggles it. Using
+    // `lastSelectedPath != null` made every click after the first behave like a
+    // Ctrl+click, so the old selection was never cleared.
+    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
     // Call toggleFolderSelection with appropriate parameters
     widget.toggleFolderSelection!(
@@ -117,6 +127,13 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
   }
 
   void _showFolderContextMenu(BuildContext context, Offset? globalPosition) {
+    // A tag rendered as a folder row gets the tag-specific context menu.
+    final tagName = _tagName;
+    if (tagName != null) {
+      showTagContextMenu(context, tagName, globalPosition: globalPosition);
+      return;
+    }
+
     // Use the shared folder context menu
     showFolderContextMenu(
       context: context,
@@ -171,7 +188,10 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                             horizontal: 12.0, vertical: 10.0),
                         child: Row(
                           children: [
-                            Icon(PhosphorIconsLight.folder,
+                            Icon(
+                                _tagName != null
+                                    ? PhosphorIconsLight.tag
+                                    : PhosphorIconsLight.folder,
                                 color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 12),
                             Expanded(
@@ -190,7 +210,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12.0, vertical: 10.0),
                           child: Text(
-                            AppLocalizations.of(context)!.folder,
+                            _tagName != null
+                                ? AppLocalizations.of(context)!.tagPrefix
+                                : AppLocalizations.of(context)!.folder,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -422,7 +444,7 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
         renameController.renamingPath == widget.folder.path;
 
     final textWidget = Text(
-      widget.folder.basename(),
+      _tagName ?? widget.folder.basename(),
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         fontWeight: _visuallySelected ? FontWeight.bold : FontWeight.normal,

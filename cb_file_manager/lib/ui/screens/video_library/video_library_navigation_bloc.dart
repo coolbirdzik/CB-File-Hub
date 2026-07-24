@@ -369,8 +369,15 @@ class VideoLibraryNavigationBloc
         .toList();
     if (videoPaths.isEmpty) return;
     VideoThumbnailHelper.setCurrentDirectory(dirPath);
-    VideoThumbnailHelper.proactiveGenerateAll(videoPaths,
-        directoryPath: dirPath);
+    // Prefer a smaller, UI-friendly preload strategy on first load.
+    // Generating thumbnails for every item immediately can stall the event loop
+    // on large libraries, so we only prioritize the visible range and let the
+    // queue expand gradually.
+    VideoThumbnailHelper.optimizedBatchPreload(
+      videoPaths,
+      maxConcurrent: 2,
+      visibleCount: 10,
+    );
   }
 
   /// Returns true if the given sort option requires calling stat() on files.

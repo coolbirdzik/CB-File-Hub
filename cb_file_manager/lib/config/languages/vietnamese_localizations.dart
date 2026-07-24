@@ -63,6 +63,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get pasteHere => 'Dán vào đây';
   @override
+  String get manage => 'Quản lý';
+  @override
   String get manageTags => 'Quản lý thẻ';
   @override
   String get moveToTrash => 'Chuyển vào thùng rác';
@@ -643,6 +645,10 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get viewFilesWithTag => 'Xem tệp với thẻ';
   @override
+  String get setThumbnail => 'Đặt ảnh thu nhỏ';
+  @override
+  String get manageHierarchy => 'Quản lý phân cấp';
+  @override
   String get renameTag => 'Đổi tên thẻ';
   @override
   String tagRenamed(String oldTag, String newTag) =>
@@ -1125,6 +1131,19 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get chooseThumbnail => 'Chọn thumbnail';
   @override
+  String get cropImage => 'Cắt ảnh';
+  @override
+  String get applyCrop => 'Áp dụng';
+  @override
+  String get useOriginal => 'Dùng ảnh gốc';
+  @override
+  String get aspectFree => 'Tự do';
+  @override
+  String get tagGridCropRecommendation =>
+      'Gợi ý cho card tag dạng grid: 16:9, tối thiểu 1280 × 720 px';
+  @override
+  String get tagGridAspectPreset => '16:9 · Grid tag';
+  @override
   String get clearThumbnail => 'Xóa thumbnail';
   @override
   String get thumbnailAuto => 'Tự động (video/ảnh đầu tiên)';
@@ -1576,6 +1595,19 @@ class VietnameseLocalizations implements AppLocalizations {
       'Bật/tắt hiển thị tag bên ngoài danh sách file';
 
   @override
+  String get tagThumbnailFit => 'Cách hiển thị thumbnail tag';
+
+  @override
+  String get tagThumbnailFitDescription =>
+      'Chọn hiển thị toàn bộ ảnh hoặc phủ đầy khung thumbnail tag';
+
+  @override
+  String get thumbnailFitContain => 'Hiển thị toàn bộ ảnh';
+
+  @override
+  String get thumbnailFitCover => 'Phủ đầy khung';
+
+  @override
   String get rememberTabWorkspace => 'Ghi nhớ không gian làm việc tab';
 
   @override
@@ -1604,6 +1636,36 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get cacheManagementDescription =>
       'Xóa dữ liệu cache để giải phóng bộ nhớ';
+
+  @override
+  String get appDataManagement => 'Quản lý dữ liệu ứng dụng';
+
+  @override
+  String get appDataManagementDescription =>
+      'Xem và xóa dữ liệu cache và dữ liệu đã lưu của ứng dụng';
+
+  @override
+  String get documentsData => 'Dữ liệu đã lưu';
+
+  @override
+  String get documentsDataDescription =>
+      'Các tệp lưu bền trong Documents, không bị xóa khi dọn cache';
+
+  @override
+  String get tagThumbnails => 'Ảnh thu nhỏ của thẻ';
+
+  @override
+  String get tagThumbnailsDescription =>
+      'Ảnh bạn chọn làm ảnh thu nhỏ cho thẻ (khung hình trích từ video)';
+
+  @override
+  String get clearTagThumbnails => 'Xóa ảnh thu nhỏ của thẻ';
+
+  @override
+  String get tagThumbnailsCleared => 'Đã xóa ảnh thu nhỏ của thẻ';
+
+  @override
+  String get documentsRoot => 'Thư mục Documents';
 
   @override
   String get cacheFolder => 'Thư mục cache:';
@@ -2444,6 +2506,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get quickAccess => 'Truy cập nhanh';
 
   @override
+  String get thisPC => 'Máy tính này';
+
+  @override
   String get browseAllYourPictures => 'Duyệt tất cả hình ảnh của bạn';
 
   @override
@@ -2905,6 +2970,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get selectModel => 'Chọn mô hình';
   @override
+  String get modelSearchHint => 'Tìm mô hình...';
+  @override
   String fetchModelsError(String error) =>
       'Không thể lấy danh sách mô hình: $error';
   @override
@@ -3195,4 +3262,62 @@ class VietnameseLocalizations implements AppLocalizations {
   String get aiWaitingApproval => 'Đang chờ bạn phê duyệt...';
   @override
   String aiRunningTool(String toolName) => 'Đang chạy $toolName...';
+
+  // Local AI Advisor
+  @override
+  String get localAiAdvisor => 'Trợ lý AI nội bộ';
+  @override
+  String get localAiAdvisorDescription =>
+      'Gợi ý dọn dẹp trên thiết bị với mô hình Gemma 4 của bạn';
+  @override
+  String get huggingFaceToken => 'Token Hugging Face';
+  @override
+  String get huggingFaceTokenHint =>
+      'Tùy chọn: Cho mô hình riêng tư hoặc truy cập catalog mở rộng';
+  @override
+  String get pasteToken => 'Dán Token';
+  @override
+  String get tokenSaved => 'Token đã lưu an toàn';
+  @override
+  String get clearToken => 'Xóa Token';
+  @override
+  String get browseModels => 'Duyệt mô hình';
+  @override
+  String get installedModels => 'Mô hình đã cài đặt';
+  @override
+  String get noModelsInstalled => 'Chưa cài đặt mô hình nào';
+  @override
+  String get installModel => 'Cài đặt';
+  @override
+  String get uninstallModel => 'Gỡ cài đặt';
+  @override
+  String get selectActiveModel => 'Đặt làm mặc định';
+  @override
+  String get modelInstalling => 'Đang cài đặt mô hình...';
+  @override
+  String get modelInstalled => 'Đã cài đặt mô hình thành công';
+  @override
+  String get modelUninstalled => 'Đã gỡ cài đặt mô hình';
+  @override
+  String get downloadProgress => 'Tiến trình tải xuống';
+  @override
+  String get noTokenSet => 'Chưa đặt token';
+  @override
+  String get setTokenFirst => 'Đặt token Hugging Face trước';
+  @override
+  String get openLocation => 'Mở vị trí';
+  @override
+  String get localAiIncompatibleArtifact =>
+      'Tệp mô hình này không tương thích với trò chuyện trên thiết bị. Cài đặt lại phiên bản LiteRT-LM để bật trò chuyện cục bộ.';
+  @override
+  String get localAiReinstallCompatible => 'Cài đặt lại mô hình tương thích';
+  @override
+  String get localAiContextWindow => 'Cửa sổ ngữ cảnh';
+  @override
+  String get localAiContextWindowHint =>
+      'Số token tối đa mỗi lượt trò chuyện (câu hỏi + trả lời). Giá trị cao xử lý được tệp lớn và hội thoại dài hơn nhưng tốn nhiều bộ nhớ hơn.';
+  @override
+  String get localAiTokensSuffix => 'token';
+  @override
+  String get localAiInvalidTokenCount => 'Vui lòng nhập số hợp lệ';
 }

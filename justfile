@@ -34,6 +34,12 @@ default:
 deps:
     cd {{project_dir}} && {{flutter}} pub get
 
+# Fetch the bundled llama.cpp Windows runtime (Vulkan DLLs + llama-server.exe).
+# These large binaries are not committed to git; the Windows build bundles them
+# from cb_file_manager/windows/llama/, so they must be fetched before building.
+fetch-llama:
+    bash scripts/fetch_llama_runtime.sh
+
 # Run flutter doctor
 doctor:
     {{flutter}} doctor -v
@@ -95,9 +101,15 @@ verify-analyze:
 test:
     cd {{project_dir}} && {{flutter}} test --reporter {{test_reporter}}
 
-# Kill stray E2E app instances
-kill-e2e:
+# Kill all CB File Hub app processes
+kill-cb:
+    @echo "Killing CB File Hub processes..."
     taskkill //F //IM cb_file_hub.exe //T 2>/dev/null || true
+    taskkill //F //IM "CB File Hub.exe" //T 2>/dev/null || true
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'Get-Process | Where-Object { ($_.ProcessName -match "^(cb_file_hub|CB File Hub)$") -or ($_.Path -and $_.Path -like "*cb_file_manager*build*windows*") } | Stop-Process -Force -ErrorAction SilentlyContinue' 2>/dev/null || true
+
+# Kill stray E2E app instances
+kill-e2e: kill-cb
 
 # E2E single-process: build once, run all (or one suite). Fastest for local iteration.
 # Generates dashboard at cb_file_manager/build/e2e_dashboard/index.html when done.
@@ -167,7 +179,7 @@ e2e-file file suite="": kill-e2e
 # =============================================================================
 
 # Build Windows portable (ZIP)
-windows: deps
+windows: deps fetch-llama
     cd {{project_dir}} && {{flutter}} build windows --release
     mkdir -p {{build_dir}}/windows/portable
     cd {{build_dir}}/windows/x64/runner/Release && if command -v zip >/dev/null 2>&1; then zip -r ../../portable/CBFileHub-Portable.zip ./*; elif command -v 7z >/dev/null 2>&1; then 7z a -tzip ../../portable/CBFileHub-Portable.zip ./*; fi
@@ -246,6 +258,18 @@ next-major:
 # Update version in pubspec.yaml
 update-version new_version:
     bash scripts/version.sh set-version {{new_version}}
+
+# Bump patch version in pubspec.yaml (no commit or tag)
+bump-patch:
+    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1\".\"\$2\".\"\$3+1}"); echo "Bumping patch version to $NEW_VER"; bash scripts/version.sh set-version $NEW_VER'
+
+# Bump minor version in pubspec.yaml (no commit or tag)
+bump-minor:
+    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1\".\"\$2+1\".0\"}"); echo "Bumping minor version to $NEW_VER"; bash scripts/version.sh set-version $NEW_VER'
+
+# Bump major version in pubspec.yaml (no commit or tag)
+bump-major:
+    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1+1\".0.0\"}"); echo "Bumping major version to $NEW_VER"; bash scripts/version.sh set-version $NEW_VER'
 
 # Bump build number (runs verify first)
 bump-build: verify

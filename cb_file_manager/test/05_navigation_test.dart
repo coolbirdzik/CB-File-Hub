@@ -4,6 +4,10 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 
 void main() {
+  // backNavigationToPath resolves tab display names via navigatorKey, which
+  // touches a GlobalKey and therefore needs the Flutter binding initialized.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('05 Navigation Fix Tests', () {
     test('05.01 SystemScreenRouter clearWidgetCache should work correctly', () {
       // Test that clearWidgetCache method exists and works

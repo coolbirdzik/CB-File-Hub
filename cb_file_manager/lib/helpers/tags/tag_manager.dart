@@ -580,22 +580,11 @@ class TagManager {
     final List<String> filteredRecent =
         recentTagNames.where((tag) => validTags.contains(tag)).toList();
 
-    // Take only up to the limit
+    // Take only up to the limit.
+    // Note: we intentionally do NOT supplement with popular tags here.
+    // Recent tags must reflect only tags the user actually used recently;
+    // padding with popular tags made the recent list duplicate the popular list.
     final List<String> result = filteredRecent.take(limit).toList();
-
-    // If we don't have enough stored recent tags, supplement with popular tags
-    if (result.length < limit) {
-      // Get popular tags excluding the ones we already have
-      final popularTags =
-          await TagManager.instance.getPopularTags(limit: limit * 2);
-
-      for (final entry in popularTags.entries) {
-        if (result.length >= limit) break;
-        if (!result.contains(entry.key)) {
-          result.add(entry.key);
-        }
-      }
-    }
 
     return result;
   }
@@ -707,7 +696,14 @@ class TagManager {
   /// Set the full set of tags for a file (replaces existing tags)
   ///
   /// Returns true if successful, false otherwise
-  static Future<bool> setTags(String filePath, List<String> tags) async {
+  /// Sets the tags for [filePath], replacing the existing set.
+  ///
+  /// When [notify] is false the tag-change stream event is suppressed so that
+  /// callers doing bulk updates (e.g. the batch tag dialog) can fire a single
+  /// coalesced notification afterwards instead of one event per file — a large
+  /// batch would otherwise trigger one full folder-list rebuild per file.
+  static Future<bool> setTags(String filePath, List<String> tags,
+      {bool notify = true}) async {
     try {
       AppLogger.info('[TagManager] setTags START',
           error: 'filePath=$filePath incomingTags=$tags');
@@ -720,6 +716,17 @@ class TagManager {
       AppLogger.debug('[TagManager] setTags normalized',
           error:
               'filePath=$filePath validTags=$validTags useDatabase=$_useDatabase');
+
+      // Track newly added tags as "recent" so the recent-tags list reflects
+      // tags applied through this dialog path (setTags replaces the whole set).
+      final previousTags =
+          (await getTags(filePath)).map((t) => t.trim()).toSet();
+      for (final tag in validTags) {
+        final trimmed = tag.trim();
+        if (trimmed.isNotEmpty && !previousTags.contains(trimmed)) {
+          addToRecentTags(trimmed);
+        }
+      }
       debugPrint(
           '[TagManager] setTags normalized filePath=$filePath validTags=$validTags useDatabase=$_useDatabase');
 
@@ -742,7 +749,7 @@ class TagManager {
         }
 
         // Thông báo thay đổi qua Stream
-        _tagChangeController.add(filePath);
+        if (notify) _tagChangeController.add(filePath);
 
         return success;
       } else {
@@ -774,7 +781,7 @@ class TagManager {
         }
 
         // Thông báo thay đổi qua Stream
-        _tagChangeController.add(filePath);
+        if (notify) _tagChangeController.add(filePath);
 
         return success;
       }
@@ -1190,10 +1197,8 @@ class TagManager {
         }
       }
 
-      debugPrint('Migrated $migratedFileCount files to SQLite database');
       return migratedFileCount;
-    } catch (e) {
-      debugPrint('Error migrating from JSON to SQLite: $e');
+    } catch (_) {
       return migratedFileCount;
     }
   }
@@ -1291,28 +1296,10 @@ class TagManager {
   static Future<bool> _persistStandaloneTags(Set<String> standaloneTags) async {
     try {
       if (_useDatabase && _databaseManager != null) {
-        print(
-            '[SEED_DIRECT] persist db count=${standaloneTags.length} useDatabase=$_useDatabase');
-        _recordStandaloneTagDiagnostic(
-          'persist:database count=${standaloneTags.length}',
-        );
-        AppLogger.debug(
-          '[TagManager] Persisting standalone tags to database',
-          error: 'count=${standaloneTags.length}',
-        );
         final savedToDatabase = await _databaseManager!
             .replaceStandaloneTags(standaloneTags.toList());
         if (savedToDatabase) {
-          print(
-              '[SEED_DIRECT] persist db success count=${standaloneTags.length}');
           _lastStandaloneTagError = null;
-          _recordStandaloneTagDiagnostic(
-            'persist:database success count=${standaloneTags.length}',
-          );
-          AppLogger.info(
-            '[TagManager] Persisted standalone tags to database',
-            error: 'count=${standaloneTags.length}',
-          );
           await _databaseManager!.deletePreference('standalone_tags');
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove('standalone_tags');
@@ -1320,14 +1307,6 @@ class TagManager {
         }
         _lastStandaloneTagError = _databaseManager!.getLastErrorMessage() ??
             'replaceStandaloneTags returned false';
-        print('[SEED_DIRECT] persist db failed error=$_lastStandaloneTagError');
-        _recordStandaloneTagDiagnostic(
-          'persist:database failed error=$_lastStandaloneTagError',
-        );
-        AppLogger.error(
-          '[TagManager] Failed to persist standalone tags to database',
-          error: _lastStandaloneTagError,
-        );
         return false;
       }
 
@@ -1362,13 +1341,9 @@ class TagManager {
 
   static Future<Set<String>> _getStandaloneTagsFromActiveStorage() async {
     if (_useDatabase && _databaseManager != null) {
-      _recordStandaloneTagDiagnostic('load:backend=database');
       final sqliteTags = await _loadStandaloneTagsFromDatabase();
       final legacyTags = await _loadLegacyStandaloneTags();
       final mergedTags = <String>{...sqliteTags, ...legacyTags};
-      _recordStandaloneTagDiagnostic(
-        'load:counts sqlite=${sqliteTags.length} legacy=${legacyTags.length} merged=${mergedTags.length}',
-      );
 
       if (mergedTags.isEmpty) {
         return <String>{};
@@ -1506,8 +1481,6 @@ class TagManager {
           // SQLite path: query database directly, independent of JSON file
           final filesWithTag = await instance
               ._findFilesByTagInternal(oldTag.toLowerCase().trim());
-          debugPrint(
-              'TagManager.renameTag: Found ${filesWithTag.length} files with tag "$oldTag" in SQLite');
 
           for (final path in filesWithTag) {
             final currentTags = await getTags(path);

@@ -396,6 +396,11 @@ build_windows_portable() {
     # Force clean to ensure reproducible Windows builds.
     clean_build
     install_deps
+
+    # Fetch the bundled llama.cpp runtime (Vulkan DLLs + llama-server.exe).
+    # These large binaries are not committed to git; download them at build time.
+    print_info "Fetching llama.cpp runtime for Local AI..."
+    bash "$SCRIPT_DIR/fetch_llama_runtime.sh"
     
     cd "$PROJECT_DIR"
     

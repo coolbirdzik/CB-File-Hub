@@ -1,11 +1,16 @@
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:math';
 import 'tab_data.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/media/photo_thumbnail_helper.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/main.dart' show navigatorKey;
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 
 /// Events for the TabManager
 abstract class TabEvent {}
@@ -567,6 +572,32 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
         : pathParts.last;
   }
 
+  /// Derives the tab display name for [path], mirroring the naming logic used
+  /// when navigating into a folder. Handles the drives view and tag-search
+  /// paths, and falls back to the last path segment for normal folders. Used by
+  /// history navigation (back/forward) so the tab title stays in sync no matter
+  /// which entry point triggered the navigation (nav bar buttons, keyboard
+  /// shortcuts, mouse buttons, gestures).
+  String _tabDisplayNameForPath(String path) {
+    final l10n = navigatorKey.currentContext != null
+        ? AppLocalizations.of(navigatorKey.currentContext!)
+        : null;
+    if (path.isEmpty || isDrivesPath(path)) {
+      return l10n?.drivesTab ?? 'Drives';
+    }
+    final tag = UriUtils.extractTagFromSearchPath(path);
+    if (tag != null) {
+      return 'Tag: $tag';
+    }
+    final rootFolder = l10n?.rootFolder ?? 'Root';
+    final pathParts = path.split(Platform.pathSeparator);
+    final lastPart = pathParts.lastWhere(
+      (part) => part.isNotEmpty,
+      orElse: () => rootFolder,
+    );
+    return lastPart.isEmpty ? rootFolder : lastPart;
+  }
+
   // Add methods for navigation history management
   bool canTabNavigateBack(String tabId) {
     final split = _resolveSplitTab(tabId);
@@ -631,8 +662,13 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
         'TabManager: Navigation history after: ${tabs[tabIndex].navigationHistory}');
 
     if (previousPath != null) {
-      // Update the tab with the new path (history already updated by navigateBack)
-      tabs[tabIndex] = tabs[tabIndex].copyWith(path: previousPath);
+      // Update the tab with the new path AND name so the tab title stays in
+      // sync with the folder we navigated back to (history already updated by
+      // navigateBack).
+      tabs[tabIndex] = tabs[tabIndex].copyWith(
+        path: previousPath,
+        name: _tabDisplayNameForPath(previousPath),
+      );
 
       // Emit the new state directly (don't use UpdateTabPath as it would modify history again)
       // ignore: invalid_use_of_visible_for_testing_member
@@ -679,8 +715,13 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     // Navigate forward for this specific tab
     final nextPath = tabs[tabIndex].navigateForward();
     if (nextPath != null) {
-      // Update the tab with the new path (history already updated by navigateForward)
-      tabs[tabIndex] = tabs[tabIndex].copyWith(path: nextPath);
+      // Update the tab with the new path AND name so the tab title stays in
+      // sync with the folder we navigated forward to (history already updated
+      // by navigateForward).
+      tabs[tabIndex] = tabs[tabIndex].copyWith(
+        path: nextPath,
+        name: _tabDisplayNameForPath(nextPath),
+      );
 
       // Emit the new state directly (don't use UpdateTabPath as it would modify history again)
       // ignore: invalid_use_of_visible_for_testing_member

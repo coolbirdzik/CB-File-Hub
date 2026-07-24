@@ -665,6 +665,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                       : _showSearchBar
                           ? _closeSearchBar
                           : null,
+                  onSearch: _toggleSearchBar,
                   onSelectAll: () => _selectAllVisible(state),
                   onDelete: (keyboardController, permanent) =>
                       _handleDelete(keyboardController, permanent),

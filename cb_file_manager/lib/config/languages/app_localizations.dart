@@ -37,6 +37,7 @@ abstract class AppLocalizations {
   String get viewImage;
   String get open;
   String get pasteHere;
+  String get manage;
   String get manageTags;
   String get moveToTrash;
   String get errorAccessingDirectory;
@@ -321,6 +322,8 @@ abstract class AppLocalizations {
   String get openInNewTab;
   String get viewFilesWithTag;
   String get renameTag;
+  String get setThumbnail;
+  String get manageHierarchy;
   String tagRenamed(String oldTag, String newTag);
   String get openInSplitView;
   String get changeColor;
@@ -387,6 +390,7 @@ abstract class AppLocalizations {
   String get images;
   String get galleryActions;
   String get quickAccess;
+  String get thisPC;
   String get browseAllYourPictures;
   String get browseAllYourPhotos;
   String get organizeInAlbums;
@@ -597,6 +601,12 @@ abstract class AppLocalizations {
   // Folder thumbnails
   String get folderThumbnail;
   String get chooseThumbnail;
+  String get cropImage;
+  String get applyCrop;
+  String get useOriginal;
+  String get aspectFree;
+  String get tagGridCropRecommendation;
+  String get tagGridAspectPreset;
   String get clearThumbnail;
   String get thumbnailAuto;
   String get folderThumbnailSet;
@@ -877,6 +887,10 @@ abstract class AppLocalizations {
   String get showFileTagsDescription;
   String get showFileTagsToggle;
   String get showFileTagsToggleDescription;
+  String get tagThumbnailFit;
+  String get tagThumbnailFitDescription;
+  String get thumbnailFitContain;
+  String get thumbnailFitCover;
   String get rememberTabWorkspace;
   String get rememberTabWorkspaceDescription;
   String get tabInactiveThreshold;
@@ -886,6 +900,15 @@ abstract class AppLocalizations {
   String get tabInactiveThresholdHoursValue;
   String get cacheManagement;
   String get cacheManagementDescription;
+  String get appDataManagement;
+  String get appDataManagementDescription;
+  String get documentsData;
+  String get documentsDataDescription;
+  String get tagThumbnails;
+  String get tagThumbnailsDescription;
+  String get clearTagThumbnails;
+  String get tagThumbnailsCleared;
+  String get documentsRoot;
   String get cacheFolder;
   String get networkThumbnails;
   String get videoThumbnailsCache;
@@ -1261,6 +1284,7 @@ abstract class AppLocalizations {
   String get noModelsFound;
   String get noModelConfigured;
   String get selectModel;
+  String get modelSearchHint;
   String fetchModelsError(String error);
   String get newConversation;
   String get conversations;
@@ -1393,4 +1417,32 @@ abstract class AppLocalizations {
   String get aiThinking3;
   String get aiWaitingApproval;
   String aiRunningTool(String toolName);
+
+  // Local AI Advisor
+  String get localAiAdvisor;
+  String get localAiAdvisorDescription;
+  String get huggingFaceToken;
+  String get huggingFaceTokenHint;
+  String get pasteToken;
+  String get tokenSaved;
+  String get clearToken;
+  String get browseModels;
+  String get installedModels;
+  String get noModelsInstalled;
+  String get installModel;
+  String get uninstallModel;
+  String get selectActiveModel;
+  String get modelInstalling;
+  String get modelInstalled;
+  String get modelUninstalled;
+  String get downloadProgress;
+  String get noTokenSet;
+  String get setTokenFirst;
+  String get openLocation;
+  String get localAiIncompatibleArtifact;
+  String get localAiReinstallCompatible;
+  String get localAiContextWindow;
+  String get localAiContextWindowHint;
+  String get localAiTokensSuffix;
+  String get localAiInvalidTokenCount;
 }
