@@ -276,10 +276,41 @@ async function submitPackage() {
     appId,
     app.pendingApplicationSubmission,
   );
-  let submissionOrigin = pendingSubmission
-    ? 'existing pending'
-    : 'newly created';
-  let submission = pendingSubmission || (await createSubmission(accessToken, appId));
+  const pendingHasDuplicatePackage =
+    !!pendingSubmission &&
+    (pendingSubmission.applicationPackages || []).some(
+      (appPackage) => appPackage.fileName === packageFileName,
+    );
+
+  let submissionOrigin;
+  let submission;
+  if (pendingSubmission && pendingHasDuplicatePackage) {
+    // A previous failed run left a pending submission that already contains a
+    // package with this exact filename. Partner Center would reject re-adding
+    // it ("Existing Package ... should contain Id"), so delete the stale
+    // pending submission and start a fresh one that overwrites it.
+    console.error(
+      `Existing pending Partner Center submission ${pendingSubmission.id} already contains package ${packageFileName}; deleting it and creating a fresh submission.`,
+    );
+    try {
+      await deleteSubmission(accessToken, appId, pendingSubmission.id);
+    } catch (error) {
+      if (error.message.includes('created through the API')) {
+        throw new Error(
+          `Partner Center has an in-progress submission (${pendingSubmission.id}) that was created outside the API. Delete or cancel that pending submission in Partner Center, then rerun this workflow so CI can create the next submission through the API.`,
+        );
+      }
+      throw error;
+    }
+    submission = await createSubmissionWithRetry(accessToken, appId);
+    submissionOrigin = 'replacement';
+  } else if (pendingSubmission) {
+    submission = pendingSubmission;
+    submissionOrigin = 'existing pending';
+  } else {
+    submission = await createSubmission(accessToken, appId);
+    submissionOrigin = 'newly created';
+  }
 
   if (!submission?.id) {
     throw new Error('Partner Center did not return a submission id');
