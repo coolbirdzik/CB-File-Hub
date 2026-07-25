@@ -358,13 +358,14 @@ async function submitPackage() {
       : `Created ${submissionOrigin} Partner Center submission: ${submission.id}`,
   );
 
-  const publishMode = optionalEnv('PARTNER_CENTER_TARGET_PUBLISH_MODE');
-  if (publishMode) {
-    submission.targetPublishMode = publishMode;
-    if (publishMode !== 'SpecificDate') {
-      submission.targetPublishDate = '1601-01-01T00:00:00Z';
-    }
+  // Default Manual so certification can complete without auto-publishing.
+  const publishMode =
+    optionalEnv('PARTNER_CENTER_TARGET_PUBLISH_MODE') || 'Manual';
+  submission.targetPublishMode = publishMode;
+  if (publishMode !== 'SpecificDate') {
+    submission.targetPublishDate = '1601-01-01T00:00:00Z';
   }
+  console.error(`Partner Center targetPublishMode: ${publishMode}`);
 
   submission.applicationPackages = [
     ...(submission.applicationPackages || []).map(packageForDeletion),
