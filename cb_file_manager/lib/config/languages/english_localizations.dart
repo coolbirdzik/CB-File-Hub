@@ -28,6 +28,28 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get moreOptions => 'More options';
+  @override
+  String get thirdPartyApps => 'Third-party apps';
+  @override
+  String get configureContextMenu => 'Configure context menu';
+  @override
+  String get contextMenuLayout => 'Context menu layout';
+  @override
+  String get contextMenuLayoutDescription =>
+      'Reorder or hide commands shown when you right-click';
+  @override
+  String get contextMenuLayoutHint =>
+      'Drag commands to reorder them. Hidden commands remain available here.';
+  @override
+  String get contextMenuForFiles => 'Files';
+  @override
+  String get contextMenuForFolders => 'Folders';
+  @override
+  String get contextMenuForMultipleItems => 'Multiple items';
+  @override
+  String get resetContextMenuLayout => 'Reset layout';
+  @override
+  String get contextMenuLayoutReset => 'Context menu layout was reset';
 
   // File operations
   @override

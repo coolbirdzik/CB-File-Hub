@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <atomic>
+#include <thread>
 
 namespace
 {
@@ -25,6 +27,8 @@ namespace
   static UINT g_cf_tab_payload = 0;
   static UINT g_cf_tab_source_pid = 0;
   static UINT g_cf_preferred_drop_effect = 0;
+  static std::atomic<bool> g_tab_window_drag_active{false};
+  constexpr DWORD kTabWindowDragPollIntervalMs = 8;
 
   typedef enum _WINDOWCOMPOSITIONATTRIB
   {
@@ -873,9 +877,15 @@ namespace
                                         DWORD grfKeyState) override
     {
       if (fEscapePressed)
+      {
+        canceled_by_escape_ = true;
         return DRAGDROP_S_CANCEL;
+      }
       if ((grfKeyState & MK_LBUTTON) == 0)
+      {
+        dropped_by_mouse_release_ = true;
         return DRAGDROP_S_DROP;
+      }
       return S_OK;
     }
 
@@ -884,8 +894,20 @@ namespace
       return DRAGDROP_S_USEDEFAULTCURSORS;
     }
 
+    bool dropped_by_mouse_release() const
+    {
+      return dropped_by_mouse_release_;
+    }
+
+    bool canceled_by_escape() const
+    {
+      return canceled_by_escape_;
+    }
+
   private:
     ULONG ref_count_ = 1;
+    bool dropped_by_mouse_release_ = false;
+    bool canceled_by_escape_ = false;
   };
 
   class TabDropTarget : public IDropTarget
@@ -1475,6 +1497,66 @@ void WindowUtilsPlugin::HandleMethodCall(
     return;
   }
 
+  if (method == "startWindowDragIfMouseDown")
+  {
+    HWND hwnd = GetTopLevelWindow(registrar_);
+    if (!hwnd)
+    {
+      result->Error("NO_WINDOW", "Top-level window handle not available.");
+      return;
+    }
+
+    if ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0)
+    {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+
+    bool expected = false;
+    if (!g_tab_window_drag_active.compare_exchange_strong(expected, true))
+    {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+
+    POINT cursor{};
+    RECT window_rect{};
+    if (!::GetCursorPos(&cursor) || !::GetWindowRect(hwnd, &window_rect))
+    {
+      g_tab_window_drag_active.store(false);
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+
+    const LONG pointer_offset_x = cursor.x - window_rect.left;
+    const LONG pointer_offset_y = cursor.y - window_rect.top;
+
+    std::thread([hwnd, pointer_offset_x, pointer_offset_y]()
+                {
+      while (::IsWindow(hwnd) &&
+             ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0))
+      {
+        POINT current_cursor{};
+        if (::GetCursorPos(&current_cursor))
+        {
+          ::SetWindowPos(
+              hwnd,
+              nullptr,
+              current_cursor.x - pointer_offset_x,
+              current_cursor.y - pointer_offset_y,
+              0,
+              0,
+              SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        }
+        ::Sleep(kTabWindowDragPollIntervalMs);
+      }
+      g_tab_window_drag_active.store(false); })
+        .detach();
+
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
   if (method == "startNativeTabDrag")
   {
     EnsureDropTargetRegistered();
@@ -1494,15 +1576,33 @@ void WindowUtilsPlugin::HandleMethodCall(
     }
 
     IDataObject *data_object = new TabDataObject(*payload);
-    IDropSource *drop_source = new TabDropSource();
+    TabDropSource *drop_source = new TabDropSource();
     DWORD effect = DROPEFFECT_NONE;
     const HRESULT hr = ::DoDragDrop(data_object, drop_source, DROPEFFECT_MOVE,
                                     &effect);
+
+    const bool moved = (hr == DRAGDROP_S_DROP) && ((effect & DROPEFFECT_MOVE) != 0);
+    bool detached = false;
+    if (!moved && drop_source->dropped_by_mouse_release() &&
+        !drop_source->canceled_by_escape())
+    {
+      POINT cursor{};
+      HWND source_window = GetTopLevelWindow(registrar_);
+      if (::GetCursorPos(&cursor) && source_window)
+      {
+        HWND window_at_cursor = ::WindowFromPoint(cursor);
+        HWND root_window =
+            window_at_cursor ? ::GetAncestor(window_at_cursor, GA_ROOT) : nullptr;
+        detached = root_window != source_window;
+      }
+    }
+
     drop_source->Release();
     data_object->Release();
 
-    const bool moved = (hr == DRAGDROP_S_DROP) && ((effect & DROPEFFECT_MOVE) != 0);
-    result->Success(flutter::EncodableValue(moved ? "moved" : "canceled"));
+    const char *drag_result =
+        moved ? "moved" : (detached ? "detached" : "canceled");
+    result->Success(flutter::EncodableValue(drag_result));
     return;
   }
 

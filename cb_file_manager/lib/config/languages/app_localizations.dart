@@ -20,6 +20,16 @@ abstract class AppLocalizations {
   String get all;
   String get settings;
   String get moreOptions;
+  String get thirdPartyApps;
+  String get configureContextMenu;
+  String get contextMenuLayout;
+  String get contextMenuLayoutDescription;
+  String get contextMenuLayoutHint;
+  String get contextMenuForFiles;
+  String get contextMenuForFolders;
+  String get contextMenuForMultipleItems;
+  String get resetContextMenuLayout;
+  String get contextMenuLayoutReset;
 
   // File operations
   String get copy;

@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
@@ -27,11 +29,14 @@ import '../../utils/route.dart';
 import '../../screens/folder_list/folder_list_event.dart';
 import '../../screens/folder_list/folder_list_state.dart';
 import '../../../helpers/files/windows_shell_context_menu.dart';
+import '../../../helpers/files/context_menu_layout_preferences.dart';
+import '../../../e2e/cb_e2e_config.dart';
 import '../../controllers/inline_rename_controller.dart';
 import '../../../core/service_locator.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../utils/entity_open_actions.dart';
 import '../../../utils/app_logger.dart';
+import '../../screens/settings/context_menu_layout_settings_screen.dart';
 
 enum ContextMenuTargetType {
   file,
@@ -44,6 +49,7 @@ class ContextMenuAction {
   final String id;
   final String label;
   final IconData icon;
+  final Uint8List? iconBytes;
   final bool isDestructive;
   final bool isChecked;
   final bool isEnabled;
@@ -55,6 +61,7 @@ class ContextMenuAction {
     required this.id,
     required this.label,
     required this.icon,
+    this.iconBytes,
     this.isDestructive = false,
     this.isChecked = false,
     this.isEnabled = true,
@@ -76,14 +83,19 @@ class ContextMenuSection {
 
 bool _isMobileContextMenuPlatform() => Platform.isAndroid || Platform.isIOS;
 
-OverlayEntry? _submenuOverlayEntry;
+final List<OverlayEntry> _submenuOverlayEntries = <OverlayEntry>[];
 Timer? _submenuCloseTimer;
+
+void _removeContextSubmenusFrom(int depth) {
+  while (_submenuOverlayEntries.length > depth) {
+    _submenuOverlayEntries.removeLast().remove();
+  }
+}
 
 void _removeContextSubmenu() {
   _submenuCloseTimer?.cancel();
   _submenuCloseTimer = null;
-  _submenuOverlayEntry?.remove();
-  _submenuOverlayEntry = null;
+  _removeContextSubmenusFrom(0);
 }
 
 void _scheduleContextSubmenuRemoval() {
@@ -108,9 +120,281 @@ ContextMenuAction? _findContextMenuAction(
       if (action.id == actionId) {
         return action;
       }
+      final childSections = action.childSections;
+      if (childSections != null) {
+        final childAction = _findContextMenuAction(childSections, actionId);
+        if (childAction != null) {
+          return childAction;
+        }
+      }
     }
   }
   return null;
+}
+
+class _LoadedWindowsShellMenu {
+  final WindowsShellMenuSession session;
+  final List<ContextMenuSection> sections;
+
+  const _LoadedWindowsShellMenu({
+    required this.session,
+    required this.sections,
+  });
+}
+
+Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
+  required BuildContext context,
+  required List<String> paths,
+}) async {
+  // Integration tests interact with Flutter PopupMenuItem widgets. A native
+  // Shell session is outside the widget tree, so skip discovery in E2E mode.
+  if (!Platform.isWindows ||
+      kCbE2E ||
+      paths.isEmpty ||
+      paths.any(
+        (path) =>
+            FileSystemEntity.typeSync(path) == FileSystemEntityType.notFound,
+      )) {
+    return null;
+  }
+
+  final session =
+      await WindowsShellContextMenu.loadThirdPartyMenu(paths: paths);
+  if (session == null) {
+    return null;
+  }
+  if (!context.mounted) {
+    await WindowsShellContextMenu.releaseSession(session.id);
+    return null;
+  }
+
+  var generatedId = 0;
+  List<ContextMenuSection> convertEntries(
+    List<WindowsShellMenuEntry> entries,
+  ) {
+    final sections = <ContextMenuSection>[];
+    var actions = <ContextMenuAction>[];
+
+    void flushSection() {
+      if (actions.isEmpty) return;
+      sections.add(ContextMenuSection(actions: actions));
+      actions = <ContextMenuAction>[];
+    }
+
+    for (final entry in entries) {
+      if (entry.type == 'separator') {
+        flushSection();
+        continue;
+      }
+
+      final label = entry.label?.trim();
+      if (label == null || label.isEmpty) {
+        continue;
+      }
+
+      final children = convertEntries(entry.children);
+      final commandId = entry.commandId;
+      final actionId = commandId == null
+          ? 'shell_submenu_${session.id}_${generatedId++}'
+          : 'shell_command_${session.id}_$commandId';
+
+      actions.add(
+        ContextMenuAction(
+          id: actionId,
+          label: label,
+          icon: PhosphorIconsLight.appWindow,
+          iconBytes: entry.iconBytes,
+          isEnabled:
+              entry.isEnabled && (children.isNotEmpty || commandId != null),
+          isChecked: entry.isChecked,
+          childSections: children.isEmpty ? null : children,
+          onSelected: commandId == null
+              ? null
+              : (_) async {
+                  await WindowsShellContextMenu.invokeSessionCommand(
+                    sessionId: session.id,
+                    commandId: commandId,
+                  );
+                },
+        ),
+      );
+    }
+    flushSection();
+    return sections;
+  }
+
+  final shellSections = convertEntries(session.entries);
+  if (shellSections.isEmpty) {
+    await WindowsShellContextMenu.releaseSession(session.id);
+    return null;
+  }
+
+  return _LoadedWindowsShellMenu(
+    session: session,
+    sections: shellSections,
+  );
+}
+
+Future<void> _showAppContextMenu({
+  required BuildContext context,
+  required List<ContextMenuSection> sections,
+  required List<String> paths,
+  required Offset globalPosition,
+  required ContextMenuLayoutTarget layoutTarget,
+}) async {
+  final layout = await ContextMenuLayoutPreferences.instance.load(layoutTarget);
+  if (!context.mounted) {
+    return;
+  }
+  final shellMenu = layout.hiddenIds.contains(contextMenuThirdPartyAppsId)
+      ? null
+      : await _loadWindowsShellMenu(
+          context: context,
+          paths: paths,
+        );
+  if (!context.mounted) {
+    if (shellMenu != null) {
+      await WindowsShellContextMenu.releaseSession(shellMenu.session.id);
+    }
+    return;
+  }
+
+  final mergedSections = _applyContextMenuLayout(
+    context: context,
+    sections: sections,
+    shellSections: shellMenu?.sections ?? const <ContextMenuSection>[],
+    layout: layout,
+    layoutTarget: layoutTarget,
+  );
+
+  try {
+    await showContextMenuPopup(
+      context: context,
+      sections: mergedSections,
+      globalPosition: globalPosition,
+    );
+  } finally {
+    if (shellMenu != null) {
+      await WindowsShellContextMenu.releaseSession(shellMenu.session.id);
+    }
+  }
+}
+
+class _ContextMenuActionOrigin {
+  final ContextMenuAction action;
+  final int sectionIndex;
+  final String? sectionTitle;
+
+  const _ContextMenuActionOrigin({
+    required this.action,
+    required this.sectionIndex,
+    required this.sectionTitle,
+  });
+}
+
+List<ContextMenuSection> _applyContextMenuLayout({
+  required BuildContext context,
+  required List<ContextMenuSection> sections,
+  required List<ContextMenuSection> shellSections,
+  required ContextMenuLayoutPreference layout,
+  required ContextMenuLayoutTarget layoutTarget,
+}) {
+  final actionOrigins = <String, _ContextMenuActionOrigin>{};
+  for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    final section = sections[sectionIndex];
+    for (final action in section.actions) {
+      actionOrigins[action.id] = _ContextMenuActionOrigin(
+        action: action,
+        sectionIndex: sectionIndex,
+        sectionTitle: section.title,
+      );
+    }
+  }
+
+  final orderedIds = <String>[];
+  for (final id in <String>[...layout.order, ...actionOrigins.keys]) {
+    if (!orderedIds.contains(id)) {
+      orderedIds.add(id);
+    }
+  }
+
+  final result = <ContextMenuSection>[];
+  var pendingActions = <ContextMenuAction>[];
+  int? pendingSectionIndex;
+  String? pendingSectionTitle;
+
+  void flushPendingActions() {
+    if (pendingActions.isEmpty) return;
+    result.add(
+      ContextMenuSection(
+        title: pendingSectionTitle,
+        actions: pendingActions,
+      ),
+    );
+    pendingActions = <ContextMenuAction>[];
+    pendingSectionIndex = null;
+    pendingSectionTitle = null;
+  }
+
+  for (final id in orderedIds) {
+    if (layout.hiddenIds.contains(id)) {
+      continue;
+    }
+    if (id == contextMenuThirdPartyAppsId) {
+      flushPendingActions();
+      if (shellSections.isNotEmpty) {
+        result.add(
+          ContextMenuSection(
+            actions: [
+              ContextMenuAction(
+                id: contextMenuThirdPartyAppsId,
+                label: AppLocalizations.of(context)!.thirdPartyApps,
+                icon: PhosphorIconsLight.appWindow,
+                childSections: shellSections,
+              ),
+            ],
+          ),
+        );
+      }
+      continue;
+    }
+
+    final origin = actionOrigins[id];
+    if (origin == null) {
+      continue;
+    }
+    if (pendingSectionIndex != null &&
+        pendingSectionIndex != origin.sectionIndex) {
+      flushPendingActions();
+    }
+    pendingSectionIndex = origin.sectionIndex;
+    pendingSectionTitle = origin.sectionTitle;
+    pendingActions.add(origin.action);
+  }
+  flushPendingActions();
+
+  final l10n = AppLocalizations.of(context)!;
+  result.add(
+    ContextMenuSection(
+      actions: [
+        ContextMenuAction(
+          id: 'configure_context_menu',
+          label: l10n.configureContextMenu,
+          icon: PhosphorIconsLight.slidersHorizontal,
+          onSelected: (actionContext) {
+            Navigator.of(actionContext).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ContextMenuLayoutSettingsScreen(
+                  initialTarget: layoutTarget,
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    ),
+  );
+  return result;
 }
 
 Future<void> showContextMenuPopup({
@@ -252,11 +536,27 @@ Widget _buildContextMenuActionRow(
           ? theme.colorScheme.error
           : theme.colorScheme.onSurface;
 
-  final icon = Icon(
-    action.icon,
-    size: forPopup ? 18 : 20,
-    color: color,
-  );
+  final iconSize = forPopup ? 18.0 : 20.0;
+  final Widget icon;
+  if (action.iconBytes != null) {
+    icon = Image.memory(
+      action.iconBytes!,
+      width: iconSize,
+      height: iconSize,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (_, __, ___) => Icon(
+        action.icon,
+        size: iconSize,
+        color: color,
+      ),
+    );
+  } else {
+    icon = Icon(
+      action.icon,
+      size: iconSize,
+      color: color,
+    );
+  }
   final text = Text(
     action.label,
     style: TextStyle(
@@ -294,26 +594,56 @@ Widget _buildContextMenuActionRow(
   );
 }
 
-Offset _submenuPopupPosition({
+const double _contextSubmenuPreferredWidth = 220;
+const double _contextSubmenuPreferredMaxHeight = 480;
+const double _contextSubmenuWindowPadding = 8;
+
+class _ContextSubmenuGeometry {
+  final Offset position;
+  final double width;
+  final double maxHeight;
+
+  const _ContextSubmenuGeometry({
+    required this.position,
+    required this.width,
+    required this.maxHeight,
+  });
+}
+
+_ContextSubmenuGeometry _contextSubmenuGeometry({
   required Size overlaySize,
   required Offset anchorPosition,
   required double itemWidth,
 }) {
-  const submenuWidth = 220.0;
-  const verticalPadding = 8.0;
+  final availableWidth =
+      math.max(0.0, overlaySize.width - _contextSubmenuWindowPadding * 2);
+  final submenuWidth = math.min(_contextSubmenuPreferredWidth, availableWidth);
+  final availableHeight =
+      math.max(0.0, overlaySize.height - _contextSubmenuWindowPadding * 2);
+  final submenuMaxHeight =
+      math.min(_contextSubmenuPreferredMaxHeight, availableHeight);
 
   double dx = anchorPosition.dx + itemWidth;
   if (dx + submenuWidth > overlaySize.width) {
     dx = anchorPosition.dx - submenuWidth;
   }
-  dx = dx.clamp(verticalPadding, overlaySize.width - submenuWidth);
-
-  final dy = anchorPosition.dy.clamp(
-    verticalPadding,
-    overlaySize.height - 220.0,
+  final maxDx = math.max(
+    _contextSubmenuWindowPadding,
+    overlaySize.width - _contextSubmenuWindowPadding - submenuWidth,
   );
+  dx = dx.clamp(_contextSubmenuWindowPadding, maxDx);
 
-  return Offset(dx, dy);
+  final maxDy = math.max(
+    _contextSubmenuWindowPadding,
+    overlaySize.height - _contextSubmenuWindowPadding - submenuMaxHeight,
+  );
+  final dy = anchorPosition.dy.clamp(_contextSubmenuWindowPadding, maxDy);
+
+  return _ContextSubmenuGeometry(
+    position: Offset(dx, dy),
+    width: submenuWidth,
+    maxHeight: submenuMaxHeight,
+  );
 }
 
 class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
@@ -343,92 +673,14 @@ class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
         return;
       }
 
-      final itemPosition = itemBox.localToGlobal(
-        Offset.zero,
-        ancestor: overlayBox,
+      _showContextSubmenuOverlay(
+        actionContext: actionContext,
+        rootMenuContext: context,
+        overlayBox: overlayBox,
+        anchorBox: itemBox,
+        sections: action.childSections!,
+        depth: 0,
       );
-      final submenuPosition = _submenuPopupPosition(
-        overlaySize: overlayBox.size,
-        anchorPosition: itemPosition,
-        itemWidth: itemBox.size.width,
-      );
-
-      _removeContextSubmenu();
-      _submenuOverlayEntry = OverlayEntry(
-        builder: (_) => Positioned(
-          left: submenuPosition.dx,
-          top: submenuPosition.dy,
-          width: 220,
-          child: MouseRegion(
-            onEnter: (_) => _cancelContextSubmenuRemoval(),
-            onExit: (_) => _scheduleContextSubmenuRemoval(),
-            child: Material(
-              color: Theme.of(actionContext).colorScheme.surface.withAlpha(255),
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final section in action.childSections!) ...[
-                        if (section.title != null && section.title!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                            child: Text(
-                              section.title!,
-                              style: Theme.of(actionContext)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.4,
-                                  ),
-                            ),
-                          ),
-                        for (final childAction in section.actions)
-                          InkWell(
-                            key: ValueKey<String>(
-                              'context-menu-action-tap-${childAction.id}',
-                            ),
-                            onTap: !childAction.isEnabled
-                                ? null
-                                : () async {
-                                    _removeContextSubmenu();
-                                    Navigator.pop(context);
-                                    if (childAction.onSelected != null &&
-                                        actionContext.mounted) {
-                                      await childAction.onSelected!(
-                                        actionContext,
-                                      );
-                                    }
-                                  },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              child: _buildContextMenuActionRow(
-                                actionContext,
-                                childAction,
-                                forPopup: true,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      Overlay.of(actionContext).insert(_submenuOverlayEntry!);
     }
 
     return MouseRegion(
@@ -440,6 +692,204 @@ class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
         onTap: openSubmenu,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: _buildContextMenuActionRow(
+            actionContext,
+            action,
+            forPopup: true,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showContextSubmenuOverlay({
+  required BuildContext actionContext,
+  required BuildContext rootMenuContext,
+  required RenderBox overlayBox,
+  required RenderBox anchorBox,
+  required List<ContextMenuSection> sections,
+  required int depth,
+}) {
+  final anchorPosition = anchorBox.localToGlobal(
+    Offset.zero,
+    ancestor: overlayBox,
+  );
+  final geometry = _contextSubmenuGeometry(
+    overlaySize: overlayBox.size,
+    anchorPosition: anchorPosition,
+    itemWidth: anchorBox.size.width,
+  );
+
+  _removeContextSubmenusFrom(depth);
+  final entry = OverlayEntry(
+    builder: (_) => Positioned(
+      left: geometry.position.dx,
+      top: geometry.position.dy,
+      width: geometry.width,
+      child: _ContextSubmenuPanel(
+        actionContext: actionContext,
+        rootMenuContext: rootMenuContext,
+        overlayBox: overlayBox,
+        sections: sections,
+        depth: depth,
+        maxHeight: geometry.maxHeight,
+      ),
+    ),
+  );
+  _submenuOverlayEntries.add(entry);
+  Overlay.of(actionContext).insert(entry);
+}
+
+class _ContextSubmenuPanel extends StatelessWidget {
+  final BuildContext actionContext;
+  final BuildContext rootMenuContext;
+  final RenderBox overlayBox;
+  final List<ContextMenuSection> sections;
+  final int depth;
+  final double maxHeight;
+
+  const _ContextSubmenuPanel({
+    required this.actionContext,
+    required this.rootMenuContext,
+    required this.overlayBox,
+    required this.sections,
+    required this.depth,
+    required this.maxHeight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _cancelContextSubmenuRemoval(),
+      onExit: (_) => _scheduleContextSubmenuRemoval(),
+      child: Material(
+        color: Theme.of(actionContext).colorScheme.surface.withAlpha(255),
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: Scrollbar(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var sectionIndex = 0;
+                      sectionIndex < sections.length;
+                      sectionIndex++) ...[
+                    if (sectionIndex > 0) const Divider(height: 1),
+                    if (sections[sectionIndex].title != null &&
+                        sections[sectionIndex].title!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                        child: Text(
+                          sections[sectionIndex].title!,
+                          style: Theme.of(actionContext)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                              ),
+                        ),
+                      ),
+                    for (final childAction in sections[sectionIndex].actions)
+                      _ContextSubmenuActionRow(
+                        actionContext: actionContext,
+                        rootMenuContext: rootMenuContext,
+                        overlayBox: overlayBox,
+                        action: childAction,
+                        depth: depth,
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContextSubmenuActionRow extends StatelessWidget {
+  final BuildContext actionContext;
+  final BuildContext rootMenuContext;
+  final RenderBox overlayBox;
+  final ContextMenuAction action;
+  final int depth;
+
+  const _ContextSubmenuActionRow({
+    required this.actionContext,
+    required this.rootMenuContext,
+    required this.overlayBox,
+    required this.action,
+    required this.depth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final itemKey = GlobalKey();
+    final hasChildren =
+        action.childSections != null && action.childSections!.isNotEmpty;
+
+    void openChildSubmenu() {
+      if (!action.isEnabled || !hasChildren) {
+        return;
+      }
+      _cancelContextSubmenuRemoval();
+      final itemContext = itemKey.currentContext;
+      final itemBox = itemContext?.findRenderObject() as RenderBox?;
+      if (itemBox == null) {
+        return;
+      }
+      _showContextSubmenuOverlay(
+        actionContext: actionContext,
+        rootMenuContext: rootMenuContext,
+        overlayBox: overlayBox,
+        anchorBox: itemBox,
+        sections: action.childSections!,
+        depth: depth + 1,
+      );
+    }
+
+    Future<void> selectAction() async {
+      if (!action.isEnabled) {
+        return;
+      }
+      if (hasChildren) {
+        openChildSubmenu();
+        return;
+      }
+      _removeContextSubmenu();
+      Navigator.pop(rootMenuContext);
+      if (action.onSelected != null && actionContext.mounted) {
+        await action.onSelected!(actionContext);
+      }
+    }
+
+    return MouseRegion(
+      key: itemKey,
+      onEnter: (_) {
+        _cancelContextSubmenuRemoval();
+        if (hasChildren) {
+          openChildSubmenu();
+        } else {
+          _removeContextSubmenusFrom(depth + 1);
+        }
+      },
+      child: InkWell(
+        key: ValueKey<String>('context-menu-action-tap-${action.id}'),
+        onTap: action.isEnabled ? selectAction : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
           child: _buildContextMenuActionRow(
             actionContext,
             action,
@@ -1165,13 +1615,15 @@ void showFileContextMenu({
     remoteFileName: remoteFileName,
     globalPosition: effectivePosition,
   );
-  unawaited(
-    showContextMenuPopup(
+  unawaited(() async {
+    await _showAppContextMenu(
       context: context,
       sections: sections,
+      paths: [file.path],
       globalPosition: effectivePosition,
-    ),
-  );
+      layoutTarget: ContextMenuLayoutTarget.file,
+    );
+  }());
 }
 
 Future<void> _downloadRemoteFile({
@@ -1351,19 +1803,22 @@ void showFolderContextMenu({
   unawaited(() async {
     final isPinnedToSidebar = await _isPathPinnedToSidebar(folder.path);
     if (!context.mounted) return;
-    await showContextMenuPopup(
+    final sections = _buildFolderContextMenuSections(
       context: context,
-      sections: _buildFolderContextMenuSections(
-        context: context,
-        folderListBloc: folderListBloc,
-        folder: folder,
-        onNavigate: onNavigate,
-        folderTags: folderTags,
-        showAddTagToFileDialog: showAddTagToFileDialog,
-        globalPosition: effectivePosition,
-        isPinnedToSidebar: isPinnedToSidebar,
-      ),
+      folderListBloc: folderListBloc,
+      folder: folder,
+      onNavigate: onNavigate,
+      folderTags: folderTags,
+      showAddTagToFileDialog: showAddTagToFileDialog,
       globalPosition: effectivePosition,
+      isPinnedToSidebar: isPinnedToSidebar,
+    );
+    await _showAppContextMenu(
+      context: context,
+      sections: sections,
+      paths: [folder.path],
+      globalPosition: effectivePosition,
+      layoutTarget: ContextMenuLayoutTarget.folder,
     );
   }());
 }
@@ -1716,13 +2171,15 @@ void showMultipleFilesContextMenu({
     return;
   }
 
-  unawaited(
-    showContextMenuPopup(
+  unawaited(() async {
+    await _showAppContextMenu(
       context: context,
       sections: sections,
+      paths: selectedPaths,
       globalPosition: effectivePosition,
-    ),
-  );
+      layoutTarget: ContextMenuLayoutTarget.multiSelection,
+    );
+  }());
 }
 
 List<ContextMenuSection> _buildMultiSelectionContextMenuSections({

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
@@ -10,6 +11,10 @@ import 'package:window_manager/window_manager.dart';
 import 'desktop_window_process_launcher.dart';
 import 'window_startup_payload.dart';
 import 'windows_native_tab_drag_drop_service.dart';
+
+const double kDefaultTabTearOffAnchorX = 140.0;
+const double kDefaultTabTearOffAnchorY = 18.0;
+const Duration kDefaultTabTearOffDragDelay = Duration(milliseconds: 16);
 
 class DesktopWindowInfo {
   final String windowId;
@@ -160,8 +165,27 @@ class DesktopWindowingService {
         .toList(growable: false);
   }
 
-  Future<bool> openNewWindow({List<WindowTabPayload> tabs = const []}) async {
+  Future<bool> openNewWindow({
+    List<WindowTabPayload> tabs = const [],
+    Offset? sourcePointerPosition,
+    bool startDragging = false,
+  }) async {
     if (!isDesktop) return false;
+
+    Offset? initialPosition;
+    if (sourcePointerPosition != null) {
+      try {
+        final sourceWindowPosition = await windowManager.getPosition();
+        initialPosition = Offset(
+          sourceWindowPosition.dx +
+              sourcePointerPosition.dx -
+              kDefaultTabTearOffAnchorX,
+          sourceWindowPosition.dy +
+              sourcePointerPosition.dy -
+              kDefaultTabTearOffAnchorY,
+        );
+      } catch (_) {}
+    }
 
     if (Platform.isWindows) {
       await WindowsNativeTabDragDropService.allowForegroundWindow();
@@ -175,12 +199,19 @@ class DesktopWindowingService {
         );
       }
       if (spare != null) {
-        final shown = await requestShowWindow(spare, consumeSpare: true);
+        final shown = await requestShowWindow(
+          spare,
+          consumeSpare: true,
+          initialPosition: initialPosition,
+          startDragging: startDragging,
+        );
         if (shown) {
           if (tabs.isNotEmpty) {
             // Make the window appear immediately, then stream tabs in.
             // This feels closer to Chrome where the window shows first.
-            unawaited(sendTabsToWindow(spare, tabs));
+            final delivered = await sendTabsToWindow(spare, tabs);
+            unawaited(ensureSpareWindow());
+            return delivered;
           }
           unawaited(ensureSpareWindow());
           return true;
@@ -193,6 +224,9 @@ class DesktopWindowingService {
       tabs: tabs,
       startHidden: false,
       windowRole: 'normal',
+      initialPositionX: initialPosition?.dx,
+      initialPositionY: initialPosition?.dy,
+      startDragging: startDragging,
     );
     unawaited(ensureSpareWindow());
     return created;
@@ -201,6 +235,8 @@ class DesktopWindowingService {
   Future<bool> requestShowWindow(
     DesktopWindowInfo target, {
     bool consumeSpare = false,
+    Offset? initialPosition,
+    bool startDragging = false,
   }) async {
     if (!isDesktop) return false;
     final response = await _sendPeerMessage(
@@ -208,6 +244,11 @@ class DesktopWindowingService {
       message: <String, dynamic>{
         'type': 'show_window',
         'consumeSpare': consumeSpare,
+        if (initialPosition != null) ...<String, dynamic>{
+          'positionX': initialPosition.dx,
+          'positionY': initialPosition.dy,
+        },
+        'startDragging': startDragging,
       },
     );
     return response != null && response['type'] == 'ok';
@@ -368,21 +409,50 @@ class DesktopWindowingService {
 
     if (type == 'show_window') {
       final bool consumeSpare = message['consumeSpare'] == true;
-      _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
-      unawaited(() async {
-        try {
-          if (isDesktop) {
-            await windowManager.setSkipTaskbar(false);
-            await windowManager.show();
-            await windowManager.focus();
-            await WindowsNativeTabDragDropService.forceActivateWindow();
+      final bool startDragging = message['startDragging'] == true;
+      final positionX = message['positionX'];
+      final positionY = message['positionY'];
+      final initialPosition = positionX is num && positionY is num
+          ? Offset(positionX.toDouble(), positionY.toDouble())
+          : null;
+
+      try {
+        if (isDesktop) {
+          await windowManager.setSkipTaskbar(false);
+          if (initialPosition != null) {
+            await windowManager.setPosition(initialPosition);
           }
-          if (consumeSpare && _windowRole == 'spare') {
-            _windowRole = 'normal';
-            unawaited(_registerSelf());
-          }
-        } catch (_) {}
-      }());
+          await windowManager.show();
+          await windowManager.focus();
+          await WindowsNativeTabDragDropService.forceActivateWindow();
+        }
+        if (consumeSpare && _windowRole == 'spare') {
+          _windowRole = 'normal';
+          unawaited(_registerSelf());
+        }
+        _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
+        if (startDragging && isDesktop) {
+          unawaited(
+            Future<void>.delayed(
+              kDefaultTabTearOffDragDelay,
+              () async {
+                await WindowsNativeTabDragDropService
+                    .startWindowDragIfMouseDown();
+              },
+            ),
+          );
+        }
+      } catch (e, st) {
+        AppLogger.warning(
+          'Failed to show a detached tab window.',
+          error: e,
+          stackTrace: st,
+        );
+        _writeJsonLine(socket, <String, dynamic>{
+          'type': 'error',
+          'message': 'Failed to show window',
+        });
+      }
       return;
     }
 

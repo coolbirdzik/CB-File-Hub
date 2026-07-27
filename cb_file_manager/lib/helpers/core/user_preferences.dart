@@ -102,6 +102,7 @@ class UserPreferences {
   static const String _networkBrowserSortOptionKey =
       'network_browser_sort_option';
   static const String _tagThumbnailFitModeKey = 'tag_thumbnail_fit_mode';
+  static const String _contextMenuLayoutKeyPrefix = 'context_menu_layout_';
 
   // Constants for grid zoom level
   static const int minGridZoomLevel = 2; // Largest thumbnails (2 per row)
@@ -769,6 +770,24 @@ class UserPreferences {
 
   Future<bool> clearDesktopQuickCreateItemIds() async {
     return await _deletePreference(_desktopQuickCreateItemIdsKey);
+  }
+
+  Future<String?> getContextMenuLayoutJson(String targetKey) async {
+    return _getPreference<String>('$_contextMenuLayoutKeyPrefix$targetKey');
+  }
+
+  Future<bool> setContextMenuLayoutJson(
+    String targetKey,
+    String jsonValue,
+  ) async {
+    return _savePreference<String>(
+      '$_contextMenuLayoutKeyPrefix$targetKey',
+      jsonValue,
+    );
+  }
+
+  Future<bool> clearContextMenuLayout(String targetKey) async {
+    return _deletePreference('$_contextMenuLayoutKeyPrefix$targetKey');
   }
 
   Future<bool> getAllowFileExtensionRename() async {

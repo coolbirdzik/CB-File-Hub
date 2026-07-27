@@ -5,6 +5,7 @@ import 'package:flutter/services.dart'; // Import for keyboard shortcuts
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'tab_manager.dart';
 import 'tab_data.dart';
@@ -26,7 +27,6 @@ import '../../screens/home/home_screen.dart'; // Import home screen
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/windowing/desktop_windowing_service.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
-import 'package:cb_file_manager/services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
@@ -1459,23 +1459,30 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     overlay.insert(_windowDropOverlayEntry!);
   }
 
-  Future<void> _handleNativeTabDrag(DesktopTabDragData data) async {
+  Future<void> _handleNativeTabDrag(
+    DesktopTabDragData data,
+    Offset pointerPosition,
+  ) async {
     if (!Platform.isWindows) return;
+
+    final tabBloc = context.read<TabManagerBloc>();
+    if (tabBloc.state.tabs.length <= 1) {
+      await windowManager.startDragging();
+      return;
+    }
 
     final moveSelection = _resolveTabMoveSelection(data.tabId);
     final payloads = moveSelection.payloads;
-
-    final result = await WindowsNativeTabDragDropService.startDrag(
-      tabs: payloads.isNotEmpty ? payloads : <WindowTabPayload>[data.tab],
+    final tabs = payloads.isNotEmpty ? payloads : <WindowTabPayload>[data.tab];
+    final opened = await locator<DesktopWindowingService>().openNewWindow(
+      tabs: tabs,
+      sourcePointerPosition: pointerPosition,
+      startDragging: true,
     );
-    if (!mounted) return;
+    if (!mounted || !opened) return;
 
-    if (result == WindowsNativeTabDragResult.moved) {
-      // ignore: use_build_context_synchronously
-      final bloc = context.read<TabManagerBloc>();
-      for (final id in moveSelection.tabIds) {
-        bloc.add(CloseTab(id));
-      }
+    for (final id in moveSelection.tabIds) {
+      tabBloc.add(CloseTab(id));
     }
   }
 

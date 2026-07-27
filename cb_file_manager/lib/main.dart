@@ -174,6 +174,18 @@ Future<void> runCbFileApp() async {
   final isSecondaryWindow =
       env[WindowStartupPayload.envSecondaryWindowKey] == '1';
   final startHidden = env[WindowStartupPayload.envStartHiddenKey] == '1';
+  final initialWindowPositionX = double.tryParse(
+    env[WindowStartupPayload.envWindowPositionXKey] ?? '',
+  );
+  final initialWindowPositionY = double.tryParse(
+    env[WindowStartupPayload.envWindowPositionYKey] ?? '',
+  );
+  final initialWindowPosition =
+      initialWindowPositionX != null && initialWindowPositionY != null
+          ? Offset(initialWindowPositionX, initialWindowPositionY)
+          : null;
+  final startDraggingWindow =
+      env[WindowStartupPayload.envStartDraggingKey] == '1';
   final windowRole =
       (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
   final isPip = env['CB_PIP_MODE'] == '1';
@@ -273,7 +285,7 @@ Future<void> runCbFileApp() async {
 
     if (!isPip && !isProgressWindow) {
       final windowOptions = WindowOptions(
-        center: true,
+        center: initialWindowPosition == null,
         backgroundColor: Colors.transparent,
         titleBarStyle: TitleBarStyle.hidden,
         windowButtonVisibility: !Platform.isWindows,
@@ -304,10 +316,15 @@ Future<void> runCbFileApp() async {
           } else {
             try {
               await windowManager.setSkipTaskbar(false);
+              if (initialWindowPosition != null) {
+                await windowManager.setPosition(initialWindowPosition);
+              }
               await windowManager.show();
               await windowManager.focus();
               await WindowsNativeTabDragDropService.forceActivateWindow();
-              unawaited(windowManager.center());
+              if (initialWindowPosition == null) {
+                unawaited(windowManager.center());
+              }
             } catch (_) {}
           }
         } else {
@@ -521,6 +538,22 @@ Future<void> runCbFileApp() async {
       ),
     ),
   );
+
+  if (isSecondaryWindow &&
+      startDraggingWindow &&
+      !isProgressWindow &&
+      !startHidden) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 16),
+          () async {
+            await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
+          },
+        ),
+      );
+    });
+  }
 
   if (isSecondaryWindow &&
       !isProgressWindow &&

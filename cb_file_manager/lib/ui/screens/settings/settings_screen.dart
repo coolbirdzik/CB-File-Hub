@@ -25,6 +25,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_section.dart';
+import 'package:cb_file_manager/ui/screens/settings/context_menu_layout_settings_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
@@ -531,6 +532,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _rememberTabWorkspace,
             onChanged: _updateRememberTabWorkspace,
           ),
+        ),
+        _buildCompactSettingTile(
+          title: AppLocalizations.of(context)!.contextMenuLayout,
+          subtitle: AppLocalizations.of(context)!.contextMenuLayoutDescription,
+          icon: PhosphorIconsLight.listDashes,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ContextMenuLayoutSettingsScreen(),
+              ),
+            );
+          },
         ),
         _buildTabInactiveThresholdTile(),
         _buildCompactSettingTile(

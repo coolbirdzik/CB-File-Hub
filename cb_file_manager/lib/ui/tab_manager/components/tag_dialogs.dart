@@ -13,6 +13,8 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/helpers/tags/batch_tag_manager.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/widgets/resizable_dialog.dart';
+import 'package:cb_file_manager/ui/widgets/tag_browse_section.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import '../../utils/route.dart';
@@ -266,9 +268,6 @@ Widget buildTagSuggestionItem(
 
 /// Dialog for adding a tag to a file
 void showAddTagToFileDialog(BuildContext context, String filePath) {
-  final Size screenSize = MediaQuery.of(context).size;
-  final double dialogWidth = screenSize.width * 0.5;
-  final double dialogHeight = screenSize.height * 0.6;
   AppLogger.info('[ManageTags][Dialog] Opening dialog for $filePath');
 
   void refreshParentUI(String filePath, {bool preserveScroll = true}) {
@@ -286,11 +285,7 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
     context: context,
     builder: (dialogContext) {
       AppLogger.debug('[ManageTags][Dialog] showDialog builder for $filePath');
-      return _SingleFileTagDialog(
-        filePath: filePath,
-        dialogWidth: dialogWidth,
-        dialogHeight: dialogHeight,
-      );
+      return _SingleFileTagDialog(filePath: filePath);
     },
   ).then((result) {
     if (result == true) {
@@ -307,14 +302,8 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
 
 class _SingleFileTagDialog extends StatefulWidget {
   final String filePath;
-  final double dialogWidth;
-  final double dialogHeight;
 
-  const _SingleFileTagDialog({
-    required this.filePath,
-    required this.dialogWidth,
-    required this.dialogHeight,
-  });
+  const _SingleFileTagDialog({required this.filePath});
 
   @override
   State<_SingleFileTagDialog> createState() => _SingleFileTagDialogState();
@@ -728,8 +717,9 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    return AlertDialog(
-      titlePadding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
+    return ResizableDialog(
+      prefsKeyPrefix: 'manage_tags_dialog',
+      minSize: const Size(460, 420),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -772,45 +762,43 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
           ),
         ],
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      contentPadding: const EdgeInsets.fromLTRB(28, 20, 28, 16),
-      content: Container(
-        width: double.maxFinite,
-        constraints: BoxConstraints(
-          maxWidth: widget.dialogWidth,
-          maxHeight: widget.dialogHeight,
-          minHeight: widget.dialogHeight * 0.72,
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTagInputSection(l10n),
-                    const SizedBox(height: 18),
-                    _buildSectionCard(
-                      icon: PhosphorIconsLight.sparkle,
-                      title: 'Quick Picks',
-                      subtitle: 'Choose from popular or recently used tags',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          PopularTagsWidget(
-                            onTagSelected: _addTag,
-                          ),
-                          const SizedBox(height: 20),
-                          RecentTagsWidget(
-                            onTagSelected: _addTag,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+      contentBuilder: (context, dialogSize) {
+        if (_isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        // The browse tree gets whatever vertical room is left after the fixed
+        // sections, so resizing the dialog actually grows the tag list.
+        final browseHeight = (dialogSize.height - 430).clamp(160.0, 900.0);
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTagInputSection(l10n),
+              const SizedBox(height: 18),
+              _buildSectionCard(
+                icon: PhosphorIconsLight.sparkle,
+                title: 'Quick Picks',
+                subtitle: 'Choose from the most used tags',
+                child: PopularTagsWidget(
+                  onTagSelected: _addTag,
                 ),
               ),
-      ),
+              const SizedBox(height: 18),
+              _buildSectionCard(
+                icon: PhosphorIconsLight.treeStructure,
+                title: l10n.allTags,
+                subtitle:
+                    'Browse the tag tree — expand a parent to pick its children.',
+                child: TagBrowseSection(
+                  selectedTags: _selectedTags,
+                  onTagSelected: _addTag,
+                  maxHeight: browseHeight,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
       actions: [
         TextFieldTapRegion(
           child: TextButton(
@@ -966,9 +954,6 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   final hierarchyManager = TagHierarchyManager.instance;
   Future.wait([thumbnailManager.initialize(), hierarchyManager.initialize()]);
 
-  final Size screenSize = MediaQuery.of(context).size;
-  final double dialogWidth = screenSize.width * 0.5;
-  final double dialogHeight = screenSize.height * 0.6;
   AppLogger.info('[ManageTags][BatchDialog] Opening batch dialog',
       error: 'selectedFiles=$selectedFiles');
 
@@ -1086,7 +1071,9 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                   error: 'selectedFiles=$selectedFiles tag=$tag');
             }
 
-            return AlertDialog(
+            return ResizableDialog(
+              prefsKeyPrefix: 'batch_tags_dialog',
+              minSize: const Size(460, 420),
               title: Text(
                 AppLocalizations.of(context)!
                     .batchAddTags(selectedFiles.length),
@@ -1095,20 +1082,10 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-              content: Container(
-                width: double.maxFinite,
-                constraints: BoxConstraints(
-                  maxWidth: dialogWidth,
-                  maxHeight: dialogHeight,
-                  minHeight: dialogHeight * 0.7,
-                ),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                child: SingleChildScrollView(
+              contentBuilder: (context, dialogSize) {
+                final browseHeight =
+                    (dialogSize.height - 420).clamp(160.0, 900.0);
+                return SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1204,11 +1181,33 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       const SizedBox(height: 24),
                       PopularTagsWidget(onTagSelected: handleTagSelected),
                       const SizedBox(height: 24),
-                      RecentTagsWidget(onTagSelected: handleTagSelected),
+                      Row(
+                        children: [
+                          Icon(
+                            PhosphorIconsLight.treeStructure,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            AppLocalizations.of(context)!.allTags,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TagBrowseSection(
+                        selectedTags: selectedTags,
+                        onTagSelected: handleTagSelected,
+                        maxHeight: browseHeight,
+                      ),
                     ],
                   ),
-                ),
-              ),
+                );
+              },
               actions: [
                 TextFieldTapRegion(
                   child: TextButton(

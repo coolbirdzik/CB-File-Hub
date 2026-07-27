@@ -148,6 +148,18 @@ class WindowsNativeTabDragDropService {
     } catch (_) {}
   }
 
+  static Future<bool> startWindowDragIfMouseDown() async {
+    if (!Platform.isWindows) return false;
+    try {
+      return await _channel.invokeMethod<bool>(
+            'startWindowDragIfMouseDown',
+          ) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> setNativeCaptionVisible(bool visible) async {
     if (!Platform.isWindows) return;
     try {

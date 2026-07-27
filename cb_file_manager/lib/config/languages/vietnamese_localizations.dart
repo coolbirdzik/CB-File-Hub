@@ -28,6 +28,28 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get moreOptions => 'Tùy chọn khác';
+  @override
+  String get thirdPartyApps => 'Ứng dụng bên thứ ba';
+  @override
+  String get configureContextMenu => 'Tùy chỉnh menu ngữ cảnh';
+  @override
+  String get contextMenuLayout => 'Bố cục menu ngữ cảnh';
+  @override
+  String get contextMenuLayoutDescription =>
+      'Sắp xếp hoặc ẩn các lệnh hiện khi nhấp chuột phải';
+  @override
+  String get contextMenuLayoutHint =>
+      'Kéo các lệnh để đổi thứ tự. Lệnh đã ẩn vẫn có thể bật lại tại đây.';
+  @override
+  String get contextMenuForFiles => 'Tệp';
+  @override
+  String get contextMenuForFolders => 'Thư mục';
+  @override
+  String get contextMenuForMultipleItems => 'Nhiều mục';
+  @override
+  String get resetContextMenuLayout => 'Đặt lại bố cục';
+  @override
+  String get contextMenuLayoutReset => 'Đã đặt lại bố cục menu ngữ cảnh';
 
   // File operations
   @override

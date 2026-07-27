@@ -40,6 +40,67 @@ class WindowsCombinedMenuResult {
   }
 }
 
+class WindowsShellMenuEntry {
+  final String type;
+  final int? commandId;
+  final String? label;
+  final bool isEnabled;
+  final bool isChecked;
+  final Uint8List? iconBytes;
+  final List<WindowsShellMenuEntry> children;
+
+  const WindowsShellMenuEntry({
+    required this.type,
+    this.commandId,
+    this.label,
+    this.isEnabled = true,
+    this.isChecked = false,
+    this.iconBytes,
+    this.children = const [],
+  });
+
+  factory WindowsShellMenuEntry.fromMap(Map<Object?, Object?> map) {
+    final rawChildren = map['children'];
+    return WindowsShellMenuEntry(
+      type: map['type'] as String? ?? 'item',
+      commandId: map['commandId'] as int?,
+      label: map['label'] as String?,
+      isEnabled: map['enabled'] != false,
+      isChecked: map['checked'] == true,
+      iconBytes: map['iconBytes'] as Uint8List?,
+      children: rawChildren is List<Object?>
+          ? rawChildren
+              .whereType<Map<Object?, Object?>>()
+              .map(WindowsShellMenuEntry.fromMap)
+              .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
+class WindowsShellMenuSession {
+  final String id;
+  final List<WindowsShellMenuEntry> entries;
+
+  const WindowsShellMenuSession({
+    required this.id,
+    required this.entries,
+  });
+
+  factory WindowsShellMenuSession.fromMap(Map<Object?, Object?> map) {
+    final rawEntries = map['entries'];
+    return WindowsShellMenuSession(
+      id: map['sessionId'] as String? ?? '',
+      entries: rawEntries is List<Object?>
+          ? rawEntries
+              .whereType<Map<Object?, Object?>>()
+              .map(WindowsShellMenuEntry.fromMap)
+              .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
 class WindowsShellContextMenu {
   static const MethodChannel _channel =
       MethodChannel('cb_file_manager/shell_context_menu');
@@ -160,6 +221,69 @@ class WindowsShellContextMenu {
       return result == true;
     } catch (_) {
       return false;
+    }
+  }
+
+  static Future<WindowsShellMenuSession?> loadThirdPartyMenu({
+    required List<String> paths,
+  }) async {
+    if (!Platform.isWindows || paths.isEmpty) {
+      return null;
+    }
+
+    try {
+      final result = await _channel.invokeMethod<Object?>(
+        'loadThirdPartyMenu',
+        <String, Object?>{'paths': paths},
+      );
+      if (result is! Map<Object?, Object?>) {
+        return null;
+      }
+
+      final session = WindowsShellMenuSession.fromMap(result);
+      if (session.id.isEmpty || session.entries.isEmpty) {
+        return null;
+      }
+      return session;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> invokeSessionCommand({
+    required String sessionId,
+    required int commandId,
+  }) async {
+    if (!Platform.isWindows || sessionId.isEmpty) {
+      return false;
+    }
+
+    try {
+      final result = await _channel.invokeMethod<Object?>(
+        'invokeContextMenuCommand',
+        <String, Object?>{
+          'sessionId': sessionId,
+          'commandId': commandId,
+        },
+      );
+      return result == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> releaseSession(String sessionId) async {
+    if (!Platform.isWindows || sessionId.isEmpty) {
+      return;
+    }
+
+    try {
+      await _channel.invokeMethod<void>(
+        'releaseContextMenuSession',
+        <String, Object?>{'sessionId': sessionId},
+      );
+    } catch (_) {
+      // The session may already be released after invoking a Shell command.
     }
   }
 }

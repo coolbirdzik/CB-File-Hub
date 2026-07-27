@@ -11,9 +11,11 @@
 #include <wrl/client.h>
 
 #include <cmath>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -41,6 +43,25 @@ std::wstring Utf8ToWide(const std::string& utf8) {
   return wide;
 }
 
+std::string WideToUtf8(const std::wstring& wide) {
+  if (wide.empty()) {
+    return std::string();
+  }
+
+  int size_needed =
+      WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()),
+                          nullptr, 0, nullptr, nullptr);
+  if (size_needed <= 0) {
+    return std::string();
+  }
+
+  std::string utf8(static_cast<size_t>(size_needed), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, wide.data(),
+                      static_cast<int>(wide.size()), utf8.data(), size_needed,
+                      nullptr, nullptr);
+  return utf8;
+}
+
 struct ShellContextMenuState {
   Microsoft::WRL::ComPtr<IContextMenu2> menu2;
   Microsoft::WRL::ComPtr<IContextMenu3> menu3;
@@ -66,7 +87,8 @@ LRESULT CALLBACK ShellContextMenuSubclassProc(HWND hwnd,
   switch (message) {
     case WM_INITMENUPOPUP:
     case WM_DRAWITEM:
-    case WM_MEASUREITEM: {
+    case WM_MEASUREITEM:
+    case WM_MENUCHAR: {
       if (state->menu3) {
         LRESULT result = 0;
         if (SUCCEEDED(state->menu3->HandleMenuMsg2(message, wparam, lparam,
@@ -74,7 +96,7 @@ LRESULT CALLBACK ShellContextMenuSubclassProc(HWND hwnd,
           return result;
         }
       }
-      if (state->menu2) {
+      if (state->menu2 && message != WM_MENUCHAR) {
         state->menu2->HandleMenuMsg(message, wparam, lparam);
         return 0;
       }
@@ -102,10 +124,37 @@ bool ShouldHideShellVerb(const std::wstring& verb) {
   }
 
   static const std::vector<std::wstring> kHiddenVerbs = {
-      L"open",        L"opennew",   L"openas",     L"edit",
-      L"cut",         L"copy",      L"paste",      L"delete",
-      L"rename",      L"properties", L"copyto",     L"moveto",
-      L"print",       L"printto",
+      L"open",
+      L"opennew",
+      L"openas",
+      L"openwith",
+      L"edit",
+      L"cut",
+      L"copy",
+      L"paste",
+      L"delete",
+      L"rename",
+      L"properties",
+      L"copyto",
+      L"moveto",
+      L"print",
+      L"printto",
+      L"runas",
+      L"runasuser",
+      L"sendto",
+      L"share",
+      L"windows.modernshare",
+      L"copyaspath",
+      L"pintohome",
+      L"unpinfromhome",
+      L"pintoquickaccess",
+      L"unpinfromquickaccess",
+      L"pinstart",
+      L"taskbarpin",
+      L"restore",
+      L"previousversions",
+      L"includeinlibrary",
+      L"addtofavorites",
   };
 
   for (const auto& v : kHiddenVerbs) {
@@ -188,23 +237,27 @@ void PruneShellItemsFromMenu(HMENU menu,
       continue;
     }
 
+    const UINT cmd = mii.wID;
+    if (cmd >= cmd_first && cmd <= cmd_last) {
+      const std::wstring verb =
+          GetCommandVerbW(context_menu, cmd - cmd_first);
+      if (ShouldHideShellVerb(verb)) {
+        RemoveMenu(menu, static_cast<UINT>(i), MF_BYPOSITION);
+        continue;
+      }
+    }
+
     if (mii.hSubMenu) {
+      const int initial_child_count = GetMenuItemCount(mii.hSubMenu);
       PruneShellItemsFromMenu(mii.hSubMenu, context_menu, cmd_first, cmd_last);
       RemoveRedundantSeparators(mii.hSubMenu);
-      if (GetMenuItemCount(mii.hSubMenu) == 0) {
+      // Some Shell extensions populate cascading menus lazily in response to
+      // WM_INITMENUPOPUP. Keep an initially empty submenu so it still gets that
+      // callback, but remove a submenu that became empty after pruning.
+      if (initial_child_count > 0 && GetMenuItemCount(mii.hSubMenu) == 0) {
         RemoveMenu(menu, static_cast<UINT>(i), MF_BYPOSITION);
       }
       continue;
-    }
-
-    const UINT cmd = mii.wID;
-    if (cmd < cmd_first || cmd > cmd_last) {
-      continue;
-    }
-
-    const std::wstring verb = GetCommandVerbW(context_menu, cmd - cmd_first);
-    if (ShouldHideShellVerb(verb)) {
-      RemoveMenu(menu, static_cast<UINT>(i), MF_BYPOSITION);
     }
   }
 
@@ -265,11 +318,63 @@ struct ShellMenuContext {
   std::vector<PIDLIST_ABSOLUTE> pidls;
 };
 
+struct LoadedShellMenuSession {
+  std::string id;
+  HWND hwnd = nullptr;
+  ShellMenuContext shell;
+  HMENU menu = nullptr;
+  std::set<UINT> command_ids;
+};
+
+std::unique_ptr<LoadedShellMenuSession> g_loaded_shell_menu_session;
+UINT64 g_next_shell_menu_session_id = 1;
+
 void FreePidls(std::vector<PIDLIST_ABSOLUTE>& pidls) {
   for (auto* p : pidls) {
     CoTaskMemFree(p);
   }
   pidls.clear();
+}
+
+void ReleaseLoadedShellMenuSession() {
+  if (!g_loaded_shell_menu_session) {
+    return;
+  }
+  if (g_loaded_shell_menu_session->menu) {
+    DestroyMenu(g_loaded_shell_menu_session->menu);
+  }
+  FreePidls(g_loaded_shell_menu_session->shell.pidls);
+  g_loaded_shell_menu_session.reset();
+}
+
+bool HaveSameParent(const std::vector<PIDLIST_ABSOLUTE>& pidls) {
+  if (pidls.size() < 2) {
+    return true;
+  }
+
+  PIDLIST_ABSOLUTE first_parent = ILCloneFull(pidls.front());
+  if (!first_parent) {
+    return false;
+  }
+  ILRemoveLastID(first_parent);
+
+  bool same_parent = true;
+  for (size_t i = 1; i < pidls.size(); ++i) {
+    PIDLIST_ABSOLUTE candidate_parent = ILCloneFull(pidls[i]);
+    if (!candidate_parent) {
+      same_parent = false;
+      break;
+    }
+    ILRemoveLastID(candidate_parent);
+    same_parent = ILIsEqual(first_parent, candidate_parent);
+    ILFree(candidate_parent);
+    if (!same_parent) {
+      break;
+    }
+  }
+
+  ILFree(first_parent);
+  return same_parent;
 }
 
 bool CreateShellMenuContext(HWND hwnd,
@@ -295,6 +400,14 @@ bool CreateShellMenuContext(HWND hwnd,
       return false;
     }
     out.pidls.push_back(pidl);
+  }
+
+  // IShellFolder::GetUIObjectOf expects every child PIDL to be relative to the
+  // same parent folder. Passing children from unrelated folders can make Shell
+  // extensions read invalid PIDLs or expose commands for the wrong selection.
+  if (!HaveSameParent(out.pidls)) {
+    FreePidls(out.pidls);
+    return false;
   }
 
   Microsoft::WRL::ComPtr<IShellFolder> parent_folder;
@@ -344,6 +457,297 @@ bool InvokeShellCommand(HWND hwnd, IContextMenu* context_menu, UINT cmd,
   invoke.nShow = SW_SHOWNORMAL;
   return SUCCEEDED(context_menu->InvokeCommand(
       reinterpret_cast<LPCMINVOKECOMMANDINFO>(&invoke)));
+}
+
+std::wstring GetMenuLabel(HMENU menu, int index) {
+  int length =
+      GetMenuStringW(menu, static_cast<UINT>(index), nullptr, 0, MF_BYPOSITION);
+  if (length <= 0) {
+    return std::wstring();
+  }
+
+  std::wstring raw(static_cast<size_t>(length) + 1, L'\0');
+  int copied = GetMenuStringW(menu, static_cast<UINT>(index), raw.data(),
+                              length + 1, MF_BYPOSITION);
+  if (copied <= 0) {
+    return std::wstring();
+  }
+  raw.resize(static_cast<size_t>(copied));
+
+  const size_t tab = raw.find(L'\t');
+  if (tab != std::wstring::npos) {
+    raw.resize(tab);
+  }
+
+  std::wstring label;
+  label.reserve(raw.size());
+  for (size_t i = 0; i < raw.size(); ++i) {
+    if (raw[i] != L'&') {
+      label.push_back(raw[i]);
+      continue;
+    }
+    if (i + 1 < raw.size() && raw[i + 1] == L'&') {
+      label.push_back(L'&');
+      ++i;
+    }
+  }
+  return label;
+}
+
+void InitializeShellSubmenus(HWND hwnd, HMENU menu, int depth = 0) {
+  constexpr int kMaxDepth = 8;
+  if (!hwnd || !menu || depth > kMaxDepth) {
+    return;
+  }
+
+  const int count = GetMenuItemCount(menu);
+  for (int i = 0; i < count; ++i) {
+    MENUITEMINFOW mii{};
+    mii.cbSize = sizeof(mii);
+    mii.fMask = MIIM_SUBMENU;
+    if (!GetMenuItemInfoW(menu, static_cast<UINT>(i), TRUE, &mii) ||
+        !mii.hSubMenu) {
+      continue;
+    }
+
+    SendMessageW(hwnd, WM_INITMENUPOPUP,
+                 reinterpret_cast<WPARAM>(mii.hSubMenu),
+                 MAKELPARAM(static_cast<WORD>(i), FALSE));
+    InitializeShellSubmenus(hwnd, mii.hSubMenu, depth + 1);
+  }
+}
+
+std::vector<uint8_t> EncodeMenuBitmap(HBITMAP bitmap) {
+  constexpr INT_PTR kLastSystemMenuBitmap = 11;
+  if (!bitmap ||
+      reinterpret_cast<INT_PTR>(bitmap) <= kLastSystemMenuBitmap) {
+    return {};
+  }
+
+  BITMAP bitmap_info{};
+  if (GetObjectW(bitmap, sizeof(bitmap_info), &bitmap_info) == 0) {
+    return {};
+  }
+
+  const int width = bitmap_info.bmWidth;
+  const int height = std::abs(bitmap_info.bmHeight);
+  if (width <= 0 || height <= 0 || width > 256 || height > 256) {
+    return {};
+  }
+
+  const size_t pixel_size =
+      static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+  std::vector<uint8_t> pixels(pixel_size);
+
+  BITMAPINFO dib_info{};
+  dib_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  dib_info.bmiHeader.biWidth = width;
+  dib_info.bmiHeader.biHeight = -height;
+  dib_info.bmiHeader.biPlanes = 1;
+  dib_info.bmiHeader.biBitCount = 32;
+  dib_info.bmiHeader.biCompression = BI_RGB;
+
+  HDC screen_dc = GetDC(nullptr);
+  if (!screen_dc) {
+    return {};
+  }
+  const int copied_lines =
+      GetDIBits(screen_dc, bitmap, 0, static_cast<UINT>(height), pixels.data(),
+                &dib_info, DIB_RGB_COLORS);
+  ReleaseDC(nullptr, screen_dc);
+  if (copied_lines != height) {
+    return {};
+  }
+
+  bool has_alpha = false;
+  for (size_t i = 3; i < pixels.size(); i += 4) {
+    if (pixels[i] != 0) {
+      has_alpha = true;
+      break;
+    }
+  }
+  if (!has_alpha) {
+    for (size_t i = 3; i < pixels.size(); i += 4) {
+      pixels[i] = 0xFF;
+    }
+  }
+
+  BITMAPFILEHEADER file_header{};
+  file_header.bfType = 0x4D42;
+  file_header.bfOffBits =
+      sizeof(BITMAPFILEHEADER) + sizeof(BITMAPV4HEADER);
+  file_header.bfSize =
+      static_cast<DWORD>(file_header.bfOffBits + pixels.size());
+
+  BITMAPV4HEADER image_header{};
+  image_header.bV4Size = sizeof(BITMAPV4HEADER);
+  image_header.bV4Width = width;
+  image_header.bV4Height = -height;
+  image_header.bV4Planes = 1;
+  image_header.bV4BitCount = 32;
+  image_header.bV4V4Compression = BI_BITFIELDS;
+  image_header.bV4SizeImage = static_cast<DWORD>(pixels.size());
+  image_header.bV4RedMask = 0x00FF0000;
+  image_header.bV4GreenMask = 0x0000FF00;
+  image_header.bV4BlueMask = 0x000000FF;
+  image_header.bV4AlphaMask = 0xFF000000;
+  image_header.bV4CSType = LCS_sRGB;
+
+  std::vector<uint8_t> encoded(file_header.bfSize);
+  std::memcpy(encoded.data(), &file_header, sizeof(file_header));
+  std::memcpy(encoded.data() + sizeof(file_header), &image_header,
+              sizeof(image_header));
+  std::memcpy(encoded.data() + file_header.bfOffBits, pixels.data(),
+              pixels.size());
+  return encoded;
+}
+
+flutter::EncodableList EncodeShellMenuEntries(
+    HMENU menu,
+    UINT command_first,
+    UINT command_last,
+    std::set<UINT>& command_ids,
+    int depth = 0) {
+  constexpr int kMaxDepth = 8;
+  flutter::EncodableList entries;
+  if (!menu || depth > kMaxDepth) {
+    return entries;
+  }
+
+  const int count = GetMenuItemCount(menu);
+  for (int i = 0; i < count; ++i) {
+    MENUITEMINFOW mii{};
+    mii.cbSize = sizeof(mii);
+    mii.fMask =
+        MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_BITMAP;
+    if (!GetMenuItemInfoW(menu, static_cast<UINT>(i), TRUE, &mii)) {
+      continue;
+    }
+
+    if ((mii.fType & MFT_SEPARATOR) != 0) {
+      flutter::EncodableMap separator;
+      separator[flutter::EncodableValue("type")] =
+          flutter::EncodableValue("separator");
+      entries.emplace_back(separator);
+      continue;
+    }
+
+    const std::wstring label = GetMenuLabel(menu, i);
+    if (label.empty()) {
+      continue;
+    }
+
+    flutter::EncodableMap entry;
+    entry[flutter::EncodableValue("label")] =
+        flutter::EncodableValue(WideToUtf8(label));
+    entry[flutter::EncodableValue("enabled")] = flutter::EncodableValue(
+        (mii.fState & (MFS_DISABLED | MFS_GRAYED)) == 0);
+    entry[flutter::EncodableValue("checked")] =
+        flutter::EncodableValue((mii.fState & MFS_CHECKED) != 0);
+    std::vector<uint8_t> icon_bytes = EncodeMenuBitmap(mii.hbmpItem);
+    if (!icon_bytes.empty()) {
+      entry[flutter::EncodableValue("iconBytes")] =
+          flutter::EncodableValue(icon_bytes);
+    }
+
+    if (mii.hSubMenu) {
+      flutter::EncodableList children =
+          EncodeShellMenuEntries(mii.hSubMenu, command_first, command_last,
+                                 command_ids, depth + 1);
+      if (children.empty()) {
+        continue;
+      }
+      entry[flutter::EncodableValue("type")] =
+          flutter::EncodableValue("submenu");
+      entry[flutter::EncodableValue("children")] =
+          flutter::EncodableValue(children);
+      entries.emplace_back(entry);
+      continue;
+    }
+
+    if (mii.wID < command_first || mii.wID > command_last) {
+      continue;
+    }
+    entry[flutter::EncodableValue("type")] = flutter::EncodableValue("item");
+    entry[flutter::EncodableValue("commandId")] =
+        flutter::EncodableValue(static_cast<int32_t>(mii.wID));
+    command_ids.insert(mii.wID);
+    entries.emplace_back(entry);
+  }
+  return entries;
+}
+
+std::optional<flutter::EncodableMap> LoadThirdPartyShellMenu(
+    HWND hwnd,
+    const std::vector<std::wstring>& paths) {
+  ReleaseLoadedShellMenuSession();
+  if (!hwnd || paths.empty()) {
+    return std::nullopt;
+  }
+
+  auto session = std::make_unique<LoadedShellMenuSession>();
+  session->hwnd = hwnd;
+  if (!CreateShellMenuContext(hwnd, paths, session->shell)) {
+    return std::nullopt;
+  }
+
+  session->menu = CreatePopupMenu();
+  if (!session->menu) {
+    FreePidls(session->shell.pidls);
+    return std::nullopt;
+  }
+
+  if (!SetWindowSubclass(hwnd, ShellContextMenuSubclassProc,
+                         kShellContextMenuSubclassId,
+                         reinterpret_cast<DWORD_PTR>(&session->shell.state))) {
+    DestroyMenu(session->menu);
+    FreePidls(session->shell.pidls);
+    return std::nullopt;
+  }
+
+  constexpr UINT kCommandFirst = 1;
+  constexpr UINT kCommandLast = 0x7FFF;
+  UINT flags = CMF_NORMAL | CMF_EXPLORE;
+  if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+    flags |= CMF_EXTENDEDVERBS;
+  }
+
+  HRESULT hr = session->shell.context_menu->QueryContextMenu(
+      session->menu, 0, kCommandFirst, kCommandLast, flags);
+  if (FAILED(hr)) {
+    RemoveWindowSubclass(hwnd, ShellContextMenuSubclassProc,
+                         kShellContextMenuSubclassId);
+    DestroyMenu(session->menu);
+    FreePidls(session->shell.pidls);
+    return std::nullopt;
+  }
+
+  PruneShellItemsFromMenu(session->menu, session->shell.context_menu.Get(),
+                          kCommandFirst, kCommandLast);
+  InitializeShellSubmenus(hwnd, session->menu);
+  PruneShellItemsFromMenu(session->menu, session->shell.context_menu.Get(),
+                          kCommandFirst, kCommandLast);
+
+  flutter::EncodableList entries =
+      EncodeShellMenuEntries(session->menu, kCommandFirst, kCommandLast,
+                             session->command_ids);
+  RemoveWindowSubclass(hwnd, ShellContextMenuSubclassProc,
+                       kShellContextMenuSubclassId);
+
+  if (entries.empty() || session->command_ids.empty()) {
+    DestroyMenu(session->menu);
+    FreePidls(session->shell.pidls);
+    return std::nullopt;
+  }
+
+  session->id = std::to_string(g_next_shell_menu_session_id++);
+  flutter::EncodableMap response;
+  response[flutter::EncodableValue("sessionId")] =
+      flutter::EncodableValue(session->id);
+  response[flutter::EncodableValue("entries")] =
+      flutter::EncodableValue(entries);
+  g_loaded_shell_menu_session = std::move(session);
+  return response;
 }
 
 bool InvokeShellVerb(HWND hwnd,
@@ -689,7 +1093,9 @@ ShellContextMenuPlugin::ShellContextMenuPlugin(
     flutter::PluginRegistrarWindows* registrar)
     : registrar_(registrar) {}
 
-ShellContextMenuPlugin::~ShellContextMenuPlugin() = default;
+ShellContextMenuPlugin::~ShellContextMenuPlugin() {
+  ReleaseLoadedShellMenuSession();
+}
 
 void ShellContextMenuPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue>& method_call,
@@ -702,9 +1108,16 @@ void ShellContextMenuPlugin::HandleMethodCall(
       method_call.method_name().compare("showCombinedMenu") == 0;
   const bool is_invoke_verb =
       method_call.method_name().compare("invokeVerb") == 0;
+  const bool is_load_third_party_menu =
+      method_call.method_name().compare("loadThirdPartyMenu") == 0;
+  const bool is_invoke_context_menu_command =
+      method_call.method_name().compare("invokeContextMenuCommand") == 0;
+  const bool is_release_context_menu_session =
+      method_call.method_name().compare("releaseContextMenuSession") == 0;
 
   if (!is_show_shell_menu && !is_show_merged_menu && !is_show_combined_menu &&
-      !is_invoke_verb) {
+      !is_invoke_verb && !is_load_third_party_menu &&
+      !is_invoke_context_menu_command && !is_release_context_menu_session) {
     result->NotImplemented();
     return;
   }
@@ -719,6 +1132,59 @@ void ShellContextMenuPlugin::HandleMethodCall(
   HWND hwnd = nullptr;
   if (registrar_ && registrar_->GetView()) {
     hwnd = registrar_->GetView()->GetNativeWindow();
+  }
+
+  if (is_invoke_context_menu_command || is_release_context_menu_session) {
+    auto session_it =
+        arguments->find(flutter::EncodableValue("sessionId"));
+    const auto* session_id =
+        session_it == arguments->end()
+            ? nullptr
+            : std::get_if<std::string>(&session_it->second);
+    if (!session_id || session_id->empty()) {
+      result->Error("INVALID_ARGUMENTS",
+                    "'sessionId' must be a non-empty string.");
+      return;
+    }
+
+    const bool matches_active_session =
+        g_loaded_shell_menu_session &&
+        g_loaded_shell_menu_session->id == *session_id;
+    if (is_release_context_menu_session) {
+      if (matches_active_session) {
+        ReleaseLoadedShellMenuSession();
+      }
+      result->Success();
+      return;
+    }
+
+    auto command_it =
+        arguments->find(flutter::EncodableValue("commandId"));
+    UINT command_id = 0;
+    if (command_it != arguments->end()) {
+      if (const auto* value32 = std::get_if<int32_t>(&command_it->second)) {
+        if (*value32 > 0) {
+          command_id = static_cast<UINT>(*value32);
+        }
+      } else if (const auto* value64 =
+                     std::get_if<int64_t>(&command_it->second)) {
+        if (*value64 > 0 && *value64 <= 0xFFFFFFFFLL) {
+          command_id = static_cast<UINT>(*value64);
+        }
+      }
+    }
+
+    bool invoked = false;
+    if (matches_active_session && command_id > 0 &&
+        g_loaded_shell_menu_session->command_ids.find(command_id) !=
+            g_loaded_shell_menu_session->command_ids.end()) {
+      invoked = InvokeShellCommand(
+          g_loaded_shell_menu_session->hwnd,
+          g_loaded_shell_menu_session->shell.context_menu.Get(), command_id, 1);
+      ReleaseLoadedShellMenuSession();
+    }
+    result->Success(flutter::EncodableValue(invoked));
+    return;
   }
 
   auto paths_it = arguments->find(flutter::EncodableValue("paths"));
@@ -745,6 +1211,16 @@ void ShellContextMenuPlugin::HandleMethodCall(
   }
 
   std::optional<POINT> screen_point = GetScreenPointFromArgs(hwnd, *arguments);
+
+  if (is_load_third_party_menu) {
+    auto response = LoadThirdPartyShellMenu(hwnd, paths);
+    if (response.has_value()) {
+      result->Success(flutter::EncodableValue(response.value()));
+    } else {
+      result->Success(flutter::EncodableValue());
+    }
+    return;
+  }
 
   if (is_invoke_verb) {
     auto verb_it = arguments->find(flutter::EncodableValue("verb"));
