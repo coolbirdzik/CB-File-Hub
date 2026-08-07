@@ -1,3 +1,4 @@
+import '../app_insights/app_insights_models.dart';
 import 'cleaner_models.dart';
 
 /// Declarative table of all junk categories the cleaner knows about.
@@ -53,29 +54,53 @@ class CleanerCategories {
         CleanerPathRule(
           source: PathSource.env(
               'LOCALAPPDATA', r'Microsoft\Edge\User Data\Default\Cache'),
+          appOwnerHints: <String>['Microsoft Edge', 'msedge.exe'],
+          storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
           source: PathSource.env(
               'LOCALAPPDATA', r'Microsoft\Edge\User Data\Default\Code Cache'),
+          appOwnerHints: <String>['Microsoft Edge', 'msedge.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
+        CleanerPathRule(
+          source: PathSource.env(
+              'LOCALAPPDATA', r'Microsoft\Edge\User Data\Default\GPUCache'),
+          appOwnerHints: <String>['Microsoft Edge', 'msedge.exe'],
+          storageKind: AppStorageKind.cache,
         ),
         // Chrome
         CleanerPathRule(
           source: PathSource.env(
               'LOCALAPPDATA', r'Google\Chrome\User Data\Default\Cache'),
+          appOwnerHints: <String>['Google Chrome', 'chrome.exe'],
+          storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
           source: PathSource.env(
               'LOCALAPPDATA', r'Google\Chrome\User Data\Default\Code Cache'),
+          appOwnerHints: <String>['Google Chrome', 'chrome.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
+        CleanerPathRule(
+          source: PathSource.env(
+              'LOCALAPPDATA', r'Google\Chrome\User Data\Default\GPUCache'),
+          appOwnerHints: <String>['Google Chrome', 'chrome.exe'],
+          storageKind: AppStorageKind.cache,
         ),
         // Brave
         CleanerPathRule(
           source: PathSource.env('LOCALAPPDATA',
               r'BraveSoftware\Brave-Browser\User Data\Default\Cache'),
+          appOwnerHints: <String>['Brave', 'Brave Browser', 'brave.exe'],
+          storageKind: AppStorageKind.cache,
         ),
         // Opera
         CleanerPathRule(
           source:
               PathSource.env('APPDATA', r'Opera Software\Opera Stable\Cache'),
+          appOwnerHints: <String>['Opera', 'opera.exe'],
+          storageKind: AppStorageKind.cache,
         ),
         // Firefox cache2 lives under Profiles\<random>.default\cache2
         // The scanner will recurse so pointing at the parent is enough.
@@ -130,30 +155,92 @@ class CleanerCategories {
       defaultEnabled: true,
       rules: [
         // Discord
-        CleanerPathRule(source: PathSource.env('APPDATA', r'discord\Cache')),
         CleanerPathRule(
-            source: PathSource.env('APPDATA', r'discord\Code Cache')),
+          source: PathSource.env('APPDATA', r'discord\Cache'),
+          appOwnerHints: <String>['Discord', 'discord.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'discord\Code Cache'),
+          appOwnerHints: <String>['Discord', 'discord.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
         // Spotify
         CleanerPathRule(
-            source: PathSource.env('LOCALAPPDATA', r'Spotify\Storage')),
+          source: PathSource.env('LOCALAPPDATA', r'Spotify\Storage'),
+          appOwnerHints: <String>['Spotify', 'spotify.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
         CleanerPathRule(
-            source: PathSource.env('LOCALAPPDATA', r'Spotify\Data')),
+          source: PathSource.env('LOCALAPPDATA', r'Spotify\Data'),
+          appOwnerHints: <String>['Spotify', 'spotify.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
         // Teams (new + classic)
         CleanerPathRule(
           source: PathSource.env(
               'APPDATA', r'Microsoft\Teams\Service Worker\CacheStorage'),
+          appOwnerHints: <String>[
+            'Microsoft Teams',
+            'ms-teams.exe',
+            'teams.exe',
+          ],
+          storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
-            source: PathSource.env('APPDATA', r'Microsoft\Teams\Cache')),
+          source: PathSource.env('APPDATA', r'Microsoft\Teams\Cache'),
+          appOwnerHints: <String>[
+            'Microsoft Teams',
+            'ms-teams.exe',
+            'teams.exe',
+          ],
+          storageKind: AppStorageKind.cache,
+        ),
         // VSCode
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Code\Cache')),
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Code\CachedData')),
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Code\Code Cache')),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'Code\Cache'),
+          appOwnerHints: <String>[
+            'Microsoft Visual Studio Code',
+            'Visual Studio Code',
+            'code.exe',
+          ],
+          storageKind: AppStorageKind.cache,
+        ),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'Code\CachedData'),
+          appOwnerHints: <String>[
+            'Microsoft Visual Studio Code',
+            'Visual Studio Code',
+            'code.exe',
+          ],
+          storageKind: AppStorageKind.cache,
+        ),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'Code\Code Cache'),
+          appOwnerHints: <String>[
+            'Microsoft Visual Studio Code',
+            'Visual Studio Code',
+            'code.exe',
+          ],
+          storageKind: AppStorageKind.cache,
+        ),
         // Slack
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Slack\Cache')),
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Slack\Code Cache')),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'Slack\Cache'),
+          appOwnerHints: <String>['Slack', 'slack.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'Slack\Code Cache'),
+          appOwnerHints: <String>['Slack', 'slack.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
         // Zoom
-        CleanerPathRule(source: PathSource.env('APPDATA', r'Zoom\data')),
+        CleanerPathRule(
+          source: PathSource.env('APPDATA', r'Zoom\data'),
+          appOwnerHints: <String>['Zoom', 'Zoom Workplace', 'zoom.exe'],
+          storageKind: AppStorageKind.cache,
+        ),
       ],
     ),
 

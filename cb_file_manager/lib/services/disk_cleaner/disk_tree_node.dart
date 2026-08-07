@@ -134,6 +134,30 @@ class FullDiskScanProgress {
   });
 }
 
+/// Why a path was not measured completely during a full-disk scan.
+enum FullDiskScanCoverageIssueReason {
+  inaccessible,
+  maxDepthReached,
+  reparsePoint,
+  cancelled,
+  scanInProgress,
+}
+
+/// A path whose size is absent or incomplete in a [FullDiskScanResult].
+class FullDiskScanCoverageIssue {
+  final String path;
+  final FullDiskScanCoverageIssueReason reason;
+
+  /// Optional native error code or a short diagnostic intended for logs.
+  final String? detail;
+
+  const FullDiskScanCoverageIssue({
+    required this.path,
+    required this.reason,
+    this.detail,
+  });
+}
+
 /// Result of a full disk scan.
 class FullDiskScanResult {
   /// Root node of the tree (the drive root, e.g. C:\).
@@ -143,11 +167,20 @@ class FullDiskScanResult {
   final Duration duration;
 
   /// Directories that could not be accessed (permission denied, etc.).
+  ///
+  /// Kept for compatibility with existing Cleaner consumers. New code should
+  /// use [coverageIssues], which also describes depth and reparse-point gaps.
   final List<String> inaccessible;
+
+  /// Every known gap in the final tree's measurement coverage.
+  final List<FullDiskScanCoverageIssue> coverageIssues;
 
   const FullDiskScanResult({
     required this.root,
     required this.duration,
-    required this.inaccessible,
+    this.inaccessible = const <String>[],
+    this.coverageIssues = const <FullDiskScanCoverageIssue>[],
   });
+
+  bool get isPartial => inaccessible.isNotEmpty || coverageIssues.isNotEmpty;
 }

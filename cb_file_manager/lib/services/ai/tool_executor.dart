@@ -9,6 +9,7 @@ import '../album_service.dart';
 import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
+import 'cleaner_scan_registry.dart';
 import 'disk_cleaner_skill.dart';
 import '../video_library_service.dart';
 
@@ -73,6 +74,7 @@ class ToolExecutor {
     'clean_disk_junk',
     'get_pending_cleanup_review',
     'get_current_cleaner_scan',
+    'get_current_app_storage',
   };
 
   static const _toolAliases = {
@@ -264,6 +266,8 @@ class ToolExecutor {
           return _getPendingCleanupReview(call.arguments);
         case 'get_current_cleaner_scan':
           return _getCurrentCleanerScan(call.arguments);
+        case 'get_current_app_storage':
+          return _getCurrentAppStorage(call.arguments);
         default:
           return ToolResult(
             toolName: call.name,
@@ -1226,9 +1230,33 @@ class ToolExecutor {
   // Disk Cleaner skill tools
   // ---------------------------------------------------------------------------
 
-  /// In-memory cache of scan results keyed by scan_id. LRU eviction at 5.
-  static final Map<String, _CachedScan> _scanCache = {};
-  static const int _maxScanCacheSize = 5;
+  /// In-memory cache of scan results keyed by scan_id and isolated by tab.
+  static final CleanerScanRegistry _scanRegistry = CleanerScanRegistry();
+
+  ToolCall normalizeCall(ToolCall call) {
+    if (call.name != 'scan_disk_junk' && call.name != 'clean_disk_junk') {
+      return call;
+    }
+
+    final arguments = Map<String, dynamic>.from(call.arguments);
+    final normalizedCategories =
+        _normalizeCleanerCategories(arguments['categories']);
+    if (normalizedCategories != null) {
+      arguments['categories'] = normalizedCategories;
+    }
+
+    if (call.name == 'clean_disk_junk') {
+      final resolvedScanId = _scanRegistry.resolveId(
+        arguments['scan_id'],
+        ownerTabId: ownerTabId,
+      );
+      if (resolvedScanId != null) {
+        arguments['scan_id'] = resolvedScanId;
+      }
+    }
+
+    return ToolCall(name: call.name, arguments: arguments);
+  }
 
   Future<ToolResult> _listDiskJunkCategories(Map<String, dynamic> args) async {
     if (!Platform.isWindows) {
@@ -1305,8 +1333,13 @@ class ToolExecutor {
       );
     }
 
+    final normalizedArgs = normalizeCall(ToolCall(
+      name: 'scan_disk_junk',
+      arguments: args,
+    )).arguments;
+
     // Parse arguments
-    final drivesArg = args['drives'];
+    final drivesArg = normalizedArgs['drives'];
     final List<String> drives;
     if (drivesArg is List) {
       drives = drivesArg.map((e) => e.toString()).toList();
@@ -1314,7 +1347,7 @@ class ToolExecutor {
       drives = const ['C:\\'];
     }
 
-    final categoriesArg = args['categories'];
+    final categoriesArg = normalizedArgs['categories'];
     final List<String> categories;
     if (categoriesArg is List) {
       categories = categoriesArg.map((e) => e.toString()).toList();
@@ -1354,7 +1387,11 @@ class ToolExecutor {
       // Generate scan_id and cache the report
       final scanId =
           'sc_${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
-      _cacheScan(scanId, report);
+      _scanRegistry.store(
+        scanId,
+        report,
+        ownerTabId: ownerTabId,
+      );
 
       // Build output
       final buffer = StringBuffer();
@@ -1411,27 +1448,32 @@ class ToolExecutor {
       );
     }
 
-    final scanId = args['scan_id'] as String? ?? '';
-    if (scanId.isEmpty) {
-      return const ToolResult(
-        toolName: 'clean_disk_junk',
-        output: 'Error: "scan_id" argument required. Run scan_disk_junk first.',
-        success: false,
-      );
-    }
-
-    final cached = _scanCache[scanId];
+    final normalizedCall = normalizeCall(ToolCall(
+      name: 'clean_disk_junk',
+      arguments: args,
+    ));
+    final normalizedArgs = normalizedCall.arguments;
+    final scanId = _scanRegistry.resolveId(
+      normalizedArgs['scan_id'],
+      ownerTabId: ownerTabId,
+    );
+    final cached = scanId == null ? null : _scanRegistry[scanId];
     if (cached == null) {
-      return const ToolResult(
+      final requestedScanId =
+          normalizedArgs['scan_id']?.toString().trim() ?? '';
+      final usedPlaceholder =
+          CleanerScanRegistry.isPlaceholder(requestedScanId);
+      return ToolResult(
         toolName: 'clean_disk_junk',
-        output:
-            'Error: scan_id not found or expired. Run scan_disk_junk again.',
+        output: usedPlaceholder
+            ? 'Error: No current junk scan is available. Run scan_disk_junk first.'
+            : 'Error: scan_id not found, expired, or belongs to another tab. Run scan_disk_junk again.',
         success: false,
       );
     }
 
     // Filter by categories if specified
-    final categoriesArg = args['categories'];
+    final categoriesArg = normalizedArgs['categories'];
     final List<String>? filterCategories;
     if (categoriesArg is List && categoriesArg.isNotEmpty) {
       filterCategories = categoriesArg.map((e) => e.toString()).toList();
@@ -1439,8 +1481,8 @@ class ToolExecutor {
       filterCategories = null;
     }
 
-    final permanent = args['permanent'] as bool? ?? false;
-    final maxItems = args['max_items'] as int? ?? 10000;
+    final permanent = normalizedArgs['permanent'] as bool? ?? false;
+    final maxItems = normalizedArgs['max_items'] as int? ?? 10000;
 
     // Collect items to clean
     var items = cached.report.allItems;
@@ -1492,7 +1534,7 @@ class ToolExecutor {
       }
 
       // Remove from cache after successful clean
-      _scanCache.remove(scanId);
+      _scanRegistry.remove(scanId!);
 
       return ToolResult(
         toolName: 'clean_disk_junk',
@@ -1703,6 +1745,171 @@ class ToolExecutor {
     );
   }
 
+  ToolResult _getCurrentAppStorage(Map<String, dynamic> args) {
+    final service = DiskCleanerService.instance;
+    final context = service.getCleanerScanContext(ownerTabId: ownerTabId);
+    final report = context?.appStorageReport;
+    if (context == null || report == null) {
+      return const ToolResult(
+        toolName: 'get_current_app_storage',
+        output:
+            'No App Insights report is available for this Cleaner tab. Ask the user to finish a disk scan and open the Apps view first.',
+      );
+    }
+    if (!context.appInsightsSharedWithAgent) {
+      return const ToolResult(
+        toolName: 'get_current_app_storage',
+        output:
+            'App Insights has not been shared with CB Agent. Ask the user to click Ask CB Agent in the Apps view.',
+      );
+    }
+
+    final filter = (args['filter'] as String? ?? 'all').toLowerCase();
+    final requestedAppId = (args['app_id'] as String?)?.trim();
+    final maxApps = (args['max_apps'] as int?)?.clamp(1, 50) ?? 20;
+    final wantsPaths = args['include_paths'] as bool? ?? false;
+    final mayIncludePaths = wantsPaths &&
+        requestedAppId != null &&
+        requestedAppId.isNotEmpty &&
+        requestedAppId == context.selectedAppId;
+    const staleThreshold = Duration(days: 180);
+    const largeThresholdBytes = 1024 * 1024 * 1024;
+    final now = DateTime.now();
+
+    var profiles = report.apps.toList(growable: false);
+    if (requestedAppId != null && requestedAppId.isNotEmpty) {
+      profiles = profiles
+          .where((profile) => profile.app.id == requestedAppId)
+          .toList(growable: false);
+    } else {
+      switch (filter) {
+        case 'large':
+          profiles = profiles
+              .where(
+                (profile) => profile.bestKnownSizeBytes >= largeThresholdBytes,
+              )
+              .toList(growable: false);
+          break;
+        case 'stale':
+          profiles = profiles
+              .where(
+                (profile) => profile.isStale(
+                  now: now,
+                  threshold: staleThreshold,
+                ),
+              )
+              .toList(growable: false);
+          break;
+        case 'cleanable':
+          profiles = profiles
+              .where((profile) => profile.cleanableBytes > 0)
+              .toList(growable: false);
+          break;
+        case 'all':
+          break;
+        default:
+          return ToolResult(
+            toolName: 'get_current_app_storage',
+            output:
+                'Invalid filter "$filter". Use all, large, stale, or cleanable.',
+            success: false,
+          );
+      }
+    }
+
+    profiles.sort(
+      (a, b) => b.bestKnownSizeBytes.compareTo(a.bestKnownSizeBytes),
+    );
+
+    final staleCount = report.apps
+        .where(
+          (profile) => profile.isStale(
+            now: now,
+            threshold: staleThreshold,
+          ),
+        )
+        .length;
+    final largeCount = report.apps
+        .where(
+          (profile) => profile.bestKnownSizeBytes >= largeThresholdBytes,
+        )
+        .length;
+
+    final buffer = StringBuffer();
+    buffer.writeln('CURRENT CLEANER APP STORAGE');
+    buffer.writeln('Drive: ${report.drivePath}');
+    buffer.writeln('Generated: ${report.generatedAt.toIso8601String()}');
+    buffer.writeln('Coverage: ${report.isPartial ? "partial" : "complete"}');
+    buffer.writeln(
+      'Apps: ${report.apps.length}; confirmed footprint: ${_formatSize(report.confirmedSizeBytes)}; '
+      'large: $largeCount; not seen for 180+ days: $staleCount; '
+      'cleanable app data: ${_formatSize(report.cleanableBytes)}',
+    );
+    buffer.writeln(
+      'Last-opened values are local Windows evidence estimates. Unknown means no reliable evidence was found.',
+    );
+
+    if (profiles.isEmpty) {
+      buffer.writeln('No apps match the requested filter.');
+    } else {
+      buffer.writeln();
+      buffer.writeln('Matching apps:');
+      for (final profile in profiles.take(maxApps)) {
+        final app = profile.app;
+        final usage = profile.usage;
+        final lastOpenedAt = usage.lastOpenedAt;
+        final lastOpened = lastOpenedAt == null || lastOpenedAt.isAfter(now)
+            ? 'unknown'
+            : '${now.difference(lastOpenedAt).inDays} days ago '
+                '(${usage.source?.name ?? "unknown"}, ${usage.confidence?.name ?? "unknown"})';
+        final possible = profile.possibleSizeBytes > 0
+            ? ', possible=${_formatSize(profile.possibleSizeBytes)}'
+            : '';
+        final cleanable = profile.cleanableBytes > 0
+            ? ', cleanable=${_formatSize(profile.cleanableBytes)}'
+            : '';
+        buffer.writeln(
+          '- ${app.displayName} [id=${app.id}, source=${app.source.name}, '
+          'size=${_formatSize(profile.bestKnownSizeBytes)}, quality=${profile.measurementQuality.name}$possible$cleanable, '
+          'last_opened=$lastOpened]',
+        );
+        for (final entry in profile.entries) {
+          final description =
+              '${entry.kind.name}: ${_formatSize(entry.sizeBytes)} '
+              '[${entry.attributionConfidence.name}, ${entry.measurementQuality.name}${entry.isCleanable ? ", cleanable" : ""}]';
+          if (mayIncludePaths) {
+            buffer.writeln('  - $description ${entry.path}');
+          } else {
+            buffer.writeln('  - $description');
+          }
+        }
+      }
+      if (profiles.length > maxApps) {
+        buffer.writeln('... ${profiles.length - maxApps} more matching apps');
+      }
+    }
+
+    if (report.sharedOrUnattributed.isNotEmpty) {
+      final sharedBytes = report.sharedOrUnattributed.fold<int>(
+        0,
+        (sum, entry) => sum + entry.sizeBytes,
+      );
+      buffer.writeln();
+      buffer.writeln(
+        'Shared or unattributed large folders: ${report.sharedOrUnattributed.length}, ${_formatSize(sharedBytes)}. '
+        'They are informational and never cleanup targets.',
+      );
+    }
+    if (report.warnings.isNotEmpty) {
+      buffer.writeln('Warnings: ${report.warnings.join("; ")}');
+    }
+
+    return ToolResult(
+      toolName: 'get_current_app_storage',
+      output: _truncate(buffer.toString().trim()),
+    );
+  }
+
   DiskTreeNode? _findDiskTreeNode(DiskTreeNode root, String path) {
     if (root.fullPath == path) return root;
     for (final child in root.children) {
@@ -1769,11 +1976,27 @@ class ToolExecutor {
     return '${segments[0]}\\${segments[1]}\\${segments[2]}';
   }
 
-  static void _cacheScan(String scanId, ScanReport report) {
-    if (_scanCache.length >= _maxScanCacheSize) {
-      _scanCache.remove(_scanCache.keys.first);
+  static List<String>? _normalizeCleanerCategories(Object? value) {
+    if (value is! List) return null;
+
+    final normalized = <String>[];
+    void add(String category) {
+      if (!normalized.contains(category)) {
+        normalized.add(category);
+      }
     }
-    _scanCache[scanId] = _CachedScan(report: report);
+
+    for (final raw in value) {
+      final category = raw.toString().trim().toLowerCase();
+      if (category == 'cache') {
+        add('browser_cache');
+        add('thumbnail_cache');
+        add('app_cache');
+      } else if (category.isNotEmpty) {
+        add(category);
+      }
+    }
+    return normalized;
   }
 
   // ---------------------------------------------------------------------------
@@ -1915,12 +2138,6 @@ call:tool_call, unquoted keys, or invented tool names.
 - When done, respond with normal text (NO tool_call blocks).
 ${DiskCleanerSkill.isAvailable ? DiskCleanerSkill.skillBlock : ''}
 ''';
-}
-
-class _CachedScan {
-  final ScanReport report;
-  final DateTime cachedAt;
-  _CachedScan({required this.report}) : cachedAt = DateTime.now();
 }
 
 class _RootStat {

@@ -38,11 +38,16 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
   // Completer for pausing execution while waiting for user approval
   Completer<bool>? _approvalCompleter;
+  int _generationSequence = 0;
+  int? _activeGenerationId;
+  StreamSubscription<String>? _activeStreamSubscription;
+  Completer<void>? _activeStreamCompleter;
 
   AiAgentBloc({
     required AiProviderService providerService,
     AiChatHistoryService? historyService,
     LocalAiAdvisorService? localAiService,
+    ToolExecutor? toolExecutor,
     String? ownerTabId,
     List<String> thinkingPhrases = const ['Thinking...'],
     String waitingApproval = 'Waiting for your approval...',
@@ -50,18 +55,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   })  : _providerService = providerService,
         _historyService = historyService,
         _localAiService = localAiService,
-        _toolExecutor = ToolExecutor(ownerTabId: ownerTabId),
+        _toolExecutor = toolExecutor ?? ToolExecutor(ownerTabId: ownerTabId),
         super(AiAgentState(
           thinkingPhrases: thinkingPhrases,
           waitingApproval: waitingApproval,
           runningToolTemplate: runningToolTemplate,
         )) {
     on<InitializeAiAgent>(_onInitialize);
-    // SendMessage uses concurrent transformer so ApproveAction/RejectAction
-    // can fire while SendMessage is awaiting user approval.
-    on<SendMessage>(_onSendMessage,
-        transformer: (events, mapper) =>
-            events.asyncExpand(mapper)); // concurrent with others
+    on<SendMessage>(_onSendMessage);
+    on<StopGeneration>(_onStopGeneration);
     on<ClearChat>(_onClearChat);
     on<EditMessage>(_onEditMessage);
     on<ChangeSearchScope>(_onChangeSearchScope);
@@ -166,9 +168,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     Emitter<AiAgentState> emit,
   ) async {
     if (event.message.trim().isEmpty && event.referencedFiles.isEmpty) return;
+    if (state.isLoading) return;
+
+    final generationId = ++_generationSequence;
+    _activeGenerationId = generationId;
 
     if (_isLocalAiSelected()) {
-      await _onLocalAiSendMessage(event, emit);
+      await _onLocalAiSendMessage(event, emit, generationId);
       return;
     }
 
@@ -209,6 +215,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           ? state.thinkingPhrases[0]
           : 'Thinking...',
       clearToolActivity: true,
+      clearCurrentToolCalls: true,
+      clearApproval: true,
     ));
 
     try {
@@ -250,6 +258,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           preferredProviderId: state.selectedProviderId,
           preferredModelName: state.selectedModelName,
         );
+        _ensureGenerationActive(generationId);
 
         final responseText = result.response.content;
 
@@ -264,6 +273,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             activity: activity,
             systemPrompt: systemPrompt,
             providerId: result.providerId,
+            generationId: generationId,
           );
           return; // Done
         }
@@ -272,7 +282,9 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         // If hasToolCalls() returned true but parsing yields nothing, the LLM
         // produced a malformed block - display the stripped content directly
         // without re-querying (to avoid infinite loops).
-        final calls = ToolExecutor.parseToolCalls(responseText);
+        final calls = ToolExecutor.parseToolCalls(responseText)
+            .map(_toolExecutor.normalizeCall)
+            .toList(growable: false);
         if (calls.isEmpty) {
           final displayContent =
               _stripJsonBlocks(_stripToolCallTags(responseText));
@@ -337,6 +349,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           emit(state.copyWith(toolActivity: List.of(activity)));
 
           final approved = await _requestApproval(emit, combinedRequest);
+          _ensureGenerationActive(generationId);
 
           if (!approved) {
             activity.add('  Rejected: User rejected all actions');
@@ -367,7 +380,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           activity.add('  Approved: All actions approved');
           emit(state.copyWith(
             toolActivity: List.of(activity),
-            clearThinking: true,
+            thinkingText: state.runningToolTemplate
+                .replaceFirst('{}', dangerousCalls.first.name),
           ));
         }
 
@@ -377,17 +391,24 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           // Skip dangerous tools - already handled above
           if (ToolExecutor.dangerousTools.contains(call.name)) {
             activity.add('  Approved: ${call.name} (pre-approved)');
-            emit(state.copyWith(toolActivity: List.of(activity)));
+            _addRunningToolCall(allToolCalls, call);
+            emit(state.copyWith(
+              thinkingText:
+                  state.runningToolTemplate.replaceFirst('{}', call.name),
+              toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls),
+            ));
 
             // Execute the dangerous tool without asking again
             final toolResult = await _toolExecutor.execute(call);
+            _ensureGenerationActive(generationId);
 
-            allToolCalls.add(AiToolCall(
-              toolName: call.name,
-              arguments: jsonEncode(call.arguments),
-              result: toolResult.output,
+            _completeRunningToolCall(
+              allToolCalls,
+              call,
+              output: toolResult.output,
               success: toolResult.success,
-            ));
+            );
 
             activity.add(
                 '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
@@ -408,9 +429,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             thinkingText:
                 state.runningToolTemplate.replaceFirst('{}', call.name),
             toolActivity: List.of(activity),
+            currentToolCalls: List.of(allToolCalls)
+              ..add(_runningToolCall(call)),
           ));
 
           final toolResult = await _toolExecutor.execute(call);
+          _ensureGenerationActive(generationId);
 
           allToolCalls.add(AiToolCall(
             toolName: call.name,
@@ -463,8 +487,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         activity: activity,
         systemPrompt: systemPrompt,
         providerId: null, // resolved inside helper
+        generationId: generationId,
       );
+    } on _GenerationStopped {
+      return;
     } on AiProviderException catch (e) {
+      if (_activeGenerationId != generationId) return;
       AppLogger.warning('[AiAgentBloc] Chat failed: ${e.message}');
       emit(state.copyWith(
         isLoading: false,
@@ -473,6 +501,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         toolActivity: List.of(activity),
       ));
     } catch (e) {
+      if (_activeGenerationId != generationId) return;
       AppLogger.error('[AiAgentBloc] Unexpected error', error: e);
       emit(state.copyWith(
         isLoading: false,
@@ -486,6 +515,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   Future<void> _onLocalAiSendMessage(
     SendMessage event,
     Emitter<AiAgentState> emit,
+    int generationId,
   ) async {
     final localService = _localAiService;
     if (localService == null) {
@@ -528,6 +558,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           ? state.thinkingPhrases[0]
           : 'Thinking...',
       clearToolActivity: true,
+      clearCurrentToolCalls: true,
+      clearApproval: true,
       activeProviderId: _localAiProviderId,
     ));
 
@@ -571,6 +603,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           role: AiMessageRole.assistant,
           content: '',
           timestamp: DateTime.now(),
+          toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
           isLoading: true,
         );
         emit(state.copyWith(
@@ -581,48 +614,52 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         ));
 
         final rawBuffer = StringBuffer();
-        await for (final chunk in localService.sendChatMessageStream(
-          message: localPrompt,
-          systemPrompt: preparedContext.systemPrompt,
-        )) {
-          // Status messages from GGUF runtime are prefixed with [STATUS].
-          if (chunk.startsWith('[STATUS]')) {
-            final statusText = chunk.substring(8); // Remove "[STATUS]" prefix
-            emit(state.copyWith(
-              thinkingText: statusText,
-              messages: [...uiMessages, streamingMsg],
-              activeProviderId: _localAiProviderId,
-            ));
-            continue;
-          }
+        await _consumeGenerationStream(
+          generationId: generationId,
+          stream: localService.sendChatMessageStream(
+            message: localPrompt,
+            systemPrompt: preparedContext.systemPrompt,
+          ),
+          onChunk: (chunk) {
+            // Status messages from GGUF runtime are prefixed with [STATUS].
+            if (chunk.startsWith('[STATUS]')) {
+              final statusText = chunk.substring(8); // Remove "[STATUS]" prefix
+              emit(state.copyWith(
+                thinkingText: statusText,
+                messages: [...uiMessages, streamingMsg],
+                activeProviderId: _localAiProviderId,
+              ));
+              return;
+            }
 
-          rawBuffer.write(chunk);
-          final displayText = _stripJsonBlocks(
-            _stripToolCallTagsStreaming(rawBuffer.toString()),
-          );
-          // While the model is only emitting a tool call (no visible prose),
-          // displayText is empty. Don't show an empty bubble that would flash
-          // and disappear when the round resolves into a tool call; keep the
-          // thinking indicator instead.
-          if (displayText.isEmpty) {
+            rawBuffer.write(chunk);
+            final displayText = _stripJsonBlocks(
+              _stripToolCallTagsStreaming(rawBuffer.toString()),
+            );
+            // While the model is only emitting a tool call (no visible prose),
+            // displayText is empty. Don't show an empty bubble that would flash
+            // and disappear when the round resolves into a tool call; keep the
+            // thinking indicator instead.
+            if (displayText.isEmpty) {
+              emit(state.copyWith(
+                messages: uiMessages,
+                activeProviderId: _localAiProviderId,
+              ));
+              return;
+            }
             emit(state.copyWith(
-              messages: uiMessages,
+              messages: [
+                ...uiMessages,
+                streamingMsg.copyWith(
+                  content: displayText,
+                  isLoading: true,
+                ),
+              ],
+              clearThinking: true,
               activeProviderId: _localAiProviderId,
             ));
-            continue;
-          }
-          emit(state.copyWith(
-            messages: [
-              ...uiMessages,
-              streamingMsg.copyWith(
-                content: displayText,
-                isLoading: true,
-              ),
-            ],
-            clearThinking: true,
-            activeProviderId: _localAiProviderId,
-          ));
-        }
+          },
+        );
 
         final responseText = rawBuffer.toString();
         if (!ToolExecutor.hasToolCalls(responseText)) {
@@ -660,7 +697,9 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           return;
         }
 
-        final calls = ToolExecutor.parseToolCalls(responseText);
+        final calls = ToolExecutor.parseToolCalls(responseText)
+            .map(_toolExecutor.normalizeCall)
+            .toList(growable: false);
         if (calls.isEmpty) {
           final displayContent =
               _stripJsonBlocks(_stripToolCallTags(responseText));
@@ -738,6 +777,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           emit(state.copyWith(toolActivity: List.of(activity)));
 
           final approved = await _requestApproval(emit, combinedRequest);
+          _ensureGenerationActive(generationId);
           if (!approved) {
             activity.add('  Rejected: User rejected all actions');
             emit(state.copyWith(
@@ -765,7 +805,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           activity.add('  Approved: All actions approved');
           emit(state.copyWith(
             toolActivity: List.of(activity),
-            clearThinking: true,
+            thinkingText: state.runningToolTemplate
+                .replaceFirst('{}', dangerousCalls.first.name),
           ));
         }
 
@@ -773,7 +814,14 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         for (final call in calls) {
           if (ToolExecutor.dangerousTools.contains(call.name)) {
             activity.add('  Approved: ${call.name} (pre-approved)');
-            emit(state.copyWith(toolActivity: List.of(activity)));
+            _addRunningToolCall(allToolCalls, call);
+            emit(state.copyWith(
+              messages: updatedUiMessages,
+              thinkingText:
+                  state.runningToolTemplate.replaceFirst('{}', call.name),
+              toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls),
+            ));
           } else {
             activity
                 .add('> Tool: ${call.name}(${_summarizeArgs(call.arguments)})');
@@ -782,17 +830,29 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
               thinkingText:
                   state.runningToolTemplate.replaceFirst('{}', call.name),
               toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls)
+                ..add(_runningToolCall(call)),
             ));
           }
 
           final toolResult = await _toolExecutor.execute(call);
+          _ensureGenerationActive(generationId);
 
-          allToolCalls.add(AiToolCall(
-            toolName: call.name,
-            arguments: jsonEncode(call.arguments),
-            result: toolResult.output,
-            success: toolResult.success,
-          ));
+          if (ToolExecutor.dangerousTools.contains(call.name)) {
+            _completeRunningToolCall(
+              allToolCalls,
+              call,
+              output: toolResult.output,
+              success: toolResult.success,
+            );
+          } else {
+            allToolCalls.add(AiToolCall(
+              toolName: call.name,
+              arguments: jsonEncode(call.arguments),
+              result: toolResult.output,
+              success: toolResult.success,
+            ));
+          }
 
           activity.add(
               '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
@@ -840,6 +900,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         role: AiMessageRole.assistant,
         content: '',
         timestamp: DateTime.now(),
+        toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
         isLoading: true,
       );
       emit(state.copyWith(
@@ -849,24 +910,29 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       ));
 
       final rawBuffer = StringBuffer();
-      await for (final chunk in localService.sendChatMessageStream(
-        message: localPrompt,
-        systemPrompt: preparedContext.systemPrompt,
-      )) {
-        rawBuffer.write(chunk);
-        final displayText =
-            _stripJsonBlocks(_stripToolCallTagsStreaming(rawBuffer.toString()));
-        emit(state.copyWith(
-          messages: [
-            ...uiMessages,
-            streamingMsg.copyWith(
-              content: displayText,
-              isLoading: true,
-            ),
-          ],
-          activeProviderId: _localAiProviderId,
-        ));
-      }
+      await _consumeGenerationStream(
+        generationId: generationId,
+        stream: localService.sendChatMessageStream(
+          message: localPrompt,
+          systemPrompt: preparedContext.systemPrompt,
+        ),
+        onChunk: (chunk) {
+          rawBuffer.write(chunk);
+          final displayText = _stripJsonBlocks(
+            _stripToolCallTagsStreaming(rawBuffer.toString()),
+          );
+          emit(state.copyWith(
+            messages: [
+              ...uiMessages,
+              streamingMsg.copyWith(
+                content: displayText,
+                isLoading: true,
+              ),
+            ],
+            activeProviderId: _localAiProviderId,
+          ));
+        },
+      );
 
       final assistantMessage = AiMessage(
         id: streamingId,
@@ -889,7 +955,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         clearApproval: true,
         activeProviderId: _localAiProviderId,
       ));
+    } on _GenerationStopped {
+      return;
     } catch (e) {
+      if (_activeGenerationId != generationId) return;
       AppLogger.error('[AiAgentBloc] Local AI inference failed', error: e);
       emit(state.copyWith(
         messages: displayMessages,
@@ -920,6 +989,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     required List<String> activity,
     required String systemPrompt,
     required String? providerId,
+    required int generationId,
   }) async {
     // Reserve a stable ID for the streaming message so UI can key on it.
     final streamingId = _uuid.v4();
@@ -928,6 +998,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       role: AiMessageRole.assistant,
       content: '',
       timestamp: DateTime.now(),
+      toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
       isLoading: true,
     );
 
@@ -954,25 +1025,32 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         preferredProviderId: state.selectedProviderId,
         preferredModelName: state.selectedModelName,
       );
+      _ensureGenerationActive(generationId);
       resolvedProviderId = streamResult.providerId;
 
-      await for (final chunk in streamResult.stream) {
-        rawBuffer.write(chunk);
+      await _consumeGenerationStream(
+        generationId: generationId,
+        stream: streamResult.stream,
+        onChunk: (chunk) {
+          rawBuffer.write(chunk);
 
-        // Strip tool-call artifacts before displaying; never show raw tags to user.
-        final displayText =
-            _stripJsonBlocks(_stripToolCallTagsStreaming(rawBuffer.toString()));
+          // Strip tool-call artifacts before displaying; never show raw tags to user.
+          final displayText = _stripJsonBlocks(
+            _stripToolCallTagsStreaming(rawBuffer.toString()),
+          );
 
-        // Update the streaming message content in-place
-        final updatedMsg = streamingMsg.copyWith(
-          content: displayText,
-          isLoading: true,
-        );
-        emit(state.copyWith(
-          messages: [...uiMessages, updatedMsg],
-        ));
-      }
+          // Update the streaming message content in-place
+          final updatedMsg = streamingMsg.copyWith(
+            content: displayText,
+            isLoading: true,
+          );
+          emit(state.copyWith(
+            messages: [...uiMessages, updatedMsg],
+          ));
+        },
+      );
     } on AiProviderException {
+      _ensureGenerationActive(generationId);
       // If streaming fails, fall back to non-streaming
       AppLogger.warning('[AiAgentBloc] Stream failed, falling back to chat()');
       final preparedContext = _prepareContextForProvider(
@@ -987,11 +1065,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         preferredProviderId: state.selectedProviderId,
         preferredModelName: state.selectedModelName,
       );
+      _ensureGenerationActive(generationId);
       rawBuffer
         ..clear()
         ..write(fallback.response.content);
       resolvedProviderId = fallback.providerId;
     }
+    _ensureGenerationActive(generationId);
 
     // Finalise: strip tool call artifacts, parse search results
     final rawContent = rawBuffer.toString();
@@ -1175,7 +1255,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       'list_all_tags|search_content|list_video_libraries|'
       'get_video_library_files|list_albums|get_album_files|'
       'list_disk_junk_categories|get_drive_space|scan_disk_junk|clean_disk_junk|'
-      'get_pending_cleanup_review|get_current_cleaner_scan|get_current_clean_cleaner_scan';
+      'get_pending_cleanup_review|get_current_cleaner_scan|get_current_clean_cleaner_scan|'
+      'get_current_app_storage';
 
   /// Strips **complete** tool call blocks from text.
   /// Used for finished (non-streaming) responses.
@@ -1597,6 +1678,52 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     }
   }
 
+  void _onStopGeneration(
+    StopGeneration event,
+    Emitter<AiAgentState> emit,
+  ) {
+    if (!state.isLoading) return;
+
+    _activeGenerationId = null;
+
+    final stoppedToolCalls = state.currentToolCalls
+        .map(
+          (call) => call.isRunning
+              ? AiToolCall(
+                  toolName: call.toolName,
+                  arguments: call.arguments,
+                  result: 'Stopped by user.',
+                  success: false,
+                )
+              : call,
+        )
+        .toList(growable: false);
+    final messages = _finalizeStoppedMessages(
+      state.messages,
+      stoppedToolCalls,
+    );
+
+    final approval = _approvalCompleter;
+    _approvalCompleter = null;
+    if (approval != null && !approval.isCompleted) {
+      approval.complete(false);
+    }
+
+    final streamCompleter = _activeStreamCompleter;
+    if (streamCompleter != null && !streamCompleter.isCompleted) {
+      streamCompleter.completeError(const _GenerationStopped());
+    }
+    unawaited(_activeStreamSubscription?.cancel());
+
+    emit(state.copyWith(
+      messages: messages,
+      isLoading: false,
+      clearThinking: true,
+      clearApproval: true,
+      clearCurrentToolCalls: true,
+    ));
+  }
+
   Future<void> _onNewConversation(
     NewConversation event,
     Emitter<AiAgentState> emit,
@@ -1695,6 +1822,116 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     emit(state.copyWith(pendingApproval: request));
     final approved = await _approvalCompleter!.future;
     return approved;
+  }
+
+  void _ensureGenerationActive(int generationId) {
+    if (_activeGenerationId != generationId) {
+      throw const _GenerationStopped();
+    }
+  }
+
+  Future<void> _consumeGenerationStream({
+    required int generationId,
+    required Stream<String> stream,
+    required void Function(String chunk) onChunk,
+  }) async {
+    _ensureGenerationActive(generationId);
+    final completer = Completer<void>();
+    late final StreamSubscription<String> subscription;
+
+    subscription = stream.listen(
+      (chunk) {
+        if (_activeGenerationId != generationId || completer.isCompleted) {
+          return;
+        }
+        try {
+          onChunk(chunk);
+        } catch (error, stackTrace) {
+          completer.completeError(error, stackTrace);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) completer.complete();
+      },
+      cancelOnError: true,
+    );
+
+    _activeStreamSubscription = subscription;
+    _activeStreamCompleter = completer;
+    try {
+      await completer.future;
+      _ensureGenerationActive(generationId);
+    } finally {
+      if (identical(_activeStreamSubscription, subscription)) {
+        _activeStreamSubscription = null;
+      }
+      if (identical(_activeStreamCompleter, completer)) {
+        _activeStreamCompleter = null;
+      }
+      await subscription.cancel();
+    }
+  }
+
+  AiToolCall _runningToolCall(ToolCall call) => AiToolCall(
+        toolName: call.name,
+        arguments: jsonEncode(call.arguments),
+        isRunning: true,
+      );
+
+  void _addRunningToolCall(List<AiToolCall> calls, ToolCall call) {
+    calls.add(_runningToolCall(call));
+  }
+
+  void _completeRunningToolCall(
+    List<AiToolCall> calls,
+    ToolCall call, {
+    required String output,
+    required bool success,
+  }) {
+    final index = calls.lastIndexWhere(
+      (item) => item.isRunning && item.toolName == call.name,
+    );
+    final completed = AiToolCall(
+      toolName: call.name,
+      arguments: jsonEncode(call.arguments),
+      result: output,
+      success: success,
+    );
+    if (index < 0) {
+      calls.add(completed);
+    } else {
+      calls[index] = completed;
+    }
+  }
+
+  List<AiMessage> _finalizeStoppedMessages(
+    List<AiMessage> messages,
+    List<AiToolCall> toolCalls,
+  ) {
+    final updated = List<AiMessage>.of(messages);
+    if (updated.isNotEmpty && updated.last.isLoading) {
+      final partial = updated.removeLast();
+      if (partial.content.trim().isNotEmpty) {
+        updated.add(partial.copyWith(
+          isLoading: false,
+          toolCalls: toolCalls.isNotEmpty ? toolCalls : null,
+        ));
+      }
+    } else if (toolCalls.isNotEmpty) {
+      updated.add(AiMessage(
+        id: _uuid.v4(),
+        role: AiMessageRole.assistant,
+        content: 'Stopped by user.',
+        timestamp: DateTime.now(),
+        toolCalls: toolCalls,
+      ));
+    }
+    return updated;
   }
 
   // ---------------------------------------------------------------------------
@@ -2490,4 +2727,8 @@ class _PreparedContext {
     required this.messages,
     required this.systemPrompt,
   });
+}
+
+class _GenerationStopped implements Exception {
+  const _GenerationStopped();
 }

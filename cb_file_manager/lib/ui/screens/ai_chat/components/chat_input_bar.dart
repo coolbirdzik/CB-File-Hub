@@ -15,6 +15,7 @@ typedef OnSendMessage = void Function(
 /// workspace indicator, and OS-level file drag-and-drop support.
 class ChatInputBar extends StatefulWidget {
   final OnSendMessage onSend;
+  final VoidCallback? onStop;
   final bool isLoading;
 
   /// Optional widget shown below the suggestion chips, before the text field.
@@ -24,6 +25,7 @@ class ChatInputBar extends StatefulWidget {
   const ChatInputBar({
     Key? key,
     required this.onSend,
+    this.onStop,
     this.isLoading = false,
     this.workspaceIndicator,
   }) : super(key: key);
@@ -200,12 +202,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    onPressed: widget.isLoading ? null : _handleSend,
+                    tooltip: widget.isLoading ? 'Stop generation' : null,
+                    onPressed: widget.isLoading ? widget.onStop : _handleSend,
                     icon: widget.isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                        ? Icon(
+                            PhosphorIconsFill.square,
+                            size: 18,
+                            color: theme.colorScheme.error,
                           )
                         : Icon(
                             PhosphorIconsLight.paperPlaneRight,
@@ -215,10 +218,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 : theme.colorScheme.onSurfaceVariant,
                           ),
                     style: IconButton.styleFrom(
-                      backgroundColor: (_controller.text.trim().isNotEmpty ||
-                              _mentionedFiles.isNotEmpty)
-                          ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                          : null,
+                      backgroundColor: widget.isLoading
+                          ? theme.colorScheme.error.withValues(alpha: 0.1)
+                          : (_controller.text.trim().isNotEmpty ||
+                                  _mentionedFiles.isNotEmpty)
+                              ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                              : null,
                     ),
                   ),
                 ],

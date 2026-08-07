@@ -107,6 +107,23 @@ class FolderContextMenu {
     ValueChanged<String>? onAfterFileCreated,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final createSections = Platform.isWindows && !_isMobilePlatform()
+        ? _buildLazyWindowsCreateSections(
+            context: context,
+            currentPath: currentPath,
+            folderListBloc: folderListBloc,
+            onCreateFolder: onCreateFolder,
+            inlineRenameController: inlineRenameController,
+            onAfterFileCreated: onAfterFileCreated,
+          )
+        : await _buildCreateSections(
+            context: context,
+            currentPath: currentPath,
+            folderListBloc: folderListBloc,
+            onCreateFolder: onCreateFolder,
+            inlineRenameController: inlineRenameController,
+            onAfterFileCreated: onAfterFileCreated,
+          );
     return [
       ContextMenuSection(
         actions: [
@@ -260,14 +277,7 @@ class FolderContextMenu {
           ),
         ],
       ),
-      ...await _buildCreateSections(
-        context: context,
-        currentPath: currentPath,
-        folderListBloc: folderListBloc,
-        onCreateFolder: onCreateFolder,
-        inlineRenameController: inlineRenameController,
-        onAfterFileCreated: onAfterFileCreated,
-      ),
+      ...createSections,
       ContextMenuSection(
         title: l10n.moreOptions,
         actions: [
@@ -291,6 +301,47 @@ class FolderContextMenu {
             label: l10n.properties,
             icon: PhosphorIconsLight.info,
             onSelected: (_) => _showFolderProperties(context, currentPath),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  static List<ContextMenuSection> _buildLazyWindowsCreateSections({
+    required BuildContext context,
+    required String currentPath,
+    FolderListBloc? folderListBloc,
+    required Future<void> Function(String) onCreateFolder,
+    InlineRenameController? inlineRenameController,
+    ValueChanged<String>? onAfterFileCreated,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return <ContextMenuSection>[
+      ContextMenuSection(
+        title: l10n.create,
+        actions: <ContextMenuAction>[
+          ContextMenuAction(
+            id: 'new_submenu',
+            label: 'New',
+            icon: PhosphorIconsLight.filePlus,
+            loadChildSections: (_) async {
+              final sections = await _buildCreateSections(
+                context: context,
+                currentPath: currentPath,
+                folderListBloc: folderListBloc,
+                onCreateFolder: onCreateFolder,
+                inlineRenameController: inlineRenameController,
+                onAfterFileCreated: onAfterFileCreated,
+              );
+              for (final section in sections) {
+                for (final action in section.actions) {
+                  if (action.id == 'new_submenu') {
+                    return action.childSections ?? const <ContextMenuSection>[];
+                  }
+                }
+              }
+              return const <ContextMenuSection>[];
+            },
           ),
         ],
       ),

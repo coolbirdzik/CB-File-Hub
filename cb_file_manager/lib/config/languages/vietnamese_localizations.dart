@@ -3272,6 +3272,182 @@ class VietnameseLocalizations implements AppLocalizations {
           int count, String size, int skipped) =>
       'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp sau khi xóa thất bại.';
 
+  // Cleaner App Insights
+  @override
+  String get cleanerUtilitiesTitle => 'CB Agent Cleaner';
+  @override
+  String get cleanerUtilitiesSubtitle =>
+      'Các tiện ích giúp máy tính gọn gàng và hoạt động tốt hơn';
+  @override
+  String get cleanerUtilitiesStorageGroup => 'Dung lượng';
+  @override
+  String get cleanerDiskUsageTitle => 'Dung lượng ổ đĩa';
+  @override
+  String get cleanerDiskUtilityDescription =>
+      'Xem thư mục lớn và dọn rác đã được xác nhận an toàn';
+  @override
+  String get cleanerAppsTitle => 'Ứng dụng';
+  @override
+  String get cleanerAppsUtilityDescription =>
+      'Tìm ứng dụng lớn, ít dùng và xem dữ liệu liên quan';
+  @override
+  String get cleanerAppsLoading => 'Đang phân tích ứng dụng đã cài...';
+  @override
+  String get cleanerAppsUnavailable =>
+      'Thông tin ứng dụng sẽ có sau khi quét ổ đĩa hoàn tất.';
+  @override
+  String cleanerAppsLoadFailed(String error) =>
+      'Không thể phân tích ứng dụng đã cài: $error';
+  @override
+  String get cleanerAppsPartialBanner => 'Dữ liệu vẫn đang được cập nhật.';
+  @override
+  String get cleanerAppsSearchHint => 'Tìm ứng dụng';
+  @override
+  String get cleanerAppsFilterAll => 'Tất cả';
+  @override
+  String get cleanerAppsFilterAttention => 'Nên xem';
+  @override
+  String get cleanerAppsFilterLarge => 'Nặng';
+  @override
+  String get cleanerAppsFilterStale => 'Ít mở';
+  @override
+  String get cleanerAppsFilterCleanable => 'Dọn được';
+  @override
+  String get cleanerAppsSortLabel => 'Sắp xếp';
+  @override
+  String get cleanerAppsSortSize => 'Lớn nhất trước';
+  @override
+  String get cleanerAppsSortName => 'Tên';
+  @override
+  String get cleanerAppsSortLastOpened => 'Hoạt động cũ nhất';
+  @override
+  String get cleanerAppsLargeThresholdLabel => 'Ứng dụng lớn';
+  @override
+  String get cleanerAppsStaleThresholdLabel => 'Lâu chưa thấy';
+  @override
+  String cleanerAppsDays(int days) => '$days ngày';
+  @override
+  String get cleanerAppsSummaryFootprint => 'Dung lượng đã xác nhận';
+  @override
+  String get cleanerAppsSummaryAttention => 'Nên xem lại';
+  @override
+  String get cleanerAppsSummaryLarge => 'Ứng dụng lớn';
+  @override
+  String get cleanerAppsSummaryStale => 'Lâu chưa thấy mở';
+  @override
+  String get cleanerAppsSummaryCleanable => 'Cache có thể dọn';
+  @override
+  String cleanerAppsThresholdAtLeast(String size) => 'Từ $size trở lên';
+  @override
+  String cleanerAppsNotSeenForDays(int days) =>
+      'Không ghi nhận lần mở trong $days ngày';
+  @override
+  String get cleanerAppsReviewableCache => 'Có thể xem lại an toàn';
+  @override
+  String cleanerAppsShowingCount(int count) => 'Đang hiển thị $count ứng dụng';
+  @override
+  String get cleanerAppsNoResults => 'Không có ứng dụng phù hợp bộ lọc.';
+  @override
+  String get cleanerAppsUnknown => 'Không rõ';
+  @override
+  String cleanerAppsLastOpened(String date) => 'Thấy mở gần nhất: $date';
+  @override
+  String cleanerAppsNotOpenedForDays(int days) => '$days ngày chưa mở';
+  @override
+  String get cleanerAppsUsageUnknownCompact => 'Chưa có dữ liệu mở';
+  @override
+  String get cleanerAppsAttentionBadge => 'Nên xem';
+  @override
+  String get cleanerAppsViewOptions => 'Tùy chọn hiển thị';
+  @override
+  String cleanerAppsUsageEvidence(String source, String confidence) =>
+      '$source • $confidence';
+  @override
+  String cleanerAppsPossibleSize(String size) => 'Có thể thuộc app: $size';
+  @override
+  String cleanerAppsCleanableAmount(String size) => 'Có thể dọn: $size';
+  @override
+  String get cleanerAppsDetails => 'Chi tiết ứng dụng';
+  @override
+  String get cleanerAppsUsageEvidenceLabel => 'Bằng chứng sử dụng';
+  @override
+  String get cleanerAppsSelectApp =>
+      'Chọn một ứng dụng để xem dung lượng lưu trữ.';
+  @override
+  String get cleanerAppsConfirmedFootprint => 'Đã xác nhận';
+  @override
+  String get cleanerAppsPossibleFootprint => 'Có thể thuộc app';
+  @override
+  String get cleanerAppsStorageBreakdown => 'Phân bổ dung lượng';
+  @override
+  String get cleanerAppsNoStorageDetails =>
+      'Chưa có vị trí lưu trữ đo được cho ứng dụng này.';
+  @override
+  String get cleanerAppsSharedFolders =>
+      'Thư mục lớn dùng chung / chưa xác định';
+  @override
+  String get cleanerAppsSharedFoldersDescription =>
+      'Các thư mục này không được gán cho riêng một ứng dụng và không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerAppsOpenFolder => 'Mở thư mục';
+  @override
+  String get cleanerAppsManageInWindows => 'Quản lý trong Windows';
+  @override
+  String get cleanerAppsReviewCleanable => 'Xem dữ liệu có thể dọn';
+  @override
+  String get cleanerAppsAskAgent => 'Hỏi CB Agent';
+  @override
+  String cleanerAppsVersion(String version) => 'Phiên bản $version';
+  @override
+  String cleanerAppsInstalledOrUpdated(String date) =>
+      'Đã cài hoặc cập nhật: $date';
+  @override
+  String get cleanerAppsSourceWin32 => 'Ứng dụng Win32';
+  @override
+  String get cleanerAppsSourceStore => 'Ứng dụng Microsoft Store';
+  @override
+  String get cleanerAppsMeasurementMeasured => 'Đã đo';
+  @override
+  String get cleanerAppsMeasurementEstimated => 'Windows ước tính';
+  @override
+  String get cleanerAppsMeasurementPartial => 'Một phần';
+  @override
+  String get cleanerAppsMeasurementUnknown => 'Không rõ dung lượng';
+  @override
+  String get cleanerAppsAttributionConfirmed => 'Đã xác nhận';
+  @override
+  String get cleanerAppsAttributionPossible => 'Có thể thuộc app';
+  @override
+  String get cleanerAppsAttributionShared => 'Dùng chung';
+  @override
+  String get cleanerAppsUsageUserAssist => 'Lịch sử mở của Windows';
+  @override
+  String get cleanerAppsUsagePrefetch => 'Windows Prefetch';
+  @override
+  String get cleanerAppsConfidenceHigh => 'Độ tin cậy cao';
+  @override
+  String get cleanerAppsConfidenceMedium => 'Độ tin cậy trung bình';
+  @override
+  String get cleanerAppsStorageInstall => 'Thư mục cài đặt';
+  @override
+  String get cleanerAppsStorageLocalData => 'Dữ liệu ứng dụng cục bộ';
+  @override
+  String get cleanerAppsStorageRoamingData => 'Dữ liệu ứng dụng roaming';
+  @override
+  String get cleanerAppsStoragePackageData => 'Dữ liệu gói ứng dụng';
+  @override
+  String get cleanerAppsStorageProgramData => 'Dữ liệu chương trình dùng chung';
+  @override
+  String get cleanerAppsStorageCache => 'Bộ nhớ đệm';
+  @override
+  String get cleanerAppsStorageLogs => 'Nhật ký';
+  @override
+  String get cleanerAppsStorageShared => 'Dung lượng dùng chung';
+  @override
+  String get cleanerAppsStorageUnknown => 'Dung lượng khác';
+  @override
+  String get cleanerAppsCleanableBadge => 'Có thể dọn';
+
   @override
   String get aiThinking0 => 'Đang suy nghĩ...';
   @override

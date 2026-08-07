@@ -55,6 +55,7 @@ Future<FullDiskScanHandle> spawnFullDiskScan({
           root: msg.root,
           duration: DateTime.now().difference(handle._startedAt),
           inaccessible: msg.inaccessible,
+          coverageIssues: msg.coverageIssues,
         ));
       }
     }
@@ -102,6 +103,12 @@ class FullDiskScanHandle {
         root: DiskTreeNode(name: drivePath, fullPath: drivePath),
         duration: DateTime.now().difference(_startedAt),
         inaccessible: const ['cancelled'],
+        coverageIssues: <FullDiskScanCoverageIssue>[
+          FullDiskScanCoverageIssue(
+            path: drivePath,
+            reason: FullDiskScanCoverageIssueReason.cancelled,
+          ),
+        ],
       ));
     }
   }
@@ -123,6 +130,7 @@ const int _invalidHandleValue = -1;
 void _fullDiskScanWorker(_FullScanArgs args) {
   final sendPort = args.sendPort;
   final inaccessible = <String>[];
+  final coverageIssues = <FullDiskScanCoverageIssue>[];
   int totalDirs = 0;
   int totalFiles = 0;
   int totalBytes = 0;
@@ -198,7 +206,14 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     totalDirs++;
     maybeFlush(dirPath);
 
-    if (depth >= args.maxDepth) return;
+    if (depth >= args.maxDepth) {
+      coverageIssues.add(FullDiskScanCoverageIssue(
+        path: dirPath,
+        reason: FullDiskScanCoverageIssueReason.maxDepthReached,
+        detail: 'Maximum scan depth ${args.maxDepth} reached.',
+      ));
+      return;
+    }
 
     // Prepare search pattern: "C:\path\*"
     final searchPath = dirPath.endsWith('\\') ? '$dirPath*' : '$dirPath\\*';
@@ -209,6 +224,10 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       final hFind = win32.FindFirstFile(lpFileName, findData);
       if (hFind == _invalidHandleValue) {
         inaccessible.add(dirPath);
+        coverageIssues.add(FullDiskScanCoverageIssue(
+          path: dirPath,
+          reason: FullDiskScanCoverageIssueReason.inaccessible,
+        ));
         return;
       }
 
@@ -220,13 +239,20 @@ void _fullDiskScanWorker(_FullScanArgs args) {
 
           final attrs = findData.ref.dwFileAttributes;
 
-          // Skip reparse points (junctions/symlinks) to avoid infinite loops
-          if (attrs & _fileAttributeReparsePoint != 0) continue;
-
-          final isDir = attrs & _fileAttributeDirectory != 0;
           final fullPath = dirPath.endsWith('\\')
               ? '$dirPath$fileName'
               : '$dirPath\\$fileName';
+
+          // Skip reparse points (junctions/symlinks) to avoid infinite loops
+          if (attrs & _fileAttributeReparsePoint != 0) {
+            coverageIssues.add(FullDiskScanCoverageIssue(
+              path: fullPath,
+              reason: FullDiskScanCoverageIssueReason.reparsePoint,
+            ));
+            continue;
+          }
+
+          final isDir = attrs & _fileAttributeDirectory != 0;
 
           if (isDir) {
             // Skip known system directories that cause issues
@@ -262,8 +288,13 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       } finally {
         win32.FindClose(hFind);
       }
-    } catch (_) {
+    } catch (error) {
       inaccessible.add(dirPath);
+      coverageIssues.add(FullDiskScanCoverageIssue(
+        path: dirPath,
+        reason: FullDiskScanCoverageIssueReason.inaccessible,
+        detail: error.toString(),
+      ));
     } finally {
       calloc.free(findData);
       calloc.free(lpFileName);
@@ -279,7 +310,11 @@ void _fullDiskScanWorker(_FullScanArgs args) {
   // Sort by size descending
   root.sortBySize();
 
-  sendPort.send(_DoneMsg(root: root, inaccessible: inaccessible));
+  sendPort.send(_DoneMsg(
+    root: root,
+    inaccessible: inaccessible,
+    coverageIssues: coverageIssues,
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -318,5 +353,10 @@ class _TreeMsg {
 class _DoneMsg {
   final DiskTreeNode root;
   final List<String> inaccessible;
-  const _DoneMsg({required this.root, required this.inaccessible});
+  final List<FullDiskScanCoverageIssue> coverageIssues;
+  const _DoneMsg({
+    required this.root,
+    required this.inaccessible,
+    required this.coverageIssues,
+  });
 }

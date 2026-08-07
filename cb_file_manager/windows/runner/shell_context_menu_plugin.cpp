@@ -11,6 +11,7 @@
 #include <wrl/client.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -220,7 +221,8 @@ std::wstring GetCommandVerbW(IContextMenu* context_menu, UINT cmd_offset) {
 void PruneShellItemsFromMenu(HMENU menu,
                              IContextMenu* context_menu,
                              UINT cmd_first,
-                             UINT cmd_last) {
+                             UINT cmd_last,
+                             bool recurse_into_submenus = true) {
   if (!menu || !context_menu) {
     return;
   }
@@ -248,8 +250,12 @@ void PruneShellItemsFromMenu(HMENU menu,
     }
 
     if (mii.hSubMenu) {
+      if (!recurse_into_submenus) {
+        continue;
+      }
       const int initial_child_count = GetMenuItemCount(mii.hSubMenu);
-      PruneShellItemsFromMenu(mii.hSubMenu, context_menu, cmd_first, cmd_last);
+      PruneShellItemsFromMenu(mii.hSubMenu, context_menu, cmd_first, cmd_last,
+                              true);
       RemoveRedundantSeparators(mii.hSubMenu);
       // Some Shell extensions populate cascading menus lazily in response to
       // WM_INITMENUPOPUP. Keep an initially empty submenu so it still gets that
@@ -318,12 +324,21 @@ struct ShellMenuContext {
   std::vector<PIDLIST_ABSOLUTE> pidls;
 };
 
+struct ShellSubmenuReference {
+  HMENU menu = nullptr;
+  int parent_position = 0;
+  bool initialized = false;
+};
+
 struct LoadedShellMenuSession {
   std::string id;
   HWND hwnd = nullptr;
   ShellMenuContext shell;
   HMENU menu = nullptr;
   std::set<UINT> command_ids;
+  std::map<int64_t, ShellSubmenuReference> submenus;
+  std::map<HMENU, int64_t> submenu_ids;
+  int64_t next_submenu_id = 1;
 };
 
 std::unique_ptr<LoadedShellMenuSession> g_loaded_shell_menu_session;
@@ -494,27 +509,22 @@ std::wstring GetMenuLabel(HMENU menu, int index) {
   return label;
 }
 
-void InitializeShellSubmenus(HWND hwnd, HMENU menu, int depth = 0) {
-  constexpr int kMaxDepth = 8;
-  if (!hwnd || !menu || depth > kMaxDepth) {
-    return;
+int64_t RegisterShellSubmenu(LoadedShellMenuSession& session,
+                             HMENU submenu,
+                             int parent_position) {
+  const auto existing = session.submenu_ids.find(submenu);
+  if (existing != session.submenu_ids.end()) {
+    return existing->second;
   }
 
-  const int count = GetMenuItemCount(menu);
-  for (int i = 0; i < count; ++i) {
-    MENUITEMINFOW mii{};
-    mii.cbSize = sizeof(mii);
-    mii.fMask = MIIM_SUBMENU;
-    if (!GetMenuItemInfoW(menu, static_cast<UINT>(i), TRUE, &mii) ||
-        !mii.hSubMenu) {
-      continue;
-    }
-
-    SendMessageW(hwnd, WM_INITMENUPOPUP,
-                 reinterpret_cast<WPARAM>(mii.hSubMenu),
-                 MAKELPARAM(static_cast<WORD>(i), FALSE));
-    InitializeShellSubmenus(hwnd, mii.hSubMenu, depth + 1);
-  }
+  const int64_t submenu_id = session.next_submenu_id++;
+  session.submenu_ids[submenu] = submenu_id;
+  session.submenus[submenu_id] = ShellSubmenuReference{
+      submenu,
+      parent_position,
+      false,
+  };
+  return submenu_id;
 }
 
 std::vector<uint8_t> EncodeMenuBitmap(HBITMAP bitmap) {
@@ -602,15 +612,16 @@ std::vector<uint8_t> EncodeMenuBitmap(HBITMAP bitmap) {
   return encoded;
 }
 
+constexpr UINT kLoadedShellCommandFirst = 1;
+constexpr UINT kLoadedShellCommandLast = 0x7FFF;
+
 flutter::EncodableList EncodeShellMenuEntries(
     HMENU menu,
     UINT command_first,
     UINT command_last,
-    std::set<UINT>& command_ids,
-    int depth = 0) {
-  constexpr int kMaxDepth = 8;
+    LoadedShellMenuSession& session) {
   flutter::EncodableList entries;
-  if (!menu || depth > kMaxDepth) {
+  if (!menu) {
     return entries;
   }
 
@@ -651,16 +662,12 @@ flutter::EncodableList EncodeShellMenuEntries(
     }
 
     if (mii.hSubMenu) {
-      flutter::EncodableList children =
-          EncodeShellMenuEntries(mii.hSubMenu, command_first, command_last,
-                                 command_ids, depth + 1);
-      if (children.empty()) {
-        continue;
-      }
+      const int64_t submenu_id =
+          RegisterShellSubmenu(session, mii.hSubMenu, i);
       entry[flutter::EncodableValue("type")] =
           flutter::EncodableValue("submenu");
-      entry[flutter::EncodableValue("children")] =
-          flutter::EncodableValue(children);
+      entry[flutter::EncodableValue("submenuId")] =
+          flutter::EncodableValue(submenu_id);
       entries.emplace_back(entry);
       continue;
     }
@@ -671,10 +678,45 @@ flutter::EncodableList EncodeShellMenuEntries(
     entry[flutter::EncodableValue("type")] = flutter::EncodableValue("item");
     entry[flutter::EncodableValue("commandId")] =
         flutter::EncodableValue(static_cast<int32_t>(mii.wID));
-    command_ids.insert(mii.wID);
+    session.command_ids.insert(mii.wID);
     entries.emplace_back(entry);
   }
   return entries;
+}
+
+std::optional<flutter::EncodableList> LoadThirdPartyShellSubmenu(
+    LoadedShellMenuSession& session,
+    int64_t submenu_id) {
+  const auto submenu_it = session.submenus.find(submenu_id);
+  if (submenu_it == session.submenus.end() || !submenu_it->second.menu) {
+    return std::nullopt;
+  }
+
+  auto& submenu = submenu_it->second;
+  if (!submenu.initialized) {
+    if (!SetWindowSubclass(
+            session.hwnd, ShellContextMenuSubclassProc,
+            kShellContextMenuSubclassId,
+            reinterpret_cast<DWORD_PTR>(&session.shell.state))) {
+      return std::nullopt;
+    }
+
+    SendMessageW(
+        session.hwnd, WM_INITMENUPOPUP,
+        reinterpret_cast<WPARAM>(submenu.menu),
+        MAKELPARAM(static_cast<WORD>(submenu.parent_position), FALSE));
+    RemoveWindowSubclass(session.hwnd, ShellContextMenuSubclassProc,
+                         kShellContextMenuSubclassId);
+    submenu.initialized = true;
+
+    PruneShellItemsFromMenu(
+        submenu.menu, session.shell.context_menu.Get(),
+        kLoadedShellCommandFirst, kLoadedShellCommandLast, false);
+  }
+
+  return EncodeShellMenuEntries(
+      submenu.menu, kLoadedShellCommandFirst, kLoadedShellCommandLast,
+      session);
 }
 
 std::optional<flutter::EncodableMap> LoadThirdPartyShellMenu(
@@ -705,15 +747,14 @@ std::optional<flutter::EncodableMap> LoadThirdPartyShellMenu(
     return std::nullopt;
   }
 
-  constexpr UINT kCommandFirst = 1;
-  constexpr UINT kCommandLast = 0x7FFF;
   UINT flags = CMF_NORMAL | CMF_EXPLORE;
   if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) {
     flags |= CMF_EXTENDEDVERBS;
   }
 
   HRESULT hr = session->shell.context_menu->QueryContextMenu(
-      session->menu, 0, kCommandFirst, kCommandLast, flags);
+      session->menu, 0, kLoadedShellCommandFirst, kLoadedShellCommandLast,
+      flags);
   if (FAILED(hr)) {
     RemoveWindowSubclass(hwnd, ShellContextMenuSubclassProc,
                          kShellContextMenuSubclassId);
@@ -723,18 +764,16 @@ std::optional<flutter::EncodableMap> LoadThirdPartyShellMenu(
   }
 
   PruneShellItemsFromMenu(session->menu, session->shell.context_menu.Get(),
-                          kCommandFirst, kCommandLast);
-  InitializeShellSubmenus(hwnd, session->menu);
-  PruneShellItemsFromMenu(session->menu, session->shell.context_menu.Get(),
-                          kCommandFirst, kCommandLast);
+                          kLoadedShellCommandFirst,
+                          kLoadedShellCommandLast, false);
 
-  flutter::EncodableList entries =
-      EncodeShellMenuEntries(session->menu, kCommandFirst, kCommandLast,
-                             session->command_ids);
+  flutter::EncodableList entries = EncodeShellMenuEntries(
+      session->menu, kLoadedShellCommandFirst, kLoadedShellCommandLast,
+      *session);
   RemoveWindowSubclass(hwnd, ShellContextMenuSubclassProc,
                        kShellContextMenuSubclassId);
 
-  if (entries.empty() || session->command_ids.empty()) {
+  if (entries.empty()) {
     DestroyMenu(session->menu);
     FreePidls(session->shell.pidls);
     return std::nullopt;
@@ -1110,6 +1149,8 @@ void ShellContextMenuPlugin::HandleMethodCall(
       method_call.method_name().compare("invokeVerb") == 0;
   const bool is_load_third_party_menu =
       method_call.method_name().compare("loadThirdPartyMenu") == 0;
+  const bool is_load_context_menu_submenu =
+      method_call.method_name().compare("loadContextMenuSubmenu") == 0;
   const bool is_invoke_context_menu_command =
       method_call.method_name().compare("invokeContextMenuCommand") == 0;
   const bool is_release_context_menu_session =
@@ -1117,6 +1158,7 @@ void ShellContextMenuPlugin::HandleMethodCall(
 
   if (!is_show_shell_menu && !is_show_merged_menu && !is_show_combined_menu &&
       !is_invoke_verb && !is_load_third_party_menu &&
+      !is_load_context_menu_submenu &&
       !is_invoke_context_menu_command && !is_release_context_menu_session) {
     result->NotImplemented();
     return;
@@ -1134,7 +1176,8 @@ void ShellContextMenuPlugin::HandleMethodCall(
     hwnd = registrar_->GetView()->GetNativeWindow();
   }
 
-  if (is_invoke_context_menu_command || is_release_context_menu_session) {
+  if (is_invoke_context_menu_command || is_release_context_menu_session ||
+      is_load_context_menu_submenu) {
     auto session_it =
         arguments->find(flutter::EncodableValue("sessionId"));
     const auto* session_id =
@@ -1155,6 +1198,35 @@ void ShellContextMenuPlugin::HandleMethodCall(
         ReleaseLoadedShellMenuSession();
       }
       result->Success();
+      return;
+    }
+
+    if (is_load_context_menu_submenu) {
+      auto submenu_it =
+          arguments->find(flutter::EncodableValue("submenuId"));
+      int64_t submenu_id = 0;
+      if (submenu_it != arguments->end()) {
+        if (const auto* value32 =
+                std::get_if<int32_t>(&submenu_it->second)) {
+          submenu_id = static_cast<int64_t>(*value32);
+        } else if (const auto* value64 =
+                       std::get_if<int64_t>(&submenu_it->second)) {
+          submenu_id = *value64;
+        }
+      }
+
+      if (!matches_active_session || submenu_id <= 0) {
+        result->Success(flutter::EncodableValue());
+        return;
+      }
+
+      auto entries = LoadThirdPartyShellSubmenu(
+          *g_loaded_shell_menu_session, submenu_id);
+      if (entries.has_value()) {
+        result->Success(flutter::EncodableValue(entries.value()));
+      } else {
+        result->Success(flutter::EncodableValue());
+      }
       return;
     }
 

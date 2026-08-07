@@ -55,6 +55,8 @@ class ContextMenuAction {
   final bool isEnabled;
   final String? group;
   final List<ContextMenuSection>? childSections;
+  final Future<List<ContextMenuSection>> Function(BuildContext context)?
+      loadChildSections;
   final FutureOr<void> Function(BuildContext context)? onSelected;
 
   const ContextMenuAction({
@@ -67,6 +69,7 @@ class ContextMenuAction {
     this.isEnabled = true,
     this.group,
     this.childSections,
+    this.loadChildSections,
     this.onSelected,
   });
 }
@@ -83,13 +86,29 @@ class ContextMenuSection {
 
 bool _isMobileContextMenuPlatform() => Platform.isAndroid || Platform.isIOS;
 
-final List<OverlayEntry> _submenuOverlayEntries = <OverlayEntry>[];
+class _ContextSubmenuOverlayEntry {
+  final OverlayEntry entry;
+  final Object owner;
+
+  const _ContextSubmenuOverlayEntry({
+    required this.entry,
+    required this.owner,
+  });
+}
+
+final List<_ContextSubmenuOverlayEntry> _submenuOverlayEntries =
+    <_ContextSubmenuOverlayEntry>[];
 Timer? _submenuCloseTimer;
 
 void _removeContextSubmenusFrom(int depth) {
   while (_submenuOverlayEntries.length > depth) {
-    _submenuOverlayEntries.removeLast().remove();
+    _submenuOverlayEntries.removeLast().entry.remove();
   }
+}
+
+bool _isContextSubmenuOwnerActive(int depth, Object owner) {
+  return _submenuOverlayEntries.length > depth &&
+      identical(_submenuOverlayEntries[depth].owner, owner);
 }
 
 void _removeContextSubmenu() {
@@ -142,15 +161,63 @@ class _LoadedWindowsShellMenu {
   });
 }
 
+class _WindowsShellMenuLoader {
+  final BuildContext context;
+  final List<String> paths;
+
+  Future<_LoadedWindowsShellMenu?>? _loadFuture;
+  bool _disposed = false;
+  String? _leasedSessionId;
+
+  _WindowsShellMenuLoader({
+    required this.context,
+    required this.paths,
+  });
+
+  Future<List<ContextMenuSection>> load(BuildContext _) async {
+    if (_disposed) {
+      return const <ContextMenuSection>[];
+    }
+
+    final loaded = await (_loadFuture ??= _loadWindowsShellMenu(
+      context: context,
+      paths: paths,
+    ));
+    if (_disposed) {
+      return const <ContextMenuSection>[];
+    }
+    if (loaded != null && _leasedSessionId == null) {
+      _leasedSessionId = loaded.session.id;
+      WindowsShellContextMenu.retainCachedThirdPartyMenuSession(
+        loaded.session.id,
+      );
+    }
+    return loaded?.sections ?? const <ContextMenuSection>[];
+  }
+
+  void dispose() {
+    _disposed = true;
+    final leasedSessionId = _leasedSessionId;
+    _leasedSessionId = null;
+    if (leasedSessionId != null) {
+      WindowsShellContextMenu.releaseCachedThirdPartyMenuSession(
+        leasedSessionId,
+      );
+    }
+  }
+}
+
+bool _canOfferWindowsShellMenu(List<String> paths) {
+  return Platform.isWindows && !kCbE2E && paths.isNotEmpty;
+}
+
 Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
   required BuildContext context,
   required List<String> paths,
 }) async {
   // Integration tests interact with Flutter PopupMenuItem widgets. A native
   // Shell session is outside the widget tree, so skip discovery in E2E mode.
-  if (!Platform.isWindows ||
-      kCbE2E ||
-      paths.isEmpty ||
+  if (!_canOfferWindowsShellMenu(paths) ||
       paths.any(
         (path) =>
             FileSystemEntity.typeSync(path) == FileSystemEntityType.notFound,
@@ -194,8 +261,11 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
 
       final children = convertEntries(entry.children);
       final commandId = entry.commandId;
+      final submenuId = entry.submenuId;
       final actionId = commandId == null
-          ? 'shell_submenu_${session.id}_${generatedId++}'
+          ? submenuId == null
+              ? 'shell_submenu_${session.id}_${generatedId++}'
+              : 'shell_submenu_${session.id}_$submenuId'
           : 'shell_command_${session.id}_$commandId';
 
       actions.add(
@@ -204,10 +274,20 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
           label: label,
           icon: PhosphorIconsLight.appWindow,
           iconBytes: entry.iconBytes,
-          isEnabled:
-              entry.isEnabled && (children.isNotEmpty || commandId != null),
+          isEnabled: entry.isEnabled &&
+              (children.isNotEmpty || submenuId != null || commandId != null),
           isChecked: entry.isChecked,
           childSections: children.isEmpty ? null : children,
+          loadChildSections: submenuId == null
+              ? null
+              : (_) async {
+                  final childEntries =
+                      await WindowsShellContextMenu.loadThirdPartySubmenu(
+                    sessionId: session.id,
+                    submenuId: submenuId,
+                  );
+                  return convertEntries(childEntries);
+                },
           onSelected: commandId == null
               ? null
               : (_) async {
@@ -246,23 +326,19 @@ Future<void> _showAppContextMenu({
   if (!context.mounted) {
     return;
   }
-  final shellMenu = layout.hiddenIds.contains(contextMenuThirdPartyAppsId)
-      ? null
-      : await _loadWindowsShellMenu(
-          context: context,
-          paths: paths,
-        );
-  if (!context.mounted) {
-    if (shellMenu != null) {
-      await WindowsShellContextMenu.releaseSession(shellMenu.session.id);
-    }
-    return;
-  }
+  final shellMenuLoader =
+      layout.hiddenIds.contains(contextMenuThirdPartyAppsId) ||
+              !_canOfferWindowsShellMenu(paths)
+          ? null
+          : _WindowsShellMenuLoader(
+              context: context,
+              paths: paths,
+            );
 
   final mergedSections = _applyContextMenuLayout(
     context: context,
     sections: sections,
-    shellSections: shellMenu?.sections ?? const <ContextMenuSection>[],
+    loadShellSections: shellMenuLoader?.load,
     layout: layout,
     layoutTarget: layoutTarget,
   );
@@ -274,9 +350,7 @@ Future<void> _showAppContextMenu({
       globalPosition: globalPosition,
     );
   } finally {
-    if (shellMenu != null) {
-      await WindowsShellContextMenu.releaseSession(shellMenu.session.id);
-    }
+    shellMenuLoader?.dispose();
   }
 }
 
@@ -295,7 +369,8 @@ class _ContextMenuActionOrigin {
 List<ContextMenuSection> _applyContextMenuLayout({
   required BuildContext context,
   required List<ContextMenuSection> sections,
-  required List<ContextMenuSection> shellSections,
+  required Future<List<ContextMenuSection>> Function(BuildContext context)?
+      loadShellSections,
   required ContextMenuLayoutPreference layout,
   required ContextMenuLayoutTarget layoutTarget,
 }) {
@@ -342,7 +417,7 @@ List<ContextMenuSection> _applyContextMenuLayout({
     }
     if (id == contextMenuThirdPartyAppsId) {
       flushPendingActions();
-      if (shellSections.isNotEmpty) {
+      if (loadShellSections != null) {
         result.add(
           ContextMenuSection(
             actions: [
@@ -350,7 +425,7 @@ List<ContextMenuSection> _applyContextMenuLayout({
                 id: contextMenuThirdPartyAppsId,
                 label: AppLocalizations.of(context)!.thirdPartyApps,
                 icon: PhosphorIconsLight.appWindow,
-                childSections: shellSections,
+                loadChildSections: loadShellSections,
               ),
             ],
           ),
@@ -437,7 +512,7 @@ Future<void> showContextMenuPopup({
     }
 
     for (final action in actions) {
-      if (action.childSections != null && action.childSections!.isNotEmpty) {
+      if (_contextMenuActionHasSubmenu(action)) {
         popupItems.add(
           PopupMenuItem<String>(
             enabled: false,
@@ -565,7 +640,7 @@ Widget _buildContextMenuActionRow(
     ),
   );
   final Widget? trailing;
-  if (action.childSections != null && action.childSections!.isNotEmpty) {
+  if (_contextMenuActionHasSubmenu(action)) {
     trailing = Icon(
       PhosphorIconsLight.caretRight,
       size: forPopup ? 16 : 18,
@@ -592,6 +667,11 @@ Widget _buildContextMenuActionRow(
       ],
     ),
   );
+}
+
+bool _contextMenuActionHasSubmenu(ContextMenuAction action) {
+  return action.loadChildSections != null ||
+      (action.childSections != null && action.childSections!.isNotEmpty);
 }
 
 const double _contextSubmenuPreferredWidth = 220;
@@ -646,7 +726,7 @@ _ContextSubmenuGeometry _contextSubmenuGeometry({
   );
 }
 
-class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
+class _ContextMenuPopupSubmenuTrigger extends StatefulWidget {
   final BuildContext actionContext;
   final RenderBox overlayBox;
   final ContextMenuAction action;
@@ -658,43 +738,127 @@ class _ContextMenuPopupSubmenuTrigger extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final itemKey = GlobalKey();
+  State<_ContextMenuPopupSubmenuTrigger> createState() =>
+      _ContextMenuPopupSubmenuTriggerState();
+}
 
-    void openSubmenu() {
-      _cancelContextSubmenuRemoval();
-      final itemContext = itemKey.currentContext;
-      if (itemContext == null || action.childSections == null) {
-        return;
-      }
+class _ContextMenuPopupSubmenuTriggerState
+    extends State<_ContextMenuPopupSubmenuTrigger> {
+  final GlobalKey _itemKey = GlobalKey();
+  final Object _submenuOwner = Object();
+  Future<List<ContextMenuSection>>? _sectionsFuture;
+  List<ContextMenuSection>? _resolvedSections;
 
-      final itemBox = itemContext.findRenderObject() as RenderBox?;
-      if (itemBox == null) {
-        return;
-      }
+  List<ContextMenuSection> _loadingSections() {
+    return <ContextMenuSection>[
+      ContextMenuSection(
+        actions: <ContextMenuAction>[
+          ContextMenuAction(
+            id: '${widget.action.id}_loading',
+            label: AppLocalizations.of(widget.actionContext)?.loading ??
+                'Loading...',
+            icon: PhosphorIconsLight.hourglass,
+            isEnabled: false,
+          ),
+        ],
+      ),
+    ];
+  }
 
-      _showContextSubmenuOverlay(
-        actionContext: actionContext,
-        rootMenuContext: context,
-        overlayBox: overlayBox,
-        anchorBox: itemBox,
-        sections: action.childSections!,
-        depth: 0,
-      );
+  List<ContextMenuSection> _emptySections() {
+    return <ContextMenuSection>[
+      ContextMenuSection(
+        actions: <ContextMenuAction>[
+          ContextMenuAction(
+            id: '${widget.action.id}_empty',
+            label: widget.action.label,
+            icon: widget.action.icon,
+            isEnabled: false,
+          ),
+        ],
+      ),
+    ];
+  }
+
+  void _showSections(List<ContextMenuSection> sections) {
+    final itemContext = _itemKey.currentContext;
+    final itemBox = itemContext?.findRenderObject() as RenderBox?;
+    if (itemBox == null) {
+      return;
     }
 
+    _showContextSubmenuOverlay(
+      actionContext: widget.actionContext,
+      rootMenuContext: context,
+      overlayBox: widget.overlayBox,
+      anchorBox: itemBox,
+      sections: sections,
+      depth: 0,
+      owner: _submenuOwner,
+    );
+  }
+
+  Future<void> _replaceLoadingSubmenu(
+    Future<List<ContextMenuSection>> sectionsFuture,
+  ) async {
+    List<ContextMenuSection> sections;
+    try {
+      sections = await sectionsFuture;
+    } catch (_) {
+      sections = const <ContextMenuSection>[];
+    }
+    _resolvedSections = sections;
+    if (!mounted ||
+        !_isContextSubmenuOwnerActive(0, _submenuOwner) ||
+        !widget.actionContext.mounted) {
+      return;
+    }
+    _showSections(sections.isEmpty ? _emptySections() : sections);
+  }
+
+  void _openSubmenu() {
+    _cancelContextSubmenuRemoval();
+    final childSections = widget.action.childSections;
+    if (childSections != null && childSections.isNotEmpty) {
+      _showSections(childSections);
+      return;
+    }
+
+    final loader = widget.action.loadChildSections;
+    if (loader == null) {
+      return;
+    }
+
+    final resolvedSections = _resolvedSections;
+    if (resolvedSections != null) {
+      _showSections(
+        resolvedSections.isEmpty ? _emptySections() : resolvedSections,
+      );
+      return;
+    }
+
+    _showSections(_loadingSections());
+    if (_sectionsFuture == null) {
+      final sectionsFuture = loader(widget.actionContext);
+      _sectionsFuture = sectionsFuture;
+      unawaited(_replaceLoadingSubmenu(sectionsFuture));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MouseRegion(
-      key: itemKey,
-      onEnter: (_) => openSubmenu(),
+      key: _itemKey,
+      onEnter: (_) => _openSubmenu(),
       onExit: (_) => _scheduleContextSubmenuRemoval(),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: openSubmenu,
+        onTap: _openSubmenu,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: _buildContextMenuActionRow(
-            actionContext,
-            action,
+            widget.actionContext,
+            widget.action,
             forPopup: true,
           ),
         ),
@@ -710,6 +874,7 @@ void _showContextSubmenuOverlay({
   required RenderBox anchorBox,
   required List<ContextMenuSection> sections,
   required int depth,
+  required Object owner,
 }) {
   final anchorPosition = anchorBox.localToGlobal(
     Offset.zero,
@@ -737,7 +902,9 @@ void _showContextSubmenuOverlay({
       ),
     ),
   );
-  _submenuOverlayEntries.add(entry);
+  _submenuOverlayEntries.add(
+    _ContextSubmenuOverlayEntry(entry: entry, owner: owner),
+  );
   Overlay.of(actionContext).insert(entry);
 }
 
@@ -816,7 +983,7 @@ class _ContextSubmenuPanel extends StatelessWidget {
   }
 }
 
-class _ContextSubmenuActionRow extends StatelessWidget {
+class _ContextSubmenuActionRow extends StatefulWidget {
   final BuildContext actionContext;
   final BuildContext rootMenuContext;
   final RenderBox overlayBox;
@@ -832,67 +999,158 @@ class _ContextSubmenuActionRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final itemKey = GlobalKey();
-    final hasChildren =
-        action.childSections != null && action.childSections!.isNotEmpty;
+  State<_ContextSubmenuActionRow> createState() =>
+      _ContextSubmenuActionRowState();
+}
 
-    void openChildSubmenu() {
-      if (!action.isEnabled || !hasChildren) {
-        return;
-      }
-      _cancelContextSubmenuRemoval();
-      final itemContext = itemKey.currentContext;
-      final itemBox = itemContext?.findRenderObject() as RenderBox?;
-      if (itemBox == null) {
-        return;
-      }
-      _showContextSubmenuOverlay(
-        actionContext: actionContext,
-        rootMenuContext: rootMenuContext,
-        overlayBox: overlayBox,
-        anchorBox: itemBox,
-        sections: action.childSections!,
-        depth: depth + 1,
+class _ContextSubmenuActionRowState extends State<_ContextSubmenuActionRow> {
+  final GlobalKey _itemKey = GlobalKey();
+  final Object _submenuOwner = Object();
+  Future<List<ContextMenuSection>>? _sectionsFuture;
+  List<ContextMenuSection>? _resolvedSections;
+
+  int get _childDepth => widget.depth + 1;
+
+  List<ContextMenuSection> _loadingSections() {
+    return <ContextMenuSection>[
+      ContextMenuSection(
+        actions: <ContextMenuAction>[
+          ContextMenuAction(
+            id: '${widget.action.id}_loading',
+            label: AppLocalizations.of(widget.actionContext)?.loading ??
+                'Loading...',
+            icon: PhosphorIconsLight.hourglass,
+            isEnabled: false,
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<ContextMenuSection> _emptySections() {
+    return <ContextMenuSection>[
+      ContextMenuSection(
+        actions: <ContextMenuAction>[
+          ContextMenuAction(
+            id: '${widget.action.id}_empty',
+            label: widget.action.label,
+            icon: widget.action.icon,
+            isEnabled: false,
+          ),
+        ],
+      ),
+    ];
+  }
+
+  void _showSections(List<ContextMenuSection> sections) {
+    final itemContext = _itemKey.currentContext;
+    final itemBox = itemContext?.findRenderObject() as RenderBox?;
+    if (itemBox == null) {
+      return;
+    }
+    _showContextSubmenuOverlay(
+      actionContext: widget.actionContext,
+      rootMenuContext: widget.rootMenuContext,
+      overlayBox: widget.overlayBox,
+      anchorBox: itemBox,
+      sections: sections,
+      depth: _childDepth,
+      owner: _submenuOwner,
+    );
+  }
+
+  Future<void> _replaceLoadingSubmenu(
+    Future<List<ContextMenuSection>> sectionsFuture,
+  ) async {
+    List<ContextMenuSection> sections;
+    try {
+      sections = await sectionsFuture;
+    } catch (_) {
+      sections = const <ContextMenuSection>[];
+    }
+    _resolvedSections = sections;
+    if (!mounted ||
+        !_isContextSubmenuOwnerActive(_childDepth, _submenuOwner) ||
+        !widget.actionContext.mounted) {
+      return;
+    }
+    _showSections(sections.isEmpty ? _emptySections() : sections);
+  }
+
+  void _openChildSubmenu() {
+    if (!widget.action.isEnabled ||
+        !_contextMenuActionHasSubmenu(widget.action)) {
+      return;
+    }
+    _cancelContextSubmenuRemoval();
+
+    final childSections = widget.action.childSections;
+    if (childSections != null && childSections.isNotEmpty) {
+      _showSections(childSections);
+      return;
+    }
+
+    final resolvedSections = _resolvedSections;
+    if (resolvedSections != null) {
+      _showSections(
+        resolvedSections.isEmpty ? _emptySections() : resolvedSections,
       );
+      return;
     }
 
-    Future<void> selectAction() async {
-      if (!action.isEnabled) {
-        return;
-      }
-      if (hasChildren) {
-        openChildSubmenu();
-        return;
-      }
-      _removeContextSubmenu();
-      Navigator.pop(rootMenuContext);
-      if (action.onSelected != null && actionContext.mounted) {
-        await action.onSelected!(actionContext);
-      }
+    final loader = widget.action.loadChildSections;
+    if (loader == null) {
+      return;
     }
+    _showSections(_loadingSections());
+    if (_sectionsFuture == null) {
+      final sectionsFuture = loader(widget.actionContext);
+      _sectionsFuture = sectionsFuture;
+      unawaited(_replaceLoadingSubmenu(sectionsFuture));
+    }
+  }
 
+  Future<void> _selectAction() async {
+    if (!widget.action.isEnabled) {
+      return;
+    }
+    if (_contextMenuActionHasSubmenu(widget.action)) {
+      _openChildSubmenu();
+      return;
+    }
+    _removeContextSubmenu();
+    Navigator.pop(widget.rootMenuContext);
+    if (widget.action.onSelected != null && widget.actionContext.mounted) {
+      await widget.action.onSelected!(widget.actionContext);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSubmenu = _contextMenuActionHasSubmenu(widget.action);
     return MouseRegion(
-      key: itemKey,
+      key: _itemKey,
       onEnter: (_) {
         _cancelContextSubmenuRemoval();
-        if (hasChildren) {
-          openChildSubmenu();
+        if (hasSubmenu) {
+          _openChildSubmenu();
         } else {
-          _removeContextSubmenusFrom(depth + 1);
+          _removeContextSubmenusFrom(_childDepth);
         }
       },
       child: InkWell(
-        key: ValueKey<String>('context-menu-action-tap-${action.id}'),
-        onTap: action.isEnabled ? selectAction : null,
+        key: ValueKey<String>(
+          'context-menu-action-tap-${widget.action.id}',
+        ),
+        onTap: widget.action.isEnabled ? _selectAction : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: 12,
             vertical: 12,
           ),
           child: _buildContextMenuActionRow(
-            actionContext,
-            action,
+            widget.actionContext,
+            widget.action,
             forPopup: true,
           ),
         ),

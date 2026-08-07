@@ -23,6 +23,11 @@ class SendMessage extends AiAgentEvent {
   List<Object?> get props => [message, referencedFiles];
 }
 
+/// Stop the currently active AI generation or tool loop.
+class StopGeneration extends AiAgentEvent {
+  const StopGeneration();
+}
+
 /// Clear the chat history.
 class ClearChat extends AiAgentEvent {
   const ClearChat();

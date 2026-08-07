@@ -21,12 +21,14 @@ class AiToolCall {
   final String arguments;
   final String? result;
   final bool success;
+  final bool isRunning;
 
   const AiToolCall({
     required this.toolName,
     required this.arguments,
     this.result,
     this.success = true,
+    this.isRunning = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -34,6 +36,7 @@ class AiToolCall {
         'arguments': arguments,
         'result': result,
         'success': success,
+        'isRunning': isRunning,
       };
 
   factory AiToolCall.fromJson(Map<String, dynamic> json) => AiToolCall(
@@ -41,6 +44,7 @@ class AiToolCall {
         arguments: json['arguments'] as String? ?? '',
         result: json['result'] as String?,
         success: json['success'] as bool? ?? true,
+        isRunning: json['isRunning'] as bool? ?? false,
       );
 }
 

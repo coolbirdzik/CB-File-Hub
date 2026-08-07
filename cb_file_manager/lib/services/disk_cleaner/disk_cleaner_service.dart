@@ -10,6 +10,7 @@ import 'package:win32/win32.dart' as win32;
 import '../../helpers/core/filesystem_utils.dart';
 import '../../helpers/core/io_extensions.dart';
 import '../../helpers/files/trash_manager.dart';
+import '../app_insights/app_insights_models.dart';
 import '../../utils/app_logger.dart';
 import 'cleaner_categories.dart';
 import 'cleaner_models.dart';
@@ -52,6 +53,9 @@ class CleanerScanContext {
   final String? selectedPath;
   final String? chartPath;
   final bool isScanning;
+  final AppStorageReport? appStorageReport;
+  final String? selectedAppId;
+  final bool appInsightsSharedWithAgent;
   final DateTime updatedAt;
 
   const CleanerScanContext({
@@ -60,6 +64,9 @@ class CleanerScanContext {
     this.selectedPath,
     this.chartPath,
     this.isScanning = false,
+    this.appStorageReport,
+    this.selectedAppId,
+    this.appInsightsSharedWithAgent = false,
     required this.updatedAt,
   });
 }
@@ -103,6 +110,9 @@ class DiskCleanerService {
     String? selectedPath,
     String? chartPath,
     bool isScanning = false,
+    AppStorageReport? appStorageReport,
+    String? selectedAppId,
+    bool appInsightsSharedWithAgent = false,
   }) {
     if (root == null) {
       _cleanerScanContexts.remove(ownerTabId);
@@ -115,6 +125,9 @@ class DiskCleanerService {
       selectedPath: selectedPath,
       chartPath: chartPath,
       isScanning: isScanning,
+      appStorageReport: appStorageReport,
+      selectedAppId: selectedAppId,
+      appInsightsSharedWithAgent: appInsightsSharedWithAgent,
       updatedAt: DateTime.now(),
     );
   }
@@ -649,15 +662,10 @@ class DiskCleanerService {
     // paths that actually fail surface a user decision or deeper
     // classification.
     if (bulkItems.isNotEmpty) {
-      // Recycle Bin moves are much heavier than permanent deletes on Windows.
-      // Keep those batches smaller so progress advances frequently and one
-      // bad path does not hold the UI on a large native batch for too long.
-      final maxChunkSize = permanent ? 64 : 16;
-      // Start with a small warmup batch so the user sees the counter move
-      // within the first couple of native calls instead of staring at
-      // "1/N" while a full 64-file batch crunches. Subsequent batches use
-      // the full size.
-      var nextChunkSize = permanent ? 8 : 4;
+      // A healthy item should participate in a real batch. The previous
+      // 4/8/16-item ramp-up repeatedly paid the COM startup cost, and risky
+      // extensions were sent through one IFileOperation call per file.
+      const maxChunkSize = 64;
 
       var start = 0;
       while (start < bulkItems.length) {
@@ -665,15 +673,11 @@ class DiskCleanerService {
         // UI can repaint and process the close-dialog frame even when the
         // cleaner is in the middle of a large bulk-skip pass.
         await Future<void>.delayed(Duration.zero);
-        final chunkSize = skipAllRemainingDeletes ? 512 : nextChunkSize;
+        final chunkSize = skipAllRemainingDeletes ? 512 : maxChunkSize;
         final end = (start + chunkSize < bulkItems.length)
             ? start + chunkSize
             : bulkItems.length;
         final chunk = bulkItems.sublist(start, end);
-        // Grow the chunk size geometrically up to the cap. By the third or
-        // fourth batch we are at the full chunk size.
-        nextChunkSize = (chunkSize * 2).clamp(1, maxChunkSize);
-        final guardedDeletes = <JunkItem>[];
         final batchedDeletes = <JunkItem>[];
         final autoSkippedInUse = <JunkItem>[];
 
@@ -692,11 +696,8 @@ class DiskCleanerService {
           // 15-50s. With Skip all active, only do cheap string-based
           // volatile detection and let the native batch handle the rest.
           final volatileBusy = _shouldTreatAsVolatileInUsePath(item.path);
-          final guarded =
-              !permanent && _shouldGuardDeleteIndividually(item.path);
 
           bool quickBusy = false;
-          bool restartManagerBusy = false;
           bool shouldProbe = false;
 
           if (!skipAllRemainingDeletes) {
@@ -707,15 +708,12 @@ class DiskCleanerService {
             );
             quickBusy =
                 shouldProbe && _isPathBusyByAnotherProcessQuick(item.path);
-            restartManagerBusy =
-                shouldProbe && !quickBusy && _hasRestartManagerLock(item.path);
           }
 
-          final isLikelyBusy = quickBusy || restartManagerBusy || volatileBusy;
-          if (!skipAllRemainingDeletes &&
-              (shouldProbe || guarded || volatileBusy)) {
+          final isLikelyBusy = quickBusy || volatileBusy;
+          if (!skipAllRemainingDeletes && (shouldProbe || volatileBusy)) {
             AppLogger.info(
-              '[DiskCleaner] Delete preflight | path=${item.path} | shouldProbe=$shouldProbe | quickBusy=$quickBusy | restartManagerBusy=$restartManagerBusy | volatileBusy=$volatileBusy | route=${isLikelyBusy ? "skip-in-use" : guarded ? "guarded-single" : "batch"}',
+              '[DiskCleaner] Delete preflight | path=${item.path} | shouldProbe=$shouldProbe | quickBusy=$quickBusy | volatileBusy=$volatileBusy | route=${isLikelyBusy ? "skip-in-use" : "batch"}',
             );
           }
           if (isLikelyBusy) {
@@ -734,17 +732,10 @@ class DiskCleanerService {
             continue;
           }
 
-          // Do not let risky files poison an entire native batch. DLL/NODE/EXE
-          // temp artifacts are exactly the kinds of files that get held by
-          // installers, antivirus, indexers, or the current app. If one of
-          // these blocks inside IFileOperation, the whole batch appears frozen
-          // on item N. Route them through per-item deletes with independent
-          // timeouts so only that one item stalls/fails.
-          if (guarded) {
-            guardedDeletes.add(item);
-          } else {
-            batchedDeletes.add(item);
-          }
+          // Lock diagnostics are intentionally lazy. Restart Manager costs
+          // tens of milliseconds per file, so healthy items go straight into
+          // the batch and only actual failures are classified later.
+          batchedDeletes.add(item);
         }
 
         if (autoSkippedInUse.isNotEmpty) {
@@ -755,51 +746,6 @@ class DiskCleanerService {
           );
           done += autoSkippedInUse.length;
           onProgress?.call(done, total, autoSkippedInUse.last.path);
-        }
-
-        for (var i = 0; i < guardedDeletes.length; i++) {
-          final item = guardedDeletes[i];
-          if (skipAllRemainingDeletes) {
-            final remaining = guardedDeletes.sublist(i);
-            recordSkippedByUserMany(
-              remaining,
-              reason: 'Skipped after user selected Skip all',
-              actionLabel: permanent ? 'permanent delete' : 'recycle-bin move',
-              log: false,
-            );
-            done += remaining.length;
-            onProgress?.call(done, total, remaining.last.path);
-            break;
-          }
-          try {
-            AppLogger.info(
-              '[DiskCleaner] Guarded single ${permanent ? "permanent delete" : "recycle-bin move"} start | path=${item.path}',
-            );
-            // When the user already chose Skip all, do not let the native
-            // call burn the full 1-2s timeout per failure. Use a tiny
-            // timeout so healthy paths still succeed quickly while busy
-            // ones fail fast and get bulk-skipped on the next iteration.
-            final fastSkipTimeout = skipAllRemainingDeletes
-                ? const Duration(milliseconds: 200)
-                : null;
-            final ok = await (permanent
-                ? trash.deleteMultiplePermanently([item.path],
-                    chunkSize: 1, timeoutOverride: fastSkipTimeout)
-                : trash.moveMultipleToTrashBatched([item.path],
-                    chunkSize: 1, timeoutOverride: fastSkipTimeout));
-            AppLogger.info(
-              '[DiskCleaner] Guarded single ${permanent ? "permanent delete" : "recycle-bin move"} finished | ok=${ok.contains(item.path)} | path=${item.path}',
-            );
-            if (ok.contains(item.path)) {
-              recordSuccess(item, log: false);
-            } else {
-              await resolveFailedItem(item);
-            }
-          } catch (e) {
-            await resolveFailedItem(item, fallbackReason: '$e');
-          }
-          done++;
-          onProgress?.call(done, total, item.path);
         }
 
         if (batchedDeletes.isEmpty) {
@@ -1179,20 +1125,6 @@ class DiskCleanerService {
       return true;
     }
 
-    return lowerPath.endsWith('.dll') ||
-        lowerPath.endsWith('.node') ||
-        lowerPath.endsWith('.exe') ||
-        lowerPath.endsWith('.pyd') ||
-        lowerPath.endsWith('.sys') ||
-        lowerPath.endsWith('.ocx') ||
-        lowerPath.endsWith('.msi') ||
-        lowerPath.endsWith('.tmp') ||
-        lowerPath.endsWith('.log') ||
-        lowerPath.endsWith('.etl');
-  }
-
-  bool _shouldGuardDeleteIndividually(String path) {
-    final lowerPath = path.toLowerCase();
     return lowerPath.endsWith('.dll') ||
         lowerPath.endsWith('.node') ||
         lowerPath.endsWith('.exe') ||

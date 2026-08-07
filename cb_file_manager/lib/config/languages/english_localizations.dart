@@ -3275,6 +3275,180 @@ class EnglishLocalizations implements AppLocalizations {
           int count, String size, int skipped) =>
       'Permanently deleted $count items ($size). Skipped $skipped file(s) after delete failed.';
 
+  // Cleaner App Insights
+  @override
+  String get cleanerUtilitiesTitle => 'CB Agent Cleaner';
+  @override
+  String get cleanerUtilitiesSubtitle =>
+      'Utilities that help keep this PC fast and organized';
+  @override
+  String get cleanerUtilitiesStorageGroup => 'Storage';
+  @override
+  String get cleanerDiskUsageTitle => 'Disk usage';
+  @override
+  String get cleanerDiskUtilityDescription =>
+      'Inspect folders and safely clean confirmed junk';
+  @override
+  String get cleanerAppsTitle => 'Apps';
+  @override
+  String get cleanerAppsUtilityDescription =>
+      'Find large or rarely used apps and review their data';
+  @override
+  String get cleanerAppsLoading => 'Analyzing installed apps...';
+  @override
+  String get cleanerAppsUnavailable =>
+      'App insights will be available after the disk scan completes.';
+  @override
+  String cleanerAppsLoadFailed(String error) =>
+      'Could not analyze installed apps: $error';
+  @override
+  String get cleanerAppsPartialBanner => 'Results are still updating.';
+  @override
+  String get cleanerAppsSearchHint => 'Search apps';
+  @override
+  String get cleanerAppsFilterAll => 'All';
+  @override
+  String get cleanerAppsFilterAttention => 'Review';
+  @override
+  String get cleanerAppsFilterLarge => 'Large';
+  @override
+  String get cleanerAppsFilterStale => 'Rarely used';
+  @override
+  String get cleanerAppsFilterCleanable => 'Cleanable';
+  @override
+  String get cleanerAppsSortLabel => 'Sort';
+  @override
+  String get cleanerAppsSortSize => 'Largest first';
+  @override
+  String get cleanerAppsSortName => 'Name';
+  @override
+  String get cleanerAppsSortLastOpened => 'Oldest activity';
+  @override
+  String get cleanerAppsLargeThresholdLabel => 'Large app';
+  @override
+  String get cleanerAppsStaleThresholdLabel => 'Not seen';
+  @override
+  String cleanerAppsDays(int days) => '$days days';
+  @override
+  String get cleanerAppsSummaryFootprint => 'Confirmed footprint';
+  @override
+  String get cleanerAppsSummaryAttention => 'Worth reviewing';
+  @override
+  String get cleanerAppsSummaryLarge => 'Large apps';
+  @override
+  String get cleanerAppsSummaryStale => 'Not seen recently';
+  @override
+  String get cleanerAppsSummaryCleanable => 'Cleanable cache';
+  @override
+  String cleanerAppsThresholdAtLeast(String size) => '$size or larger';
+  @override
+  String cleanerAppsNotSeenForDays(int days) =>
+      'No recorded launch for $days days';
+  @override
+  String get cleanerAppsReviewableCache => 'Available for safe review';
+  @override
+  String cleanerAppsShowingCount(int count) => 'Showing $count apps';
+  @override
+  String get cleanerAppsNoResults => 'No apps match these filters.';
+  @override
+  String get cleanerAppsUnknown => 'Unknown';
+  @override
+  String cleanerAppsLastOpened(String date) => 'Last seen: $date';
+  @override
+  String cleanerAppsNotOpenedForDays(int days) => 'Not opened for $days days';
+  @override
+  String get cleanerAppsUsageUnknownCompact => 'No recent activity data';
+  @override
+  String get cleanerAppsAttentionBadge => 'Review';
+  @override
+  String get cleanerAppsViewOptions => 'View options';
+  @override
+  String cleanerAppsUsageEvidence(String source, String confidence) =>
+      '$source • $confidence';
+  @override
+  String cleanerAppsPossibleSize(String size) => 'Possible: $size';
+  @override
+  String cleanerAppsCleanableAmount(String size) => 'Cleanable: $size';
+  @override
+  String get cleanerAppsDetails => 'App details';
+  @override
+  String get cleanerAppsUsageEvidenceLabel => 'Usage evidence';
+  @override
+  String get cleanerAppsSelectApp => 'Select an app to view its storage.';
+  @override
+  String get cleanerAppsConfirmedFootprint => 'Confirmed';
+  @override
+  String get cleanerAppsPossibleFootprint => 'Possible';
+  @override
+  String get cleanerAppsStorageBreakdown => 'Storage breakdown';
+  @override
+  String get cleanerAppsNoStorageDetails =>
+      'No measured storage locations are available for this app.';
+  @override
+  String get cleanerAppsSharedFolders => 'Shared / unattributed large folders';
+  @override
+  String get cleanerAppsSharedFoldersDescription =>
+      'These folders are not assigned to one app and are never selected for cleanup.';
+  @override
+  String get cleanerAppsOpenFolder => 'Open folder';
+  @override
+  String get cleanerAppsManageInWindows => 'Manage in Windows';
+  @override
+  String get cleanerAppsReviewCleanable => 'Review cleanable data';
+  @override
+  String get cleanerAppsAskAgent => 'Ask CB Agent';
+  @override
+  String cleanerAppsVersion(String version) => 'Version $version';
+  @override
+  String cleanerAppsInstalledOrUpdated(String date) =>
+      'Installed or updated: $date';
+  @override
+  String get cleanerAppsSourceWin32 => 'Win32 app';
+  @override
+  String get cleanerAppsSourceStore => 'Microsoft Store app';
+  @override
+  String get cleanerAppsMeasurementMeasured => 'Measured';
+  @override
+  String get cleanerAppsMeasurementEstimated => 'Windows estimate';
+  @override
+  String get cleanerAppsMeasurementPartial => 'Partial';
+  @override
+  String get cleanerAppsMeasurementUnknown => 'Unknown size';
+  @override
+  String get cleanerAppsAttributionConfirmed => 'Confirmed';
+  @override
+  String get cleanerAppsAttributionPossible => 'Possible';
+  @override
+  String get cleanerAppsAttributionShared => 'Shared';
+  @override
+  String get cleanerAppsUsageUserAssist => 'Windows launch history';
+  @override
+  String get cleanerAppsUsagePrefetch => 'Windows Prefetch';
+  @override
+  String get cleanerAppsConfidenceHigh => 'High confidence';
+  @override
+  String get cleanerAppsConfidenceMedium => 'Medium confidence';
+  @override
+  String get cleanerAppsStorageInstall => 'Installation';
+  @override
+  String get cleanerAppsStorageLocalData => 'Local app data';
+  @override
+  String get cleanerAppsStorageRoamingData => 'Roaming app data';
+  @override
+  String get cleanerAppsStoragePackageData => 'Package data';
+  @override
+  String get cleanerAppsStorageProgramData => 'Shared program data';
+  @override
+  String get cleanerAppsStorageCache => 'Cache';
+  @override
+  String get cleanerAppsStorageLogs => 'Logs';
+  @override
+  String get cleanerAppsStorageShared => 'Shared storage';
+  @override
+  String get cleanerAppsStorageUnknown => 'Other storage';
+  @override
+  String get cleanerAppsCleanableBadge => 'Cleanable';
+
   @override
   String get aiThinking0 => 'Thinking...';
   @override

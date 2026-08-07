@@ -221,6 +221,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
 
                     // Workspace indicator + Input bar
                     ChatInputBar(
+                      onStop: () => context
+                          .read<AiAgentBloc>()
+                          .add(const StopGeneration()),
                       onSend: (text, files) {
                         context
                             .read<AiAgentBloc>()
