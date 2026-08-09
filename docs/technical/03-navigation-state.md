@@ -10,4 +10,8 @@
 - **Mobile Actions** `ui/tab_manager/mobile/mobile_file_actions_controller.dart` coordinates action bars shared across file list and media galleries.
 - **Selection Logic** `bloc/selection/` tracks multi-select state and exposes BLoC events for UI components.
 
-_Last reviewed: 2026-02-15_
+Provider and lifecycle ownership are documented in the
+[Agent State Ownership Graph](../agent/state/state-ownership.md). Consult it
+before moving a menu, dialog, or overlay outside its pane's provider subtree.
+
+_Last reviewed: 2026-08-08_

@@ -1355,13 +1355,16 @@ class VideoThumbnailHelper {
           }
         } catch (e) {
           _log(
-              'VideoThumbnail: [Custom Mode] Extraction failed for $videoPath: $e');
+            'VideoThumbnail: [Custom Mode] Extraction failed for $videoPath: $e',
+            forceShow: true,
+          );
         }
 
         // Fallback to shell thumbnail only if custom mode extraction failed
         if (nativePath == null) {
           _log(
             'VideoThumbnail: [Custom Mode] Falling back to shell thumbnail for $videoPath',
+            forceShow: true,
           );
           try {
             nativePath = await FcNativeVideoThumbnail.generateThumbnail(

@@ -13,6 +13,8 @@
   - `quality/02-e2e-desktop-integration.md` — Desktop E2E (`integration_test`, Makefile, logs, CI)
 - **Technical**
   - `technical/index.md`
+- **Agent Graph**
+  - `agent/index.md` — Source-linked architecture, feature, state, native-contract, and verification graphs
 - **Features**
   - `features/01-file-browser-grid-preview.md`
   - `features/02-keyboard-shortcuts.md` - Keyboard shortcuts guide
@@ -34,4 +36,6 @@
   - `troubleshooting/01-index.md`
   - `troubleshooting/02-android-smb-vlc-no-render.md`
 
-Each document is short and focused. Start with the overview, then dive into guides and technical docs as needed.
+Each document is short and focused. Coding agents should start with
+`agent/index.md`; human-oriented background remains under `technical/` and
+`features/`.

@@ -384,7 +384,7 @@ class FcNativeVideoThumbnail {
         return null;
       } on PlatformException catch (e) {
         debugPrint(
-            'FcNativeVideoThumbnail: Platform error for $videoPath: ${e.message}');
+            'FcNativeVideoThumbnail: FFmpeg/custom error for $videoPath: ${e.code} ${e.message}');
         return null;
       } catch (e) {
         debugPrint('FcNativeVideoThumbnail: Channel error: $e');
@@ -397,6 +397,11 @@ class FcNativeVideoThumbnail {
         if (await outputFile.exists() && await outputFile.length() > 0) {
           return result;
         }
+        debugPrint(
+            'FcNativeVideoThumbnail: FFmpeg reported success but output missing/empty: $result');
+      } else {
+        debugPrint(
+            'FcNativeVideoThumbnail: FFmpeg returned empty result for $videoPath');
       }
 
       return null;

@@ -1,0 +1,236 @@
+schema_version: 1
+verified_at: 2026-08-09
+verified_revision: "7f40c2a+working-tree"
+path_base: workspace_root
+# Feature ids here are the canonical keys for verification/test-impact-map.yaml.
+
+features:
+  agent_graph_first_workflow:
+    entrypoints:
+      - AGENTS.md
+      - .agents/skills/graph-first/SKILL.md
+      - docs/agent/index.md
+    canonical_graph:
+      - docs/agent/feature-map.yaml
+      - docs/agent/system-map.md
+      - docs/agent/flows/core-flows.md
+      - docs/agent/state/state-ownership.md
+      - docs/agent/native/method-channels.yaml
+      - docs/agent/verification/test-impact-map.yaml
+    edges:
+      - "AGENTS.md -> graph-first skill"
+      - "graph-first skill -> docs/agent"
+      - "graph impact changed -> user approval"
+      - "approved graph delta -> canonical graph -> source code"
+      - "implementation -> verification -> graph reconciliation"
+    invariants:
+      - "Every source-code task reads the relevant graph before editing."
+      - "Graph impact none does not require a user approval pause or documentation churn."
+      - "A changed graph boundary requires explicit approval before any edit."
+      - "Canonical graph changes precede source edits after approval."
+      - "Verification failures may loop autonomously only inside the approved scope and invariants."
+
+  application_bootstrap:
+    entrypoints:
+      - cb_file_manager/lib/main.dart
+      - cb_file_manager/lib/core/service_locator.dart
+    related:
+      - cb_file_manager/lib/config/app_initializer.dart
+      - cb_file_manager/lib/providers/theme_provider.dart
+      - cb_file_manager/lib/config/language_controller.dart
+    edges:
+      - "main -> setupServiceLocator"
+      - "main -> DatabaseManager.initialize"
+      - "main -> CBFileApp"
+      - "CBFileApp -> TabMainScreen"
+    invariants:
+      - "main.dart is the authoritative startup wiring diagram."
+      - "Secondary windows may defer expensive initialization until after the first frame."
+      - "PiP mode uses a lightweight application path."
+
+  tabbed_file_browser:
+    entrypoints:
+      - cb_file_manager/lib/ui/tab_manager/core/tab_main_screen.dart
+      - cb_file_manager/lib/ui/tab_manager/core/tab_manager.dart
+      - cb_file_manager/lib/ui/tab_manager/core/tab_screen.dart
+      - cb_file_manager/lib/ui/tab_manager/core/tabbed_folder/tabbed_folder_list_screen.dart
+    state:
+      - cb_file_manager/lib/ui/screens/folder_list/folder_list_bloc.dart
+      - cb_file_manager/lib/bloc/selection/selection_bloc.dart
+    routing:
+      - cb_file_manager/lib/ui/screens/system_screen_router.dart
+      - cb_file_manager/lib/ui/tab_manager/core/tab_paths.dart
+    tests:
+      - cb_file_manager/test/05_navigation_test.dart
+      - cb_file_manager/test/10_tab_activity_manager_test.dart
+    invariants:
+      - "Navigation is tab based; do not assume conventional named Flutter routes."
+      - "A folder pane owns its FolderListBloc and must preserve the matching provider context."
+      - "Tab sessions and caches must remain isolated by tab or pane identity."
+
+  ai_agent:
+    entrypoints:
+      - cb_file_manager/lib/ui/screens/ai_chat/ai_chat_screen.dart
+      - cb_file_manager/lib/ui/screens/ai_chat/ai_side_panel.dart
+      - cb_file_manager/lib/bloc/ai_agent/ai_agent_bloc.dart
+    services:
+      - cb_file_manager/lib/services/ai/ai_provider_service.dart
+      - cb_file_manager/lib/services/ai/tool_executor.dart
+      - cb_file_manager/lib/services/ai/ai_chat_history_service.dart
+    contracts:
+      - cb_file_manager/lib/models/ai/ai_message.dart
+      - cb_file_manager/lib/services/ai/disk_cleaner_skill.dart
+    tests:
+      - cb_file_manager/test/17_ai_agent_stop_test.dart
+      - cb_file_manager/test/18_app_storage_tool_test.dart
+    invariants:
+      - "Tool calls with side effects require the existing approval path."
+      - "Stopping generation must prevent an older stream or tool loop from overwriting newer state."
+      - "Cleaner scan data is scoped to the owning tab."
+
+  cb_agent_cleaner:
+    entrypoints:
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cb_agent_cleaner_screen.dart
+      - cb_file_manager/lib/services/disk_cleaner/disk_cleaner_service.dart
+    scan_pipeline:
+      - cb_file_manager/lib/services/disk_cleaner/full_disk_scan_isolate.dart
+      - cb_file_manager/lib/services/disk_cleaner/disk_tree_node.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_categories.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_safety.dart
+    selection_and_delete:
+      - cb_file_manager/lib/services/disk_cleaner/disk_tree_selection.dart
+      - cb_file_manager/lib/helpers/files/trash_manager.dart
+      - cb_file_manager/lib/helpers/files/windows_file_operations.dart
+    app_insights:
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_apps_view.dart
+      - cb_file_manager/lib/bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart
+      - cb_file_manager/lib/services/app_insights/windows_app_inventory_service.dart
+      - cb_file_manager/lib/services/app_insights/app_storage_analyzer.dart
+    tests:
+      - cb_file_manager/test/services/disk_cleaner/disk_tree_selection_test.dart
+      - cb_file_manager/test/helpers/files/trash_manager_test.dart
+      - cb_file_manager/test/bloc/cleaner_app_insights_cubit_test.dart
+      - cb_file_manager/test/services/app_insights/app_storage_analyzer_test.dart
+      - cb_file_manager/test/ui/screens/cb_agent_cleaner/cb_agent_cleaner_app_mode_safety_test.dart
+    invariants:
+      - "Bulk selection selects only scanner-confirmed junk nodes."
+      - "Deletion requires an exact target set and explicit user approval."
+      - "Installation folders and user data are analysis evidence, not automatic junk."
+      - "Unknown application activity remains unknown and must not be treated as stale."
+      - "Shared or unattributed storage is never automatically assigned to one app."
+
+  windows_shell_context_menu:
+    entrypoints:
+      - cb_file_manager/lib/ui/components/common/shared_file_context_menu.dart
+      - cb_file_manager/lib/helpers/files/windows_shell_context_menu.dart
+      - cb_file_manager/windows/runner/shell_context_menu_plugin.cpp
+    integrations:
+      - cb_file_manager/lib/ui/tab_manager/components/folder_context_menu.dart
+      - cb_file_manager/windows/runner/flutter_window.cpp
+    tests:
+      - cb_file_manager/test/helpers/files/windows_shell_context_menu_test.dart
+      - cb_file_manager/test/ui/components/common/shared_file_context_menu_test.dart
+    invariants:
+      - "Render the root menu without waiting for optional third-party submenu contents."
+      - "A native Shell session is bound to the exact normalized selection and Shift state."
+      - "Command IDs and IContextMenu state must not be shared across different targets."
+      - "Keep a session leased while one of its lazy submenus is open."
+
+  local_ai_runtime:
+    entrypoints:
+      - cb_file_manager/lib/services/local_ai/local_ai_advisor_service.dart
+      - cb_file_manager/lib/services/local_ai/gguf_llama_cpp_runtime.dart
+      - cb_file_manager/lib/services/local_ai/windows_process_reaper.dart
+    build_and_packaging:
+      - scripts/fetch_llama_runtime.sh
+      - cb_file_manager/windows/CMakeLists.txt
+      - cb_file_manager/windows/runner/CMakeLists.txt
+    tests:
+      - cb_file_manager/test/14_local_ai_advisor_service_test.dart
+    invariants:
+      - "Inference runs in llama-server.exe, not through in-process llama.cpp FFI."
+      - "The runtime stays in the llama subfolder to avoid loading the app-local Vulkan DLL."
+      - "The server is attached to a kill-on-close Windows Job Object."
+      - "A clean direct Flutter Windows build requires fetching the runtime first."
+
+  persistence:
+    entrypoints:
+      - cb_file_manager/lib/models/database/database_manager.dart
+      - cb_file_manager/lib/models/database/sqlite_database_provider.dart
+      - cb_file_manager/lib/helpers/core/user_preferences.dart
+    consumers:
+      - cb_file_manager/lib/services/network_credentials_service.dart
+      - cb_file_manager/lib/services/album_service.dart
+      - cb_file_manager/lib/services/video_library_service.dart
+      - cb_file_manager/lib/services/ai/ai_provider_service.dart
+    invariants:
+      - "SQLite is the active structured persistence backend."
+      - "SharedPreferences remains in use for bootstrap, UI state, and legacy migration paths."
+      - "Legacy objectbox directory names do not imply an ObjectBox runtime dependency."
+
+  network_browsing:
+    status: stub
+    entrypoints:
+      - cb_file_manager/lib/bloc/network_browsing/network_browsing_bloc.dart
+      - cb_file_manager/lib/services/network_browsing/smb_service.dart
+      - cb_file_manager/lib/services/network_browsing/mobile_smb_service.dart
+      - cb_file_manager/lib/services/network_browsing/ftp_service.dart
+      - cb_file_manager/lib/services/network_browsing/webdav_service.dart
+    related:
+      - cb_file_manager/lib/services/network_credentials_service.dart
+      - mobile_smb_native/
+    invariants:
+      - "SMB/CIFS desktop and mobile paths may differ; verify the active ISmbService implementation."
+      - "Credentials belong to NetworkCredentialsService / persistence, not ad-hoc SharedPreferences writes."
+      - "Network panes still own FolderListBloc context the same way local panes do."
+
+  media_streaming:
+    status: stub
+    entrypoints:
+      - cb_file_manager/lib/services/streaming/streaming_service_manager.dart
+      - cb_file_manager/lib/services/streaming/file_streaming_manager.dart
+      - cb_file_manager/lib/services/streaming/smb_http_proxy_server.dart
+    related:
+      - cb_file_manager/lib/ui/screens/media_gallery/video_player_full_screen.dart
+    invariants:
+      - "HTTP streaming and SMB proxy servers are process-local helpers, not durable background daemons."
+      - "Remote playback paths must keep auth and proxy lifetime bound to the active media session."
+
+  gallery_and_tags:
+    status: stub
+    entrypoints:
+      - cb_file_manager/lib/ui/screens/gallery_hub/gallery_hub_screen.dart
+      - cb_file_manager/lib/ui/screens/media_gallery/image_viewer_screen.dart
+      - cb_file_manager/lib/ui/screens/tag_management/tag_management_screen.dart
+      - cb_file_manager/lib/helpers/tags/tag_manager.dart
+    related:
+      - cb_file_manager/lib/helpers/tags/tag_hierarchy_manager.dart
+      - cb_file_manager/lib/ui/screens/folder_list/bloc/tag_search_bloc.dart
+    invariants:
+      - "Tag hierarchy and color state go through the tag helpers and SQLite-backed persistence."
+      - "Gallery viewers must not assume a single global selection owner across tabs."
+
+  localization:
+    entrypoints:
+      - cb_file_manager/lib/config/languages/app_localizations.dart
+      - cb_file_manager/lib/config/languages/english_localizations.dart
+      - cb_file_manager/lib/config/languages/vietnamese_localizations.dart
+    invariants:
+      - "English and Vietnamese localization classes must stay in sync for every new user-facing string key."
+      - "This app does not use Flutter gen-l10n / ARB files."
+
+  cleaner_app_insights:
+    entrypoints:
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_apps_view.dart
+      - cb_file_manager/lib/bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart
+      - cb_file_manager/lib/services/app_insights/windows_app_inventory_service.dart
+      - cb_file_manager/lib/services/app_insights/app_storage_analyzer.dart
+    parent: cb_agent_cleaner
+    tests:
+      - cb_file_manager/test/services/app_insights/app_storage_analyzer_test.dart
+      - cb_file_manager/test/bloc/cleaner_app_insights_cubit_test.dart
+      - cb_file_manager/test/18_app_storage_tool_test.dart
+    invariants:
+      - "Installation folders and user data are analysis evidence, not automatic junk."
+      - "Unknown application activity remains unknown and must not be treated as stale."
+      - "Shared or unattributed storage is never automatically assigned to one app."

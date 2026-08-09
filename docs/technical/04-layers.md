@@ -1,15 +1,21 @@
-## Layer Catalogue
+# Layer Catalogue
 
-| Layer         | Representative Paths                                                           | Highlights                                                                                        |
-| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Configuration | `config/theme_config.dart`, `config/app_theme.dart`, `config/languages/`       | Minimal theme tokens, color scheme, localization delegates, runtime language switching.           |
-| Utils         | `utils/app_logger.dart`                                                        | Centralized logging framework (NEVER use `print()` in production).                                |
-| Helpers       | `helpers/core/filesystem_utils.dart`, `helpers/media/`, `helpers/tags/`        | Filesystem traversal, media caches, tag batch operations, platform-specific utilities.            |
-| Native Plugins| `windows/runner/`                                                              | Custom Windows C++ plugins for high-performance tasks (Thumbnails, Shell integration).            |
-| Services      | `services/album_*`, `services/network_browsing/`, `services/streaming/`        | Long-running tasks, isolates, network adapters (FTP/SMB/WebDAV), streaming session orchestration. |
-| UI Screens    | `ui/screens/media_gallery/`, `ui/screens/permissions/`, `ui/screens/settings/` | Feature-specific views with responsive layouts and shared action patterns.                        |
-| UI Components | `ui/components/`                                                               | Reusable cards, buttons, bottom sheets, PiP controls, gallery tiles.                              |
-| Widgets       | `widgets/`                                                                     | Leaf widgets consumed across multiple screens (e.g., progress indicators).                        |
-| Data Models   | `models/` + `objectbox-model.json`                                             | ObjectBox entities for files, tags, preferences, plus DAO helpers.                                |
+| Layer | Representative paths | Responsibility |
+| --- | --- | --- |
+| Bootstrap | `main.dart`, `core/service_locator.dart` | Window roles, initialization order, root widget, long-lived service registration. |
+| Configuration | `config/`, `providers/theme_provider.dart` | Feature flags, theme selection, language controller, localization implementations. |
+| State | `bloc/`, `ui/screens/folder_list/*_bloc.dart`, `ui/tab_manager/core/tab_manager.dart` | Application, tab, pane, selection, AI, and feature state machines. |
+| Helpers | `helpers/core/`, `helpers/files/`, `helpers/media/`, `helpers/tags/` | Cross-cutting filesystem, native-wrapper, media-cache, and tag operations. |
+| Services | `services/` | Persistence consumers, networking, streaming, AI providers, local runtimes, and long-running work. |
+| Persistence | `models/database/`, `helpers/core/user_preferences.dart` | SQLite abstraction plus SharedPreferences-backed bootstrap and migration state. |
+| UI | `ui/screens/`, `ui/components/`, `ui/widgets/`, `ui/tab_manager/` | Feature surfaces, reusable interaction components, and the tab shell. |
+| Native plugins | `windows/runner/` | Windows Shell, file operations, app inventory/icons, thumbnails, drag/drop, and window behavior. |
+| Local FFI plugin | `../mobile_smb_native/` | SMB/CIFS access through libsmb2. |
+| Verification | `test/`, `integration_test/`, `tool/` | Unit/widget coverage, Windows E2E, parallel runner, reports, and dashboard. |
 
-_Last reviewed: 2026-03-07_
+The repository contains compatibility paths and legacy names. In particular,
+`lib/models/objectbox/` model imports do not mean ObjectBox is the active
+database backend. Follow the [Agent Feature Map](../agent/feature-map.yaml) from
+an entry point to its active implementation.
+
+_Last reviewed: 2026-08-08_

@@ -637,6 +637,209 @@ namespace fc_native_video_thumbnail
     return "";
   }
 
+  // Shell thumbnails often return HBITMAPs without a usable alpha channel.
+  // WICBitmapUseAlpha alone fails with WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT for
+  // many of those bitmaps, so try several alpha options then fall back to GDI+.
+  std::string SaveHBitmapWithWic(HBITMAP hBitmap, PCWSTR destFile, REFGUID type)
+  {
+    IWICImagingFactory *pFactory = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&pFactory));
+    if (!SUCCEEDED(hr) || !pFactory)
+    {
+      return "`CoCreateInstance` for WIC factory failed with " + HRESULTToString(hr);
+    }
+
+    const WICBitmapAlphaChannelOption alphaOptions[] = {
+        WICBitmapUseAlpha,
+        WICBitmapUsePremultipliedAlpha,
+        WICBitmapIgnoreAlpha,
+    };
+
+    IWICBitmap *pWicBitmap = nullptr;
+    HRESULT lastCreateHr = E_FAIL;
+    for (const auto alphaOption : alphaOptions)
+    {
+      hr = pFactory->CreateBitmapFromHBITMAP(hBitmap, nullptr, alphaOption, &pWicBitmap);
+      lastCreateHr = hr;
+      if (SUCCEEDED(hr) && pWicBitmap)
+      {
+        break;
+      }
+      pWicBitmap = nullptr;
+    }
+
+    if (!pWicBitmap)
+    {
+      pFactory->Release();
+      return "Failed to create WIC bitmap from HBITMAP with " + HRESULTToString(lastCreateHr);
+    }
+
+    IWICStream *pStream = nullptr;
+    hr = pFactory->CreateStream(&pStream);
+    if (!SUCCEEDED(hr) || !pStream)
+    {
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to create WIC stream";
+    }
+
+    hr = pStream->InitializeFromFilename(destFile, GENERIC_WRITE);
+    if (!SUCCEEDED(hr))
+    {
+      pStream->Release();
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to initialize WIC stream";
+    }
+
+    const GUID containerFormat =
+        (type == Gdiplus::ImageFormatPNG) ? GUID_ContainerFormatPng : GUID_ContainerFormatJpeg;
+    IWICBitmapEncoder *pEncoder = nullptr;
+    hr = pFactory->CreateEncoder(containerFormat, nullptr, &pEncoder);
+    if (!SUCCEEDED(hr) || !pEncoder)
+    {
+      pStream->Release();
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to create WIC encoder";
+    }
+
+    hr = pEncoder->Initialize(pStream, WICBitmapEncoderNoCache);
+    if (!SUCCEEDED(hr))
+    {
+      pEncoder->Release();
+      pStream->Release();
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to initialize WIC encoder";
+    }
+
+    IWICBitmapFrameEncode *pFrame = nullptr;
+    IPropertyBag2 *pProps = nullptr;
+    hr = pEncoder->CreateNewFrame(&pFrame, &pProps);
+    if (!SUCCEEDED(hr) || !pFrame)
+    {
+      if (pProps)
+      {
+        pProps->Release();
+      }
+      pEncoder->Release();
+      pStream->Release();
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to create WIC frame";
+    }
+
+    if (containerFormat == GUID_ContainerFormatJpeg && pProps)
+    {
+      PROPBAG2 option = {};
+      option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
+      VARIANT varValue;
+      VariantInit(&varValue);
+      varValue.vt = VT_R4;
+      varValue.fltVal = 0.9f;
+      pProps->Write(1, &option, &varValue);
+      VariantClear(&varValue);
+    }
+
+    hr = pFrame->Initialize(pProps);
+    if (pProps)
+    {
+      pProps->Release();
+    }
+    if (!SUCCEEDED(hr))
+    {
+      pFrame->Release();
+      pEncoder->Release();
+      pStream->Release();
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to initialize WIC frame";
+    }
+
+    UINT width = 0;
+    UINT height = 0;
+    pWicBitmap->GetSize(&width, &height);
+    pFrame->SetSize(width, height);
+
+    // JPEG has no alpha; prefer 24bpp BGR so encoders accept shell bitmaps reliably.
+    GUID pixelFormat = (containerFormat == GUID_ContainerFormatJpeg)
+                           ? GUID_WICPixelFormat24bppBGR
+                           : GUID_WICPixelFormat32bppBGRA;
+    pFrame->SetPixelFormat(&pixelFormat);
+
+    hr = pFrame->WriteSource(pWicBitmap, nullptr);
+    if (!SUCCEEDED(hr))
+    {
+      pFrame->Release();
+      pEncoder->Release();
+      pStream->Release();
+      pWicBitmap->Release();
+      pFactory->Release();
+      return "Failed to write WIC frame with " + HRESULTToString(hr);
+    }
+
+    pFrame->Commit();
+    pEncoder->Commit();
+
+    pFrame->Release();
+    pEncoder->Release();
+    pStream->Release();
+    pWicBitmap->Release();
+    pFactory->Release();
+    return "";
+  }
+
+  std::string SaveHBitmapWithGdiplus(HBITMAP hBitmap, PCWSTR destFile, REFGUID type)
+  {
+    ULONG_PTR gdiplusToken = 0;
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr) != Gdiplus::Ok)
+    {
+      return "GdiplusStartup failed while saving shell thumbnail";
+    }
+
+    std::unique_ptr<Gdiplus::Bitmap> bitmap(Gdiplus::Bitmap::FromHBITMAP(hBitmap, nullptr));
+    if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok)
+    {
+      Gdiplus::GdiplusShutdown(gdiplusToken);
+      return "GDI+ FromHBITMAP failed for shell thumbnail";
+    }
+
+    CLSID clsid;
+    const bool isPng = (type == Gdiplus::ImageFormatPNG);
+    if (GetEncoderClsid(isPng ? L"image/png" : L"image/jpeg", &clsid) < 0)
+    {
+      Gdiplus::GdiplusShutdown(gdiplusToken);
+      return "Failed to find GDI+ encoder for shell thumbnail";
+    }
+
+    Gdiplus::Status status;
+    if (isPng)
+    {
+      status = bitmap->Save(destFile, &clsid, nullptr);
+    }
+    else
+    {
+      Gdiplus::EncoderParameters encoderParams;
+      ULONG qualityValue = 90;
+      encoderParams.Count = 1;
+      encoderParams.Parameter[0].Guid = Gdiplus::EncoderQuality;
+      encoderParams.Parameter[0].Type = Gdiplus::EncoderParameterValueTypeLong;
+      encoderParams.Parameter[0].NumberOfValues = 1;
+      encoderParams.Parameter[0].Value = &qualityValue;
+      status = bitmap->Save(destFile, &clsid, &encoderParams);
+    }
+
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    if (status != Gdiplus::Ok)
+    {
+      return "GDI+ failed to save shell thumbnail";
+    }
+    return "";
+  }
+
   std::string ExtractShellThumbnail(PCWSTR srcFile, PCWSTR destFile, int size, REFGUID type)
   {
     IShellItem *pSI;
@@ -675,7 +878,7 @@ namespace fc_native_video_thumbnail
       }
       return "`GetThumbnail` failed with " + HRESULTToString(hr);
     }
-    HBITMAP hBitmap;
+    HBITMAP hBitmap = nullptr;
     hr = pSharedBitmap->GetSharedBitmap(&hBitmap);
     if (!SUCCEEDED(hr) || !hBitmap)
     {
@@ -685,143 +888,35 @@ namespace fc_native_video_thumbnail
       return "`GetSharedBitmap` failed with " + HRESULTToString(hr);
     }
 
+    // Own a stable DIB copy before releasing shell objects. Shared shell bitmaps
+    // may use uncommon pixel formats that confuse WIC unless copied first.
+    HBITMAP hOwnedBitmap =
+        static_cast<HBITMAP>(CopyImage(hBitmap, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION));
+    if (hOwnedBitmap)
+    {
+      DeleteObject(hBitmap);
+      hBitmap = hOwnedBitmap;
+    }
+
     pSI->Release();
     pSharedBitmap->Release();
     pThumbCache->Release();
 
-    IWICImagingFactory *pFactory = nullptr;
-    hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFactory));
-    if (!SUCCEEDED(hr) || !pFactory)
+    const std::string wicResult = SaveHBitmapWithWic(hBitmap, destFile, type);
+    if (wicResult.empty())
     {
       DeleteObject(hBitmap);
-      return "`CoCreateInstance` for WIC factory failed with " + HRESULTToString(hr);
+      return "";
     }
 
-    IWICBitmap *pWicBitmap = nullptr;
-    hr = pFactory->CreateBitmapFromHBITMAP(hBitmap, nullptr, WICBitmapUseAlpha, &pWicBitmap);
-    if (!SUCCEEDED(hr) || !pWicBitmap)
-    {
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to create WIC bitmap from HBITMAP";
-    }
-
-    IWICStream *pStream = nullptr;
-    hr = pFactory->CreateStream(&pStream);
-    if (!SUCCEEDED(hr) || !pStream)
-    {
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to create WIC stream";
-    }
-
-    hr = pStream->InitializeFromFilename(destFile, GENERIC_WRITE);
-    if (!SUCCEEDED(hr))
-    {
-      pStream->Release();
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to initialize WIC stream";
-    }
-
-    GUID containerFormat = (type == Gdiplus::ImageFormatPNG) ? GUID_ContainerFormatPng : GUID_ContainerFormatJpeg;
-    IWICBitmapEncoder *pEncoder = nullptr;
-    hr = pFactory->CreateEncoder(containerFormat, nullptr, &pEncoder);
-    if (!SUCCEEDED(hr) || !pEncoder)
-    {
-      pStream->Release();
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to create WIC encoder";
-    }
-
-    hr = pEncoder->Initialize(pStream, WICBitmapEncoderNoCache);
-    if (!SUCCEEDED(hr))
-    {
-      pEncoder->Release();
-      pStream->Release();
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to initialize WIC encoder";
-    }
-
-    IWICBitmapFrameEncode *pFrame = nullptr;
-    IPropertyBag2 *pProps = nullptr;
-    hr = pEncoder->CreateNewFrame(&pFrame, &pProps);
-    if (!SUCCEEDED(hr) || !pFrame)
-    {
-      if (pProps)
-        pProps->Release();
-      pEncoder->Release();
-      pStream->Release();
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to create WIC frame";
-    }
-
-    if (containerFormat == GUID_ContainerFormatJpeg && pProps)
-    {
-      PROPBAG2 option = {};
-      option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
-      VARIANT varValue;
-      VariantInit(&varValue);
-      varValue.vt = VT_R4;
-      varValue.fltVal = 0.9f;
-      pProps->Write(1, &option, &varValue);
-      VariantClear(&varValue);
-    }
-
-    hr = pFrame->Initialize(pProps);
-    if (pProps)
-    {
-      pProps->Release();
-    }
-    if (!SUCCEEDED(hr))
-    {
-      pFrame->Release();
-      pEncoder->Release();
-      pStream->Release();
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to initialize WIC frame";
-    }
-
-    UINT width = 0;
-    UINT height = 0;
-    pWicBitmap->GetSize(&width, &height);
-    pFrame->SetSize(width, height);
-
-    GUID pixelFormat = GUID_WICPixelFormat32bppBGRA;
-    pFrame->SetPixelFormat(&pixelFormat);
-
-    hr = pFrame->WriteSource(pWicBitmap, nullptr);
-    if (!SUCCEEDED(hr))
-    {
-      pFrame->Release();
-      pEncoder->Release();
-      pStream->Release();
-      pWicBitmap->Release();
-      pFactory->Release();
-      DeleteObject(hBitmap);
-      return "Failed to write WIC frame";
-    }
-
-    pFrame->Commit();
-    pEncoder->Commit();
-
-    pFrame->Release();
-    pEncoder->Release();
-    pStream->Release();
-    pWicBitmap->Release();
-    pFactory->Release();
+    const std::string gdiResult = SaveHBitmapWithGdiplus(hBitmap, destFile, type);
     DeleteObject(hBitmap);
-    return "";
+    if (gdiResult.empty())
+    {
+      return "";
+    }
+
+    return "WIC save failed with " + wicResult + "; GDI+ fallback failed with " + gdiResult;
   }
 
   std::string SaveThumbnail(PCWSTR srcFile, PCWSTR destFile, int size, REFGUID type, int *timeSeconds, int quality, bool useShellThumbnail)
@@ -1256,7 +1351,11 @@ namespace fc_native_video_thumbnail
           }
           else
           {
-            result_ptr->Success(flutter::EncodableValue());  // null on error
+            // Surface the real FFmpeg reason to Dart (was silently Success(null)).
+            OutputDebugStringA(("FcNativeVideoThumbnail FFmpeg error: " + error +
+                                " for " + srcPath + "\n")
+                                   .c_str());
+            result_ptr->Error("PluginError", "FFmpeg thumbnail failed. " + error);
           } })
             .detach();
       }
