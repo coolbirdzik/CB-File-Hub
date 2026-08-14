@@ -119,56 +119,6 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
     }
   }
 
-  // ignore: unused_element
-  Future<void> _toggleDatabaseEnabled(bool value) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      await _preferences.setUsingDatabaseStorage(value);
-
-      if (value && !_isUsingDatabase) {
-        // Switch from JSON to Database - migrate the data
-        final migratedCount = await TagManager.migrateFromJsonToDatabase();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content:
-                    Text('Migrated $migratedCount files to SQLite database')),
-          );
-        }
-      }
-
-      _isUsingDatabase = value;
-
-      // Reload statistics
-      await _loadStatistics();
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error toggling Database: $e');
-
-      // Revert the change
-      await _preferences.setUsingDatabaseStorage(!value);
-      _isUsingDatabase = !value;
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return BaseScreen(

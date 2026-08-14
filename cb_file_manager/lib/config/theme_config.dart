@@ -243,9 +243,6 @@ class ThemeConfig {
     return AppUiFontConfig.applyToTheme(base, uiFont);
   }
 
-  static ThemeData get lightTheme => getLightTheme();
-  static ThemeData get darkTheme => getDarkTheme();
-
   // --------------------------------------------------------------------
   // Theme tokens and helpers
   // --------------------------------------------------------------------

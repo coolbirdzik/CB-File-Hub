@@ -19,9 +19,7 @@
 - `lib/core/service_locator.dart` is the registration source of truth.
 - Registration and initialization are separate: lazy singletons do not become
   ready merely because `setupServiceLocator()` completed.
-- `lib/main.dart` remains the authoritative call sequence. Helpers under
-  `lib/config/app_initializer.dart` must not be assumed active without checking
-  their callers.
+- `lib/main.dart` remains the authoritative call sequence for startup wiring.
 
 ## Platform branches
 

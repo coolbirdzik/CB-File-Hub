@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../cb_tokens.dart';
 import '../tokens/cb_geometry_tokens.dart';
-import '../tokens/cb_motion_tokens.dart';
 import '../tokens/cb_type_tokens.dart';
 import 'cb_button.dart';
 import 'cb_surface.dart';
@@ -222,40 +221,4 @@ Future<bool?> showCbConfirmDialog({
       ],
     ),
   );
-}
-
-/// Route transition for CoolBird dialogs — a short fade with a small rise.
-///
-/// Material's dialog transition scales the surface from 0.9, which on a large
-/// desktop dialog reads as a zoom. This travels 8px instead.
-class CbDialogTransition extends StatelessWidget {
-  final Animation<double> animation;
-  final Widget child;
-
-  const CbDialogTransition({
-    Key? key,
-    required this.animation,
-    required this.child,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: CbCurves.standard,
-      reverseCurve: CbCurves.exit,
-    );
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          // 8px at a 440px-wide dialog — expressed as a fraction of the
-          // dialog's own height by SlideTransition.
-          begin: const Offset(0, 0.02),
-          end: Offset.zero,
-        ).animate(curved),
-        child: child,
-      ),
-    );
-  }
 }

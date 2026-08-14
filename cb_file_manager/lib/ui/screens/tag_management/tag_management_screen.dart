@@ -1408,12 +1408,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  // ignore: unused_element
-  Widget _buildBulkActionBar() {
-    // Reserved for future multi-select bulk action bar UI
-    return const SizedBox.shrink();
-  }
-
   /// Show rename dialog for mobile
   Future<void> _showRenameDialog(String tag) async {
     final localizations = AppLocalizations.of(context)!;

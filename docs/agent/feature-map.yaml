@@ -35,7 +35,6 @@ features:
       - cb_file_manager/lib/main.dart
       - cb_file_manager/lib/core/service_locator.dart
     related:
-      - cb_file_manager/lib/config/app_initializer.dart
       - cb_file_manager/lib/providers/theme_provider.dart
       - cb_file_manager/lib/config/language_controller.dart
     edges:
