@@ -61,6 +61,15 @@ class FileOperationsDeleteItems extends FileOperationsEvent {
   List<Object> get props => [filePaths, folderPaths, permanent];
 }
 
+class FileOperationsRetryDeleteAsAdministrator extends FileOperationsEvent {
+  final List<String> failedPaths;
+
+  const FileOperationsRetryDeleteAsAdministrator(this.failedPaths);
+
+  @override
+  List<Object> get props => [failedPaths];
+}
+
 // ─── Rename ────────────────────────────────────────────────────────
 
 class FileOperationsRename extends FileOperationsEvent {

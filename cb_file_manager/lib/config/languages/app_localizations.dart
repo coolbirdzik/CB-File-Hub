@@ -266,6 +266,23 @@ abstract class AppLocalizations {
   String get themeOnboardingDarkLabel;
   String get themeOnboardingMoreThemesMessage;
   String get themeOnboardingContinue;
+  String get accentColor;
+  String currentAccentColor(String name);
+  String get fontColor;
+  String currentFontColor(String name);
+  String get uiFont;
+  String currentUiFont(String name);
+  String get uiFontUnicodeHint;
+  String get backdropMode;
+  String get backdropModeDynamic;
+  String get backdropModeWallpaper;
+  String get backdropModeDynamicDescription;
+  String get backdropModeWallpaperDescription;
+  String get noSystemWallpaperDetected;
+  String get customBackdropImage;
+  String get backdropImageNotFound;
+  String get desktopAcrylicStrength;
+  String desktopAcrylicStrengthDescription(int percentage);
   String get vietnameseLanguage;
   String get englishLanguage;
 
@@ -731,6 +748,43 @@ abstract class AppLocalizations {
 
   // UI labels
   String get noStorageLocationsFound;
+  String get driveGroupFixed;
+  String get driveGroupRemovable;
+  String get driveGroupNetwork;
+  String get driveGroupOther;
+  String get driveTapToBrowse;
+  String get driveRestrictedAccess;
+  String get driveEject;
+  String get driveEjectConfirmTitle;
+  String driveEjectConfirmMessage(String name);
+  String get driveEjectSuccess;
+  String driveEjectFailed(String error);
+  String get driveRename;
+  String get driveRenameTitle;
+  String get driveRenameHint;
+  String get driveRenameSuccess;
+  String driveRenameFailed(String error);
+  String get driveFormatConfirmTitle;
+  String driveFormatConfirmMessage(String name);
+  String get driveOpenInCleaner;
+  String get driveUsed;
+  String get driveFree;
+  String get driveTotal;
+  String get driveType;
+  String get driveFilesystem;
+  String get driveSerial;
+  String get driveKindFixed;
+  String get driveKindRemovable;
+  String get driveKindNetwork;
+  String get driveKindOptical;
+  String get driveKindRam;
+  String get driveKindInternal;
+  String get driveKindUnknown;
+  String get openInNewPane;
+  String get openInWindowsTerminal;
+  String get driveCleanup;
+  String get driveFormat;
+  String get driveBitLocker;
   String get menuPinningOnlyLargeScreens;
   String get pinMenu;
   String get unpinMenu;
@@ -1382,6 +1436,10 @@ abstract class AppLocalizations {
   String diskCleanerDirsCount(int count);
   String get diskCleanerStarting;
   String diskCleanerDriveSummary(String path, String size, int count);
+  String get diskCleanerGrowthTitle;
+  String diskCleanerGrowthFilter(int count);
+  String diskCleanerGrowthIncrease(String size);
+  String diskCleanerGrowthCurrentSize(String size);
   String diskCleanerAgentPath(String path);
   String diskCleanerItemsBytes(int count, String size);
   String diskCleanerSizeFiles(String size, int files);
@@ -1419,6 +1477,57 @@ abstract class AppLocalizations {
       int count, String size, int skipped);
   String diskCleanerPermanentDeletedWithSkipped(
       int count, String size, int skipped);
+
+  // Cleaner - drive picker, quick clean, junk reasons
+  String get diskCleanerDriveLowSpace;
+  String diskCleanerDriveCapacity(String used, String total, String free);
+  String diskCleanerLastScanFound(String when, String junk);
+  String get diskCleanerTimeJustNow;
+  String get diskCleanerTimeToday;
+  String get diskCleanerTimeYesterday;
+  String diskCleanerTimeDaysAgo(int days);
+  String diskCleanerTimeWeeksAgo(int weeks);
+  String diskCleanerTimeMonthsAgo(int months);
+  String get diskCleanerQuickCleanHint;
+  String get diskCleanerQuickCleanButton;
+  String get diskCleanerQuickCleanScanning;
+  String get diskCleanerQuickCleanNothing;
+  String get diskCleanerQuickCleanReviewTitle;
+  String diskCleanerQuickCleanReviewSubtitle(int count, String size);
+  String get diskCleanerQuickCleanRecycleNote;
+  String get diskCleanerCategoryWindowsTemp;
+  String get diskCleanerCategoryBrowserCache;
+  String get diskCleanerCategoryRecycleBin;
+  String get diskCleanerCategoryThumbnailCache;
+  String get diskCleanerCategoryAppCache;
+  String get diskCleanerCategoryCrashLogs;
+  String get diskCleanerCategoryWindowsUpdate;
+  String get diskCleanerCategoryPrefetch;
+  String get diskCleanerCategoryDeliveryOptimization;
+  String get diskCleanerCategoryDevCache;
+  String get diskCleanerReasonWindowsTemp;
+  String get diskCleanerReasonBrowserCache;
+  String get diskCleanerReasonRecycleBin;
+  String get diskCleanerReasonThumbnailCache;
+  String get diskCleanerReasonAppCache;
+  String get diskCleanerReasonCrashLogs;
+  String get diskCleanerReasonWindowsUpdate;
+  String get diskCleanerReasonPrefetch;
+  String get diskCleanerReasonDeliveryOptimization;
+  String get diskCleanerReasonDevCache;
+  String get diskCleanerReasonGeneric;
+
+  // Cleaner - tree preset views
+  String get diskCleanerPresetTooltip;
+  String get diskCleanerPresetAll;
+  String get diskCleanerPresetLargeFiles;
+  String get diskCleanerPresetLogsCaches;
+  String get diskCleanerPresetInstallers;
+
+  // Cleaner - cleaned screen outcome
+  String diskCleanerFreeSpaceBeforeAfter(String before, String after);
+  String get diskCleanerGrowthWatchTitle;
+  String diskCleanerGrowthWatchLine(String path, String size);
 
   // Cleaner App Insights
   String get cleanerUtilitiesTitle;

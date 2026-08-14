@@ -20,6 +20,8 @@ features:
     focused_tests:
       - "flutter test test/05_navigation_test.dart"
       - "flutter test test/10_tab_activity_manager_test.dart"
+      - "flutter test test/helpers/files/windows_file_operations_test.dart test/ui/screens/folder_list/file_operations_bloc_test.dart"
+    windows_build_required_for_native_changes: true
     e2e_recommended: true
 
   ai_agent:
@@ -31,6 +33,7 @@ features:
       - "flutter test test/16_cleaner_scan_registry_test.dart"
       - "flutter test test/17_ai_agent_stop_test.dart"
       - "flutter test test/18_app_storage_tool_test.dart"
+      - "flutter test test/19_cleaner_scan_advice_test.dart"
 
   cb_agent_cleaner:
     paths:
@@ -38,11 +41,15 @@ features:
       - cb_file_manager/lib/ui/screens/cb_agent_cleaner/
       - cb_file_manager/lib/helpers/files/trash_manager.dart
     focused_tests:
+      - "flutter test test/19_cleaner_scan_advice_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_growth_history_service_test.dart"
       - "flutter test test/services/disk_cleaner/disk_tree_selection_test.dart"
       - "flutter test test/helpers/files/trash_manager_test.dart"
+      - "flutter test test/helpers/files/windows_file_operations_test.dart"
       - "flutter test test/ui/screens/cb_agent_cleaner/cb_agent_cleaner_app_mode_safety_test.dart"
     manual_checks:
       - "Confirm the preview contains only the exact approved targets."
+      - "Confirm click, Ctrl-click, Shift-click, and Space follow Explorer-style selection while remaining responsive on a large tree."
       - "Confirm Recycle Bin and permanent delete remain visibly distinct."
 
   cleaner_app_insights:
@@ -137,6 +144,19 @@ features:
     minimum_checks:
       - "dart format --output=none --set-exit-if-changed lib/config/languages"
       - "flutter analyze"
+
+  drive_manager:
+    paths:
+      - cb_file_manager/lib/services/drive/
+      - cb_file_manager/lib/ui/tab_manager/components/drive_view.dart
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/StorageVolumesPlugin.kt
+    focused_tests:
+      - "flutter test test/services/drive/drive_info_test.dart"
+      - "flutter test test/services/drive/drive_inventory_service_test.dart"
+    manual_checks:
+      - "Confirm removable USB/SD shows an eject action and system/primary volumes do not."
+      - "Confirm Android drive cards show free/used space after StorageVolumesPlugin registration."
+      - "Confirm rename and eject ask for confirmation and refresh the drive list."
 
 notes:
   - "Focused checks accelerate iteration; they do not prove runtime UX."

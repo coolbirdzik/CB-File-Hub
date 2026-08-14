@@ -69,10 +69,16 @@ class FullDiskScanHandle {
   final Isolate _isolate;
   final ReceivePort _receivePort;
   final String drivePath;
+  // Single-subscription (not broadcast) on purpose: the isolate starts sending
+  // as soon as it is spawned, but callers can only attach their listeners
+  // after `spawnFullDiskScan` returns. A broadcast controller discards
+  // everything emitted in that gap, so the UI could miss the early progress
+  // ticks and the first tree snapshots entirely. These controllers buffer
+  // until the listener arrives. Each handle is listened to exactly once.
   final StreamController<FullDiskScanProgress> _progress =
-      StreamController<FullDiskScanProgress>.broadcast();
+      StreamController<FullDiskScanProgress>();
   final StreamController<DiskTreeNode> _treeSnapshots =
-      StreamController<DiskTreeNode>.broadcast();
+      StreamController<DiskTreeNode>();
   final Completer<FullDiskScanResult> _done = Completer<FullDiskScanResult>();
   final DateTime _startedAt = DateTime.now();
   bool _cancelled = false;

@@ -36,6 +36,9 @@ class DiskTreeNode {
   /// Reset to null when selection changes to force recalculation.
   bool? _hasSelectionInSubtree;
 
+  bool? _hasJunkChildrenCache;
+  int? _junkBytesCache;
+
   DiskTreeNode({
     required this.name,
     required this.fullPath,
@@ -57,20 +60,38 @@ class DiskTreeNode {
 
   /// Whether any child is junk (for partial highlighting).
   bool get hasJunkChildren {
+    final cached = _hasJunkChildrenCache;
+    if (cached != null) return cached;
     for (final child in children) {
-      if (child.isJunk || child.hasJunkChildren) return true;
+      if (child.isJunk || child.hasJunkChildren) {
+        _hasJunkChildrenCache = true;
+        return true;
+      }
     }
+    _hasJunkChildrenCache = false;
     return false;
   }
 
   /// Total junk bytes in this subtree.
   int get junkBytes {
     if (isJunk) return sizeBytes;
+    final cached = _junkBytesCache;
+    if (cached != null) return cached;
     int total = 0;
     for (final child in children) {
       total += child.junkBytes;
     }
+    _junkBytesCache = total;
     return total;
+  }
+
+  /// Invalidates cached junk aggregates after scan metadata or tree changes.
+  void invalidateJunkCache() {
+    _hasJunkChildrenCache = null;
+    _junkBytesCache = null;
+    for (final child in children) {
+      child.invalidateJunkCache();
+    }
   }
 
   /// Whether this node or any descendant has been selected for deletion.

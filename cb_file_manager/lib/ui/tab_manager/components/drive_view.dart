@@ -1,20 +1,21 @@
-import 'dart:ffi';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
+import 'package:cb_file_manager/services/drive/drive_actions.dart';
+import 'package:cb_file_manager/services/drive/drive_info.dart';
+import 'package:cb_file_manager/services/drive/drive_inventory_service.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
-import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
+import 'package:cb_file_manager/ui/utils/format_utils.dart';
+import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
-import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:win32/win32.dart' as win32;
 
 import '../../components/common/skeleton_helper.dart';
 import '../../screens/folder_list/folder_list_bloc.dart';
@@ -22,7 +23,7 @@ import '../../screens/folder_list/folder_list_event.dart';
 import '../../screens/folder_list/folder_list_state.dart';
 import '../core/tab_manager.dart';
 
-/// Component for displaying local drives/local storage locations.
+/// Component for displaying and managing local drives / storage volumes.
 class DriveView extends StatefulWidget {
   static const double _gridSpacing = 12.0;
   static const double _gridAspectRatio = 1.35;
@@ -58,19 +59,7 @@ class DriveView extends StatefulWidget {
 }
 
 class _DriveViewState extends State<DriveView> {
-  /// Cache of the most recent drive snapshot, shared across all DriveView
-  /// instances in the process so navigating back from a folder doesn't
-  /// trigger a cold spinner — we render cached entries immediately and
-  /// revalidate in the background.
-  static List<_DriveEntry>? _cachedDriveEntries;
-
-  /// How long a cached drive snapshot is considered fresh enough to skip
-  /// background revalidation. We still revalidate older snapshots to pick up
-  /// newly mounted/unmounted volumes.
-  static const Duration _cacheFreshness = Duration(minutes: 5);
-  static DateTime? _cachedAt;
-
-  List<_DriveEntry> _driveEntries = const <_DriveEntry>[];
+  List<DriveInfo> _drives = const <DriveInfo>[];
   bool _isLoadingDrives = false;
   Object? _loadError;
 
@@ -80,22 +69,14 @@ class _DriveViewState extends State<DriveView> {
   @override
   void initState() {
     super.initState();
-
-    // Seed from the process-wide cache so back-navigation shows content
-    // instantly instead of an empty pane + spinner.
-    final cached = _cachedDriveEntries;
+    final cached = DriveInventoryService.cachedSnapshot;
     if (cached != null && cached.isNotEmpty) {
-      _driveEntries = cached;
+      _drives = cached;
     }
-
     if (!widget.isLazyLoading) {
-      // If we have a fresh cache, skip the foreground reload entirely.
-      // Otherwise reload (foreground if no cache, background if stale).
-      final hasFreshCache = cached != null &&
-          cached.isNotEmpty &&
-          _cachedAt != null &&
-          DateTime.now().difference(_cachedAt!) < _cacheFreshness;
-      if (!hasFreshCache) {
+      if (DriveInventoryService.hasFreshCache) {
+        // Keep cached paint; still optional background refresh omitted when fresh.
+      } else {
         _revalidateDrivesInBackground();
       }
     }
@@ -104,95 +85,51 @@ class _DriveViewState extends State<DriveView> {
   @override
   void didUpdateWidget(covariant DriveView oldWidget) {
     super.didUpdateWidget(oldWidget);
-
     if (oldWidget.tabId != widget.tabId ||
         (oldWidget.isLazyLoading && !widget.isLazyLoading) ||
         (!oldWidget.isRefreshing && widget.isRefreshing)) {
-      _reloadDriveEntries();
+      _reloadDriveEntries(force: true);
     }
   }
 
-  /// Revalidate drives in the background without blocking the UI.
-  /// If the cache is stale, fetch fresh data but don't setState until done,
-  /// so the UI shows stale entries immediately while we refresh.
   Future<void> _revalidateDrivesInBackground() async {
     try {
-      final entries = await _loadDriveEntries();
-      _cachedDriveEntries = entries;
-      _cachedAt = DateTime.now();
+      final entries = await DriveInventoryService.load();
       if (mounted) {
-        setState(() {
-          _driveEntries = entries;
-        });
+        setState(() => _drives = entries);
       }
     } catch (e) {
       debugPrint('Background drive revalidation failed: $e');
-      // Keep showing stale data on error; don't update _loadError.
     }
   }
 
-  Future<void> _reloadDriveEntries() async {
+  Future<void> _reloadDriveEntries({bool force = false}) async {
     if (_isLoadingDrives) return;
-
     if (mounted) {
       setState(() {
         _isLoadingDrives = true;
         _loadError = null;
       });
     }
-
     try {
-      final entries = await _loadDriveEntries();
-      // Update the process-wide cache for the next mount.
-      _cachedDriveEntries = entries;
-      _cachedAt = DateTime.now();
+      if (force) DriveInventoryService.invalidateCache();
+      final entries = await DriveInventoryService.load(forceRefresh: force);
       if (!mounted) return;
-      setState(() {
-        _driveEntries = entries;
-      });
+      setState(() => _drives = entries);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _loadError = e;
-      });
+      setState(() => _loadError = e);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingDrives = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingDrives = false);
     }
-  }
-
-  Future<List<_DriveEntry>> _loadDriveEntries() async {
-    final List<Directory> drives = List<Directory>.from(
-      await getAllStorageLocations(),
-    )..sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
-
-    if (drives.isEmpty) {
-      return const <_DriveEntry>[];
-    }
-
-    return Future.wait(
-      drives.map((drive) async {
-        final _DriveMeta meta = await _getDriveMeta(drive.path);
-        return _DriveEntry(
-          path: drive.path,
-          displayName: meta.displayName,
-          spaceInfo: meta.spaceInfo,
-        );
-      }),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isGridMode = _effectiveViewMode() == ViewMode.grid;
     final content = CtrlScrollZoom(
-      // Ctrl+scroll zoom only applies in grid mode.
       onDelta: isGridMode ? widget.onZoomChanged : null,
       child: Listener(
-        // Side-mouse-buttons for back/forward remain on the plain Listener.
         onPointerDown: _handlePointerDown,
         child: widget.isLazyLoading
             ? _buildSkeletonDriveList(context)
@@ -200,11 +137,9 @@ class _DriveViewState extends State<DriveView> {
       ),
     );
 
-    // Workaround for intermittent Windows AXTree update errors in drives list mode.
     if (Platform.isWindows && _effectiveViewMode() == ViewMode.list) {
       return ExcludeSemantics(child: content);
     }
-
     return content;
   }
 
@@ -228,31 +163,19 @@ class _DriveViewState extends State<DriveView> {
   }
 
   Widget _buildActualDriveList(BuildContext context) {
-    // No cached/loaded entries yet but a fetch is in flight: show the
-    // structural skeleton instead of a centered spinner so back-navigation
-    // never lands on a blank pane with a circular loader.
-    if (_isLoadingDrives && _driveEntries.isEmpty) {
+    if (_isLoadingDrives && _drives.isEmpty) {
       return _buildSkeletonDriveList(context);
     }
-
-    if (_loadError != null && _driveEntries.isEmpty) {
-      return Center(
-        child: Text(
-          AppLocalizations.of(context)!.noStorageLocationsFound,
-        ),
-      );
-    }
-
-    if (_driveEntries.isEmpty) {
+    if ((_loadError != null || _drives.isEmpty) && _drives.isEmpty) {
       return Center(
         child: Text(AppLocalizations.of(context)!.noStorageLocationsFound),
       );
     }
 
     if (_effectiveViewMode() == ViewMode.grid) {
-      return _buildGridView(context, _driveEntries);
+      return _buildGridView(context, _drives);
     }
-    return _buildListView(context, _driveEntries);
+    return _buildListView(context, _drives);
   }
 
   ViewMode _effectiveViewMode() {
@@ -263,21 +186,79 @@ class _DriveViewState extends State<DriveView> {
     return ViewMode.list;
   }
 
-  Widget _buildListView(BuildContext context, List<_DriveEntry> drives) {
-    return ListView.separated(
+  List<_DriveSection> _sectionsFor(List<DriveInfo> drives) {
+    final map = <DriveGroup, List<DriveInfo>>{};
+    for (final drive in drives) {
+      map.putIfAbsent(drive.group, () => <DriveInfo>[]).add(drive);
+    }
+    final order = <DriveGroup>[
+      DriveGroup.fixed,
+      DriveGroup.removable,
+      DriveGroup.network,
+      DriveGroup.other,
+    ];
+    return [
+      for (final group in order)
+        if (map[group]?.isNotEmpty == true)
+          _DriveSection(group: group, drives: map[group]!),
+    ];
+  }
+
+  String _groupTitle(BuildContext context, DriveGroup group) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (group) {
+      case DriveGroup.fixed:
+        return l10n.driveGroupFixed;
+      case DriveGroup.removable:
+        return l10n.driveGroupRemovable;
+      case DriveGroup.network:
+        return l10n.driveGroupNetwork;
+      case DriveGroup.other:
+        return l10n.driveGroupOther;
+    }
+  }
+
+  Widget _buildListView(BuildContext context, List<DriveInfo> drives) {
+    final sections = _sectionsFor(drives);
+    return ListView.builder(
       padding: const EdgeInsets.all(16.0),
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: true,
-      addSemanticIndexes: false,
-      itemCount: drives.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12.0),
+      itemCount: sections.fold<int>(
+        0,
+        (sum, s) => sum + 1 + s.drives.length,
+      ),
       itemBuilder: (context, index) {
-        return _buildDriveCard(
-          key: ValueKey<String>('drive-list-${drives[index].path}'),
-          context: context,
-          drive: drives[index],
-          compact: false,
-        );
+        var cursor = 0;
+        for (final section in sections) {
+          if (index == cursor) {
+            return Padding(
+              padding: EdgeInsets.only(top: cursor == 0 ? 0 : 12, bottom: 8),
+              child: Text(
+                _groupTitle(context, section.group),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            );
+          }
+          cursor += 1;
+          final driveIndex = index - cursor;
+          if (driveIndex >= 0 && driveIndex < section.drives.length) {
+            final drive = section.drives[driveIndex];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildDriveCard(
+                key: ValueKey<String>('drive-list-${drive.path}'),
+                context: context,
+                drive: drive,
+                compact: false,
+              ),
+            );
+          }
+          cursor += section.drives.length;
+        }
+        return const SizedBox.shrink();
       },
     );
   }
@@ -301,7 +282,7 @@ class _DriveViewState extends State<DriveView> {
     return math.max(1, raw);
   }
 
-  Widget _buildGridView(BuildContext context, List<_DriveEntry> drives) {
+  Widget _buildGridView(BuildContext context, List<DriveInfo> drives) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxZoom = GridZoomConstraints.maxGridSize(
@@ -325,7 +306,6 @@ class _DriveViewState extends State<DriveView> {
           padding: const EdgeInsets.all(16.0),
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
-          addSemanticIndexes: false,
           itemCount: drives.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
@@ -334,15 +314,16 @@ class _DriveViewState extends State<DriveView> {
             mainAxisExtent: itemHeight,
           ),
           itemBuilder: (context, index) {
+            final drive = drives[index];
             return Align(
               alignment: Alignment.topCenter,
               child: SizedBox(
                 width: itemWidth,
                 height: itemHeight,
                 child: _buildDriveCard(
-                  key: ValueKey<String>('drive-grid-${drives[index].path}'),
+                  key: ValueKey<String>('drive-grid-${drive.path}'),
                   context: context,
-                  drive: drives[index],
+                  drive: drive,
                   compact: true,
                 ),
               ),
@@ -353,28 +334,75 @@ class _DriveViewState extends State<DriveView> {
     );
   }
 
+  IconData _iconFor(DriveInfo drive) {
+    switch (drive.kind) {
+      case DriveKind.removable:
+        return PhosphorIconsLight.usb;
+      case DriveKind.network:
+        return PhosphorIconsLight.cloud;
+      case DriveKind.optical:
+        return PhosphorIconsLight.disc;
+      case DriveKind.ram:
+        return PhosphorIconsLight.memory;
+      case DriveKind.internal:
+        return PhosphorIconsLight.deviceMobile;
+      case DriveKind.fixed:
+      case DriveKind.unknown:
+        return PhosphorIconsLight.hardDrives;
+    }
+  }
+
+  String _kindLabel(BuildContext context, DriveInfo drive) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (drive.kind) {
+      case DriveKind.fixed:
+        return l10n.driveKindFixed;
+      case DriveKind.removable:
+        return l10n.driveKindRemovable;
+      case DriveKind.network:
+        return l10n.driveKindNetwork;
+      case DriveKind.optical:
+        return l10n.driveKindOptical;
+      case DriveKind.ram:
+        return l10n.driveKindRam;
+      case DriveKind.internal:
+        return l10n.driveKindInternal;
+      case DriveKind.unknown:
+        return l10n.driveKindUnknown;
+    }
+  }
+
+  String _subtitleFor(BuildContext context, DriveInfo drive) {
+    final l10n = AppLocalizations.of(context)!;
+    final parts = <String>[];
+    if (drive.filesystem.isNotEmpty) parts.add(drive.filesystem);
+    parts.add(_kindLabel(context, drive));
+    if (drive.requiresAdmin) parts.add(l10n.driveRestrictedAccess);
+    return parts.join(' · ');
+  }
+
   Widget _buildDriveCard({
     required Key key,
     required BuildContext context,
-    required _DriveEntry drive,
+    required DriveInfo drive,
     required bool compact,
   }) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final bool isDarkMode = theme.brightness == Brightness.dark;
-    final _DriveSpaceInfo space = drive.spaceInfo;
+    final space = drive.space;
 
     final Color progressColor = space.usageRatio > 0.9
         ? Colors.red
         : (space.usageRatio > 0.7
             ? Colors.orange
-            : Theme.of(context).colorScheme.primary);
+            : theme.colorScheme.primary);
 
     final Color progressBackgroundColor =
         isDarkMode ? Colors.grey[800]! : Colors.grey[200]!;
     final Color headerTextColor = isDarkMode ? Colors.white : Colors.black87;
     final Color subtitleColor =
         isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
-
     final cardColor = theme.colorScheme.surface.withValues(
       alpha: isDarkMode ? 0.58 : 0.64,
     );
@@ -385,30 +413,20 @@ class _DriveViewState extends State<DriveView> {
       color: cardColor,
       elevation: 0,
       child: GestureDetector(
-        onSecondaryTapDown: _isDesktopPlatform
-            ? (details) {
-                _showDriveContextMenu(
-                  context,
-                  drive,
-                  details.globalPosition,
-                );
-              }
-            : null,
-        onLongPressStart: _isDesktopPlatform
-            ? (details) {
-                _showDriveContextMenu(
-                  context,
-                  drive,
-                  details.globalPosition,
-                );
-              }
-            : null,
+        onSecondaryTapDown: (details) {
+          _showDriveActions(context, drive, details.globalPosition);
+        },
+        onLongPressStart: (details) {
+          _showDriveActions(context, drive, details.globalPosition);
+        },
         child: InkWell(
           borderRadius: BorderRadius.circular(12.0),
-          onTap:
-              _isDesktopPlatform ? null : () => _openDrive(context, drive.path),
-          onDoubleTap:
-              _isDesktopPlatform ? () => _openDrive(context, drive.path) : null,
+          onTap: _isDesktopPlatform
+              ? null
+              : () => _openDrive(context, drive.path),
+          onDoubleTap: _isDesktopPlatform
+              ? () => _openDrive(context, drive.path)
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(
@@ -416,24 +434,43 @@ class _DriveViewState extends State<DriveView> {
               children: [
                 Row(
                   children: [
-                    Icon(
-                      PhosphorIconsLight.hardDrives,
-                      size: compact ? 24 : 32,
-                    ),
+                    Icon(_iconFor(drive), size: compact ? 24 : 32),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        drive.displayName,
-                        style: TextStyle(
-                          fontSize: compact ? 14 : 17,
-                          fontWeight: FontWeight.bold,
-                          color: headerTextColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            drive.displayName,
+                            style: TextStyle(
+                              fontSize: compact ? 14 : 17,
+                              fontWeight: FontWeight.bold,
+                              color: headerTextColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            _subtitleFor(context, drive),
+                            style: TextStyle(
+                              color: subtitleColor,
+                              fontSize: compact ? 11 : 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
-                    const Icon(PhosphorIconsLight.caretRight, size: 16),
+                    if (drive.canEject)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: l10n.driveEject,
+                        icon: const Icon(PhosphorIconsLight.eject, size: 18),
+                        onPressed: () => _confirmEject(context, drive),
+                      )
+                    else
+                      const Icon(PhosphorIconsLight.caretRight, size: 16),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -449,7 +486,8 @@ class _DriveViewState extends State<DriveView> {
                   const SizedBox(height: 8),
                   if (compact)
                     Text(
-                      'Used: ${space.usedStr} • Free: ${space.freeStr}',
+                      '${l10n.driveUsed}: ${FormatUtils.formatFileSize(space.usedBytes)}'
+                      ' • ${l10n.driveFree}: ${FormatUtils.formatFileSize(space.freeBytes)}',
                       style: TextStyle(color: subtitleColor, fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -459,7 +497,7 @@ class _DriveViewState extends State<DriveView> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Used: ${space.usedStr}',
+                          '${l10n.driveUsed}: ${FormatUtils.formatFileSize(space.usedBytes)}',
                           style: TextStyle(
                             color: progressColor,
                             fontWeight: FontWeight.bold,
@@ -467,18 +505,20 @@ class _DriveViewState extends State<DriveView> {
                           ),
                         ),
                         Text(
-                          'Free: ${space.freeStr}',
+                          '${l10n.driveFree}: ${FormatUtils.formatFileSize(space.freeBytes)}',
                           style: TextStyle(color: subtitleColor, fontSize: 12),
                         ),
                         Text(
-                          'Total: ${space.totalStr}',
+                          '${l10n.driveTotal}: ${FormatUtils.formatFileSize(space.totalBytes)}',
                           style: TextStyle(color: subtitleColor, fontSize: 12),
                         ),
                       ],
                     ),
                 ] else
                   Text(
-                    'Tap to browse',
+                    drive.requiresAdmin
+                        ? l10n.driveRestrictedAccess
+                        : l10n.driveTapToBrowse,
                     style: TextStyle(color: subtitleColor, fontSize: 12),
                   ),
               ],
@@ -489,12 +529,23 @@ class _DriveViewState extends State<DriveView> {
     );
   }
 
-  Future<void> _showDriveContextMenu(
+  Future<void> _showDriveActions(
     BuildContext context,
-    _DriveEntry drive,
+    DriveInfo drive,
     Offset globalPosition,
   ) async {
-    if (!_isDesktopPlatform) return;
+    if (_isDesktopPlatform) {
+      await _showDesktopContextMenu(context, drive, globalPosition);
+    } else {
+      await _showMobileActionSheet(context, drive);
+    }
+  }
+
+  Future<void> _showDesktopContextMenu(
+    BuildContext context,
+    DriveInfo drive,
+    Offset globalPosition,
+  ) async {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
@@ -503,7 +554,7 @@ class _DriveViewState extends State<DriveView> {
     final isPinned = await prefs.isPathPinnedToSidebar(drive.path);
     if (!context.mounted) return;
     final l10n = AppLocalizations.of(context)!;
-    final openInNewWindowText = _openInNewWindowLabel(context);
+    final openInNewWindowText = '${l10n.open} ${l10n.newWindow.toLowerCase()}';
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final position = RelativeRect.fromRect(
       Rect.fromPoints(globalPosition, globalPosition),
@@ -532,8 +583,7 @@ class _DriveViewState extends State<DriveView> {
         ),
         PopupMenuItem(
           value: 'open_new_pane',
-          child:
-              _menuRow('Open in new pane', PhosphorIconsLight.splitHorizontal),
+          child: _menuRow(l10n.openInNewPane, PhosphorIconsLight.splitHorizontal),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -549,42 +599,153 @@ class _DriveViewState extends State<DriveView> {
           value: 'properties',
           child: _menuRow(l10n.properties, PhosphorIconsLight.info),
         ),
+        if (drive.canRename)
+          PopupMenuItem(
+            value: 'rename',
+            child: _menuRow(l10n.driveRename, PhosphorIconsLight.pencilSimple),
+          ),
+        if (drive.canEject)
+          PopupMenuItem(
+            value: 'eject',
+            child: _menuRow(l10n.driveEject, PhosphorIconsLight.eject),
+          ),
         if (Platform.isWindows)
           PopupMenuItem(
             value: 'open_terminal',
             child: _menuRow(
-                'Open in Windows Terminal', PhosphorIconsLight.terminalWindow),
+              l10n.openInWindowsTerminal,
+              PhosphorIconsLight.terminalWindow,
+            ),
           ),
         if (Platform.isWindows)
           PopupMenuItem(
             value: 'cleanup',
-            child: _menuRow('Cleanup', PhosphorIconsLight.broom),
+            child: _menuRow(l10n.driveCleanup, PhosphorIconsLight.broom),
           ),
-        if (Platform.isWindows)
+        PopupMenuItem(
+          value: 'open_cleaner',
+          child: _menuRow(l10n.driveOpenInCleaner, PhosphorIconsLight.magicWand),
+        ),
+        if (Platform.isWindows && !drive.isSystemVolume)
           PopupMenuItem(
             value: 'format',
-            child: _menuRow('Format', PhosphorIconsLight.floppyDiskBack),
+            child: _menuRow(l10n.driveFormat, PhosphorIconsLight.floppyDiskBack),
           ),
         if (Platform.isWindows)
           PopupMenuItem(
             value: 'bitlocker',
-            child: _menuRow('Turn on BitLocker', PhosphorIconsLight.lockSimple),
+            child: _menuRow(l10n.driveBitLocker, PhosphorIconsLight.lockSimple),
           ),
         if (canShowShellMenu) ...[
           const PopupMenuDivider(),
           PopupMenuItem(
             value: 'more_options',
             child: _menuRow(
-                l10n.moreOptions, PhosphorIconsLight.dotsThreeVertical),
+              l10n.moreOptions,
+              PhosphorIconsLight.dotsThreeVertical,
+            ),
           ),
         ],
       ],
     );
 
-    if (selected == null) return;
-    if (!context.mounted) return;
+    if (selected == null || !context.mounted) return;
+    await _handleAction(
+      context,
+      drive,
+      selected,
+      globalPosition: globalPosition,
+      devicePixelRatio: devicePixelRatio,
+    );
+  }
 
-    switch (selected) {
+  Future<void> _showMobileActionSheet(
+    BuildContext context,
+    DriveInfo drive,
+  ) async {
+    final prefs = UserPreferences.instance;
+    await prefs.init();
+    final isPinned = await prefs.isPathPinnedToSidebar(drive.path);
+    if (!context.mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(drive.displayName),
+                subtitle: Text(_subtitleFor(context, drive)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.folderOpen),
+                title: Text(l10n.open),
+                onTap: () => Navigator.pop(sheetContext, 'open'),
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.squaresFour),
+                title: Text(l10n.openInNewTab),
+                onTap: () => Navigator.pop(sheetContext, 'open_new_tab'),
+              ),
+              ListTile(
+                leading: Icon(
+                  isPinned
+                      ? PhosphorIconsLight.pushPinSlash
+                      : PhosphorIconsLight.pushPin,
+                ),
+                title: Text(
+                  isPinned ? l10n.unpinFromSidebar : l10n.pinToSidebar,
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'toggle_pin_sidebar'),
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.info),
+                title: Text(l10n.properties),
+                onTap: () => Navigator.pop(sheetContext, 'properties'),
+              ),
+              if (drive.canRename)
+                ListTile(
+                  leading: const Icon(PhosphorIconsLight.pencilSimple),
+                  title: Text(l10n.driveRename),
+                  onTap: () => Navigator.pop(sheetContext, 'rename'),
+                ),
+              if (drive.canEject)
+                ListTile(
+                  leading: const Icon(PhosphorIconsLight.eject),
+                  title: Text(l10n.driveEject),
+                  onTap: () => Navigator.pop(sheetContext, 'eject'),
+                ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.magicWand),
+                title: Text(l10n.driveOpenInCleaner),
+                onTap: () => Navigator.pop(sheetContext, 'open_cleaner'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !context.mounted) return;
+    await _handleAction(context, drive, selected);
+  }
+
+  Future<void> _handleAction(
+    BuildContext context,
+    DriveInfo drive,
+    String action, {
+    Offset? globalPosition,
+    double? devicePixelRatio,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final toast = AppToast.capture(context);
+
+    switch (action) {
       case 'open':
         _openDrive(context, drive.path);
         break;
@@ -592,8 +753,10 @@ class _DriveViewState extends State<DriveView> {
         EntityOpenActions.openInNewTab(context, sourcePath: drive.path);
         break;
       case 'open_new_window':
-        await EntityOpenActions.openInNewWindow(context,
-            sourcePath: drive.path);
+        await EntityOpenActions.openInNewWindow(
+          context,
+          sourcePath: drive.path,
+        );
         break;
       case 'open_new_pane':
         EntityOpenActions.openInNewPane(context, sourcePath: drive.path);
@@ -604,24 +767,48 @@ class _DriveViewState extends State<DriveView> {
       case 'properties':
         _showDrivePropertiesDialog(context, drive);
         break;
+      case 'rename':
+        await _promptRename(context, drive);
+        break;
+      case 'eject':
+        await _confirmEject(context, drive);
+        break;
       case 'open_terminal':
-        await _openDriveInTerminal(context, drive.path);
+        final ok = await DriveActions.openTerminal(drive.path);
+        if (!ok && context.mounted) {
+          toast.error(l10n.openTerminalFailed('Windows Terminal'));
+        }
         break;
       case 'cleanup':
-        await _runDriveCleanup(context, drive.path);
+        final ok = await DriveActions.openCleanup(drive.path);
+        if (!ok && context.mounted) {
+          toast.error(l10n.startCleanupFailed('cleanmgr'));
+        }
+        break;
+      case 'open_cleaner':
+        context.read<TabManagerBloc>().add(
+              AddTab(path: kCbAgentCleanerPath, name: l10n.driveOpenInCleaner),
+            );
         break;
       case 'format':
-        await _formatDrive(context, drive.path);
+        await _confirmFormat(context, drive);
         break;
       case 'bitlocker':
-        await _openBitLocker(context, drive.path);
+        final ok = await DriveActions.openBitLocker();
+        if (!ok && context.mounted) {
+          toast.error(
+            'Unable to open BitLocker. Open Control Panel > BitLocker Drive Encryption manually.',
+          );
+        }
         break;
       case 'more_options':
-        await WindowsShellContextMenu.showForPaths(
-          paths: <String>[drive.path],
-          globalPosition: globalPosition,
-          devicePixelRatio: devicePixelRatio,
-        );
+        if (globalPosition != null && devicePixelRatio != null) {
+          await WindowsShellContextMenu.showForPaths(
+            paths: <String>[drive.path],
+            globalPosition: globalPosition,
+            devicePixelRatio: devicePixelRatio,
+          );
+        }
         break;
     }
   }
@@ -636,158 +823,106 @@ class _DriveViewState extends State<DriveView> {
     );
   }
 
-  String _openInNewWindowLabel(BuildContext context) {
+  Future<void> _confirmEject(BuildContext context, DriveInfo drive) async {
     final l10n = AppLocalizations.of(context)!;
-    return '${l10n.open} ${l10n.newWindow.toLowerCase()}';
-  }
-
-  Future<void> _openDriveInTerminal(
-      BuildContext context, String drivePath) async {
-    final toast = AppToast.capture(context);
-    try {
-      await Process.start(
-        'wt.exe',
-        <String>['-d', drivePath],
-        mode: ProcessStartMode.detached,
-      );
-    } catch (_) {
-      try {
-        await Process.start(
-          'powershell.exe',
-          <String>[
-            '-NoExit',
-            '-Command',
-            "Set-Location -LiteralPath '${drivePath.replaceAll("'", "''")}'"
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.driveEjectConfirmTitle),
+          content: Text(l10n.driveEjectConfirmMessage(drive.displayName)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.driveEject),
+            ),
           ],
-          mode: ProcessStartMode.detached,
         );
-      } catch (e) {
-        if (!context.mounted) return;
-        final l10n = AppLocalizations.of(context)!;
-        toast.error(l10n.openTerminalFailed(e.toString()));
-      }
-    }
-  }
-
-  Future<void> _runDriveCleanup(BuildContext context, String drivePath) async {
-    final toast = AppToast.capture(context);
-    try {
-      final driveLetter = drivePath.replaceAll('\\', '');
-      await Process.start(
-        'cleanmgr.exe',
-        <String>['/d', driveLetter],
-        mode: ProcessStartMode.detached,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      final l10n = AppLocalizations.of(context)!;
-      toast.error(l10n.startCleanupFailed(e.toString()));
-    }
-  }
-
-  Future<void> _formatDrive(BuildContext context, String drivePath) async {
-    final toast = AppToast.capture(context);
-    if (!Platform.isWindows) return;
-    final driveLetter = _normalizeDriveLetter(drivePath);
-    if (driveLetter == null) return;
-    final driveRoot = '$driveLetter\\';
-
-    try {
-      final invoked = await WindowsShellContextMenu.invokeVerb(
-        paths: <String>[driveRoot],
-        verb: 'format',
-      );
-      if (invoked) return;
-
-      final escapedDriveRoot = driveRoot.replaceAll("'", "''");
-      await Process.start(
-        'powershell.exe',
-        <String>[
-          '-NoProfile',
-          '-Command',
-          "Start-Process -FilePath '$escapedDriveRoot' -Verb Format",
-        ],
-        mode: ProcessStartMode.detached,
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      final l10n = AppLocalizations.of(context)!;
-      toast.error(l10n.startFormatFailed(e.toString()));
-    }
-  }
-
-  Future<void> _openBitLocker(BuildContext context, String drivePath) async {
-    final toast = AppToast.capture(context);
-    if (!Platform.isWindows) return;
-
-    Future<bool> tryStart(
-      String executable,
-      List<String> arguments, {
-      bool runInShell = false,
-    }) async {
-      try {
-        await Process.start(
-          executable,
-          arguments,
-          mode: ProcessStartMode.detached,
-          runInShell: runInShell,
-        );
-        return true;
-      } catch (_) {
-        return false;
-      }
-    }
-
-    final String? driveLetter = _normalizeDriveLetter(drivePath);
-
-    // Try native Control Panel entry first (works across most Windows versions).
-    if (await tryStart(
-      'control.exe',
-      <String>['/name', 'Microsoft.BitLockerDriveEncryption'],
-    )) {
-      return;
-    }
-
-    // Try opening the specific drive configuration page when available.
-    if (driveLetter != null &&
-        await tryStart(
-          'control.exe',
-          <String>[
-            '/name',
-            'Microsoft.BitLockerDriveEncryption',
-            '/page',
-            'pageConfigureDrive',
-            driveLetter,
-          ],
-        )) {
-      return;
-    }
-
-    // Fallback through cmd shell start.
-    if (await tryStart('cmd.exe', <String>[
-      '/c',
-      'start',
-      '',
-      'control.exe',
-      '/name',
-      'Microsoft.BitLockerDriveEncryption',
-    ])) {
-      return;
-    }
-
-    // Last fallback for modern Windows settings.
-    if (await tryStart(
-      'cmd.exe',
-      <String>['/c', 'start', '', 'ms-settings:deviceencryption'],
-      runInShell: true,
-    )) {
-      return;
-    }
-
-    if (!context.mounted) return;
-    toast.error(
-      'Unable to open BitLocker. Please open Control Panel > BitLocker Drive Encryption manually.',
+      },
     );
+    if (confirmed != true || !context.mounted) return;
+
+    final toast = AppToast.capture(context);
+    final ok = await DriveActions.eject(drive);
+    if (!context.mounted) return;
+    if (ok) {
+      toast.info(l10n.driveEjectSuccess);
+      await _reloadDriveEntries(force: true);
+    } else {
+      toast.error(l10n.driveEjectFailed(drive.displayName));
+    }
+  }
+
+  Future<void> _confirmFormat(BuildContext context, DriveInfo drive) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.driveFormatConfirmTitle),
+          content: Text(l10n.driveFormatConfirmMessage(drive.displayName)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.driveFormat),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    final toast = AppToast.capture(context);
+    final ok = await DriveActions.openFormat(drive);
+    if (!ok && context.mounted) {
+      toast.error(l10n.startFormatFailed(drive.displayName));
+    }
+  }
+
+  Future<void> _promptRename(BuildContext context, DriveInfo drive) async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController(text: drive.label);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.driveRenameTitle),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(hintText: l10n.driveRenameHint),
+            maxLength: 32,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.driveRename),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    final toast = AppToast.capture(context);
+    final ok = await DriveActions.rename(drive, controller.text);
+    if (!context.mounted) return;
+    if (ok) {
+      toast.info(l10n.driveRenameSuccess);
+      await _reloadDriveEntries(force: true);
+    } else {
+      toast.error(l10n.driveRenameFailed(controller.text));
+    }
   }
 
   Future<void> _togglePinSidebar(BuildContext context, String path) async {
@@ -802,22 +937,12 @@ class _DriveViewState extends State<DriveView> {
       await prefs.addSidebarPinnedPath(path);
     }
     if (!context.mounted) return;
-    final message = isPinned ? l10n.removedFromSidebar : l10n.pinnedToSidebar;
-    toast.info(message);
+    toast.info(isPinned ? l10n.removedFromSidebar : l10n.pinnedToSidebar);
   }
 
-  String? _normalizeDriveLetter(String drivePath) {
-    var path = drivePath.trim();
-    if (path.isEmpty) return null;
-    path = path.replaceAll('\\', '');
-    if (!path.contains(':')) return null;
-    final driveLetter = path.substring(0, 2).toUpperCase();
-    return driveLetter;
-  }
-
-  void _showDrivePropertiesDialog(BuildContext context, _DriveEntry drive) {
+  void _showDrivePropertiesDialog(BuildContext context, DriveInfo drive) {
     final l10n = AppLocalizations.of(context)!;
-    final space = drive.spaceInfo;
+    final space = drive.space;
     final usagePercent =
         (space.usageRatio * 100).clamp(0, 100).toStringAsFixed(1);
 
@@ -826,24 +951,46 @@ class _DriveViewState extends State<DriveView> {
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(l10n.properties),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              _propertyRow('Name', drive.displayName),
-              const Divider(),
-              _propertyRow(l10n.filePath, drive.path),
-              if (space.hasDetails) ...<Widget>[
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _propertyRow('Name', drive.displayName),
                 const Divider(),
-                _propertyRow('Used', space.usedStr),
+                _propertyRow(l10n.filePath, drive.path),
                 const Divider(),
-                _propertyRow('Free', space.freeStr),
-                const Divider(),
-                _propertyRow('Total', space.totalStr),
-                const Divider(),
-                _propertyRow('Usage', '$usagePercent%'),
+                _propertyRow(l10n.driveType, _kindLabel(context, drive)),
+                if (drive.filesystem.isNotEmpty) ...[
+                  const Divider(),
+                  _propertyRow(l10n.driveFilesystem, drive.filesystem),
+                ],
+                if (drive.volumeSerial != null &&
+                    drive.volumeSerial!.isNotEmpty) ...[
+                  const Divider(),
+                  _propertyRow(l10n.driveSerial, drive.volumeSerial!),
+                ],
+                if (space.hasDetails) ...<Widget>[
+                  const Divider(),
+                  _propertyRow(
+                    l10n.driveUsed,
+                    FormatUtils.formatFileSize(space.usedBytes),
+                  ),
+                  const Divider(),
+                  _propertyRow(
+                    l10n.driveFree,
+                    FormatUtils.formatFileSize(space.freeBytes),
+                  ),
+                  const Divider(),
+                  _propertyRow(
+                    l10n.driveTotal,
+                    FormatUtils.formatFileSize(space.totalBytes),
+                  ),
+                  const Divider(),
+                  _propertyRow('Usage', '$usagePercent%'),
+                ],
               ],
-            ],
+            ),
           ),
           actions: <Widget>[
             TextButton(
@@ -861,31 +1008,12 @@ class _DriveViewState extends State<DriveView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
-          width: 90,
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          width: 100,
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
         Expanded(child: Text(value)),
       ],
     );
-  }
-
-  Future<_DriveMeta> _getDriveMeta(String drivePath) async {
-    final String label = await _getDriveDisplayName(drivePath);
-    final _DriveSpaceInfo spaceInfo = await _getDriveSpaceInfo(drivePath);
-    return _DriveMeta(displayName: label, spaceInfo: spaceInfo);
-  }
-
-  Future<String> _getDriveDisplayName(String drivePath) async {
-    if (Platform.isWindows) {
-      final label = await getDriveLabel(drivePath);
-      if (label.isNotEmpty) {
-        return '$drivePath ($label)';
-      }
-    }
-    return drivePath;
   }
 
   void _openDrive(BuildContext context, String drivePath) {
@@ -901,109 +1029,14 @@ class _DriveViewState extends State<DriveView> {
     final normalized = drivePath.replaceAll('\\', '/');
     final parts =
         normalized.split('/').where((part) => part.isNotEmpty).toList();
-    if (parts.isEmpty) {
-      return drivePath;
-    }
+    if (parts.isEmpty) return drivePath;
     return parts.last;
   }
-
-  Future<_DriveSpaceInfo> _getDriveSpaceInfo(String drivePath) async {
-    if (!Platform.isWindows) {
-      return _DriveSpaceInfo.empty();
-    }
-
-    final String drive = drivePath.endsWith('\\') ? drivePath : '$drivePath\\';
-    final lpFreeBytesAvailable = calloc<Uint64>();
-    final lpTotalNumberOfBytes = calloc<Uint64>();
-    final lpTotalNumberOfFreeBytes = calloc<Uint64>();
-
-    try {
-      final result = win32.GetDiskFreeSpaceEx(
-        drive.toNativeUtf16(),
-        lpFreeBytesAvailable,
-        lpTotalNumberOfBytes,
-        lpTotalNumberOfFreeBytes,
-      );
-
-      if (result == 0) {
-        return _DriveSpaceInfo.empty();
-      }
-
-      final int totalBytes = lpTotalNumberOfBytes.value;
-      final int freeBytes = lpFreeBytesAvailable.value;
-      final int usedBytes = totalBytes - freeBytes;
-      final double usageRatio = totalBytes > 0 ? usedBytes / totalBytes : 0.0;
-
-      return _DriveSpaceInfo(
-        totalStr: _formatSize(totalBytes),
-        freeStr: _formatSize(freeBytes),
-        usedStr: _formatSize(usedBytes),
-        usageRatio: usageRatio,
-      );
-    } catch (_) {
-      return _DriveSpaceInfo.empty();
-    } finally {
-      calloc.free(lpFreeBytesAvailable);
-      calloc.free(lpTotalNumberOfBytes);
-      calloc.free(lpTotalNumberOfFreeBytes);
-    }
-  }
-
-  String _formatSize(int bytes) {
-    const suffixes = <String>['B', 'KB', 'MB', 'GB', 'TB'];
-    int index = 0;
-    double size = bytes.toDouble();
-    while (size >= 1024 && index < suffixes.length - 1) {
-      size /= 1024;
-      index++;
-    }
-    return '${size.toStringAsFixed(1)} ${suffixes[index]}';
-  }
 }
 
-class _DriveEntry {
-  final String path;
-  final String displayName;
-  final _DriveSpaceInfo spaceInfo;
+class _DriveSection {
+  final DriveGroup group;
+  final List<DriveInfo> drives;
 
-  const _DriveEntry({
-    required this.path,
-    required this.displayName,
-    required this.spaceInfo,
-  });
-}
-
-class _DriveMeta {
-  final String displayName;
-  final _DriveSpaceInfo spaceInfo;
-
-  const _DriveMeta({
-    required this.displayName,
-    required this.spaceInfo,
-  });
-}
-
-class _DriveSpaceInfo {
-  final String totalStr;
-  final String freeStr;
-  final String usedStr;
-  final double usageRatio;
-
-  const _DriveSpaceInfo({
-    required this.totalStr,
-    required this.freeStr,
-    required this.usedStr,
-    required this.usageRatio,
-  });
-
-  bool get hasDetails => totalStr.isNotEmpty;
-
-  factory _DriveSpaceInfo.empty() {
-    return const _DriveSpaceInfo(
-      totalStr: '',
-      freeStr: '',
-      usedStr: '',
-      usageRatio: 0.0,
-    );
-  }
+  const _DriveSection({required this.group, required this.drives});
 }

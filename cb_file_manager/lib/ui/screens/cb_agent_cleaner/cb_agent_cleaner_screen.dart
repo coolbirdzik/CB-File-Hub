@@ -10,6 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../e2e/cb_e2e_config.dart';
 
@@ -31,7 +32,10 @@ import '../../../services/ai/ai_provider_service.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../../services/app_insights/app_storage_analyzer.dart';
 import '../../../services/app_insights/windows_app_inventory_service.dart';
+import '../../../services/disk_cleaner/cleaner_categories.dart';
 import '../../../services/disk_cleaner/cleaner_models.dart';
+import '../../../services/disk_cleaner/cleaner_growth_history_service.dart';
+import '../../../services/disk_cleaner/cleaner_last_scan_service.dart';
 import '../../../services/disk_cleaner/disk_cleaner_service.dart';
 import '../../../services/disk_cleaner/disk_tree_node.dart';
 import '../../../services/disk_cleaner/disk_tree_selection.dart';
@@ -52,9 +56,13 @@ class CbAgentCleanerScreen extends StatefulWidget {
   State<CbAgentCleanerScreen> createState() => _CbAgentCleanerScreenState();
 }
 
-enum _Phase { setup, scanning, results, cleaned }
+enum _Phase { setup, results, cleaned }
 
 enum _CleanDeleteMode { recycleBin, permanent }
+
+/// One-tap views over the scanned tree. These match how people actually think
+/// about reclaiming space, instead of requiring them to walk the hierarchy.
+enum _TreePreset { none, largeFiles, logsAndCaches, installers }
 
 enum _CleanerSubFeature { diskCleaner, appInsights }
 
@@ -123,13 +131,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   // Animation
   late final AnimationController _pulseController;
-  late final AnimationController _scanRingController;
 
   // Setup
   List<DriveSpace> _drives = [];
   String? _selectedDrive;
   String? _appInsightsDrive;
   bool _aiAvailable = false;
+
+  /// Last completed scan per drive, keyed by [_normalizedDriveKey]. Drives the
+  /// "previous scan" card on the setup screen; purely informational.
+  final Map<String, CleanerLastScanSummary> _lastScanSummaries =
+      <String, CleanerLastScanSummary>{};
 
   // Scan progress
   FullDiskScanProgress? _lastProgress;
@@ -139,6 +151,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   // Cleanup progress
   bool _isCleaningJunk = false;
+  bool _isQuickCleaning = false;
   // Hot progress data lives in a ValueNotifier so only the progress bar
   // rebuilds during cleanup. Calling setState on every progress tick used
   // to rebuild the entire 2900-line screen — including the disk tree and
@@ -162,6 +175,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   int _cleanedSkippedInUseCount = 0;
   int _cleanedSkippedByUserCount = 0;
   int _lastCleanSuccessCount = 0;
+
+  /// Free space on the cleaned drive immediately before and after the run, so
+  /// the cleaned screen can show the change rather than just a freed total.
+  int? _freeBytesBeforeClean;
+  int? _freeBytesAfterClean;
   bool _lastCleanWasPermanent = false;
   bool _skipAllDeleteFailures = false;
   bool _isPermanentDeleting = false;
@@ -170,22 +188,48 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   // Results
   DiskTreeNode? _rootNode;
+  DiskTreeNode? _aggregateCacheRoot;
+  int _cachedJunkBytes = 0;
+  int _cachedCleanableCount = 0;
   DiskTreeNode? _selectedNode; // node shown in pie chart
   DiskTreeNode? _chartNode;
   Timer? _chartUpdateTimer;
+  final Set<DiskTreeNode> _selectedTreeTargets = <DiskTreeNode>{};
   final Set<String> _selectedTreePaths = <String>{};
+  final Set<String> _reviewVisibleTreePaths = <String>{};
   final ValueNotifier<Set<String>> _selectedTreePathListenable =
       ValueNotifier<Set<String>>(const <String>{});
+  final ValueNotifier<String?> _focusedTreePathListenable =
+      ValueNotifier<String?>(null);
   String? _selectionAnchorPath;
-  int _selectionMutationVersion = 0;
   String? _publishedCleanerContextTabId;
   bool _showCleanableOnly = false;
+  _TreePreset _activePreset = _TreePreset.none;
+
+  /// Memoised [_matchesPresetSubtree] results for the current (root, preset).
+  final Map<DiskTreeNode, bool> _presetMatchCache = <DiskTreeNode, bool>{};
+
+  static const int _largeFileThresholdBytes = 1024 * 1024 * 1024;
+  static const int _installerThresholdBytes = 50 * 1024 * 1024;
+  static const Set<String> _installerExtensions = <String>{
+    '.msi', '.exe', '.iso', '.msix', '.appx', '.msu', '.cab',
+  };
+  static const Set<String> _logAndCacheCategoryIds = <String>{
+    'windows_temp',
+    'browser_cache',
+    'thumbnail_cache',
+    'app_cache',
+    'crash_dumps_logs',
+    'dev_cache',
+  };
+  bool _showGrowthOnly = false;
   bool _reviewMode = false; // when true, tree shows only selected items
   bool _isRefreshingNode = false;
   late final CleanerAppInsightsCubit _appInsightsCubit;
   StreamSubscription<CleanerAppInsightsState>? _appInsightsStateSub;
   AppStorageReport? _appStorageReport;
   FullDiskScanResult? _lastDiskScanResult;
+  List<CleanerFolderGrowth> _recentFolderGrowth = const <CleanerFolderGrowth>[];
   FullDiskScanResult? _appInsightsScanResult;
   bool _isScanningAppInsights = false;
   final ValueNotifier<FullDiskScanProgress?> _appInsightsProgressListenable =
@@ -203,6 +247,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   int _agentBytesFound = 0;
   String _agentCurrentPath = '';
 
+  /// Scroll controller for the flat tree list. Needed so keyboard navigation
+  /// can keep the focused row on screen; rows use a fixed 28px extent.
+  final ScrollController _treeScrollController = ScrollController();
+  static const double _treeRowExtent = 28;
+
   final FocusNode _resultsFocusNode = FocusNode(debugLabel: 'cbCleanerResults');
   final FocusNode _appsFocusNode = FocusNode(debugLabel: 'cbCleanerApps');
 
@@ -218,10 +267,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
-    _scanRingController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
     _loadSetup();
     _agentActivitySub = _service.agentActivityStream.listen(_onAgentActivity);
   }
@@ -241,11 +286,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
     _chartUpdateTimer?.cancel();
     _selectedTreePathListenable.dispose();
+    _focusedTreePathListenable.dispose();
     _appInsightsProgressListenable.dispose();
     _subFeatureListenable.dispose();
     _cleanProgress.dispose();
     _pulseController.dispose();
-    _scanRingController.dispose();
+    _treeScrollController.dispose();
     _resultsFocusNode.dispose();
     _appsFocusNode.dispose();
     super.dispose();
@@ -342,8 +388,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
 
     _drives = await _service.getDriveSpace();
-    _selectedDrive = _defaultDrivePath(_drives);
+    _selectedDrive = _mostPressuredDrivePath(_drives);
     _appInsightsDrive = _defaultDrivePath(_drives);
+    await _loadLastScanSummaries();
     try {
       final providers =
           await GetIt.instance<AiProviderService>().getEnabledProviders();
@@ -354,6 +401,53 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _appInsightsCubit.state.status == CleanerAppInsightsStatus.idle) {
       unawaited(_startAppInsightsScan());
     }
+  }
+
+  Future<void> _loadLastScanSummaries() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final service = CleanerLastScanService(preferences);
+      for (final drive in _drives) {
+        final summary = service.read(drive.path);
+        if (summary != null) {
+          _lastScanSummaries[_normalizedDriveKey(drive.path)] = summary;
+        }
+      }
+    } catch (error) {
+      debugPrint('Unable to read Cleaner last scan summaries: $error');
+    }
+  }
+
+  CleanerLastScanSummary? _lastScanFor(String? drivePath) {
+    if (drivePath == null) return null;
+    return _lastScanSummaries[_normalizedDriveKey(drivePath)];
+  }
+
+  /// Fraction of the drive already in use, 0..1. Used to colour the capacity
+  /// bars so the drive that actually needs attention is obvious at a glance.
+  static double _driveUsedFraction(DriveSpace drive) {
+    if (drive.totalBytes <= 0) return 0;
+    return (drive.usedBytes / drive.totalBytes).clamp(0.0, 1.0);
+  }
+
+  /// Picks the drive under the most space pressure rather than always
+  /// defaulting to the system drive — that is almost always the one the user
+  /// opened the Cleaner for.
+  String? _mostPressuredDrivePath(List<DriveSpace> drives) {
+    if (drives.isEmpty) return null;
+    DriveSpace? best;
+    var bestFraction = -1.0;
+    for (final drive in drives) {
+      if (drive.totalBytes <= 0) continue;
+      final fraction = _driveUsedFraction(drive);
+      if (fraction > bestFraction) {
+        bestFraction = fraction;
+        best = drive;
+      }
+    }
+    // Only override the system-drive default when a drive is genuinely tight.
+    if (best != null && bestFraction >= 0.85) return best.path;
+    return _defaultDrivePath(drives);
   }
 
   String? _defaultDrivePath(List<DriveSpace> drives) {
@@ -574,21 +668,42 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       _rootNode = root;
       _selectedNode = root.children.first;
       _chartNode = root.children.first;
+      _selectedTreeTargets.clear();
       _selectedTreePaths.clear();
       _publishTreeSelection();
       _selectionAnchorPath = root.children.first.fullPath;
       _showCleanableOnly = false;
+      _showGrowthOnly = false;
       _cachedFlatRoot = null;
       _flatRowsValid = false;
       _appStorageReport = appReport;
       _lastDiskScanResult = scanResult;
       _appInsightsScanResult = scanResult;
+      _recentFolderGrowth = const <CleanerFolderGrowth>[
+        CleanerFolderGrowth(
+          path: r'C:\Users\ngtan\Downloads',
+          previousSizeBytes: 6 * 1024 * 1024 * 1024,
+          currentSizeBytes: 8 * 1024 * 1024 * 1024,
+        ),
+        CleanerFolderGrowth(
+          path:
+              r'C:\Users\ngtan\AppData\Local\Google\Chrome\User Data\Default\GPUCache',
+          previousSizeBytes: 500 * 1024 * 1024,
+          currentSizeBytes: 1700 * 1024 * 1024,
+        ),
+      ];
     });
     _appInsightsCubit.setReport(appReport, evaluatedAt: evaluatedAt);
   }
 
   Future<void> _startScan() async {
     if (_selectedDrive == null || _isScanningAppInsights) return;
+    // Recover from a scan the service still considers active while this screen
+    // is not tracking one (a previous run that failed, or a screen that was
+    // disposed mid-scan). Without this the service rejects every new scan.
+    if (_service.isFullScanning && !_isScanningFullDisk) {
+      _service.cancelFullDiskScan();
+    }
     final drive = _selectedDrive!;
     final driveRoot = drive.endsWith('\\') ? drive : '$drive\\';
     final diskScanGeneration = ++_diskScanGeneration;
@@ -605,12 +720,14 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       );
       _selectedNode = _rootNode;
       _chartNode = _rootNode;
+      _selectedTreeTargets.clear();
       _selectedTreePaths.clear();
       _publishTreeSelection();
       _selectionAnchorPath = null;
       _appInsightsSharedWithAgent = false;
+      _showGrowthOnly = false;
+      _recentFolderGrowth = const <CleanerFolderGrowth>[];
     });
-    _scanRingController.repeat();
 
     try {
       final handle = await _service.scanFullDisk(
@@ -639,6 +756,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _rootNode = root;
           _selectedNode = root;
           _chartNode = root;
+          _selectedTreeTargets.clear();
           _selectedTreePaths.clear();
           _publishTreeSelection();
           _selectionAnchorPath = null;
@@ -651,13 +769,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         final expandedPaths = _collectExpandedPaths(_rootNode);
         _service.markJunkNodes(result.root);
         _applyExpandedPaths(result.root, expandedPaths);
-        _scanRingController.stop();
         setState(() {
           _isScanningFullDisk = false;
           _rootNode = result.root;
           _selectedNode = result.root;
           _chartNode = result.root;
           _phase = _Phase.results;
+          _selectedTreeTargets.clear();
           _selectedTreePaths.clear();
           _publishTreeSelection();
           _selectionAnchorPath = null;
@@ -666,6 +784,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           _lastDiskScanResult = result;
         });
         _publishCleanerScanContext();
+        unawaited(_updateFolderGrowthHistory(result, diskScanGeneration));
+        unawaited(_recordLastScanSummary(drive, result));
         if (_activeSubFeature == _CleanerSubFeature.appInsights &&
             _appStorageReport == null &&
             !_isScanningAppInsights) {
@@ -674,7 +794,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       }
     } catch (e) {
       if (mounted && diskScanGeneration == _diskScanGeneration) {
-        _scanRingController.stop();
         setState(() {
           _isScanningFullDisk = false;
           _phase = _Phase.setup;
@@ -690,6 +809,72 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           unawaited(_startAppInsightsScan());
         }
       }
+    }
+  }
+
+  /// Persists a one-line summary of this scan so the setup screen can show
+  /// what the previous run found instead of an empty placeholder.
+  Future<void> _recordLastScanSummary(
+    String drivePath,
+    FullDiskScanResult result,
+  ) async {
+    try {
+      final root = result.root;
+      DriveSpace? drive;
+      for (final candidate in _drives) {
+        if (candidate.path == drivePath) {
+          drive = candidate;
+          break;
+        }
+      }
+      final summary = CleanerLastScanSummary(
+        drivePath: drivePath,
+        scannedAt: DateTime.now(),
+        totalBytes: root.sizeBytes,
+        fileCount: root.fileCount,
+        junkBytes: root.junkBytes,
+        cleanableCount: _countCleanableNodes(root),
+        freeBytes: drive?.freeBytes ?? 0,
+      );
+      final preferences = await SharedPreferences.getInstance();
+      await CleanerLastScanService(preferences).write(summary);
+      if (!mounted) return;
+      setState(() => _lastScanSummaries[_normalizedDriveKey(drivePath)] = summary);
+    } catch (error) {
+      debugPrint('Unable to record Cleaner last scan summary: $error');
+    }
+  }
+
+  static String _normalizedDriveKey(String drivePath) {
+    var normalized = drivePath.trim().toUpperCase();
+    while (normalized.endsWith(r'\')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  Future<void> _updateFolderGrowthHistory(
+    FullDiskScanResult result,
+    int diskScanGeneration,
+  ) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final comparison =
+          await CleanerGrowthHistoryService(preferences).compareAndStore(
+        result,
+      );
+      if (!mounted || diskScanGeneration != _diskScanGeneration) return;
+      setState(() {
+        _recentFolderGrowth = comparison.folders;
+        if (_showGrowthOnly && _recentFolderGrowth.isEmpty) {
+          _showGrowthOnly = false;
+        } else if (_showGrowthOnly && _rootNode != null) {
+          _expandGrowthAncestors(_rootNode!);
+        }
+        _flatRowsValid = false;
+      });
+    } catch (error) {
+      debugPrint('Unable to update Cleaner folder growth history: $error');
     }
   }
 
@@ -1036,9 +1221,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
 
     clearSelection(root);
+    _selectedTreeTargets.clear();
     _selectedTreePaths.clear();
     for (final node in safeNodes) {
       node.isSelectedForDeletion = true;
+      _selectedTreeTargets.add(node);
       _selectedTreePaths.add(node.fullPath);
     }
     root.invalidateSelectionCache();
@@ -1052,6 +1239,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       _selectionAnchorPath = safeNodes.first.fullPath;
       _flatRowsValid = false;
     });
+    _rebuildReviewVisibleTreePaths();
     _publishTreeSelection();
     _enterReviewMode(exactCleanableItems: safeItems);
   }
@@ -1199,24 +1387,151 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   bool _passesTreeFilter(DiskTreeNode node) {
     if (_reviewMode) {
-      return _subtreeHasSelection(node);
+      return _reviewVisibleTreePaths.contains(
+        AppStorageAnalyzer.normalizeWindowsPath(node.fullPath),
+      );
     }
-    if (!_showCleanableOnly) return true;
-    return _isNodeCleanable(node);
+    if (_showGrowthOnly) return _isGrowthNodeOrAncestor(node);
+    if (_showCleanableOnly) return _isNodeCleanable(node);
+    if (_activePreset != _TreePreset.none) return _matchesPresetSubtree(node);
+    return true;
   }
 
-  /// Whether this node OR any descendant has been ticked for deletion.
-  /// Used by review mode to keep ancestor folders visible in the tree.
-  bool _subtreeHasSelection(DiskTreeNode node) {
-    if (node.isSelectedForDeletion && node.fullPath.isNotEmpty) return true;
-    for (final c in node.children) {
-      if (_subtreeHasSelection(c)) return true;
+  /// True when [node] itself matches the active preset, ignoring descendants.
+  bool _matchesPresetDirectly(DiskTreeNode node) {
+    switch (_activePreset) {
+      case _TreePreset.none:
+        return true;
+      case _TreePreset.largeFiles:
+        return node.isFile && node.sizeBytes >= _largeFileThresholdBytes;
+      case _TreePreset.logsAndCaches:
+        return _logAndCacheCategoryIds.contains(node.junkCategoryId);
+      case _TreePreset.installers:
+        if (!node.isFile) return false;
+        if (node.sizeBytes < _installerThresholdBytes) return false;
+        final extension = p.extension(node.name).toLowerCase();
+        return _installerExtensions.contains(extension);
+    }
+  }
+
+  /// A node stays visible when it matches, or when anything beneath it does —
+  /// otherwise the matching files would be unreachable in the tree.
+  ///
+  /// Results are memoised per (root, preset); [_invalidatePresetCache] clears
+  /// the cache whenever either changes.
+  bool _matchesPresetSubtree(DiskTreeNode node) {
+    final cached = _presetMatchCache[node];
+    if (cached != null) return cached;
+    var matches = _matchesPresetDirectly(node);
+    if (!matches) {
+      for (final child in node.children) {
+        if (_matchesPresetSubtree(child)) {
+          matches = true;
+          break;
+        }
+      }
+    }
+    _presetMatchCache[node] = matches;
+    return matches;
+  }
+
+  void _invalidatePresetCache() => _presetMatchCache.clear();
+
+  void _setTreePreset(_TreePreset preset) {
+    setState(() {
+      _activePreset = preset;
+      if (preset != _TreePreset.none) {
+        _showCleanableOnly = false;
+        _showGrowthOnly = false;
+      }
+      _invalidatePresetCache();
+      _flatRowsValid = false;
+    });
+    final root = _rootNode;
+    if (preset != _TreePreset.none && root != null) {
+      _expandPresetAncestors(root, 0);
+      setState(() => _flatRowsValid = false);
+    }
+  }
+
+  /// Opens the branches leading to matches so the user sees results without
+  /// drilling down manually. Bounded in depth to keep very deep trees usable.
+  void _expandPresetAncestors(DiskTreeNode node, int depth) {
+    if (depth >= 6) return;
+    if (!_matchesPresetSubtree(node)) return;
+    for (final child in node.children) {
+      if (child.isFile || !_matchesPresetSubtree(child)) continue;
+      node.isExpanded = true;
+      _expandPresetAncestors(child, depth + 1);
+    }
+  }
+
+  String _presetLabel(AppLocalizations l, _TreePreset preset) {
+    switch (preset) {
+      case _TreePreset.none:
+        return l.diskCleanerPresetAll;
+      case _TreePreset.largeFiles:
+        return l.diskCleanerPresetLargeFiles;
+      case _TreePreset.logsAndCaches:
+        return l.diskCleanerPresetLogsCaches;
+      case _TreePreset.installers:
+        return l.diskCleanerPresetInstallers;
+    }
+  }
+
+  CleanerFolderGrowth? _growthForNode(DiskTreeNode node) {
+    final nodePath = AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
+    for (final growth in _recentFolderGrowth) {
+      if (AppStorageAnalyzer.normalizeWindowsPath(growth.path) == nodePath) {
+        return growth;
+      }
+    }
+    return null;
+  }
+
+  bool _isGrowthNodeOrAncestor(DiskTreeNode node) {
+    if (node.isFile) return false;
+    final nodePath = AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
+    for (final growth in _recentFolderGrowth) {
+      final growthPath = AppStorageAnalyzer.normalizeWindowsPath(growth.path);
+      if (growthPath == nodePath || growthPath.startsWith('$nodePath\\')) {
+        return true;
+      }
     }
     return false;
   }
 
+  void _expandGrowthAncestors(DiskTreeNode node) {
+    if (!_isGrowthNodeOrAncestor(node)) return;
+    for (final child in node.children) {
+      if (child.isFile || !_isGrowthNodeOrAncestor(child)) continue;
+      node.isExpanded = true;
+      _expandGrowthAncestors(child);
+    }
+  }
+
+  void _setGrowthOnly(bool enabled) {
+    if (enabled && _recentFolderGrowth.isEmpty) return;
+    setState(() {
+      _showGrowthOnly = enabled;
+      if (enabled) {
+        _showCleanableOnly = false;
+        final root = _rootNode;
+        if (root != null) _expandGrowthAncestors(root);
+      }
+      _flatRowsValid = false;
+    });
+  }
+
   int _countCleanableNodes(DiskTreeNode? node) {
     return DiskTreeSelection.countCleanableNodes(node);
+  }
+
+  void _ensureCleanerAggregates(DiskTreeNode root) {
+    if (identical(_aggregateCacheRoot, root)) return;
+    _aggregateCacheRoot = root;
+    _cachedJunkBytes = root.junkBytes;
+    _cachedCleanableCount = _countCleanableNodes(root);
   }
 
   void _setAllCleanableChecked(DiskTreeNode? node, bool checked) {
@@ -1226,6 +1541,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     _selectedTreePaths
       ..clear()
       ..addAll(selectedPaths);
+    _selectedTreeTargets
+      ..clear()
+      ..addAll(DiskTreeSelection.collectDeletionTargets(node));
+    _rebuildReviewVisibleTreePaths();
     _flatRowsValid = false;
     _publishTreeSelection();
     setState(() {});
@@ -1284,7 +1603,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     node.sizeBytes = (node.sizeBytes - prunedBytes).clamp(0, node.sizeBytes);
     node.fileCount = (node.fileCount - prunedFiles).clamp(0, node.fileCount);
 
-    // Clear selection on whatever remains so stale checkboxes don't linger.
+    // Clear selection on whatever remains so stale row highlights do not linger.
     node.isSelectedForDeletion = false;
 
     return prunedBytes;
@@ -1368,8 +1687,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     switch (_phase) {
       case _Phase.setup:
         return _buildSetup(theme, l);
-      case _Phase.scanning:
-        return _buildScanning(theme, l);
       case _Phase.results:
         return _buildResults(theme, l);
       case _Phase.cleaned:
@@ -1382,43 +1699,243 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // ---------------------------------------------------------------------------
 
   Widget _buildSetup(ThemeData theme, AppLocalizations l) {
-    return Center(
+    // Scroll when the drive grid + last-scan card exceed the pane height
+    // (common with many volumes or a short window).
+    return LayoutBuilder(
       key: const ValueKey('setup'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Animated scan button
-          _buildScanButton(theme),
-          const SizedBox(height: 28),
-          Text(l.diskCleanerScanTitle,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
-          // Drive picker chips
-          Wrap(
-            spacing: 10,
-            children: _drives.map((d) {
-              final selected = _selectedDrive == d.path;
-              final label =
-                  d.label.isNotEmpty ? '${d.path} (${d.label})' : d.path;
-              return ChoiceChip(
-                label: Text(l.diskCleanerDriveFree(label, _fmt(d.freeBytes))),
-                selected: selected,
-                onSelected: (_) => setState(() => _selectedDrive = d.path),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
-          if (_aiAvailable)
-            _buildAcrylicChip(
-              theme: theme,
-              icon: PhosphorIconsLight.sparkle,
-              label: l.diskCleanerAskAgent,
-              onTap: _openAiPanel,
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Animated scan button
+                  _buildScanButton(theme),
+                  const SizedBox(height: 28),
+                  Text(l.diskCleanerScanTitle,
+                      style: theme.textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 18),
+                  // Drive picker — capacity bars make the drive that needs
+                  // attention obvious without reading any numbers.
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.center,
+                      children: _drives
+                          .map((d) => _buildDriveCard(theme, l, d))
+                          .toList(growable: false),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _buildLastScanCard(theme, l),
+                  const SizedBox(height: 18),
+                  if (_aiAvailable)
+                    _buildAcrylicChip(
+                      theme: theme,
+                      icon: PhosphorIconsLight.sparkle,
+                      label: l.diskCleanerAskAgent,
+                      onTap: _openAiPanel,
+                    ),
+                ],
+              ),
             ),
-        ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Selectable drive tile showing a used/total capacity bar. The bar turns
+  /// amber past 85% and red past 95% so space pressure reads at a glance.
+  Widget _buildDriveCard(ThemeData theme, AppLocalizations l, DriveSpace d) {
+    final selected = _selectedDrive == d.path;
+    final fraction = _driveUsedFraction(d);
+    final isCritical = fraction >= 0.95;
+    final isLow = fraction >= 0.85;
+    final barColor = isCritical
+        ? theme.colorScheme.error
+        : (isLow ? Colors.orange : theme.colorScheme.primary);
+    final label = d.label.isNotEmpty ? '${d.path} (${d.label})' : d.path;
+
+    return SizedBox(
+      width: 250,
+      child: Material(
+        color: selected
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.45)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _selectedDrive = d.path),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.dividerColor.withValues(alpha: 0.6),
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(PhosphorIconsLight.hardDrive,
+                        size: 16, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isLow) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: barColor.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          l.diskCleanerDriveLowSpace,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: barColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: fraction,
+                    minHeight: 6,
+                    backgroundColor:
+                        theme.colorScheme.onSurface.withValues(alpha: 0.10),
+                    valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l.diskCleanerDriveCapacity(
+                    _fmt(d.usedBytes),
+                    _fmt(d.totalBytes),
+                    _fmt(d.freeBytes),
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  /// Shows what the previous scan of the selected drive found, plus a
+  /// one-tap "quick clean" for the categories classified as safe. Most users
+  /// only want that — the tree and pie chart are the advanced path.
+  Widget _buildLastScanCard(ThemeData theme, AppLocalizations l) {
+    final summary = _lastScanFor(_selectedDrive);
+    if (summary == null) return const SizedBox.shrink();
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest
+              .withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(PhosphorIconsLight.clockCounterClockwise,
+                    size: 16, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l.diskCleanerLastScanFound(
+                      _relativeTimeLabel(l, summary.scannedAt),
+                      _fmt(summary.junkBytes),
+                    ),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.diskCleanerQuickCleanHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilledButton.tonalIcon(
+                  onPressed: _isQuickCleaning ? null : _startQuickClean,
+                  icon: _isQuickCleaning
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(PhosphorIconsLight.broom, size: 16),
+                  label: Text(_isQuickCleaning
+                      ? l.diskCleanerQuickCleanScanning
+                      : l.diskCleanerQuickCleanButton),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Human-friendly "3 days ago" style label for the previous scan time.
+  String _relativeTimeLabel(AppLocalizations l, DateTime when) {
+    final delta = DateTime.now().difference(when);
+    if (delta.inMinutes < 5) return l.diskCleanerTimeJustNow;
+    if (delta.inHours < 24) return l.diskCleanerTimeToday;
+    final days = delta.inDays;
+    if (days <= 1) return l.diskCleanerTimeYesterday;
+    if (days < 7) return l.diskCleanerTimeDaysAgo(days);
+    final weeks = days ~/ 7;
+    if (weeks < 5) return l.diskCleanerTimeWeeksAgo(weeks);
+    return l.diskCleanerTimeMonthsAgo(days ~/ 30);
   }
 
   Widget _buildScanButton(ThemeData theme) {
@@ -1468,101 +1985,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           ),
         );
       },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Scanning phase — progress ring
-  // ---------------------------------------------------------------------------
-
-  Widget _buildScanning(ThemeData theme, AppLocalizations l) {
-    return Center(
-      key: const ValueKey('scanning'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedBuilder(
-            animation: _scanRingController,
-            builder: (context, child) {
-              return SizedBox(
-                width: 220,
-                height: 220,
-                child: CustomPaint(
-                  painter: _ScanRingPainter(
-                    progress: _scanRingController.value,
-                    color: theme.colorScheme.primary,
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(PhosphorIconsLight.hardDrive,
-                            size: 36, color: theme.colorScheme.primary),
-                        const SizedBox(height: 10),
-                        if (_lastProgress != null) ...[
-                          Text(
-                            _fmt(_lastProgress!.bytesScanned),
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            l.diskCleanerFilesCount(
-                                _lastProgress!.filesScanned),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          Text(
-                            l.diskCleanerDirsCount(
-                                _lastProgress!.directoriesScanned),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ] else
-                          Text(l.diskCleanerStarting,
-                              style: theme.textTheme.bodyMedium),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Text(l.diskCleanerScanRunning, style: theme.textTheme.titleLarge),
-          if (_lastProgress != null) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: 320,
-              child: Text(
-                _lastProgress!.currentPath,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          _buildAcrylicChip(
-            theme: theme,
-            icon: Icons.stop_rounded,
-            label: l.diskCleanerCancel,
-            onTap: () {
-              _service.cancelFullDiskScan();
-              _scanRingController.stop();
-              _appInsightsGeneration++;
-              _appInsightsSharedWithAgent = false;
-              _appInsightsCubit.clear();
-              setState(() {
-                _phase = _Phase.setup;
-                _appStorageReport = null;
-              });
-              _publishCleanerScanContext();
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -1642,14 +2064,49 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   }
 
   List<DiskTreeNode> _selectedTreeNodes() {
-    return DiskTreeSelection.collectDeletionTargets(_rootNode);
+    return List<DiskTreeNode>.unmodifiable(_selectedTreeTargets);
   }
 
   void _publishTreeSelection() {
+    _selectedTreePaths
+      ..clear()
+      ..addAll(_selectedTreeTargets.map((node) => node.fullPath));
     _selectedTreePathListenable.value = Set<String>.unmodifiable(
       _selectedTreePaths,
     );
     _publishCleanerScanContext();
+  }
+
+  void _rebuildReviewVisibleTreePaths() {
+    _reviewVisibleTreePaths.clear();
+    for (final target in _selectedTreeTargets) {
+      var path = AppStorageAnalyzer.normalizeWindowsPath(target.fullPath);
+      while (path.isNotEmpty) {
+        _reviewVisibleTreePaths.add(path);
+        if (path.length <= 3) break;
+        final separator = path.lastIndexOf(r'\');
+        if (separator < 0) break;
+        path = path.substring(0, separator);
+        if (path.length == 2 && path.endsWith(':')) path = '$path\\';
+      }
+    }
+  }
+
+  void _replaceTreeTargets(Iterable<DiskTreeNode> targets) {
+    final nextTargets = targets.toSet();
+    for (final current in _selectedTreeTargets) {
+      if (!nextTargets.contains(current)) {
+        current.isSelectedForDeletion = false;
+      }
+    }
+    for (final target in nextTargets) {
+      target.isSelectedForDeletion = true;
+    }
+    _selectedTreeTargets
+      ..clear()
+      ..addAll(nextTargets);
+    _rebuildReviewVisibleTreePaths();
+    _publishTreeSelection();
   }
 
   String? _activeTabId() {
@@ -1677,118 +2134,86 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     );
   }
 
-  void _setCleanSelectedRecursive(DiskTreeNode node, bool selected) {
-    if (node.fullPath.isNotEmpty) {
-      node.isSelectedForDeletion = selected;
-      if (selected) {
-        _selectedTreePaths.add(node.fullPath);
-      } else {
-        _selectedTreePaths.remove(node.fullPath);
+  Set<DiskTreeNode> _canonicalTreeTargets(Iterable<DiskTreeNode> nodes) {
+    final sorted = nodes.where((node) => node.fullPath.isNotEmpty).toList()
+      ..sort((a, b) {
+        final aPath = AppStorageAnalyzer.normalizeWindowsPath(a.fullPath);
+        final bPath = AppStorageAnalyzer.normalizeWindowsPath(b.fullPath);
+        return aPath.length.compareTo(bPath.length);
+      });
+    final targets = <DiskTreeNode>{};
+    final targetPaths = <String>[];
+    for (final node in sorted) {
+      final path = AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
+      if (targetPaths.any(
+        (parent) => AppStorageAnalyzer.isSameOrDescendant(path, parent),
+      )) {
+        continue;
       }
+      targets.add(node);
+      targetPaths.add(path);
     }
-    for (final child in node.children) {
-      _setCleanSelectedRecursive(child, selected);
-    }
-  }
-
-  void _applyCleanSelectionAfterPaint(
-    Iterable<DiskTreeNode> nodes,
-    bool selected,
-  ) {
-    final version = ++_selectionMutationVersion;
-    final targets = List<DiskTreeNode>.of(nodes, growable: false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || version != _selectionMutationVersion) return;
-      for (final target in targets) {
-        _setCleanSelectedRecursive(target, selected);
-      }
-      if (_reviewMode) _flatRowsValid = false;
-      _publishTreeSelection();
-      setState(() {});
-    });
+    return targets;
   }
 
   void _selectTreeRow(DiskTreeNode node, List<_FlatRow> visibleRows) {
     if (node.fullPath.isEmpty) return;
     _resultsFocusNode.requestFocus();
+    _selectedNode = node;
+    _focusedTreePathListenable.value = node.fullPath;
 
     final keyboard = HardwareKeyboard.instance;
     final isCtrl = keyboard.isControlPressed || keyboard.isMetaPressed;
     final isShift = keyboard.isShiftPressed;
-    final path = node.fullPath;
-
-    _selectedNode = node;
-
+    var appliedRange = false;
     if (isShift && _selectionAnchorPath != null) {
       final anchorIndex = visibleRows.indexWhere(
         (row) => row.node.fullPath == _selectionAnchorPath,
       );
       final currentIndex = visibleRows.indexWhere(
-        (row) => row.node.fullPath == path,
+        (row) => row.node.fullPath == node.fullPath,
       );
       if (anchorIndex >= 0 && currentIndex >= 0) {
         final start = math.min(anchorIndex, currentIndex);
         final end = math.max(anchorIndex, currentIndex);
-        final checked = !node.isSelectedForDeletion;
-        node.isSelectedForDeletion = checked;
-        if (checked) {
-          _selectedTreePaths.add(path);
-        } else {
-          _selectedTreePaths.remove(path);
-        }
-        _publishTreeSelection();
-        for (var i = start; i <= end; i++) {
-          visibleRows[i].node.isSelectedForDeletion = checked;
-          final rowPath = visibleRows[i].node.fullPath;
-          if (rowPath.isEmpty) continue;
-          if (checked) {
-            _selectedTreePaths.add(rowPath);
-          } else {
-            _selectedTreePaths.remove(rowPath);
-          }
-        }
-        _publishTreeSelection();
-        _applyCleanSelectionAfterPaint(
-          visibleRows.sublist(start, end + 1).map((row) => row.node),
-          checked,
+        final range =
+            visibleRows.sublist(start, end + 1).map((row) => row.node);
+        _replaceTreeTargets(
+          _canonicalTreeTargets(
+            isCtrl ? <DiskTreeNode>[..._selectedTreeTargets, ...range] : range,
+          ),
         );
-        _scheduleChartNodeUpdate(node);
-        return;
+        appliedRange = true;
       }
     }
-
-    if (isCtrl) {
-      final checked = !node.isSelectedForDeletion;
-      node.isSelectedForDeletion = checked;
-      if (checked) {
-        _selectedTreePaths.add(path);
-      } else {
-        _selectedTreePaths.remove(path);
-      }
-      _selectionAnchorPath = path;
-      _publishTreeSelection();
-      _applyCleanSelectionAfterPaint([node], checked);
-      _scheduleChartNodeUpdate(node);
-      return;
+    if (!appliedRange && isCtrl) {
+      _toggleTreeTarget(node, !_selectedTreeTargets.contains(node));
+      _selectionAnchorPath = node.fullPath;
+    } else if (!appliedRange) {
+      _replaceTreeTargets(<DiskTreeNode>[node]);
+      _selectionAnchorPath = node.fullPath;
     }
-
-    final checked = !node.isSelectedForDeletion;
-    node.isSelectedForDeletion = checked;
-    if (checked) {
-      _selectedTreePaths.add(path);
-    } else {
-      _selectedTreePaths.remove(path);
+    if (_reviewMode) {
+      setState(() => _flatRowsValid = false);
     }
-    _selectionAnchorPath = path;
-    _publishTreeSelection();
-    _applyCleanSelectionAfterPaint([node], checked);
-
     _scheduleChartNodeUpdate(node);
+  }
+
+  void _toggleTreeTarget(DiskTreeNode node, bool checked) {
+    final targets = DiskTreeSelection.setExactTargetChecked(
+      _selectedTreeTargets,
+      node,
+      checked,
+    );
+    _replaceTreeTargets(targets);
+    if (_reviewMode) {
+      setState(() => _flatRowsValid = false);
+    }
   }
 
   void _scheduleChartNodeUpdate(DiskTreeNode node) {
     _chartUpdateTimer?.cancel();
-    _chartUpdateTimer = Timer(const Duration(milliseconds: 80), () {
+    _chartUpdateTimer = Timer(const Duration(milliseconds: 120), () {
       if (!mounted || _chartNode == node) return;
       setState(() => _chartNode = node);
       _publishCleanerScanContext();
@@ -1826,18 +2251,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     }
 
     if (isCtrl && key == LogicalKeyboardKey.keyA) {
-      final rows = _cachedFlatRows ?? const <_FlatRow>[];
-      setState(() {
-        for (final row in rows) {
-          _setCleanSelectedRecursive(row.node, true);
-        }
-        if (rows.isNotEmpty) {
-          _selectedNode = rows.last.node;
-          _selectionAnchorPath = rows.first.node.fullPath;
-          _scheduleChartNodeUpdate(rows.last.node);
-        }
-        _publishTreeSelection();
-      });
+      _setAllCleanableChecked(_rootNode, true);
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.space) {
+      final focused = _selectedNode;
+      if (focused != null && focused.fullPath.isNotEmpty) {
+        _toggleTreeTarget(
+          focused,
+          !_selectedTreeTargets.contains(focused),
+        );
+      }
       return KeyEventResult.handled;
     }
 
@@ -1846,7 +2271,120 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       return KeyEventResult.handled;
     }
 
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _moveTreeFocus(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _moveTreeFocus(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.home) {
+      _moveTreeFocusTo(0);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.end) {
+      _moveTreeFocusTo((_cachedFlatRows?.length ?? 1) - 1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _expandOrDescendFocusedRow();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _collapseOrAscendFocusedRow();
+      return KeyEventResult.handled;
+    }
+
     return KeyEventResult.ignored;
+  }
+
+  int _focusedRowIndex() {
+    final rows = _cachedFlatRows;
+    if (rows == null || rows.isEmpty) return -1;
+    final focusedPath = _selectedNode?.fullPath;
+    if (focusedPath == null || focusedPath.isEmpty) return -1;
+    return rows.indexWhere((row) => row.node.fullPath == focusedPath);
+  }
+
+  /// Moves keyboard focus [delta] visible rows and scrolls it into view.
+  void _moveTreeFocus(int delta) {
+    final rows = _cachedFlatRows;
+    if (rows == null || rows.isEmpty) return;
+    final current = _focusedRowIndex();
+    final next = current < 0
+        ? (delta > 0 ? 0 : rows.length - 1)
+        : (current + delta).clamp(0, rows.length - 1);
+    _moveTreeFocusTo(next);
+  }
+
+  void _moveTreeFocusTo(int index) {
+    final rows = _cachedFlatRows;
+    if (rows == null || rows.isEmpty) return;
+    final target = index.clamp(0, rows.length - 1);
+    final node = rows[target].node;
+    if (node.fullPath.isEmpty) return;
+    setState(() {
+      _selectedNode = node;
+      _chartNode = node;
+    });
+    _focusedTreePathListenable.value = node.fullPath;
+    _selectionAnchorPath = node.fullPath;
+    _scrollTreeRowIntoView(target);
+  }
+
+  void _scrollTreeRowIntoView(int index) {
+    if (!_treeScrollController.hasClients) return;
+    final position = _treeScrollController.position;
+    final rowTop = index * _treeRowExtent;
+    final rowBottom = rowTop + _treeRowExtent;
+    double? target;
+    if (rowTop < position.pixels) {
+      target = rowTop;
+    } else if (rowBottom > position.pixels + position.viewportDimension) {
+      target = rowBottom - position.viewportDimension;
+    }
+    if (target == null) return;
+    _treeScrollController.jumpTo(
+      target.clamp(position.minScrollExtent, position.maxScrollExtent),
+    );
+  }
+
+  /// Right arrow: expand a collapsed folder, or step into its first child.
+  void _expandOrDescendFocusedRow() {
+    final node = _selectedNode;
+    if (node == null || node.isFile || node.children.isEmpty) return;
+    if (!node.isExpanded) {
+      setState(() {
+        node.isExpanded = true;
+        _flatRowsValid = false;
+      });
+      return;
+    }
+    _moveTreeFocus(1);
+  }
+
+  /// Left arrow: collapse an expanded folder, or step out to its parent.
+  void _collapseOrAscendFocusedRow() {
+    final node = _selectedNode;
+    if (node == null) return;
+    if (!node.isFile && node.isExpanded && node.children.isNotEmpty) {
+      setState(() {
+        node.isExpanded = false;
+        _flatRowsValid = false;
+      });
+      return;
+    }
+    final rows = _cachedFlatRows;
+    final current = _focusedRowIndex();
+    if (rows == null || current <= 0) return;
+    final currentDepth = rows[current].depth;
+    for (var index = current - 1; index >= 0; index--) {
+      if (rows[index].depth < currentDepth) {
+        _moveTreeFocusTo(index);
+        return;
+      }
+    }
   }
 
   void _setSubFeature(_CleanerSubFeature feature) {
@@ -2086,7 +2624,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               ],
             ),
           ),
-          _buildBottomBar(theme, l),
+          ValueListenableBuilder<Set<String>>(
+            valueListenable: _selectedTreePathListenable,
+            builder: (context, _, __) => _buildBottomBar(theme, l),
+          ),
         ],
       ),
     );
@@ -2097,8 +2638,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     AppLocalizations l,
     DiskTreeNode root,
   ) {
-    final junkBytes = root.junkBytes;
-    final cleanableCount = _countCleanableNodes(root);
+    _ensureCleanerAggregates(root);
+    final junkBytes = _cachedJunkBytes;
+    final cleanableCount = _cachedCleanableCount;
     final driveSummary = l.diskCleanerDriveSummary(
         root.fullPath, _fmt(root.sizeBytes), root.fileCount);
     final hasStatus = _isScanningFullDisk || _agentScanning;
@@ -2210,6 +2752,35 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
           ),
         ),
       ),
+      // Preset views — "how do I get space back" shortcuts that don't
+      // require walking the hierarchy.
+      boundedAction(
+        PopupMenuButton<_TreePreset>(
+          key: const ValueKey<String>('cleaner-preset-menu'),
+          tooltip: l.diskCleanerPresetTooltip,
+          initialValue: _activePreset,
+          onSelected: _setTreePreset,
+          itemBuilder: (_) => _TreePreset.values
+              .map(
+                (preset) => PopupMenuItem<_TreePreset>(
+                  value: preset,
+                  child: Text(_presetLabel(l, preset)),
+                ),
+              )
+              .toList(growable: false),
+          child: Chip(
+            avatar: const Icon(PhosphorIconsLight.funnel, size: 16),
+            label: Text(
+              _presetLabel(l, _activePreset),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            backgroundColor: _activePreset == _TreePreset.none
+                ? null
+                : theme.colorScheme.primaryContainer,
+          ),
+        ),
+      ),
       // Filter cleanable-only
       boundedAction(
         Tooltip(
@@ -2223,11 +2794,29 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             selected: _showCleanableOnly,
             onSelected: (v) => setState(() {
               _showCleanableOnly = v;
+              if (v) _showGrowthOnly = false;
               _flatRowsValid = false;
             }),
           ),
         ),
       ),
+      if (_recentFolderGrowth.isNotEmpty)
+        boundedAction(
+          Tooltip(
+            message: l.diskCleanerGrowthTitle,
+            child: FilterChip(
+              key: const ValueKey<String>('cleaner-growth-filter'),
+              avatar: const Icon(PhosphorIconsLight.trendUp, size: 16),
+              label: Text(
+                l.diskCleanerGrowthFilter(_recentFolderGrowth.length),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              selected: _showGrowthOnly,
+              onSelected: _setGrowthOnly,
+            ),
+          ),
+        ),
       // Quick check actions
       boundedAction(
         TextButton(
@@ -2267,8 +2856,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             if (_isScanningFullDisk) {
               _service.cancelFullDiskScan();
               _diskScanGeneration++;
-              _scanRingController.stop();
-            }
+                  }
             _appInsightsSharedWithAgent = false;
             setState(() {
               _phase = _Phase.setup;
@@ -2277,6 +2865,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
               _rootNode = null;
               _selectedNode = null;
               _chartNode = null;
+              _selectedTreeTargets.clear();
               _selectedTreePaths.clear();
               _publishTreeSelection();
               _selectionAnchorPath = null;
@@ -2366,6 +2955,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       ThemeData theme, AppLocalizations l, DiskTreeNode root) {
     // Re-flatten only when cache is invalid or the root object changed.
     if (!_flatRowsValid || _cachedFlatRows == null || _cachedFlatRoot != root) {
+      // Every tree mutation invalidates the flat rows, so this is also the
+      // one place that has to drop memoised preset matches.
+      _invalidatePresetCache();
       final rows = <_FlatRow>[];
       void flatten(DiskTreeNode node, int depth, int parentSize) {
         if (!_passesTreeFilter(node)) return;
@@ -2460,14 +3052,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                   ),
                 )
               : ListView.builder(
+                  controller: _treeScrollController,
                   itemCount: flatRows.length,
-                  itemExtent: 28,
+                  itemExtent: _treeRowExtent,
                   itemBuilder: (context, index) {
                     final row = flatRows[index];
                     return _FlatTreeRowWidget(
                       row: row,
                       theme: theme,
+                      growth: _growthForNode(row.node),
                       selectedPaths: _selectedTreePathListenable,
+                      focusedPath: _focusedTreePathListenable,
                       onTap: () => _selectTreeRow(row.node, flatRows),
                       onExpandToggle: row.node.isFile
                           ? null
@@ -2475,9 +3070,6 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                                 row.node.isExpanded = !row.node.isExpanded;
                                 _flatRowsValid = false;
                               }),
-                      onToggleJunk: (node, target) => setState(() {
-                        _applyCheckRecursiveGlobal(node, target);
-                      }),
                       onAskAi:
                           _aiAvailable ? () => _askAiAboutNode(row.node) : null,
                       onShowContextMenu: _showNodeContextMenu,
@@ -2489,29 +3081,97 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     );
   }
 
-  void _applyCheckRecursiveGlobal(DiskTreeNode node, bool checked) {
-    void walk(DiskTreeNode n) {
-      if (n.fullPath.isNotEmpty) {
-        n.isSelectedForDeletion = checked;
-        if (checked) {
-          _selectedTreePaths.add(n.fullPath);
-        } else {
-          _selectedTreePaths.remove(n.fullPath);
-        }
-      }
-      for (final c in n.children) {
-        walk(c);
-      }
-    }
-
-    walk(node);
-    _flatRowsValid = false;
-    _publishTreeSelection();
-  }
-
   // ---------------------------------------------------------------------------
   // Pie chart panel (right)
   // ---------------------------------------------------------------------------
+
+  /// Index of the pie slice matching the currently focused tree node, so the
+  /// chart and the tree visibly agree on what is selected.
+  int? _pieHighlightIndex(List<DiskTreeNode> topChildren) {
+    final focused = _selectedNode;
+    if (focused == null) return null;
+    for (var i = 0; i < topChildren.length; i++) {
+      if (identical(topChildren[i], focused)) return i;
+    }
+    return null;
+  }
+
+  /// Maps a tap inside the pie to a slice index, mirroring the geometry in
+  /// [_PieChartPainter]. Returns null for taps outside the circle or in the
+  /// gap left by children beyond the top 10.
+  int? _pieSegmentAt(
+    Offset position,
+    Size size,
+    List<_PieSegment> segments,
+    double total,
+  ) {
+    if (total <= 0) return null;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 8;
+    final delta = position - center;
+    if (delta.distance > radius) return null;
+
+    // The painter starts drawing at -pi/2 (12 o'clock) and sweeps clockwise.
+    var angle = math.atan2(delta.dy, delta.dx) + math.pi / 2;
+    if (angle < 0) angle += 2 * math.pi;
+
+    var start = 0.0;
+    for (var i = 0; i < segments.length; i++) {
+      final sweep = segments[i].value / total * 2 * math.pi;
+      if (angle >= start && angle < start + sweep) return i;
+      start += sweep;
+    }
+    return null;
+  }
+
+  /// Focuses [target] in the tree: expands every ancestor, selects the row,
+  /// and scrolls it into view. Used by the pie slices and the legend so the
+  /// chart acts as a navigator instead of a read-only picture.
+  ///
+  /// The chart itself deliberately stays on the current parent — re-rooting it
+  /// would make the slice the user just clicked disappear from under the
+  /// cursor.
+  void _revealNodeInTree(DiskTreeNode target) {
+    final root = _rootNode;
+    if (root == null || target.fullPath.isEmpty) return;
+
+    final targetUpper = target.fullPath.toUpperCase();
+    bool expandTowards(DiskTreeNode node) {
+      if (identical(node, target)) return true;
+      for (final child in node.children) {
+        final childUpper = child.fullPath.toUpperCase();
+        // Prune branches that cannot contain the target.
+        if (!identical(child, target) &&
+            targetUpper != childUpper &&
+            !targetUpper.startsWith('$childUpper\\')) {
+          continue;
+        }
+        if (expandTowards(child)) {
+          node.isExpanded = true;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    expandTowards(root);
+
+    setState(() {
+      _selectedNode = target;
+      _flatRowsValid = false;
+    });
+    _focusedTreePathListenable.value = target.fullPath;
+    _selectionAnchorPath = target.fullPath;
+    _resultsFocusNode.requestFocus();
+
+    // The flat rows are rebuilt during the next build, so the row index is
+    // only known after this frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final index = _focusedRowIndex();
+      if (index >= 0) _scrollTreeRowIntoView(index);
+    });
+  }
 
   Widget _buildPiePanel(
       ThemeData theme, AppLocalizations l, DiskTreeNode node) {
@@ -2621,14 +3281,37 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // Pie chart
+          // Pie chart — clicking a slice reveals that folder in the tree.
           Expanded(
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: _PieChartPainter(
-                segments: segments,
-                total: node.sizeBytes.toDouble(),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                );
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (details) {
+                    final index = _pieSegmentAt(
+                      details.localPosition,
+                      size,
+                      segments,
+                      node.sizeBytes.toDouble(),
+                    );
+                    if (index != null) {
+                      _revealNodeInTree(topChildren[index]);
+                    }
+                  },
+                  child: CustomPaint(
+                    size: Size.infinite,
+                    painter: _PieChartPainter(
+                      segments: segments,
+                      total: node.sizeBytes.toDouble(),
+                      highlightIndex: _pieHighlightIndex(topChildren),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 12),
@@ -2644,35 +3327,55 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
                 final pct = node.sizeBytes > 0
                     ? (c.sizeBytes / node.sizeBytes * 100).toStringAsFixed(1)
                     : '0';
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(2),
+                final isFocused =
+                    _selectedNode != null && identical(_selectedNode, c);
+                // The legend is the same control as the slice: tapping either
+                // reveals that folder in the tree.
+                return InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () => _revealNodeInTree(c),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 3, horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: isFocused
+                          ? theme.colorScheme.primary.withValues(alpha: 0.10)
+                          : null,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          c.name,
-                          style: const TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            c.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isFocused
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '$pct%  ${_fmt(c.sizeBytes)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurfaceVariant,
+                        Text(
+                          '$pct%  ${_fmt(c.sizeBytes)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
@@ -2689,7 +3392,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
 
   Widget _buildBottomBar(ThemeData theme, AppLocalizations l) {
     final root = _rootNode;
-    final junkBytes = root?.junkBytes ?? 0;
+    if (root != null) _ensureCleanerAggregates(root);
+    final junkBytes = root == null ? 0 : _cachedJunkBytes;
     final selectedBytes = _selectedJunkBytes(root);
     final cleaningBytes = _isCleaningJunk ? _pendingCleanBytes : selectedBytes;
 
@@ -2988,23 +3692,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     );
   }
 
-  /// Sum of sizes of all selected junk nodes (top-most selected only, since
-  /// _applyCheckRecursive marks both parent and descendants).
+  /// Sum of exact canonical cleanup targets without walking the scan tree.
   int _selectedJunkBytes(DiskTreeNode? root) {
     if (root == null) return 0;
-    int total = 0;
-    void walk(DiskTreeNode n) {
-      if (n.isSelectedForDeletion && n.fullPath.isNotEmpty) {
-        total += n.sizeBytes;
-        return; // top-most selected node already covers the subtree
-      }
-      for (final c in n.children) {
-        walk(c);
-      }
-    }
-
-    walk(root);
-    return total;
+    return _selectedTreeTargets.fold<int>(
+      0,
+      (total, node) => total + node.sizeBytes,
+    );
   }
 
   void _enterReviewMode({List<JunkItem>? exactCleanableItems}) {
@@ -3033,6 +3727,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     if (root != null) {
       DiskTreeSelection.expandAncestorsOfSelection(root);
     }
+    _rebuildReviewVisibleTreePaths();
     final totalBytes = items.fold<int>(0, (s, i) => s + i.sizeBytes);
     setState(() {
       _pendingCleanItems = items;
@@ -3042,6 +3737,271 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
     });
     _service.pendingCleanupItems = items;
     _service.pendingCleanupBytes = totalBytes;
+  }
+
+  /// Current free bytes on the selected drive, or null if it can't be read.
+  Future<int?> _currentFreeBytes() async {
+    final drivePath = _selectedDrive;
+    if (drivePath == null) return null;
+    try {
+      final drives = await _service.getDriveSpace();
+      for (final drive in drives) {
+        if (drive.path == drivePath) return drive.freeBytes;
+      }
+    } catch (error) {
+      debugPrint('Unable to read drive free space: $error');
+    }
+    return null;
+  }
+
+  /// Re-reads free space after a cleanup so the cleaned screen can show the
+  /// real before/after, not just the sum of the deleted file sizes.
+  Future<void> _refreshFreeSpaceAfterClean() async {
+    final free = await _currentFreeBytes();
+    if (!mounted || free == null) return;
+    setState(() {
+      _freeBytesAfterClean = free;
+      _drives = _drives
+          .map((d) => d.path == _selectedDrive
+              ? DriveSpace(
+                  path: d.path,
+                  label: d.label,
+                  totalBytes: d.totalBytes,
+                  freeBytes: free,
+                  requiresAdmin: d.requiresAdmin,
+                )
+              : d)
+          .toList(growable: false);
+    });
+  }
+
+  /// Localised title for a junk category, falling back to the English
+  /// [CleanerCategory.displayName] for categories with no translation yet.
+  static String _junkCategoryTitle(AppLocalizations l, String categoryId) {
+    switch (categoryId) {
+      case 'windows_temp':
+        return l.diskCleanerCategoryWindowsTemp;
+      case 'browser_cache':
+        return l.diskCleanerCategoryBrowserCache;
+      case 'recycle_bin':
+        return l.diskCleanerCategoryRecycleBin;
+      case 'thumbnail_cache':
+        return l.diskCleanerCategoryThumbnailCache;
+      case 'app_cache':
+        return l.diskCleanerCategoryAppCache;
+      case 'crash_dumps_logs':
+        return l.diskCleanerCategoryCrashLogs;
+      case 'windows_update_cache':
+        return l.diskCleanerCategoryWindowsUpdate;
+      case 'prefetch':
+        return l.diskCleanerCategoryPrefetch;
+      case 'delivery_optimization':
+        return l.diskCleanerCategoryDeliveryOptimization;
+      case 'dev_cache':
+        return l.diskCleanerCategoryDevCache;
+      default:
+        return CleanerCategories.byId(categoryId)?.displayName ?? categoryId;
+    }
+  }
+
+  /// Plain-language answer to "why is this junk?", shown next to each item so
+  /// the user can judge a deletion without opening the folder.
+  static String _junkReason(AppLocalizations l, String? categoryId) {
+    switch (categoryId) {
+      case 'windows_temp':
+        return l.diskCleanerReasonWindowsTemp;
+      case 'browser_cache':
+        return l.diskCleanerReasonBrowserCache;
+      case 'recycle_bin':
+        return l.diskCleanerReasonRecycleBin;
+      case 'thumbnail_cache':
+        return l.diskCleanerReasonThumbnailCache;
+      case 'app_cache':
+        return l.diskCleanerReasonAppCache;
+      case 'crash_dumps_logs':
+        return l.diskCleanerReasonCrashLogs;
+      case 'windows_update_cache':
+        return l.diskCleanerReasonWindowsUpdate;
+      case 'prefetch':
+        return l.diskCleanerReasonPrefetch;
+      case 'delivery_optimization':
+        return l.diskCleanerReasonDeliveryOptimization;
+      case 'dev_cache':
+        return l.diskCleanerReasonDevCache;
+      default:
+        return l.diskCleanerReasonGeneric;
+    }
+  }
+
+  /// Category IDs that the cleaner classifies as safe to remove without the
+  /// user auditing individual paths. Derived from the declarative category
+  /// table so a new safe category is picked up automatically.
+  static List<String> _quickCleanCategoryIds() => CleanerCategories.all()
+      .where((c) =>
+          c.safety == CleanerSafety.safe && c.defaultEnabled && !c.requiresAdmin)
+      .map((c) => c.id)
+      .toList(growable: false);
+
+  /// One-tap cleanup of the safe categories. Scans, shows a grouped preview so
+  /// the user still sees exactly what will go, then reuses the normal
+  /// [_cleanJunk] pipeline (Recycle Bin, never permanent).
+  Future<void> _startQuickClean() async {
+    if (_isQuickCleaning || _isCleaningJunk || _isScanningFullDisk) return;
+    final drive = _selectedDrive;
+    if (drive == null) return;
+
+    setState(() => _isQuickCleaning = true);
+    ScanReport report;
+    try {
+      report = await _service.scanJunk(
+        drivePaths: <String>[drive],
+        categoryIds: _quickCleanCategoryIds(),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isQuickCleaning = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.diskCleanerScanFailedMsg('$error'),
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isQuickCleaning = false);
+
+    final items = report.allItems;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text(AppLocalizations.of(context)!.diskCleanerQuickCleanNothing),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await _showQuickCleanPreviewDialog(report);
+    if (confirmed != true || !mounted) return;
+
+    final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
+    setState(() {
+      _pendingCleanItems = items;
+      _pendingCleanBytes = totalBytes;
+      _selectedCleanMode = _CleanDeleteMode.recycleBin;
+    });
+    await _cleanJunk(permanent: false);
+  }
+
+  /// Grouped "here is what will be deleted" sheet shown before a quick clean.
+  /// Each row is a category with its item count, size, and the plain-language
+  /// reason it is considered junk.
+  Future<bool?> _showQuickCleanPreviewDialog(ScanReport report) {
+    final l = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final entries = report.itemsByCategory.entries
+        .where((e) => e.value.isNotEmpty)
+        .toList(growable: false)
+      ..sort((a, b) {
+        final aBytes = a.value.fold<int>(0, (s, i) => s + i.sizeBytes);
+        final bBytes = b.value.fold<int>(0, (s, i) => s + i.sizeBytes);
+        return bBytes.compareTo(aBytes);
+      });
+
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.diskCleanerQuickCleanReviewTitle),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l.diskCleanerQuickCleanReviewSubtitle(
+                  report.totalCount,
+                  _fmt(report.totalBytes),
+                ),
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: entries.length,
+                  separatorBuilder: (_, __) => const Divider(height: 12),
+                  itemBuilder: (_, index) {
+                    final entry = entries[index];
+                    final bytes =
+                        entry.value.fold<int>(0, (s, i) => s + i.sizeBytes);
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _junkCategoryTitle(l, entry.key),
+                                style: theme.textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _junkReason(l, entry.key),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _fmt(bytes),
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(PhosphorIconsLight.recycle,
+                      size: 15, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l.diskCleanerQuickCleanRecycleNote,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.diskCleanerMoveToRecycleBinButton(
+                _fmt(report.totalBytes))),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmCleanFromReview() async {
@@ -3067,6 +4027,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   }) async {
     if (_isCleaningJunk || _pendingCleanItems.isEmpty) return;
     final l = AppLocalizations.of(context)!;
+    _freeBytesBeforeClean = await _currentFreeBytes();
+    _freeBytesAfterClean = null;
+    if (!mounted) return;
     setState(() {
       _isCleaningJunk = true;
       _cleanedSkippedInUseCount = 0;
@@ -3125,15 +4088,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         final deletedUpper = succeededSet.map((p) => p.toUpperCase()).toSet();
         _pruneDeletedPaths(_rootNode!, deletedUpper);
         _recalculateTreeStats(_rootNode!);
+        _rootNode!.invalidateJunkCache();
+        _aggregateCacheRoot = null;
         // If the currently-viewed pie node was deleted, fall back to root.
         if (_selectedNode != null &&
             deletedUpper.contains(_selectedNode!.fullPath.toUpperCase())) {
           _selectedNode = _rootNode;
           _chartNode = _rootNode;
         }
-        _selectedTreePaths.removeWhere(
-          (path) => deletedUpper.contains(path.toUpperCase()),
+        _selectedTreeTargets.removeWhere(
+          (target) => deletedUpper.contains(target.fullPath.toUpperCase()),
         );
+        _rebuildReviewVisibleTreePaths();
         _publishTreeSelection();
         if (_selectionAnchorPath != null &&
             deletedUpper.contains(_selectionAnchorPath!.toUpperCase())) {
@@ -3159,6 +4125,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
       });
       _service.pendingCleanupItems = const [];
       _service.pendingCleanupBytes = 0;
+      unawaited(_refreshFreeSpaceAfterClean());
       if (result.skippedInUseCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3437,6 +4404,108 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
   // Cleaned phase — list of files moved to Recycle Bin + permanent delete
   // ---------------------------------------------------------------------------
 
+  /// Closes the loop after a cleanup: shows the drive's free space before and
+  /// after, and what has been growing since the previous scan — so the screen
+  /// answers "what changed, and what should I watch" instead of just "done".
+  Widget _buildCleanedOutcomeCard(ThemeData theme, AppLocalizations l) {
+    final before = _freeBytesBeforeClean;
+    final after = _freeBytesAfterClean;
+    final growth = _recentFolderGrowth.take(3).toList(growable: false);
+    final hasFreeSpaceDelta = before != null && after != null && after > before;
+    if (!hasFreeSpaceDelta && growth.isEmpty) return const SizedBox.shrink();
+
+    final drive = _selectedDrive;
+    DriveSpace? driveSpace;
+    for (final candidate in _drives) {
+      if (candidate.path == drive) {
+        driveSpace = candidate;
+        break;
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasFreeSpaceDelta) ...[
+            Row(
+              children: [
+                Icon(PhosphorIconsLight.hardDrive,
+                    size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l.diskCleanerFreeSpaceBeforeAfter(
+                      _fmt(before),
+                      _fmt(after),
+                    ),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            if (driveSpace != null && driveSpace.totalBytes > 0) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: _driveUsedFraction(driveSpace),
+                  minHeight: 6,
+                  backgroundColor:
+                      theme.colorScheme.onSurface.withValues(alpha: 0.10),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                ),
+              ),
+            ],
+          ],
+          if (hasFreeSpaceDelta && growth.isNotEmpty)
+            const Divider(height: 20),
+          if (growth.isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(PhosphorIconsLight.trendUp,
+                    size: 15, color: theme.colorScheme.tertiary),
+                const SizedBox(width: 8),
+                Text(
+                  l.diskCleanerGrowthWatchTitle,
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (final folder in growth)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  l.diskCleanerGrowthWatchLine(
+                    folder.path,
+                    _fmt(folder.increasedBytes),
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildCleaned(ThemeData theme, AppLocalizations l) {
     final successCount =
         _lastCleanWasPermanent ? _lastCleanSuccessCount : _cleanedItems.length;
@@ -3549,6 +4618,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
             ],
           ),
         ),
+        _buildCleanedOutcomeCard(theme, l),
         if (_cleanedSkippedInUseCount > 0)
           Container(
             width: double.infinity,
@@ -3953,10 +5023,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen>
         _copyNodeData(node, result.root);
         _recalculateTreeStats(root);
         _service.markJunkNodes(root);
+        _aggregateCacheRoot = null;
         if (_selectedNode?.fullPath == node.fullPath) {
           _selectedNode = node;
         }
+        _flatRowsValid = false;
       });
+      _replaceTreeTargets(DiskTreeSelection.collectDeletionTargets(root));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -4447,20 +5520,28 @@ class _TreeRowState extends State<_TreeRow> {
                         ),
                         // Junk category badge
                         if (categoryId != null)
-                          Container(
-                            margin: const EdgeInsets.only(left: 6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(3),
+                          Tooltip(
+                            // Answers "why is this junk?" without making the
+                            // user open the folder to find out.
+                            message: _CbAgentCleanerScreenState._junkReason(
+                              AppLocalizations.of(context)!,
+                              categoryId,
                             ),
-                            child: Text(
-                              _junkLabel(categoryId),
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.orange.shade800,
+                            child: Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                _junkLabel(categoryId),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade800,
+                                ),
                               ),
                             ),
                           ),
@@ -4675,7 +5756,14 @@ class _PieChartPainter extends CustomPainter {
   final List<_PieSegment> segments;
   final double total;
 
-  _PieChartPainter({required this.segments, required this.total});
+  /// Slice matching the focused tree row, drawn pulled out and outlined.
+  final int? highlightIndex;
+
+  _PieChartPainter({
+    required this.segments,
+    required this.total,
+    this.highlightIndex,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -4683,37 +5771,42 @@ class _PieChartPainter extends CustomPainter {
     final radius = math.min(size.width, size.height) / 2 - 8;
     double startAngle = -math.pi / 2;
 
-    for (final seg in segments) {
+    for (var i = 0; i < segments.length; i++) {
+      final seg = segments[i];
       final sweep = total > 0 ? (seg.value / total) * 2 * math.pi : 0.0;
+      final isHighlighted = i == highlightIndex;
+
+      // Offset the focused slice along its own mid-angle so the link to the
+      // tree selection is readable at a glance.
+      var sliceCenter = center;
+      if (isHighlighted && sweep > 0) {
+        final midAngle = startAngle + sweep / 2;
+        sliceCenter = center +
+            Offset(math.cos(midAngle), math.sin(midAngle)) * 6;
+      }
+      final rect = Rect.fromCircle(center: sliceCenter, radius: radius);
+
       final paint = Paint()
         ..color = seg.color
         ..style = PaintingStyle.fill;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweep,
-        true,
-        paint,
-      );
+      canvas.drawArc(rect, startAngle, sweep, true, paint);
+
       // Thin white separator
       final sepPaint = Paint()
         ..color = Colors.white
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweep,
-        true,
-        sepPaint,
-      );
+        ..strokeWidth = isHighlighted ? 2.5 : 1.5;
+      canvas.drawArc(rect, startAngle, sweep, true, sepPaint);
+
       startAngle += sweep;
     }
   }
 
   @override
   bool shouldRepaint(_PieChartPainter old) {
-    if (old.total != total || old.segments.length != segments.length) {
+    if (old.total != total ||
+        old.segments.length != segments.length ||
+        old.highlightIndex != highlightIndex) {
       return true;
     }
     for (var i = 0; i < segments.length; i++) {
@@ -4749,20 +5842,22 @@ class _FlatRow {
 class _FlatTreeRowWidget extends StatefulWidget {
   final _FlatRow row;
   final ThemeData theme;
+  final CleanerFolderGrowth? growth;
   final ValueListenable<Set<String>> selectedPaths;
+  final ValueListenable<String?> focusedPath;
   final VoidCallback onTap;
   final VoidCallback? onExpandToggle;
-  final void Function(DiskTreeNode, bool) onToggleJunk;
   final VoidCallback? onAskAi;
   final void Function(DiskTreeNode, Offset)? onShowContextMenu;
 
   const _FlatTreeRowWidget({
     required this.row,
     required this.theme,
+    required this.growth,
     required this.selectedPaths,
+    required this.focusedPath,
     required this.onTap,
     this.onExpandToggle,
-    required this.onToggleJunk,
     this.onAskAi,
     this.onShowContextMenu,
   });
@@ -4775,34 +5870,28 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
   bool _hovering = false;
   String? _lastTapPath;
   DateTime? _lastTapAt;
-  bool? _tapSequenceWasSelected;
 
   void _handleTap(bool hasChildren) {
     final path = widget.row.node.fullPath;
     final now = DateTime.now();
     final lastTapAt = _lastTapAt;
-    final wasSelected = widget.selectedPaths.value.contains(path);
     final isDoubleTap = _lastTapPath == path &&
         lastTapAt != null &&
         now.difference(lastTapAt) <= const Duration(milliseconds: 300);
 
     if (isDoubleTap) {
-      if (_tapSequenceWasSelected == true && !wasSelected) {
-        widget.onTap();
-      }
+      widget.onTap();
       final onExpandToggle = widget.onExpandToggle;
       if (hasChildren && onExpandToggle != null) {
         onExpandToggle();
       }
       _lastTapPath = null;
       _lastTapAt = null;
-      _tapSequenceWasSelected = null;
       return;
     }
 
     _lastTapPath = path;
     _lastTapAt = now;
-    _tapSequenceWasSelected = wasSelected;
     widget.onTap();
   }
 
@@ -4814,141 +5903,191 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
     final hasChildren = !node.isFile && node.children.isNotEmpty;
     final isJunk = node.isJunk || node.hasJunkChildren;
     final categoryId = node.junkCategoryId;
+    final growth = widget.growth;
     final theme = widget.theme;
+    final localizations = AppLocalizations.of(context)!;
 
     return ValueListenableBuilder<Set<String>>(
       valueListenable: widget.selectedPaths,
       builder: (context, selectedPaths, _) {
         final isSelected = selectedPaths.contains(node.fullPath);
-        return MouseRegion(
-          onEnter: (_) => setState(() => _hovering = true),
-          onExit: (_) => setState(() => _hovering = false),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _handleTap(hasChildren),
-            onSecondaryTapUp:
-                widget.onShowContextMenu == null || node.fullPath.isEmpty
-                    ? null
-                    : (d) => widget.onShowContextMenu!(node, d.globalPosition),
-            child: Container(
-              color: isSelected
-                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                  : _hovering
-                      ? theme.colorScheme.primary.withValues(alpha: 0.06)
-                      : isJunk
-                          ? Colors.orange.withValues(alpha: 0.04)
-                          : Colors.transparent,
-              padding: EdgeInsets.only(left: 12 + indent, right: 12),
-              child: Row(
-                children: [
-                  const SizedBox(width: 28),
-                  SizedBox(
-                    width: 20,
-                    child: hasChildren
-                        ? GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: widget.onExpandToggle,
-                            child: Icon(
-                              node.isExpanded
-                                  ? PhosphorIconsLight.caretDown
-                                  : PhosphorIconsLight.caretRight,
-                              size: 12,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: Row(
-                      children: [
-                        Icon(
-                          node.isFile
-                              ? PhosphorIconsLight.file
-                              : PhosphorIconsLight.folder,
-                          size: 14,
-                          color: node.isJunk
-                              ? Colors.orange
-                              : node.isFile
-                                  ? theme.colorScheme.onSurfaceVariant
-                                  : theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            node.name,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: node.isFile
-                                  ? FontWeight.normal
-                                  : FontWeight.w500,
-                              color: node.isJunk
-                                  ? Colors.orange.shade800
-                                  : theme.colorScheme.onSurface,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (categoryId != null)
-                          Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              _junkLabel(categoryId),
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.orange.shade800,
-                              ),
-                            ),
-                          ),
-                        if (widget.onAskAi != null && _hovering)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: GestureDetector(
-                              onTap: widget.onAskAi,
+        return ValueListenableBuilder<String?>(
+          valueListenable: widget.focusedPath,
+          builder: (context, focusedPath, _) => MouseRegion(
+            onEnter: (_) => setState(() => _hovering = true),
+            onExit: (_) => setState(() => _hovering = false),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _handleTap(hasChildren),
+              onSecondaryTapUp: widget.onShowContextMenu == null ||
+                      node.fullPath.isEmpty
+                  ? null
+                  : (d) => widget.onShowContextMenu!(node, d.globalPosition),
+              child: Container(
+                key: ValueKey<String>(
+                  'cleaner-tree-row-${isSelected ? 'selected' : 'idle'}-${node.fullPath}',
+                ),
+                color: isSelected
+                    ? theme.colorScheme.primary.withValues(alpha: 0.14)
+                    : focusedPath == node.fullPath
+                        ? theme.colorScheme.primary.withValues(alpha: 0.06)
+                        : _hovering
+                            ? theme.colorScheme.primary.withValues(alpha: 0.06)
+                            : isJunk
+                                ? Colors.orange.withValues(alpha: 0.04)
+                                : growth != null
+                                    ? Colors.green.withValues(alpha: 0.06)
+                                    : Colors.transparent,
+                padding: EdgeInsets.only(left: 12 + indent, right: 12),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      child: hasChildren
+                          ? GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: widget.onExpandToggle,
                               child: Icon(
-                                PhosphorIconsLight.sparkle,
+                                node.isExpanded
+                                    ? PhosphorIconsLight.caretDown
+                                    : PhosphorIconsLight.caretRight,
                                 size: 12,
-                                color: theme.colorScheme.tertiary,
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    Expanded(
+                      flex: 4,
+                      child: Row(
+                        children: [
+                          Icon(
+                            node.isFile
+                                ? PhosphorIconsLight.file
+                                : PhosphorIconsLight.folder,
+                            size: 14,
+                            color: node.isJunk
+                                ? Colors.orange
+                                : node.isFile
+                                    ? theme.colorScheme.onSurfaceVariant
+                                    : theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              node.name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: node.isFile
+                                    ? FontWeight.normal
+                                    : FontWeight.w500,
+                                color: node.isJunk
+                                    ? Colors.orange.shade800
+                                    : theme.colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      _CbAgentCleanerScreenState._fmt(node.sizeBytes),
-                      style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w500),
-                      textAlign: TextAlign.right,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 90,
-                    child: _PercentBar(percent: percent, isJunk: node.isJunk),
-                  ),
-                  SizedBox(
-                    width: 60,
-                    child: Text(
-                      node.isFile ? '' : '${node.fileCount}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
+                          if (categoryId != null)
+                            Tooltip(
+                              // Answers "why is this junk?" without making the
+                              // user open the folder to find out.
+                              message: _CbAgentCleanerScreenState._junkReason(
+                                localizations,
+                                categoryId,
+                              ),
+                              child: Container(
+                                margin: const EdgeInsets.only(left: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  _junkLabel(categoryId),
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.orange.shade800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (growth != null)
+                            Tooltip(
+                              message:
+                                  '${growth.path}\n${localizations.diskCleanerGrowthCurrentSize(_CbAgentCleanerScreenState._fmt(growth.currentSizeBytes))}',
+                              child: Container(
+                                key: ValueKey<String>(
+                                  'cleaner-growth-badge-${node.fullPath}',
+                                ),
+                                margin: const EdgeInsets.only(left: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  localizations.diskCleanerGrowthIncrease(
+                                    _CbAgentCleanerScreenState._fmt(
+                                      growth.increasedBytes,
+                                    ),
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (widget.onAskAi != null && _hovering)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: GestureDetector(
+                                onTap: widget.onAskAi,
+                                child: Icon(
+                                  PhosphorIconsLight.sparkle,
+                                  size: 12,
+                                  color: theme.colorScheme.tertiary,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      textAlign: TextAlign.right,
                     ),
-                  ),
-                ],
+                    SizedBox(
+                      width: 80,
+                      child: Text(
+                        _CbAgentCleanerScreenState._fmt(node.sizeBytes),
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 90,
+                      child: _PercentBar(percent: percent, isJunk: node.isJunk),
+                    ),
+                    SizedBox(
+                      width: 60,
+                      child: Text(
+                        node.isFile ? '' : '${node.fileCount}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -4983,56 +6122,6 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
         return 'JUNK';
     }
   }
-}
-
-class _ScanRingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-
-  _ScanRingPainter({required this.progress, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 12;
-
-    final bgPaint = Paint()
-      ..color = color.withValues(alpha: 0.1)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8;
-    canvas.drawCircle(center, radius, bgPaint);
-
-    final arcPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round;
-    final startAngle = progress * 2 * math.pi;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle - math.pi / 2,
-      math.pi * 0.7,
-      false,
-      arcPaint,
-    );
-
-    final arc2Paint = Paint()
-      ..color = color.withValues(alpha: 0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle + math.pi - math.pi / 2,
-      math.pi * 0.35,
-      false,
-      arc2Paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ScanRingPainter old) =>
-      old.progress != progress || old.color != color;
 }
 
 /// Hot progress snapshot for the cleanup phase. Lives behind a

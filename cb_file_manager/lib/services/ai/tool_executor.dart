@@ -6,6 +6,7 @@ import '../../helpers/files/trash_manager.dart';
 import '../../helpers/tags/tag_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
+import '../disk_cleaner/cleaner_categories.dart';
 import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
@@ -1393,37 +1394,9 @@ class ToolExecutor {
         ownerTabId: ownerTabId,
       );
 
-      // Build output
-      final buffer = StringBuffer();
-      buffer.writeln('Scan complete. scan_id=$scanId');
-      buffer.writeln('Drives: ${report.drivesScanned.join(', ')}');
-      buffer.writeln(
-          'Total: ${report.totalCount} items, ${_formatSize(report.totalBytes)}');
-      buffer.writeln();
-      buffer.writeln('By category:');
-      for (final entry in report.itemsByCategory.entries) {
-        final items = entry.value;
-        final catBytes = items.fold<int>(0, (s, i) => s + i.sizeBytes);
-        final sample = items.isNotEmpty ? items.first.path : '';
-        buffer.writeln(
-            '- ${entry.key}: ${items.length} items, ${_formatSize(catBytes)}${sample.isNotEmpty ? ' (sample: $sample)' : ''}');
-      }
-
-      if (report.warnings.isNotEmpty) {
-        buffer.writeln();
-        buffer.writeln('Warnings:');
-        for (final w in report.warnings) {
-          buffer.writeln('- $w');
-        }
-      }
-
-      buffer.writeln();
-      buffer.writeln(
-          'To clean: call clean_disk_junk with scan_id="$scanId" and categories:[...] to clean specific categories.');
-
       return ToolResult(
         toolName: 'scan_disk_junk',
-        output: _truncate(buffer.toString().trim()),
+        output: formatJunkScanReport(report, scanId),
       );
     } catch (e) {
       service.emitAgentActivity(DiskCleanerAgentActivity(
@@ -1437,6 +1410,71 @@ class ToolExecutor {
         success: false,
       );
     }
+  }
+
+  /// Formats a junk scan as evidence for a recommendation, not as a cleanup
+  /// instruction. Kept public so the output contract can be tested without
+  /// touching the Windows filesystem.
+  String formatJunkScanReport(ScanReport report, String scanId) {
+    final buffer = StringBuffer();
+    buffer.writeln('JUNK SCAN ANALYSIS');
+    buffer.writeln('scan_id=$scanId');
+    buffer.writeln('Drives: ${report.drivesScanned.join(', ')}');
+    buffer.writeln(
+        'Total rule-matched junk: ${report.totalCount} items, ${_formatSize(report.totalBytes)}');
+
+    final categories = report.itemsByCategory.entries.toList()
+      ..sort((a, b) {
+        final aBytes =
+            a.value.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+        final bBytes =
+            b.value.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+        return bBytes.compareTo(aBytes);
+      });
+
+    buffer.writeln();
+    buffer.writeln('Categories ranked by reclaimable size:');
+    if (categories.isEmpty) {
+      buffer.writeln('  (none)');
+    }
+    for (final entry in categories) {
+      final category = CleanerCategories.byId(entry.key);
+      final items = entry.value.toList()
+        ..sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+      final bytes = items.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+      final safety = category?.safety ?? CleanerSafety.careful;
+      buffer.writeln(
+        '- ${category?.displayName ?? entry.key} [id=${entry.key}, safety=${safety.name}]: '
+        '${items.length} items, ${_formatSize(bytes)}. '
+        '${category?.description ?? 'Unknown cleaner category.'}',
+      );
+      buffer.writeln('  recommendation: ${_categoryRecommendation(safety)}');
+      for (final item in items.take(3)) {
+        buffer.writeln(
+          '  largest: ${item.path} [${item.isContainerOnly ? 'folder contents' : 'file/folder'}, '
+          '${_formatSize(item.sizeBytes)}, owner=${_junkOwner(entry.key, item.path)}]',
+        );
+      }
+      if (items.length > 3) {
+        buffer.writeln('  ... ${items.length - 3} more in this category');
+      }
+    }
+
+    if (report.warnings.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('Coverage warnings:');
+      for (final warning in report.warnings) {
+        buffer.writeln('- $warning');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln(
+        'RESPONSE REQUIREMENT: Summarize the ranked findings in normal '
+        'language. Include path, size, owner/category, CLEAN/REVIEW/KEEP, and '
+        'reason. This scan is analysis-only. Do not call clean_disk_junk unless '
+        'the user explicitly confirms cleanup after seeing the findings.');
+    return _truncate(buffer.toString().trim());
   }
 
   Future<ToolResult> _cleanDiskJunk(Map<String, dynamic> args) async {
@@ -1644,6 +1682,7 @@ class ToolExecutor {
     }
 
     final maxItems = (args['max_items'] as int?)?.clamp(5, 50) ?? 20;
+    final sectionLimit = maxItems > 8 ? 8 : maxItems;
     final includeSelected = args['include_selected'] as bool? ?? true;
     final root = context.root;
     final selectedNode = context.selectedPath == null
@@ -1653,31 +1692,42 @@ class ToolExecutor {
         ? null
         : _findDiskTreeNode(root, context.chartPath!);
 
+    final largestFiles = <DiskTreeNode>[];
+    final largestFolders = <DiskTreeNode>[];
     final junkNodes = <DiskTreeNode>[];
     final selectedNodes = <DiskTreeNode>[];
     var selectedBytes = 0;
     var selectedCount = 0;
 
-    void collect(DiskTreeNode node) {
+    void collect(DiskTreeNode node, {bool coveredByJunkAncestor = false}) {
       if (node.fullPath.isNotEmpty && node.isSelectedForDeletion) {
         selectedNodes.add(node);
         selectedBytes += node.sizeBytes;
         selectedCount++;
       }
-      if (node.fullPath.isNotEmpty && (node.isJunk || node.hasJunkChildren)) {
-        junkNodes.add(node);
+
+      if (node.fullPath.isNotEmpty && !identical(node, root)) {
+        _offerLargest(
+          node.isFile ? largestFiles : largestFolders,
+          node,
+          sectionLimit,
+        );
+      }
+
+      final isCanonicalJunk = node.isJunk && !coveredByJunkAncestor;
+      if (node.fullPath.isNotEmpty && isCanonicalJunk) {
+        _offerLargest(junkNodes, node, sectionLimit);
       }
       for (final child in node.children) {
-        collect(child);
+        collect(
+          child,
+          coveredByJunkAncestor: coveredByJunkAncestor || node.isJunk,
+        );
       }
     }
 
     collect(root);
-    junkNodes.sort((a, b) => b.junkBytes.compareTo(a.junkBytes));
     selectedNodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
-
-    final topChildren = root.children.toList()
-      ..sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
 
     final buffer = StringBuffer();
     buffer.writeln('CURRENT CLEANER SCAN');
@@ -1699,28 +1749,32 @@ class ToolExecutor {
     }
 
     buffer.writeln();
-    buffer.writeln('Top directories by size:');
-    if (topChildren.isEmpty) {
+    buffer.writeln('Largest folders (size is evidence, not deletion safety):');
+    if (largestFolders.isEmpty) {
       buffer.writeln('  (none)');
     } else {
-      for (final node in topChildren.take(maxItems)) {
-        buffer.writeln('  - ${_formatDiskTreeNode(node)}');
-      }
-      if (topChildren.length > maxItems) {
-        buffer.writeln('  ... ${topChildren.length - maxItems} more');
+      for (final node in largestFolders) {
+        buffer.writeln('  - ${_formatSpaceConsumer(node)}');
       }
     }
 
     buffer.writeln();
-    buffer.writeln('Top junk candidates:');
+    buffer.writeln('Largest files (size is evidence, not deletion safety):');
+    if (largestFiles.isEmpty) {
+      buffer.writeln('  (none)');
+    } else {
+      for (final node in largestFiles) {
+        buffer.writeln('  - ${_formatSpaceConsumer(node)}');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln('Rule-backed cleanup candidates:');
     if (junkNodes.isEmpty) {
       buffer.writeln('  (none marked as junk)');
     } else {
-      for (final node in junkNodes.take(maxItems)) {
-        buffer.writeln('  - ${_formatDiskTreeNode(node)}');
-      }
-      if (junkNodes.length > maxItems) {
-        buffer.writeln('  ... ${junkNodes.length - maxItems} more');
+      for (final node in junkNodes) {
+        buffer.writeln('  - ${_formatCleanupCandidate(node)}');
       }
     }
 
@@ -1730,14 +1784,21 @@ class ToolExecutor {
       if (selectedNodes.isEmpty) {
         buffer.writeln('  (none selected)');
       } else {
-        for (final node in selectedNodes.take(maxItems)) {
+        for (final node in selectedNodes.take(sectionLimit)) {
           buffer.writeln('  - ${_formatDiskTreeNode(node)}');
         }
-        if (selectedNodes.length > maxItems) {
-          buffer.writeln('  ... ${selectedNodes.length - maxItems} more');
+        if (selectedNodes.length > sectionLimit) {
+          buffer.writeln('  ... ${selectedNodes.length - sectionLimit} more');
         }
       }
     }
+
+    buffer.writeln();
+    buffer.writeln(
+        'RESPONSE REQUIREMENT: Answer with a readable ranked report, '
+        'not JSON. Explain what each item belongs to and label it CLEAN, REVIEW, '
+        'or KEEP with a reason. Do not call clean_disk_junk for an analysis or '
+        'recommendation request.');
 
     return ToolResult(
       toolName: 'get_current_cleaner_scan',
@@ -1928,6 +1989,97 @@ class ToolExecutor {
             : '');
     final selected = node.isSelectedForDeletion ? ', selected' : '';
     return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, ${node.fileCount} files$junk$selected]';
+  }
+
+  void _offerLargest(
+    List<DiskTreeNode> nodes,
+    DiskTreeNode candidate,
+    int limit,
+  ) {
+    nodes.add(candidate);
+    nodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+    if (nodes.length > limit) {
+      nodes.removeLast();
+    }
+  }
+
+  String _formatSpaceConsumer(DiskTreeNode node) {
+    final type = node.isFile ? 'file' : 'folder';
+    if (node.isJunk) {
+      final categoryId = node.junkCategoryId!;
+      final category = CleanerCategories.byId(categoryId);
+      final safety = category?.safety ?? CleanerSafety.careful;
+      return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
+          'owner=${_junkOwner(categoryId, node.fullPath)}, '
+          'category=${category?.displayName ?? categoryId}, '
+          '${_categoryRecommendation(safety)}]';
+    }
+    return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
+        'owner=${_pathOwner(node.fullPath)}, REVIEW: Large size alone does not '
+        'make this safe to delete; keep it unless the user recognizes it.]';
+  }
+
+  String _formatCleanupCandidate(DiskTreeNode node) {
+    final categoryId = node.junkCategoryId!;
+    final category = CleanerCategories.byId(categoryId);
+    final safety = category?.safety ?? CleanerSafety.careful;
+    final type = node.isFile ? 'file' : 'folder';
+    return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
+        'owner=${_junkOwner(categoryId, node.fullPath)}, '
+        'category=${category?.displayName ?? categoryId} ($categoryId), '
+        'safety=${safety.name}, ${_categoryRecommendation(safety)}]';
+  }
+
+  String _categoryRecommendation(CleanerSafety safety) {
+    switch (safety) {
+      case CleanerSafety.safe:
+        return 'CLEAN: Usually safe because the OS or app can recreate it.';
+      case CleanerSafety.careful:
+        return 'REVIEW: Usually removable, but inspect the side effects first.';
+      case CleanerSafety.risky:
+        return 'KEEP: Do not clean by default; rebuilding may be slow or costly.';
+    }
+  }
+
+  String _junkOwner(String categoryId, String path) {
+    final category = CleanerCategories.byId(categoryId);
+    if (category == null) return 'Unknown';
+
+    final upperPath = path.toUpperCase();
+    final hints = <String>[];
+    for (final rule in category.rules) {
+      for (final hint in rule.appOwnerHints) {
+        final normalized = hint.trim();
+        if (normalized.isEmpty || normalized.toLowerCase().endsWith('.exe')) {
+          continue;
+        }
+        if (!hints.contains(normalized)) hints.add(normalized);
+      }
+    }
+    for (final hint in hints) {
+      final tokens = RegExp(r'[A-Za-z0-9]+')
+          .allMatches(hint.toUpperCase())
+          .map((match) => match.group(0)!)
+          .where((token) => token.length > 1);
+      if (tokens.isNotEmpty && tokens.every(upperPath.contains)) return hint;
+    }
+    return hints.isNotEmpty ? hints.take(3).join(' / ') : category.displayName;
+  }
+
+  String _pathOwner(String path) {
+    final normalized = path.replaceAll('/', r'\').toUpperCase();
+    if (normalized.contains(r'\WINDOWS\')) return 'Windows system';
+    if (normalized.contains(r'\PROGRAM FILES\') ||
+        normalized.contains(r'\PROGRAM FILES (X86)\')) {
+      return 'Installed application';
+    }
+    if (normalized.contains(r'\USERS\') &&
+        (normalized.contains(r'\DOWNLOADS\') ||
+            normalized.endsWith(r'\DOWNLOADS'))) {
+      return 'User Downloads';
+    }
+    if (normalized.contains(r'\APPDATA\')) return 'Application data';
+    return 'User or application data (unclassified)';
   }
 
   /// Resolves Windows known folders so paths in the review can be shown as

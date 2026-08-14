@@ -35,21 +35,77 @@ class DiskTreeSelection {
     if (root == null) return <String>{};
     final selectedPaths = <String>{};
 
-    void walk(DiskTreeNode node) {
+    void walk(DiskTreeNode node, {required bool ancestorSelected}) {
       if (node.fullPath.isNotEmpty) {
-        node.isSelectedForDeletion = checked && node.isJunk;
+        node.isSelectedForDeletion =
+            checked && node.isJunk && !ancestorSelected;
       }
       if (node.isSelectedForDeletion && node.fullPath.isNotEmpty) {
         selectedPaths.add(node.fullPath);
       }
       for (final child in node.children) {
-        walk(child);
+        walk(
+          child,
+          ancestorSelected: ancestorSelected || node.isSelectedForDeletion,
+        );
       }
     }
 
-    walk(root);
+    walk(root, ancestorSelected: false);
     root.invalidateSelectionCache();
     return selectedPaths;
+  }
+
+  /// Toggles one exact cleanup target without materializing its descendants.
+  ///
+  /// The result remains canonical: selecting a target removes selected
+  /// ancestors and descendants because either relationship would represent
+  /// overlapping deletion work. Only nodes whose exact target state changes
+  /// are mutated, so this costs O(selected targets), not O(tree size).
+  static Set<DiskTreeNode> setExactTargetChecked(
+    Iterable<DiskTreeNode> currentTargets,
+    DiskTreeNode target,
+    bool checked,
+  ) {
+    final result = <DiskTreeNode>{...currentTargets};
+    final targetPath = _normalizePath(target.fullPath);
+    if (targetPath.isEmpty) return result;
+
+    if (!checked) {
+      for (final existing in result.toList(growable: false)) {
+        if (_normalizePath(existing.fullPath) != targetPath) continue;
+        existing.isSelectedForDeletion = false;
+        result.remove(existing);
+      }
+      target.isSelectedForDeletion = false;
+      return result;
+    }
+
+    for (final existing in result.toList(growable: false)) {
+      final existingPath = _normalizePath(existing.fullPath);
+      if (_isSameOrDescendant(existingPath, targetPath) ||
+          _isSameOrDescendant(targetPath, existingPath)) {
+        existing.isSelectedForDeletion = false;
+        result.remove(existing);
+      }
+    }
+    target.isSelectedForDeletion = true;
+    result.add(target);
+    return result;
+  }
+
+  static String _normalizePath(String path) {
+    var normalized = path.trim().replaceAll('/', r'\').toUpperCase();
+    while (normalized.length > 3 && normalized.endsWith(r'\')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  static bool _isSameOrDescendant(String path, String root) {
+    if (path == root) return true;
+    final prefix = root.endsWith(r'\') ? root : '$root\\';
+    return path.startsWith(prefix);
   }
 
   /// Returns the exact top-level nodes that will be sent to cleanup.

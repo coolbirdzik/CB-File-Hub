@@ -597,6 +597,7 @@ class TrashManager {
     int chunkSize = 200,
     void Function(String currentPath, int done, int total)? onChunkStart,
     void Function(int done, int total)? onChunkDone,
+    void Function(String path, Object error)? onError,
     Duration? timeoutOverride,
   }) async {
     if (filePaths.isEmpty) return <String>{};
@@ -637,6 +638,7 @@ class TrashManager {
           }
           succeeded.add(path);
         } catch (e, st) {
+          onError?.call(path, e);
           AppLogger.warning(
             '[TrashManager] Direct permanent delete failed: $path',
             error: e,
@@ -655,6 +657,29 @@ class TrashManager {
         (_) => worker(),
       ),
     );
+    return succeeded;
+  }
+
+  /// Retries an already-approved permanent deletion through Windows Shell
+  /// with an explicit elevation request. No ownership or ACL changes are made.
+  Future<Set<String>> retryPermanentDeleteAsAdministrator(
+    List<String> failedPaths,
+  ) async {
+    if (!Platform.isWindows || failedPaths.isEmpty) return <String>{};
+
+    final exactPaths = failedPaths.toSet().toList(growable: false);
+    await WindowsFileOperations.deleteItems(
+      sources: exactPaths,
+      permanent: true,
+      silent: true,
+      requireElevation: true,
+      timeout: const Duration(minutes: 2),
+    );
+
+    final succeeded = <String>{};
+    for (final path in exactPaths) {
+      if (_isPathGoneAfterDelete(path)) succeeded.add(path);
+    }
     return succeeded;
   }
 

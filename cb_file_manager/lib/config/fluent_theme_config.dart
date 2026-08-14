@@ -10,12 +10,16 @@ class FluentThemeConfig {
   static fluent.FluentThemeData getTheme(
     AppThemeType themeType, {
     AppAccentColor accentColor = ThemeConfig.defaultAccentColor,
+    AppFontColor fontColor = ThemeConfig.defaultFontColor,
+    AppUiFont uiFont = ThemeConfig.defaultUiFont,
     double acrylicStrength = 1.00,
     bool preferTransparentBackdrop = false,
   }) {
     final materialTheme = ThemeConfig.getTheme(
       themeType,
       accentColor: accentColor,
+      fontColor: fontColor,
+      uiFont: uiFont,
     );
     final fluentAccentColor = _resolveAccentColor(accentColor);
     final isDark = materialTheme.brightness == Brightness.dark;

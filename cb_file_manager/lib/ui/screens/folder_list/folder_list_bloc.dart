@@ -64,6 +64,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     on<ClearSearchAndFilters>(_onClearSearchAndFilters);
     on<FolderListDeleteFiles>(_onDeleteFiles);
     on<FolderListDeleteItems>(_onDeleteItems);
+    on<FolderListRetryDeleteAsAdministrator>(
+      _onRetryDeleteAsAdministrator,
+    );
     on<FolderListReloadCurrentFolder>(_onReloadCurrentFolder);
     on<FolderListDeleteTagGlobally>(_onDeleteTagGlobally);
     on<CopyFile>(_onCopyFile);
@@ -212,6 +215,15 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       folderPaths: event.folderPaths,
       permanent: event.permanent,
     ));
+  }
+
+  void _onRetryDeleteAsAdministrator(
+    FolderListRetryDeleteAsAdministrator event,
+    Emitter<FolderListState> emit,
+  ) {
+    _operationsBloc.add(
+      ops.FileOperationsRetryDeleteAsAdministrator(event.failedPaths),
+    );
   }
 
   void _onCopyFile(CopyFile event, Emitter<FolderListState> emit) {
@@ -403,6 +415,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     emit(state.copyWith(
       error: opsState.error,
       clipboardRevision: opsState.clipboardRevision,
+      retryableElevatedDeletePaths: opsState.retryableElevatedDeletePaths,
     ));
   }
 

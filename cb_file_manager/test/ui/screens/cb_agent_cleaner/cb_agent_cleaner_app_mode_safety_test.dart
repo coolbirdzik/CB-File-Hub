@@ -59,6 +59,29 @@ void main() {
       );
       expect(appsPane, findsOneWidget);
       expect(storagePane, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('cleaner-recent-growth')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('cleaner-growth-filter')),
+        findsOneWidget,
+      );
+      expect(find.text('Recently increased (2)'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            r'cleaner-growth-badge-C:\Users\ngtan\Downloads',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Recently increased (2)'));
+      await _pumpUi(tester);
+      expect(find.text('Windows'), findsNothing);
+      expect(find.text('Downloads'), findsOneWidget);
+      await tester.tap(find.text('Recently increased (2)'));
+      await _pumpUi(tester);
       final appsPaneElement = tester.element(appsPane);
       final storagePaneElement = tester.element(storagePane);
 
@@ -106,6 +129,119 @@ void main() {
         find.byKey(const ValueKey<String>('cleaner-review-and-clean')),
       );
       expect(reviewButton.onPressed, isNull);
+
+      await tester.tap(find.text('Downloads'));
+      await _pumpUi(tester);
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            r'cleaner-tree-row-selected-C:\Users\ngtan\Downloads',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(
+                const ValueKey<String>('cleaner-review-and-clean'),
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await _pumpUi(tester);
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            r'cleaner-tree-row-idle-C:\Users\ngtan\Downloads',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(
+                const ValueKey<String>('cleaner-review-and-clean'),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.text('Downloads'));
+      await _pumpUi(tester);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('cleaner-tree-row-idle-C:\\Windows'),
+        ),
+      );
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await _pumpUi(tester);
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            r'cleaner-tree-row-selected-C:\Users\ngtan\Downloads',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey<String>('cleaner-tree-row-selected-C:\\Windows'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(
+                const ValueKey<String>('cleaner-review-and-clean'),
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await _pumpUi(tester);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(
+                const ValueKey<String>('cleaner-review-and-clean'),
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('cleaner-tree-row-idle-C:\\Windows'),
+        ),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.tap(find.text('Downloads').first);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await _pumpUi(tester);
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            r'cleaner-tree-row-selected-C:\Users\ngtan\Downloads',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey<String>('cleaner-tree-row-selected-C:\\Windows'),
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Apps'));
       await _pumpUi(tester);

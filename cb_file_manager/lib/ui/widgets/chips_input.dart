@@ -319,6 +319,22 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
     final suggestions = widget.suggestions;
 
+    // The replacement characters represent existing chips and must not be
+    // included when selecting the editable draft. Otherwise, typing after
+    // Ctrl/Cmd+A removes those placeholders while the chips are still present,
+    // causing the new text to render on top of the existing tags.
+    final isSelectAll = event.logicalKey == LogicalKeyboardKey.keyA &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed);
+    if (isSelectAll) {
+      final draftStart = countReplacements(controller.text);
+      controller.selection = TextSelection(
+        baseOffset: draftStart,
+        extentOffset: controller.text.length,
+      );
+      return KeyEventResult.handled;
+    }
+
     // Promote the highlighted suggestion into a "parent:" prefix when the user
     // presses ":". Lets the user autocomplete the parent tag, then keep typing
     // the child tag (parent:child hierarchy syntax).

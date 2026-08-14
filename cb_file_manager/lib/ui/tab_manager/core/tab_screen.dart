@@ -408,12 +408,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final isTablet = _isTablet(context);
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
-    final desktopUnifiedChromeColor = _isDesktop
-        ? (isDarkMode
-            ? theme.colorScheme.surface.withValues(alpha: 0.32)
-            : const Color(0xFFFFFFFF).withValues(alpha: 0.22))
-        : theme.scaffoldBackgroundColor;
-    final desktopBodyTintColor = _isDesktop ? desktopUnifiedChromeColor : null;
+    // Match agent cleaner / side-menu chrome: use the acrylic-bridged scaffold
+    // color so dynamic backdrop tint stays consistent across the window.
+    final desktopBodyTintColor =
+        _isDesktop ? theme.scaffoldBackgroundColor : null;
     final desktopTopBarColor = _isDesktop ? Colors.transparent : null;
     final desktopActiveTabColor = _isDesktop ? Colors.transparent : null;
 

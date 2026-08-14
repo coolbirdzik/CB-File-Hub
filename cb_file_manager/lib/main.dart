@@ -27,6 +27,7 @@ import 'providers/theme_provider.dart';
 import 'config/theme_config.dart';
 import 'config/fluent_theme_config.dart';
 import 'config/design_system_config.dart';
+import 'design_system/cb_font_licenses.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/language_controller.dart';
 import 'config/languages/app_localizations_delegate.dart';
@@ -139,6 +140,10 @@ void main(List<String> args) {
 /// Shared entry for production [main] and for `integration_test` (with `--dart-define=CB_E2E=true`).
 Future<void> runCbFileApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Bundled Inter / JetBrains Mono are OFL-licensed; the licence has to ship
+  // with them. Lazy — the text is only read if the user opens the licence page.
+  registerCbFontLicenses();
 
   // E2E serialization: block until the previous test's teardown is complete.
   // This prevents DirectoryWatcherService from racing against _deleteDirectorySafe().
@@ -776,7 +781,11 @@ class _CBFileAppState extends State<CBFileApp>
   ThemeData _resolveMaterialLightTheme(ThemeProvider provider) {
     final isDarkTheme = provider.currentTheme == AppThemeType.dark;
     return isDarkTheme
-        ? ThemeConfig.getLightTheme(accentColor: provider.currentAccentColor)
+        ? ThemeConfig.getLightTheme(
+            accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
+          )
         : provider.themeData;
   }
 
@@ -784,7 +793,11 @@ class _CBFileAppState extends State<CBFileApp>
     final isDarkTheme = provider.currentTheme == AppThemeType.dark;
     return isDarkTheme
         ? provider.themeData
-        : ThemeConfig.getDarkTheme(accentColor: provider.currentAccentColor);
+        : ThemeConfig.getDarkTheme(
+            accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
+          );
   }
 
   fluent.FluentThemeData _resolveFluentLightTheme(ThemeProvider provider) {
@@ -793,6 +806,8 @@ class _CBFileAppState extends State<CBFileApp>
         ? FluentThemeConfig.getTheme(
             AppThemeType.light,
             accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
             acrylicStrength: provider.desktopAcrylicStrength,
             preferTransparentBackdrop:
                 provider.backdropMode == AcrylicBackdropMode.dynamic,
@@ -807,6 +822,8 @@ class _CBFileAppState extends State<CBFileApp>
         : FluentThemeConfig.getTheme(
             AppThemeType.dark,
             accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
             acrylicStrength: provider.desktopAcrylicStrength,
             preferTransparentBackdrop:
                 provider.backdropMode == AcrylicBackdropMode.dynamic,

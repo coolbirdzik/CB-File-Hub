@@ -72,6 +72,88 @@ void main() {
     expect(manuallySelected.isSelectedForDeletion, isFalse);
   });
 
+  test('Check all stores only top-level junk targets', () {
+    final child = DiskTreeNode(
+      name: 'child.tmp',
+      fullPath: r'C:\cache\child.tmp',
+      isFile: true,
+      junkCategoryId: 'dev_cache',
+    );
+    final parent = DiskTreeNode(
+      name: 'cache',
+      fullPath: r'C:\cache',
+      junkCategoryId: 'dev_cache',
+      children: [child],
+    );
+    final root = DiskTreeNode(
+      name: r'C:\',
+      fullPath: r'C:\',
+      children: [parent],
+    );
+
+    final selected = DiskTreeSelection.setAllCleanableChecked(root, true);
+
+    expect(selected, {parent.fullPath});
+    expect(parent.isSelectedForDeletion, isTrue);
+    expect(child.isSelectedForDeletion, isFalse);
+  });
+
+  test('Exact target toggle replaces overlapping targets without tree walk',
+      () {
+    final child = DiskTreeNode(
+      name: 'child.tmp',
+      fullPath: r'C:\cache\child.tmp',
+      isFile: true,
+      isSelectedForDeletion: true,
+    );
+    final sibling = DiskTreeNode(
+      name: 'other.tmp',
+      fullPath: r'C:\other.tmp',
+      isFile: true,
+      isSelectedForDeletion: true,
+    );
+    final parent = DiskTreeNode(
+      name: 'cache',
+      fullPath: r'C:\cache',
+      children: [child],
+    );
+
+    final selected = DiskTreeSelection.setExactTargetChecked(
+      {child, sibling},
+      parent,
+      true,
+    );
+
+    expect(selected, {parent, sibling});
+    expect(parent.isSelectedForDeletion, isTrue);
+    expect(child.isSelectedForDeletion, isFalse);
+    expect(sibling.isSelectedForDeletion, isTrue);
+  });
+
+  test('Junk aggregate cache refreshes after tree metadata changes', () {
+    final child = DiskTreeNode(
+      name: 'cache.tmp',
+      fullPath: r'C:\cache.tmp',
+      isFile: true,
+      sizeBytes: 128,
+      junkCategoryId: 'dev_cache',
+    );
+    final root = DiskTreeNode(
+      name: r'C:\',
+      fullPath: r'C:\',
+      children: [child],
+    );
+
+    expect(root.hasJunkChildren, isTrue);
+    expect(root.junkBytes, 128);
+
+    child.junkCategoryId = null;
+    root.invalidateJunkCache();
+
+    expect(root.hasJunkChildren, isFalse);
+    expect(root.junkBytes, 0);
+  });
+
   test('Preview targets contain selected parents without duplicate children',
       () {
     final child = DiskTreeNode(

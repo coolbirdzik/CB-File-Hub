@@ -118,38 +118,43 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // Overlay drawer keeps its own frosted panel. Pinned drawer stays
+            // transparent so it shares the same scaffold acrylic as the rest.
             if (isDesktopPlatform && !usePinnedIntegratedStyle)
               BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
                 child: const SizedBox.expand(),
               ),
-            Container(
-              decoration: BoxDecoration(
-                color: usePinnedIntegratedStyle
-                    ? (isDarkMode
-                        ? theme.colorScheme.surface.withValues(alpha: 0.22)
-                        : windowsLightDrawerBottomBase.withValues(alpha: 0.62))
-                    : null,
-                gradient: usePinnedIntegratedStyle
-                    ? null
-                    : LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          isDarkMode
-                              ? theme.colorScheme.surface
-                                  .withValues(alpha: topTintAlpha)
-                              : windowsLightDrawerTopBase.withValues(
-                                  alpha: topTintAlpha),
-                          isDarkMode
-                              ? theme.colorScheme.surfaceContainerLowest
-                                  .withValues(alpha: bottomTintAlpha)
-                              : windowsLightDrawerBottomBase.withValues(
-                                  alpha: bottomTintAlpha),
-                        ],
-                      ),
+            if (!usePinnedIntegratedStyle)
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      isDarkMode
+                          ? theme.colorScheme.surface
+                              .withValues(alpha: topTintAlpha)
+                          : windowsLightDrawerTopBase.withValues(
+                              alpha: topTintAlpha),
+                      isDarkMode
+                          ? theme.colorScheme.surfaceContainerLowest
+                              .withValues(alpha: bottomTintAlpha)
+                          : windowsLightDrawerBottomBase.withValues(
+                              alpha: bottomTintAlpha),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  width: 1,
+                  color: theme.colorScheme.outline
+                      .withValues(alpha: isDarkMode ? 0.12 : 0.08),
+                ),
               ),
-            ),
             Column(
               children: [
                 // Modern drawer header

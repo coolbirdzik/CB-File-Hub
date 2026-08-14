@@ -68,6 +68,10 @@ Every async continuation must verify that it still belongs to the active
 generation. Read-only labels do not override actual side effects; the tool
 implementation and approval registry must agree.
 
+Cleaner questions about large files, scan results, or recommendations remain
+on the read-only analysis edge. They may reach `clean_disk_junk` only after the
+user explicitly requests cleanup and the existing approval edge is completed.
+
 ## Cleaner scan, review, and deletion
 
 ```mermaid
@@ -82,6 +86,9 @@ flowchart TD
     Preview --> Approval{Explicit approval}
     Approval -->|Recycle Bin| Trash[TrashManager]
     Approval -->|Permanent| Direct[Bounded direct deletion]
+    Direct -->|Access denied| Retry{Retry as administrator}
+    Retry -->|User clicks retry| Elevated[Elevated IFileOperation for failed paths only]
+    Elevated --> Shell[Windows IFileOperation]
     Trash --> FileOps[WindowsFileOperations]
     FileOps --> Shell[Windows IFileOperation]
 ```
@@ -89,6 +96,10 @@ flowchart TD
 The scan can report usage without authorizing deletion. Safe ancestors,
 application install folders, user data, and shared/unattributed folders do not
 become junk merely because they are large.
+
+An elevated retry does not create a new deletion approval. It may operate only
+on the already-approved paths that failed direct permanent deletion, must be
+triggered by a visible user action, and must not take ownership or modify ACLs.
 
 ## Cleaner App Insights
 
@@ -129,6 +140,29 @@ flowchart TD
 
 The cache is process-local and target-specific. Never persist native command
 IDs or reuse them for another selection.
+
+## Drive manager browse and actions
+
+```mermaid
+flowchart TD
+    View[DriveView] --> Load[DriveInventoryService.load]
+    Load --> Cache{Fresh cache?}
+    Cache -->|Yes| Render[Typed DriveInfo cards]
+    Cache -->|No| Platform{Platform}
+    Platform -->|Windows| Win32[GetDriveType / volume info / free space]
+    Platform -->|Android| Channel[cb_file_manager/storage_volumes]
+    Win32 --> Render
+    Channel --> Render
+    Render --> Action[User action]
+    Action --> Confirm{Destructive?}
+    Confirm -->|Eject rename format| Dialog[Confirm dialog]
+    Confirm -->|Open pin properties| Run[DriveActions]
+    Dialog -->|Approved| Run
+    Run --> Refresh[Invalidate inventory cache]
+```
+
+Drive inventory lists mounted volumes only. Full-disk analysis and junk deletion
+remain on the CB Agent Cleaner flow. Format and BitLocker stay shell-delegated.
 
 ## Local GGUF inference
 

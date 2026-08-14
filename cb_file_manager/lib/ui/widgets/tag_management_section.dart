@@ -656,17 +656,20 @@ class PopularTagsWidget extends StatelessWidget {
 class RecentTagsWidget extends StatelessWidget {
   final Function(String) onTagSelected;
   final int limit;
+  final Future<List<String>> Function(int limit)? loadRecentTags;
 
   const RecentTagsWidget({
     Key? key,
     required this.onTagSelected,
     this.limit = 20,
+    this.loadRecentTags,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<String>>(
-      future: TagManager.getRecentTags(limit: limit),
+      future:
+          loadRecentTags?.call(limit) ?? TagManager.getRecentTags(limit: limit),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();

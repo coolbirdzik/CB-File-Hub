@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
 class SelectionSummaryTooltip extends StatefulWidget {
@@ -23,7 +23,8 @@ class SelectionSummaryTooltip extends StatefulWidget {
 }
 
 class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
-  int _totalSize = 0;
+  int? _totalSize;
+  int _calculationGeneration = 0;
 
   @override
   void initState() {
@@ -42,29 +43,23 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
   }
 
   Future<void> _calculateSize() async {
+    final generation = ++_calculationGeneration;
     if (widget.selectedFileCount == 0 && widget.selectedFolderCount == 0) {
-      if (mounted) setState(() => _totalSize = 0);
+      if (mounted) setState(() => _totalSize = null);
       return;
     }
 
-    int size = 0;
-
-    // We copy the list to ensure we are working on a stable list even if widget updates
     final filesToCheck = List<String>.from(widget.selectedFilePaths);
+    final foldersToCheck = List<String>.from(widget.selectedFolderPaths);
+    setState(() => _totalSize = null);
 
-    for (final path in filesToCheck) {
-      // Check if widget was updated while we were calculating
-      if (!mounted) return;
+    final size = await LazyPathSizeCalculator.calculate(
+      filePaths: filesToCheck,
+      folderPaths: foldersToCheck,
+      isCancelled: () => !mounted || generation != _calculationGeneration,
+    );
 
-      try {
-        final stat = await File(path).stat();
-        size += stat.size;
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-
-    if (mounted) {
+    if (mounted && generation == _calculationGeneration) {
       setState(() {
         _totalSize = size;
       });
@@ -88,9 +83,10 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
       text = '${widget.selectedFolderCount} items selected';
     }
 
-    if (widget.selectedFileCount > 0) {
-      text += '   |   ${FormatUtils.formatFileSize(_totalSize)}';
-    }
+    final totalSize = _totalSize;
+    text += totalSize == null
+        ? '   |   Calculating size...'
+        : '   |   ${FormatUtils.formatFileSize(totalSize)}';
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

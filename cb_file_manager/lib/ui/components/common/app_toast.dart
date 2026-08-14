@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import 'package:cb_file_manager/config/theme_factory.dart';
+import 'package:cb_file_manager/config/app_toast_theme.dart';
 
 class AppToast {
   const AppToast._();
@@ -272,62 +272,80 @@ class _AppToastOverlay extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Row(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: _iconBoxSize,
-                      height: _iconBoxSize,
-                      decoration: BoxDecoration(
-                        color:
-                            accentColor.withValues(alpha: _iconAccentOpacity),
-                        borderRadius: BorderRadius.circular(_iconBoxRadius),
-                      ),
-                      child: Icon(icon, color: accentColor, size: _iconSize),
-                    ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        message,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: _iconBoxSize,
+                          height: _iconBoxSize,
+                          decoration: BoxDecoration(
+                            color: accentColor.withValues(
+                              alpha: _iconAccentOpacity,
                             ),
-                      ),
-                    ),
-                    if (actionLabel != null) ...[
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () {
-                          onAction?.call();
-                          onDismiss();
-                        },
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          foregroundColor: accentColor,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
+                            borderRadius: BorderRadius.circular(_iconBoxRadius),
+                          ),
+                          child:
+                              Icon(icon, color: accentColor, size: _iconSize),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              message,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
                           ),
                         ),
-                        child: Text(
-                          actionLabel!,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).closeButtonTooltip,
+                          onPressed: onDismiss,
+                          icon: Icon(
+                            PhosphorIconsLight.x,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (actionLabel != null) ...[
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            onAction?.call();
+                            onDismiss();
+                          },
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            foregroundColor: accentColor,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                          ),
+                          child: Text(
+                            actionLabel!,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ),
                     ],
-                    const SizedBox(width: 6),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip:
-                          MaterialLocalizations.of(context).closeButtonTooltip,
-                      onPressed: onDismiss,
-                      icon: Icon(
-                        PhosphorIconsLight.x,
-                        size: 16,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   ],
                 ),
               ),

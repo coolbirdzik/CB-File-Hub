@@ -130,6 +130,45 @@ class DirectoryListingCacheService {
     }
   }
 
+  /// Removes moved or deleted items from every cached directory listing.
+  ///
+  /// Unlike [invalidate], this keeps the rest of the source listing warm so
+  /// navigating back after a cut-and-paste does not require a full disk scan.
+  void removePaths(Iterable<String> paths) {
+    final removed = paths.map(_comparisonKey).toSet();
+    if (removed.isEmpty) return;
+
+    for (final cachePath in _cache.keys.toList(growable: false)) {
+      final entry = _cache[cachePath];
+      if (entry == null) continue;
+
+      final filePaths = entry.filePaths
+          .where((path) => !removed.contains(_comparisonKey(path)))
+          .toList(growable: false);
+      final folderPaths = entry.folderPaths
+          .where((path) => !removed.contains(_comparisonKey(path)))
+          .toList(growable: false);
+      if (filePaths.length == entry.filePaths.length &&
+          folderPaths.length == entry.folderPaths.length) {
+        continue;
+      }
+
+      final stats =
+          entry.stats == null ? null : Map<String, FileStat>.from(entry.stats!)
+            ?..removeWhere((path, _) => removed.contains(_comparisonKey(path)));
+      _cache[cachePath] = _ListingEntry(
+        filePaths: filePaths,
+        folderPaths: folderPaths,
+        stats: stats,
+        savedAt: DateTime.now(),
+      );
+      _touch(cachePath);
+      AppLogger.perf(
+        '[DirListingCache] removed moved/deleted paths from "$cachePath"',
+      );
+    }
+  }
+
   void clearAll() {
     _cache.clear();
     _lruOrder.clear();
@@ -144,6 +183,11 @@ class DirectoryListingCacheService {
 
   static String _normalize(String path) {
     return path.replaceAll(RegExp(r'[/\\]+$'), '');
+  }
+
+  static String _comparisonKey(String path) {
+    final normalized = _normalize(path);
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
   }
 
   void _touch(String normalized) {

@@ -56,9 +56,19 @@ channels:
       - moveItems
       - deleteItems
       - enumerateRecycleBin
+    delete_items_payload:
+      required:
+        - sources
+        - permanent
+        - silent
+      optional:
+        - timeoutMs
+        - requireElevation
     invariants:
       - "Recycle Bin and permanent deletion are distinct user choices."
       - "Callers must retain exact targets and approval semantics."
+      - "requireElevation is valid only for a user-triggered retry of already-approved permanent-delete failures."
+      - "Elevated deletion must not take ownership, modify ACLs, or broaden the supplied source paths."
 
   cb_file_manager/app_icon:
     dart:
@@ -121,6 +131,46 @@ channels:
     windows:
       - cb_file_manager/windows/runner/smb_native_thumbnail_plugin.cpp
       - cb_file_manager/windows/runner/smb_native_thumbnail_plugin.h
+
+  cb_file_manager/storage_volumes:
+    dart:
+      - cb_file_manager/lib/services/drive/android_storage_volumes.dart
+      - cb_file_manager/lib/services/drive/drive_inventory_service.dart
+    android:
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/StorageVolumesPlugin.kt
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/MainActivity.kt
+    methods:
+      - listVolumes
+      - ejectVolume
+      - renameVolume
+    list_volumes_result_item:
+      required:
+        - path
+        - isPrimary
+        - isRemovable
+      optional:
+        - label
+        - uuid
+        - description
+        - totalBytes
+        - freeBytes
+        - filesystem
+        - canEject
+    eject_volume_payload:
+      required:
+        - path
+      optional:
+        - uuid
+    rename_volume_payload:
+      required:
+        - path
+        - label
+      optional:
+        - uuid
+    invariants:
+      - "Primary or emulated internal storage must never be ejected through this channel."
+      - "Partial volume rows are allowed when StatFs or StorageVolume fields are unavailable."
+      - "renameVolume may open a system settings intent when the OS denies direct label changes."
 
 review_checklist:
   - "Update Dart argument encoding and native argument decoding together."

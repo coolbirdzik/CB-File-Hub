@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 
+import '../design_system/cb_tokens.dart';
 import '../providers/theme_provider.dart';
 import 'theme_config.dart';
 import 'fluent_theme_config.dart';
@@ -17,14 +18,22 @@ class AppThemeResolver {
 
   static ThemeData resolveMaterialLightTheme(ThemeProvider provider) {
     return provider.currentTheme == AppThemeType.dark
-        ? ThemeConfig.getLightTheme(accentColor: provider.currentAccentColor)
+        ? ThemeConfig.getLightTheme(
+            accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
+          )
         : provider.themeData;
   }
 
   static ThemeData resolveMaterialDarkTheme(ThemeProvider provider) {
     return provider.currentTheme == AppThemeType.dark
         ? provider.themeData
-        : ThemeConfig.getDarkTheme(accentColor: provider.currentAccentColor);
+        : ThemeConfig.getDarkTheme(
+            accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
+          );
   }
 
   static fluent.FluentThemeData resolveFluentLightTheme(
@@ -33,6 +42,8 @@ class AppThemeResolver {
         ? FluentThemeConfig.getTheme(
             AppThemeType.light,
             accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
             acrylicStrength: provider.desktopAcrylicStrength,
           )
         : provider.fluentThemeData;
@@ -44,6 +55,8 @@ class AppThemeResolver {
         : FluentThemeConfig.getTheme(
             AppThemeType.dark,
             accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
             acrylicStrength: provider.desktopAcrylicStrength,
           );
   }
@@ -131,7 +144,36 @@ class AppThemeResolver {
     // Menus and dropdown overlays stay solid even when page chrome uses acrylic.
     final Color menuColor = lightContainerBase;
 
+    // The design-system tokens carry their own surface set, and the CoolBird
+    // primitives read those rather than the ColorScheme — so they need the
+    // same treatment or a CbSurface would stay opaque over an acrylic window.
+    final cbTokens = baseTheme.extension<CbTokens>();
+    final bridgedExtensions = cbTokens == null
+        ? null
+        : <ThemeExtension<dynamic>>[
+            for (final ext in baseTheme.extensions.values)
+              if (ext is CbTokens)
+                ext.copyWith(
+                  colors: ext.colors.copyWith(
+                    canvas: ext.colors.canvas
+                        .withValues(alpha: scaffoldOpacity()),
+                    surface:
+                        ext.colors.surface.withValues(alpha: surfaceOpacity()),
+                    surfaceRaised: ext.colors.surfaceRaised
+                        .withValues(alpha: containerOpacity()),
+                    surfaceSunken: ext.colors.surfaceSunken
+                        .withValues(alpha: lowContainerOpacity()),
+                    // Overlays stay solid: a translucent menu over translucent
+                    // page chrome stacks two blurs and stops being readable.
+                    surfaceOverlay: ext.colors.surfaceOverlay,
+                  ),
+                )
+              else
+                ext,
+          ];
+
     return baseTheme.copyWith(
+      extensions: bridgedExtensions,
       colorScheme: bridged,
       scaffoldBackgroundColor: baseTheme.scaffoldBackgroundColor
           .withValues(alpha: scaffoldOpacity()),

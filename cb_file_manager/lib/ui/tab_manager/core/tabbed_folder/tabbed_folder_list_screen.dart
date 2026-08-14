@@ -154,6 +154,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   // Refresh state
   bool _isRefreshing = false;
+  String? _lastShownFolderError;
 
   /// Set true while a refocus-from-inactive reload is in flight. Drives the
   /// dedicated "restoring tab" UI (skeleton + slim progress bar + status
@@ -1318,6 +1319,38 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             value: _folderListBloc,
             child: BlocListener<FolderListBloc, FolderListState>(
               listener: (context, folderState) {
+                final error = folderState.error;
+                if (error == null) {
+                  _lastShownFolderError = null;
+                } else if (error != _lastShownFolderError) {
+                  _lastShownFolderError = error;
+                  final retryPaths = List<String>.from(
+                    folderState.retryableElevatedDeletePaths,
+                  );
+                  if (retryPaths.isNotEmpty && Platform.isWindows) {
+                    final l10n = AppLocalizations.of(context)!;
+                    AppToast.show(
+                      context,
+                      error,
+                      icon: PhosphorIconsLight.warningCircle,
+                      accentColor: Theme.of(context).colorScheme.error,
+                      duration: const Duration(seconds: 12),
+                      actionLabel: '${l10n.retry} (${l10n.adminAccess})',
+                      onAction: () {
+                        _folderListBloc.add(
+                          FolderListRetryDeleteAsAdministrator(retryPaths),
+                        );
+                      },
+                    );
+                  } else {
+                    AppToast.error(
+                      context,
+                      error,
+                      duration: const Duration(seconds: 7),
+                    );
+                  }
+                }
+
                 _maybeApplyFocusAfterDelete(folderState);
                 _maybeStartPendingCreatedFileRename(folderState);
                 _maybeScrollToHighlightedFile(folderState);

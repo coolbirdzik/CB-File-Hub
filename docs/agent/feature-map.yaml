@@ -63,10 +63,13 @@ features:
     tests:
       - cb_file_manager/test/05_navigation_test.dart
       - cb_file_manager/test/10_tab_activity_manager_test.dart
+      - cb_file_manager/test/helpers/files/windows_file_operations_test.dart
+      - cb_file_manager/test/ui/screens/folder_list/file_operations_bloc_test.dart
     invariants:
       - "Navigation is tab based; do not assume conventional named Flutter routes."
       - "A folder pane owns its FolderListBloc and must preserve the matching provider context."
       - "Tab sessions and caches must remain isolated by tab or pane identity."
+      - "An elevated permanent-delete retry may target only paths that failed after the user's existing delete approval; it must not change ACLs or elevate the whole app."
 
   ai_agent:
     entrypoints:
@@ -81,12 +84,14 @@ features:
       - cb_file_manager/lib/models/ai/ai_message.dart
       - cb_file_manager/lib/services/ai/disk_cleaner_skill.dart
     tests:
+      - cb_file_manager/test/19_cleaner_scan_advice_test.dart
       - cb_file_manager/test/17_ai_agent_stop_test.dart
       - cb_file_manager/test/18_app_storage_tool_test.dart
     invariants:
       - "Tool calls with side effects require the existing approval path."
       - "Stopping generation must prevent an older stream or tool loop from overwriting newer state."
       - "Cleaner scan data is scoped to the owning tab."
+      - "Cleaner analysis requests return ranked space consumers and rule-backed cleanup advice; they must not become clean_disk_junk calls without an explicit cleanup request."
 
   cb_agent_cleaner:
     entrypoints:
@@ -95,6 +100,7 @@ features:
     scan_pipeline:
       - cb_file_manager/lib/services/disk_cleaner/full_disk_scan_isolate.dart
       - cb_file_manager/lib/services/disk_cleaner/disk_tree_node.dart
+      - cb_file_manager/lib/services/disk_cleaner/cleaner_growth_history_service.dart
       - cb_file_manager/lib/services/disk_cleaner/cleaner_categories.dart
       - cb_file_manager/lib/services/disk_cleaner/cleaner_safety.dart
     selection_and_delete:
@@ -107,14 +113,23 @@ features:
       - cb_file_manager/lib/services/app_insights/windows_app_inventory_service.dart
       - cb_file_manager/lib/services/app_insights/app_storage_analyzer.dart
     tests:
+      - cb_file_manager/test/19_cleaner_scan_advice_test.dart
+      - cb_file_manager/test/services/disk_cleaner/cleaner_growth_history_service_test.dart
       - cb_file_manager/test/services/disk_cleaner/disk_tree_selection_test.dart
       - cb_file_manager/test/helpers/files/trash_manager_test.dart
+      - cb_file_manager/test/helpers/files/windows_file_operations_test.dart
       - cb_file_manager/test/bloc/cleaner_app_insights_cubit_test.dart
       - cb_file_manager/test/services/app_insights/app_storage_analyzer_test.dart
       - cb_file_manager/test/ui/screens/cb_agent_cleaner/cb_agent_cleaner_app_mode_safety_test.dart
     invariants:
       - "Bulk selection selects only scanner-confirmed junk nodes."
+      - "Cleaner tree rows use Explorer-style selection: click replaces the cleanup target set, Ctrl-click toggles a target, Shift-click selects a visible range, and Space toggles the focused row."
+      - "Directory cleanup selection stores canonical top-level targets without eagerly selecting every descendant."
+      - "Cleaner junk aggregates may be cached only for a stable tree and must be invalidated after metadata or structure changes."
       - "Deletion requires an exact target set and explicit user approval."
+      - "An elevated retry is limited to the approved paths that failed direct deletion and must remain a separate user action."
+      - "Folder growth compares only completed scans of the same drive; cancelled or in-progress scans never replace the persisted baseline."
+      - "Folder growth is informational and never selects deletion targets."
       - "Installation folders and user data are analysis evidence, not automatic junk."
       - "Unknown application activity remains unknown and must not be treated as stale."
       - "Shared or unattributed storage is never automatically assigned to one app."
@@ -218,6 +233,32 @@ features:
     invariants:
       - "English and Vietnamese localization classes must stay in sync for every new user-facing string key."
       - "This app does not use Flutter gen-l10n / ARB files."
+
+  drive_manager:
+    entrypoints:
+      - cb_file_manager/lib/ui/tab_manager/components/drive_view.dart
+      - cb_file_manager/lib/services/drive/drive_inventory_service.dart
+      - cb_file_manager/lib/services/drive/drive_actions.dart
+      - cb_file_manager/lib/services/drive/drive_info.dart
+    related:
+      - cb_file_manager/lib/services/drive/android_storage_volumes.dart
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/StorageVolumesPlugin.kt
+      - cb_file_manager/lib/helpers/core/filesystem_utils.dart
+      - cb_file_manager/lib/ui/tab_manager/mobile/mobile_file_actions_controller.dart
+    tests:
+      - cb_file_manager/test/services/drive/drive_info_test.dart
+      - cb_file_manager/test/services/drive/drive_inventory_service_test.dart
+    edges:
+      - "DriveView -> DriveInventoryService.load"
+      - "DriveInventoryService -> win32 volume APIs | Android StorageVolumes channel"
+      - "DriveView actions -> DriveActions (open/pin/properties/eject/rename/format/shell)"
+      - "DriveActions.cleanup -> cleanmgr or #cb-agent-cleaner"
+    invariants:
+      - "Drive inventory is process-local cached metadata; it is not a full-disk scan."
+      - "Eject and format are never offered for the system/boot or primary emulated volume."
+      - "Format and BitLocker remain OS-shell delegated; the app does not implement an in-app formatter."
+      - "Eject, rename, and format require an explicit user confirmation before native or shell work."
+      - "Android volume space and eject go through cb_file_manager/storage_volumes; failures may yield partial DriveInfo."
 
   cleaner_app_insights:
     entrypoints:

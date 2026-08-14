@@ -1272,8 +1272,16 @@ class DiskCleanerService {
     );
     _activeFullScan = handle;
 
-    // Auto-clear when done
-    handle.future.then((_) => _activeFullScan = null);
+    // Auto-clear when done, including when the scan fails or is cancelled.
+    // A bare `.then` would skip the error path and leave the handle pinned,
+    // after which every later scan throws "already in progress" until the
+    // app restarts. The identity check keeps a slow completion from clearing
+    // a newer scan that has since started.
+    // Callers await `handle.future` themselves and handle its error, so this
+    // bookkeeping branch is ignored rather than left as an unhandled error.
+    handle.future.whenComplete(() {
+      if (identical(_activeFullScan, handle)) _activeFullScan = null;
+    }).ignore();
 
     return handle;
   }
@@ -1293,6 +1301,7 @@ class DiskCleanerService {
   ///   that directory are junk. The directory itself is NOT marked — only
   ///   matching leaf files get tagged.
   void markJunkNodes(DiskTreeNode root) {
+    root.invalidateJunkCache();
     final categories = CleanerCategories.all();
 
     // Split rules into "whole directory" vs "glob-filtered"

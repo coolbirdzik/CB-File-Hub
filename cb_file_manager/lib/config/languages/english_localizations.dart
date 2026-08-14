@@ -536,6 +536,44 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get themeOnboardingContinue => 'Continue';
   @override
+  String get accentColor => 'Accent color';
+  @override
+  String currentAccentColor(String name) => 'Current accent: $name';
+  @override
+  String get fontColor => 'Font color';
+  @override
+  String currentFontColor(String name) => 'Current font color: $name';
+  @override
+  String get uiFont => 'Font family';
+  @override
+  String currentUiFont(String name) => 'Current font: $name';
+  @override
+  String get uiFontUnicodeHint =>
+      'Free Unicode fonts (Vietnamese + Latin Extended). Extra fonts download once and cache locally.';
+  @override
+  String get backdropMode => 'Backdrop mode';
+  @override
+  String get backdropModeDynamic => 'Dynamic';
+  @override
+  String get backdropModeWallpaper => 'Wallpaper';
+  @override
+  String get backdropModeDynamicDescription =>
+      'Using system dynamic acrylic backdrop.';
+  @override
+  String get backdropModeWallpaperDescription =>
+      'Using system wallpaper as backdrop.';
+  @override
+  String get noSystemWallpaperDetected => 'No system wallpaper detected';
+  @override
+  String get customBackdropImage => 'Custom';
+  @override
+  String get backdropImageNotFound => 'Image not found';
+  @override
+  String get desktopAcrylicStrength => 'Desktop acrylic strength';
+  @override
+  String desktopAcrylicStrengthDescription(int percentage) =>
+      'Adjust blur and tint intensity for desktop backdrop ($percentage%).';
+  @override
   String get vietnameseLanguage => 'Vietnamese';
   @override
   String get englishLanguage => 'English';
@@ -1950,6 +1988,82 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get noStorageLocationsFound => 'No storage locations found';
   @override
+  String get driveGroupFixed => 'This PC';
+  @override
+  String get driveGroupRemovable => 'Removable';
+  @override
+  String get driveGroupNetwork => 'Network';
+  @override
+  String get driveGroupOther => 'Other';
+  @override
+  String get driveTapToBrowse => 'Tap to browse';
+  @override
+  String get driveRestrictedAccess => 'Restricted access';
+  @override
+  String get driveEject => 'Eject';
+  @override
+  String get driveEjectConfirmTitle => 'Eject drive?';
+  @override
+  String driveEjectConfirmMessage(String name) =>
+      'Safely remove "$name"? Make sure no files are in use.';
+  @override
+  String get driveEjectSuccess => 'Drive ejected';
+  @override
+  String driveEjectFailed(String error) => 'Unable to eject: $error';
+  @override
+  String get driveRename => 'Rename';
+  @override
+  String get driveRenameTitle => 'Rename volume';
+  @override
+  String get driveRenameHint => 'Volume label';
+  @override
+  String get driveRenameSuccess => 'Volume renamed';
+  @override
+  String driveRenameFailed(String error) => 'Unable to rename: $error';
+  @override
+  String get driveFormatConfirmTitle => 'Format drive?';
+  @override
+  String driveFormatConfirmMessage(String name) =>
+      'Open the system format tool for "$name"? This can erase all data on the volume.';
+  @override
+  String get driveOpenInCleaner => 'Open in Disk Cleaner';
+  @override
+  String get driveUsed => 'Used';
+  @override
+  String get driveFree => 'Free';
+  @override
+  String get driveTotal => 'Total';
+  @override
+  String get driveType => 'Type';
+  @override
+  String get driveFilesystem => 'File system';
+  @override
+  String get driveSerial => 'Serial';
+  @override
+  String get driveKindFixed => 'Local Disk';
+  @override
+  String get driveKindRemovable => 'Removable';
+  @override
+  String get driveKindNetwork => 'Network';
+  @override
+  String get driveKindOptical => 'Optical';
+  @override
+  String get driveKindRam => 'RAM Disk';
+  @override
+  String get driveKindInternal => 'Internal storage';
+  @override
+  String get driveKindUnknown => 'Storage';
+  @override
+  String get openInNewPane => 'Open in new pane';
+  @override
+  String get openInWindowsTerminal => 'Open in Windows Terminal';
+  @override
+  String get driveCleanup => 'Cleanup';
+  @override
+  String get driveFormat => 'Format';
+  @override
+  String get driveBitLocker => 'Turn on BitLocker';
+  @override
   String get menuPinningOnlyLargeScreens =>
       'Menu pinning is only available on larger screens';
 
@@ -3056,6 +3170,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerCheckAllCleanable => 'Check all cleanable';
   @override
   String get diskCleanerUncheckAll => 'Uncheck all';
+
   @override
   String get diskCleanerColumnName => 'Name';
   @override
@@ -3186,6 +3301,14 @@ class EnglishLocalizations implements AppLocalizations {
   String diskCleanerDriveSummary(String path, String size, int count) =>
       '$path  $size  •  $count files';
   @override
+  String get diskCleanerGrowthTitle => 'Recently increased folders';
+  @override
+  String diskCleanerGrowthFilter(int count) => 'Recently increased ($count)';
+  @override
+  String diskCleanerGrowthIncrease(String size) => '+$size';
+  @override
+  String diskCleanerGrowthCurrentSize(String size) => 'Current size: $size';
+  @override
   String diskCleanerAgentPath(String path) => 'CB Agent: $path';
   @override
   String diskCleanerItemsBytes(int count, String size) =>
@@ -3274,6 +3397,123 @@ class EnglishLocalizations implements AppLocalizations {
   String diskCleanerPermanentDeletedWithSkipped(
           int count, String size, int skipped) =>
       'Permanently deleted $count items ($size). Skipped $skipped file(s) after delete failed.';
+
+  // Cleaner - drive picker, quick clean, junk reasons
+  @override
+  String get diskCleanerDriveLowSpace => 'Low space';
+  @override
+  String diskCleanerDriveCapacity(String used, String total, String free) =>
+      '$used of $total used · $free free';
+  @override
+  String diskCleanerLastScanFound(String when, String junk) =>
+      'Last scan $when · found $junk of junk';
+  @override
+  String get diskCleanerTimeJustNow => 'just now';
+  @override
+  String get diskCleanerTimeToday => 'today';
+  @override
+  String get diskCleanerTimeYesterday => 'yesterday';
+  @override
+  String diskCleanerTimeDaysAgo(int days) => '$days days ago';
+  @override
+  String diskCleanerTimeWeeksAgo(int weeks) =>
+      weeks == 1 ? 'a week ago' : '$weeks weeks ago';
+  @override
+  String diskCleanerTimeMonthsAgo(int months) =>
+      months <= 1 ? 'a month ago' : '$months months ago';
+  @override
+  String get diskCleanerQuickCleanHint =>
+      'Temporary files, caches and the Recycle Bin. Apps rebuild these on demand.';
+  @override
+  String get diskCleanerQuickCleanButton => 'Quick clean';
+  @override
+  String get diskCleanerQuickCleanScanning => 'Finding safe items...';
+  @override
+  String get diskCleanerQuickCleanNothing => 'Nothing safe to clean right now';
+  @override
+  String get diskCleanerQuickCleanReviewTitle => 'Review quick clean';
+  @override
+  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
+      '$count items in these groups, $size in total.';
+  @override
+  String get diskCleanerQuickCleanRecycleNote =>
+      'Everything goes to the Recycle Bin, so you can restore it from there.';
+  @override
+  String get diskCleanerCategoryWindowsTemp => 'Windows temporary files';
+  @override
+  String get diskCleanerCategoryBrowserCache => 'Browser caches';
+  @override
+  String get diskCleanerCategoryRecycleBin => 'Recycle Bin';
+  @override
+  String get diskCleanerCategoryThumbnailCache => 'Thumbnail cache';
+  @override
+  String get diskCleanerCategoryAppCache => 'App caches';
+  @override
+  String get diskCleanerCategoryCrashLogs => 'Crash dumps and logs';
+  @override
+  String get diskCleanerCategoryWindowsUpdate => 'Windows Update cache';
+  @override
+  String get diskCleanerCategoryPrefetch => 'Prefetch data';
+  @override
+  String get diskCleanerCategoryDeliveryOptimization =>
+      'Delivery Optimization files';
+  @override
+  String get diskCleanerCategoryDevCache => 'Developer caches';
+  @override
+  String get diskCleanerReasonWindowsTemp =>
+      'Left behind by apps. Safe to remove; nothing depends on it.';
+  @override
+  String get diskCleanerReasonBrowserCache =>
+      'Your browser rebuilds this on demand. Pages may load slightly slower once.';
+  @override
+  String get diskCleanerReasonRecycleBin =>
+      'Already deleted files waiting to be emptied.';
+  @override
+  String get diskCleanerReasonThumbnailCache =>
+      'Windows regenerates thumbnails the next time you open a folder.';
+  @override
+  String get diskCleanerReasonAppCache =>
+      'Temporary app data. Apps recreate it; you stay signed in.';
+  @override
+  String get diskCleanerReasonCrashLogs =>
+      'Diagnostic files from past crashes. Only useful for troubleshooting.';
+  @override
+  String get diskCleanerReasonWindowsUpdate =>
+      'Installers for updates that are already applied.';
+  @override
+  String get diskCleanerReasonPrefetch =>
+      'App launch hints. Windows rebuilds them over the next few launches.';
+  @override
+  String get diskCleanerReasonDeliveryOptimization =>
+      'Update files cached for sharing with other PCs on your network.';
+  @override
+  String get diskCleanerReasonDevCache =>
+      'Build and package caches. Your tools re-download or rebuild them.';
+  @override
+  String get diskCleanerReasonGeneric =>
+      'Matched a known junk location and is safe to remove.';
+
+  // Cleaner - tree preset views
+  @override
+  String get diskCleanerPresetTooltip => 'Filter the tree';
+  @override
+  String get diskCleanerPresetAll => 'Everything';
+  @override
+  String get diskCleanerPresetLargeFiles => 'Files over 1 GB';
+  @override
+  String get diskCleanerPresetLogsCaches => 'Logs and caches';
+  @override
+  String get diskCleanerPresetInstallers => 'Installers and archives';
+
+  // Cleaner - cleaned screen outcome
+  @override
+  String diskCleanerFreeSpaceBeforeAfter(String before, String after) =>
+      'Free space: $before → $after';
+  @override
+  String get diskCleanerGrowthWatchTitle => 'Growing since your last scan';
+  @override
+  String diskCleanerGrowthWatchLine(String path, String size) =>
+      '$path  +$size';
 
   // Cleaner App Insights
   @override

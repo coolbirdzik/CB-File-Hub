@@ -109,6 +109,7 @@ dependencies:
   flutter_secure_storage: ^10.3.1 # Secure token storage for local AI advisor
   flutter_gemma: 1.0.0-rc.1
   flutter_gemma_litertlm: 1.0.0-rc.1
+  google_fonts: ^8.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -141,6 +142,30 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/logo.png
+    # Bundled so registerCbFontLicenses() can surface them in the app's
+    # licence page — the OFL requires the licence to ship with the font.
+    - assets/fonts/Inter-OFL.txt
+    - assets/fonts/JetBrainsMono-OFL.txt
+
+  # CoolBird design system typography. Both families are SIL Open Font
+  # License 1.1 — free for commercial use, redistributable with the app —
+  # and both cover the full Vietnamese range (including ₫ U+20AB).
+  # Licences ship alongside the binaries in assets/fonts/.
+  # Only the three weights the type scale actually uses are bundled; see
+  # lib/design_system/tokens/cb_type_tokens.dart.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
   #  - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

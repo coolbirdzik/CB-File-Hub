@@ -70,6 +70,7 @@ class WindowsFileOperations {
     required List<String> sources,
     bool permanent = false,
     bool silent = true,
+    bool requireElevation = false,
     Duration? timeout,
   }) async {
     if (!isAvailable || sources.isEmpty) {
@@ -89,6 +90,7 @@ class WindowsFileOperations {
           'sources': sources,
           'permanent': permanent,
           'silent': silent,
+          'requireElevation': requireElevation,
           if (timeout != null) 'timeoutMs': timeout.inMilliseconds,
         },
       );

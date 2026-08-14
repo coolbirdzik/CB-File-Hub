@@ -1882,6 +1882,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               }),
               _buildAccentColorControl(themeProvider),
+              _buildFontColorControl(themeProvider),
+              _buildUiFontControl(themeProvider),
               if (showDesktopAcrylicControl) ...[
                 _buildBackdropModeControl(themeProvider),
                 _buildDesktopAcrylicStrengthControl(themeProvider),
@@ -1900,19 +1902,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final accents =
         ThemeConfig.accentSeedColors.entries.toList(growable: false);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Accent Color',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            l10n.accentColor,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-            'Current accent: $selectedAccentName',
+            l10n.currentAccentColor(selectedAccentName),
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
@@ -1967,25 +1970,212 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildFontColorControl(ThemeProvider themeProvider) {
+    final selectedFont = themeProvider.currentFontColor;
+    final selectedFontName =
+        ThemeConfig.fontColorNames[selectedFont] ?? selectedFont.name;
+    final fonts = AppFontColor.values.toList(growable: false);
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final currentAccent = themeProvider.currentAccentColor;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.fontColor,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.currentFontColor(selectedFontName),
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: fonts.map((fontColor) {
+              final isSelected = fontColor == selectedFont;
+              final letterColor = ThemeConfig.fontColorSwatch(
+                fontColor,
+                brightness: theme.brightness,
+                accentColor: currentAccent,
+                fallback: theme.colorScheme.onSurface,
+              );
+              return Tooltip(
+                message:
+                    ThemeConfig.fontColorNames[fontColor] ?? fontColor.name,
+                child: InkWell(
+                  onTap: () =>
+                      context.read<ThemeProvider>().setFontColor(fontColor),
+                  borderRadius: BorderRadius.circular(99),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline
+                                .withValues(alpha: 0.35),
+                        width: isSelected ? 2 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.18),
+                                blurRadius: 6,
+                                spreadRadius: 0.2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      'A',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: letterColor,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUiFontControl(ThemeProvider themeProvider) {
+    final selected = themeProvider.currentUiFont;
+    final selectedName =
+        AppUiFontConfig.displayNames[selected] ?? selected.name;
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.uiFont,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.currentUiFont(selectedName),
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.uiFontUnicodeHint,
+            style: TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AppUiFont.values.map((font) {
+              final isSelected = font == selected;
+              final name = AppUiFontConfig.displayNames[font] ?? font.name;
+              return Tooltip(
+                message: name,
+                child: InkWell(
+                  onTap: () => context.read<ThemeProvider>().setUiFont(font),
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                          : theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline.withValues(alpha: 0.28),
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: AppUiFontConfig.previewStyle(font).copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          AppUiFontConfig.previewSample,
+                          style: AppUiFontConfig.previewStyle(
+                            font,
+                            fontSize: 12,
+                          ).copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBackdropModeControl(ThemeProvider themeProvider) {
     final theme = Theme.of(context);
     final mode = themeProvider.backdropMode;
     final imagePath = themeProvider.backdropImagePath;
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Backdrop Mode',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            l10n.backdropMode,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
             mode == AcrylicBackdropMode.wallpaper
-                ? 'Using system wallpaper as backdrop.'
-                : 'Using system dynamic acrylic backdrop.',
+                ? l10n.backdropModeWallpaperDescription
+                : l10n.backdropModeDynamicDescription,
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
@@ -1995,7 +2185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Row(
             children: [
               _buildModeChip(
-                label: 'Dynamic',
+                label: l10n.backdropModeDynamic,
                 icon: PhosphorIconsLight.monitor,
                 isSelected: mode == AcrylicBackdropMode.dynamic,
                 onTap: () =>
@@ -2003,7 +2193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(width: 8),
               _buildModeChip(
-                label: 'Wallpaper',
+                label: l10n.backdropModeWallpaper,
                 icon: PhosphorIconsLight.image,
                 isSelected: mode == AcrylicBackdropMode.wallpaper,
                 onTap: () => themeProvider
@@ -2019,7 +2209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Text(
                     imagePath != null && imagePath.isNotEmpty
                         ? imagePath.split(Platform.pathSeparator).last
-                        : 'No system wallpaper detected',
+                        : l10n.noSystemWallpaperDetected,
                     style: TextStyle(
                       fontSize: 12,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -2034,8 +2224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => themeProvider.refreshSystemWallpaper(),
                     icon: const Icon(PhosphorIconsLight.arrowsClockwise,
                         size: 14),
-                    label:
-                        const Text('Refresh', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.refresh, style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
@@ -2058,7 +2247,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     },
                     icon: const Icon(PhosphorIconsLight.folderOpen, size: 14),
-                    label: const Text('Custom', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.customBackdropImage,
+                        style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
@@ -2080,7 +2270,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: theme.colorScheme.errorContainer,
                       alignment: Alignment.center,
                       child: Text(
-                        'Image not found',
+                        l10n.backdropImageNotFound,
                         style: TextStyle(
                           fontSize: 11,
                           color: theme.colorScheme.onErrorContainer,
@@ -2152,19 +2342,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDesktopAcrylicStrengthControl(ThemeProvider themeProvider) {
     final value = themeProvider.desktopAcrylicStrength;
     final percentage = (value * 100).round();
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Desktop Acrylic Strength',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            l10n.desktopAcrylicStrength,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-            'Adjust blur and tint intensity for desktop backdrop ($percentage%).',
+            l10n.desktopAcrylicStrengthDescription(percentage),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,

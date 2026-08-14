@@ -29,6 +29,7 @@
   - `ui-patterns/03-skeleton-loading.md`
   - `ui-patterns/04-tree-view.md` — Generic tree view component + tag/file/network integrations
   - `ui-patterns/05-scroll-optimizations.md` — Scroll velocity tracking + Ctrl+scroll zoom
+  - `ui-patterns/06-design-system.md` — CoolBird tokens + primitives replacing Material defaults
 - **Coding Rules**
   - `coding-rules/01-theme-styling-guide.md`
   - `coding-rules/02-i18n-internationalization-guide.md`

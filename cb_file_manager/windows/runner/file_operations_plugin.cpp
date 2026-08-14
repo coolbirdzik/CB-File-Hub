@@ -137,7 +137,8 @@ namespace file_operations_plugin
             HWND hwnd,
             const std::vector<std::wstring> &source_paths,
             bool permanent,
-            bool silent)
+            bool silent,
+            bool require_elevation)
         {
             if (source_paths.empty())
             {
@@ -149,6 +150,8 @@ namespace file_operations_plugin
                 std::to_wstring(source_paths.size()) +
                 L" | permanent=" + std::to_wstring(permanent ? 1 : 0) +
                 L" | silent=" + std::to_wstring(silent ? 1 : 0) +
+                L" | requireElevation=" +
+                    std::to_wstring(require_elevation ? 1 : 0) +
                 L" | first=" + source_paths.front());
 
             // IFileOperation requires COM. The Flutter Windows engine
@@ -190,6 +193,11 @@ namespace file_operations_plugin
                     flags |= FOF_NO_UI | FOF_NOCONFIRMATION |
                              FOF_NOERRORUI | FOF_SILENT |
                              FOFX_EARLYFAILURE;
+                }
+                if (require_elevation)
+                {
+                    flags |= FOFX_SHOWELEVATIONPROMPT |
+                             FOFX_REQUIREELEVATION;
                 }
                 hr = pfo->SetOperationFlags(flags);
                 if (FAILED(hr))
@@ -521,6 +529,21 @@ namespace file_operations_plugin
                     if (const auto *b = std::get_if<bool>(&silent_it->second)) silent = *b;
                 }
 
+                bool require_elevation = false;
+                if (auto elevation_it = arguments->find(flutter::EncodableValue("requireElevation"));
+                    elevation_it != arguments->end())
+                {
+                    if (const auto *b = std::get_if<bool>(&elevation_it->second)) require_elevation = *b;
+                }
+
+                if (require_elevation && !permanent)
+                {
+                    result->Error(
+                        "INVALID_ARGUMENTS",
+                        "requireElevation is valid only for permanent deletion.");
+                    return;
+                }
+
                 int timeout_ms = 0;
                 if (auto timeout_it = arguments->find(flutter::EncodableValue("timeoutMs"));
                     timeout_it != arguments->end())
@@ -542,7 +565,8 @@ namespace file_operations_plugin
                     std::to_wstring(request_id) + L" | count=" +
                     std::to_wstring(source_paths.size()) + L" | permanent=" +
                     std::to_wstring(permanent ? 1 : 0) + L" | silent=" +
-                    std::to_wstring(silent ? 1 : 0) + L" | first=" +
+                    std::to_wstring(silent ? 1 : 0) + L" | requireElevation=" +
+                    std::to_wstring(require_elevation ? 1 : 0) + L" | first=" +
                     source_paths.front());
                 auto pending_delete_manager = pending_delete_manager_;
                 {
@@ -594,7 +618,7 @@ namespace file_operations_plugin
                 }
 
                 std::thread(
-                    [pending_delete_manager, request_id, hwnd, completion_window, source_paths = std::move(source_paths), permanent, silent]() mutable
+                    [pending_delete_manager, request_id, hwnd, completion_window, source_paths = std::move(source_paths), permanent, silent, require_elevation]() mutable
                     {
                         LogDeleteMessage(
                             L"deleteItems worker started | requestId=" +
@@ -603,7 +627,12 @@ namespace file_operations_plugin
                         bool ok = false;
                         try
                         {
-                            ok = PerformDeleteOperation(hwnd, source_paths, permanent, silent);
+                            ok = PerformDeleteOperation(
+                                hwnd,
+                                source_paths,
+                                permanent,
+                                silent,
+                                require_elevation);
                         }
                         catch (...)
                         {

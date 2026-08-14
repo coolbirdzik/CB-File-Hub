@@ -768,7 +768,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
         }
         // The browse tree gets whatever vertical room is left after the fixed
         // sections, so resizing the dialog actually grows the tag list.
-        final browseHeight = (dialogSize.height - 430).clamp(160.0, 900.0);
+        final browseHeight = (dialogSize.height - 520).clamp(160.0, 900.0);
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -778,9 +778,18 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
               _buildSectionCard(
                 icon: PhosphorIconsLight.sparkle,
                 title: 'Quick Picks',
-                subtitle: 'Choose from the most used tags',
-                child: PopularTagsWidget(
-                  onTagSelected: _addTag,
+                subtitle: 'Choose from popular and recently used tags',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PopularTagsWidget(
+                      onTagSelected: _addTag,
+                    ),
+                    const SizedBox(height: 18),
+                    RecentTagsWidget(
+                      onTagSelected: _addTag,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
@@ -1084,7 +1093,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
               ),
               contentBuilder: (context, dialogSize) {
                 final browseHeight =
-                    (dialogSize.height - 420).clamp(160.0, 900.0);
+                    (dialogSize.height - 510).clamp(160.0, 900.0);
                 return SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1180,6 +1189,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                         ),
                       const SizedBox(height: 24),
                       PopularTagsWidget(onTagSelected: handleTagSelected),
+                      const SizedBox(height: 24),
+                      RecentTagsWidget(onTagSelected: handleTagSelected),
                       const SizedBox(height: 24),
                       Row(
                         children: [
