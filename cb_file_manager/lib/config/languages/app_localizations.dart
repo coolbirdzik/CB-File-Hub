@@ -42,6 +42,9 @@ abstract class AppLocalizations {
   String get chooseDefaultApp;
   String get setCoolBirdAsDefaultForVideos;
   String get setCoolBirdAsDefaultForVideosAndroidHint;
+  String get setCoolBirdAsDefaultForArchives;
+  String get setCoolBirdAsDefaultForArchivesSuccess;
+  String get setCoolBirdAsDefaultForArchivesFailed;
   String get openFolder;
   String get openFile;
   String get viewImage;
@@ -94,12 +97,27 @@ abstract class AppLocalizations {
   String get viewModeGridPreview;
   String get viewModeColumns;
   String get viewModeTree;
+  String get viewModeTiles;
 
   // Preview pane
   String get previewPaneTitle;
   String get previewSelectFile;
   String get previewNotSupported;
+  String get archiveSectionTitle;
+  String get archiveBrowseTitle;
+  String get archiveExtractHere;
+  String get archiveExtractTo;
+  String get archiveExtractToTitle;
+  String get archiveExtractAll;
+  String get archiveExtracting;
+  String get archiveExtractComplete;
+  String archiveExtractFailed(String error);
+  String get archiveEmpty;
+  String archivePreviewSummary(int count);
+  String archivePreviewMore(int count);
   String get previewUnavailable;
+  String get previewTextTruncated;
+  String get previewTextTooLarge;
   String get showPreview;
   String get hidePreview;
 
@@ -574,6 +592,10 @@ abstract class AppLocalizations {
   String get useSystemDefaultForVideoDescription;
   String get useSystemDefaultForVideoEnabled;
   String get useSystemDefaultForVideoDisabled;
+  String get openVideoInNewWindow;
+  String get openVideoInNewWindowDescription;
+  String get openVideoInNewWindowEnabled;
+  String get openVideoInNewWindowDisabled;
   String get seekSpeed;
   String get seekSpeedDescription;
   String get seekSpeedSlow;
@@ -951,6 +973,8 @@ abstract class AppLocalizations {
   String get showFileTagsDescription;
   String get showFileTagsToggle;
   String get showFileTagsToggleDescription;
+  String get fileThumbnailFit;
+  String get fileThumbnailFitDescription;
   String get tagThumbnailFit;
   String get tagThumbnailFitDescription;
   String get thumbnailFitContain;
@@ -1374,6 +1398,7 @@ abstract class AppLocalizations {
   String get diskCleanerSelectCategories;
   String get diskCleanerSelectDrives;
   String get diskCleanerScanAgain;
+  String get diskCleanerCachedResultStatus;
 
   // Disk Cleaner — extended UI strings
   String get diskCleanerCancel;
@@ -1390,6 +1415,17 @@ abstract class AppLocalizations {
   String get diskCleanerAnalyzingDisk;
   String get diskCleanerPieChartPending;
   String get diskCleanerPieEmpty;
+  String get diskCleanerIncrementalScanTitle;
+  String diskCleanerIncrementalScanProgress(int count);
+  String get diskCleanerFullScanFallback;
+  String get diskCleanerOldLargeTitle;
+  String get diskCleanerOldLargeSubtitle;
+  String get diskCleanerOldLargeAll;
+  String get diskCleanerOldLargeFiles;
+  String get diskCleanerOldLargeFolders;
+  String diskCleanerOldLargeLastActivity(String date);
+  String get diskCleanerOldLargeReviewOnly;
+  String get diskCleanerOldLargeEmpty;
   String get diskCleanerPreparingFiles;
   String get diskCleanerCleaning;
   String get diskCleanerScanningSelectedDirs;
@@ -1443,6 +1479,10 @@ abstract class AppLocalizations {
   String diskCleanerAgentPath(String path);
   String diskCleanerItemsBytes(int count, String size);
   String diskCleanerSizeFiles(String size, int files);
+
+  /// Label for the synthetic tree row standing in for entries the scan folded
+  /// away because they were too small or too numerous to display.
+  String diskCleanerRolledUpItems(int items);
   String diskCleanerScannedProgress(String size, int files);
   String get diskCleanerPieChartPendingScan;
   String diskCleanerScanningPath(String path);

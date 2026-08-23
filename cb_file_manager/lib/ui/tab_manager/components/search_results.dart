@@ -6,6 +6,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/index.dart'
     as folder_list_components;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 
 /// Displays search results from tag and filename searches
@@ -250,8 +251,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
             folders: folders,
             state: displayState,
             isSelectionMode: widget.isSelectionMode,
-            isGridView: state.viewMode == ViewMode.grid ||
-                state.viewMode == ViewMode.gridPreview,
+            isGridView: ViewModeUtils.isGridLike(state.viewMode),
             selectedFiles: widget.selectedFiles,
             toggleFileSelection: widget.toggleFileSelection,
             toggleFolderSelection:

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Graph First"
-  short_description: "Plan graph impact before coding"
-  default_prompt: "Use $graph-first to inspect graph impact before changing source code."

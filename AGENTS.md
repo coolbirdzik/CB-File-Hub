@@ -80,22 +80,6 @@ CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Ma
 - **Network browsing:** SMB/CIFS via local `mobile_smb_native` FFI plugin, plus FTP support.
 - **Windows native:** Uses `win32` FFI, acrylic backdrop, native tab drag-drop, PiP windowing.
 
-## Mandatory graph-first coding loop
-
-For every source-code change, use the repository skill at
-`.agents/skills/graph-first/SKILL.md`.
-
-- Inspect the relevant graph and source read-only, then announce graph impact as
-  `none` or `changed` before editing.
-- For `changed`, present the graph delta and wait for explicit approval. After
-  approval, update the canonical graph before source code.
-- Implement and verify within the approved boundary. Ask again only if the graph
-  boundary changes.
-- Finish only when graph, code, and checks agree.
-
-Analysis-only, review-only, diagnostics-only, and documentation-only tasks are
-exempt from this loop.
-
 ## Feature flags (compile-time)
 
 Passed via `--dart-define=FLAG=value`:

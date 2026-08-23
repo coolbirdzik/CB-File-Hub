@@ -56,6 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Show file tags setting
   bool _showFileTags = true;
+  FileThumbnailFitMode _fileThumbnailFitMode = FileThumbnailFitMode.cover;
   TagThumbnailFitMode _tagThumbnailFitMode = TagThumbnailFitMode.contain;
   bool _rememberTabWorkspace = false;
   // Tab inactive threshold (in minutes). 0 means auto-suspend disabled.
@@ -64,6 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Use system default app for video (false = in-app player by default)
   bool _useSystemDefaultForVideo = false;
+  bool _openVideoInNewWindow = true;
   bool _isThemeExpanded = false;
   bool _isLanguageExpanded = false;
   String _appVersion = '';
@@ -123,11 +125,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final thumbnailMode = await _preferences.getThumbnailMode();
       final maxConcurrency = await _preferences.getMaxThumbnailConcurrency();
       final showFileTags = await _preferences.getShowFileTags();
+      final fileThumbnailFitMode = await _preferences.getFileThumbnailFitMode();
       final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
       final rememberTabWorkspace =
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
           await _preferences.getUseSystemDefaultForVideo();
+      final openVideoInNewWindow = await _preferences.getOpenVideoInNewWindow();
       final tabInactiveMinutes =
           await _preferences.getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
@@ -139,9 +143,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _thumbnailMode = thumbnailMode;
           _maxConcurrency = maxConcurrency;
           _showFileTags = showFileTags;
+          _fileThumbnailFitMode = fileThumbnailFitMode;
           _tagThumbnailFitMode = tagThumbnailFitMode;
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
+          _openVideoInNewWindow = openVideoInNewWindow;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
@@ -237,6 +243,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _updateFileThumbnailFitMode(FileThumbnailFitMode mode) async {
+    final saved = await _preferences.setFileThumbnailFitMode(mode);
+    if (saved && mounted) {
+      setState(() {
+        _fileThumbnailFitMode = mode;
+      });
+    }
+  }
+
   Future<void> _updateRememberTabWorkspace(bool enabled) async {
     await _preferences.setRememberTabWorkspaceEnabled(enabled);
     if (!enabled) {
@@ -263,6 +278,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _tabInactiveThresholdMinutes = clamped;
       });
+    }
+  }
+
+  Future<void> _updateOpenVideoInNewWindow(bool value) async {
+    await _preferences.setOpenVideoInNewWindow(value);
+    setState(() => _openVideoInNewWindow = value);
+    if (mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(
+        context,
+        value
+            ? l10n.openVideoInNewWindowEnabled
+            : l10n.openVideoInNewWindowDisabled,
+      );
     }
   }
 
@@ -501,6 +530,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         _buildCompactSettingTile(
+          title: AppLocalizations.of(context)!.fileThumbnailFit,
+          subtitle: AppLocalizations.of(context)!.fileThumbnailFitDescription,
+          icon: PhosphorIconsLight.imageSquare,
+          trailing: DropdownButton<FileThumbnailFitMode>(
+            value: _fileThumbnailFitMode,
+            onChanged: (mode) {
+              if (mode != null) {
+                _updateFileThumbnailFitMode(mode);
+              }
+            },
+            items: [
+              DropdownMenuItem(
+                value: FileThumbnailFitMode.cover,
+                child: Text(AppLocalizations.of(context)!.thumbnailFitCover),
+              ),
+              DropdownMenuItem(
+                value: FileThumbnailFitMode.contain,
+                child: Text(AppLocalizations.of(context)!.thumbnailFitContain),
+              ),
+            ],
+          ),
+        ),
+        _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.tagThumbnailFit,
           subtitle: AppLocalizations.of(context)!.tagThumbnailFitDescription,
           icon: PhosphorIconsLight.image,
@@ -571,6 +623,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _updateUseSystemDefaultForVideo,
           ),
         ),
+        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          _buildCompactSettingTile(
+            title: AppLocalizations.of(context)!.openVideoInNewWindow,
+            subtitle:
+                AppLocalizations.of(context)!.openVideoInNewWindowDescription,
+            icon: PhosphorIconsLight.appWindow,
+            trailing: Switch(
+              value: _openVideoInNewWindow,
+              onChanged: _updateOpenVideoInNewWindow,
+            ),
+          ),
         // Thumbnail Mode Selection
         Padding(
           padding: const EdgeInsets.all(16),
@@ -2026,8 +2089,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       border: Border.all(
                         color: isSelected
                             ? theme.colorScheme.primary
-                            : theme.colorScheme.outline
-                                .withValues(alpha: 0.35),
+                            : theme.colorScheme.outline.withValues(alpha: 0.35),
                         width: isSelected ? 2 : 1,
                       ),
                       boxShadow: isSelected
@@ -2224,7 +2286,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => themeProvider.refreshSystemWallpaper(),
                     icon: const Icon(PhosphorIconsLight.arrowsClockwise,
                         size: 14),
-                    label: Text(l10n.refresh, style: const TextStyle(fontSize: 12)),
+                    label: Text(l10n.refresh,
+                        style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),

@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../controllers/file_operations_handler.dart';
+import '../../controllers/archive_operations_handler.dart';
+import '../../controllers/archive_navigation.dart';
+import '../../widgets/file_preview_pane.dart';
 import '../../screens/folder_list/file_details_screen.dart';
 import '../../screens/media_gallery/image_viewer_screen.dart';
-import '../../screens/media_gallery/video_player_full_screen.dart';
 import '../../dialogs/open_with_dialog.dart';
 import '../../../helpers/files/external_app_helper.dart';
 import 'package:path/path.dart' as pathlib;
@@ -35,6 +37,7 @@ import '../../controllers/inline_rename_controller.dart';
 import '../../../core/service_locator.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../utils/entity_open_actions.dart';
+import '../../utils/video_playback_launcher.dart';
 import '../../../utils/app_logger.dart';
 import '../../screens/settings/context_menu_layout_settings_screen.dart';
 
@@ -1565,8 +1568,47 @@ List<ContextMenuSection> _buildFileContextMenuSections({
   final canDownloadRemote =
       (currentService is WebDAVService || currentService is FTPService) &&
           remotePath != null;
+  final isArchive = FileTypeUtils.isArchiveFile(file.path);
+  final isTextOrPdf =
+      FileTypeUtils.isTextFile(file.path) || FileTypeUtils.isPdfFile(file.path);
 
   return [
+    if (isArchive)
+      ContextMenuSection(
+        title: l10n.archiveSectionTitle,
+        actions: [
+          ContextMenuAction(
+            id: 'browse_archive',
+            label: l10n.archiveBrowseTitle,
+            icon: PhosphorIconsLight.archive,
+            onSelected: (_) => ArchiveNavigation.openBrowse(
+              context,
+              archiveFilePath: file.path,
+              folderListBloc: folderListBloc,
+            ),
+          ),
+          ContextMenuAction(
+            id: 'extract_here',
+            label: l10n.archiveExtractHere,
+            icon: PhosphorIconsLight.package,
+            onSelected: (_) => ArchiveOperationsHandler.extractHere(
+              context: context,
+              archiveFile: file,
+              folderListBloc: folderListBloc,
+            ),
+          ),
+          ContextMenuAction(
+            id: 'extract_to',
+            label: l10n.archiveExtractTo,
+            icon: PhosphorIconsLight.folderOpen,
+            onSelected: (_) => ArchiveOperationsHandler.extractToDirectory(
+              context: context,
+              archiveFile: file,
+              folderListBloc: folderListBloc,
+            ),
+          ),
+        ],
+      ),
     ContextMenuSection(
       title: l10n.open,
       actions: [
@@ -1595,8 +1637,13 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           id: 'open',
           label: l10n.open,
           icon: PhosphorIconsLight.file,
-          onSelected: (_) =>
-              ExternalAppHelper.openFileWithApp(file.path, 'shell_open'),
+          onSelected: (_) {
+            if (isTextOrPdf) {
+              InAppFileViewer.open(context, file);
+            } else {
+              ExternalAppHelper.openFileWithApp(file.path, 'shell_open');
+            }
+          },
         ),
         if (showOpenFileLocation && isDesktopPlatform)
           ContextMenuAction(
@@ -1607,6 +1654,7 @@ List<ContextMenuSection> _buildFileContextMenuSections({
               context,
               sourcePath: file.path,
               preferredTabName: pathlib.basename(file.parent.path),
+              openContainingFolder: true,
             ),
           ),
         if (isDesktopPlatform)
@@ -1969,9 +2017,9 @@ bool _tryStartInlineRename(BuildContext context, FileSystemEntity entity) {
     }
   }();
   final bool supportsInlineRename = viewMode == ViewMode.grid ||
-      viewMode == ViewMode.gridPreview ||
       viewMode == ViewMode.details ||
-      viewMode == ViewMode.columns;
+      viewMode == ViewMode.columns ||
+      viewMode == ViewMode.tiles;
   if (!supportsInlineRename) {
     return false;
   }
@@ -2015,12 +2063,7 @@ Future<void> _openVideoWithUserPreference(
   }
 
   if (!navigator.mounted) return;
-  await navigator.push(
-    MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => VideoPlayerFullScreen(file: file),
-    ),
-  );
+  await VideoPlaybackLauncher.open(navigator.context, file: file);
 }
 
 /// Helper function to show folder context menu

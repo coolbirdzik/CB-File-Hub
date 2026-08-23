@@ -178,6 +178,47 @@ class WindowsAppIcon {
     }
   }
 
+  /// Registers [extensions] with Windows Open-with / Default-apps (HKCU).
+  /// Does not change the current default unless [setAsDefault] is true.
+  static Future<bool> registerFileAssociations({
+    required String exePath,
+    required List<String> extensions,
+    bool setAsDefault = false,
+  }) async {
+    if (!Platform.isWindows || extensions.isEmpty) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'registerFileAssociations',
+        {
+          'exePath': exePath,
+          'extensions': extensions,
+          'setAsDefault': setAsDefault,
+        },
+      );
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> setSelfAsDefaultForArchives(String exePath) {
+    return registerFileAssociations(
+      exePath: exePath,
+      extensions: const [
+        '.zip',
+        '.rar',
+        '.7z',
+        '.tar',
+        '.gz',
+        '.bz2',
+        '.tgz',
+        '.tbz2',
+        '.txz',
+      ],
+      setAsDefault: true,
+    );
+  }
+
   // ─── Brand Detection (for create-file dialog) ────────────────────────────────
 
   /// Windows: Detects which office suites are installed via the native plugin.

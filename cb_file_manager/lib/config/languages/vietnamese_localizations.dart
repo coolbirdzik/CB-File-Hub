@@ -75,6 +75,15 @@ class VietnameseLocalizations implements AppLocalizations {
   String get setCoolBirdAsDefaultForVideosAndroidHint =>
       'Đang mở Cài đặt. Trong "Mở theo mặc định", bật CB File Hub cho file video.';
   @override
+  String get setCoolBirdAsDefaultForArchives =>
+      'Đặt CB File Hub làm mặc định cho tệp nén';
+  @override
+  String get setCoolBirdAsDefaultForArchivesSuccess =>
+      'CB File Hub đã là ứng dụng mặc định cho tệp nén.';
+  @override
+  String get setCoolBirdAsDefaultForArchivesFailed =>
+      'Không thể đặt CB File Hub làm mặc định cho tệp nén.';
+  @override
   String get openFolder => 'Mở thư mục';
   @override
   String get openFile => 'Mở tệp';
@@ -198,6 +207,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get viewModeTree => 'Cây';
 
   @override
+  String get viewModeTiles => 'Thẻ';
+
+  @override
   String get previewPaneTitle => 'Xem trước';
 
   @override
@@ -207,7 +219,49 @@ class VietnameseLocalizations implements AppLocalizations {
   String get previewNotSupported => 'Chưa hỗ trợ xem trước loại tệp này';
 
   @override
+  String get archiveSectionTitle => 'Tệp nén';
+
+  @override
+  String get archiveBrowseTitle => 'Xem nội dung';
+
+  @override
+  String get archiveExtractHere => 'Giải nén tại đây';
+
+  @override
+  String get archiveExtractTo => 'Giải nén vào…';
+
+  @override
+  String get archiveExtractToTitle => 'Chọn thư mục giải nén';
+
+  @override
+  String get archiveExtractAll => 'Giải nén tất cả';
+
+  @override
+  String get archiveExtracting => 'Đang giải nén…';
+
+  @override
+  String get archiveExtractComplete => 'Giải nén xong';
+
+  @override
+  String archiveExtractFailed(String error) => 'Giải nén thất bại: $error';
+
+  @override
+  String get archiveEmpty => 'Tệp nén trống';
+
+  @override
+  String archivePreviewSummary(int count) => '$count mục';
+
+  @override
+  String archivePreviewMore(int count) => '… và $count mục nữa';
+
+  @override
   String get previewUnavailable => 'Không thể xem trước';
+
+  @override
+  String get previewTextTruncated => 'Hiển thị một phần nội dung';
+
+  @override
+  String get previewTextTooLarge => 'Tệp quá lớn để xem trước';
 
   @override
   String get showPreview => 'Hiện xem trước';
@@ -1066,6 +1120,8 @@ class VietnameseLocalizations implements AppLocalizations {
   String get useSystemDefaultForVideoEnabled =>
       'Video sẽ mở bằng ứng dụng mặc định của hệ thống';
   @override
+  String get useSystemDefaultForVideoDisabled =>
+      'Video sẽ mở bằng trình phát trong app';
   @override
   String get seekSpeed => 'Tốc độ tua video';
   @override
@@ -1078,8 +1134,16 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Nhanh';
   @override
-  String get useSystemDefaultForVideoDisabled =>
-      'Video sẽ mở bằng trình phát trong app';
+  String get openVideoInNewWindow => 'Mở video ở cửa sổ riêng';
+  @override
+  String get openVideoInNewWindowDescription =>
+      'Chỉ trên desktop. Dùng một cửa sổ trình phát riêng; khi mở video khác, video trong cửa sổ đó sẽ được thay thế.';
+  @override
+  String get openVideoInNewWindowEnabled =>
+      'Video sẽ mở trong một cửa sổ trình phát riêng';
+  @override
+  String get openVideoInNewWindowDisabled =>
+      'Trình phát video sẽ mở trong cửa sổ hiện tại';
   @override
   String get thumbnailCache => 'Bộ nhớ đệm hình thu nhỏ';
   @override
@@ -1653,6 +1717,13 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get showFileTagsToggleDescription =>
       'Bật/tắt hiển thị tag bên ngoài danh sách file';
+
+  @override
+  String get fileThumbnailFit => 'Cách hiển thị thumbnail file';
+
+  @override
+  String get fileThumbnailFitDescription =>
+      'Chọn thumbnail phủ đầy khung hoặc hiển thị toàn bộ ảnh';
 
   @override
   String get tagThumbnailFit => 'Cách hiển thị thumbnail tag';
@@ -3154,6 +3225,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerSelectDrives => 'Chọn ổ đĩa';
   @override
   String get diskCleanerScanAgain => 'Quét lại';
+  @override
+  String get diskCleanerCachedResultStatus =>
+      'Đang hiển thị kết quả quét trước (bản lưu đệm). Nhấn Quét lại để làm mới.';
 
   // Disk Cleaner — extended UI strings
   @override
@@ -3311,12 +3385,43 @@ class VietnameseLocalizations implements AppLocalizations {
   String diskCleanerItemsBytes(int count, String size) => '$count mục • $size';
   @override
   String diskCleanerSizeFiles(String size, int files) => '$size • $files tệp';
+
+  @override
+  String diskCleanerRolledUpItems(int items) => '$items mục nhỏ hơn';
   @override
   String diskCleanerScannedProgress(String size, int files) =>
       'Đã quét $size • $files tệp';
   @override
   String get diskCleanerPieChartPendingScan =>
       'Biểu đồ sẽ xuất hiện ngay khi quét xong';
+  @override
+  String get diskCleanerIncrementalScanTitle => 'Quét phần thay đổi';
+  @override
+  String diskCleanerIncrementalScanProgress(int count) =>
+      'Đã cập nhật $count thư mục thay đổi';
+  @override
+  String get diskCleanerFullScanFallback =>
+      'Không thể quét phần thay đổi — đã quét lại toàn bộ ổ đĩa';
+  @override
+  String get diskCleanerOldLargeTitle =>
+      'Tệp và thư mục lớn, lâu không hoạt động';
+  @override
+  String get diskCleanerOldLargeSubtitle =>
+      'Chỉ là gợi ý để xem xét. Dấu thời gian hệ thống không khẳng định mục đó không còn được dùng.';
+  @override
+  String get diskCleanerOldLargeAll => 'Tất cả';
+  @override
+  String get diskCleanerOldLargeFiles => 'Tệp';
+  @override
+  String get diskCleanerOldLargeFolders => 'Thư mục';
+  @override
+  String diskCleanerOldLargeLastActivity(String date) =>
+      'Gợi ý hoạt động gần nhất: $date';
+  @override
+  String get diskCleanerOldLargeReviewOnly => 'Chỉ xem xét';
+  @override
+  String get diskCleanerOldLargeEmpty =>
+      'Không tìm thấy tệp hoặc thư mục lớn nào lâu không hoạt động.';
   @override
   String diskCleanerScanningPath(String path) => 'Đang quét $path';
   @override
@@ -3428,8 +3533,7 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerQuickCleanNothing =>
       'Hiện không có mục nào an toàn để dọn';
   @override
-  String get diskCleanerQuickCleanReviewTitle =>
-      'Xem lại trước khi dọn nhanh';
+  String get diskCleanerQuickCleanReviewTitle => 'Xem lại trước khi dọn nhanh';
   @override
   String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
       '$count mục trong các nhóm này, tổng cộng $size.';
@@ -3439,30 +3543,24 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerCategoryWindowsTemp => 'Tệp tạm của Windows';
   @override
-  String get diskCleanerCategoryBrowserCache =>
-      'Bộ nhớ đệm trình duyệt';
+  String get diskCleanerCategoryBrowserCache => 'Bộ nhớ đệm trình duyệt';
   @override
   String get diskCleanerCategoryRecycleBin => 'Thùng rác';
   @override
-  String get diskCleanerCategoryThumbnailCache =>
-      'Bộ nhớ đệm ảnh thu nhỏ';
+  String get diskCleanerCategoryThumbnailCache => 'Bộ nhớ đệm ảnh thu nhỏ';
   @override
-  String get diskCleanerCategoryAppCache =>
-      'Bộ nhớ đệm ứng dụng';
+  String get diskCleanerCategoryAppCache => 'Bộ nhớ đệm ứng dụng';
   @override
-  String get diskCleanerCategoryCrashLogs =>
-      'Tệp sự cố và nhật ký';
+  String get diskCleanerCategoryCrashLogs => 'Tệp sự cố và nhật ký';
   @override
-  String get diskCleanerCategoryWindowsUpdate =>
-      'Bộ nhớ đệm Windows Update';
+  String get diskCleanerCategoryWindowsUpdate => 'Bộ nhớ đệm Windows Update';
   @override
   String get diskCleanerCategoryPrefetch => 'Dữ liệu Prefetch';
   @override
   String get diskCleanerCategoryDeliveryOptimization =>
       'Tệp Delivery Optimization';
   @override
-  String get diskCleanerCategoryDevCache =>
-      'Bộ nhớ đệm lập trình';
+  String get diskCleanerCategoryDevCache => 'Bộ nhớ đệm lập trình';
   @override
   String get diskCleanerReasonWindowsTemp =>
       'Do ứng dụng để lại. Xóa an toàn, không có gì phụ thuộc vào chúng.';
@@ -3505,8 +3603,7 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get diskCleanerPresetLargeFiles => 'Tệp trên 1 GB';
   @override
-  String get diskCleanerPresetLogsCaches =>
-      'Nhật ký và bộ nhớ đệm';
+  String get diskCleanerPresetLogsCaches => 'Nhật ký và bộ nhớ đệm';
   @override
   String get diskCleanerPresetInstallers => 'Bộ cài và tệp nén';
 
@@ -3515,8 +3612,7 @@ class VietnameseLocalizations implements AppLocalizations {
   String diskCleanerFreeSpaceBeforeAfter(String before, String after) =>
       'Dung lượng trống: $before → $after';
   @override
-  String get diskCleanerGrowthWatchTitle =>
-      'Đang tăng kể từ lần quét trước';
+  String get diskCleanerGrowthWatchTitle => 'Đang tăng kể từ lần quét trước';
   @override
   String diskCleanerGrowthWatchLine(String path, String size) =>
       '$path  +$size';

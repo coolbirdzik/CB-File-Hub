@@ -1,35 +1,10 @@
 schema_version: 1
-verified_at: 2026-08-09
-verified_revision: "7f40c2a+working-tree"
+verified_at: 2026-08-15
+verified_revision: "0b1d279+working-tree"
 path_base: workspace_root
 # Feature ids here are the canonical keys for verification/test-impact-map.yaml.
 
 features:
-  agent_graph_first_workflow:
-    entrypoints:
-      - AGENTS.md
-      - .agents/skills/graph-first/SKILL.md
-      - docs/agent/index.md
-    canonical_graph:
-      - docs/agent/feature-map.yaml
-      - docs/agent/system-map.md
-      - docs/agent/flows/core-flows.md
-      - docs/agent/state/state-ownership.md
-      - docs/agent/native/method-channels.yaml
-      - docs/agent/verification/test-impact-map.yaml
-    edges:
-      - "AGENTS.md -> graph-first skill"
-      - "graph-first skill -> docs/agent"
-      - "graph impact changed -> user approval"
-      - "approved graph delta -> canonical graph -> source code"
-      - "implementation -> verification -> graph reconciliation"
-    invariants:
-      - "Every source-code task reads the relevant graph before editing."
-      - "Graph impact none does not require a user approval pause or documentation churn."
-      - "A changed graph boundary requires explicit approval before any edit."
-      - "Canonical graph changes precede source edits after approval."
-      - "Verification failures may loop autonomously only inside the approved scope and invariants."
-
   application_bootstrap:
     entrypoints:
       - cb_file_manager/lib/main.dart
@@ -98,6 +73,7 @@ features:
       - cb_file_manager/lib/services/disk_cleaner/disk_cleaner_service.dart
     scan_pipeline:
       - cb_file_manager/lib/services/disk_cleaner/full_disk_scan_isolate.dart
+      - cb_file_manager/lib/services/disk_cleaner/usn_journal.dart
       - cb_file_manager/lib/services/disk_cleaner/disk_tree_node.dart
       - cb_file_manager/lib/services/disk_cleaner/cleaner_growth_history_service.dart
       - cb_file_manager/lib/services/disk_cleaner/cleaner_categories.dart
@@ -114,7 +90,10 @@ features:
     tests:
       - cb_file_manager/test/19_cleaner_scan_advice_test.dart
       - cb_file_manager/test/services/disk_cleaner/cleaner_growth_history_service_test.dart
+      - cb_file_manager/test/services/disk_cleaner/disk_cleaner_isolate_test.dart
       - cb_file_manager/test/services/disk_cleaner/disk_tree_selection_test.dart
+      - cb_file_manager/test/services/disk_cleaner/full_disk_scan_prune_test.dart
+      - cb_file_manager/test/services/disk_cleaner/usn_journal_test.dart
       - cb_file_manager/test/helpers/files/trash_manager_test.dart
       - cb_file_manager/test/helpers/files/windows_file_operations_test.dart
       - cb_file_manager/test/bloc/cleaner_app_insights_cubit_test.dart
@@ -130,6 +109,9 @@ features:
       - "Folder growth compares only completed scans of the same drive; cancelled or in-progress scans never replace the persisted baseline."
       - "Folder growth is informational and never selects deletion targets."
       - "Installation folders and user data are analysis evidence, not automatic junk."
+      - "Old-large scan insights are bounded filesystem-timestamp evidence only; they never become cleanup targets without the existing explicit approval flow."
+      - "Incremental scans may reuse a cached tree only while the process-local filesystem change tracker is reliable, or while USN Journal cursor and directory reference mappings validate; watcher errors, overflow, journal gaps, and missing mappings must fall back to a full scan."
+      - "Full scans collect per-directory NTFS reference numbers only after raw USN Journal read capability is verified."
       - "Unknown application activity remains unknown and must not be treated as stale."
       - "Shared or unattributed storage is never automatically assigned to one app."
 
@@ -274,3 +256,24 @@ features:
       - "Installation folders and user data are analysis evidence, not automatic junk."
       - "Unknown application activity remains unknown and must not be treated as stale."
       - "Shared or unattributed storage is never automatically assigned to one app."
+
+  archive_support:
+    entrypoints:
+      - cb_file_manager/lib/services/archive/archive_service.dart
+      - cb_file_manager/lib/ui/controllers/archive_operations_handler.dart
+      - cb_file_manager/lib/ui/dialogs/archive_browser_dialog.dart
+      - cb_file_manager/lib/ui/widgets/archive_preview.dart
+    related:
+      - cb_file_manager/lib/ui/components/common/shared_file_context_menu.dart
+      - cb_file_manager/lib/ui/widgets/file_preview_pane.dart
+      - cb_file_manager/lib/ui/controllers/file_operations_handler.dart
+    tests:
+      - cb_file_manager/test/services/archive/archive_service_test.dart
+    edges:
+      - "File preview pane -> ArchivePreview.listEntries"
+      - "Double-click archive -> #archive? virtual path in tab file list"
+      - "Context menu / double-click -> in-tab browse or extract"
+      - "ArchiveService -> archive package (zip/tar/gz/bz2/xz) | 7-Zip CLI (7z/rar on Windows)"
+    invariants:
+      - "Extraction writes only inside the user-chosen destination directory."
+      - "Archive browse uses #archive? virtual paths; Up navigates inner folders then the host directory."

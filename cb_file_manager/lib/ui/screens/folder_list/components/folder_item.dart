@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import '../../../components/common/shared_file_context_menu.dart';
@@ -89,8 +90,10 @@ class _FolderItemState extends State<FolderItem> {
   Future<FileStat> _getFolderStatLazy() async {
     final path = widget.folder.path;
 
-    // Skip stat for virtual network / tag paths to prevent errors and jank
-    if (path.startsWith('#network/') || path.startsWith('#search')) {
+    // Skip stat for virtual network / tag / archive paths to prevent errors and jank
+    if (path.startsWith('#network/') ||
+        path.startsWith('#search') ||
+        ArchivePathUtils.isArchiveBrowsePath(path)) {
       return Future.error('Virtual folder - no stat needed');
     }
 
@@ -435,11 +438,13 @@ class _FolderItemState extends State<FolderItem> {
                             _handleFolderSelection();
                           }
                         },
-                        onLongPress: () {
-                          if (widget.toggleFolderSelection != null) {
-                            _handleFolderSelection();
-                          }
-                        },
+                        onLongPress: !widget.isDesktopMode
+                            ? () {
+                                if (widget.toggleFolderSelection != null) {
+                                  _handleFolderSelection();
+                                }
+                              }
+                            : null,
                         onTertiaryTapUp: (_) {
                           context
                               .read<TabManagerBloc>()
@@ -450,6 +455,7 @@ class _FolderItemState extends State<FolderItem> {
                     // Interactive layer cho tên (navigate)
                     if (!isBeingRenamed)
                       Positioned(
+                        key: const ValueKey('name-hit-area'),
                         left: 80,
                         top: 0,
                         right: 0,
@@ -490,24 +496,32 @@ class _FolderItemState extends State<FolderItem> {
                           },
                         ),
                       ),
-                    // Selection indicator
-                    if (widget.isSelected)
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 3,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: widget.isDesktopMode
-                                ? const BorderRadius.horizontal(
-                                    left: Radius.circular(12),
-                                  )
-                                : BorderRadius.zero,
-                          ),
+                    // Selection indicator. Kept unconditionally in the Stack so
+                    // selection only flips a paint property instead of adding or
+                    // removing a child (see file_item.dart for the AXTree
+                    // rationale).
+                    Positioned(
+                      key: const ValueKey('selection-indicator'),
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 3,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: widget.isSelected
+                              ? BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: widget.isDesktopMode
+                                      ? const BorderRadius.horizontal(
+                                          left: Radius.circular(12),
+                                        )
+                                      : BorderRadius.zero,
+                                )
+                              : const BoxDecoration(),
+                          child: const SizedBox.expand(),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),

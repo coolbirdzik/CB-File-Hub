@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'dart:async';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart'; // Import for keyboard shortcuts
@@ -19,8 +20,12 @@ import '../desktop/desktop_tab_drag_data.dart';
 import '../mobile/mobile_tab_view.dart'; // Import giao diện mobile kiểu Chrome
 import 'package:cb_file_manager/config/languages/app_localizations.dart'; // Import AppLocalizations
 import 'package:cb_file_manager/config/translation_helper.dart'; // Import translation helper
+import 'package:cb_file_manager/config/design_system_config.dart';
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart'; // Import system screen router
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
+import 'package:cb_file_manager/design_system/fluent_surface_tokens.dart';
 // import 'package:cb_file_manager/widgets/test_native_streaming.dart'; // Test widget removed
 import '../../utils/route.dart';
 import '../../screens/home/home_screen.dart'; // Import home screen
@@ -97,6 +102,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  bool get _useFluentDesktopShell =>
+      _isDesktop &&
+      DesignSystemConfig.enableFluentDesktopShell &&
+      !DesignSystemConfig.enableLegacyMaterialDesktopShell;
   bool get _isSecondaryDesktopWindow =>
       _isDesktop &&
       Platform.environment[WindowStartupPayload.envSecondaryWindowKey] == '1';
@@ -373,6 +382,180 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     });
   }
 
+  Widget _buildDesktopDrawerButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final tooltip = MaterialLocalizations.of(context).openAppDrawerTooltip;
+    void onPressed() {
+      _scaffoldKey.currentState?.openDrawer();
+    }
+
+    if (_useFluentDesktopShell) {
+      return fluent.Tooltip(
+        message: tooltip,
+        child: fluent.IconButton(
+          icon: Icon(
+            PhosphorIconsLight.list,
+            color: isDarkMode
+                ? Colors.white.withValues(alpha: 0.9)
+                : theme.colorScheme.onSurface,
+            size: 20,
+          ),
+          style: fluent.ButtonStyle(
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            ),
+            backgroundColor: WidgetStatePropertyAll(
+              isDarkMode
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            ),
+          ),
+          iconButtonMode: fluent.IconButtonMode.small,
+          onPressed: onPressed,
+        ),
+      );
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        icon: Icon(
+          PhosphorIconsLight.list,
+          color: isDarkMode
+              ? Colors.white.withValues(alpha: 0.9)
+              : theme.colorScheme.onSurface,
+          size: 20,
+        ),
+        style: IconButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          backgroundColor: isDarkMode
+              ? Colors.white.withValues(alpha: 0.04)
+              : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+        ),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildAgentToolbarButton(
+    BuildContext context, {
+    required bool isOpen,
+    required VoidCallback onPressed,
+  }) {
+    final theme = Theme.of(context);
+    final iconColor =
+        isOpen ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant;
+    final tooltip = context.tr.cbAgent;
+
+    if (_useFluentDesktopShell) {
+      return fluent.Tooltip(
+        message: tooltip,
+        child: fluent.IconButton(
+          icon: Icon(PhosphorIconsLight.sparkle, color: iconColor, size: 20),
+          style: fluent.ButtonStyle(
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            ),
+            backgroundColor: WidgetStatePropertyAll(
+              isOpen
+                  ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                  : Colors.transparent,
+            ),
+          ),
+          iconButtonMode: fluent.IconButtonMode.small,
+          onPressed: onPressed,
+        ),
+      );
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        icon: Icon(PhosphorIconsLight.sparkle, color: iconColor, size: 20),
+        style: IconButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          backgroundColor: isOpen
+              ? theme.colorScheme.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+        ),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildTabOptionsButton(BuildContext context) {
+    final theme = Theme.of(context);
+    const tooltip = 'Tab options';
+    final backgroundColor = theme.colorScheme.primary.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.06 : 0.07,
+    );
+    final icon = Icon(
+      PhosphorIconsLight.dotsThree,
+      color: theme.colorScheme.primary,
+      size: 22,
+    );
+    void onPressed() {
+      _showTabOptions(context);
+    }
+
+    if (_useFluentDesktopShell) {
+      return fluent.Tooltip(
+        message: tooltip,
+        child: fluent.IconButton(
+          icon: icon,
+          style: fluent.ButtonStyle(
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            ),
+            backgroundColor: WidgetStatePropertyAll(backgroundColor),
+          ),
+          iconButtonMode: fluent.IconButtonMode.small,
+          onPressed: onPressed,
+        ),
+      );
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        icon: icon,
+        style: IconButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          backgroundColor: backgroundColor,
+        ),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildEmptyTabAction(BuildContext context, ThemeData theme) {
+    final label = context.tr.addNewTab;
+    if (_useFluentDesktopShell) {
+      return fluent.Tooltip(
+        message: label,
+        child: Semantics(
+          button: true,
+          label: label,
+          child: fluent.Button(
+            onPressed: _handleAddNewTab,
+            child: const Icon(PhosphorIconsLight.plus),
+          ),
+        ),
+      );
+    }
+
+    return FloatingActionButton(
+      heroTag: null,
+      onPressed: _handleAddNewTab,
+      tooltip: label,
+      elevation: 0,
+      backgroundColor: theme.colorScheme.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      child: const Icon(PhosphorIconsLight.plus, size: 24),
+    );
+  }
+
   // Xác định thiết bị là tablet hay điện thoại dựa trên kích thước màn hình
   bool _isTablet(BuildContext context) {
     // Coi rộng > 600dp là tablet, theo Material Design guidelines
@@ -407,7 +590,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     // Xác định xem thiết bị có phải là tablet hay không
     final isTablet = _isTablet(context);
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
     // Match agent cleaner / side-menu chrome: use the acrylic-bridged scaffold
     // color so dynamic backdrop tint stays consistent across the window.
     final desktopBodyTintColor =
@@ -644,323 +826,363 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                             child: Scaffold(
                               key: _scaffoldKey,
                               backgroundColor: desktopBodyTintColor,
-                              // Modern AppBar, always present on tablet/desktop for custom title bar
+                              // Use Fluent controls for the desktop row when the
+                              // Fluent host is active; helpers provide Material
+                              // controls for the legacy desktop host.
                               appBar: isTablet
-                                  ? AppBar(
-                                      automaticallyImplyLeading: false,
-                                      elevation: 0,
-                                      backgroundColor: desktopTopBarColor,
-                                      surfaceTintColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      leading: !_isDrawerPinned
-                                          ? IconButton(
-                                              icon: Icon(
-                                                PhosphorIconsLight.list,
-                                                color: isDarkMode
-                                                    ? Colors.white
-                                                        .withValues(alpha: 0.9)
-                                                    : theme
-                                                        .colorScheme.onSurface,
-                                                size: 22,
-                                              ),
-                                              tooltip: MaterialLocalizations.of(
-                                                      context)
-                                                  .openAppDrawerTooltip,
-                                              style: IconButton.styleFrom(
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          12.0),
-                                                ),
-                                                backgroundColor: isDarkMode
-                                                    ? Colors.white
-                                                        .withValues(alpha: 0.04)
-                                                    : theme
-                                                        .colorScheme.onSurface
-                                                        .withValues(
-                                                            alpha: 0.05),
-                                              ),
-                                              onPressed: () => _scaffoldKey
-                                                  .currentState
-                                                  ?.openDrawer(),
-                                            )
-                                          : null,
-                                      // Always show ScrollableTabBar in the title for Windows (isTablet)
-                                      // It handles its own content (tabs or add button) and window controls.
-                                      title: KeyedSubtree(
-                                        key: _tabStripAreaKey,
-                                        child: ScrollConfiguration(
-                                          behavior: TabBarMouseScrollBehavior(),
-                                          child: ScrollableTabBar(
-                                            controller:
-                                                _tabController, // Ensure this controller has the correct length
-                                            barBackgroundColor:
-                                                desktopTopBarColor,
-                                            activeTabBackgroundColor:
-                                                desktopActiveTabColor,
-                                            onTabPrimaryClick:
-                                                (index, shiftPressed) {
-                                              if (index >= state.tabs.length) {
-                                                return;
-                                              }
-
-                                              final tabId =
-                                                  state.tabs[index].id;
-                                              final bloc = context
-                                                  .read<TabManagerBloc>();
-                                              final selectedIds =
-                                                  state.selectedTabIds;
-                                              final keepMultiSelection =
-                                                  _isDesktop &&
-                                                      !shiftPressed &&
-                                                      selectedIds.length > 1 &&
-                                                      selectedIds
-                                                          .contains(tabId);
-
-                                              if (_isDesktop && shiftPressed) {
-                                                // Shift+click is additive:
-                                                // - First Shift selection includes current active tab.
-                                                // - Next Shift selections only add (do not toggle off).
-                                                if (selectedIds.isEmpty) {
-                                                  final activeId =
-                                                      state.activeTabId;
-                                                  if (activeId != null &&
-                                                      activeId != tabId &&
-                                                      state.tabs.any((tab) =>
-                                                          tab.id == activeId)) {
-                                                    bloc.add(ToggleTabSelection(
-                                                        activeId));
-                                                  }
-                                                  bloc.add(ToggleTabSelection(
-                                                      tabId));
-                                                } else if (!selectedIds
-                                                    .contains(tabId)) {
-                                                  bloc.add(ToggleTabSelection(
-                                                      tabId));
-                                                }
-                                              } else if (_isDesktop &&
-                                                  !keepMultiSelection) {
-                                                bloc.add(ClearTabSelection());
-                                              }
-
-                                              bloc.add(SwitchToTab(tabId));
-                                            },
-                                            draggableTabs: _isDesktop
-                                                ? state.tabs
-                                                    .map(
-                                                      (t) => DesktopTabDragData(
-                                                        tabId: t.id,
-                                                        tab:
-                                                            _toWindowTabPayload(
-                                                                t),
+                                  ? PreferredSize(
+                                      preferredSize: const Size.fromHeight(48),
+                                      child: Builder(
+                                        builder: (context) {
+                                          final FluentSurfaceTokens? chrome =
+                                              _useFluentDesktopShell
+                                                  ? FluentSurfaceTokens.of(
+                                                      context,
+                                                    )
+                                                  : null;
+                                          final tabBar = Container(
+                                            height: 48,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8),
+                                            decoration: BoxDecoration(
+                                              color: desktopTopBarColor,
+                                              border: chrome == null
+                                                  ? Border(
+                                                      bottom: BorderSide(
+                                                        color: theme
+                                                            .colorScheme.outline
+                                                            .withValues(
+                                                                alpha: 0.16),
                                                       ),
                                                     )
-                                                    .toList(growable: false)
-                                                : null,
-                                            selectedTabIds: _isDesktop
-                                                ? state.selectedTabIds
-                                                : const <String>{},
-                                            onTabReorder: _isDesktop
-                                                ? (fromIndex, toIndex) {
-                                                    context
-                                                        .read<TabManagerBloc>()
-                                                        .add(
-                                                          ReorderTab(
-                                                            fromIndex:
-                                                                fromIndex,
-                                                            toIndex: toIndex,
-                                                          ),
-                                                        );
-                                                  }
-                                                : null,
-                                            onNativeTabDragRequested:
-                                                Platform.isWindows
-                                                    ? _handleNativeTabDrag
-                                                    : null,
-                                            onTabDragStarted: (_isDesktop &&
-                                                    !Platform.isWindows)
-                                                ? (d) => unawaited(
-                                                      _showWindowDropOverlay(
-                                                          context, d),
-                                                    )
-                                                : null,
-                                            onTabDragEnded:
-                                                (!Platform.isWindows)
-                                                    ? _removeWindowDropOverlay
-                                                    : null,
-                                            onTabContextMenu: (index, pos) {
-                                              if (index < state.tabs.length) {
-                                                unawaited(
-                                                    _showDesktopTabContextMenu(
-                                                  context: context,
-                                                  tab: state.tabs[index],
-                                                  globalPosition: pos,
-                                                ));
-                                              }
-                                            },
-                                            // Add tab close callback
-                                            onTabClose: (index) {
-                                              if (index < state.tabs.length) {
-                                                context
-                                                    .read<TabManagerBloc>()
-                                                    .add(CloseTab(
-                                                        state.tabs[index].id));
-                                              }
-                                            },
-                                            // Keep the add tab button functionality
-                                            onAddTabPressed: _handleAddNewTab,
-                                            leadingCaptionActions: [
-                                              const StatusCenterToolbarButton(),
-                                              if (!isAiChatPath(
-                                                  state.activeTab?.path ?? ''))
-                                                ListenableBuilder(
-                                                  listenable:
-                                                      _aiPanelController,
-                                                  builder: (context, _) {
-                                                    final isOpen =
-                                                        _aiPanelController
-                                                            .isOpen;
-                                                    return Padding(
-                                                      padding:
-                                                          const EdgeInsets.only(
-                                                              right: 4.0),
-                                                      child: IconButton(
-                                                        tooltip:
-                                                            context.tr.cbAgent,
-                                                        icon: Icon(
-                                                          PhosphorIconsLight
-                                                              .sparkle,
-                                                          color: isOpen
-                                                              ? theme
-                                                                  .colorScheme
-                                                                  .primary
-                                                              : theme
-                                                                  .colorScheme
-                                                                  .onSurfaceVariant,
-                                                          size: 20,
-                                                        ),
-                                                        style: IconButton
-                                                            .styleFrom(
-                                                          shape:
-                                                              RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        16.0),
-                                                          ),
-                                                          backgroundColor: isOpen
-                                                              ? theme
-                                                                  .colorScheme
-                                                                  .primary
-                                                                  .withValues(
-                                                                      alpha:
-                                                                          0.12)
-                                                              : Colors
-                                                                  .transparent,
-                                                        ),
-                                                        onPressed: () {
-                                                          _aiPanelController
-                                                              .toggle(
-                                                            path: state
-                                                                .activeTab
-                                                                ?.path,
-                                                            tabId: state
-                                                                .activeTabId,
-                                                          );
-                                                        },
-                                                      ),
-                                                    );
-                                                  },
-                                                ),
-                                            ],
-                                            tabs: [
-                                              // Generate modern-style tabs from state.tabs
-                                              ...state.tabs.map((tab) {
-                                                return Tab(
-                                                  height: 38,
-                                                  child: Padding(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 4),
-                                                    child: Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        if (tab.isLoading) ...[
-                                                          const SizedBox(
-                                                            width: 14,
-                                                            height: 14,
-                                                            child:
-                                                                CircularProgressIndicator(
-                                                              strokeWidth: 2,
-                                                            ),
-                                                          ),
-                                                          const SizedBox(
-                                                              width: 6),
-                                                        ],
-                                                        Icon(
-                                                          tab.isPinned
-                                                              ? PhosphorIconsLight
-                                                                  .pushPin
-                                                              : tab.icon ??
-                                                                  PhosphorIconsLight
-                                                                      .folder,
-                                                          size: 16,
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 8),
-                                                        Flexible(
-                                                          child: Text(
-                                                            tab.name,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 4),
-                                                        TabAlwaysActiveIndicator(
-                                                          tabId: tab.id,
-                                                        ),
-                                                        TabInactiveIndicator(
-                                                          tabId: tab.id,
-                                                        ),
-                                                      ],
+                                                  : null,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                if (!_isDrawerPinned)
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            right: 8),
+                                                    child:
+                                                        _buildDesktopDrawerButton(
+                                                      context,
                                                     ),
                                                   ),
-                                                );
-                                              }).toList(),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      actions: [
-                                        // Modern menu button
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(right: 8.0),
-                                          child: IconButton(
-                                            icon: Icon(
-                                              PhosphorIconsLight.dotsThree,
-                                              color: theme.colorScheme.primary,
-                                              size: 22,
+                                                Expanded(
+                                                  child: KeyedSubtree(
+                                                    key: _tabStripAreaKey,
+                                                    child: ScrollConfiguration(
+                                                      // Always show ScrollableTabBar in the desktop command row.
+                                                      // It handles its own content (tabs or add button) and window controls.
+                                                      behavior:
+                                                          TabBarMouseScrollBehavior(),
+                                                      child: ScrollableTabBar(
+                                                        controller:
+                                                            _tabController, // Ensure this controller has the correct length
+                                                        barBackgroundColor:
+                                                            desktopTopBarColor,
+                                                        activeTabBackgroundColor:
+                                                            desktopActiveTabColor,
+                                                        onTabPrimaryClick:
+                                                            (index,
+                                                                shiftPressed) {
+                                                          if (index >=
+                                                              state.tabs
+                                                                  .length) {
+                                                            return;
+                                                          }
+
+                                                          final tabId = state
+                                                              .tabs[index].id;
+                                                          final bloc = context.read<
+                                                              TabManagerBloc>();
+                                                          final selectedIds =
+                                                              state
+                                                                  .selectedTabIds;
+                                                          final keepMultiSelection =
+                                                              _isDesktop &&
+                                                                  !shiftPressed &&
+                                                                  selectedIds
+                                                                          .length >
+                                                                      1 &&
+                                                                  selectedIds
+                                                                      .contains(
+                                                                          tabId);
+
+                                                          if (_isDesktop &&
+                                                              shiftPressed) {
+                                                            // Shift+click is additive:
+                                                            // - First Shift selection includes current active tab.
+                                                            // - Next Shift selections only add (do not toggle off).
+                                                            if (selectedIds
+                                                                .isEmpty) {
+                                                              final activeId =
+                                                                  state
+                                                                      .activeTabId;
+                                                              if (activeId !=
+                                                                      null &&
+                                                                  activeId !=
+                                                                      tabId &&
+                                                                  state.tabs.any(
+                                                                      (tab) =>
+                                                                          tab.id ==
+                                                                          activeId)) {
+                                                                bloc.add(
+                                                                    ToggleTabSelection(
+                                                                        activeId));
+                                                              }
+                                                              bloc.add(
+                                                                  ToggleTabSelection(
+                                                                      tabId));
+                                                            } else if (!selectedIds
+                                                                .contains(
+                                                                    tabId)) {
+                                                              bloc.add(
+                                                                  ToggleTabSelection(
+                                                                      tabId));
+                                                            }
+                                                          } else if (_isDesktop &&
+                                                              !keepMultiSelection) {
+                                                            bloc.add(
+                                                                ClearTabSelection());
+                                                          }
+
+                                                          bloc.add(SwitchToTab(
+                                                              tabId));
+                                                        },
+                                                        draggableTabs:
+                                                            _isDesktop
+                                                                ? state.tabs
+                                                                    .map(
+                                                                      (t) =>
+                                                                          DesktopTabDragData(
+                                                                        tabId: t
+                                                                            .id,
+                                                                        tab: _toWindowTabPayload(
+                                                                            t),
+                                                                      ),
+                                                                    )
+                                                                    .toList(
+                                                                        growable:
+                                                                            false)
+                                                                : null,
+                                                        selectedTabIds: _isDesktop
+                                                            ? state
+                                                                .selectedTabIds
+                                                            : const <String>{},
+                                                        onTabReorder: _isDesktop
+                                                            ? (fromIndex,
+                                                                toIndex) {
+                                                                context
+                                                                    .read<
+                                                                        TabManagerBloc>()
+                                                                    .add(
+                                                                      ReorderTab(
+                                                                        fromIndex:
+                                                                            fromIndex,
+                                                                        toIndex:
+                                                                            toIndex,
+                                                                      ),
+                                                                    );
+                                                              }
+                                                            : null,
+                                                        onNativeTabDragRequested:
+                                                            Platform.isWindows
+                                                                ? _handleNativeTabDrag
+                                                                : null,
+                                                        onTabDragStarted:
+                                                            (_isDesktop &&
+                                                                    !Platform
+                                                                        .isWindows)
+                                                                ? (d) =>
+                                                                    unawaited(
+                                                                      _showWindowDropOverlay(
+                                                                          context,
+                                                                          d),
+                                                                    )
+                                                                : null,
+                                                        onTabDragEnded: (!Platform
+                                                                .isWindows)
+                                                            ? _removeWindowDropOverlay
+                                                            : null,
+                                                        onTabContextMenu:
+                                                            (index, pos) {
+                                                          if (index <
+                                                              state.tabs
+                                                                  .length) {
+                                                            unawaited(
+                                                                _showDesktopTabContextMenu(
+                                                              context: context,
+                                                              tab: state
+                                                                  .tabs[index],
+                                                              globalPosition:
+                                                                  pos,
+                                                            ));
+                                                          }
+                                                        },
+                                                        // Add tab close callback
+                                                        onTabClose: (index) {
+                                                          if (index <
+                                                              state.tabs
+                                                                  .length) {
+                                                            context
+                                                                .read<
+                                                                    TabManagerBloc>()
+                                                                .add(CloseTab(
+                                                                    state
+                                                                        .tabs[
+                                                                            index]
+                                                                        .id));
+                                                          }
+                                                        },
+                                                        // Keep the add tab button functionality
+                                                        onAddTabPressed:
+                                                            _handleAddNewTab,
+                                                        leadingCaptionActions: [
+                                                          const StatusCenterToolbarButton(),
+                                                          if (!isAiChatPath(
+                                                              state.activeTab
+                                                                      ?.path ??
+                                                                  ''))
+                                                            ListenableBuilder(
+                                                              listenable:
+                                                                  _aiPanelController,
+                                                              builder:
+                                                                  (context, _) {
+                                                                final isOpen =
+                                                                    _aiPanelController
+                                                                        .isOpen;
+                                                                return Padding(
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .only(
+                                                                          right:
+                                                                              4.0),
+                                                                  child:
+                                                                      _buildAgentToolbarButton(
+                                                                    context,
+                                                                    isOpen:
+                                                                        isOpen,
+                                                                    onPressed:
+                                                                        () {
+                                                                      _aiPanelController
+                                                                          .toggle(
+                                                                        path: state
+                                                                            .activeTab
+                                                                            ?.path,
+                                                                        tabId: state
+                                                                            .activeTabId,
+                                                                      );
+                                                                    },
+                                                                  ),
+                                                                );
+                                                              },
+                                                            ),
+                                                        ],
+                                                        tabs: [
+                                                          // Generate modern-style tabs from state.tabs
+                                                          ...state.tabs
+                                                              .map((tab) {
+                                                            return Tab(
+                                                              height: 38,
+                                                              child: Padding(
+                                                                padding: const EdgeInsets
+                                                                    .symmetric(
+                                                                    horizontal:
+                                                                        4),
+                                                                child: Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    if (tab
+                                                                        .isLoading) ...[
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            14,
+                                                                        height:
+                                                                            14,
+                                                                        child:
+                                                                            CircularProgressIndicator(
+                                                                          strokeWidth:
+                                                                              2,
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                          width:
+                                                                              6),
+                                                                    ],
+                                                                    Icon(
+                                                                      tab.isPinned
+                                                                          ? PhosphorIconsLight
+                                                                              .pushPin
+                                                                          : tab.icon ??
+                                                                              PhosphorIconsLight.folder,
+                                                                      size: 16,
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            8),
+                                                                    Flexible(
+                                                                      child:
+                                                                          Text(
+                                                                        tab.name,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            4),
+                                                                    TabAlwaysActiveIndicator(
+                                                                      tabId: tab
+                                                                          .id,
+                                                                    ),
+                                                                    TabInactiveIndicator(
+                                                                      tabId: tab
+                                                                          .id,
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }).toList(),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                // Tab command menu.
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          right: 8.0),
+                                                  child: _buildTabOptionsButton(
+                                                    context,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            style: IconButton.styleFrom(
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(16.0),
+                                          );
+                                          if (chrome == null) return tabBar;
+                                          return FluentChromeSurface(
+                                            key: const ValueKey<String>(
+                                                'fluent-global-toolbar'),
+                                            tint: chrome.chromeTint,
+                                            tintAlpha: chrome.toolbarTintAlpha,
+                                            blurSigma: chrome.chromeBlur,
+                                            borderRadius: FluentSurfaceTokens
+                                                .toolbarRadius,
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: chrome.chromeStroke,
                                               ),
-                                              backgroundColor: isDarkMode
-                                                  ? theme.colorScheme.primary
-                                                      .withValues(alpha: 0.06)
-                                                  : theme.colorScheme.primary
-                                                      .withValues(alpha: 0.07),
                                             ),
-                                            onPressed: () =>
-                                                _showTabOptions(context),
-                                          ),
-                                        ),
-                                      ],
+                                            child: tabBar,
+                                          );
+                                        },
+                                      ),
                                     )
                                   : null, // No AppBar for mobile interface
                               drawer: !_isDrawerPinned
@@ -998,22 +1220,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                 ],
                               ),
                               floatingActionButton: state.tabs.isEmpty
-                                  ? FloatingActionButton(
-                                      heroTag:
-                                          null, // Disable hero animation to avoid conflicts
-                                      onPressed: _handleAddNewTab,
-                                      tooltip: context.tr.newFolder,
-                                      elevation: 0,
-                                      backgroundColor:
-                                          theme.colorScheme.primary,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: const Icon(
-                                        PhosphorIconsLight.plus,
-                                        size: 24,
-                                      ),
-                                    )
+                                  ? _buildEmptyTabAction(context, theme)
                                   : null,
                             ), // Scaffold
                           ), // Listener
@@ -1095,7 +1302,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   Widget _createTabContent(TabData tab) {
     final Widget content;
-    if (tab.path.startsWith('#') && !isDrivesPath(tab.path)) {
+    if (tab.path.startsWith('#') &&
+        !isDrivesPath(tab.path) &&
+        !ArchivePathUtils.isArchiveBrowsePath(tab.path)) {
       content = SystemScreenRouter.routeSystemPath(context, tab.path, tab.id) ??
           Container();
     } else if (tab.splitPanePath != null) {

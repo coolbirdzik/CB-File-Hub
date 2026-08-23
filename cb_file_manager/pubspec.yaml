@@ -110,6 +110,8 @@ dependencies:
   flutter_gemma: 1.0.0-rc.1
   flutter_gemma_litertlm: 1.0.0-rc.1
   google_fonts: ^8.2.1
+  highlight: ^0.7.0
+  archive: ^4.0.9
 dev_dependencies:
   flutter_test:
     sdk: flutter

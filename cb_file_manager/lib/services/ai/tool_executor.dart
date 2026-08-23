@@ -1730,10 +1730,19 @@ class ToolExecutor {
     selectedNodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
 
     final buffer = StringBuffer();
-    buffer.writeln('CURRENT CLEANER SCAN');
+    buffer.writeln(context.isCached
+        ? 'PREVIOUS CACHED CLEANER SCAN'
+        : 'CURRENT CLEANER SCAN');
     buffer.writeln('Owner tab: ${context.ownerTabId}');
-    buffer.writeln('Updated: ${context.updatedAt.toIso8601String()}');
-    buffer.writeln('Status: ${context.isScanning ? "scanning" : "ready"}');
+    buffer.writeln('Context published: ${context.updatedAt.toIso8601String()}');
+    buffer.writeln(
+        'Status: ${context.isCached ? "previous cached result" : context.isScanning ? "scanning" : "ready"}');
+    if (context.isCached) {
+      buffer.writeln(
+          'Freshness: previous cached result; this is not a current scan.');
+      buffer.writeln(
+          'Refresh: Use Scan again to refresh before relying on this data.');
+    }
     buffer.writeln(
         'Root: ${root.fullPath} (${_formatSize(root.sizeBytes)}, ${root.fileCount} files)');
     buffer.writeln('Junk marked: ${_formatSize(root.junkBytes)}');

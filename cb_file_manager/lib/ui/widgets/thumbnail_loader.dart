@@ -1077,6 +1077,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
       videoPath: widget.filePath,
       width: widget.width,
       height: widget.height,
+      fit: widget.fit,
       onThumbnailGenerated: (path) {
         if (_widgetMounted) {
           _isLoadingNotifier.value = false;

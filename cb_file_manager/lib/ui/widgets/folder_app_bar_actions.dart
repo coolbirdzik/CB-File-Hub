@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 
 /// Builder for folder app bar actions
 class FolderAppBarActions {
@@ -23,9 +24,9 @@ class FolderAppBarActions {
     required Function(int) onGridZoomChange,
     required VoidCallback onColumnSettingsPressed,
     required Function(String)? onGallerySelected,
-    required VoidCallback onPreviewPaneToggled,
+    VoidCallback? onPreviewPaneToggled,
     required bool isPreviewPaneVisible,
-    required bool showPreviewModeOption,
+    required bool showDesktopViewModes,
   }) {
     return SharedActionBar.buildCommonActions(
       context: context,
@@ -37,8 +38,7 @@ class FolderAppBarActions {
       onViewModeToggled: onViewModeToggled,
       onViewModeSelected: onViewModeSelected,
       onRefresh: onRefresh,
-      currentGridZoomLevel: (folderListState.viewMode == ViewMode.grid ||
-              folderListState.viewMode == ViewMode.gridPreview)
+      currentGridZoomLevel: ViewModeUtils.isGridLike(folderListState.viewMode)
           ? folderListState.gridZoomLevel
           : null,
       onGridZoomChanged: onGridZoomChange,
@@ -47,7 +47,7 @@ class FolderAppBarActions {
           : null,
       onPreviewPaneToggled: onPreviewPaneToggled,
       isPreviewPaneVisible: isPreviewPaneVisible,
-      showPreviewModeOption: showPreviewModeOption,
+      showDesktopViewModes: showDesktopViewModes,
       onSelectionModeToggled: onSelectionModeToggled,
       onManageTagsPressed: onManageTagsPressed,
       allowFileExtensionRename: allowFileExtensionRename,

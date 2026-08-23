@@ -154,7 +154,7 @@ class DirectoryWatcherService {
     }
 
     // Check if it's a directory
-    final isDirectory = FileSystemEntity.isDirectorySync(event.path);
+    final isDirectory = event.isDirectory;
 
     // Create and emit the event
     final changeEvent = FileChangeEvent(

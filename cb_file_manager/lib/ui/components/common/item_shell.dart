@@ -259,12 +259,21 @@ class _GridItemShellState extends State<GridItemShell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final Color overlayColor = ItemInteractionStyle.thumbnailOverlayColor(
+    // Whole-cell selection fill + border, matching the folder/file grid items so
+    // selection reads consistently without painting an overlay over the
+    // thumbnail itself.
+    final Color cellBackgroundColor = ItemInteractionStyle.backgroundColor(
       theme: theme,
       isDesktopMode: widget.isDesktopMode,
       isSelected: widget.isSelected,
       isHovering: _isHovering,
     );
+    final Color primary = theme.colorScheme.primary;
+    final Color cellBorderColor = widget.isSelected
+        ? primary
+        : (_isHovering && widget.isDesktopMode
+            ? primary.withValues(alpha: 0.4)
+            : Colors.transparent);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -275,15 +284,15 @@ class _GridItemShellState extends State<GridItemShell> {
         onDoubleTap: widget.onDoubleTap == null ? null : _handleDoubleTap,
         onLongPress: _handleLongPress,
         onSecondaryTapUp: widget.onSecondaryTapUp,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            widget.child,
-            if (overlayColor != Colors.transparent)
-              IgnorePointer(
-                child: Container(color: overlayColor),
-              ),
-          ],
+        child: Container(
+          decoration: BoxDecoration(
+            color: cellBackgroundColor,
+            border: cellBorderColor != Colors.transparent
+                ? Border.all(color: cellBorderColor, width: 1.5)
+                : null,
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+          child: widget.child,
         ),
       ),
     );

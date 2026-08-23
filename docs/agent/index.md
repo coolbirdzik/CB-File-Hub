@@ -7,11 +7,6 @@ code remains authoritative when a graph and the implementation disagree.
 This is curated agent routing, not vector Graph RAG. There is no embedding index
 here; agents follow these documents by path and then read the cited source.
 
-Source-code tasks use the repo-scoped `graph-first` skill under
-`.agents/skills/graph-first/`. `AGENTS.md` keeps only the mandatory routing rule;
-the skill owns the reusable inspect, impact, approval, implementation, and
-reconciliation loop.
-
 ## How to use this documentation
 
 1. Start with [system-map.md](system-map.md) for workspace and runtime
@@ -28,12 +23,10 @@ reconciliation loop.
    select focused checks, then follow the repository CI order when risk warrants
    it.
 
-For every source-code task, classify the graph impact before editing:
-
-- `none`: the implementation stays inside existing nodes, edges, ownership,
-  contracts, scope, and invariants; proceed without a graph approval pause.
-- `changed`: present a concise graph delta and wait for explicit approval, then
-  update the canonical graph before source code.
+For source-code tasks, use the maps routed by this index and confirm important
+findings in source. Select focused checks from the verification map, then update
+the curated graph when an intentional source change makes its ownership,
+contracts, invariants, or test boundary stale.
 
 ## Coverage policy
 
@@ -84,5 +77,5 @@ For major architectural decisions, add an ADR under
 [decisions/](decisions/README.md). Keep an ADR focused on the decision and its
 tradeoffs; keep file mappings in the graph documents.
 
-_Verified against repository baseline `7f40c2a` plus the working tree on
-2026-08-09._
+_Verified against repository baseline `0b1d279` plus the working tree on
+2026-08-15._

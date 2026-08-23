@@ -30,9 +30,14 @@ namespace file_operations_plugin
 
     namespace
     {
-        constexpr UINT kDeleteCompleteMessage = WM_APP + 0x4F1;
+        constexpr UINT kOperationCompleteMessage = WM_APP + 0x4F1;
 
-        struct PendingDeleteManager
+        // Tracks method-channel results whose native work runs on a detached
+        // worker thread. flutter::MethodResult is NOT thread-safe, so the
+        // worker only records its boolean outcome here and posts
+        // kOperationCompleteMessage; the result itself is always completed on
+        // the platform thread. Used by deleteItems, copyItems and moveItems.
+        struct PendingRequestManager
         {
             std::mutex mutex;
             std::unordered_map<uint64_t,
@@ -41,8 +46,8 @@ namespace file_operations_plugin
             std::unordered_map<uint64_t, bool> status;
         };
 
-        bool TrySetDeleteStatus(
-            const std::shared_ptr<PendingDeleteManager> &manager,
+        bool TrySetRequestStatus(
+            const std::shared_ptr<PendingRequestManager> &manager,
             uint64_t request_id,
             bool ok)
         {
@@ -62,8 +67,8 @@ namespace file_operations_plugin
             return true;
         }
 
-        void FinishDeleteRequest(
-            const std::shared_ptr<PendingDeleteManager> &manager,
+        void FinishPendingRequest(
+            const std::shared_ptr<PendingRequestManager> &manager,
             uint64_t request_id)
         {
             if (!manager)
@@ -123,7 +128,7 @@ namespace file_operations_plugin
             return wide;
         }
 
-        void LogDeleteMessage(const std::wstring &message)
+        void LogOperationMessage(const std::wstring &message)
         {
             std::wstring line = L"[CBFileHub][FileOperations] " + message + L"\n";
             OutputDebugStringW(line.c_str());
@@ -145,7 +150,7 @@ namespace file_operations_plugin
                 return false;
             }
 
-            LogDeleteMessage(
+            LogOperationMessage(
                 L"PerformDeleteOperation start | count=" +
                 std::to_wstring(source_paths.size()) +
                 L" | permanent=" + std::to_wstring(permanent ? 1 : 0) +
@@ -178,7 +183,7 @@ namespace file_operations_plugin
                     IID_PPV_ARGS(&pfo));
                 if (FAILED(hr))
                 {
-                    LogDeleteMessage(
+                    LogOperationMessage(
                         L"CoCreateInstance failed | hr=" + std::to_wstring(hr));
                     break;
                 }
@@ -202,7 +207,7 @@ namespace file_operations_plugin
                 hr = pfo->SetOperationFlags(flags);
                 if (FAILED(hr))
                 {
-                    LogDeleteMessage(
+                    LogOperationMessage(
                         L"SetOperationFlags failed | hr=" + std::to_wstring(hr));
                     break;
                 }
@@ -229,7 +234,7 @@ namespace file_operations_plugin
                         IID_PPV_ARGS(&psiSource));
                     if (FAILED(hr))
                     {
-                        LogDeleteMessage(
+                        LogOperationMessage(
                             L"SHCreateItemFromParsingName failed | hr=" +
                             std::to_wstring(hr) + L" | path=" + source);
                         continue;
@@ -242,7 +247,7 @@ namespace file_operations_plugin
                     }
                     else
                     {
-                        LogDeleteMessage(
+                        LogOperationMessage(
                             L"DeleteItem queue failed | hr=" +
                             std::to_wstring(hr) + L" | path=" + source);
                     }
@@ -250,11 +255,11 @@ namespace file_operations_plugin
 
                 if (queued == 0)
                 {
-                    LogDeleteMessage(L"No paths were queued for deletion");
+                    LogOperationMessage(L"No paths were queued for deletion");
                     break;
                 }
 
-                LogDeleteMessage(
+                LogOperationMessage(
                     L"Calling PerformOperations | queued=" +
                     std::to_wstring(queued) + L" | first=" +
                     source_paths.front());
@@ -262,7 +267,7 @@ namespace file_operations_plugin
                 hr = pfo->PerformOperations();
                 if (FAILED(hr))
                 {
-                    LogDeleteMessage(
+                    LogOperationMessage(
                         L"PerformOperations failed | hr=" + std::to_wstring(hr));
                     break;
                 }
@@ -270,7 +275,7 @@ namespace file_operations_plugin
                 BOOL aborted = FALSE;
                 pfo->GetAnyOperationsAborted(&aborted);
                 result_ok = !aborted;
-                LogDeleteMessage(
+                LogOperationMessage(
                     L"PerformOperations finished | aborted=" +
                     std::to_wstring(aborted ? 1 : 0) + L" | ok=" +
                     std::to_wstring(result_ok ? 1 : 0));
@@ -280,7 +285,7 @@ namespace file_operations_plugin
             {
                 CoUninitialize();
             }
-            LogDeleteMessage(
+            LogOperationMessage(
                 L"PerformDeleteOperation end | ok=" +
                 std::to_wstring(result_ok ? 1 : 0));
             return result_ok;
@@ -293,6 +298,10 @@ namespace file_operations_plugin
             const std::wstring &destination_path,
             bool is_move)
         {
+
+            HRESULT init_hr = CoInitializeEx(
+                nullptr, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
+            const bool inited_here = SUCCEEDED(init_hr) && init_hr != S_FALSE;
 
             Microsoft::WRL::ComPtr<IFileOperation> pfo;
             HRESULT hr = CoCreateInstance(
@@ -314,11 +323,9 @@ namespace file_operations_plugin
                 return false;
             }
 
-            // Set the owner window for the progress dialog
-            if (hwnd)
-            {
-                pfo->SetOwnerWindow(hwnd);
-            }
+            // Do not set an owner window from a worker thread. Windows may
+            // attach the worker and Flutter UI threads, causing a deadlock.
+            (void)hwnd;
 
             // Get the destination folder
             Microsoft::WRL::ComPtr<IShellItem> psiDest;
@@ -373,7 +380,12 @@ namespace file_operations_plugin
             BOOL aborted = FALSE;
             pfo->GetAnyOperationsAborted(&aborted);
 
-            return !aborted;
+            const bool success = !aborted;
+            if (inited_here)
+            {
+                CoUninitialize();
+            }
+            return success;
         }
 
         class FileOperationsPlugin : public flutter::Plugin
@@ -393,14 +405,14 @@ namespace file_operations_plugin
                 UINT message,
                 WPARAM wparam,
                 LPARAM lparam);
-            void FinishDeleteRequestOnPlatformThread(uint64_t request_id);
+            void FinishRequestOnPlatformThread(uint64_t request_id);
 
             flutter::PluginRegistrarWindows *registrar_;
             HWND top_level_window_ = nullptr;
             int window_proc_delegate_id_ = 0;
-            std::atomic<uint64_t> next_delete_request_id_{1};
-            std::shared_ptr<PendingDeleteManager> pending_delete_manager_ =
-                std::make_shared<PendingDeleteManager>();
+            std::atomic<uint64_t> next_request_id_{1};
+            std::shared_ptr<PendingRequestManager> pending_request_manager_ =
+                std::make_shared<PendingRequestManager>();
         };
 
         void FileOperationsPlugin::RegisterWithRegistrar(
@@ -453,20 +465,20 @@ namespace file_operations_plugin
             WPARAM wparam,
             LPARAM lparam)
         {
-            if (message != kDeleteCompleteMessage)
+            if (message != kOperationCompleteMessage)
             {
                 return std::nullopt;
             }
 
             auto request_id = static_cast<uint64_t>(wparam);
-            FinishDeleteRequestOnPlatformThread(request_id);
+            FinishRequestOnPlatformThread(request_id);
             return 0;
         }
 
-        void FileOperationsPlugin::FinishDeleteRequestOnPlatformThread(
+        void FileOperationsPlugin::FinishRequestOnPlatformThread(
             uint64_t request_id)
         {
-            FinishDeleteRequest(pending_delete_manager_, request_id);
+            FinishPendingRequest(pending_request_manager_, request_id);
         }
 
         void FileOperationsPlugin::HandleMethodCall(
@@ -559,8 +571,8 @@ namespace file_operations_plugin
                 }
 
                 HWND hwnd = silent ? nullptr : top_level_window_;
-                const uint64_t request_id = next_delete_request_id_++;
-                LogDeleteMessage(
+                const uint64_t request_id = next_request_id_++;
+                LogOperationMessage(
                     L"deleteItems request received | requestId=" +
                     std::to_wstring(request_id) + L" | count=" +
                     std::to_wstring(source_paths.size()) + L" | permanent=" +
@@ -568,7 +580,7 @@ namespace file_operations_plugin
                     std::to_wstring(silent ? 1 : 0) + L" | requireElevation=" +
                     std::to_wstring(require_elevation ? 1 : 0) + L" | first=" +
                     source_paths.front());
-                auto pending_delete_manager = pending_delete_manager_;
+                auto pending_delete_manager = pending_request_manager_;
                 {
                     std::lock_guard<std::mutex> lock(pending_delete_manager->mutex);
                     pending_delete_manager->results.emplace(request_id, std::move(result));
@@ -583,7 +595,7 @@ namespace file_operations_plugin
                             std::this_thread::sleep_for(
                                 std::chrono::milliseconds(timeout_ms));
 
-                            if (!TrySetDeleteStatus(
+                            if (!TrySetRequestStatus(
                                     pending_delete_manager,
                                     request_id,
                                     false))
@@ -596,19 +608,19 @@ namespace file_operations_plugin
                             {
                                 posted = PostMessage(
                                     completion_window,
-                                    kDeleteCompleteMessage,
+                                    kOperationCompleteMessage,
                                     static_cast<WPARAM>(request_id),
                                     0);
                             }
 
                             if (!posted)
                             {
-                                FinishDeleteRequest(
+                                FinishPendingRequest(
                                     pending_delete_manager,
                                     request_id);
                             }
 
-                            LogDeleteMessage(
+                            LogOperationMessage(
                                 L"deleteItems timed out | requestId=" +
                                 std::to_wstring(request_id) +
                                 L" | timeoutMs=" +
@@ -620,7 +632,7 @@ namespace file_operations_plugin
                 std::thread(
                     [pending_delete_manager, request_id, hwnd, completion_window, source_paths = std::move(source_paths), permanent, silent, require_elevation]() mutable
                     {
-                        LogDeleteMessage(
+                        LogOperationMessage(
                             L"deleteItems worker started | requestId=" +
                             std::to_wstring(request_id) + L" | first=" +
                             source_paths.front());
@@ -636,19 +648,19 @@ namespace file_operations_plugin
                         }
                         catch (...)
                         {
-                            LogDeleteMessage(
+                            LogOperationMessage(
                                 L"deleteItems worker threw exception | requestId=" +
                                 std::to_wstring(request_id));
                             ok = false;
                         }
 
                         bool posted = false;
-                        if (!TrySetDeleteStatus(
+                        if (!TrySetRequestStatus(
                                 pending_delete_manager,
                                 request_id,
                                 ok))
                         {
-                            LogDeleteMessage(
+                            LogOperationMessage(
                                 L"deleteItems worker finished after response was already completed | requestId=" +
                                 std::to_wstring(request_id) + L" | ok=" +
                                 std::to_wstring(ok ? 1 : 0));
@@ -659,16 +671,16 @@ namespace file_operations_plugin
                         {
                             posted = PostMessage(
                                 completion_window,
-                                kDeleteCompleteMessage,
+                                kOperationCompleteMessage,
                                 static_cast<WPARAM>(request_id),
                                 0);
                         }
 
                         if (!posted)
                         {
-                            FinishDeleteRequest(pending_delete_manager, request_id);
+                            FinishPendingRequest(pending_delete_manager, request_id);
                         }
-                        LogDeleteMessage(
+                        LogOperationMessage(
                             L"deleteItems worker finished | requestId=" +
                             std::to_wstring(request_id) + L" | ok=" +
                             std::to_wstring(ok ? 1 : 0) + L" | posted=" +
@@ -736,13 +748,45 @@ namespace file_operations_plugin
                 std::wstring destination = Utf8ToWide(*dest_path);
                 bool is_move = (method == "moveItems");
 
-                // Get the Flutter window handle
-                HWND hwnd = registrar_->GetView()->GetNativeWindow();
+                const uint64_t request_id = next_request_id_++;
+                auto pending_request_manager = pending_request_manager_;
+                {
+                    std::lock_guard<std::mutex> lock(pending_request_manager->mutex);
+                    pending_request_manager->results.emplace(request_id, std::move(result));
+                }
 
-                // Perform the file operation
-                bool success = PerformFileOperation(hwnd, source_paths, destination, is_move);
+                HWND completion_window = top_level_window_;
+                std::thread(
+                    [pending_request_manager, request_id, completion_window,
+                     source_paths = std::move(source_paths), destination, is_move]() mutable
+                    {
+                        bool success = false;
+                        try
+                        {
+                            success = PerformFileOperation(
+                                nullptr, source_paths, destination, is_move);
+                        }
+                        catch (...)
+                        {
+                            success = false;
+                        }
 
-                result->Success(flutter::EncodableValue(success));
+                        if (!TrySetRequestStatus(
+                                pending_request_manager, request_id, success))
+                        {
+                            return;
+                        }
+
+                        if (!completion_window || !PostMessage(
+                                completion_window,
+                                kOperationCompleteMessage,
+                                static_cast<WPARAM>(request_id),
+                                0))
+                        {
+                            FinishPendingRequest(pending_request_manager, request_id);
+                        }
+                    })
+                    .detach();
                 return;
             }
 

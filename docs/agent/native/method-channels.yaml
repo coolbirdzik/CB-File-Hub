@@ -83,6 +83,7 @@ channels:
       - getAppsForExtension
       - getInstalledAppBrands
       - setSelfAsDefaultForVideo
+      - registerFileAssociations
       - extractIconsForExtensions
       - setTaskbarProgress
       - clearTaskbarProgress

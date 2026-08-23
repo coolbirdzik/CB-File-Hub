@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
+import 'package:cb_file_manager/services/archive/archive_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
-import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
+import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
@@ -18,6 +21,7 @@ import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 
 /// Handles file operations such as opening files with appropriate viewers
 class FileOperationsHandler {
@@ -434,9 +438,23 @@ class FileOperationsHandler {
     SelectionBloc? selectionBloc,
     String? currentFilter,
     String? currentSearchTag,
+    void Function(String path)? onNavigateToPath,
   }) {
     // Stop any ongoing thumbnail processing when opening a file
     VideoThumbnailHelper.stopAllProcessing();
+
+    if (ArchivePathUtils.isArchiveEntryPath(file.path)) {
+      unawaited(_openArchiveEntry(
+        context: context,
+        virtualFilePath: file.path,
+        folderListBloc: folderListBloc,
+        selectionBloc: selectionBloc,
+        currentFilter: currentFilter,
+        currentSearchTag: currentSearchTag,
+        onNavigateToPath: onNavigateToPath,
+      ));
+      return;
+    }
 
     // Check file type using utility
     final isVideo = FileTypeUtils.isVideoFile(file.path);
@@ -479,22 +497,21 @@ class FileOperationsHandler {
             });
           } else {
             if (context.mounted) {
-              // ignore: use_build_context_synchronously
-              Navigator.of(context, rootNavigator: true)
-                  .push(
-                MaterialPageRoute(
-                  fullscreenDialog: true,
-                  builder: (_) => VideoPlayerFullScreen(file: file),
-                ),
-              )
-                  .then((_) {
-                _tryRestoreSelectionAfterViewer(
+              unawaited(
+                VideoPlaybackLauncher.open(
                   // ignore: use_build_context_synchronously
                   context,
-                  snapshot: selectionSnapshot,
-                  selectionBloc: selectionBloc,
-                );
-              });
+                  file: file,
+                  onClosed: () {
+                    _tryRestoreSelectionAfterViewer(
+                      // ignore: use_build_context_synchronously
+                      context,
+                      snapshot: selectionSnapshot,
+                      selectionBloc: selectionBloc,
+                    );
+                  },
+                ),
+              );
             }
           }
         });
@@ -535,19 +552,72 @@ class FileOperationsHandler {
           ),
         ),
       );
+    } else if (FileTypeUtils.isArchiveFile(file.path)) {
+      _openArchiveWithSystemDefault(context, file.path);
+    } else if (FileTypeUtils.isTextFile(file.path) ||
+        FileTypeUtils.isPdfFile(file.path)) {
+      if (context.mounted) {
+        unawaited(InAppFileViewer.open(context, file));
+      }
     } else {
-      // For other file types, open with external app
-      // First try to open with the default app
+      // Unsupported in-app: delegate to the OS default app (user can pick via Open with).
       ExternalAppHelper.openFileWithApp(file.path, 'shell_open')
           .then((success) {
         if (!success && context.mounted) {
-          // If that fails, show the open with dialog
           RouteUtils.showAcrylicDialog(
             context: context,
             builder: (context) => OpenWithDialog(filePath: file.path),
           );
         }
       });
+    }
+  }
+
+  static void _openArchiveWithSystemDefault(
+    BuildContext context,
+    String filePath,
+  ) {
+    ExternalAppHelper.openFileWithApp(filePath, 'shell_open').then((success) {
+      if (!success && context.mounted) {
+        RouteUtils.showAcrylicDialog(
+          context: context,
+          builder: (context) => OpenWithDialog(filePath: filePath),
+        );
+      }
+    });
+  }
+
+  static Future<void> _openArchiveEntry({
+    required BuildContext context,
+    required String virtualFilePath,
+    required FolderListBloc folderListBloc,
+    SelectionBloc? selectionBloc,
+    String? currentFilter,
+    String? currentSearchTag,
+    void Function(String path)? onNavigateToPath,
+  }) async {
+    final location = ArchivePathUtils.parse(virtualFilePath);
+    if (location == null || location.innerPath.isEmpty) return;
+
+    try {
+      final materialized = await locator<ArchiveService>().materializeEntryFile(
+        archiveFilePath: location.archiveFile,
+        entryInnerPath: location.innerPath,
+        cacheKey: virtualFilePath,
+      );
+      if (!context.mounted) return;
+      onFileTap(
+        context: context,
+        file: materialized,
+        folderListBloc: folderListBloc,
+        selectionBloc: selectionBloc,
+        currentFilter: currentFilter,
+        currentSearchTag: currentSearchTag,
+        onNavigateToPath: onNavigateToPath,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      AppToast.error(context, e.toString());
     }
   }
 }

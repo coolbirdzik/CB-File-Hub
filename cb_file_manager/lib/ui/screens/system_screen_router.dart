@@ -16,6 +16,7 @@ import 'package:cb_file_manager/bloc/network_browsing/network_browsing_bloc.dart
 import 'package:cb_file_manager/services/network_browsing/network_service_registry.dart';
 import 'package:cb_file_manager/ui/screens/home/home_screen.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/screens/album_management/album_management_screen.dart';
 import 'package:cb_file_manager/ui/screens/album_management/auto_rules_screen.dart';
 import 'package:cb_file_manager/ui/screens/album_management/album_detail_screen.dart';
@@ -125,6 +126,9 @@ class SystemScreenRouter {
     } else if (path.startsWith('#network/')) {
       _loggedKeys.add(cacheKey);
       return _handleNetworkPath(context, path, tabId);
+    } else if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+      // Virtual archive browse paths are rendered by TabbedFolderListScreen.
+      return null;
     }
 
     // Fallback for unknown system paths

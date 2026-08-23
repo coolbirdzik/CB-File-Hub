@@ -17,6 +17,7 @@ stale async results, lost provider context, or expensive pane rebuilds.
 | File selection | `SelectionBloc` | View or pane | `cb_file_manager/lib/bloc/selection/selection_bloc.dart` |
 | AI conversation execution | `AiAgentBloc` | AI chat tab/surface | `cb_file_manager/lib/bloc/ai_agent/ai_agent_bloc.dart` |
 | Cleaner scan engine | `DiskCleanerService` via GetIt | Application service; scan state is session-bound | `cb_file_manager/lib/services/disk_cleaner/disk_cleaner_service.dart` |
+| Cleaner incremental scan cache | `DiskCleanerService` | Process-local completed tree and recursive filesystem change tracker for Windows drive roots only, with NTFS USN cursor as fallback; subtree scans are not retained, and drive caches are invalidated by watcher errors/overflow, journal gaps, or missing mappings | `cb_file_manager/lib/services/disk_cleaner/disk_cleaner_service.dart` |
 | Cleaner row focus and cleanup targets | `CbAgentCleanerScreen` | Cleaner pane; row focus is independent from canonical top-level cleanup targets | `cb_file_manager/lib/ui/screens/cb_agent_cleaner/cb_agent_cleaner_screen.dart` |
 | Cleaner folder-growth baseline | `CleanerGrowthHistoryService` persisted via SharedPreferences | Application persistence; one latest completed snapshot per drive | `cb_file_manager/lib/services/disk_cleaner/cleaner_growth_history_service.dart` |
 | Cleaner App Insights filters | `CleanerAppInsightsCubit` | Cleaner Apps pane | `cb_file_manager/lib/bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart` |

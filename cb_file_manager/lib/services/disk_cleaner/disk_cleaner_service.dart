@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:win32/win32.dart' as win32;
 
@@ -53,6 +54,7 @@ class CleanerScanContext {
   final String? selectedPath;
   final String? chartPath;
   final bool isScanning;
+  final bool isCached;
   final AppStorageReport? appStorageReport;
   final String? selectedAppId;
   final bool appInsightsSharedWithAgent;
@@ -64,11 +66,195 @@ class CleanerScanContext {
     this.selectedPath,
     this.chartPath,
     this.isScanning = false,
+    this.isCached = false,
     this.appStorageReport,
     this.selectedAppId,
     this.appInsightsSharedWithAgent = false,
     required this.updatedAt,
   });
+}
+
+class _TrackedScanChanges {
+  final int version;
+  final List<String> directories;
+
+  const _TrackedScanChanges({
+    required this.version,
+    required this.directories,
+  });
+}
+
+class _FullScanChangeTracker {
+  static const int _maxTrackedDirectories = 4096;
+
+  final String rootPath;
+  final Map<String, int> _dirtyDirectories = <String, int>{};
+  StreamSubscription<FileSystemEvent>? _subscription;
+  var _version = 0;
+  var _isReliable = true;
+
+  _FullScanChangeTracker(String path)
+      : rootPath = _normalizeTrackedScanPath(path);
+
+  bool get isUsable => _isReliable && _subscription != null;
+
+  void start() {
+    if (isUsable) return;
+    _isReliable = true;
+    try {
+      _subscription = Directory(rootPath).watch(recursive: true).listen(
+        _recordEvent,
+        onError: (_) {
+          _isReliable = false;
+          unawaited(_subscription?.cancel() ?? Future<void>.value());
+          _subscription = null;
+        },
+        cancelOnError: false,
+      );
+    } catch (_) {
+      _isReliable = false;
+      _subscription = null;
+    }
+  }
+
+  _TrackedScanChanges snapshot() => _TrackedScanChanges(
+        version: _version,
+        directories: _dirtyDirectories.keys.toList(growable: false),
+      );
+
+  void acknowledge(_TrackedScanChanges snapshot) {
+    _dirtyDirectories.removeWhere(
+      (_, version) => version <= snapshot.version,
+    );
+  }
+
+  void _recordEvent(FileSystemEvent event) {
+    if (!_isReliable) return;
+    final dirtyDirectory = _parentDirectory(event.path);
+    if (!_isWithinRoot(dirtyDirectory)) return;
+    _dirtyDirectories[dirtyDirectory] = ++_version;
+    if (_dirtyDirectories.length > _maxTrackedDirectories) {
+      _isReliable = false;
+      unawaited(_subscription?.cancel() ?? Future<void>.value());
+      _subscription = null;
+    }
+  }
+
+  bool _isWithinRoot(String path) {
+    return fullScanPathsWithinRoot(rootPath, path);
+  }
+
+  String _parentDirectory(String path) {
+    final normalized = _normalizeTrackedScanPath(path);
+    if (normalized == rootPath) return rootPath;
+    final separator = normalized.lastIndexOf('\\');
+    if (separator <= 2) return rootPath;
+    return normalized.substring(0, separator);
+  }
+}
+
+/// Narrow seam for tests that need to exercise service cache lifecycle
+/// without traversing a real drive.
+@visibleForTesting
+typedef FullDiskScanSpawner = Future<FullDiskScanHandle> Function({
+  required String drivePath,
+  int maxDepth,
+  int minDisplayEntryBytes,
+  int maxChildrenPerDirectory,
+  List<FullDiskJunkRule> junkRules,
+  DiskTreeNode? baseRoot,
+  DiskScanJournalCursor? journalCursor,
+  List<FullDiskScanInsight> baseOldLargeItems,
+  List<String> trackedDirtyDirectories,
+  bool hasTrackedChanges,
+  void Function(FullDiskScanResult result)? onCompleted,
+});
+
+String _normalizeTrackedScanPath(String path) {
+  var normalized = path.trim().replaceAll('/', '\\').toUpperCase();
+  while (normalized.length > 3 && normalized.endsWith('\\')) {
+    normalized = normalized.substring(0, normalized.length - 1);
+  }
+  return normalized;
+}
+
+/// Returns whether a filesystem event belongs to a tracked scan root.
+///
+/// This small seam is also used by deterministic tests because Windows can
+/// report event paths with a different casing or separator style than the
+/// path passed to [Directory.watch].
+@visibleForTesting
+bool fullScanPathsWithinRoot(String rootPath, String eventPath) {
+  final normalizedRoot = _normalizeTrackedScanPath(rootPath);
+  final normalizedEvent = _normalizeTrackedScanPath(eventPath);
+  return normalizedEvent == normalizedRoot ||
+      normalizedEvent.startsWith(
+        normalizedRoot.endsWith('\\') ? normalizedRoot : '$normalizedRoot\\',
+      );
+}
+
+class _CompletedFullScan {
+  DiskTreeNode root;
+  int nodeCount;
+  int junkBytes;
+  int cleanableCount;
+  List<FullDiskScanInsight> oldLargeItems;
+  List<String> inaccessible;
+  List<FullDiskScanCoverageIssue> coverageIssues;
+  DiskScanJournalCursor? journalCursor;
+  final _FullScanChangeTracker changeTracker;
+  int maxDepth;
+  int minDisplayEntryBytes;
+  int maxChildrenPerDirectory;
+  Duration duration;
+  FullDiskScanMode scanMode;
+  int changedDirectoryCount;
+  String? incrementalFallbackReason;
+
+  _CompletedFullScan({
+    required this.root,
+    required this.nodeCount,
+    required this.junkBytes,
+    required this.cleanableCount,
+    required this.oldLargeItems,
+    required this.inaccessible,
+    required this.coverageIssues,
+    required this.journalCursor,
+    required this.changeTracker,
+    required this.maxDepth,
+    required this.minDisplayEntryBytes,
+    required this.maxChildrenPerDirectory,
+    required this.duration,
+    required this.scanMode,
+    required this.changedDirectoryCount,
+    required this.incrementalFallbackReason,
+  });
+
+  FullDiskScanResult toResult() => FullDiskScanResult(
+        root: root,
+        nodeCount: nodeCount,
+        junkBytes: junkBytes,
+        cleanableCount: cleanableCount,
+        duration: duration,
+        inaccessible: inaccessible,
+        coverageIssues: coverageIssues,
+        oldLargeItems: oldLargeItems,
+        scanMode: scanMode,
+        changedDirectoryCount: changedDirectoryCount,
+        journalCursor: journalCursor,
+        incrementalFallbackReason: incrementalFallbackReason,
+      );
+}
+
+int _countCleanableNodes(DiskTreeNode root) {
+  var count = 0;
+  final stack = <DiskTreeNode>[root];
+  while (stack.isNotEmpty) {
+    final node = stack.removeLast();
+    if (node.fullPath.isNotEmpty && node.isJunk) count++;
+    stack.addAll(node.children);
+  }
+  return count;
 }
 
 /// Public façade for the Disk Cleaner skill.
@@ -77,9 +263,17 @@ class CleanerScanContext {
 /// tool layer (`tool_executor.dart`) and the companion UI screen produce
 /// identical results from identical code paths.
 class DiskCleanerService {
-  DiskCleanerService._();
+  DiskCleanerService._({FullDiskScanSpawner? fullDiskScanSpawner})
+      : _fullDiskScanSpawner = fullDiskScanSpawner ?? spawnFullDiskScan;
+
+  @visibleForTesting
+  DiskCleanerService.forTesting(
+      {required FullDiskScanSpawner fullDiskScanSpawner})
+      : _fullDiskScanSpawner = fullDiskScanSpawner;
 
   static final DiskCleanerService instance = DiskCleanerService._();
+
+  final FullDiskScanSpawner _fullDiskScanSpawner;
 
   final StreamController<DiskCleanerAgentActivity> _agentActivityController =
       StreamController<DiskCleanerAgentActivity>.broadcast();
@@ -97,6 +291,7 @@ class DiskCleanerService {
   int pendingCleanupBytes = 0;
 
   final Map<String, CleanerScanContext> _cleanerScanContexts = {};
+  final Map<String, _CompletedFullScan> _completedFullScans = {};
 
   CleanerScanHandle? _activeScan;
 
@@ -110,6 +305,7 @@ class DiskCleanerService {
     String? selectedPath,
     String? chartPath,
     bool isScanning = false,
+    bool isCached = false,
     AppStorageReport? appStorageReport,
     String? selectedAppId,
     bool appInsightsSharedWithAgent = false,
@@ -125,6 +321,7 @@ class DiskCleanerService {
       selectedPath: selectedPath,
       chartPath: chartPath,
       isScanning: isScanning,
+      isCached: isCached,
       appStorageReport: appStorageReport,
       selectedAppId: selectedAppId,
       appInsightsSharedWithAgent: appInsightsSharedWithAgent,
@@ -1249,6 +1446,46 @@ class DiskCleanerService {
   /// Whether a full disk scan is currently running.
   bool get isFullScanning => _activeFullScan != null;
 
+  /// Whether a completed scan for [drivePath] can be refreshed from its
+  /// process-local filesystem change tracker or NTFS journal metadata.
+  bool canUseIncrementalScan(String drivePath) {
+    if (!Platform.isWindows) return false;
+    if (!_isWindowsDriveRoot(drivePath)) return false;
+    final cached = _completedFullScans[_fullScanKey(drivePath)];
+    return cached?.changeTracker.isUsable == true ||
+        cached?.journalCursor != null;
+  }
+
+  /// Returns the cached tree that an incremental refresh will update.
+  DiskTreeNode? cachedFullScanRoot(String drivePath) {
+    if (!canUseIncrementalScan(drivePath)) return null;
+    return _completedFullScans[_fullScanKey(drivePath)]?.root;
+  }
+
+  /// Returns the most recent completed result for the canonical drive root.
+  ///
+  /// This lookup deliberately does not depend on the filesystem watcher or
+  /// USN journal being usable. Those mechanisms only decide how a later
+  /// explicit refresh is performed; an existing completed result remains
+  /// useful evidence while either mechanism is unavailable.
+  FullDiskScanResult? cachedFullScanResult(String drivePath) {
+    if (!Platform.isWindows || !_isWindowsDriveRoot(drivePath)) return null;
+    return _completedFullScans[_fullScanKey(drivePath)]?.toResult();
+  }
+
+  static String _fullScanKey(String drivePath) {
+    var normalized = drivePath.trim().replaceAll('/', '\\').toUpperCase();
+    while (normalized.endsWith(r'\')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  static bool _isWindowsDriveRoot(String drivePath) {
+    final normalized = drivePath.trim().replaceAll('/', '\\');
+    return RegExp(r'^[A-Za-z]:\\$').hasMatch(normalized);
+  }
+
   /// Scans the entire drive at [drivePath] recursively, building a tree of
   /// directory sizes. Returns a handle with progress stream and future result.
   ///
@@ -1257,6 +1494,8 @@ class DiskCleanerService {
   Future<FullDiskScanHandle> scanFullDisk({
     required String drivePath,
     int maxDepth = 20,
+    int minDisplayEntryBytes = defaultMinDisplayEntryBytes,
+    int maxChildrenPerDirectory = defaultMaxChildrenPerDirectory,
   }) async {
     if (_activeFullScan != null) {
       throw StateError(
@@ -1266,9 +1505,112 @@ class DiskCleanerService {
       throw StateError('Full disk scan is only supported on Windows.');
     }
 
-    final handle = await spawnFullDiskScan(
+    final cacheEligible = _isWindowsDriveRoot(drivePath);
+    final cacheKey = cacheEligible ? _fullScanKey(drivePath) : '';
+    final previous = cacheEligible ? _completedFullScans[cacheKey] : null;
+    final trackedChanges = previous?.changeTracker.snapshot();
+    final canReuseSettings = previous != null &&
+        previous.maxDepth == maxDepth &&
+        previous.minDisplayEntryBytes == minDisplayEntryBytes &&
+        previous.maxChildrenPerDirectory == maxChildrenPerDirectory;
+    final useTrackedChanges =
+        previous?.changeTracker.isUsable == true && canReuseSettings;
+    final useJournal = !useTrackedChanges &&
+        previous?.journalCursor != null &&
+        canReuseSettings;
+    final trackedDirectories =
+        trackedChanges == null ? const <String>[] : trackedChanges.directories;
+
+    // A reliable watcher snapshot with no dirty directories is already the
+    // completed result. Return it directly instead of spawning a worker whose
+    // only job would be to copy the same tree through an isolate port.
+    if (useTrackedChanges &&
+        canReuseSettings &&
+        trackedChanges != null &&
+        trackedChanges.directories.isEmpty) {
+      final result = FullDiskScanResult(
+        root: previous.root,
+        nodeCount: previous.nodeCount,
+        junkBytes: previous.junkBytes,
+        cleanableCount: previous.cleanableCount,
+        duration: Duration.zero,
+        inaccessible: previous.inaccessible,
+        coverageIssues: previous.coverageIssues,
+        oldLargeItems: previous.oldLargeItems,
+        scanMode: FullDiskScanMode.incremental,
+        changedDirectoryCount: 0,
+        journalCursor: previous.journalCursor,
+      );
+      final completed = FullDiskScanHandle.completed(
+        drivePath: drivePath,
+        result: result,
+      );
+      _activeFullScan = completed;
+      completed.future.whenComplete(() {
+        if (identical(_activeFullScan, completed)) _activeFullScan = null;
+      }).ignore();
+      return completed;
+    }
+
+    void cacheCompletedResult(FullDiskScanResult result) {
+      final cached = previous ??
+          _CompletedFullScan(
+            root: result.root,
+            nodeCount: result.nodeCount,
+            junkBytes: result.junkBytes ?? result.root.junkBytes,
+            cleanableCount:
+                result.cleanableCount ?? _countCleanableNodes(result.root),
+            oldLargeItems: result.oldLargeItems,
+            inaccessible: result.inaccessible,
+            coverageIssues: result.coverageIssues,
+            journalCursor: result.journalCursor,
+            changeTracker: _FullScanChangeTracker(drivePath),
+            maxDepth: maxDepth,
+            minDisplayEntryBytes: minDisplayEntryBytes,
+            maxChildrenPerDirectory: maxChildrenPerDirectory,
+            duration: result.duration,
+            scanMode: result.scanMode,
+            changedDirectoryCount: result.changedDirectoryCount,
+            incrementalFallbackReason: result.incrementalFallbackReason,
+          );
+      cached.root = result.root;
+      cached.nodeCount = result.nodeCount;
+      cached.junkBytes = result.junkBytes ?? result.root.junkBytes;
+      cached.cleanableCount =
+          result.cleanableCount ?? _countCleanableNodes(result.root);
+      cached.oldLargeItems = result.oldLargeItems;
+      cached.inaccessible = result.inaccessible;
+      cached.coverageIssues = result.coverageIssues;
+      cached.journalCursor = result.journalCursor ?? cached.journalCursor;
+      cached.maxDepth = maxDepth;
+      cached.minDisplayEntryBytes = minDisplayEntryBytes;
+      cached.maxChildrenPerDirectory = maxChildrenPerDirectory;
+      cached.duration = result.duration;
+      cached.scanMode = result.scanMode;
+      cached.changedDirectoryCount = result.changedDirectoryCount;
+      cached.incrementalFallbackReason = result.incrementalFallbackReason;
+      cached.changeTracker.start();
+      if (trackedChanges != null) {
+        cached.changeTracker.acknowledge(trackedChanges);
+      }
+      _completedFullScans[cacheKey] = cached;
+    }
+
+    final handle = await _fullDiskScanSpawner(
       drivePath: drivePath,
       maxDepth: maxDepth,
+      minDisplayEntryBytes: minDisplayEntryBytes,
+      maxChildrenPerDirectory: maxChildrenPerDirectory,
+      junkRules: _fullDiskJunkRules(),
+      baseRoot: (useTrackedChanges || useJournal) ? previous.root : null,
+      journalCursor: useJournal ? previous.journalCursor : null,
+      baseOldLargeItems: (useTrackedChanges || useJournal)
+          ? previous.oldLargeItems
+          : const <FullDiskScanInsight>[],
+      trackedDirtyDirectories:
+          useTrackedChanges ? trackedDirectories : const <String>[],
+      hasTrackedChanges: useTrackedChanges,
+      onCompleted: cacheEligible ? cacheCompletedResult : null,
     );
     _activeFullScan = handle;
 
@@ -1328,26 +1670,51 @@ class DiskCleanerService {
       }
     }
 
-    _markJunkRecursive(root, wholeDirJunk, globFilteredJunk);
+    // Flatten once. Iterating `Map.entries` allocates an iterator and a
+    // MapEntry per node, and this walk visits every node in the tree.
+    final wholeDirRules = <_WholeDirRule>[
+      for (final entry in wholeDirJunk.entries)
+        _WholeDirRule(
+            path: entry.key, prefix: '${entry.key}\\', categoryId: entry.value),
+    ];
+
+    _markJunkRecursive(root, wholeDirRules, globFilteredJunk);
+  }
+
+  List<FullDiskJunkRule> _fullDiskJunkRules() {
+    final rules = <FullDiskJunkRule>[];
+    for (final category in CleanerCategories.all()) {
+      for (final rule in category.rules) {
+        if (rule.source.kind == PathSourceKind.recycleBin) continue;
+        final resolved = WindowsKnownFolders.resolve(rule.source);
+        if (resolved == null || resolved.isEmpty) continue;
+        rules.add(FullDiskJunkRule(
+          basePath: resolved,
+          categoryId: category.id,
+          includeGlobs: rule.includeGlobs ?? const <String>[],
+        ));
+      }
+    }
+    return rules;
   }
 
   void _markJunkRecursive(
     DiskTreeNode node,
-    Map<String, String> wholeDirJunk,
+    List<_WholeDirRule> wholeDirJunk,
     List<_GlobRule> globFilteredJunk,
   ) {
     final upperPath = node.fullPath.toUpperCase();
 
     // Check whole-directory rules: if this node IS the junk dir or inside it
-    for (final entry in wholeDirJunk.entries) {
-      if (upperPath == entry.key || upperPath.startsWith('${entry.key}\\')) {
-        _markSubtreeAsJunk(node, entry.value);
+    for (final rule in wholeDirJunk) {
+      if (upperPath == rule.path || upperPath.startsWith(rule.prefix)) {
+        _markSubtreeAsJunk(node, rule.categoryId);
         return; // Entire subtree is junk
       }
     }
 
     // Check glob-filtered rules: only mark individual files, not directories
-    if (node.isFile) {
+    if (node.isFile && globFilteredJunk.isNotEmpty) {
       final fileName = _nodeBasename(node.fullPath).toUpperCase();
       final parentPath = _nodeParentDir(node.fullPath).toUpperCase();
       for (final rule in globFilteredJunk) {
@@ -1379,13 +1746,27 @@ class DiskCleanerService {
     }
   }
 
+  /// Index of the last path separator, found by scanning characters.
+  ///
+  /// This used to be `path.lastIndexOf(RegExp(r'[\\/]'))`, which compiled a
+  /// fresh RegExp on every call — and junk marking calls it twice for every
+  /// file node in the tree, so a single scan compiled hundreds of thousands of
+  /// throwaway patterns on the UI isolate.
+  static int _lastSeparator(String path) {
+    for (var i = path.length - 1; i >= 0; i--) {
+      final code = path.codeUnitAt(i);
+      if (code == 0x5C || code == 0x2F) return i; // '\' or '/'
+    }
+    return -1;
+  }
+
   static String _nodeBasename(String path) {
-    final i = path.lastIndexOf(RegExp(r'[\\/]'));
+    final i = _lastSeparator(path);
     return i < 0 ? path : path.substring(i + 1);
   }
 
   static String _nodeParentDir(String path) {
-    final i = path.lastIndexOf(RegExp(r'[\\/]'));
+    final i = _lastSeparator(path);
     return i > 0 ? path.substring(0, i) : path;
   }
 
@@ -1532,6 +1913,21 @@ class _DriveSpaceRaw {
 }
 
 /// Helper for glob-filtered junk rules used by [markJunkNodes].
+/// A rule whose entire resolved directory subtree counts as junk.
+///
+/// [prefix] is precomputed because the alternative — building `'$path\\'` at
+/// every node — allocates a string per rule per node.
+class _WholeDirRule {
+  final String path; // uppercased
+  final String prefix; // uppercased, trailing separator
+  final String categoryId;
+  const _WholeDirRule({
+    required this.path,
+    required this.prefix,
+    required this.categoryId,
+  });
+}
+
 class _GlobRule {
   final String basePath; // uppercased
   final String categoryId;

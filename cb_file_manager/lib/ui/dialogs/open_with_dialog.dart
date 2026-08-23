@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'package:cb_file_manager/helpers/files/windows_app_icon.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
-import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
+import 'dart:async';
+
+import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
+import 'package:cb_file_manager/ui/controllers/archive_navigation.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -42,8 +45,7 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
     await prefs.init();
 
     if (appIdentifier == '__cb_video_player__') {
-      await prefs.clearPreferredVideoPlayerApp();
-      await prefs.setUseSystemDefaultForVideo(false);
+      await _selectBuiltInVideoPlayerAsDefault(prefs);
       return;
     }
 
@@ -55,6 +57,16 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
 
     await prefs.setPreferredVideoPlayerApp(appIdentifier);
     await prefs.setUseSystemDefaultForVideo(false);
+  }
+
+  Future<void> _selectBuiltInVideoPlayerAsDefault(
+    UserPreferences prefs,
+  ) async {
+    await prefs.clearPreferredVideoPlayerApp();
+    await prefs.setUseSystemDefaultForVideo(false);
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      await prefs.setOpenVideoInNewWindow(true);
+    }
   }
 
   @override
@@ -166,14 +178,24 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                                     app.packageName);
 
                                 if (!mounted) return;
+
+                                if (app.packageName ==
+                                    '__cb_archive_browse__') {
+                                  ArchiveNavigation.openBrowse(
+                                    context,
+                                    archiveFilePath: widget.filePath,
+                                  );
+                                  rootNavigator.pop();
+                                  return;
+                                }
+
                                 rootNavigator.pop();
 
                                 if (app.packageName == '__cb_video_player__') {
-                                  rootNavigator.push(
-                                    MaterialPageRoute(
-                                      fullscreenDialog: true,
-                                      builder: (_) => VideoPlayerFullScreen(
-                                          file: File(widget.filePath)),
+                                  unawaited(
+                                    VideoPlaybackLauncher.open(
+                                      rootNavigator.context,
+                                      file: File(widget.filePath),
                                     ),
                                   );
                                 } else if (app.packageName == 'shell_open') {
@@ -220,6 +242,11 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                               final ok =
                                   await WindowsAppIcon.setSelfAsDefaultForVideo(
                                       exe);
+                              if (ok) {
+                                final prefs = UserPreferences.instance;
+                                await prefs.init();
+                                await _selectBuiltInVideoPlayerAsDefault(prefs);
+                              }
                               try {
                                 toast.info(ok
                                     ? 'CB File Hub is now the default for video files.'
@@ -238,6 +265,39 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                         ),
                       if ((Platform.isWindows || Platform.isAndroid) &&
                           FileTypeUtils.isVideoFile(widget.filePath))
+                        const Divider(),
+                      if (Platform.isWindows &&
+                          FileTypeUtils.isArchiveFile(widget.filePath))
+                        ListTile(
+                          leading: const Icon(PhosphorIconsLight.archive),
+                          title: Text(
+                            AppLocalizations.of(context)!
+                                .setCoolBirdAsDefaultForArchives,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode
+                                  ? Colors.blue[200]
+                                  : Colors.blue[700],
+                            ),
+                          ),
+                          onTap: () async {
+                            final toast = AppToast.capture(context);
+                            final navigator = Navigator.of(context);
+                            final exe = Platform.resolvedExecutable;
+                            final ok = await WindowsAppIcon
+                                .setSelfAsDefaultForArchives(exe);
+                            try {
+                              toast.info(ok
+                                  ? AppLocalizations.of(context)!
+                                      .setCoolBirdAsDefaultForArchivesSuccess
+                                  : AppLocalizations.of(context)!
+                                      .setCoolBirdAsDefaultForArchivesFailed);
+                              navigator.pop();
+                            } catch (_) {}
+                          },
+                        ),
+                      if (Platform.isWindows &&
+                          FileTypeUtils.isArchiveFile(widget.filePath))
                         const Divider(),
                       ListTile(
                         leading: const Icon(PhosphorIconsLight.dotsThree),

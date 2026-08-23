@@ -106,29 +106,5 @@ flowchart LR
 The CI order is format, analyze, unit tests, E2E, then build. Focused checks may
 be used during iteration, but they do not redefine the final risk boundary.
 
-## Graph-first coding loop
-
-```mermaid
-flowchart TD
-    Task[Source-code task] --> Inspect[Inspect agent graph and source]
-    Inspect --> Impact{Graph impact?}
-    Impact -->|None| Code[Implement]
-    Impact -->|Changed| Delta[Present graph delta]
-    Delta --> Approval{User approval}
-    Approval -->|Revise| Inspect
-    Approval -->|Approved| Graph[Update canonical graph]
-    Graph --> Code
-    Code --> Verify[Verify]
-    Verify --> Match{Graph, code, and checks agree?}
-    Match -->|Yes| Done[Finish]
-    Match -->|No, same approved scope| Code
-    Match -->|No, graph boundary changed| Delta
-```
-
-Reading and classifying graph impact is mandatory for source-code tasks. User
-approval is required only when nodes, edges, ownership, contracts, scope,
-destructive behavior, or safety invariants change. Failures within the approved
-scope loop through implementation and verification without another approval.
-
-_Verified against repository baseline `7f40c2a` plus the working tree on
-2026-08-09._
+_Verified against repository baseline `0b1d279` plus the working tree on
+2026-08-15._

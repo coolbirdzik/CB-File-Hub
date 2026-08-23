@@ -32,9 +32,9 @@ class AppBarActionsBuilder {
     required Function(int) onGridZoomChange,
     required VoidCallback onColumnSettingsPressed,
     required Function(dynamic)? onGalleryResult,
-    required VoidCallback onPreviewPaneToggled,
+    VoidCallback? onPreviewPaneToggled,
     required bool isPreviewPaneVisible,
-    required bool showPreviewModeOption,
+    required bool showDesktopViewModes,
   }) {
     // Always keep the action bar visible; selection actions are handled elsewhere.
     return FolderAppBarActions.buildActions(
@@ -56,7 +56,7 @@ class AppBarActionsBuilder {
       onColumnSettingsPressed: onColumnSettingsPressed,
       onPreviewPaneToggled: onPreviewPaneToggled,
       isPreviewPaneVisible: isPreviewPaneVisible,
-      showPreviewModeOption: showPreviewModeOption,
+      showDesktopViewModes: showDesktopViewModes,
       onGallerySelected: isNetworkPath
           ? null
           : (value) {

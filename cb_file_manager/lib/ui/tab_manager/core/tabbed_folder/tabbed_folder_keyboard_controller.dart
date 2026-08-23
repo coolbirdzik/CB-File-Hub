@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -15,6 +18,12 @@ class TabbedFolderKeyboardController {
   final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
 
   String? focusedPath;
+  final Map<String, ValueNotifier<bool?>> _immediateSelectionNotifiers =
+      <String, ValueNotifier<bool?>>{};
+  Set<String>? _immediateSelectionPaths;
+  final Set<String> _immediateSelectionTouchedPaths = <String>{};
+  int _immediateSelectionGeneration = 0;
+
   String? _keyboardRangeAnchorPath;
 
   // Type-ahead search state
@@ -23,8 +32,74 @@ class TabbedFolderKeyboardController {
   static const Duration _typeAheadTimeout = Duration(milliseconds: 1000);
 
   void dispose() {
+    _immediateSelectionGeneration++;
     focusNode.dispose();
     scrollController.dispose();
+    for (final notifier in _immediateSelectionNotifiers.values) {
+      notifier.dispose();
+    }
+    _immediateSelectionNotifiers.clear();
+  }
+
+  ValueListenable<bool?> immediateSelectionForPath(String path) {
+    final immediatePaths = _immediateSelectionPaths;
+    if (immediatePaths != null) {
+      _immediateSelectionTouchedPaths.add(path);
+    }
+    return _immediateSelectionNotifiers.putIfAbsent(
+      path,
+      () => ValueNotifier<bool?>(
+        immediatePaths?.contains(path),
+      ),
+    );
+  }
+
+  void showImmediateSelection(
+    Set<String> paths, {
+    required Iterable<String> currentSelectedPaths,
+  }) {
+    _immediateSelectionGeneration++;
+    final affectedPaths = <String>{
+      ..._immediateSelectionTouchedPaths,
+      ...currentSelectedPaths,
+      ...paths,
+    };
+    _immediateSelectionPaths = Set<String>.unmodifiable(paths);
+    _immediateSelectionTouchedPaths
+      ..clear()
+      ..addAll(affectedPaths);
+
+    for (final path in affectedPaths) {
+      final notifier = _immediateSelectionNotifiers[path];
+      if (notifier != null) {
+        notifier.value = paths.contains(path);
+      }
+    }
+  }
+
+  void clearImmediateSelection() {
+    if (_immediateSelectionPaths == null) return;
+    _immediateSelectionGeneration++;
+    _immediateSelectionPaths = null;
+    for (final path in _immediateSelectionTouchedPaths) {
+      final notifier = _immediateSelectionNotifiers[path];
+      if (notifier != null) notifier.value = null;
+    }
+    _immediateSelectionTouchedPaths.clear();
+  }
+
+  void _settleImmediateSelection(SelectionState selectionState) {
+    final immediatePaths = _immediateSelectionPaths;
+    if (immediatePaths == null ||
+        !setEquals(immediatePaths, selectionState.allSelectedPaths.toSet())) {
+      return;
+    }
+
+    final generation = ++_immediateSelectionGeneration;
+    scheduleMicrotask(() {
+      if (generation != _immediateSelectionGeneration) return;
+      clearImmediateSelection();
+    });
   }
 
   GlobalKey itemKeyForPath(String path) {
@@ -37,6 +112,12 @@ class TabbedFolderKeyboardController {
   void pruneItemKeys(Iterable<String> visiblePaths) {
     final visible = visiblePaths.toSet();
     _itemKeys.removeWhere((path, _) => !visible.contains(path));
+    _immediateSelectionNotifiers.removeWhere(
+      (path, _) => !visible.contains(path),
+    );
+    _immediateSelectionTouchedPaths.removeWhere(
+      (path) => !visible.contains(path),
+    );
   }
 
   bool hasRenderedItem(String path) {
@@ -134,9 +215,11 @@ class TabbedFolderKeyboardController {
   void clearFocus() {
     focusedPath = null;
     _keyboardRangeAnchorPath = null;
+    clearImmediateSelection();
   }
 
   void syncFromSelection(SelectionState selectionState) {
+    _settleImmediateSelection(selectionState);
     final String? lastPath = selectionState.lastSelectedPath;
     if (lastPath != null && lastPath != focusedPath) {
       focusedPath = lastPath;
@@ -159,6 +242,9 @@ class TabbedFolderKeyboardController {
       required bool ctrlSelect,
     }) selectRange,
     required void Function(FileSystemEntity entity) activateEntity,
+
+    /// Shift+Enter: open the focused entity in a brand new window.
+    void Function(FileSystemEntity entity)? activateEntityInNewWindow,
     required void Function(bool permanent) onDelete,
     VoidCallback? onSelectAll,
     VoidCallback? onCopy,
@@ -258,8 +344,9 @@ class TabbedFolderKeyboardController {
         _getNavigableItems(folderListState, currentFilter);
     if (items.isEmpty) return KeyEventResult.ignored;
 
-    final bool isGridLayout = folderListState.viewMode == ViewMode.grid ||
-        folderListState.viewMode == ViewMode.gridPreview;
+    final bool isGridLayout =
+        ViewModeUtils.isGridLike(folderListState.viewMode) ||
+            folderListState.viewMode == ViewMode.tiles;
     final int crossAxisCount = isGridLayout
         ? (gridCrossAxisCount ?? folderListState.gridZoomLevel).clamp(1, 999)
         : 1;
@@ -302,7 +389,11 @@ class TabbedFolderKeyboardController {
         );
         return KeyEventResult.handled;
       }
-      activateEntity(items[currentIndex]);
+      if (isShiftPressed && activateEntityInNewWindow != null) {
+        activateEntityInNewWindow(items[currentIndex]);
+      } else {
+        activateEntity(items[currentIndex]);
+      }
       return KeyEventResult.handled;
     } else {
       // Type-ahead search support

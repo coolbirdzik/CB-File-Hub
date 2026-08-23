@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cb_file_manager/services/disk_cleaner/cleaner_growth_history_service.dart';
 import 'package:cb_file_manager/services/disk_cleaner/disk_tree_node.dart';
@@ -32,6 +33,73 @@ FullDiskScanResult _scan({
     ),
     duration: const Duration(seconds: 1),
     coverageIssues: coverageIssues,
+  );
+}
+
+String _snapshotKey(String drivePath) {
+  final normalized = drivePath.replaceAll('/', r'\').trim().toUpperCase();
+  var withoutTrailingSlash = normalized;
+  while (withoutTrailingSlash.endsWith(r'\')) {
+    withoutTrailingSlash = withoutTrailingSlash.substring(
+      0,
+      withoutTrailingSlash.length - 1,
+    );
+  }
+  final encoded =
+      base64Url.encode(utf8.encode(withoutTrailingSlash)).replaceAll('=', '');
+  return 'cleaner.folder_growth.v1.$encoded';
+}
+
+class _FolderSpec {
+  final String path;
+  final int sizeBytes;
+
+  const _FolderSpec(this.path, this.sizeBytes);
+}
+
+FullDiskScanResult _folderScan(
+  Iterable<_FolderSpec> folders, {
+  List<FullDiskScanCoverageIssue> coverageIssues = const [],
+}) {
+  final children = folders
+      .map(
+        (folder) => DiskTreeNode(
+          name: folder.path.split(r'\').last,
+          fullPath: folder.path,
+          sizeBytes: folder.sizeBytes,
+        ),
+      )
+      .toList(growable: false);
+  return FullDiskScanResult(
+    root: DiskTreeNode(
+      name: r'C:\',
+      fullPath: r'C:\',
+      sizeBytes: children.fold<int>(
+        0,
+        (sum, child) => sum + child.sizeBytes,
+      ),
+      children: children,
+    ),
+    duration: Duration.zero,
+    coverageIssues: coverageIssues,
+  );
+}
+
+Future<void> _writeLegacySnapshot(
+  SharedPreferences preferences, {
+  required List<String> folderPaths,
+  required List<String> incompletePaths,
+}) async {
+  await preferences.setString(
+    _snapshotKey(r'C:\'),
+    jsonEncode(<String, dynamic>{
+      'capturedAt': DateTime(2026, 8, 10).toIso8601String(),
+      'folders': [
+        for (final path in folderPaths)
+          <String, dynamic>{'path': path, 'sizeBytes': 0},
+      ],
+      'incompletePaths': incompletePaths,
+    }),
   );
 }
 
@@ -139,6 +207,159 @@ void main() {
 
     expect(comparison.hasBaseline, isTrue);
     expect(comparison.folders, isEmpty);
+  });
+
+  test('persists bounded folder coverage flags instead of raw issue paths',
+      () async {
+    final preferences = await SharedPreferences.getInstance();
+    final service = CleanerGrowthHistoryService(preferences);
+    final folders = [
+      for (var index = 0; index < 6000; index++)
+        _FolderSpec(
+          'C:\\Folder${index.toString().padLeft(4, '0')}',
+          index == 0 ? 200 * 1024 * 1024 : index,
+        ),
+    ];
+    const issue = FullDiskScanCoverageIssue(
+      path: r'C:\Folder0000\nested',
+      reason: FullDiskScanCoverageIssueReason.reparsePoint,
+    );
+    final coverageIssues = <FullDiskScanCoverageIssue>[
+      issue,
+      issue,
+      for (var index = 0; index < 12000; index++)
+        FullDiskScanCoverageIssue(
+          path: 'C:\\Unrelated\\Issue${index.toString().padLeft(5, '0')}',
+          reason: FullDiskScanCoverageIssueReason.reparsePoint,
+        ),
+    ];
+    var eventLoopWasReached = false;
+    Timer.run(() => eventLoopWasReached = true);
+
+    await service.compareAndStore(
+      _folderScan(folders, coverageIssues: coverageIssues),
+      scannedAt: DateTime(2026, 8, 10),
+    );
+
+    expect(eventLoopWasReached, isTrue);
+    final raw = preferences.getString(_snapshotKey(r'C:\'));
+    expect(raw, isNotNull);
+    final json = jsonDecode(raw!) as Map<String, dynamic>;
+    expect(json['incompletePaths'], isEmpty);
+    final savedFolders = (json['folders'] as List).cast<Map>();
+    expect(savedFolders, hasLength(5000));
+    final flagged = savedFolders
+        .where((folder) => folder['hasIncompleteCoverage'] == true)
+        .map((folder) => folder['path'])
+        .toList();
+    expect(flagged, contains(r'C:\Folder0000'));
+  });
+
+  test('legacy coverage index preserves boundary and normalization semantics',
+      () async {
+    final preferences = await SharedPreferences.getInstance();
+    final service = CleanerGrowthHistoryService(preferences);
+    const exact = r'C:\Data\Exact';
+    const ancestorChild = r'C:\Data\Ancestor\Child';
+    const descendantParent = r'C:\Data\Descendant';
+    const sibling = r'C:\Data\Sibling';
+    const siblingTwin = r'C:\Data\SiblingTwin';
+    const folders = [
+      exact,
+      ancestorChild,
+      descendantParent,
+      sibling,
+      siblingTwin
+    ];
+    await _writeLegacySnapshot(
+      preferences,
+      folderPaths: folders,
+      incompletePaths: const [
+        r'c:/data/exact/',
+        r'C:\Data\Ancestor',
+        r'C:\Data\Descendant\nested',
+        r'C:\Data\Sibling\nested',
+      ],
+    );
+
+    final comparison = await service.compareAndStore(
+      _folderScan([
+        for (final path in folders) _FolderSpec(path, 100 * 1024 * 1024),
+      ]),
+      scannedAt: DateTime(2026, 8, 12),
+    );
+
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      contains(siblingTwin),
+    );
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      isNot(contains(exact)),
+    );
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      isNot(contains(ancestorChild)),
+    );
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      isNot(contains(descendantParent)),
+    );
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      isNot(contains(sibling)),
+    );
+  });
+
+  test('legacy index handles thousands of issue paths without quadratic scans',
+      () async {
+    final preferences = await SharedPreferences.getInstance();
+    final service = CleanerGrowthHistoryService(preferences);
+    final folderPaths = [
+      for (var index = 0; index < 4999; index++)
+        'C:\\Folder${index.toString().padLeft(4, '0')}',
+      r'C:\Folder00000',
+    ];
+    final incompletePaths = <String>[
+      r'C:\Folder0000\child',
+      for (var index = 0; index < 115956; index++)
+        'C:\\Unrelated\\Issue${index.toString().padLeft(5, '0')}',
+    ];
+    await _writeLegacySnapshot(
+      preferences,
+      folderPaths: folderPaths,
+      incompletePaths: incompletePaths,
+    );
+
+    final comparison = await service.compareAndStore(
+      _folderScan([
+        for (final path in folderPaths)
+          _FolderSpec(
+            path,
+            path == r'C:\Folder00000' ? 200 * 1024 * 1024 : 64 * 1024 * 1024,
+          ),
+      ]),
+      scannedAt: DateTime(2026, 8, 12),
+    );
+
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      contains(r'C:\Folder00000'),
+    );
+    expect(
+      comparison.folders.map((folder) => folder.path),
+      isNot(contains(r'C:\Folder0000')),
+    );
+
+    final savedRaw = preferences.getString(_snapshotKey(r'C:\'));
+    expect(savedRaw, isNotNull);
+    final savedJson = jsonDecode(savedRaw!) as Map<String, dynamic>;
+    expect(savedJson['incompletePaths'], isEmpty);
+    final savedFolders = (savedJson['folders'] as List).cast<Map>();
+    expect(
+      savedFolders,
+      everyElement(containsPair('hasIncompleteCoverage', false)),
+    );
   });
 
   test('suppresses an ancestor when a descendant explains the same growth',

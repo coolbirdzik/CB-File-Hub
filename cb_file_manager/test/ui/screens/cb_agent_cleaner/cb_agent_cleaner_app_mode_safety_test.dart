@@ -265,7 +265,9 @@ void main() {
       expect(item.isUserSelected, isFalse);
       expect(cleaner.pendingCleanupBytes, 1200 * 1024 * 1024);
 
-      await tester.tap(find.text('Scan again'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('cleaner-select-drives')),
+      );
       await _pumpUi(tester);
       expect(find.byKey(const ValueKey<String>('setup')), findsOneWidget);
       expect(

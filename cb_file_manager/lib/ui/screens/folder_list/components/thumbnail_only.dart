@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io'; // Import dart:io for FileSystemEntity
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
@@ -97,34 +98,39 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
     }
 
     // For media files (video/image), use ThumbnailLoader with no border radius
-    return RepaintBoundary(
-      child: ThumbnailLoader(
-        key: ValueKey('thumb-loader-${widget.file.path}'),
-        filePath: widget.file.path,
-        isVideo: isVideo,
-        isImage: isImage,
-        width: double.infinity,
-        height: double.infinity,
-        fit: BoxFit.cover,
-        isPriority:
-            false, // Don't mark all as priority to reduce concurrent loads
-        borderRadius: BorderRadius.circular(0),
-        showLoadingIndicator: true,
-        fallbackBuilder: () => isVideo
-            ? Center(
-                child: Icon(
-                  PhosphorIconsLight.playCircle,
-                  size: widget.iconSize,
-                  color: Colors.white70,
+    return ValueListenableBuilder<FileThumbnailFitMode>(
+      valueListenable: UserPreferences.instance.fileThumbnailFitMode,
+      builder: (context, fitMode, _) => RepaintBoundary(
+        child: ThumbnailLoader(
+          key: ValueKey('thumb-loader-${widget.file.path}'),
+          filePath: widget.file.path,
+          isVideo: isVideo,
+          isImage: isImage,
+          width: double.infinity,
+          height: double.infinity,
+          fit: fitMode == FileThumbnailFitMode.contain
+              ? BoxFit.contain
+              : BoxFit.cover,
+          isPriority:
+              false, // Don't mark all as priority to reduce concurrent loads
+          borderRadius: BorderRadius.circular(0),
+          showLoadingIndicator: true,
+          fallbackBuilder: () => isVideo
+              ? Center(
+                  child: Icon(
+                    PhosphorIconsLight.playCircle,
+                    size: widget.iconSize,
+                    color: Colors.white70,
+                  ),
+                )
+              : Center(
+                  child: Icon(
+                    genericIcon,
+                    size: widget.iconSize,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
                 ),
-              )
-            : Center(
-                child: Icon(
-                  genericIcon,
-                  size: widget.iconSize,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              ),
+        ),
       ),
     );
   }

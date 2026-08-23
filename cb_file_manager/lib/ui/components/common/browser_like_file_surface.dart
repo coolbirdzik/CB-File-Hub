@@ -5,6 +5,7 @@ import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
+import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:flutter/material.dart';
 
@@ -171,6 +172,13 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
         focusFilePath: widget.focusFilePath!,
         selectRange: widget.selectRange!,
         activateEntity: widget.activateEntity!,
+        activateEntityInNewWindow: (entity) => unawaited(
+          EntityOpenActions.openInNewWindow(
+            context,
+            sourcePath: entity.path,
+            forceNewWindow: true,
+          ),
+        ),
         onDelete: (permanent) {
           unawaited(
             Future<void>.sync(

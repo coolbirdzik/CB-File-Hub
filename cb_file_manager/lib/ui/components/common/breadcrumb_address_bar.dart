@@ -1,5 +1,11 @@
+import 'dart:io' show Platform;
+
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../../config/design_system_config.dart';
+import '../../../design_system/fluent_surface_tokens.dart';
+import '../../../design_system/tokens/cb_geometry_tokens.dart';
 
 /// A single item in a [BreadcrumbAddressBar].
 class BreadcrumbSegment {
@@ -85,6 +91,12 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
 
   Widget _buildBreadcrumbs(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final useFluentDesktopShell =
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
+            DesignSystemConfig.enableFluentDesktopShell &&
+            !DesignSystemConfig.enableLegacyMaterialDesktopShell;
+    final surfaces =
+        useFluentDesktopShell ? FluentSurfaceTokens.of(context) : null;
     final items = <Widget>[];
 
     for (int i = 0; i < widget.segments.length; i++) {
@@ -97,7 +109,7 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
           child: Icon(
             PhosphorIconsLight.caretRight,
             size: 11,
-            color: colorScheme.onSurfaceVariant,
+            color: surfaces?.textSecondary ?? colorScheme.onSurfaceVariant,
           ),
         ));
       }
@@ -112,6 +124,7 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
         segment: seg,
         isLast: isLast,
         colorScheme: colorScheme,
+        surfaces: surfaces,
         onTap: effectiveTap,
       );
 
@@ -128,6 +141,37 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
 
   Widget _buildEditField(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final useFluentDesktopShell =
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
+            DesignSystemConfig.enableFluentDesktopShell &&
+            !DesignSystemConfig.enableLegacyMaterialDesktopShell;
+    if (useFluentDesktopShell) {
+      final surfaces = FluentSurfaceTokens.of(context);
+      return fluent.TextBox(
+        controller: widget.editController,
+        focusNode: _focusNode,
+        autofocus: true,
+        onSubmitted: (value) {
+          widget.onPathSubmitted?.call(value);
+          _stopEditing();
+        },
+        onTapOutside: (_) => _stopEditing(),
+        placeholder: 'Enter path...',
+        style: TextStyle(
+          fontSize: 13,
+          color: surfaces.textPrimary,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: WidgetStatePropertyAll(
+          BoxDecoration(
+            color: surfaces.control,
+            borderRadius: FluentSurfaceTokens.controlRadius,
+            border: Border.all(color: surfaces.stroke),
+          ),
+        ),
+      );
+    }
+
     return TextField(
       controller: widget.editController,
       focusNode: _focusNode,
@@ -156,6 +200,7 @@ class _BreadcrumbChip extends StatefulWidget {
   final BreadcrumbSegment segment;
   final bool isLast;
   final ColorScheme colorScheme;
+  final FluentSurfaceTokens? surfaces;
   final VoidCallback? onTap;
 
   const _BreadcrumbChip({
@@ -163,6 +208,7 @@ class _BreadcrumbChip extends StatefulWidget {
     required this.segment,
     required this.isLast,
     required this.colorScheme,
+    this.surfaces,
     this.onTap,
   }) : super(key: key);
 
@@ -177,7 +223,19 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
   Widget build(BuildContext context) {
     final seg = widget.segment;
     final colorScheme = widget.colorScheme;
+    final surfaces = widget.surfaces;
     final tappable = widget.onTap != null;
+    final textColor = surfaces?.textPrimary ?? colorScheme.onSurface;
+    final secondaryColor =
+        surfaces?.textSecondary ?? colorScheme.onSurfaceVariant;
+
+    if (surfaces != null && tappable) {
+      return _buildFluentChip(
+        surfaces,
+        textColor: textColor,
+        secondaryColor: secondaryColor,
+      );
+    }
 
     return MouseRegion(
       onEnter: tappable ? (_) => setState(() => _hovering = true) : null,
@@ -190,25 +248,29 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: _hovering
-                ? colorScheme.onSurface.withValues(alpha: 0.08)
+                ? surfaces?.controlHover ??
+                    colorScheme.onSurface.withValues(alpha: 0.08)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: surfaces != null
+                ? FluentSurfaceTokens.controlRadius
+                : BorderRadius.circular(14),
           ),
           child: Row(
             // Last chip expands to fill its Flexible slot; others shrink-wrap.
             mainAxisSize: widget.isLast ? MainAxisSize.max : MainAxisSize.min,
             children: [
               if (seg.icon != null) ...[
-                Icon(seg.icon, size: 13, color: colorScheme.onSurfaceVariant),
+                Icon(seg.icon, size: 13, color: secondaryColor),
                 const SizedBox(width: 5),
               ],
               if (widget.isLast)
                 Flexible(
                   child: Text(
                     seg.label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
+                      color: textColor,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -218,7 +280,7 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                   seg.label,
                   style: TextStyle(
                     fontSize: 13,
-                    color: colorScheme.onSurfaceVariant,
+                    color: secondaryColor,
                   ),
                 ),
               if (seg.badge != null) ...[
@@ -227,7 +289,7 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                   seg.badge!,
                   style: TextStyle(
                     fontSize: 11,
-                    color: colorScheme.onSurfaceVariant,
+                    color: secondaryColor,
                   ),
                 ),
               ],
@@ -235,6 +297,95 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFluentChip(
+    FluentSurfaceTokens surfaces, {
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
+    final seg = widget.segment;
+    return fluent.HoverButton(
+      cursor: SystemMouseCursors.click,
+      semanticLabel: seg.label,
+      onPressed: widget.onTap,
+      builder: (context, states) {
+        final isPressed = states.contains(WidgetState.pressed);
+        final isHovered = states.contains(WidgetState.hovered);
+        final isFocused = states.contains(WidgetState.focused);
+        final Color backgroundColor = isPressed
+            ? surfaces.controlPressed
+            : isHovered
+                ? surfaces.controlHover
+                : Colors.transparent;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: FluentSurfaceTokens.controlRadius,
+            border: isFocused
+                ? Border.all(
+                    color: surfaces.focusRing,
+                    width: CbStrokes.emphasis,
+                  )
+                : null,
+          ),
+          child: _buildChipContent(
+            textColor: textColor,
+            secondaryColor: secondaryColor,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChipContent({
+    required Color textColor,
+    required Color secondaryColor,
+  }) {
+    final seg = widget.segment;
+    return Row(
+      // Last chip expands to fill its Flexible slot; others shrink-wrap.
+      mainAxisSize: widget.isLast ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        if (seg.icon != null) ...[
+          Icon(seg.icon, size: 13, color: secondaryColor),
+          const SizedBox(width: 5),
+        ],
+        if (widget.isLast)
+          Flexible(
+            child: Text(
+              seg.label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
+        else
+          Text(
+            seg.label,
+            style: TextStyle(
+              fontSize: 13,
+              color: secondaryColor,
+            ),
+          ),
+        if (seg.badge != null) ...[
+          const SizedBox(width: 6),
+          Text(
+            seg.badge!,
+            style: TextStyle(
+              fontSize: 11,
+              color: secondaryColor,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

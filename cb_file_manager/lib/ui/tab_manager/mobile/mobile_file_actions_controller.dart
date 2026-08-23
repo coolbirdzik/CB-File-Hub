@@ -8,6 +8,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/folder_context_menu.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 
 enum MobileActionBarProfile {
   full,
@@ -298,13 +299,6 @@ class MobileFileActionsController {
                     localizations.viewModeList, PhosphorIconsLight.listBullets),
                 _buildViewModeOption(context, ViewMode.grid,
                     localizations.viewModeGrid, PhosphorIconsLight.squaresFour),
-                if (!(Platform.isAndroid || Platform.isIOS))
-                  _buildViewModeOption(
-                    context,
-                    ViewMode.gridPreview,
-                    localizations.viewModeGridPreview,
-                    PhosphorIconsLight.layout,
-                  ),
                 _buildViewModeOption(context, ViewMode.details,
                     localizations.viewModeDetails, PhosphorIconsLight.rows),
                 _buildViewModeOption(context, ViewMode.tree,
@@ -401,8 +395,7 @@ class MobileFileActionsController {
             ),
 
             if (onGridSizePressed != null &&
-                (currentViewMode == ViewMode.grid ||
-                    currentViewMode == ViewMode.gridPreview))
+                ViewModeUtils.isGridLike(currentViewMode))
               ListTile(
                 leading: const Icon(PhosphorIconsLight.rectangle),
                 title: Text(localizations.gridSize ?? 'Kích thước lưới'),
@@ -462,8 +455,7 @@ class MobileFileActionsController {
                 Navigator.pop(context);
                 isMasonryLayout = !isMasonryLayout;
                 if (isMasonryLayout &&
-                    currentViewMode != ViewMode.grid &&
-                    currentViewMode != ViewMode.gridPreview) {
+                    !ViewModeUtils.isGridLike(currentViewMode)) {
                   currentViewMode = ViewMode.grid;
                   onViewModeToggled?.call(ViewMode.grid);
                 }
@@ -749,12 +741,14 @@ class MobileFileActionsController {
     switch (mode) {
       case ViewMode.list:
         return PhosphorIconsLight.listBullets;
+      case ViewMode.tiles:
+        return PhosphorIconsLight.gridNine;
       case ViewMode.grid:
         return PhosphorIconsLight.squaresFour;
       case ViewMode.details:
         return PhosphorIconsLight.rows;
       case ViewMode.gridPreview:
-        return PhosphorIconsLight.layout;
+        return PhosphorIconsLight.squaresFour;
       case ViewMode.columns:
         return PhosphorIconsLight.columns;
       case ViewMode.tree:

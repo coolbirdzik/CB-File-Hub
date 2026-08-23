@@ -1647,12 +1647,16 @@ class VideoThumbnailHelper {
         if (cachedPath != null) {
           final cacheFile = File(cachedPath);
           if (await cacheFile.exists()) {
-            final value = _inMemoryPathCache.remove(key)!;
+            // The cache can be cleared while the file check is awaiting I/O.
+            final value = _inMemoryPathCache.remove(key);
+            if (value == null) {
+              continue;
+            }
             _inMemoryPathCache[key] = value;
             if (cacheKey != key) {
-              _inMemoryPathCache[cacheKey] = cachedPath;
+              _inMemoryPathCache[cacheKey] = value;
             }
-            return cachedPath;
+            return value;
           } else {
             _inMemoryPathCache.remove(key);
           }

@@ -7,7 +7,7 @@ import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
-import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
+import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart'; // Import TagManager để lắng nghe thay đổi
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -27,6 +27,8 @@ import 'package:flutter/services.dart'; // Import for keyboard key detection
 // Import for RepaintBoundary
 import '../../../components/common/optimized_interaction_handler.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
+import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import '../../../utils/item_interaction_style.dart';
 import 'package:cb_file_manager/helpers/network/streaming_helper.dart';
 import 'package:cb_file_manager/services/network_browsing/webdav_service.dart';
@@ -280,11 +282,8 @@ class _FileItemState extends State<FileItem> {
               });
             } else {
               if (mounted) {
-                Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute(
-                    fullscreenDialog: true,
-                    builder: (_) => VideoPlayerFullScreen(file: widget.file),
-                  ),
+                unawaited(
+                  VideoPlaybackLauncher.open(context, file: widget.file),
                 );
               }
             }
@@ -295,6 +294,22 @@ class _FileItemState extends State<FileItem> {
         Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
             fullscreenDialog: true,
             builder: (context) => ImageViewerScreen(file: widget.file)));
+      } else if (FileTypeUtils.isArchiveFile(widget.file.path)) {
+        ExternalAppHelper.openFileWithApp(widget.file.path, 'shell_open')
+            .then((success) {
+          if (!success && mounted) {
+            RouteUtils.showAcrylicDialog(
+              context: context,
+              builder: (dialogContext) =>
+                  OpenWithDialog(filePath: widget.file.path),
+            );
+          }
+        });
+      } else if (FileTypeUtils.isTextFile(widget.file.path) ||
+          FileTypeUtils.isPdfFile(widget.file.path)) {
+        if (mounted) {
+          unawaited(InAppFileViewer.open(context, widget.file));
+        }
       } else {
         ExternalAppHelper.openFileWithApp(widget.file.path, 'shell_open')
             .then((success) {
@@ -317,9 +332,7 @@ class _FileItemState extends State<FileItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    final bool shouldCtrlSelect = widget.isDesktopMode
-        ? isCtrlPressed || (widget.isSelectionMode && !isShiftPressed)
-        : true;
+    final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
     widget.toggleFileSelection(widget.file.path,
         shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
@@ -467,17 +480,23 @@ class _FileItemState extends State<FileItem> {
                               // Click vào icon sẽ select item
                               _handleSelection();
                             },
-                            onLongPress: () {
-                              if (!widget.isSelectionMode) {
-                                widget.toggleFileSelection(widget.file.path,
-                                    shiftSelect: false, ctrlSelect: false);
-                              }
-                            },
+                            onLongPress: !widget.isDesktopMode
+                                ? () {
+                                    if (!widget.isSelectionMode) {
+                                      widget.toggleFileSelection(
+                                        widget.file.path,
+                                        shiftSelect: false,
+                                        ctrlSelect: false,
+                                      );
+                                    }
+                                  }
+                                : null,
                           ),
                         ),
                         // Interactive layer cho tên (open)
                         if (!isBeingRenamed)
                           Positioned(
+                            key: const ValueKey('name-hit-area'),
                             left: 80,
                             top: 0,
                             right: 0,
@@ -509,26 +528,39 @@ class _FileItemState extends State<FileItem> {
                                   : null,
                             ),
                           ),
-                        // Selection indicator - only rebuilds when selection changes
-                        if (isSelected &&
-                            (!widget.isDesktopMode ||
-                                !widget.showItemBackground))
-                          Positioned(
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 3,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
-                                borderRadius: widget.isDesktopMode
-                                    ? const BorderRadius.horizontal(
-                                        left: Radius.circular(12),
-                                      )
-                                    : BorderRadius.zero,
-                              ),
+                        // Selection indicator. Kept unconditionally in the Stack
+                        // so selection only flips a paint property instead of
+                        // adding/removing a child. Inserting a Stack child on
+                        // every arrow-key press churned the element and render
+                        // trees, which on Windows made the engine batch node
+                        // creates and destroys into one ui::AXTreeUpdate and log
+                        // "Failed to update ui::AXTree, error: <id> will not be
+                        // in the tree and is not the new root".
+                        Positioned(
+                          key: const ValueKey('selection-indicator'),
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 3,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: isSelected &&
+                                      (!widget.isDesktopMode ||
+                                          !widget.showItemBackground)
+                                  ? BoxDecoration(
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      borderRadius: widget.isDesktopMode
+                                          ? const BorderRadius.horizontal(
+                                              left: Radius.circular(12),
+                                            )
+                                          : BorderRadius.zero,
+                                    )
+                                  : const BoxDecoration(),
+                              child: const SizedBox.expand(),
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -668,32 +700,38 @@ class _FileItemContentState extends State<_FileItemContent> {
         width: 48,
         height: 48,
         child: isVideo || isImage
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(16.0),
-                child: ThumbnailLoader(
-                  filePath: widget.file.path,
-                  isVideo: isVideo,
-                  isImage: isImage,
-                  width: 48,
-                  height: 48,
+            ? ValueListenableBuilder<FileThumbnailFitMode>(
+                valueListenable: UserPreferences.instance.fileThumbnailFitMode,
+                builder: (context, fitMode, _) => ClipRRect(
                   borderRadius: BorderRadius.circular(16.0),
-                  fallbackBuilder: () {
-                    final theme = Theme.of(context);
-                    return Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16.0),
-                        color: theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.3),
-                      ),
-                      child: Icon(
-                        isVideo
-                            ? PhosphorIconsLight.videoCamera
-                            : PhosphorIconsLight.image,
-                        size: 36,
-                        color: theme.colorScheme.primary,
-                      ),
-                    );
-                  },
+                  child: ThumbnailLoader(
+                    filePath: widget.file.path,
+                    isVideo: isVideo,
+                    isImage: isImage,
+                    width: 48,
+                    height: 48,
+                    fit: fitMode == FileThumbnailFitMode.contain
+                        ? BoxFit.contain
+                        : BoxFit.cover,
+                    borderRadius: BorderRadius.circular(16.0),
+                    fallbackBuilder: () {
+                      final theme = Theme.of(context);
+                      return Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16.0),
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3),
+                        ),
+                        child: Icon(
+                          isVideo
+                              ? PhosphorIconsLight.videoCamera
+                              : PhosphorIconsLight.image,
+                          size: 36,
+                          color: theme.colorScheme.primary,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               )
             : FutureBuilder<Widget>(
@@ -920,6 +958,9 @@ class _FileItemContentState extends State<_FileItemContent> {
   }
 
   String _getDisplayName(File file) {
+    // Archive entries live behind a virtual path; show the entry name.
+    final archiveEntryName = ArchivePathUtils.entryDisplayName(file.path);
+    if (archiveEntryName != null) return archiveEntryName;
     // For network files, extract just the filename from the path
     if (file.path.startsWith('#network/')) {
       final parts = file.path.split('/');

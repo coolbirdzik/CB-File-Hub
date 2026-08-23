@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/components/index.dart'
 import 'package:cb_file_manager/ui/tab_manager/components/index.dart'
     as tab_components;
 import 'package:cb_file_manager/bloc/selection/selection.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 
@@ -239,8 +240,7 @@ class SearchFilterResultsView extends StatelessWidget {
                   state: folderListState,
                   isSelectionMode:
                       selectionState.isSelectionMode && !isDesktopPlatform,
-                  isGridView: folderListState.viewMode == ViewMode.grid ||
-                      folderListState.viewMode == ViewMode.gridPreview,
+                  isGridView: ViewModeUtils.isGridLike(folderListState.viewMode),
                   selectedFiles: selectionState.selectedFilePaths.toList(),
                   toggleFileSelection: toggleFileSelection,
                   toggleFolderSelection: toggleFolderSelection,

@@ -137,6 +137,11 @@ class CleanerAppInsightsCubit extends Cubit<CleanerAppInsightsState> {
     final nextSelectedId = selectedIsVisible
         ? selectedId
         : (visible.isEmpty ? null : visible.first.app.id);
+    if (nextSelectedId == selectedId) {
+      // Keep `next` itself so its memoized visible list survives the emit.
+      emit(next);
+      return;
+    }
     emit(next.copyWith(selectedAppId: nextSelectedId));
   }
 }

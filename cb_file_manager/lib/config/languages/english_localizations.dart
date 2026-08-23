@@ -75,6 +75,15 @@ class EnglishLocalizations implements AppLocalizations {
   String get setCoolBirdAsDefaultForVideosAndroidHint =>
       'Opening Settings. In "Open by default", enable CB File Hub for video files.';
   @override
+  String get setCoolBirdAsDefaultForArchives =>
+      'Set CB File Hub as default for archive files';
+  @override
+  String get setCoolBirdAsDefaultForArchivesSuccess =>
+      'CB File Hub is now the default for archive files.';
+  @override
+  String get setCoolBirdAsDefaultForArchivesFailed =>
+      'Could not set CB File Hub as the default for archive files.';
+  @override
   String get openFolder => 'Open Folder';
   @override
   String get openFile => 'Open File';
@@ -200,6 +209,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewModeTree => 'Tree';
 
   @override
+  String get viewModeTiles => 'Tiles';
+
+  @override
   String get previewPaneTitle => 'Preview';
 
   @override
@@ -209,7 +221,49 @@ class EnglishLocalizations implements AppLocalizations {
   String get previewNotSupported => 'Preview not available for this file type';
 
   @override
+  String get archiveSectionTitle => 'Archive';
+
+  @override
+  String get archiveBrowseTitle => 'Browse contents';
+
+  @override
+  String get archiveExtractHere => 'Extract here';
+
+  @override
+  String get archiveExtractTo => 'Extract to…';
+
+  @override
+  String get archiveExtractToTitle => 'Choose extraction folder';
+
+  @override
+  String get archiveExtractAll => 'Extract all';
+
+  @override
+  String get archiveExtracting => 'Extracting archive…';
+
+  @override
+  String get archiveExtractComplete => 'Archive extracted';
+
+  @override
+  String archiveExtractFailed(String error) => 'Extraction failed: $error';
+
+  @override
+  String get archiveEmpty => 'This archive is empty';
+
+  @override
+  String archivePreviewSummary(int count) => '$count item(s)';
+
+  @override
+  String archivePreviewMore(int count) => '… and $count more';
+
+  @override
   String get previewUnavailable => 'Preview not available';
+
+  @override
+  String get previewTextTruncated => 'Showing partial content';
+
+  @override
+  String get previewTextTooLarge => 'File is too large to preview';
 
   @override
   String get showPreview => 'Show preview';
@@ -1043,6 +1097,8 @@ class EnglishLocalizations implements AppLocalizations {
   String get useSystemDefaultForVideoEnabled =>
       'Videos will open with the system default app';
   @override
+  String get useSystemDefaultForVideoDisabled =>
+      'Videos will open in the in-app player';
   @override
   String get seekSpeed => 'Seek speed';
   @override
@@ -1055,8 +1111,16 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Fast';
   @override
-  String get useSystemDefaultForVideoDisabled =>
-      'Videos will open in the in-app player';
+  String get openVideoInNewWindow => 'Open videos in a separate window';
+  @override
+  String get openVideoInNewWindowDescription =>
+      'Desktop only. Uses one separate in-app player window; opening another video replaces the current video in that window.';
+  @override
+  String get openVideoInNewWindowEnabled =>
+      'Videos will open in a separate player window';
+  @override
+  String get openVideoInNewWindowDisabled =>
+      'The video player will open in the current window';
   @override
   String get thumbnailCache => 'Thumbnail Cache';
   @override
@@ -1653,6 +1717,13 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get showFileTagsToggleDescription =>
       'Enable/disable showing tags outside file list';
+
+  @override
+  String get fileThumbnailFit => 'File thumbnail display';
+
+  @override
+  String get fileThumbnailFitDescription =>
+      'Choose whether file thumbnails fill the frame or show the full image';
 
   @override
   String get tagThumbnailFit => 'Tag thumbnail display';
@@ -3158,6 +3229,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerSelectDrives => 'Select drives';
   @override
   String get diskCleanerScanAgain => 'Scan again';
+  @override
+  String get diskCleanerCachedResultStatus =>
+      'Showing the previous scan (cached result). Scan again to refresh.';
 
   // Disk Cleaner — extended UI strings
   @override
@@ -3315,12 +3389,42 @@ class EnglishLocalizations implements AppLocalizations {
       '$count items • $size';
   @override
   String diskCleanerSizeFiles(String size, int files) => '$size • $files files';
+
+  @override
+  String diskCleanerRolledUpItems(int items) => '$items smaller items';
   @override
   String diskCleanerScannedProgress(String size, int files) =>
       '$size scanned • $files files';
   @override
   String get diskCleanerPieChartPendingScan =>
       'Pie chart will appear as soon as scan completes';
+  @override
+  String get diskCleanerIncrementalScanTitle => 'Incremental scan';
+  @override
+  String diskCleanerIncrementalScanProgress(int count) =>
+      'Updated $count changed folder(s)';
+  @override
+  String get diskCleanerFullScanFallback =>
+      'Incremental scan unavailable — full scan completed';
+  @override
+  String get diskCleanerOldLargeTitle => 'Old and large items';
+  @override
+  String get diskCleanerOldLargeSubtitle =>
+      'Review hints only. Filesystem timestamps do not prove an item is unused.';
+  @override
+  String get diskCleanerOldLargeAll => 'All';
+  @override
+  String get diskCleanerOldLargeFiles => 'Files';
+  @override
+  String get diskCleanerOldLargeFolders => 'Folders';
+  @override
+  String diskCleanerOldLargeLastActivity(String date) =>
+      'Last activity hint: $date';
+  @override
+  String get diskCleanerOldLargeReviewOnly => 'Review only';
+  @override
+  String get diskCleanerOldLargeEmpty =>
+      'No old, large files or folders were found.';
   @override
   String diskCleanerScanningPath(String path) => 'Scanning $path';
   @override

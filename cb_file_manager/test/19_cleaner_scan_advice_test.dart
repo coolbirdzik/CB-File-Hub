@@ -92,6 +92,10 @@ void main() {
       children: [downloads, cache],
     );
     service.publishCleanerScanContext(ownerTabId: tabId, root: root);
+    expect(
+      service.getCleanerScanContext(ownerTabId: tabId)?.isCached,
+      isFalse,
+    );
 
     final result = await ToolExecutor(ownerTabId: tabId).execute(
       const ToolCall(
@@ -110,6 +114,34 @@ void main() {
     expect(result.output, contains('owner=Google Chrome'));
     expect(result.output, contains('CLEAN:'));
     expect(result.output, contains('not JSON'));
+  });
+
+  test('cached scan advice identifies stale data and asks for a refresh',
+      () async {
+    final root = DiskTreeNode(
+      name: r'C:\',
+      fullPath: r'C:\',
+      sizeBytes: 1024,
+      fileCount: 1,
+    );
+    service.publishCleanerScanContext(
+      ownerTabId: tabId,
+      root: root,
+      isCached: true,
+    );
+
+    final result = await ToolExecutor(ownerTabId: tabId).execute(
+      const ToolCall(
+        name: 'get_current_cleaner_scan',
+        arguments: <String, dynamic>{},
+      ),
+    );
+
+    expect(result.output, contains('PREVIOUS CACHED CLEANER SCAN'));
+    expect(result.output, contains('previous cached result'));
+    expect(result.output, contains('this is not a current scan'));
+    expect(result.output, contains('Use Scan again to refresh'));
+    expect(result.output, isNot(contains('CURRENT CLEANER SCAN')));
   });
 
   test('cleaner skill keeps recommendation requests read-only', () {

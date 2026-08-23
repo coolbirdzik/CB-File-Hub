@@ -18,6 +18,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/tab_manager/shared/screen_menu_registry.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
@@ -63,6 +64,7 @@ import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 
 // Import extracted view layer components
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/widgets/file_list_view_builder.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:cb_file_manager/ui/controllers/dialog_manager.dart';
@@ -288,7 +290,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   String _displayPathForInput(String path) {
-    return _isDrivesPathValue(path) ? '' : path;
+    if (_isDrivesPathValue(path)) return '';
+    if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+      return ArchivePathUtils.displayPath(path);
+    }
+    return path;
   }
 
   @override
@@ -497,6 +503,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _toggleFileSelection(String filePath,
       {bool shiftSelect = false, bool ctrlSelect = false}) {
+    _keyboardController.focusedPath = filePath;
+    _showImmediateSelectionForToggle(
+      filePath,
+      shiftSelect: shiftSelect,
+      ctrlSelect: ctrlSelect,
+    );
     _selectionCoordinator.toggleFileSelection(
       filePath,
       shiftSelect: shiftSelect,
@@ -506,10 +518,39 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _toggleFolderSelection(String folderPath,
       {bool shiftSelect = false, bool ctrlSelect = false}) {
+    _keyboardController.focusedPath = folderPath;
+    _showImmediateSelectionForToggle(
+      folderPath,
+      shiftSelect: shiftSelect,
+      ctrlSelect: ctrlSelect,
+    );
     _selectionCoordinator.toggleFolderSelection(
       folderPath,
       shiftSelect: shiftSelect,
       ctrlSelect: ctrlSelect,
+    );
+  }
+
+  void _showImmediateSelectionForToggle(
+    String path, {
+    required bool shiftSelect,
+    required bool ctrlSelect,
+  }) {
+    if (!isDesktopPlatform || shiftSelect) {
+      _keyboardController.clearImmediateSelection();
+      return;
+    }
+
+    final currentPaths = _selectionBloc.state.allSelectedPaths.toSet();
+    final nextPaths = ctrlSelect ? Set<String>.of(currentPaths) : <String>{};
+    if (ctrlSelect && nextPaths.contains(path)) {
+      nextPaths.remove(path);
+    } else {
+      nextPaths.add(path);
+    }
+    _keyboardController.showImmediateSelection(
+      nextPaths,
+      currentSelectedPaths: currentPaths,
     );
   }
 
@@ -738,9 +779,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   void _toggleDrivesViewMode() {
     final currentMode = _folderListBloc.state.viewMode;
     final nextMode =
-        (currentMode == ViewMode.grid || currentMode == ViewMode.gridPreview)
-            ? ViewMode.list
-            : ViewMode.grid;
+        (currentMode == ViewMode.grid) ? ViewMode.list : ViewMode.grid;
     _setViewMode(nextMode);
   }
 
@@ -891,8 +930,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       }
     }
 
-    final isGridLayout = state.viewMode == ViewMode.grid ||
-        state.viewMode == ViewMode.gridPreview;
+    final isGridLayout =
+        state.viewMode == ViewMode.grid || state.viewMode == ViewMode.tiles;
     final crossAxisCount = isGridLayout
         ? (_gridCrossAxisCount ?? state.gridZoomLevel).clamp(1, 999).toInt()
         : 1;
@@ -943,8 +982,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     FolderListState state,
     int crossAxisCount,
   ) {
-    if (state.viewMode != ViewMode.grid &&
-        state.viewMode != ViewMode.gridPreview) {
+    if (state.viewMode != ViewMode.grid) {
+      if (state.viewMode == ViewMode.tiles) {
+        return 84.0;
+      }
       return state.viewMode == ViewMode.details ? 48.0 : 88.0;
     }
 
@@ -1046,10 +1087,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       final folderSortManager = FolderSortManager();
       final savedViewMode = await folderSortManager.getFolderViewMode(path) ??
           await prefs.getViewMode();
-      final effectiveViewMode =
-          !isDesktopPlatform && savedViewMode == ViewMode.gridPreview
-              ? ViewMode.grid
-              : savedViewMode;
+      final effectiveViewMode = ViewModeUtils.normalize(
+        !isDesktopPlatform && savedViewMode == ViewMode.gridPreview
+            ? ViewMode.grid
+            : savedViewMode,
+      );
       final savedSortOption =
           await folderSortManager.getFolderSortOption(path) ??
               await prefs.getSortOption();
@@ -1179,6 +1221,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     if (_currentPath.startsWith('#') &&
         !_currentPath.startsWith('#search?tag=') &&
         !_currentPath.startsWith('#network/') &&
+        !ArchivePathUtils.isArchiveBrowsePath(_currentPath) &&
         !isDrivesPath(_currentPath)) {
       return;
     }
@@ -1215,6 +1258,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     // Route system paths except the special inline tag-search variant
     if (_currentPath.startsWith('#') &&
         !_currentPath.startsWith('#search?tag=') &&
+        !ArchivePathUtils.isArchiveBrowsePath(_currentPath) &&
         !isDrivesPath(_currentPath)) {
       final systemWidget = SystemScreenRouter.routeSystemPath(
           context, _currentPath, widget.tabId);
@@ -1255,16 +1299,31 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 tabManagerBloc.backNavigationToPath(widget.tabId);
               }
             },
-            focusFolderPath: (path) => _toggleFolderSelection(path,
-                shiftSelect: false, ctrlSelect: false),
-            focusFilePath: (path) => _toggleFileSelection(path,
-                shiftSelect: false, ctrlSelect: false),
+            focusFolderPath: (path) => _toggleFolderSelection(
+              path,
+              shiftSelect: false,
+              ctrlSelect: false,
+            ),
+            focusFilePath: (path) => _toggleFileSelection(
+              path,
+              shiftSelect: false,
+              ctrlSelect: false,
+            ),
             selectRange: ({
               required Set<String> folderPaths,
               required Set<String> filePaths,
               required String lastSelectedPath,
               required bool ctrlSelect,
             }) {
+              final currentPaths = _selectionBloc.state.allSelectedPaths;
+              _keyboardController.showImmediateSelection(
+                <String>{
+                  if (ctrlSelect) ...currentPaths,
+                  ...folderPaths,
+                  ...filePaths,
+                },
+                currentSelectedPaths: currentPaths,
+              );
               _selectionBloc.add(SelectItemsInRect(
                 folderPaths: folderPaths,
                 filePaths: filePaths,
@@ -1782,7 +1841,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             return InlineRenameScope(
               controller: _inlineRenameController,
               // Ctrl+scroll walks the full view spectrum (tree↔column↔
-              // detail↔list↔grid) in every mode. CtrlScrollZoom emits +1 on
+              // detail↔list↔tiles↔grid) in every mode. CtrlScrollZoom emits +1 on
               // scroll-down; spectrum convention is +1 = more spacious
               // (scroll-up), so invert the raw sign here.
               child: CtrlScrollZoom(
@@ -1811,6 +1870,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   onPreviewPaneToggled: _togglePreviewPane,
                   scrollController: _keyboardController.scrollController,
                   itemKeyForPath: _keyboardController.itemKeyForPath,
+                  immediateSelectionForPath:
+                      _keyboardController.immediateSelectionForPath,
                   tabId: widget.tabId,
                   isMasonryLayout: _isMasonryLayout,
                   onGridCrossAxisCountChanged: (c) {
@@ -1901,6 +1962,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       selectionBloc: _selectionBloc,
       currentFilter: _currentFilter,
       currentSearchTag: _currentSearchTag,
+      onNavigateToPath: (path) => _navigationController.navigateToPath(
+        context,
+        path,
+        _pathController,
+        (_) => _keyboardController.clearFocus(),
+      ),
     );
   }
 
@@ -1937,8 +2004,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   List<Widget> _getAppBarActions() {
     if (_isDrivesMode()) {
-      final isGridView = _folderListBloc.state.viewMode == ViewMode.grid ||
-          _folderListBloc.state.viewMode == ViewMode.gridPreview;
+      final isGridView = _folderListBloc.state.viewMode == ViewMode.grid;
 
       return [
         if (isGridView)
@@ -2001,9 +2067,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         showColumnVisibilityDialog(context);
       },
       onGalleryResult: null,
-      onPreviewPaneToggled: _togglePreviewPane,
+      onPreviewPaneToggled: isDesktopPlatform ? _togglePreviewPane : null,
       isPreviewPaneVisible: isPreviewPaneVisible,
-      showPreviewModeOption: isDesktopPlatform,
+      showDesktopViewModes: isDesktopPlatform,
     );
   }
 }

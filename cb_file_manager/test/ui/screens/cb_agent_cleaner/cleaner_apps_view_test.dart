@@ -203,7 +203,7 @@ void main() {
       find.byKey(const ValueKey<String>('cleaner-apps-search')),
       'Beta',
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(
       find.byKey(const ValueKey<String>('cleaner-app-row-alpha')),
@@ -221,7 +221,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey<String>('cleaner-apps-filter-cleanable')),
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(
       find.byKey(const ValueKey<String>('cleaner-app-row-alpha')),

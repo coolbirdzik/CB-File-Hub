@@ -1,11 +1,15 @@
 import 'dart:io' show Platform;
 
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../../config/design_system_config.dart';
+import '../../../design_system/fluent_surface_tokens.dart';
 import '../core/tab_manager.dart';
 import '../../../config/languages/app_localizations.dart';
 import 'address_bar_menu.dart';
+import '../../../helpers/files/archive_path_utils.dart';
 import '../../../ui/components/common/breadcrumb_address_bar.dart';
 
 /// Navigation bar component that includes back/forward buttons and path input field
@@ -70,6 +74,24 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
 
   // Converts the current filesystem path into breadcrumb segments.
   List<BreadcrumbSegment> _buildSegments() {
+    if (ArchivePathUtils.isArchiveBrowsePath(widget.tabPath)) {
+      final crumbs = ArchivePathUtils.breadcrumbs(widget.tabPath);
+      if (crumbs.isEmpty) {
+        return [BreadcrumbSegment(label: widget.tabPath)];
+      }
+
+      return [
+        for (int i = 0; i < crumbs.length; i++)
+          BreadcrumbSegment(
+            label: crumbs[i].label,
+            icon: i == 0 ? PhosphorIconsLight.archive : null,
+            onTap: i == crumbs.length - 1
+                ? null
+                : () => widget.onPathSubmitted(crumbs[i].virtualPath),
+          ),
+      ];
+    }
+
     final path = widget.currentPath;
     if (path.isEmpty) {
       return [
@@ -107,6 +129,14 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
     // Gọi lại _updateNavigationState để đảm bảo trạng thái mới nhất
     if (_tabBloc != null) {
       _updateNavigationState();
+    }
+
+    final useFluentDesktopShell =
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
+            DesignSystemConfig.enableFluentDesktopShell &&
+            !DesignSystemConfig.enableLegacyMaterialDesktopShell;
+    if (useFluentDesktopShell) {
+      return _buildDesktopNavigationBar(context);
     }
 
     return Row(
@@ -162,6 +192,130 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           AddressBarMenu(
             items: widget.menuItems!,
             tooltip: 'Tùy chọn',
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopNavigationBar(BuildContext context) {
+    final surfaces = FluentSurfaceTokens.of(context);
+    final buttonStyle = fluent.ButtonStyle(
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: FluentSurfaceTokens.controlRadius,
+        ),
+      ),
+      padding: const WidgetStatePropertyAll(EdgeInsets.all(7)),
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed)) {
+          return surfaces.controlPressed;
+        }
+        if (states.contains(WidgetState.hovered)) {
+          return surfaces.controlHover;
+        }
+        return Colors.transparent;
+      }),
+      foregroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return surfaces.textDisabled;
+        }
+        return surfaces.icon;
+      }),
+    );
+
+    Widget iconButton({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onPressed,
+    }) {
+      return fluent.Tooltip(
+        message: tooltip,
+        child: fluent.IconButton(
+          // Let Fluent's IconTheme apply the state-resolved foreground color.
+          // An explicit Icon color would override disabled contrast.
+          icon: Icon(icon, size: 16),
+          style: buttonStyle,
+          iconButtonMode: fluent.IconButtonMode.small,
+          onPressed: onPressed,
+        ),
+      );
+    }
+
+    final pathContent = widget.isNetworkPath
+        ? Row(
+            children: [
+              Icon(
+                PhosphorIconsLight.wifiHigh,
+                size: 15,
+                color: surfaces.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _formatNetworkPath(widget.currentPath),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: surfaces.textPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          )
+        : BreadcrumbAddressBar(
+            segments: _buildSegments(),
+            editController: widget.pathController,
+            onPathSubmitted: widget.onPathSubmitted,
+          );
+
+    return Row(
+      children: [
+        iconButton(
+          icon: PhosphorIconsLight.arrowLeft,
+          tooltip: 'Go back',
+          onPressed: _canNavigateBack
+              ? () => context.read<TabManagerBloc>().backNavigationToPath(
+                    widget.tabId,
+                  )
+              : null,
+        ),
+        iconButton(
+          icon: PhosphorIconsLight.arrowRight,
+          tooltip: 'Go forward',
+          onPressed: _canNavigateForward
+              ? () => context.read<TabManagerBloc>().forwardNavigationToPath(
+                    widget.tabId,
+                  )
+              : null,
+        ),
+        if (widget.onNavigateToParent != null)
+          iconButton(
+            icon: PhosphorIconsLight.arrowUp,
+            tooltip: AppLocalizations.of(context)!.parentFolder,
+            onPressed:
+                widget.canNavigateToParent ? widget.onNavigateToParent : null,
+          ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Container(
+            height: FluentSurfaceTokens.controlHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: surfaces.control,
+              borderRadius: FluentSurfaceTokens.controlRadius,
+              border: Border.all(color: surfaces.stroke),
+            ),
+            child: pathContent,
+          ),
+        ),
+        if (widget.menuItems != null && widget.menuItems!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 6),
+            child: AddressBarMenu(
+              items: widget.menuItems!,
+              tooltip: 'Options',
+            ),
           ),
       ],
     );

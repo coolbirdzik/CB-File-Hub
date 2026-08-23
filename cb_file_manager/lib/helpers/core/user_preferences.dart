@@ -22,6 +22,11 @@ enum TagThumbnailFitMode {
   cover,
 }
 
+enum FileThumbnailFitMode {
+  cover,
+  contain,
+}
+
 /// A class to manage user preferences for the application
 class UserPreferences {
   // Singleton instance with getter
@@ -41,6 +46,8 @@ class UserPreferences {
 
   final ValueNotifier<TagThumbnailFitMode> tagThumbnailFitMode =
       ValueNotifier<TagThumbnailFitMode>(TagThumbnailFitMode.contain);
+  final ValueNotifier<FileThumbnailFitMode> fileThumbnailFitMode =
+      ValueNotifier<FileThumbnailFitMode>(FileThumbnailFitMode.cover);
 
   // Stream that can be listened to for theme changes
   Stream<ThemeMode> get themeChangeStream => _themeChangeController.stream;
@@ -76,6 +83,7 @@ class UserPreferences {
       'use_system_default_for_video';
   static const String _preferredVideoPlayerAppKey =
       'preferred_video_player_app';
+  static const String _openVideoInNewWindowKey = 'open_video_in_new_window';
   static const String _recentPathsKey = 'recent_paths';
   static const String _sidebarPinnedPathsKey = 'sidebar_pinned_paths';
   static const String _rememberTabWorkspaceKey = 'remember_tab_workspace';
@@ -102,6 +110,7 @@ class UserPreferences {
   static const String _networkBrowserSortOptionKey =
       'network_browser_sort_option';
   static const String _tagThumbnailFitModeKey = 'tag_thumbnail_fit_mode';
+  static const String _fileThumbnailFitModeKey = 'file_thumbnail_fit_mode';
   static const String _contextMenuLayoutKeyPrefix = 'context_menu_layout_';
 
   // Constants for grid zoom level
@@ -166,6 +175,16 @@ class UserPreferences {
       _useDatabaseStorage = false;
     } finally {
       _initialized = true;
+    }
+
+    try {
+      final stored = await _databaseManager?.getStringPreference(
+        _fileThumbnailFitModeKey,
+        defaultValue: FileThumbnailFitMode.cover.name,
+      );
+      fileThumbnailFitMode.value = _parseFileThumbnailFitMode(stored);
+    } catch (_) {
+      fileThumbnailFitMode.value = FileThumbnailFitMode.cover;
     }
 
     try {
@@ -1182,6 +1201,34 @@ class UserPreferences {
     );
   }
 
+  Future<FileThumbnailFitMode> getFileThumbnailFitMode() async {
+    final stored = await _getPreference<String>(
+      _fileThumbnailFitModeKey,
+      defaultValue: FileThumbnailFitMode.cover.name,
+    );
+    final mode = _parseFileThumbnailFitMode(stored);
+    fileThumbnailFitMode.value = mode;
+    return mode;
+  }
+
+  Future<bool> setFileThumbnailFitMode(FileThumbnailFitMode mode) async {
+    final saved = await _savePreference<String>(
+      _fileThumbnailFitModeKey,
+      mode.name,
+    );
+    if (saved) {
+      fileThumbnailFitMode.value = mode;
+    }
+    return saved;
+  }
+
+  FileThumbnailFitMode _parseFileThumbnailFitMode(String? value) {
+    return FileThumbnailFitMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => FileThumbnailFitMode.cover,
+    );
+  }
+
   /// Get max thumbnail generation concurrency
   Future<int> getMaxThumbnailConcurrency() async {
     return await _getPreference<int>(
@@ -1596,6 +1643,20 @@ class UserPreferences {
 
   Future<bool> setUseSystemDefaultForVideo(bool value) async {
     return await _savePreference<bool>(_useSystemDefaultForVideoKey, value);
+  }
+
+  /// Desktop only: use one separate built-in player window instead of pushing
+  /// a full-screen route inside the current window. Default true.
+  Future<bool> getOpenVideoInNewWindow() async {
+    return await _getPreference<bool>(
+          _openVideoInNewWindowKey,
+          defaultValue: true,
+        ) ??
+        true;
+  }
+
+  Future<bool> setOpenVideoInNewWindow(bool value) async {
+    return await _savePreference<bool>(_openVideoInNewWindowKey, value);
   }
 
   /// Preferred external app identifier for video playback.

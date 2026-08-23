@@ -43,7 +43,10 @@ features:
     focused_tests:
       - "flutter test test/19_cleaner_scan_advice_test.dart"
       - "flutter test test/services/disk_cleaner/cleaner_growth_history_service_test.dart"
+      - "flutter test test/services/disk_cleaner/disk_cleaner_isolate_test.dart"
       - "flutter test test/services/disk_cleaner/disk_tree_selection_test.dart"
+      - "flutter test test/services/disk_cleaner/full_disk_scan_prune_test.dart"
+      - "flutter test test/services/disk_cleaner/usn_journal_test.dart"
       - "flutter test test/helpers/files/trash_manager_test.dart"
       - "flutter test test/helpers/files/windows_file_operations_test.dart"
       - "flutter test test/ui/screens/cb_agent_cleaner/cb_agent_cleaner_app_mode_safety_test.dart"
@@ -51,6 +54,7 @@ features:
       - "Confirm the preview contains only the exact approved targets."
       - "Confirm click, Ctrl-click, Shift-click, and Space follow Explorer-style selection while remaining responsive on a large tree."
       - "Confirm Recycle Bin and permanent delete remain visibly distinct."
+      - "After Select drives then rescanning the same drive, confirm unchanged paths are served from the cached tree and only changed folders refresh."
 
   cleaner_app_insights:
     paths:
@@ -157,6 +161,16 @@ features:
       - "Confirm removable USB/SD shows an eject action and system/primary volumes do not."
       - "Confirm Android drive cards show free/used space after StorageVolumesPlugin registration."
       - "Confirm rename and eject ask for confirmation and refresh the drive list."
+
+  archive_support:
+    paths:
+      - cb_file_manager/lib/services/archive/
+      - cb_file_manager/lib/ui/controllers/archive_operations_handler.dart
+      - cb_file_manager/lib/ui/dialogs/archive_browser_dialog.dart
+      - cb_file_manager/lib/ui/widgets/archive_preview.dart
+    focused_tests:
+      - "flutter test test/services/archive/archive_service_test.dart"
+      - "flutter test test/helpers/files/archive_path_utils_test.dart"
 
 notes:
   - "Focused checks accelerate iteration; they do not prove runtime UX."

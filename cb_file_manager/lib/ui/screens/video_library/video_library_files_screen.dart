@@ -22,7 +22,7 @@ import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
-import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
+import 'package:cb_file_manager/ui/utils/video_playback_launcher.dart';
 import 'package:cb_file_manager/ui/screens/video_library/video_library_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_state.dart';
@@ -551,12 +551,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
           });
         } else {
           if (mounted) {
-            Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(
-                fullscreenDialog: true,
-                builder: (_) => VideoPlayerFullScreen(file: file),
-              ),
-            );
+            unawaited(VideoPlaybackLauncher.open(context, file: file));
           }
         }
       });

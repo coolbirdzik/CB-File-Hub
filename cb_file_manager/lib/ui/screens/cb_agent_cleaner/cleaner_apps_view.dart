@@ -39,7 +39,10 @@ class CleanerAppsView extends StatefulWidget {
 }
 
 class _CleanerAppsViewState extends State<CleanerAppsView> {
+  static const Duration _searchDebounce = Duration(milliseconds: 220);
+
   late final TextEditingController _searchController;
+  Timer? _searchDebounceTimer;
 
   @override
   void initState() {
@@ -59,11 +62,25 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  // Filtering rescans every app, so keystrokes are coalesced instead of
+  // driving one full filter + rebuild each.
+  void _onSearchChanged(String query) {
+    _searchDebounceTimer?.cancel();
+    if (query.trim() == widget.cubit.state.searchQuery.trim()) return;
+    _searchDebounceTimer = Timer(_searchDebounce, () {
+      if (!mounted) return;
+      widget.cubit.setSearchQuery(query);
+    });
+  }
+
   void _syncSearchText(String query) {
+    // A pending debounce means the field is ahead of the cubit on purpose.
+    if (_searchDebounceTimer?.isActive ?? false) return;
     if (_searchController.text == query) return;
     _searchController.value = TextEditingValue(
       text: query,
@@ -145,6 +162,7 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
             cubit: widget.cubit,
             state: state,
             searchController: _searchController,
+            onSearchChanged: _onSearchChanged,
           ),
         ),
         const Divider(height: 1),
@@ -488,11 +506,13 @@ class _FiltersToolbar extends StatelessWidget {
   final CleanerAppInsightsCubit cubit;
   final CleanerAppInsightsState state;
   final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
 
   const _FiltersToolbar({
     required this.cubit,
     required this.state,
     required this.searchController,
+    required this.onSearchChanged,
   });
 
   @override
@@ -501,28 +521,17 @@ class _FiltersToolbar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final searchWidth =
-            constraints.maxWidth < 560 ? constraints.maxWidth : 260.0;
+            constraints.maxWidth < 560 ? constraints.maxWidth : 280.0;
         return Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: 8,
+          runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            SizedBox(
+            _SearchField(
               width: searchWidth,
-              height: 38,
-              child: TextField(
-                key: const ValueKey<String>('cleaner-apps-search'),
-                controller: searchController,
-                onChanged: cubit.setSearchQuery,
-                decoration: InputDecoration(
-                  hintText: l10n.cleanerAppsSearchHint,
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                ),
-              ),
+              controller: searchController,
+              hintText: l10n.cleanerAppsSearchHint,
+              onChanged: onSearchChanged,
             ),
             for (final filter in CleanerAppFilter.values)
               FilterChip(
@@ -530,6 +539,15 @@ class _FiltersToolbar extends StatelessWidget {
                 selected: state.filter == filter,
                 onSelected: (_) => cubit.setFilter(filter),
                 label: Text(_filterLabel(l10n, filter)),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                showCheckmark: false,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
               ),
             _ViewOptionsMenu(
               cubit: cubit,
@@ -538,6 +556,95 @@ class _FiltersToolbar extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Search box for the apps list. Rebuilds on its own (clear button, focus
+/// highlight) so typing never repaints the surrounding toolbar or list.
+class _SearchField extends StatelessWidget {
+  final double width;
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  const _SearchField({
+    required this.width,
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(999),
+      borderSide: BorderSide(color: colors.outlineVariant),
+    );
+
+    return SizedBox(
+      width: width,
+      height: 38,
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, child) {
+          return TextField(
+            key: const ValueKey<String>('cleaner-apps-search'),
+            controller: controller,
+            onChanged: onChanged,
+            textAlignVertical: TextAlignVertical.center,
+            style: theme.textTheme.bodyMedium,
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+              hintText: hintText,
+              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 18,
+                color: colors.onSurfaceVariant,
+              ),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 36,
+                minHeight: 36,
+              ),
+              suffixIcon: value.text.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const ValueKey<String>('cleaner-apps-search-clear'),
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      splashRadius: 14,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      tooltip:
+                          MaterialLocalizations.of(context).deleteButtonTooltip,
+                      onPressed: () {
+                        controller.clear();
+                        onChanged('');
+                      },
+                    ),
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 36,
+                minHeight: 36,
+              ),
+              border: border,
+              enabledBorder: border,
+              focusedBorder: border.copyWith(
+                borderSide: BorderSide(color: colors.primary, width: 1.4),
+              ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -1180,12 +1287,14 @@ class _DetailsActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final buttonShape = ChipTheme.of(context).shape ?? const StadiumBorder();
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         if (profile.app.canManage && onManageApp != null)
           OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(shape: buttonShape),
             key: ValueKey<String>(
               'cleaner-app-manage-${profile.app.id}',
             ),
@@ -1195,6 +1304,7 @@ class _DetailsActions extends StatelessWidget {
           ),
         if (profile.cleanableBytes > 0 && onReviewCleanable != null)
           FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(shape: buttonShape),
             key: ValueKey<String>(
               'cleaner-app-review-${profile.app.id}',
             ),
@@ -1204,6 +1314,7 @@ class _DetailsActions extends StatelessWidget {
           ),
         if (onAskAgent != null)
           FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(shape: buttonShape),
             key: ValueKey<String>(
               'cleaner-app-ask-agent-${profile.app.id}',
             ),
@@ -1295,6 +1406,9 @@ class _StorageEntryTile extends StatelessWidget {
             ),
           if (onOpenFolder != null)
             IconButton(
+              style: IconButton.styleFrom(
+                shape: ChipTheme.of(context).shape ?? const StadiumBorder(),
+              ),
               key: ValueKey<String>(
                 'cleaner-app-open-folder-${entry.path}',
               ),

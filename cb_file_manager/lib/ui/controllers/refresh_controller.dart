@@ -10,6 +10,7 @@ import 'package:cb_file_manager/ui/screens/system_screen_router.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 
 /// Controller for handling refresh operations in folder list screens
 ///
@@ -193,6 +194,9 @@ class RefreshController {
             tabManagerBloc.add(UpdateTabPath(tabId, currentPath));
 
             // If this screen still uses FolderList, trigger bloc refresh to regenerate thumbnails
+            folderListBloc.add(FolderListRefresh(currentPath,
+                forceRegenerateThumbnails: true));
+          } else if (ArchivePathUtils.isArchiveBrowsePath(currentPath)) {
             folderListBloc.add(FolderListRefresh(currentPath,
                 forceRegenerateThumbnails: true));
           }

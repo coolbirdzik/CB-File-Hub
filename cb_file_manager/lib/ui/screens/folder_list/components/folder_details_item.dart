@@ -439,12 +439,6 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                       widget.onTap!(widget.folder.path);
                     }
                   },
-                  onLongPress: () {
-                    if (widget.isDesktopMode &&
-                        widget.toggleFolderSelection != null) {
-                      _handleFolderSelection();
-                    }
-                  },
                   onLongPressStart: !widget.isDesktopMode
                       ? (details) {
                           HapticFeedback.mediumImpact();

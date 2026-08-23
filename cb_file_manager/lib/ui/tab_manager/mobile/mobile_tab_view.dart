@@ -17,6 +17,7 @@ import '../../../bloc/network_browsing/network_browsing_bloc.dart';
 import 'package:cb_file_manager/services/network_browsing/network_service_registry.dart';
 import 'package:cb_file_manager/ui/state/video_ui_state.dart';
 import '../../screens/system_screen_router.dart'; // Import SystemScreenRouter for system paths
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'mobile_file_actions_controller.dart';
 import '../components/tab_inactive_indicator.dart';
@@ -682,7 +683,9 @@ class MobileTabView extends StatelessWidget {
 
   Widget _buildTabContentInner(BuildContext context, TabData activeTab) {
     // Check if this is a system path (starting with #)
-    if (activeTab.path.startsWith('#') && !isDrivesPath(activeTab.path)) {
+    if (activeTab.path.startsWith('#') &&
+        !isDrivesPath(activeTab.path) &&
+        !ArchivePathUtils.isArchiveBrowsePath(activeTab.path)) {
       // Handle network-specific paths
       if (activeTab.path == '#network') {
         // Path for displaying connection manager
@@ -1069,6 +1072,10 @@ extension MobileTabViewDynamicMenu on MobileTabView {
     }
 
     if (path.startsWith('#search?tag=')) {
+      return true;
+    }
+
+    if (ArchivePathUtils.isArchiveBrowsePath(path)) {
       return true;
     }
 

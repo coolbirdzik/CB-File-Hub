@@ -115,7 +115,12 @@ class _AiChatBodyState extends State<_AiChatBody> {
     if (!_showConversations) {
       context.read<AiAgentBloc>().add(const RefreshConversations());
     }
-    setState(() => _showConversations = !_showConversations);
+    _setConversationsVisible(!_showConversations);
+  }
+
+  void _setConversationsVisible(bool visible) {
+    if (_showConversations == visible) return;
+    setState(() => _showConversations = visible);
   }
 
   @override
@@ -175,68 +180,82 @@ class _AiChatBodyState extends State<_AiChatBody> {
       builder: (context, state) {
         return Scaffold(
           backgroundColor: Colors.transparent,
-          body: Row(
-            children: [
-              // Conversation list panel (animated slide-in)
-              ClipRect(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  width: _showConversations ? 260 : 0,
-                  child: OverflowBox(
-                    maxWidth: 260,
-                    minWidth: 0,
-                    alignment: Alignment.centerLeft,
-                    child: SizedBox(
-                      width: 260,
-                      child: _showConversations
-                          ? ConversationListPanel(
-                              onClose: () =>
-                                  setState(() => _showConversations = false),
-                            )
-                          : const SizedBox.shrink(),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              // Matches the app's other side menus (see CleanerUtilitiesShell):
+              // an inline column that pushes the content aside rather than an
+              // overlay flying in over it. Narrow layouts give it two thirds.
+              final isCompact = constraints.maxWidth < 600;
+              final panelWidth = isCompact
+                  ? constraints.maxWidth * 2 / 3
+                  : 280.0.clamp(0.0, constraints.maxWidth);
+
+              return Row(
+                children: [
+                  // Conversation history side menu
+                  ClipRect(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      width: _showConversations ? panelWidth : 0,
+                      child: OverflowBox(
+                        minWidth: 0,
+                        maxWidth: panelWidth,
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: panelWidth,
+                          child: _showConversations
+                              ? ConversationListPanel(
+                                  onClose: () =>
+                                      _setConversationsVisible(false),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              // Main chat area
-              Expanded(
-                child: Column(
-                  children: [
-                    // Header
-                    _buildHeader(context, l, theme, state),
+                  // Main chat area
+                  Expanded(
+                    child: Column(
+                      children: [
+                        // Header
+                        _buildHeader(context, l, theme, state),
 
-                    // Error banner (provider failures, bad request, etc.)
-                    if (state.error != null)
-                      _buildErrorBanner(context, theme, state),
+                        // Error banner (provider failures, bad request, etc.)
+                        if (state.error != null)
+                          _buildErrorBanner(context, theme, state),
 
-                    // Messages / empty state
-                    Expanded(
-                      child: state.messages.isEmpty &&
-                              state.pendingApproval == null
-                          ? _buildEmptyState(context, l, theme, state)
-                          : _buildMessageList(context, state),
+                        // Messages / empty state
+                        Expanded(
+                          child: state.messages.isEmpty &&
+                                  state.pendingApproval == null
+                              ? _buildEmptyState(context, l, theme, state)
+                              : _buildMessageList(context, state),
+                        ),
+
+                        // Workspace indicator + Input bar
+                        ChatInputBar(
+                          onStop: () => context
+                              .read<AiAgentBloc>()
+                              .add(const StopGeneration()),
+                          onSend: (text, files) {
+                            context
+                                .read<AiAgentBloc>()
+                                .add(SendMessage(text, referencedFiles: files));
+                          },
+                          isLoading: state.isLoading,
+                          workspaceIndicator: _buildWorkspaceIndicator(
+                              context, l, theme, state),
+                          modelSelector:
+                              _buildModelSelector(context, l, theme, state),
+                        ),
+                      ],
                     ),
-
-                    // Workspace indicator + Input bar
-                    ChatInputBar(
-                      onStop: () => context
-                          .read<AiAgentBloc>()
-                          .add(const StopGeneration()),
-                      onSend: (text, files) {
-                        context
-                            .read<AiAgentBloc>()
-                            .add(SendMessage(text, referencedFiles: files));
-                      },
-                      isLoading: state.isLoading,
-                      workspaceIndicator:
-                          _buildWorkspaceIndicator(context, l, theme, state),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -272,17 +291,17 @@ class _AiChatBodyState extends State<_AiChatBody> {
     final contextInfo = _calcContextInfo(state.messages);
 
     return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 30,
+      padding: const EdgeInsets.only(left: 14, right: 8),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.black.withValues(alpha: 0.03),
+            ? Colors.white.withValues(alpha: 0.03)
+            : Colors.black.withValues(alpha: 0.02),
         border: Border(
           bottom: BorderSide(
             color: isDark
                 ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.07),
+                : Colors.black.withValues(alpha: 0.06),
           ),
         ),
       ),
@@ -350,79 +369,66 @@ class _AiChatBodyState extends State<_AiChatBody> {
   Widget _buildHeader(BuildContext context, AppLocalizations l, ThemeData theme,
       AiAgentState state) {
     final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.07)
-                : Colors.black.withValues(alpha: 0.08),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Conversations list toggle
-          _HeaderIconButton(
-            icon: _showConversations
-                ? PhosphorIconsLight.sidebarSimple
-                : PhosphorIconsLight.chatsCircle,
-            tooltip: l.conversations,
-            isDark: isDark,
-            onPressed: _toggleConversations,
-          ),
-          const SizedBox(width: 4),
-          Icon(
-            PhosphorIconsLight.brain,
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              l.cbAgent,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+    // Borderless, compact toolbar — the chat content below provides the
+    // visual separation, so a hairline rule here only adds noise.
+    return SizedBox(
+      height: 44,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          children: [
+            // Conversations toggle — labelled so it reads as the way back to
+            // history rather than an anonymous glyph.
+            _HeaderIconButton(
+              icon: PhosphorIconsLight.chatsCircle,
+              label: l.conversations,
+              isDark: isDark,
+              isActive: _showConversations,
+              onPressed: _toggleConversations,
             ),
-          ),
-          if (state.providerModelCatalogs.isNotEmpty ||
-              state.isLoadingProviderModels) ...[
-            ModelSelectorButton(
-              catalogs: state.providerModelCatalogs,
-              selectedProviderId: state.selectedProviderId,
-              selectedModelName: state.selectedModelName,
-              isLoading: state.isLoadingProviderModels,
-              tooltip: l.selectModel,
-              defaultLabel: l.defaultModel,
-              loadingLabel: l.loadingModels,
-              emptyLabel: l.noModelConfigured,
-              searchHint: l.modelSearchHint,
-              noMatchesLabel: l.noModelsFound,
-              onSelected: (value) {
-                context.read<AiAgentBloc>().add(
-                      SelectChatModel(
-                        providerId: value.providerId,
-                        modelName: value.modelName,
-                      ),
-                    );
+            const Spacer(),
+            // New conversation button
+            _HeaderIconButton(
+              icon: PhosphorIconsLight.plus,
+              tooltip: l.newConversation,
+              isDark: isDark,
+              onPressed: () {
+                context.read<AiAgentBloc>().add(const NewConversation());
               },
             ),
-            const SizedBox(width: 6),
           ],
-          // New conversation button
-          _HeaderIconButton(
-            icon: PhosphorIconsLight.plus,
-            tooltip: l.newConversation,
-            isDark: isDark,
-            onPressed: () {
-              context.read<AiAgentBloc>().add(const NewConversation());
-            },
-          ),
-          const SizedBox(width: 2),
-        ],
+        ),
       ),
+    );
+  }
+
+  /// Model picker rendered inside the composer footer. Returns null when there
+  /// is nothing to pick from yet.
+  Widget? _buildModelSelector(BuildContext context, AppLocalizations l,
+      ThemeData theme, AiAgentState state) {
+    if (state.providerModelCatalogs.isEmpty && !state.isLoadingProviderModels) {
+      return null;
+    }
+    return ModelSelectorButton(
+      catalogs: state.providerModelCatalogs,
+      selectedProviderId: state.selectedProviderId,
+      selectedModelName: state.selectedModelName,
+      isLoading: state.isLoadingProviderModels,
+      compact: true,
+      tooltip: l.selectModel,
+      defaultLabel: l.defaultModel,
+      loadingLabel: l.loadingModels,
+      emptyLabel: l.noModelConfigured,
+      searchHint: l.modelSearchHint,
+      noMatchesLabel: l.noModelsFound,
+      onSelected: (value) {
+        context.read<AiAgentBloc>().add(
+              SelectChatModel(
+                providerId: value.providerId,
+                modelName: value.modelName,
+              ),
+            );
+      },
     );
   }
 
@@ -434,17 +440,47 @@ class _AiChatBodyState extends State<_AiChatBody> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              PhosphorIconsLight.magnifyingGlass,
-              size: 48,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primary.withValues(alpha: 0.18),
+                    theme.colorScheme.primary.withValues(alpha: 0.04),
+                  ],
+                ),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Icon(
+                PhosphorIconsLight.brain,
+                size: 32,
+                color: theme.colorScheme.primary.withValues(alpha: 0.9),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            Text(
+              l.cbAgent,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
             Text(
               l.askAiToFindFiles,
               style: TextStyle(
-                fontSize: 16,
-                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 13,
+                height: 1.45,
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
               ),
               textAlign: TextAlign.center,
             ),
@@ -595,62 +631,65 @@ class _AiChatBodyState extends State<_AiChatBody> {
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => _messageListFocusNode.requestFocus(),
-        child: ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          itemCount: _itemCount(state),
-          itemBuilder: (context, index) {
-            // Approval card at the very end (after thinking bubble)
-            if (hasApproval && index == _itemCount(state) - 1) {
-              return Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 16),
-                child: _buildApprovalCard(context, theme, state),
-              );
-            }
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 820),
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              itemCount: _itemCount(state),
+              itemBuilder: (context, index) {
+                // Approval card at the very end (after thinking bubble)
+                if (hasApproval && index == _itemCount(state) - 1) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 16),
+                    child: _buildApprovalCard(context, theme, state),
+                  );
+                }
 
-            // Thinking indicator (second to last if approval exists, otherwise last)
-            final thinkingIndex =
-                hasApproval ? _itemCount(state) - 2 : _itemCount(state) - 1;
-            if (hasThinking && index == thinkingIndex) {
-              return _buildThinkingBubble(context, state);
-            }
+                // Thinking indicator (second to last if approval exists, otherwise last)
+                final thinkingIndex =
+                    hasApproval ? _itemCount(state) - 2 : _itemCount(state) - 1;
+                if (hasThinking && index == thinkingIndex) {
+                  return _buildThinkingBubble(context, state);
+                }
 
-            // Message bubbles
-            if (index < state.messages.length) {
-              final message = state.messages[index];
-              final isAssistant = message.role == AiMessageRole.assistant;
-              final hasResults = isAssistant &&
-                  message.searchResults != null &&
-                  message.searchResults!.isNotEmpty;
-              final hasToolCalls = isAssistant &&
-                  message.toolCalls != null &&
-                  message.toolCalls!.isNotEmpty;
-              final showToolLog = isAssistant &&
-                  !state.isLoading &&
-                  index == state.messages.length - 1 &&
-                  state.toolActivity.isNotEmpty;
+                // Message bubbles
+                if (index < state.messages.length) {
+                  final message = state.messages[index];
+                  final isAssistant = message.role == AiMessageRole.assistant;
+                  final hasResults = isAssistant &&
+                      message.searchResults != null &&
+                      message.searchResults!.isNotEmpty;
+                  final hasToolCalls = isAssistant &&
+                      message.toolCalls != null &&
+                      message.toolCalls!.isNotEmpty;
+                  final showToolLog = isAssistant &&
+                      !state.isLoading &&
+                      index == state.messages.length - 1 &&
+                      state.toolActivity.isNotEmpty;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Tool calls render BEFORE the assistant message because
-                  // chronologically the agent calls tools first, then writes
-                  // the answer using the tool results.
-                  if (hasToolCalls)
-                    Padding(
-                      padding:
-                          const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: message.toolCalls!
-                            .map((tc) => ToolCallChip(toolCall: tc))
-                            .toList(),
-                      ),
-                    ),
-                  ChatMessageBubble(
-                    message: message,
-                    onEdit:
-                        !state.isLoading && message.role == AiMessageRole.user
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Tool calls render BEFORE the assistant message because
+                      // chronologically the agent calls tools first, then writes
+                      // the answer using the tool results.
+                      if (hasToolCalls)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              left: 12, right: 12, bottom: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: message.toolCalls!
+                                .map((tc) => ToolCallChip(toolCall: tc))
+                                .toList(),
+                          ),
+                        ),
+                      ChatMessageBubble(
+                        message: message,
+                        onEdit: !state.isLoading &&
+                                message.role == AiMessageRole.user
                             ? (content) => context.read<AiAgentBloc>().add(
                                   EditMessage(
                                     messageId: message.id,
@@ -658,24 +697,26 @@ class _AiChatBodyState extends State<_AiChatBody> {
                                   ),
                                 )
                             : null,
-                    onRetry: message.error != null
-                        ? () => context
-                            .read<AiAgentBloc>()
-                            .add(const RetryLastMessage())
-                        : null,
-                  ),
-                  // File results inline below this assistant message
-                  if (hasResults)
-                    _buildInlineResults(context, message.searchResults!),
-                  // Tool activity log (only on the latest assistant message)
-                  if (showToolLog)
-                    _ToolActivityLog(activity: state.toolActivity),
-                ],
-              );
-            }
+                        onRetry: message.error != null
+                            ? () => context
+                                .read<AiAgentBloc>()
+                                .add(const RetryLastMessage())
+                            : null,
+                      ),
+                      // File results inline below this assistant message
+                      if (hasResults)
+                        _buildInlineResults(context, message.searchResults!),
+                      // Tool activity log (only on the latest assistant message)
+                      if (showToolLog)
+                        _ToolActivityLog(activity: state.toolActivity),
+                    ],
+                  );
+                }
 
-            return const SizedBox.shrink();
-          },
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -787,10 +828,19 @@ class _AiChatBodyState extends State<_AiChatBody> {
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8, right: 48),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(6),
+            topRight: Radius.circular(18),
+            bottomLeft: Radius.circular(18),
+            bottomRight: Radius.circular(18),
+          ),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -893,14 +943,22 @@ class _AiChatBodyState extends State<_AiChatBody> {
 
 class _HeaderIconButton extends StatefulWidget {
   final IconData icon;
+
+  /// When set the button renders as a labelled pill instead of a square icon.
+  final String? label;
   final String? tooltip;
   final bool isDark;
+
+  /// Keeps the hover background painted while the target is open.
+  final bool isActive;
   final VoidCallback? onPressed;
 
   const _HeaderIconButton({
     required this.icon,
     required this.isDark,
+    this.label,
     this.tooltip,
+    this.isActive = false,
     this.onPressed,
   });
 
@@ -920,11 +978,17 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
         ? (widget.isDark
             ? Colors.white.withValues(alpha: 0.14)
             : Colors.black.withValues(alpha: 0.10))
-        : _hovered
+        : (_hovered || widget.isActive)
             ? (widget.isDark
                 ? Colors.white.withValues(alpha: 0.08)
                 : Colors.black.withValues(alpha: 0.06))
             : Colors.transparent;
+
+    final fg = widget.isActive
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurface.withValues(alpha: 0.8);
+
+    final hasLabel = widget.label != null;
 
     Widget btn = MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -940,18 +1004,31 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
         onTap: widget.onPressed,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 80),
-          width: 32,
           height: 32,
+          width: hasLabel ? null : 32,
+          padding: hasLabel
+              ? const EdgeInsets.symmetric(horizontal: 10)
+              : EdgeInsets.zero,
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(hasLabel ? 999 : 7),
           ),
-          child: Center(
-            child: Icon(
-              widget.icon,
-              size: 18,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 18, color: fg),
+              if (hasLabel) ...[
+                const SizedBox(width: 7),
+                Text(
+                  widget.label!,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: fg,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

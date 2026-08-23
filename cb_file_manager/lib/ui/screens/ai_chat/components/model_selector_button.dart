@@ -41,10 +41,13 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
   OverlayEntry? _overlay;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  bool _hovered = false;
 
   @override
   void dispose() {
-    _removeOverlay();
+    // Remove directly: _removeOverlay() calls setState, which is illegal here.
+    _overlay?.remove();
+    _overlay = null;
     _searchController.dispose();
     super.dispose();
   }
@@ -61,11 +64,13 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     _searchController.clear();
     _overlay = _buildOverlay();
     Overlay.of(context).insert(_overlay!);
+    setState(() {});
   }
 
   void _removeOverlay() {
     _overlay?.remove();
     _overlay = null;
+    if (mounted) setState(() {});
   }
 
   void _handleSelected(ModelSelectorValue value) {
@@ -363,63 +368,79 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     final selectedCatalog = _findSelectedCatalog();
     final selectedLabel = _buildSelectedLabel(selectedCatalog);
 
+    // Compact mode renders as a ghost pill (transparent until hovered) so it
+    // sits inside the composer card without reading as a nested box.
+    final Color background = widget.compact
+        ? (_hovered || _overlay != null
+            ? theme.colorScheme.onSurface.withValues(alpha: 0.06)
+            : Colors.transparent)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
+
     return Tooltip(
       message: widget.tooltip,
-      child: GestureDetector(
-        onTap: _toggleOverlay,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 120),
-          opacity: _isEnabled || widget.isLoading ? 1 : 0.6,
-          child: Container(
-            constraints: BoxConstraints(
-              minWidth: widget.compact ? 0 : 150,
-              maxWidth: widget.compact ? 180 : 280,
-              minHeight: 30,
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.compact ? 8 : 10,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.isLoading)
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
+      child: MouseRegion(
+        cursor:
+            _isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: _toggleOverlay,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 120),
+            opacity: _isEnabled || widget.isLoading ? 1 : 0.6,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              constraints: BoxConstraints(
+                minWidth: widget.compact ? 0 : 150,
+                maxWidth: widget.compact ? 240 : 280,
+                minHeight: widget.compact ? 28 : 30,
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.compact ? 8 : 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(widget.compact ? 999 : 8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.isLoading)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Icon(
+                      PhosphorIconsLight.cpu,
+                      size: widget.compact ? 14 : 15,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      selectedLabel,
+                      style: TextStyle(
+                        fontSize: widget.compact ? 11 : 12,
+                        color: widget.compact
+                            ? theme.colorScheme.onSurfaceVariant
+                            : theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   Icon(
-                    PhosphorIconsLight.cpu,
-                    size: widget.compact ? 14 : 15,
+                    PhosphorIconsLight.caretDown,
+                    size: widget.compact ? 12 : 13,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    selectedLabel,
-                    style: TextStyle(
-                      fontSize: widget.compact ? 11 : 12,
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  PhosphorIconsLight.caretDown,
-                  size: widget.compact ? 12 : 13,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -448,6 +469,9 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
             : (selectedCatalog.models.isNotEmpty
                 ? selectedCatalog.models.first
                 : widget.emptyLabel));
+    // Compact mode has little room, so the provider prefix is dropped — the
+    // tooltip and the dropdown still show which provider it belongs to.
+    if (widget.compact) return effectiveModel;
     return '${selectedCatalog.providerName}: $effectiveModel';
   }
 }

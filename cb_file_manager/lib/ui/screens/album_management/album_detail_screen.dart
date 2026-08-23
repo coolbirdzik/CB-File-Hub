@@ -29,6 +29,7 @@ import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
@@ -774,7 +775,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         BreadcrumbSegment(
           label: 'Albums',
           icon: PhosphorIconsLight.images,
-          onTap: () => Navigator.of(context).maybePop(),
+          onTap: () => _navigateToAlbums(context),
         ),
         BreadcrumbSegment(
           label: widget.album.name,
@@ -782,6 +783,32 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         ),
       ],
     );
+  }
+
+  /// Navigate back to the Albums list. The album detail screen is rendered as
+  /// a tab path (`#album/<id>`) by [SystemScreenRouter], not pushed on a
+  /// Navigator stack, so [Navigator.maybePop] would instead close the tab.
+  /// Use the tab's navigation history when available, falling back to an
+  /// explicit `#albums` path update.
+  void _navigateToAlbums(BuildContext context) {
+    try {
+      final tabBloc = context.read<TabManagerBloc>();
+      final activeTab = tabBloc.state.activeTab;
+      if (activeTab != null) {
+        if (tabBloc.canTabNavigateBack(activeTab.id)) {
+          tabBloc.backNavigationToPath(activeTab.id);
+        } else {
+          TabNavigator.updateTabPath(context, activeTab.id, '#albums');
+        }
+        return;
+      }
+    } catch (_) {
+      // TabManagerBloc not available in this context — fall through below.
+    }
+    // Last-resort fallback: pop if something is actually on the stack.
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   // ---------------------------------------------------------------------------

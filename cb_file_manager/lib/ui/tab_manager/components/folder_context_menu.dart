@@ -142,6 +142,13 @@ class FolderContextMenu {
                     onSelected: (_) => onViewModeChanged(ViewMode.list),
                   ),
                   ContextMenuAction(
+                    id: 'view_tiles',
+                    label: l10n.viewModeTiles,
+                    icon: PhosphorIconsLight.gridNine,
+                    isChecked: currentViewMode == ViewMode.tiles,
+                    onSelected: (_) => onViewModeChanged(ViewMode.tiles),
+                  ),
+                  ContextMenuAction(
                     id: 'view_grid',
                     label: l10n.viewModeGrid,
                     icon: PhosphorIconsLight.squaresFour,
@@ -155,15 +162,6 @@ class FolderContextMenu {
                     isChecked: currentViewMode == ViewMode.details,
                     onSelected: (_) => onViewModeChanged(ViewMode.details),
                   ),
-                  if (!_isMobilePlatform())
-                    ContextMenuAction(
-                      id: 'view_grid_preview',
-                      label: l10n.viewModeGridPreview,
-                      icon: PhosphorIconsLight.layout,
-                      isChecked: currentViewMode == ViewMode.gridPreview,
-                      onSelected: (_) =>
-                          onViewModeChanged(ViewMode.gridPreview),
-                    ),
                 ],
               ),
             ],

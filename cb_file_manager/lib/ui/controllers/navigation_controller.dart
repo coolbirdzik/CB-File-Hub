@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 
 /// Resolves the filesystem / virtual parent of [path] for "Up" navigation.
 /// Returns [kDrivesPath] when already at a volume root (e.g. `H:\`).
@@ -21,6 +22,9 @@ String? computeParentPathRaw(String path) {
   }
   if (path.startsWith('#search')) {
     return null;
+  }
+  if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+    return ArchivePathUtils.parentBrowsePath(path);
   }
   if (path.startsWith('#') && !path.startsWith('#network/')) {
     return null;
@@ -116,6 +120,17 @@ class NavigationController {
       onPathChanged(path);
       folderListBloc.add(SearchByTagGlobally(tagForPath));
       tabManagerBloc.add(UpdateTabName(tabId, 'Tag: $tagForPath'));
+      return;
+    }
+
+    if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+      clearKeyboardFocus(path);
+      pathController.text = ArchivePathUtils.displayPath(path);
+      folderListBloc.add(const ClearSearchAndFilters());
+      tabManagerBloc.add(UpdateTabPath(tabId, path));
+      onPathChanged(path);
+      folderListBloc.add(FolderListLoad(path));
+      tabManagerBloc.add(UpdateTabName(tabId, ArchivePathUtils.tabTitle(path)));
       return;
     }
 
@@ -362,8 +377,11 @@ class NavigationController {
     // Stop any ongoing thumbnail processing to prevent UI lag
     VideoThumbnailHelper.stopAllProcessing();
 
-    pathController.text =
-        (isDrivesPath(newPath) || newPath.isEmpty) ? '' : newPath;
+    pathController.text = (isDrivesPath(newPath) || newPath.isEmpty)
+        ? ''
+        : ArchivePathUtils.isArchiveBrowsePath(newPath)
+            ? ArchivePathUtils.displayPath(newPath)
+            : newPath;
 
     if (isDrivesPath(newPath) || newPath.isEmpty) {
       if (currentFilter != null || currentSearchTag != null) {
@@ -381,6 +399,15 @@ class NavigationController {
         folderListBloc.add(SearchByTagGlobally(tag));
       }
       onPathChanged(newPath);
+      return;
+    }
+
+    if (ArchivePathUtils.isArchiveBrowsePath(newPath)) {
+      if (currentFilter != null || currentSearchTag != null) {
+        folderListBloc.add(const ClearSearchAndFilters());
+      }
+      onPathChanged(newPath);
+      folderListBloc.add(FolderListLoad(newPath));
       return;
     }
 

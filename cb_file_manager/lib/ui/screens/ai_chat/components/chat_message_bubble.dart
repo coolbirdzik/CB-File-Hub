@@ -86,19 +86,35 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
             children: [
               Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: _isEditing ? 10 : 14,
-                  vertical: _isEditing ? 10 : 10,
+                  horizontal: _isEditing ? 10 : 15,
+                  vertical: _isEditing ? 10 : 11,
                 ),
                 decoration: BoxDecoration(
                   color: isUser
                       ? colorScheme.primary
-                      : colorScheme.surfaceContainerHighest,
+                      : colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.55),
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(isUser ? 16 : 4),
-                    bottomRight: Radius.circular(isUser ? 4 : 16),
+                    topLeft: Radius.circular(isUser ? 18 : 6),
+                    topRight: Radius.circular(isUser ? 6 : 18),
+                    bottomLeft: const Radius.circular(18),
+                    bottomRight: const Radius.circular(18),
                   ),
+                  border: isUser
+                      ? null
+                      : Border.all(
+                          color: colorScheme.outlineVariant
+                              .withValues(alpha: 0.35),
+                        ),
+                  boxShadow: isUser
+                      ? [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(alpha: 0.22),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -77,10 +77,13 @@ class CleanerGrowthHistoryService {
       for (final folder in previous.folders)
         _normalizePath(folder.path): folder,
     };
-    final excludedPaths = <String>{
-      ...previous.incompletePaths.map(_normalizePath),
-      ...current.incompletePaths.map(_normalizePath),
-    };
+    // Snapshots written before folder-level coverage state was introduced
+    // contain an unbounded list of raw issue paths. Build the index once so a
+    // comparison remains linear in the retained folder count instead of
+    // scanning every issue for every folder.
+    final legacyIncompleteIndex = previous.incompletePaths.isEmpty
+        ? null
+        : await _IncompletePathIndex.build(previous.incompletePaths);
     final growth = <CleanerFolderGrowth>[];
 
     for (var index = 0; index < current.folders.length; index++) {
@@ -91,7 +94,9 @@ class CleanerGrowthHistoryService {
       final normalizedPath = _normalizePath(folder.path);
       final oldFolder = previousByPath[normalizedPath];
       if (oldFolder == null ||
-          _overlapsIncompletePath(normalizedPath, excludedPaths)) {
+          folder.hasIncompleteCoverage ||
+          oldFolder.hasIncompleteCoverage ||
+          (legacyIncompleteIndex?.overlaps(normalizedPath) ?? false)) {
         continue;
       }
       final increasedBytes = folder.sizeBytes - oldFolder.sizeBytes;
@@ -184,30 +189,34 @@ class CleanerGrowthHistoryService {
 
     folders.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
 
-    final incompletePaths = <String>{
-      ...result.inaccessible,
-      ...result.coverageIssues.map((issue) => issue.path),
-    }..removeWhere((path) => path.isEmpty || path == 'cancelled');
+    final retainedFolders =
+        folders.take(maximumSnapshotDirectories).toList(growable: false);
+    // Keep the source lazy: a scan can report hundreds of thousands of issue
+    // paths, so materializing a second raw Set here would create one large
+    // synchronous UI-isolate burst before the cooperative index can yield.
+    final incompleteIndex = await _IncompletePathIndex.build(
+      _coveragePaths(result),
+    );
+    final foldersWithCoverage = <_CleanerDirectorySnapshot>[];
+    for (var index = 0; index < retainedFolders.length; index++) {
+      final folder = retainedFolders[index];
+      foldersWithCoverage.add(folder.copyWith(
+        hasIncompleteCoverage:
+            incompleteIndex.overlaps(_normalizePath(folder.path)),
+      ));
+      if (index % 256 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
 
     return _CleanerGrowthSnapshot(
       capturedAt: capturedAt,
-      folders: folders.take(maximumSnapshotDirectories).toList(growable: false),
-      incompletePaths: incompletePaths.toList(growable: false),
+      folders: foldersWithCoverage,
+      // New snapshots carry coverage on each retained folder. Keep this
+      // legacy field empty so a scan with tens of thousands of coverage gaps
+      // cannot write an equally large baseline to SharedPreferences.
+      incompletePaths: const <String>[],
     );
-  }
-
-  bool _overlapsIncompletePath(
-    String folderPath,
-    Set<String> incompletePaths,
-  ) {
-    for (final incompletePath in incompletePaths) {
-      if (folderPath == incompletePath ||
-          folderPath.startsWith('$incompletePath\\') ||
-          incompletePath.startsWith('$folderPath\\')) {
-        return true;
-      }
-    }
-    return false;
   }
 
   _CleanerGrowthSnapshot? _readSnapshot(String? raw) {
@@ -218,6 +227,13 @@ class CleanerGrowthHistoryService {
       return _CleanerGrowthSnapshot.fromJson(json);
     } catch (_) {
       return null;
+    }
+  }
+
+  static Iterable<String> _coveragePaths(FullDiskScanResult result) sync* {
+    yield* result.inaccessible;
+    for (final issue in result.coverageIssues) {
+      yield issue.path;
     }
   }
 
@@ -281,21 +297,162 @@ class _CleanerGrowthSnapshot {
 class _CleanerDirectorySnapshot {
   final String path;
   final int sizeBytes;
+  final bool hasIncompleteCoverage;
 
   const _CleanerDirectorySnapshot({
     required this.path,
     required this.sizeBytes,
+    this.hasIncompleteCoverage = false,
   });
 
   factory _CleanerDirectorySnapshot.fromJson(Map<String, dynamic> json) {
     return _CleanerDirectorySnapshot(
       path: json['path'] as String,
       sizeBytes: json['sizeBytes'] as int,
+      hasIncompleteCoverage: json['hasIncompleteCoverage'] == true,
+    );
+  }
+
+  _CleanerDirectorySnapshot copyWith({bool? hasIncompleteCoverage}) {
+    return _CleanerDirectorySnapshot(
+      path: path,
+      sizeBytes: sizeBytes,
+      hasIncompleteCoverage:
+          hasIncompleteCoverage ?? this.hasIncompleteCoverage,
     );
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'path': path,
         'sizeBytes': sizeBytes,
+        'hasIncompleteCoverage': hasIncompleteCoverage,
       };
+}
+
+/// Normalized, boundary-aware index for legacy raw coverage paths.
+///
+/// A folder overlaps an incomplete path when it is the same path, an ancestor
+/// of it, or a descendant of it. The sorted list makes descendant lookups a
+/// single lower-bound probe, while the set makes ancestor lookups proportional
+/// to path depth rather than to the number of issue paths.
+class _IncompletePathIndex {
+  static const int _sortBatchSize = 512;
+
+  final Set<String> _paths;
+  final List<String> _sortedPaths;
+
+  const _IncompletePathIndex(this._paths, this._sortedPaths);
+
+  static Future<_IncompletePathIndex> build(Iterable<String> rawPaths) async {
+    final paths = <String>{};
+    var processed = 0;
+    for (final rawPath in rawPaths) {
+      final normalized = CleanerGrowthHistoryService._normalizePath(rawPath);
+      if (normalized.isNotEmpty && normalized != 'CANCELLED') {
+        paths.add(normalized);
+      }
+      processed++;
+      if (processed % 256 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    final sortedPaths = await _sortCooperatively(paths);
+    return _IncompletePathIndex(paths, sortedPaths);
+  }
+
+  static Future<List<String>> _sortCooperatively(Set<String> paths) async {
+    if (paths.isEmpty) return <String>[];
+
+    final chunks = <List<String>>[];
+    var chunk = <String>[];
+    for (final path in paths) {
+      chunk.add(path);
+      if (chunk.length == _sortBatchSize) {
+        chunk.sort();
+        chunks.add(chunk);
+        chunk = <String>[];
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    if (chunk.isNotEmpty) {
+      chunk.sort();
+      chunks.add(chunk);
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    var sortedChunks = chunks;
+    while (sortedChunks.length > 1) {
+      final mergedChunks = <List<String>>[];
+      for (var index = 0; index < sortedChunks.length; index += 2) {
+        if (index + 1 == sortedChunks.length) {
+          mergedChunks.add(sortedChunks[index]);
+        } else {
+          mergedChunks.add(await _mergeSortedChunks(
+            sortedChunks[index],
+            sortedChunks[index + 1],
+          ));
+        }
+      }
+      sortedChunks = mergedChunks;
+      await Future<void>.delayed(Duration.zero);
+    }
+    return sortedChunks.single;
+  }
+
+  static Future<List<String>> _mergeSortedChunks(
+    List<String> left,
+    List<String> right,
+  ) async {
+    final merged = <String>[];
+    var leftIndex = 0;
+    var rightIndex = 0;
+    while (leftIndex < left.length || rightIndex < right.length) {
+      if (rightIndex == right.length ||
+          (leftIndex < left.length &&
+              left[leftIndex].compareTo(right[rightIndex]) <= 0)) {
+        merged.add(left[leftIndex++]);
+      } else {
+        merged.add(right[rightIndex++]);
+      }
+      if (merged.length % _sortBatchSize == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    return merged;
+  }
+
+  bool overlaps(String rawFolderPath) {
+    final folderPath = CleanerGrowthHistoryService._normalizePath(
+      rawFolderPath,
+    );
+    if (folderPath.isEmpty) return false;
+
+    var ancestor = folderPath;
+    while (true) {
+      if (_paths.contains(ancestor)) return true;
+      final separator = ancestor.lastIndexOf(r'\');
+      if (separator < 0) break;
+      ancestor = ancestor.substring(0, separator);
+    }
+
+    final descendantPrefix = '$folderPath\\';
+    final descendantIndex = _lowerBound(_sortedPaths, descendantPrefix);
+    return descendantIndex < _sortedPaths.length &&
+        _sortedPaths[descendantIndex].startsWith(descendantPrefix);
+  }
+
+  static int _lowerBound(List<String> values, String target) {
+    var low = 0;
+    var high = values.length;
+    while (low < high) {
+      final middle = low + ((high - low) >> 1);
+      if (values[middle].compareTo(target) < 0) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low;
+  }
 }

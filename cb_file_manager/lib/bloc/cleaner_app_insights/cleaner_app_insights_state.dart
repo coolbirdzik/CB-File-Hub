@@ -38,7 +38,7 @@ class CleanerAppInsightsState extends Equatable {
   final DateTime evaluatedAt;
   final String? errorMessage;
 
-  const CleanerAppInsightsState({
+  CleanerAppInsightsState({
     required this.evaluatedAt,
     this.status = CleanerAppInsightsStatus.idle,
     this.report,
@@ -51,18 +51,49 @@ class CleanerAppInsightsState extends Equatable {
     this.errorMessage,
   });
 
+  // Filtering/sorting scans every app (and every entry path when searching),
+  // so the result is computed once per state instead of once per read: the
+  // UI touches these getters several times during a single rebuild.
+  final _Memo _memo = _Memo();
+
   List<AppStorageProfile> get visibleApps {
+    final cached = _memo.visibleApps;
+    if (cached != null) return cached;
     final currentReport = report;
-    if (currentReport == null) return const <AppStorageProfile>[];
-    return filterAndSortAppProfiles(
-      profiles: currentReport.apps,
-      searchQuery: searchQuery,
-      filter: filter,
-      sort: sort,
-      largeThresholdBytes: largeThresholdBytes,
-      staleThresholdDays: staleThresholdDays,
-      evaluatedAt: evaluatedAt,
-    );
+    final computed = currentReport == null
+        ? const <AppStorageProfile>[]
+        : filterAndSortAppProfiles(
+            profiles: currentReport.apps,
+            searchQuery: searchQuery,
+            filter: filter,
+            sort: sort,
+            largeThresholdBytes: largeThresholdBytes,
+            staleThresholdDays: staleThresholdDays,
+            evaluatedAt: evaluatedAt,
+          );
+    return _memo.visibleApps = computed;
+  }
+
+  _AppCounters get _appCounters {
+    final cached = _memo.counters;
+    if (cached != null) return cached;
+    var large = 0;
+    var stale = 0;
+    var attention = 0;
+    var attentionSize = 0;
+    final staleThreshold = Duration(days: staleThresholdDays);
+    for (final profile in report?.apps ?? const <AppStorageProfile>[]) {
+      final isLarge = profile.bestKnownSizeBytes >= largeThresholdBytes;
+      final isStale =
+          profile.isStale(now: evaluatedAt, threshold: staleThreshold);
+      if (isLarge) large++;
+      if (isStale) stale++;
+      if (isLarge && isStale) {
+        attention++;
+        attentionSize += profile.bestKnownSizeBytes;
+      }
+    }
+    return _memo.counters = _AppCounters(large, stale, attention, attentionSize);
   }
 
   AppStorageProfile? get selectedProfile {
@@ -71,51 +102,13 @@ class CleanerAppInsightsState extends Equatable {
     return report?.findApp(appId);
   }
 
-  int get largeAppCount =>
-      report?.apps
-          .where((profile) => profile.bestKnownSizeBytes >= largeThresholdBytes)
-          .length ??
-      0;
+  int get largeAppCount => _appCounters.large;
 
-  int get staleAppCount =>
-      report?.apps
-          .where(
-            (profile) => profile.isStale(
-              now: evaluatedAt,
-              threshold: Duration(days: staleThresholdDays),
-            ),
-          )
-          .length ??
-      0;
+  int get staleAppCount => _appCounters.stale;
 
-  int get attentionAppCount =>
-      report?.apps
-          .where(
-            (profile) => appNeedsAttention(
-              profile,
-              evaluatedAt: evaluatedAt,
-              largeThresholdBytes: largeThresholdBytes,
-              staleThresholdDays: staleThresholdDays,
-            ),
-          )
-          .length ??
-      0;
+  int get attentionAppCount => _appCounters.attention;
 
-  int get attentionBytes =>
-      report?.apps
-          .where(
-            (profile) => appNeedsAttention(
-              profile,
-              evaluatedAt: evaluatedAt,
-              largeThresholdBytes: largeThresholdBytes,
-              staleThresholdDays: staleThresholdDays,
-            ),
-          )
-          .fold<int>(
-            0,
-            (total, profile) => total + profile.bestKnownSizeBytes,
-          ) ??
-      0;
+  int get attentionBytes => _appCounters.attentionBytes;
 
   CleanerAppInsightsState copyWith({
     CleanerAppInsightsStatus? status,
@@ -129,7 +122,7 @@ class CleanerAppInsightsState extends Equatable {
     DateTime? evaluatedAt,
     Object? errorMessage = _notSet,
   }) {
-    return CleanerAppInsightsState(
+    final next = CleanerAppInsightsState(
       status: status ?? this.status,
       report: identical(report, _notSet)
           ? this.report
@@ -147,6 +140,20 @@ class CleanerAppInsightsState extends Equatable {
           ? this.errorMessage
           : errorMessage as String?,
     );
+
+    // Selection-only changes leave the filtered list identical, so hand the
+    // memoized results over instead of recomputing them.
+    if (identical(next.report, this.report) &&
+        next.searchQuery == this.searchQuery &&
+        next.filter == this.filter &&
+        next.sort == this.sort &&
+        next.largeThresholdBytes == this.largeThresholdBytes &&
+        next.staleThresholdDays == this.staleThresholdDays &&
+        next.evaluatedAt == this.evaluatedAt) {
+      next._memo.visibleApps = _memo.visibleApps;
+      next._memo.counters = _memo.counters;
+    }
+    return next;
   }
 
   @override
@@ -266,19 +273,57 @@ bool appNeedsAttention(
       );
 }
 
-bool _matchesSearch(AppStorageProfile profile, String normalizedQuery) {
-  final app = profile.app;
-  final values = <String?>[
-    app.displayName,
-    app.publisher,
-    app.version,
-    app.installLocation,
-    app.packageFamilyName,
-    ...profile.entries.map((entry) => entry.path),
-  ];
-  return values.any(
-    (value) => value?.toLowerCase().contains(normalizedQuery) ?? false,
+/// Mutable memo holder so the state object itself stays all-final.
+class _Memo {
+  List<AppStorageProfile>? visibleApps;
+  _AppCounters? counters;
+}
+
+class _AppCounters {
+  final int large;
+  final int stale;
+  final int attention;
+  final int attentionBytes;
+
+  const _AppCounters(
+    this.large,
+    this.stale,
+    this.attention,
+    this.attentionBytes,
   );
+}
+
+// Lowercasing every searchable field of every app on each keystroke is what
+// made typing stutter; the haystack only depends on the profile, so it is
+// built once and kept alive as long as the profile is.
+final Expando<String> _searchHaystacks = Expando<String>('appSearchHaystack');
+
+String _searchHaystack(AppStorageProfile profile) {
+  final cached = _searchHaystacks[profile];
+  if (cached != null) return cached;
+  final app = profile.app;
+  final buffer = StringBuffer()
+    ..write(app.displayName)
+    ..write('\n')
+    ..write(app.publisher ?? '')
+    ..write('\n')
+    ..write(app.version ?? '')
+    ..write('\n')
+    ..write(app.installLocation ?? '')
+    ..write('\n')
+    ..write(app.packageFamilyName ?? '');
+  for (final entry in profile.entries) {
+    buffer
+      ..write('\n')
+      ..write(entry.path);
+  }
+  final haystack = buffer.toString().toLowerCase();
+  _searchHaystacks[profile] = haystack;
+  return haystack;
+}
+
+bool _matchesSearch(AppStorageProfile profile, String normalizedQuery) {
+  return _searchHaystack(profile).contains(normalizedQuery);
 }
 
 int _compareLastOpened(
