@@ -126,7 +126,7 @@ class ArchivePathUtils {
     final location = parse(path);
     if (location == null) return null;
     if (location.innerPath.isEmpty) {
-      return p.basename(location.archiveFile);
+      return _basename(location.archiveFile);
     }
     return location.innerPath.split('/').last;
   }
@@ -145,7 +145,7 @@ class ArchivePathUtils {
 
     final crumbs = <ArchiveBreadcrumb>[
       ArchiveBreadcrumb(
-        label: p.basename(location.archiveFile),
+        label: _basename(location.archiveFile),
         virtualPath: build(archiveFile: location.archiveFile),
       ),
     ];
@@ -175,5 +175,13 @@ class ArchivePathUtils {
         .split('/')
         .where((part) => part.isNotEmpty)
         .join('/');
+  }
+
+  static String _basename(String pathValue) {
+    final parts = pathValue.split(RegExp(r'[\\/]+'));
+    for (var i = parts.length - 1; i >= 0; i--) {
+      if (parts[i].isNotEmpty) return parts[i];
+    }
+    return pathValue;
   }
 }

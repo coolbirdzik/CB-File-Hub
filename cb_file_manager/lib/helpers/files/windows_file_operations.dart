@@ -73,7 +73,7 @@ class WindowsFileOperations {
     bool requireElevation = false,
     Duration? timeout,
   }) async {
-    if (!isAvailable || sources.isEmpty) {
+    if (sources.isEmpty) {
       return false;
     }
 
