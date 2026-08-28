@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../e2e/cb_e2e_config.dart';
+import '../../../design_system/primitives/cb_tooltip.dart';
 
 import '../../../bloc/ai_agent/ai_agent_event.dart';
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart';
@@ -3165,7 +3166,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       ),
       // Filter cleanable-only
       boundedAction(
-        Tooltip(
+        CbTooltip(
           message: l.diskCleanerShowCleanableOnly,
           child: FilterChip(
             label: Text(
@@ -3184,7 +3185,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       ),
       if (_recentFolderGrowth.isNotEmpty)
         boundedAction(
-          Tooltip(
+          CbTooltip(
             message: l.diskCleanerGrowthTitle,
             child: FilterChip(
               key: const ValueKey<String>('cleaner-growth-filter'),
@@ -6438,7 +6439,7 @@ class _TreeRowState extends State<_TreeRow> {
                         ),
                         // Junk category badge
                         if (categoryId != null)
-                          Tooltip(
+                          CbTooltip(
                             // Answers "why is this junk?" without making the
                             // user open the folder to find out.
                             message: _CbAgentCleanerScreenState._junkReason(
@@ -6470,7 +6471,7 @@ class _TreeRowState extends State<_TreeRow> {
                             child: InkWell(
                               borderRadius: BorderRadius.circular(10),
                               onTap: () => widget.onAskAi!(node),
-                              child: Tooltip(
+                              child: CbTooltip(
                                 message: AppLocalizations.of(context)!
                                     .diskCleanerAskAgentAboutThis,
                                 child: Icon(
@@ -6916,7 +6917,7 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                             ),
                           ),
                           if (categoryId != null)
-                            Tooltip(
+                            CbTooltip(
                               // Answers "why is this junk?" without making the
                               // user open the folder to find out.
                               message: _CbAgentCleanerScreenState._junkReason(
@@ -6942,7 +6943,7 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                               ),
                             ),
                           if (growth != null)
-                            Tooltip(
+                            CbTooltip(
                               message:
                                   '${growth.path}\n${localizations.diskCleanerGrowthCurrentSize(_CbAgentCleanerScreenState._fmt(growth.currentSizeBytes))}',
                               child: Container(

@@ -706,7 +706,7 @@ class NetworkThumbnailHelper {
           scheduleMicrotask(_processNextQueuedRequest);
         });
 
-        return future;
+        return await future;
       }
 
       // For other network protocols (not implemented yet)

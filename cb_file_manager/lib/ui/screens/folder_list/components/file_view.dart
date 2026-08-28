@@ -12,6 +12,7 @@ import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -216,7 +217,9 @@ class FileView extends StatelessWidget {
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
       // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
-      cacheExtent: isDesktop ? 600 : (isMobile ? 400 : 500),
+      scrollCacheExtent: ScrollCacheExtent.pixels(
+        isDesktop ? 600 : (isMobile ? 400 : 500),
+      ),
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       addSemanticIndexes: false,
@@ -500,7 +503,9 @@ class FileView extends StatelessWidget {
                         parent: AlwaysScrollableScrollPhysics(),
                       ),
             // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
-            cacheExtent: isDesktop ? 600 : (isMobile ? 400 : 500),
+            scrollCacheExtent: ScrollCacheExtent.pixels(
+              isDesktop ? 600 : (isMobile ? 400 : 500),
+            ),
             addAutomaticKeepAlives: true,
             addRepaintBoundaries: true,
             addSemanticIndexes: false,
@@ -824,7 +829,9 @@ class FileView extends StatelessWidget {
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
               // Reduced cache extent to prevent pre-building too many widgets during fast scroll
-              cacheExtent: isDesktop ? 600 : (isMobile ? 400 : 500),
+              scrollCacheExtent: ScrollCacheExtent.pixels(
+                isDesktop ? 600 : (isMobile ? 400 : 500),
+              ),
               addAutomaticKeepAlives: true,
               addRepaintBoundaries: true,
               addSemanticIndexes: false,

@@ -779,8 +779,8 @@ class _PdfPreviewState extends State<_PdfPreview> {
   Widget build(BuildContext context) {
     return PdfView(
       controller: _controller,
-      builders: PdfViewBuilders<DefaultBuilderOptions>(
-        options: const DefaultBuilderOptions(),
+      builders: const PdfViewBuilders<DefaultBuilderOptions>(
+        options: DefaultBuilderOptions(),
         documentLoaderBuilder: _buildPdfLoader,
         pageLoaderBuilder: _buildPdfLoader,
       ),

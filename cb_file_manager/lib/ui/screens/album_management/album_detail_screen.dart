@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' show min, max;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -1275,7 +1276,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           padding: const EdgeInsets.all(GridZoomConstraints.fileGridSpacing),
           // Match file-browser GridView settings for consistent perf.
           physics: const ClampingScrollPhysics(),
-          cacheExtent: isDesktop ? 300 : 200,
+          scrollCacheExtent: ScrollCacheExtent.pixels(isDesktop ? 300 : 200),
           // Let off-screen album item states dispose promptly. Thumbnail image
           // cache already handles reuse; keeping widget states alive adds RAM
           // and per-item stream/subscription pressure in large albums.

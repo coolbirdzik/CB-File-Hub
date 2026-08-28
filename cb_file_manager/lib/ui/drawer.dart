@@ -26,15 +26,6 @@ import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 
 /// Returns a key that forces a Fluent drawer section to honor the active tab's
 /// persisted expansion state after a tab switch or expansion change.
-String fluentDrawerSectionExpansionKey({
-  required DrawerState state,
-  required String section,
-}) {
-  final isExpanded =
-      section == 'pinned' ? state.isPinnedExpanded : state.isStorageExpanded;
-  return 'fluent-$section-${state.activeTabId}-$isExpanded';
-}
-
 /// Shared geometry and motion values for the desktop navigation surface.
 ///
 /// Keeping these values together makes the drawer's spacing rhythm intentional
@@ -55,11 +46,23 @@ class _FluentDrawerTokens {
 
 /// A borderless Fluent navigation section that keeps its content state in the
 /// same keyed widget as the active tab's persisted expansion state.
-class FluentDrawerSection extends StatelessWidget {
+/// One collapsible group (Pinned, Drives, ...) in the desktop drawer.
+///
+/// [expanded] is a live value, not a one-shot seed: the section stays mounted
+/// and animates to match whenever the drawer state changes. That matters
+/// beyond tidiness — this group used to carry a [ValueKey] built from the
+/// active tab id and the expansion flag, so every tab switch and every
+/// expand/collapse remounted the whole subtree. Remounting destroys and
+/// recreates each semantics node under it inside a single frame, and the
+/// Windows AccessibilityBridge cannot serialize an ui::AXTreeUpdate that drops
+/// node ids and reclaims their slots at once — it drops the batch and floods
+/// stderr with "Failed to update ui::AXTree". See the same reasoning in
+/// ui/components/common/optimized_interaction_handler.dart.
+class FluentDrawerSection extends StatefulWidget {
   final IconData icon;
   final String title;
   final bool selected;
-  final bool initiallyExpanded;
+  final bool expanded;
   final ValueChanged<bool> onStateChanged;
   final Widget content;
 
@@ -68,34 +71,79 @@ class FluentDrawerSection extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.selected,
-    required this.initiallyExpanded,
+    required this.expanded,
     required this.onStateChanged,
     required this.content,
   }) : super(key: key);
+
+  @override
+  State<FluentDrawerSection> createState() => _FluentDrawerSectionState();
+}
+
+class _FluentDrawerSectionState extends State<FluentDrawerSection> {
+  // fluent's Expander reads `initiallyExpanded` once and has no
+  // didUpdateWidget, so following the drawer state means driving its state
+  // object directly.
+  final GlobalKey<fluent.ExpanderState> _expanderKey =
+      GlobalKey<fluent.ExpanderState>();
+
+  /// True while [_syncExpansion] drives the expander, so the resulting
+  /// callback is not echoed back into the cubit that asked for it.
+  bool _syncingFromState = false;
+
+  @override
+  void didUpdateWidget(FluentDrawerSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.expanded != oldWidget.expanded) {
+      _syncExpansion(widget.expanded);
+    }
+  }
+
+  void _syncExpansion(bool expanded) {
+    // Expander.isExpanded calls setState; didUpdateWidget runs mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = _expanderKey.currentState;
+      if (!mounted || state == null || state.isExpanded == expanded) return;
+      _syncingFromState = true;
+      try {
+        state.isExpanded = expanded;
+      } finally {
+        _syncingFromState = false;
+      }
+    });
+  }
+
+  void _handleStateChanged(bool expanded) {
+    if (_syncingFromState) return;
+    widget.onStateChanged(expanded);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = fluent.FluentTheme.of(context);
     final resources = theme.resources;
     final accent = theme.accentColor.defaultBrushFor(theme.brightness);
+    final icon = widget.icon;
+    final selected = widget.selected;
 
     return fluent.Expander(
+      key: _expanderKey,
       leading: Icon(
         icon,
         size: 18,
         color: selected ? accent : resources.textFillColorSecondary,
       ),
       header: Text(
-        title,
+        widget.title,
         style: TextStyle(
           color: resources.textFillColorPrimary,
           fontSize: 13.5,
           fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
         ),
       ),
-      content: content,
-      initiallyExpanded: initiallyExpanded,
-      onStateChanged: onStateChanged,
+      content: widget.content,
+      initiallyExpanded: widget.expanded,
+      onStateChanged: _handleStateChanged,
       animationDuration: _FluentDrawerTokens.sectionTransition,
       headerBackgroundColor: WidgetStateProperty.resolveWith<Color>(
         (states) => _fluentDrawerStateFill(
@@ -523,16 +571,11 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                           if (state.pinnedPaths.isNotEmpty)
                             _buildFluentSection(
                               context,
-                              key: ValueKey<String>(
-                                fluentDrawerSectionExpansionKey(
-                                  state: state,
-                                  section: 'pinned',
-                                ),
-                              ),
+                              key: const ValueKey<String>('fluent-pinned'),
                               icon: PhosphorIconsLight.pushPin,
                               title: context.tr.pinnedSection,
                               selected: hasSelectedPinnedPath,
-                              initiallyExpanded: state.isPinnedExpanded,
+                              expanded: state.isPinnedExpanded,
                               onStateChanged:
                                   context.read<DrawerCubit>().setPinnedExpanded,
                               content: Column(
@@ -583,16 +626,11 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                           ),
                           _buildFluentSection(
                             context,
-                            key: ValueKey<String>(
-                              fluentDrawerSectionExpansionKey(
-                                state: state,
-                                section: 'storage',
-                              ),
-                            ),
+                            key: const ValueKey<String>('fluent-storage'),
                             icon: PhosphorIconsLight.hardDrives,
                             title: context.tr.drivesTab,
                             selected: hasSelectedStoragePath,
-                            initiallyExpanded: state.isStorageExpanded,
+                            expanded: state.isStorageExpanded,
                             onStateChanged:
                                 context.read<DrawerCubit>().setStorageExpanded,
                             content: _buildFluentStorageItems(
@@ -818,7 +856,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     required IconData icon,
     required String title,
     required bool selected,
-    required bool initiallyExpanded,
+    required bool expanded,
     required ValueChanged<bool> onStateChanged,
     required Widget content,
   }) {
@@ -827,7 +865,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       icon: icon,
       title: title,
       selected: selected,
-      initiallyExpanded: initiallyExpanded,
+      expanded: expanded,
       onStateChanged: onStateChanged,
       content: content,
     );

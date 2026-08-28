@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../tokens/cb_motion_tokens.dart';
+import 'cb_tooltip.dart';
 
 /// The interaction states a CoolBird control can be in.
 @immutable
@@ -161,7 +162,7 @@ class _CbPressableState extends State<CbPressable> {
     }
 
     if (widget.tooltip != null) {
-      child = Tooltip(
+      child = CbTooltip(
         message: widget.tooltip!,
         waitDuration: CbDurations.slow,
         child: child,

@@ -784,9 +784,12 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
                 },
               ),
         filled: true,
-        fillColor: isDark
-            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.42)
-            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+        fillColor: WidgetStateColor.resolveWith((states) {
+          final focused = states.contains(WidgetState.focused);
+          return theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: isDark ? (focused ? 0.56 : 0.42) : (focused ? 0.34 : 0.2),
+          );
+        }),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.transparent, width: 0),
@@ -798,7 +801,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: theme.colorScheme.primary.withValues(alpha: 0.45),
+            color: theme.colorScheme.outline.withValues(alpha: 0.48),
             width: 1,
           ),
         ),

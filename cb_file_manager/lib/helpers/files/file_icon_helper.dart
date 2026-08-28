@@ -109,6 +109,7 @@ class FileIconHelper {
       height: size.toDouble(),
       child: Image.memory(
         bmpBytes,
+        excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
         width: size.toDouble(),
         height: size.toDouble(),
         fit: BoxFit.contain,
@@ -344,7 +345,7 @@ class FileIconHelper {
       }
 
       if (appPath != null && appPath.isNotEmpty) {
-        return _windowsIconFromAppPath(appPath, size);
+        return await _windowsIconFromAppPath(appPath, size);
       }
     } catch (e) {
       debugPrint('Error getting default app icon: $e');

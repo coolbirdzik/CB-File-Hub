@@ -590,7 +590,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.45),
+                  color: theme.colorScheme.outline.withValues(alpha: 0.48),
                   width: 1,
                 ),
               ),
@@ -598,11 +598,14 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
               hintText: '${l10n.enterTagName} (e.g. Actress:Hung)',
               prefixIcon: const Icon(PhosphorIconsLight.tag),
               filled: true,
-              fillColor: isDarkMode
-                  ? theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.42)
-                  : theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.2),
+              fillColor: WidgetStateColor.resolveWith((states) {
+                final focused = states.contains(WidgetState.focused);
+                return theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: isDarkMode
+                      ? (focused ? 0.56 : 0.42)
+                      : (focused ? 0.34 : 0.2),
+                );
+              }),
             ),
             style: const TextStyle(fontSize: 16),
             onChanged: (updatedTags) {

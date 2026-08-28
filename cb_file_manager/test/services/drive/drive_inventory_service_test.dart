@@ -48,14 +48,14 @@ void main() {
 
   group('DriveInfo system eject eligibility helpers', () {
     test('system volumes must not be ejectable by policy', () {
-      final system = DriveInfo(
+      const system = DriveInfo(
         path: 'C:\\',
         displayName: 'C:\\',
         kind: DriveKind.fixed,
         isSystemVolume: true,
         canEject: false,
       );
-      final usb = DriveInfo(
+      const usb = DriveInfo(
         path: 'E:\\',
         displayName: 'USB',
         kind: DriveKind.removable,

@@ -1,6 +1,7 @@
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 class BrowserLikeCollectionView<T> extends StatelessWidget {
   final ViewMode viewMode;
@@ -154,7 +155,9 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
         controller: scrollController,
         padding: padding,
         physics: physics,
-        cacheExtent: gridCacheExtent,
+        scrollCacheExtent: gridCacheExtent == null
+            ? null
+            : ScrollCacheExtent.pixels(gridCacheExtent!),
         addAutomaticKeepAlives: true,
         addRepaintBoundaries: true,
         addSemanticIndexes: false,
@@ -177,7 +180,9 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               controller: scrollController,
               padding: padding,
               physics: physics,
-              cacheExtent: detailsCacheExtent,
+              scrollCacheExtent: detailsCacheExtent == null
+                  ? null
+                  : ScrollCacheExtent.pixels(detailsCacheExtent!),
               addAutomaticKeepAlives: true,
               addRepaintBoundaries: true,
               addSemanticIndexes: false,
@@ -191,7 +196,9 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               controller: scrollController,
               padding: padding,
               physics: physics,
-              cacheExtent: detailsCacheExtent,
+              scrollCacheExtent: detailsCacheExtent == null
+                  ? null
+                  : ScrollCacheExtent.pixels(detailsCacheExtent!),
               addAutomaticKeepAlives: true,
               addRepaintBoundaries: true,
               addSemanticIndexes: false,
@@ -225,7 +232,9 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       controller: scrollController,
       padding: padding,
       physics: physics,
-      cacheExtent: listCacheExtent,
+      scrollCacheExtent: listCacheExtent == null
+          ? null
+          : ScrollCacheExtent.pixels(listCacheExtent!),
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       addSemanticIndexes: false,

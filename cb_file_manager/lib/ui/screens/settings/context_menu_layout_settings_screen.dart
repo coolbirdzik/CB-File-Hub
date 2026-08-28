@@ -167,10 +167,7 @@ class _ContextMenuLayoutSettingsScreenState
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       buildDefaultDragHandles: false,
       itemCount: orderedDescriptors.length,
-      onReorder: (oldIndex, newIndex) {
-        if (newIndex > oldIndex) {
-          newIndex -= 1;
-        }
+      onReorderItem: (oldIndex, newIndex) {
         final reorderedIds =
             orderedDescriptors.map((descriptor) => descriptor.id).toList();
         final movedId = reorderedIds.removeAt(oldIndex);

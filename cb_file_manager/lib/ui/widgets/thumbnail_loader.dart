@@ -954,6 +954,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
         // PERFORMANCE: Use adaptive filter quality based on scrolling state
         return Image.file(
           File(thumbnailPath),
+          excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
           key: ValueKey(
               'thumb-img-${widget.filePath}-${thumbnailPath.hashCode}-$_thumbnailVersion'),
           width: widget.width,
@@ -1117,6 +1118,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
         // PERFORMANCE: Use adaptive filter quality based on scrolling state
         return Image.file(
           File(thumbnailPath),
+          excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
           width: widget.width,
           height: widget.height,
           fit: widget.fit,
@@ -1245,6 +1247,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
     // NetworkThumbnailHelper / VideoThumbnailHelper as before).
     if (!widget.filePath.startsWith('#')) {
       return Image(
+        excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
         image: ResizeImage(
           FileImage(File(widget.filePath)),
           width: 512,
@@ -1292,6 +1295,7 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
     final displayPath = _networkThumbnailPath!;
     return Image.file(
       File(displayPath),
+      excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
       width: widget.width,
       height: widget.height,
       fit: widget.fit,

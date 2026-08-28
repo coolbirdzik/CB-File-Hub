@@ -634,6 +634,12 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
         height: widget.height,
         child: Image.file(
           File(thumbnailPath),
+          // Decorative: the file name next to it is what a screen reader
+          // announces. Image would otherwise add a semantics node that appears
+          // when the thumbnail lands and disappears as tiles recycle, and the
+          // Windows AccessibilityBridge drops any ui::AXTreeUpdate that creates
+          // and destroys nodes in one frame.
+          excludeFromSemantics: true,
           key: ValueKey(
               'thumbnail-${widget.videoPath}-${thumbnailPath.hashCode}-$_thumbnailVersion'),
           width: widget.width,

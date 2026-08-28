@@ -272,11 +272,19 @@ class CbThemeBuilder {
       ),
 
       // ─── Inputs ──────────────────────────────────────────────────────────
-      // Kept in step with CbTextField: sunken fill, hairline border, 2px
-      // accent border on focus, no floating label.
+      // Kept in step with CbTextField: sunken fill, hairline border, and a
+      // neutral raised-fill focus state instead of a coloured outline.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: c.surfaceSunken,
+        fillColor: WidgetStateColor.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return c.surfaceSunken.withValues(alpha: 0.5);
+          }
+          if (states.contains(WidgetState.focused)) {
+            return c.surfaceRaised;
+          }
+          return c.surfaceSunken;
+        }),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: CbSpacing.sm + 2,
@@ -284,13 +292,13 @@ class CbThemeBuilder {
         ),
         hintStyle: CbTypography.body.copyWith(color: c.textTertiary),
         labelStyle: CbTypography.labelSm.copyWith(color: c.textSecondary),
-        floatingLabelStyle: CbTypography.labelSm.copyWith(color: c.accent.text),
+        floatingLabelStyle: CbTypography.labelSm.copyWith(color: c.textPrimary),
         helperStyle: CbTypography.caption.copyWith(color: c.textTertiary),
         errorStyle: CbTypography.caption.copyWith(color: c.status.danger),
         border: _inputBorder(c.stroke),
         enabledBorder: _inputBorder(c.stroke),
         disabledBorder: _inputBorder(c.strokeSubtle),
-        focusedBorder: _inputBorder(c.accent.base, width: CbStrokes.emphasis),
+        focusedBorder: _inputBorder(c.strokeStrong),
         errorBorder: _inputBorder(c.status.danger),
         focusedErrorBorder:
             _inputBorder(c.status.danger, width: CbStrokes.emphasis),

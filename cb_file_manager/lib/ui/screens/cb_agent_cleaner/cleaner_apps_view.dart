@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights.dart';
 import '../../../config/languages/app_localizations.dart';
+import '../../../design_system/primitives/cb_tooltip.dart';
 import '../../../helpers/files/windows_app_icon.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../utils/format_utils.dart';
@@ -583,6 +584,12 @@ class _SearchField extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       borderSide: BorderSide(color: colors.outlineVariant),
     );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(999),
+      borderSide: BorderSide(
+        color: colors.outline.withValues(alpha: 0.55),
+      ),
+    );
 
     return SizedBox(
       width: width,
@@ -599,7 +606,11 @@ class _SearchField extends StatelessWidget {
             decoration: InputDecoration(
               isDense: true,
               filled: true,
-              fillColor: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+              fillColor: WidgetStateColor.resolveWith((states) {
+                return colors.surfaceContainerHighest.withValues(
+                  alpha: states.contains(WidgetState.focused) ? 0.62 : 0.45,
+                );
+              }),
               hintText: hintText,
               hintStyle: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
@@ -637,9 +648,7 @@ class _SearchField extends StatelessWidget {
               ),
               border: border,
               enabledBorder: border,
-              focusedBorder: border.copyWith(
-                borderSide: BorderSide(color: colors.primary, width: 1.4),
-              ),
+              focusedBorder: focusedBorder,
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
             ),
           );
@@ -1381,7 +1390,7 @@ class _StorageEntryTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Tooltip(
+                CbTooltip(
                   message: '${entry.path}\n$technicalDetails',
                   child: Text(
                     entry.path,

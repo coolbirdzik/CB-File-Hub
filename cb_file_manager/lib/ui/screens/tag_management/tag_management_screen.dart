@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' show ImageFilter;
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
@@ -3412,21 +3413,28 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                               horizontal: 4, vertical: 2),
                           border: OutlineInputBorder(
                             borderSide: BorderSide(
-                                color: theme.colorScheme.primary, width: 2),
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                             borderRadius: BorderRadius.circular(2),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderSide: BorderSide(
-                                color: theme.colorScheme.primary, width: 2),
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                             borderRadius: BorderRadius.circular(2),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderSide: BorderSide(
-                                color: theme.colorScheme.primary, width: 2),
+                              color: theme.colorScheme.outline,
+                            ),
                             borderRadius: BorderRadius.circular(2),
                           ),
                           filled: true,
-                          fillColor: theme.colorScheme.surface,
+                          fillColor: WidgetStateColor.resolveWith((states) {
+                            return states.contains(WidgetState.focused)
+                                ? theme.colorScheme.surfaceContainer
+                                : theme.colorScheme.surface;
+                          }),
                         ),
                         cursorColor: theme.colorScheme.primary,
                         onEditingComplete: () => _commitTagRename(tag),
@@ -3456,7 +3464,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                               ),
                               if (isDesktop) ...[
                                 const SizedBox(width: 4),
-                                Tooltip(
+                                CbTooltip(
                                   message: AppLocalizations.of(context)!
                                       .doubleClickToRename,
                                   child: Icon(PhosphorIconsLight.pencilSimple,
@@ -3863,7 +3871,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     required double iconSize,
     double padding = 7.0,
   }) {
-    return Tooltip(
+    return CbTooltip(
       message: tooltip,
       child: InkWell(
         onTap: onTap,
@@ -4350,11 +4358,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                                             2),
                                                                 border:
                                                                     OutlineInputBorder(
-                                                                  borderSide: BorderSide(
-                                                                      color: theme
-                                                                          .colorScheme
-                                                                          .primary,
-                                                                      width: 2),
+                                                                  borderSide:
+                                                                      BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .outlineVariant,
+                                                                  ),
                                                                   borderRadius:
                                                                       BorderRadius
                                                                           .circular(
@@ -4362,11 +4371,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                                 ),
                                                                 enabledBorder:
                                                                     OutlineInputBorder(
-                                                                  borderSide: BorderSide(
-                                                                      color: theme
-                                                                          .colorScheme
-                                                                          .primary,
-                                                                      width: 2),
+                                                                  borderSide:
+                                                                      BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .outlineVariant,
+                                                                  ),
                                                                   borderRadius:
                                                                       BorderRadius
                                                                           .circular(
@@ -4374,20 +4384,31 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                                 ),
                                                                 focusedBorder:
                                                                     OutlineInputBorder(
-                                                                  borderSide: BorderSide(
-                                                                      color: theme
-                                                                          .colorScheme
-                                                                          .primary,
-                                                                      width: 2),
+                                                                  borderSide:
+                                                                      BorderSide(
+                                                                    color: theme
+                                                                        .colorScheme
+                                                                        .outline,
+                                                                  ),
                                                                   borderRadius:
                                                                       BorderRadius
                                                                           .circular(
                                                                               2),
                                                                 ),
                                                                 filled: true,
-                                                                fillColor: theme
-                                                                    .colorScheme
-                                                                    .surface,
+                                                                fillColor: WidgetStateColor
+                                                                    .resolveWith(
+                                                                        (states) {
+                                                                  return states.contains(
+                                                                          WidgetState
+                                                                              .focused)
+                                                                      ? theme
+                                                                          .colorScheme
+                                                                          .surfaceContainer
+                                                                      : theme
+                                                                          .colorScheme
+                                                                          .surface;
+                                                                }),
                                                               ),
                                                               cursorColor: theme
                                                                   .colorScheme
@@ -4409,7 +4430,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                     ),
                                                   )
                                                 else
-                                                  Tooltip(
+                                                  CbTooltip(
                                                     message: _tagHierarchyManager
                                                             .isParent(tag)
                                                         ? 'Double click to open child tags'

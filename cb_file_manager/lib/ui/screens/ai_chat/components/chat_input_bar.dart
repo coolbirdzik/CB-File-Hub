@@ -98,11 +98,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final canSend =
         _controller.text.trim().isNotEmpty || _mentionedFiles.isNotEmpty;
 
-    // Border color escalates: idle hairline -> focused primary -> dragging primary
+    // Focus reads through a quieter surface shift; dragging keeps the accent
+    // because it is an active drop target, not a routine text-field focus.
     final Color composerBorder = _isDragging
         ? theme.colorScheme.primary.withValues(alpha: 0.7)
         : _isFocused
-            ? theme.colorScheme.primary.withValues(alpha: 0.45)
+            ? theme.colorScheme.outline.withValues(alpha: 0.55)
             : (isDark
                 ? Colors.white.withValues(alpha: 0.10)
                 : Colors.black.withValues(alpha: 0.10));
@@ -151,8 +152,14 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   curve: Curves.easeOut,
                   decoration: BoxDecoration(
                     color: isDark
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.white.withValues(alpha: 0.72),
+                        ? Colors.white
+                            .withValues(alpha: _isFocused ? 0.08 : 0.05)
+                        : Color.alphaBlend(
+                            Colors.black.withValues(
+                              alpha: _isFocused ? 0.035 : 0,
+                            ),
+                            Colors.white.withValues(alpha: 0.72),
+                          ),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: composerBorder),
                     boxShadow: [

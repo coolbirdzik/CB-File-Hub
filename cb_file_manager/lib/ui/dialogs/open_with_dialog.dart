@@ -168,6 +168,8 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                               leading: app.icon,
                               title: Text(app.appName),
                               onTap: () async {
+                                // Pre-extract values that depend on BuildContext
+                                // before any async gap.
                                 final rootNavigator =
                                     Navigator.of(context, rootNavigator: true);
                                 setState(() {
@@ -181,6 +183,7 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
 
                                 if (app.packageName ==
                                     '__cb_archive_browse__') {
+                                  if (!context.mounted) return;
                                   ArchiveNavigation.openBrowse(
                                     context,
                                     archiveFilePath: widget.filePath,
@@ -281,17 +284,24 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                             ),
                           ),
                           onTap: () async {
+                            // Pre-extract context-dependent values before
+                            // any async gap so we don't use BuildContext
+                            // across await boundaries.
                             final toast = AppToast.capture(context);
                             final navigator = Navigator.of(context);
+                            final archivesSuccessL10n =
+                                AppLocalizations.of(context)!
+                                    .setCoolBirdAsDefaultForArchivesSuccess;
+                            final archivesFailedL10n =
+                                AppLocalizations.of(context)!
+                                    .setCoolBirdAsDefaultForArchivesFailed;
                             final exe = Platform.resolvedExecutable;
                             final ok = await WindowsAppIcon
                                 .setSelfAsDefaultForArchives(exe);
                             try {
                               toast.info(ok
-                                  ? AppLocalizations.of(context)!
-                                      .setCoolBirdAsDefaultForArchivesSuccess
-                                  : AppLocalizations.of(context)!
-                                      .setCoolBirdAsDefaultForArchivesFailed);
+                                  ? archivesSuccessL10n
+                                  : archivesFailedL10n);
                               navigator.pop();
                             } catch (_) {}
                           },

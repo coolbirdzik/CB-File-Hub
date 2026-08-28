@@ -63,11 +63,14 @@ class CommonVideoControlsOverlay extends StatelessWidget {
               Text(VideoPlayerUtils.formatDurationAlwaysHms(position),
                   style: const TextStyle(color: Colors.white, fontSize: 12)),
               Expanded(
-                child: Slider(
-                  value: progress,
-                  onChanged: onSeek,
-                  activeColor: Colors.redAccent,
-                  inactiveColor: Colors.white30,
+                child: Semantics(
+                  container: true,
+                  child: Slider(
+                    value: progress,
+                    onChanged: onSeek,
+                    activeColor: Colors.redAccent,
+                    inactiveColor: Colors.white30,
+                  ),
                 ),
               ),
               Text(VideoPlayerUtils.formatDurationAlwaysHms(duration),
@@ -117,13 +120,16 @@ class CommonVideoControlsOverlay extends StatelessWidget {
                         color: Colors.white, size: 18),
                     SizedBox(
                       width: 100,
-                      child: Slider(
-                        value: (volume ?? 70).clamp(0, 100),
-                        min: 0,
-                        max: 100,
-                        onChanged: onVolumeChange,
-                        activeColor: Colors.white,
-                        inactiveColor: Colors.white30,
+                      child: Semantics(
+                        container: true,
+                        child: Slider(
+                          value: (volume ?? 70).clamp(0, 100),
+                          min: 0,
+                          max: 100,
+                          onChanged: onVolumeChange,
+                          activeColor: Colors.white,
+                          inactiveColor: Colors.white30,
+                        ),
                       ),
                     ),
                   ],

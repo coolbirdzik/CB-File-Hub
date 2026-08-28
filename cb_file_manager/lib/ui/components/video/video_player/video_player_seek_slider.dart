@@ -22,20 +22,23 @@ class VideoPlayerSeekSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        trackHeight: 3,
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-      ),
-      child: Slider(
-        value: value,
-        min: min,
-        max: max,
-        activeColor: Colors.white,
-        inactiveColor: Colors.white24,
-        onChangeStart: (_) => onChangeStart?.call(),
-        onChanged: onChanged,
-        onChangeEnd: (_) => onChangeEnd?.call(),
+    return Semantics(
+      container: true,
+      child: SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          trackHeight: 3,
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+        ),
+        child: Slider(
+          value: value,
+          min: min,
+          max: max,
+          activeColor: Colors.white,
+          inactiveColor: Colors.white24,
+          onChangeStart: (_) => onChangeStart?.call(),
+          onChanged: onChanged,
+          onChangeEnd: (_) => onChangeEnd?.call(),
+        ),
       ),
     );
   }

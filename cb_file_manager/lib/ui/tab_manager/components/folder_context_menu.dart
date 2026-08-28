@@ -558,11 +558,8 @@ class FolderContextMenu {
             height: 520,
             child: ReorderableListView.builder(
               itemCount: allItems.length,
-              onReorder: (oldIndex, newIndex) {
+              onReorderItem: (oldIndex, newIndex) {
                 setState(() {
-                  if (newIndex > oldIndex) {
-                    newIndex -= 1;
-                  }
                   final movedItem = allItems.removeAt(oldIndex);
                   allItems.insert(newIndex, movedItem);
                 });

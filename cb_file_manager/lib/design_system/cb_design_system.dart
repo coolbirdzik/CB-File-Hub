@@ -30,6 +30,7 @@ export 'primitives/cb_dialog.dart';
 export 'primitives/cb_pressable.dart';
 export 'primitives/cb_surface.dart';
 export 'primitives/cb_text_field.dart';
+export 'primitives/cb_tooltip.dart';
 export 'tokens/cb_color_tokens.dart';
 export 'tokens/cb_elevation_tokens.dart';
 export 'tokens/cb_geometry_tokens.dart';

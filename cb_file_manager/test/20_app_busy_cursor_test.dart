@@ -134,6 +134,53 @@ void main() {
     expect(busyRegion(tester), isNull);
     expect(_MountProbeState.mounts, 1);
   });
+
+  testWidgets('overlay contributes no semantics nodes in either state',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+
+    int countNodes() {
+      final root = tester
+          .binding.renderViews.first.owner?.semanticsOwner?.rootSemanticsNode;
+      if (root == null) return 0;
+      var total = 0;
+      void walk(SemanticsNode node) {
+        total++;
+        node.visitChildren((child) {
+          walk(child);
+          return true;
+        });
+      }
+
+      walk(root);
+      return total;
+    }
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Center(child: Text('item'))),
+    );
+    final int baseline = countNodes();
+    expect(baseline, greaterThan(0));
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AppBusyCursorOverlay(child: Center(child: Text('item'))),
+      ),
+    );
+    expect(countNodes(), baseline);
+
+    // The engine's AXTree flood comes from nodes appearing/disappearing between
+    // updates, so the busy state must not add or drop any either.
+    AppBusyCursor.pulse(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(busyRegion(tester), isNotNull);
+    expect(countNodes(), baseline);
+
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(countNodes(), baseline);
+
+    handle.dispose();
+  });
 }
 
 /// Counts how often it is mounted, so a reparented overlay is caught.

@@ -165,8 +165,12 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                     )
                   : null,
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.3),
+              fillColor: WidgetStateColor.resolveWith((states) {
+                final base = theme.colorScheme.surfaceContainerHighest;
+                return states.contains(WidgetState.focused)
+                    ? base.withValues(alpha: 0.5)
+                    : base.withValues(alpha: 0.3);
+              }),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16.0),
                 borderSide: BorderSide.none,
@@ -174,8 +178,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16.0),
                 borderSide: BorderSide(
-                  color: theme.colorScheme.primary,
-                  width: 1.5,
+                  color: theme.colorScheme.outline.withValues(alpha: 0.55),
+                  width: 1,
                 ),
               ),
               contentPadding: const EdgeInsets.symmetric(

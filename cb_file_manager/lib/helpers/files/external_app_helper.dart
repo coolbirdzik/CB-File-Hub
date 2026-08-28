@@ -203,7 +203,7 @@ class ExternalAppHelper {
       } else if (Platform.isWindows) {
         // Special case for shell_open
         if (packageName == 'shell_open') {
-          return _openWithWindowsDefault(filePath);
+          return await _openWithWindowsDefault(filePath);
         } else {
           // On Windows, the packageName is actually the path to the executable
           await Process.start(
@@ -446,7 +446,7 @@ class ExternalAppHelper {
   static Future<bool> _openWithSystemDefault(String filePath) async {
     try {
       if (Platform.isWindows) {
-        return _openWithWindowsDefault(filePath);
+        return await _openWithWindowsDefault(filePath);
       }
       if (Platform.isAndroid) {
         final r = await _channel

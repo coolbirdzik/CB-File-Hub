@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../bloc/ai_agent/ai_agent.dart';
 import '../../../../config/languages/app_localizations.dart';
+import '../../../../design_system/primitives/cb_tooltip.dart';
 import '../../../../models/ai/ai_conversation.dart';
 
 /// Side drawer listing saved conversations.
@@ -178,7 +179,7 @@ class _FlatIconButtonState extends State<_FlatIconButton> {
     );
 
     if (widget.tooltip != null) {
-      btn = Tooltip(message: widget.tooltip!, child: btn);
+      btn = CbTooltip(message: widget.tooltip!, child: btn);
     }
     return btn;
   }
@@ -332,7 +333,7 @@ class _DeleteButtonState extends State<_DeleteButton> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Tooltip(
+    return CbTooltip(
       message: widget.tooltip,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,

@@ -355,12 +355,16 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: isDarkMode ? Colors.white70 : Colors.blue,
+            color: isDarkMode ? Colors.white54 : Colors.black38,
           ),
         ),
         filled: true,
-        fillColor:
-            isDarkMode ? Colors.white.withAlpha(13) : Colors.black.withAlpha(5),
+        fillColor: WidgetStateColor.resolveWith((states) {
+          final focused = states.contains(WidgetState.focused);
+          return isDarkMode
+              ? Colors.white.withAlpha(focused ? 24 : 13)
+              : Colors.black.withAlpha(focused ? 12 : 5);
+        }),
       ),
       onChanged: (value) {
         setState(() => _searchQuery = value);

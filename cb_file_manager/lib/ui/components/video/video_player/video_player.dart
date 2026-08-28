@@ -2931,106 +2931,73 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     : null;
 
                 final seekSlider = Expanded(
-                  child: _useVlcControls
-                      ? ValueListenableBuilder<VlcPlayerValue>(
-                          valueListenable: _vlcController!,
-                          builder: (context, v, _) {
-                            final durMs = v.duration.inMilliseconds;
-                            final hasDuration = durMs > 0;
-                            final maxMs = hasDuration
-                                ? durMs
-                                : (v.position.inMilliseconds > 0
-                                    ? v.position.inMilliseconds + 1000
-                                    : 1);
-                            final value = v.position.inMilliseconds
-                                .clamp(0, maxMs)
-                                .toDouble();
-                            return Slider(
-                              value: value,
-                              min: 0,
-                              max: maxMs.toDouble(),
-                              activeColor: Colors.white,
-                              inactiveColor: Colors.white24,
-                              onChangeStart:
-                                  hasDuration ? (_) => _isSeeking = true : null,
-                              onChanged: hasDuration
-                                  ? (vv) async {
-                                      await _vlcController?.seekTo(
-                                          Duration(milliseconds: vv.toInt()));
-                                    }
-                                  : null,
-                              onChangeEnd: hasDuration
-                                  ? (_) {
-                                      _seekingTimer?.cancel();
-                                      _seekingTimer = Timer(
-                                          const Duration(milliseconds: 200),
-                                          () {
-                                        if (mounted) _isSeeking = false;
-                                      });
-                                    }
-                                  : null,
-                            );
-                          },
-                        )
-                      : _useExoControls
-                          ? ValueListenableBuilder<exo.VideoPlayerValue>(
-                              valueListenable: _exoController!,
-                              builder: (context, v, _) {
-                                final maxMs = v.duration.inMilliseconds <= 0
-                                    ? 1
-                                    : v.duration.inMilliseconds;
-                                final value = v.position.inMilliseconds
-                                    .clamp(0, maxMs)
-                                    .toDouble();
-                                return Slider(
-                                  value: value,
-                                  min: 0,
-                                  max: maxMs.toDouble(),
-                                  activeColor: Colors.white,
-                                  inactiveColor: Colors.white24,
-                                  onChangeStart: (_) => _isSeeking = true,
-                                  onChanged: (vv) async {
-                                    await _exoController!.seekTo(
-                                        Duration(milliseconds: vv.toInt()));
-                                  },
-                                  onChangeEnd: (_) {
-                                    _seekingTimer?.cancel();
-                                    _seekingTimer = Timer(
-                                        const Duration(milliseconds: 200), () {
-                                      if (mounted) _isSeeking = false;
-                                    });
-                                  },
-                                );
-                              },
-                            )
-                          : StreamBuilder<Duration>(
-                              stream: _player!.stream.position,
-                              builder: (context, snapshot) {
-                                final position = snapshot.data ?? Duration.zero;
-                                final duration = _player!.state.duration;
-                                final maxMs = duration.inMilliseconds <= 0
-                                    ? 1
-                                    : duration.inMilliseconds;
-                                final value = position.inMilliseconds
-                                    .clamp(0, maxMs)
-                                    .toDouble();
-                                return SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    trackHeight: 2.5,
-                                    thumbShape: const RoundSliderThumbShape(
-                                        enabledThumbRadius: 7),
-                                  ),
-                                  child: Slider(
+                  // Material Slider owns an OverlayPortal for its value
+                  // indicator. Keep that traversal anchor separate while
+                  // playback continuously updates the control row.
+                  child: Semantics(
+                    container: true,
+                    child: _useVlcControls
+                        ? ValueListenableBuilder<VlcPlayerValue>(
+                            valueListenable: _vlcController!,
+                            builder: (context, v, _) {
+                              final durMs = v.duration.inMilliseconds;
+                              final hasDuration = durMs > 0;
+                              final maxMs = hasDuration
+                                  ? durMs
+                                  : (v.position.inMilliseconds > 0
+                                      ? v.position.inMilliseconds + 1000
+                                      : 1);
+                              final value = v.position.inMilliseconds
+                                  .clamp(0, maxMs)
+                                  .toDouble();
+                              return Slider(
+                                value: value,
+                                min: 0,
+                                max: maxMs.toDouble(),
+                                activeColor: Colors.white,
+                                inactiveColor: Colors.white24,
+                                onChangeStart: hasDuration
+                                    ? (_) => _isSeeking = true
+                                    : null,
+                                onChanged: hasDuration
+                                    ? (vv) async {
+                                        await _vlcController?.seekTo(
+                                            Duration(milliseconds: vv.toInt()));
+                                      }
+                                    : null,
+                                onChangeEnd: hasDuration
+                                    ? (_) {
+                                        _seekingTimer?.cancel();
+                                        _seekingTimer = Timer(
+                                            const Duration(milliseconds: 200),
+                                            () {
+                                          if (mounted) _isSeeking = false;
+                                        });
+                                      }
+                                    : null,
+                              );
+                            },
+                          )
+                        : _useExoControls
+                            ? ValueListenableBuilder<exo.VideoPlayerValue>(
+                                valueListenable: _exoController!,
+                                builder: (context, v, _) {
+                                  final maxMs = v.duration.inMilliseconds <= 0
+                                      ? 1
+                                      : v.duration.inMilliseconds;
+                                  final value = v.position.inMilliseconds
+                                      .clamp(0, maxMs)
+                                      .toDouble();
+                                  return Slider(
                                     value: value,
                                     min: 0,
                                     max: maxMs.toDouble(),
                                     activeColor: Colors.white,
                                     inactiveColor: Colors.white24,
                                     onChangeStart: (_) => _isSeeking = true,
-                                    onChanged: (v) async {
-                                      final target =
-                                          Duration(milliseconds: v.toInt());
-                                      await _player!.seek(target);
+                                    onChanged: (vv) async {
+                                      await _exoController!.seekTo(
+                                          Duration(milliseconds: vv.toInt()));
                                     },
                                     onChangeEnd: (_) {
                                       _seekingTimer?.cancel();
@@ -3040,10 +3007,52 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                                         if (mounted) _isSeeking = false;
                                       });
                                     },
-                                  ),
-                                );
-                              },
-                            ),
+                                  );
+                                },
+                              )
+                            : StreamBuilder<Duration>(
+                                stream: _player!.stream.position,
+                                builder: (context, snapshot) {
+                                  final position =
+                                      snapshot.data ?? Duration.zero;
+                                  final duration = _player!.state.duration;
+                                  final maxMs = duration.inMilliseconds <= 0
+                                      ? 1
+                                      : duration.inMilliseconds;
+                                  final value = position.inMilliseconds
+                                      .clamp(0, maxMs)
+                                      .toDouble();
+                                  return SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 2.5,
+                                      thumbShape: const RoundSliderThumbShape(
+                                          enabledThumbRadius: 7),
+                                    ),
+                                    child: Slider(
+                                      value: value,
+                                      min: 0,
+                                      max: maxMs.toDouble(),
+                                      activeColor: Colors.white,
+                                      inactiveColor: Colors.white24,
+                                      onChangeStart: (_) => _isSeeking = true,
+                                      onChanged: (v) async {
+                                        final target =
+                                            Duration(milliseconds: v.toInt());
+                                        await _player!.seek(target);
+                                      },
+                                      onChangeEnd: (_) {
+                                        _seekingTimer?.cancel();
+                                        _seekingTimer = Timer(
+                                            const Duration(milliseconds: 200),
+                                            () {
+                                          if (mounted) _isSeeking = false;
+                                        });
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
                 );
 
                 final width = constraints.maxWidth;

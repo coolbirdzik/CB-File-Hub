@@ -215,7 +215,7 @@ class ArchiveService {
     final output = archive_io.OutputFileStream(outPath);
     try {
       if (format == ArchiveFormat.gzip) {
-        GZipDecoder().decodeStream(input, output);
+        const GZipDecoder().decodeStream(input, output);
       } else {
         BZip2Decoder().decodeStream(input, output);
       }
@@ -240,7 +240,7 @@ class ArchiveService {
         await _decompressToFile(
           archivePath,
           workingPath,
-          (input, output) => GZipDecoder().decodeStream(input, output),
+          (input, output) => const GZipDecoder().decodeStream(input, output),
         );
         workingFormat = ArchiveFormat.tar;
       } else if (workingFormat == ArchiveFormat.tarBz2) {

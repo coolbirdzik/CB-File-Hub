@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:flutter/material.dart';
 
 /// Compact volume slider (0–100) for video player. Reuses SliderTheme across player backends.
@@ -13,19 +14,25 @@ class VideoPlayerVolumeSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        trackHeight: 2,
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
-      ),
-      child: Slider(
-        value: value.clamp(0.0, 100.0),
-        min: 0.0,
-        max: 100.0,
-        onChanged: onChanged,
-        activeColor: Colors.white,
-        inactiveColor: Colors.white.withValues(alpha: 0.3),
+    // Slider uses an OverlayPortal for its value indicator even without a
+    // label. Isolate that traversal anchor from the neighboring player
+    // tooltip and menu portals.
+    return Semantics(
+      container: true,
+      child: SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          trackHeight: 2,
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+          overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+        ),
+        child: Slider(
+          value: value.clamp(0.0, 100.0),
+          min: 0.0,
+          max: 100.0,
+          onChanged: onChanged,
+          activeColor: Colors.white,
+          inactiveColor: Colors.white.withValues(alpha: 0.3),
+        ),
       ),
     );
   }
@@ -65,7 +72,7 @@ class VideoPlayerControlButton extends StatelessWidget {
     );
 
     return tooltip != null
-        ? Tooltip(
+        ? CbTooltip(
             message: tooltip!,
             child: button,
           )

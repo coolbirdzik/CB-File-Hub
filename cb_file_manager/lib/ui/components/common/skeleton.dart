@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 /// Unified skeleton component for file, album, and media loading across all platforms
 /// Automatically adapts to mobile/desktop with consistent design
@@ -138,7 +139,7 @@ class _SkeletonState extends State<Skeleton>
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       itemCount: widget.itemCount ?? 12,
-      cacheExtent: 500,
+      scrollCacheExtent: const ScrollCacheExtent.pixels(500),
       itemBuilder: (context, index) => _SkeletonListItem(
         index: index,
         controller: _controller,
@@ -163,7 +164,7 @@ class _SkeletonState extends State<Skeleton>
     return GridView.builder(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.all(8.0),
-      cacheExtent: 800,
+      scrollCacheExtent: const ScrollCacheExtent.pixels(800),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 8,
@@ -202,7 +203,7 @@ class _SkeletonState extends State<Skeleton>
     return GridView.builder(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.all(8.0),
-      cacheExtent: 800,
+      scrollCacheExtent: const ScrollCacheExtent.pixels(800),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: widget.crossAxisCount ?? 3,
         crossAxisSpacing: 6,

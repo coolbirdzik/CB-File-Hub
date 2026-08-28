@@ -13,7 +13,7 @@ import '../tokens/cb_type_tokens.dart';
 /// along the floating label, the animated underline and a 48px minimum height
 /// that cannot be fully overridden — all of which are unmistakably Material
 /// and all of which are wrong for a dense desktop app. Here the label sits
-/// above the field, the field is 32px, and focus is a 2px accent border.
+/// above the field, the field is 32px, and focus uses a neutral raised fill.
 class CbTextField extends StatefulWidget {
   final TextEditingController? controller;
   final FocusNode? focusNode;
@@ -131,11 +131,14 @@ class _CbTextFieldState extends State<CbTextField> {
         ? c.strokeSubtle
         : hasError
             ? c.status.danger
-            : _focused
-                ? c.accent.base
-                : _hovered
-                    ? c.strokeStrong
-                    : c.stroke;
+            : (_focused || _hovered)
+                ? c.strokeStrong
+                : c.stroke;
+    final Color fillColor = !isEnabled
+        ? c.surfaceSunken.withValues(alpha: 0.5)
+        : _focused
+            ? c.surfaceRaised
+            : c.surfaceSunken;
 
     final TextStyle textStyle =
         (widget.mono ? CbTypography.mono : CbTypography.body).copyWith(
@@ -200,18 +203,13 @@ class _CbTextFieldState extends State<CbTextField> {
               vertical: multiline ? CbSpacing.sm : 0,
             ),
             decoration: BoxDecoration(
-              color: isEnabled
-                  ? c.surfaceSunken
-                  : c.surfaceSunken.withValues(alpha: 0.5),
+              color: fillColor,
               borderRadius: CbRadii.smAll,
               border: Border.all(
                 color: borderColor,
-                // The focused border thickens rather than glowing, so the
-                // field does not shift its neighbours: the extra pixel is
-                // taken from the padding, not the layout.
-                width: (_focused || hasError)
-                    ? CbStrokes.emphasis
-                    : CbStrokes.hairline,
+                // Focus now reads through the fill; only errors need the
+                // heavier outline so the field does not look alarmed.
+                width: hasError ? CbStrokes.emphasis : CbStrokes.hairline,
               ),
             ),
             child: Row(
