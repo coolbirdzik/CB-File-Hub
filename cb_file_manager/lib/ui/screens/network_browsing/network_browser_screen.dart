@@ -10,6 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 // Import for keyboard keys
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/ui/utils/app_busy_cursor.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart'; // Import the Fluent Design background
 
 // Import network browsing components
@@ -1269,6 +1270,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   void _handleFileOpen(BuildContext context, File file) {
+    AppBusyCursor.pulse();
     final String filePath = file.path;
     final String extension = p.extension(filePath).toLowerCase();
     final String fileName = p.basename(filePath);

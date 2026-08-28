@@ -35,6 +35,7 @@ import 'config/languages/app_localizations_delegate.dart';
 import 'services/streaming_service_manager.dart';
 import 'ui/utils/safe_navigation_wrapper.dart';
 import 'ui/utils/desktop_acrylic_backdrop.dart';
+import 'ui/utils/app_busy_cursor.dart';
 import 'core/service_locator.dart';
 import 'e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/services/album_service.dart';
@@ -1027,7 +1028,9 @@ class _CBFileAppState extends State<CBFileApp>
         Locale('en', ''),
       ],
       builder: (context, child) {
-        final wrappedChild = child ?? const SizedBox.shrink();
+        final wrappedChild = AppBusyCursorOverlay(
+          child: child ?? const SizedBox.shrink(),
+        );
         if (!_useDesktopAcrylicVisuals) return wrappedChild;
         return DesktopAcrylicBackdrop(
           brightness: Theme.of(context).brightness,
@@ -1063,7 +1066,9 @@ class _CBFileAppState extends State<CBFileApp>
         // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use
         // [ScaffoldMessenger.of] for snackbars — wrap so those lookups succeed.
         final shell = ScaffoldMessenger(
-          child: child ?? const SizedBox.shrink(),
+          child: AppBusyCursorOverlay(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
         final brightness = fluent.FluentTheme.of(context).brightness;
         final resolvedTheme = brightness == Brightness.dark

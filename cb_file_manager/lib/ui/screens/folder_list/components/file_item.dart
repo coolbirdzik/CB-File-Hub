@@ -26,6 +26,7 @@ import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart'; // Import Thu
 import 'package:flutter/services.dart'; // Import for keyboard key detection
 // Import for RepaintBoundary
 import '../../../components/common/optimized_interaction_handler.dart';
+import 'package:cb_file_manager/ui/utils/app_busy_cursor.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
@@ -258,6 +259,7 @@ class _FileItemState extends State<FileItem> {
   }
 
   void _openFile(bool isVideo, bool isImage) {
+    AppBusyCursor.pulse();
     if (widget.onFileTap != null) {
       widget.onFileTap!(widget.file, isVideo);
     } else {

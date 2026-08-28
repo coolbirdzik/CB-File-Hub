@@ -9,6 +9,7 @@ import 'windows_app_icon.dart';
 import 'windows_shell_context_menu.dart';
 import 'package:path/path.dart' as p;
 import 'dart:ui' as ui;
+import 'package:cb_file_manager/ui/utils/app_busy_cursor.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'file_type_registry.dart';
 import '../core/user_preferences.dart';
@@ -182,8 +183,15 @@ class ExternalAppHelper {
     }
   }
 
-  /// Open file with a specific app
-  static Future<bool> openFileWithApp(
+  /// Open file with a specific app.
+  ///
+  /// Runs inside a busy-cursor scope: launching a handler is the slow part of
+  /// a double-click, so the pointer stays busy until the process is up.
+  static Future<bool> openFileWithApp(String filePath, String packageName) {
+    return AppBusyCursor.run(() => _openFileWithApp(filePath, packageName));
+  }
+
+  static Future<bool> _openFileWithApp(
       String filePath, String packageName) async {
     try {
       if (Platform.isAndroid) {
@@ -431,7 +439,11 @@ class ExternalAppHelper {
 
   /// Open file with system default app (no chooser).
   /// Windows: Shell "open" verb (respects WinRAR etc.); Android: ACTION_VIEW.
-  static Future<bool> openWithSystemDefault(String filePath) async {
+  static Future<bool> openWithSystemDefault(String filePath) {
+    return AppBusyCursor.run(() => _openWithSystemDefault(filePath));
+  }
+
+  static Future<bool> _openWithSystemDefault(String filePath) async {
     try {
       if (Platform.isWindows) {
         return _openWithWindowsDefault(filePath);

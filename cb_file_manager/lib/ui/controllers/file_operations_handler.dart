@@ -11,6 +11,7 @@ import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
+import 'package:cb_file_manager/ui/utils/app_busy_cursor.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -440,6 +441,10 @@ class FileOperationsHandler {
     String? currentSearchTag,
     void Function(String path)? onNavigateToPath,
   }) {
+    // Explorer-style feedback: the pointer turns busy the moment the open
+    // starts, and the launch paths below extend it while they are running.
+    AppBusyCursor.pulse();
+
     // Stop any ongoing thumbnail processing when opening a file
     VideoThumbnailHelper.stopAllProcessing();
 
@@ -600,10 +605,12 @@ class FileOperationsHandler {
     if (location == null || location.innerPath.isEmpty) return;
 
     try {
-      final materialized = await locator<ArchiveService>().materializeEntryFile(
-        archiveFilePath: location.archiveFile,
-        entryInnerPath: location.innerPath,
-        cacheKey: virtualFilePath,
+      final materialized = await AppBusyCursor.run(
+        () => locator<ArchiveService>().materializeEntryFile(
+          archiveFilePath: location.archiveFile,
+          entryInnerPath: location.innerPath,
+          cacheKey: virtualFilePath,
+        ),
       );
       if (!context.mounted) return;
       onFileTap(

@@ -1,0 +1,32 @@
+name: phosphor_flutter
+description: >-
+  Trimmed, locally patched build of phosphor_flutter 2.1.0 carrying only the
+  Light, Fill and Bold styles. Patched so icon constants are plain IconData
+  values rather than subclasses, which Flutter no longer permits.
+version: 2.1.0
+homepage: https://phosphoricons.com/
+repository: https://github.com/phosphor-icons/phosphor-flutter
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  fonts:
+    - family: PhosphorLight
+      fonts:
+        - asset: lib/fonts/Phosphor-Light.ttf
+          weight: 400
+    - family: PhosphorFill
+      fonts:
+        - asset: lib/fonts/Phosphor-Fill.ttf
+          weight: 400
+    - family: PhosphorBold
+      fonts:
+        - asset: lib/fonts/Phosphor-Bold.ttf
+          weight: 400

@@ -7,6 +7,7 @@ import '../../core/service_locator.dart';
 import '../../helpers/core/user_preferences.dart';
 import '../../services/windowing/video_window_service.dart';
 import '../screens/media_gallery/video_player_full_screen.dart';
+import 'app_busy_cursor.dart';
 
 /// Opens the built-in video player, honouring the desktop
 /// "open the player in a new window" preference.
@@ -38,9 +39,11 @@ class VideoPlaybackLauncher {
         try {
           parentIsMaximized = await windowManager.isMaximized();
         } catch (_) {}
-        final launched = await VideoWindowService.openVideoWindow(
-          file.path,
-          initiallyMaximized: parentIsMaximized,
+        final launched = await AppBusyCursor.run(
+          () => VideoWindowService.openVideoWindow(
+            file.path,
+            initiallyMaximized: parentIsMaximized,
+          ),
         );
         if (launched) {
           onClosed?.call();

@@ -130,6 +130,12 @@ dependency_overrides:
   pointycastle: ^4.0.0
   # Ensure crypto package is compatible with both FTP and SMB
   crypto: ^3.0.6
+  # Upstream 2.1.0 (the newest release, and still what `main` carries) declares
+  # `class PhosphorIconData extends IconData`, which no longer compiles now that
+  # Flutter marks IconData final. Trimmed local build patches that; see
+  # third_party/phosphor_flutter/README.md
+  phosphor_flutter:
+    path: third_party/phosphor_flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
