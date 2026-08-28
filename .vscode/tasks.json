@@ -92,15 +92,6 @@
       "problemMatcher": []
     },
     {
-      "label": "just: verify-analyze",
-      "type": "shell",
-      "command": "just verify-analyze",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": "$dart-analyze"
-    },
-    {
       "label": "just: test",
       "type": "shell",
       "command": "just test",
@@ -113,15 +104,6 @@
       "label": "just: kill-cb",
       "type": "shell",
       "command": "just kill-cb",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: kill-e2e",
-      "type": "shell",
-      "command": "just kill-e2e",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -473,78 +455,6 @@
       "label": "just: git-push-tags",
       "type": "shell",
       "command": "just git-push-tags",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: dev-test-e2e-single",
-      "type": "shell",
-      "command": "just dev-test-e2e-single \"${input:e2eSuite}\"",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: dev-test-e2e-only",
-      "type": "shell",
-      "command": "just dev-test-e2e-only",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: dev-test-e2e-failed",
-      "type": "shell",
-      "command": "just dev-test-e2e-failed",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: dev-test-e2e-clean",
-      "type": "shell",
-      "command": "just dev-test-e2e-clean",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: dev-test",
-      "type": "shell",
-      "command": "just dev-test",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": "$dart-test"
-    },
-    {
-      "label": "just: dev-test-unit",
-      "type": "shell",
-      "command": "just dev-test-unit",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": "$dart-test"
-    },
-    {
-      "label": "just: dev-test-e2e",
-      "type": "shell",
-      "command": "just dev-test-e2e \"${input:e2eSuite}\"",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "just: kill-e2e-app",
-      "type": "shell",
-      "command": "just kill-e2e-app",
       "options": {
         "cwd": "${workspaceFolder}"
       },

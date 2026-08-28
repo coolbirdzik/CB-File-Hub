@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
 
 import 'dart:async';
 import 'dart:io';
@@ -558,8 +558,11 @@ class FolderContextMenu {
             height: 520,
             child: ReorderableListView.builder(
               itemCount: allItems.length,
-              onReorderItem: (oldIndex, newIndex) {
+              onReorder: (oldIndex, newIndex) {
                 setState(() {
+                  if (newIndex > oldIndex) {
+                    newIndex -= 1;
+                  }
                   final movedItem = allItems.removeAt(oldIndex);
                   allItems.insert(newIndex, movedItem);
                 });

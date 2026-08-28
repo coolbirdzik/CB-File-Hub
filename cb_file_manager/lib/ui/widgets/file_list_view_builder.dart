@@ -1,8 +1,9 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -644,9 +645,7 @@ class FileListViewBuilder {
                             physics: const ClampingScrollPhysics(),
                             // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
                             // Desktop: 400px, Mobile: 200px - balances smooth scrolling vs thumbnail generation
-                            scrollCacheExtent: ScrollCacheExtent.pixels(
-                              isDesktopPlatform ? 600 : 400,
-                            ),
+                            cacheExtent: isDesktopPlatform ? 600 : 400,
                             addAutomaticKeepAlives: true,
                             addRepaintBoundaries: true,
                             addSemanticIndexes: false,
@@ -897,7 +896,7 @@ class FileListViewBuilder {
                   child: ListView.builder(
                     controller: scrollController,
                     physics: const ClampingScrollPhysics(),
-                    scrollCacheExtent: const ScrollCacheExtent.pixels(800),
+                    cacheExtent: 800,
                     addAutomaticKeepAlives: true,
                     addRepaintBoundaries: true,
                     addSemanticIndexes: false,
@@ -1138,7 +1137,7 @@ class FileListViewBuilder {
                       return GridView.builder(
                         controller: scrollController,
                         physics: const ClampingScrollPhysics(),
-                        scrollCacheExtent: const ScrollCacheExtent.pixels(800),
+                        cacheExtent: 800,
                         padding: const EdgeInsets.all(_tilesSpacing),
                         gridDelegate:
                             const SliverGridDelegateWithMaxCrossAxisExtent(

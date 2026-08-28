@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -167,7 +169,10 @@ class _ContextMenuLayoutSettingsScreenState
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       buildDefaultDragHandles: false,
       itemCount: orderedDescriptors.length,
-      onReorderItem: (oldIndex, newIndex) {
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) {
+          newIndex -= 1;
+        }
         final reorderedIds =
             orderedDescriptors.map((descriptor) => descriptor.id).toList();
         final movedId = reorderedIds.removeAt(oldIndex);

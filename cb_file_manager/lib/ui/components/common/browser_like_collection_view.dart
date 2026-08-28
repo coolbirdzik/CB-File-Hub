@@ -1,7 +1,8 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 class BrowserLikeCollectionView<T> extends StatelessWidget {
   final ViewMode viewMode;
@@ -155,9 +156,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
         controller: scrollController,
         padding: padding,
         physics: physics,
-        scrollCacheExtent: gridCacheExtent == null
-            ? null
-            : ScrollCacheExtent.pixels(gridCacheExtent!),
+        cacheExtent: gridCacheExtent,
         addAutomaticKeepAlives: true,
         addRepaintBoundaries: true,
         addSemanticIndexes: false,
@@ -180,9 +179,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               controller: scrollController,
               padding: padding,
               physics: physics,
-              scrollCacheExtent: detailsCacheExtent == null
-                  ? null
-                  : ScrollCacheExtent.pixels(detailsCacheExtent!),
+              cacheExtent: detailsCacheExtent,
               addAutomaticKeepAlives: true,
               addRepaintBoundaries: true,
               addSemanticIndexes: false,
@@ -196,9 +193,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               controller: scrollController,
               padding: padding,
               physics: physics,
-              scrollCacheExtent: detailsCacheExtent == null
-                  ? null
-                  : ScrollCacheExtent.pixels(detailsCacheExtent!),
+              cacheExtent: detailsCacheExtent,
               addAutomaticKeepAlives: true,
               addRepaintBoundaries: true,
               addSemanticIndexes: false,
@@ -232,9 +227,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       controller: scrollController,
       padding: padding,
       physics: physics,
-      scrollCacheExtent: listCacheExtent == null
-          ? null
-          : ScrollCacheExtent.pixels(listCacheExtent!),
+      cacheExtent: listCacheExtent,
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       addSemanticIndexes: false,
