@@ -212,9 +212,8 @@ Future<bool?> showCbConfirmDialog({
         ),
         CbButton(
           label: confirmLabel ?? materialL10n.okButtonLabel,
-          variant: destructive
-              ? CbButtonVariant.danger
-              : CbButtonVariant.primary,
+          variant:
+              destructive ? CbButtonVariant.danger : CbButtonVariant.primary,
           autofocus: true,
           onPressed: () => Navigator.of(dialogContext).pop(true),
         ),

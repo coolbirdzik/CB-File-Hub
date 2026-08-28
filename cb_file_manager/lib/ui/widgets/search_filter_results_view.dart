@@ -240,7 +240,8 @@ class SearchFilterResultsView extends StatelessWidget {
                   state: folderListState,
                   isSelectionMode:
                       selectionState.isSelectionMode && !isDesktopPlatform,
-                  isGridView: ViewModeUtils.isGridLike(folderListState.viewMode),
+                  isGridView:
+                      ViewModeUtils.isGridLike(folderListState.viewMode),
                   selectedFiles: selectionState.selectedFilePaths.toList(),
                   toggleFileSelection: toggleFileSelection,
                   toggleFolderSelection: toggleFolderSelection,

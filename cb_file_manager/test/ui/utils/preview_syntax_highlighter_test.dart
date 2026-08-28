@@ -60,8 +60,7 @@ void main() {
       expect(
         flattened.any(
           (part) =>
-              part.style?.color != null &&
-              part.style!.color != Colors.black,
+              part.style?.color != null && part.style!.color != Colors.black,
         ),
         isTrue,
       );

@@ -145,8 +145,7 @@ class CbButton extends StatelessWidget {
     }
   }
 
-  double get _radius =>
-      size == CbButtonSize.lg ? CbRadii.md : CbRadii.sm;
+  double get _radius => size == CbButtonSize.lg ? CbRadii.md : CbRadii.sm;
 
   TextStyle get _textStyle {
     switch (size) {
@@ -223,9 +222,8 @@ class CbButton extends StatelessWidget {
 
       case CbButtonVariant.danger:
         return _CbButtonPaint(
-          background: s.pressed || s.hovered
-              ? c.status.dangerHover
-              : c.status.danger,
+          background:
+              s.pressed || s.hovered ? c.status.dangerHover : c.status.danger,
           border: Colors.transparent,
           foreground: c.textInverse,
         );

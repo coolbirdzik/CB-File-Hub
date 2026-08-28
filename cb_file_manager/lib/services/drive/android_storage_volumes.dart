@@ -34,7 +34,8 @@ class AndroidStorageVolumes {
     String? uuid,
   }) async {
     try {
-      final ok = await _channel.invokeMethod<bool>('ejectVolume', <String, dynamic>{
+      final ok =
+          await _channel.invokeMethod<bool>('ejectVolume', <String, dynamic>{
         'path': path,
         if (uuid != null && uuid.isNotEmpty) 'uuid': uuid,
       });
@@ -53,7 +54,8 @@ class AndroidStorageVolumes {
     String? uuid,
   }) async {
     try {
-      final ok = await _channel.invokeMethod<bool>('renameVolume', <String, dynamic>{
+      final ok =
+          await _channel.invokeMethod<bool>('renameVolume', <String, dynamic>{
         'path': path,
         'label': label,
         if (uuid != null && uuid.isNotEmpty) 'uuid': uuid,

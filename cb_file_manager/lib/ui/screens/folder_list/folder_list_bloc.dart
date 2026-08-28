@@ -135,7 +135,8 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     emit(state.copyWith(isLoading: true));
   }
 
-  Future<void> _onLoad(FolderListLoad event, Emitter<FolderListState> emit) async {
+  Future<void> _onLoad(
+      FolderListLoad event, Emitter<FolderListState> emit) async {
     final path = event.path;
     if (ArchivePathUtils.isArchiveBrowsePath(path)) {
       await _loadArchiveBrowsePath(path, emit);

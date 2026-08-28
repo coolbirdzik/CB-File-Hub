@@ -82,8 +82,8 @@ void main() {
             ThemeConfig.getAccentSeedColor(accent),
             brightness,
           );
-          expect(_contrastRatio(ramp.onBase, ramp.base),
-              greaterThanOrEqualTo(3.0),
+          expect(
+              _contrastRatio(ramp.onBase, ramp.base), greaterThanOrEqualTo(3.0),
               reason: '$accent/$brightness label on a filled control');
         }
       }
@@ -97,8 +97,8 @@ void main() {
 
       final mid = light.lerp(dark, 0.5);
       expect(mid.brightness, Brightness.dark);
-      expect(mid.colors.surface, Color.lerp(light.colors.surface,
-          dark.colors.surface, 0.5));
+      expect(mid.colors.surface,
+          Color.lerp(light.colors.surface, dark.colors.surface, 0.5));
 
       expect(light.lerp(dark, 0.0).colors.surface, light.colors.surface);
       expect(light.lerp(dark, 1.0).colors.surface, dark.colors.surface);

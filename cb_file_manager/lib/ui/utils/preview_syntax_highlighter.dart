@@ -122,7 +122,8 @@ class PreviewSyntaxHighlighter {
 
     return TextSpan(
       style: baseStyle,
-      children: nodes.map((node) => _nodeToSpan(node, styles, baseStyle)).toList(),
+      children:
+          nodes.map((node) => _nodeToSpan(node, styles, baseStyle)).toList(),
     );
   }
 

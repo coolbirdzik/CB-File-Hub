@@ -459,7 +459,8 @@ class ArchiveService {
       relative = relative.replaceAll(RegExp(r'^/+'), '');
       if (relative.isEmpty) continue;
 
-      final parts = relative.split('/').where((part) => part.isNotEmpty).toList();
+      final parts =
+          relative.split('/').where((part) => part.isNotEmpty).toList();
       if (parts.isEmpty) continue;
 
       if (parts.length == 1) {

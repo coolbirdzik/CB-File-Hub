@@ -25,7 +25,8 @@ class FileIconHelper {
     return null;
   }
 
-  static Future<Widget?> _windowsIconFromAppPath(String appPath, double size) async {
+  static Future<Widget?> _windowsIconFromAppPath(
+      String appPath, double size) async {
     if (appPath.isEmpty || !File(appPath).existsSync()) return null;
     final nativeIcon = await WindowsAppIcon.extractIconFromFile(appPath);
     if (nativeIcon == null) return null;

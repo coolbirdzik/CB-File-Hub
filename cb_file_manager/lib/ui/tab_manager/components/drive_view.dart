@@ -394,9 +394,7 @@ class _DriveViewState extends State<DriveView> {
 
     final Color progressColor = space.usageRatio > 0.9
         ? Colors.red
-        : (space.usageRatio > 0.7
-            ? Colors.orange
-            : theme.colorScheme.primary);
+        : (space.usageRatio > 0.7 ? Colors.orange : theme.colorScheme.primary);
 
     final Color progressBackgroundColor =
         isDarkMode ? Colors.grey[800]! : Colors.grey[200]!;
@@ -421,12 +419,10 @@ class _DriveViewState extends State<DriveView> {
         },
         child: InkWell(
           borderRadius: BorderRadius.circular(12.0),
-          onTap: _isDesktopPlatform
-              ? null
-              : () => _openDrive(context, drive.path),
-          onDoubleTap: _isDesktopPlatform
-              ? () => _openDrive(context, drive.path)
-              : null,
+          onTap:
+              _isDesktopPlatform ? null : () => _openDrive(context, drive.path),
+          onDoubleTap:
+              _isDesktopPlatform ? () => _openDrive(context, drive.path) : null,
           child: Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(
@@ -583,7 +579,8 @@ class _DriveViewState extends State<DriveView> {
         ),
         PopupMenuItem(
           value: 'open_new_pane',
-          child: _menuRow(l10n.openInNewPane, PhosphorIconsLight.splitHorizontal),
+          child:
+              _menuRow(l10n.openInNewPane, PhosphorIconsLight.splitHorizontal),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -624,12 +621,14 @@ class _DriveViewState extends State<DriveView> {
           ),
         PopupMenuItem(
           value: 'open_cleaner',
-          child: _menuRow(l10n.driveOpenInCleaner, PhosphorIconsLight.magicWand),
+          child:
+              _menuRow(l10n.driveOpenInCleaner, PhosphorIconsLight.magicWand),
         ),
         if (Platform.isWindows && !drive.isSystemVolume)
           PopupMenuItem(
             value: 'format',
-            child: _menuRow(l10n.driveFormat, PhosphorIconsLight.floppyDiskBack),
+            child:
+                _menuRow(l10n.driveFormat, PhosphorIconsLight.floppyDiskBack),
           ),
         if (Platform.isWindows)
           PopupMenuItem(
@@ -1009,7 +1008,8 @@ class _DriveViewState extends State<DriveView> {
       children: <Widget>[
         SizedBox(
           width: 100,
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          child:
+              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
         Expanded(child: Text(value)),
       ],

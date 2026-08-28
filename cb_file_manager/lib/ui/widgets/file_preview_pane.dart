@@ -69,7 +69,8 @@ class FilePreviewPane extends StatelessWidget {
                     stops: const [0.0, 0.35, 1.0],
                     colors: [
                       theme.shadowColor.withValues(alpha: isDark ? 0.1 : 0.04),
-                      theme.shadowColor.withValues(alpha: isDark ? 0.04 : 0.015),
+                      theme.shadowColor
+                          .withValues(alpha: isDark ? 0.04 : 0.015),
                       Colors.transparent,
                     ],
                   ),
@@ -237,7 +238,6 @@ class FilePreviewPane extends StatelessWidget {
     if (!matched.existsSync()) return null;
     return matched;
   }
-
 }
 
 /// Opens text/PDF files in a fullscreen in-app viewer (default double-click path).
@@ -559,13 +559,13 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
 
         final lines = content.text.split('\n');
         final lineNumberDigits = lines.length.toString().length;
-        final useMonospace = FileTypeUtils.isCodeLikeTextFile(widget.file.path) ||
-            _shouldSyntaxHighlight(widget.file.path);
+        final useMonospace =
+            FileTypeUtils.isCodeLikeTextFile(widget.file.path) ||
+                _shouldSyntaxHighlight(widget.file.path);
         final textStyle = theme.textTheme.bodySmall?.copyWith(
           fontFamily: useMonospace ? 'Consolas' : null,
-          fontFamilyFallback: useMonospace
-              ? const ['Courier New', 'monospace']
-              : null,
+          fontFamilyFallback:
+              useMonospace ? const ['Courier New', 'monospace'] : null,
           fontSize: useMonospace ? 12 : 13,
           height: useMonospace ? 1.55 : 1.6,
           fontWeight: FontWeight.w400,
@@ -576,7 +576,8 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.34),
           fontFeatures: const [FontFeature.tabularFigures()],
         );
-        final gutterText = _buildLineNumberColumn(lines.length, lineNumberDigits);
+        final gutterText =
+            _buildLineNumberColumn(lines.length, lineNumberDigits);
         final highlightedSpan = _shouldSyntaxHighlight(widget.file.path)
             ? PreviewSyntaxHighlighter.buildHighlightedSpan(
                 source: content.text,

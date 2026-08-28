@@ -55,8 +55,7 @@ class CbTokens extends ThemeExtension<CbTokens> {
 
   static Color _c(Color a, Color b, double t) => Color.lerp(a, b, t)!;
 
-  static CbColorTokens _lerpColors(
-      CbColorTokens a, CbColorTokens b, double t) {
+  static CbColorTokens _lerpColors(CbColorTokens a, CbColorTokens b, double t) {
     return CbColorTokens(
       canvas: _c(a.canvas, b.canvas, t),
       surface: _c(a.surface, b.surface, t),

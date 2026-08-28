@@ -187,7 +187,8 @@ class _CbTextFieldState extends State<CbTextField> {
           const SizedBox(height: CbSpacing.xs + 2),
         ],
         MouseRegion(
-          cursor: isEnabled ? SystemMouseCursors.text : SystemMouseCursors.basic,
+          cursor:
+              isEnabled ? SystemMouseCursors.text : SystemMouseCursors.basic,
           onEnter: (_) => setState(() => _hovered = true),
           onExit: (_) => setState(() => _hovered = false),
           child: AnimatedContainer(
@@ -199,7 +200,9 @@ class _CbTextFieldState extends State<CbTextField> {
               vertical: multiline ? CbSpacing.sm : 0,
             ),
             decoration: BoxDecoration(
-              color: isEnabled ? c.surfaceSunken : c.surfaceSunken.withValues(alpha: 0.5),
+              color: isEnabled
+                  ? c.surfaceSunken
+                  : c.surfaceSunken.withValues(alpha: 0.5),
               borderRadius: CbRadii.smAll,
               border: Border.all(
                 color: borderColor,

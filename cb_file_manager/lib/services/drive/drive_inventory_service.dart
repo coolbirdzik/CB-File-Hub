@@ -81,7 +81,8 @@ class DriveInventoryService {
       systemDrive: systemDrive,
     );
     final requiresAdmin = dir.getProperty('requiresAdmin') == true;
-    final isRemovable = kind == DriveKind.removable || kind == DriveKind.optical;
+    final isRemovable =
+        kind == DriveKind.removable || kind == DriveKind.optical;
     final label = volume.label;
     final displayName = label.isNotEmpty ? '$root ($label)' : root;
 
@@ -95,7 +96,8 @@ class DriveInventoryService {
       space: space,
       isRemovable: isRemovable,
       canEject: isRemovable && !isSystem,
-      canRename: !isSystem && kind != DriveKind.network && kind != DriveKind.optical,
+      canRename:
+          !isSystem && kind != DriveKind.network && kind != DriveKind.optical,
       requiresAdmin: requiresAdmin,
       isSystemVolume: isSystem,
       isPrimary: isSystem,

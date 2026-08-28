@@ -165,8 +165,7 @@ class ContentReader {
       final content = await _readWithEncodingFallbackStatic(file);
       final totalLength = content.length;
       final truncated = totalLength > previewMaxChars;
-      final text =
-          truncated ? content.substring(0, previewMaxChars) : content;
+      final text = truncated ? content.substring(0, previewMaxChars) : content;
 
       return FileContent(
         text: text,

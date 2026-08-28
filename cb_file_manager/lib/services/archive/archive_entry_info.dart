@@ -17,5 +17,6 @@ class ArchiveEntryInfo extends Equatable {
   });
 
   @override
-  List<Object?> get props => [name, size, compressedSize, isDirectory, modified];
+  List<Object?> get props =>
+      [name, size, compressedSize, isDirectory, modified];
 }

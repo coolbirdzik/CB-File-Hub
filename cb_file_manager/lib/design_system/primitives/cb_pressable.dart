@@ -72,7 +72,6 @@ class CbPressable extends StatefulWidget {
 
   @override
   State<CbPressable> createState() => _CbPressableState();
-
 }
 
 class _CbPressableState extends State<CbPressable> {

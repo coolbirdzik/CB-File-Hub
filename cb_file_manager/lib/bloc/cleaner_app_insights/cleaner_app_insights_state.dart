@@ -93,7 +93,8 @@ class CleanerAppInsightsState extends Equatable {
         attentionSize += profile.bestKnownSizeBytes;
       }
     }
-    return _memo.counters = _AppCounters(large, stale, attention, attentionSize);
+    return _memo.counters =
+        _AppCounters(large, stale, attention, attentionSize);
   }
 
   AppStorageProfile? get selectedProfile {

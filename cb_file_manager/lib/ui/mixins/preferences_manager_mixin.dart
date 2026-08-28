@@ -197,9 +197,7 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   /// Set view mode directly to a specific mode
   void setViewMode(ViewMode mode, {String? tabId}) {
     final resolved = ViewModeUtils.normalize(
-      !isDesktopPlatform && mode == ViewMode.gridPreview
-          ? ViewMode.grid
-          : mode,
+      !isDesktopPlatform && mode == ViewMode.gridPreview ? ViewMode.grid : mode,
     );
     setState(() {
       viewMode = resolved;

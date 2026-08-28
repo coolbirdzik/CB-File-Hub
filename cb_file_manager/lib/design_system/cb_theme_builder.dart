@@ -215,8 +215,7 @@ class CbThemeBuilder {
         showDragHandle: true,
         dragHandleColor: c.strokeStrong,
         shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(CbRadii.xl)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(CbRadii.xl)),
         ),
       ),
 
@@ -226,8 +225,8 @@ class CbThemeBuilder {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shadowColor: c.shadow,
-        labelTextStyle:
-            WidgetStatePropertyAll(CbTypography.body.copyWith(color: c.textPrimary)),
+        labelTextStyle: WidgetStatePropertyAll(
+            CbTypography.body.copyWith(color: c.textPrimary)),
         shape: RoundedRectangleBorder(
           borderRadius: CbRadii.lgAll,
           side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
@@ -367,10 +366,8 @@ class CbThemeBuilder {
         selectedColor: c.accent.text,
         selectedTileColor: c.surfaceSelected,
         titleTextStyle: CbTypography.body.copyWith(color: c.textPrimary),
-        subtitleTextStyle:
-            CbTypography.bodySm.copyWith(color: c.textSecondary),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: CbSpacing.md),
+        subtitleTextStyle: CbTypography.bodySm.copyWith(color: c.textSecondary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
         minVerticalPadding: CbSpacing.xs,
         horizontalTitleGap: CbSpacing.md,
         shape: const RoundedRectangleBorder(borderRadius: CbRadii.smAll),
@@ -421,8 +418,7 @@ class CbThemeBuilder {
         indicatorColor: c.surfaceSelected,
         selectedIconTheme:
             IconThemeData(color: c.accent.text, size: CbSizes.iconLg),
-        unselectedIconTheme:
-            IconThemeData(color: c.icon, size: CbSizes.iconLg),
+        unselectedIconTheme: IconThemeData(color: c.icon, size: CbSizes.iconLg),
         selectedLabelTextStyle:
             CbTypography.labelSm.copyWith(color: c.textPrimary),
         unselectedLabelTextStyle:

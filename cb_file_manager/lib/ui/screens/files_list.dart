@@ -150,12 +150,10 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       }
     });
 
-    folderListBloc.add(SetViewMode(viewMode == ViewMode.gridPreview
-        ? ViewMode.grid
-        : viewMode));
-    saveViewModeSetting(viewMode == ViewMode.gridPreview
-        ? ViewMode.grid
-        : viewMode);
+    folderListBloc.add(SetViewMode(
+        viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode));
+    saveViewModeSetting(
+        viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode);
   }
 
   /// Set view mode directly to a specific mode

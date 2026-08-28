@@ -146,8 +146,8 @@ class _ArchivePreviewState extends State<ArchivePreview> {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Text(
-                          l10n.archivePreviewMore(_entries.length -
-                              previewEntries.length),
+                          l10n.archivePreviewMore(
+                              _entries.length - previewEntries.length),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withValues(

@@ -359,7 +359,8 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
                 kind: row.kind,
                 depth: row.depth,
                 indentPerDepth: widget.indentPerDepth,
-                onTap: row.parent == null ? null : () => _retryLoad(row.parent!),
+                onTap:
+                    row.parent == null ? null : () => _retryLoad(row.parent!),
               ),
             );
           case FlatRowKind.truncated:
