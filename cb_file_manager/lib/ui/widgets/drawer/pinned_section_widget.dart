@@ -63,6 +63,7 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
             child: Material(
               color: Colors.transparent,
               child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 14),
                 key: ValueKey<String>(
                   'pinned-${state.activeTabId}-${widget.initialExpanded}',
                 ),
@@ -80,7 +81,7 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
                 ),
                 leading: Icon(
                   PhosphorIconsLight.pushPin,
-                  size: 22,
+                  size: 20,
                   color: theme.colorScheme.primary,
                 ),
                 title: Text(

@@ -38,6 +38,7 @@ class _FluentDrawerTokens {
   static const double itemRadius = 6;
   static const double itemHeight = 42;
   static const double itemVerticalMargin = 2;
+  static const double sectionLeadingInset = 8;
   static const double sectionIndent = 30;
   static const double groupGap = 12;
   static const Duration stateTransition = Duration(milliseconds: 180);
@@ -128,10 +129,18 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
 
     return fluent.Expander(
       key: _expanderKey,
-      leading: Icon(
-        icon,
-        size: 18,
-        color: selected ? accent : resources.textFillColorSecondary,
+      leading: Padding(
+        // Fluent Expander starts its leading widget 8px earlier than the
+        // navigation-row icon slot. Compensate here so Pinned and Drives share
+        // the same icon centerline as every other top-level drawer item.
+        padding: const EdgeInsetsDirectional.only(
+          start: _FluentDrawerTokens.sectionLeadingInset,
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: selected ? accent : resources.textFillColorSecondary,
+        ),
       ),
       header: Text(
         widget.title,

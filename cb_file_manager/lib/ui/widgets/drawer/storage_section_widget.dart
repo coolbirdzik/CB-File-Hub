@@ -133,6 +133,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
             child: Material(
               color: Colors.transparent,
               child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -147,7 +148,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
                 ),
                 leading: Icon(
                   PhosphorIconsLight.hardDrives,
-                  size: 22,
+                  size: 20,
                   color: theme.colorScheme.primary,
                 ),
                 title: Text(

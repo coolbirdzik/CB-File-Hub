@@ -47,6 +47,11 @@ void main() {
 
     final fluent.ExpanderState mountedOnce = expanderState();
     expect(isExpanded(), isFalse);
+    expect(
+      tester.getCenter(find.byIcon(fluent.FluentIcons.folder)).dx,
+      33,
+      reason: 'section icons must share the top-level drawer icon centerline',
+    );
 
     await tester.tap(find.text('Drives'));
     await tester.pumpAndSettle();
