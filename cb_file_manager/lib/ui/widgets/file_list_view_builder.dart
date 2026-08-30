@@ -393,6 +393,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();
@@ -731,6 +734,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();
@@ -849,6 +855,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();
@@ -1075,6 +1084,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();

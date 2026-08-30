@@ -1797,6 +1797,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       // Wrap with the same background right-click handler so "Paste Here",
       // "New Folder", etc. remain accessible even in an empty directory.
       return GestureDetector(
+        key: const ValueKey<String>(
+          'file-browser-background-context-target',
+        ),
         onSecondaryTapUp: (details) =>
             _showContextMenu(context, details.globalPosition),
         behavior: HitTestBehavior.translucent,
