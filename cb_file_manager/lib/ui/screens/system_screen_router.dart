@@ -10,6 +10,7 @@ import 'package:cb_file_manager/ui/screens/network_browsing/ftp_browser_screen.d
 import 'package:cb_file_manager/ui/screens/network_browsing/webdav_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
 import 'package:cb_file_manager/ui/screens/video_library/video_library_files_screen.dart';
+import 'package:cb_file_manager/ui/screens/video_library/video_library_settings_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/bloc/network_browsing/network_browsing_bloc.dart';
@@ -83,7 +84,7 @@ class SystemScreenRouter {
       case '#gallery':
         return const GalleryHubScreen();
       case '#video':
-        return const VideoHubScreen();
+        return VideoHubScreen(tabId: tabId);
       case '#albums':
         return const AlbumManagementScreen();
       case '#auto-rules':
@@ -117,6 +118,8 @@ class SystemScreenRouter {
       return _handleAiChatRoute(path, tabId);
     } else if (path.startsWith('#album/')) {
       return _handleAlbumRoute(path);
+    } else if (path.startsWith('#video-library-settings/')) {
+      return _handleVideoLibrarySettingsRoute(path, tabId);
     } else if (path.startsWith('#video-library/')) {
       return _handleVideoLibraryRoute(path, tabId);
     } else if (path.startsWith('#image?')) {
@@ -211,6 +214,29 @@ class SystemScreenRouter {
           }
           if (snapshot.hasData && snapshot.data != null) {
             return VideoLibraryFilesScreen(
+              library: snapshot.data!,
+              tabId: tabId,
+            );
+          }
+          return const Center(child: Text('Video library not found'));
+        },
+      );
+    }
+    return const Center(child: Text('Invalid video library ID'));
+  }
+
+  static Widget _handleVideoLibrarySettingsRoute(String path, String tabId) {
+    final libraryIdStr = path.substring('#video-library-settings/'.length);
+    final libraryId = int.tryParse(libraryIdStr);
+    if (libraryId != null) {
+      return FutureBuilder<VideoLibrary?>(
+        future: VideoLibraryService().getLibraryById(libraryId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasData && snapshot.data != null) {
+            return VideoLibrarySettingsScreen(
               library: snapshot.data!,
               tabId: tabId,
             );

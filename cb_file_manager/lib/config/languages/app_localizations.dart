@@ -1254,6 +1254,14 @@ abstract class AppLocalizations {
   String get noVideosInLibrary;
   String get libraryCreatedSuccessfully;
   String videoLibraryCount(int count);
+  String get libraryCover;
+  String get changeCoverImage;
+  String get removeCoverImage;
+  String get coverImageUpdated;
+  String get coverImageRemoved;
+  String get coverImageUpdateFailed;
+  String get lastScanLabel;
+  String get neverScanned;
 
   // Streaming and download dialogs
   String openFileTypeFile(String fileType);

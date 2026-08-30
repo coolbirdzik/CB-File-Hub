@@ -32,6 +32,7 @@ import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/navigation_bar.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
@@ -63,6 +64,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   late final TabbedFolderDragSelectionController _dragSelectionController;
   final ValueNotifier<double> _previewPaneWidthNotifier =
       ValueNotifier<double>(320);
+  final TextEditingController _addressController = TextEditingController();
 
   bool _isInitialized = false;
   String _searchQuery = '';
@@ -105,6 +107,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     _dragFolderListBloc.close();
     _selectionBloc.close();
     _previewPaneWidthNotifier.dispose();
+    _addressController.dispose();
     _bloc.close();
     super.dispose();
   }
@@ -389,17 +392,41 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     _selectionBloc.add(const ToggleSelectionMode());
   }
 
+  void _openVideoGallery() {
+    final tabId = widget.tabId;
+    if (tabId == null) return;
+
+    TabNavigator.updateTabPath(context, tabId, '#video');
+    context.read<TabManagerBloc>().add(
+          UpdateTabName(tabId, AppLocalizations.of(context)!.videoHubTitle),
+        );
+  }
+
   Widget _buildPathNavigationBar(AppLocalizations l10n) {
-    return BreadcrumbAddressBar(
-      segments: [
-        BreadcrumbSegment(
-          label: l10n.videoLibrary,
-          icon: PhosphorIconsLight.filmStrip,
-        ),
-        BreadcrumbSegment(
-          label: widget.library.name,
-        ),
-      ],
+    final segments = [
+      BreadcrumbSegment(
+        label: l10n.videoGallery,
+        icon: PhosphorIconsLight.filmStrip,
+        onTap: _openVideoGallery,
+      ),
+      BreadcrumbSegment(label: widget.library.name),
+    ];
+    final tabId = widget.tabId;
+
+    if (tabId == null) {
+      return BreadcrumbAddressBar(segments: segments);
+    }
+
+    return PathNavigationBar(
+      tabId: tabId,
+      pathController: _addressController,
+      onPathSubmitted: (_) {},
+      currentPath: '#video-library/${widget.library.id}',
+      tabPath: '#video-library/${widget.library.id}',
+      enablePathEditing: false,
+      canNavigateToParent: true,
+      onNavigateToParent: _openVideoGallery,
+      breadcrumbSegments: segments,
     );
   }
 

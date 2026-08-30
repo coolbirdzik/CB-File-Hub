@@ -27,6 +27,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/components/file_grid_item
 import 'package:cb_file_manager/ui/screens/folder_list/components/file_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/folder_grid_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/folder_item.dart';
+import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 
 import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
@@ -80,6 +81,13 @@ Future<bool> _confirmDeleteDialog(
     await et.pumpAndSettle(const Duration(milliseconds: 200));
   }
   return false;
+}
+
+Finder _findInlineRenameField() {
+  return find.descendant(
+    of: find.byType(InlineRenameField),
+    matching: find.byType(TextField),
+  );
 }
 
 void main() {
@@ -360,11 +368,12 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.f2);
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // F2 starts inline rename; a path TextField (hint: Path) may also be present.
-        final textFields = find.byType(TextField);
-        expect(textFields, findsAtLeastNWidgets(1),
+        // Target the inline editor specifically; the address bar may also
+        // contain a TextField and must not receive the new filename.
+        final renameField = _findInlineRenameField();
+        expect(renameField, findsOneWidget,
             reason: 'Inline rename TextField not found');
-        await et.enterText(textFields.at(0), newName, detail: 'type_new_name');
+        await et.enterText(renameField, newName, detail: 'type_new_name');
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await et.pumpAndSettle(const Duration(seconds: 3));

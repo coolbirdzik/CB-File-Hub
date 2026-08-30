@@ -241,6 +241,50 @@ void main() {
         IconTheme.of(tester.element(rightIcon)).color, surfaces.textDisabled);
   });
 
+  testWidgets('virtual routes keep navigation controls and friendly crumbs',
+      (tester) async {
+    var backCount = 0;
+    var upCount = 0;
+
+    await tester.pumpWidget(
+      _desktopFluentHost(
+        brightness: Brightness.light,
+        child: SizedBox(
+          width: 520,
+          child: PathNavigationBar(
+            tabId: 'tags-tab',
+            pathController: TextEditingController(text: '#tags'),
+            onPathSubmitted: (_) {},
+            currentPath: '#tags',
+            tabPath: '#tags',
+            enablePathEditing: false,
+            canNavigateBack: true,
+            onNavigateBack: () => backCount++,
+            canNavigateToParent: true,
+            onNavigateToParent: () => upCount++,
+            breadcrumbSegments: const [
+              BreadcrumbSegment(
+                label: 'Tag Management',
+                icon: PhosphorIconsLight.tag,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Tag Management'), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsLight.arrowLeft), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsLight.arrowRight), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsLight.arrowUp), findsOneWidget);
+
+    await tester.tap(find.byIcon(PhosphorIconsLight.arrowLeft));
+    await tester.tap(find.byIcon(PhosphorIconsLight.arrowUp));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(backCount, 1);
+    expect(upCount, 1);
+  });
+
   testWidgets('Fluent breadcrumbs expose focus and keyboard activation',
       (tester) async {
     var activations = 0;

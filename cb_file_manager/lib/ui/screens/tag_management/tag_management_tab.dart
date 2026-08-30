@@ -25,6 +25,7 @@ class TagManagementTab extends StatelessWidget {
       systemId: '#tags',
       icon: PhosphorIconsLight.tag,
       child: TagManagementScreen(
+        tabId: tabId,
         startingDirectory: '',
         onTagSelected: (tag) => _openTagSearchTab(context, tag),
       ),

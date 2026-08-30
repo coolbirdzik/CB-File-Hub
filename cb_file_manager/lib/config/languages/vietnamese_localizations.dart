@@ -2932,6 +2932,30 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String videoLibraryCount(int count) => '$count thư viện';
 
+  @override
+  String get libraryCover => 'Ảnh Bìa Thư Viện';
+
+  @override
+  String get changeCoverImage => 'Đổi Ảnh Bìa';
+
+  @override
+  String get removeCoverImage => 'Xóa Ảnh Bìa';
+
+  @override
+  String get coverImageUpdated => 'Đã cập nhật ảnh bìa';
+
+  @override
+  String get coverImageRemoved => 'Đã xóa ảnh bìa';
+
+  @override
+  String get coverImageUpdateFailed => 'Không thể cập nhật ảnh bìa';
+
+  @override
+  String get lastScanLabel => 'Quét lần cuối';
+
+  @override
+  String get neverScanned => 'Chưa quét lần nào';
+
   // Streaming and download dialogs
   @override
   String openFileTypeFile(String fileType) => 'Mở tệp $fileType';

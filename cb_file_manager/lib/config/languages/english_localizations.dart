@@ -2938,6 +2938,30 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String videoLibraryCount(int count) => '$count libraries';
 
+  @override
+  String get libraryCover => 'Library Cover';
+
+  @override
+  String get changeCoverImage => 'Change Cover';
+
+  @override
+  String get removeCoverImage => 'Remove Cover';
+
+  @override
+  String get coverImageUpdated => 'Cover image updated';
+
+  @override
+  String get coverImageRemoved => 'Cover image removed';
+
+  @override
+  String get coverImageUpdateFailed => 'Failed to update cover image';
+
+  @override
+  String get lastScanLabel => 'Last scan';
+
+  @override
+  String get neverScanned => 'Never scanned';
+
   // Streaming and download dialogs
   @override
   String openFileTypeFile(String fileType) => 'Open $fileType File';

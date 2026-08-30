@@ -25,6 +25,10 @@ class PathNavigationBar extends StatefulWidget {
   final String tabPath;
   final bool isNetworkPath;
   final List<AddressBarMenuItem>? menuItems;
+  final List<BreadcrumbSegment>? breadcrumbSegments;
+  final bool enablePathEditing;
+  final bool? canNavigateBack;
+  final VoidCallback? onNavigateBack;
   final bool canNavigateToParent;
   final VoidCallback? onNavigateToParent;
 
@@ -37,6 +41,10 @@ class PathNavigationBar extends StatefulWidget {
     required this.tabPath,
     this.isNetworkPath = false,
     this.menuItems,
+    this.breadcrumbSegments,
+    this.enablePathEditing = true,
+    this.canNavigateBack,
+    this.onNavigateBack,
     this.canNavigateToParent = false,
     this.onNavigateToParent,
   }) : super(key: key);
@@ -72,8 +80,24 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
     }
   }
 
+  bool get _effectiveCanNavigateBack =>
+      widget.canNavigateBack ?? _canNavigateBack;
+
+  void _navigateBack() {
+    final callback = widget.onNavigateBack;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    _tabBloc?.backNavigationToPath(widget.tabId);
+  }
+
   // Converts the current filesystem path into breadcrumb segments.
   List<BreadcrumbSegment> _buildSegments() {
+    if (widget.breadcrumbSegments != null) {
+      return widget.breadcrumbSegments!;
+    }
+
     if (ArchivePathUtils.isArchiveBrowsePath(widget.tabPath)) {
       final crumbs = ArchivePathUtils.breadcrumbs(widget.tabPath);
       if (crumbs.isEmpty) {
@@ -143,10 +167,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
       children: [
         IconButton(
           icon: const Icon(PhosphorIconsLight.arrowLeft),
-          onPressed: _canNavigateBack
-              ? () => BlocProvider.of<TabManagerBloc>(context)
-                  .backNavigationToPath(widget.tabId)
-              : null,
+          onPressed: _effectiveCanNavigateBack ? _navigateBack : null,
           tooltip: 'Go back',
         ),
         IconButton(
@@ -162,7 +183,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
             icon: const Icon(PhosphorIconsLight.arrowUp),
             onPressed:
                 widget.canNavigateToParent ? widget.onNavigateToParent : null,
-            tooltip: AppLocalizations.of(context)!.parentFolder,
+            tooltip: AppLocalizations.of(context)?.parentFolder ?? 'Up',
           ),
 
         // Special display for network paths
@@ -183,8 +204,10 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           Expanded(
             child: BreadcrumbAddressBar(
               segments: _buildSegments(),
-              editController: widget.pathController,
-              onPathSubmitted: widget.onPathSubmitted,
+              editController:
+                  widget.enablePathEditing ? widget.pathController : null,
+              onPathSubmitted:
+                  widget.enablePathEditing ? widget.onPathSubmitted : null,
             ),
           ),
         ],
@@ -264,8 +287,10 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           )
         : BreadcrumbAddressBar(
             segments: _buildSegments(),
-            editController: widget.pathController,
-            onPathSubmitted: widget.onPathSubmitted,
+            editController:
+                widget.enablePathEditing ? widget.pathController : null,
+            onPathSubmitted:
+                widget.enablePathEditing ? widget.onPathSubmitted : null,
           );
 
     return Row(
@@ -273,11 +298,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
         iconButton(
           icon: PhosphorIconsLight.arrowLeft,
           tooltip: 'Go back',
-          onPressed: _canNavigateBack
-              ? () => context.read<TabManagerBloc>().backNavigationToPath(
-                    widget.tabId,
-                  )
-              : null,
+          onPressed: _effectiveCanNavigateBack ? _navigateBack : null,
         ),
         iconButton(
           icon: PhosphorIconsLight.arrowRight,
@@ -291,7 +312,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
         if (widget.onNavigateToParent != null)
           iconButton(
             icon: PhosphorIconsLight.arrowUp,
-            tooltip: AppLocalizations.of(context)!.parentFolder,
+            tooltip: AppLocalizations.of(context)?.parentFolder ?? 'Up',
             onPressed:
                 widget.canNavigateToParent ? widget.onNavigateToParent : null,
           ),

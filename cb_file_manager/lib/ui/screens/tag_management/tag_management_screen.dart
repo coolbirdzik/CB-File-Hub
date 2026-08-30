@@ -33,6 +33,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/navigation_bar.dart';
 import 'package:cb_file_manager/ui/widgets/tree_view/tree_view.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
@@ -60,12 +61,14 @@ class _TagTreeLayoutMetrics {
 
 class TagManagementScreen extends StatefulWidget {
   final String startingDirectory;
+  final String tabId;
 
   /// Callback when a tag is selected, used for opening in a new tab
   final Function(String)? onTagSelected;
 
   const TagManagementScreen({
     Key? key,
+    required this.tabId,
     this.startingDirectory = '',
     this.onTagSelected,
   }) : super(key: key);
@@ -105,6 +108,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   // Search functionality
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _addressController =
+      TextEditingController(text: '#tags');
   bool _isSearching = false;
 
   // Pagination variables
@@ -468,6 +473,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _searchController.removeListener(_filterTags);
     _searchController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -1799,17 +1805,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(_selectedTags.isNotEmpty && !showingTaggedFiles
-                          ? PhosphorIconsLight.x
-                          : PhosphorIconsLight.arrowLeft),
-                      onPressed: _selectedTags.isNotEmpty && !showingTaggedFiles
-                          ? _deselectAllTags
-                          : showingTaggedFiles
-                              ? _clearTagSelection
-                              : () => _handleBack(context),
-                    ),
-                    const SizedBox(width: 8),
+                    if (_selectedTags.isNotEmpty && !showingTaggedFiles) ...[
+                      IconButton(
+                        icon: const Icon(PhosphorIconsLight.x),
+                        onPressed: _deselectAllTags,
+                        tooltip: localizations.deselectAllTags,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     if (_isSearching && !showingTaggedFiles)
                       Expanded(
                         child: TextField(
@@ -1829,13 +1832,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           ),
                         ),
                       )
-                    else if (showingTaggedFiles)
-                      Expanded(
-                        child:
-                            _buildTaggedFilesHeaderTitle(theme, localizations),
-                      )
                     else
-                      const Spacer(),
+                      Expanded(child: _buildTagAddressBar(localizations)),
                     if (_selectedTags.isNotEmpty &&
                         !showingTaggedFiles &&
                         _isMobile) ...[
@@ -1932,21 +1930,62 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
   }
 
-  Widget _buildTaggedFilesHeaderTitle(
-    ThemeData theme,
-    AppLocalizations localizations,
-  ) {
-    return BreadcrumbAddressBar(
-      segments: [
-        BreadcrumbSegment(
-          label: localizations.tagManagementTitle,
-          icon: PhosphorIconsLight.tag,
-        ),
-        BreadcrumbSegment(
-          label: _selectedTagForFiles ?? localizations.tagManagementTitle,
-          badge: '${_filesBySelectedTag.length}',
-        ),
-      ],
+  Widget _buildTagAddressBar(AppLocalizations localizations) {
+    final showingTaggedFiles = _selectedTagForFiles != null;
+    final segments = showingTaggedFiles
+        ? <BreadcrumbSegment>[
+            BreadcrumbSegment(
+              label: localizations.tagManagementTitle,
+              icon: PhosphorIconsLight.tag,
+              onTap: _clearTagSelection,
+            ),
+            BreadcrumbSegment(
+              label: _selectedTagForFiles!,
+              badge: '${_filesBySelectedTag.length}',
+            ),
+          ]
+        : <BreadcrumbSegment>[
+            BreadcrumbSegment(
+              label: localizations.tagManagementTitle,
+              icon: PhosphorIconsLight.tag,
+              onTap: _drillPath.isEmpty ? null : () => _drillUp(toIndex: -1),
+            ),
+            for (var i = 0; i < _drillPath.length; i++)
+              BreadcrumbSegment(
+                label: _drillPath[i],
+                onTap: i == _drillPath.length - 1
+                    ? null
+                    : () => _drillUp(toIndex: i),
+              ),
+          ];
+    final tabBloc = context.read<TabManagerBloc>();
+    final hasInScreenParent = showingTaggedFiles || _drillPath.isNotEmpty;
+
+    return PathNavigationBar(
+      tabId: widget.tabId,
+      pathController: _addressController,
+      onPathSubmitted: (_) {},
+      currentPath: '#tags',
+      tabPath: '#tags',
+      enablePathEditing: false,
+      breadcrumbSegments: segments,
+      canNavigateBack:
+          _hasInScreenBackState() || tabBloc.canTabNavigateBack(widget.tabId),
+      onNavigateBack: () {
+        if (!_stepBackWithinScreen()) {
+          tabBloc.backNavigationToPath(widget.tabId);
+        }
+      },
+      canNavigateToParent: hasInScreenParent,
+      onNavigateToParent: hasInScreenParent
+          ? () {
+              if (showingTaggedFiles) {
+                _clearTagSelection();
+              } else {
+                _drillUp();
+              }
+            }
+          : null,
     );
   }
 
@@ -2622,12 +2661,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         if (_hierarchyFilter != 'all' || _thumbnailFilter != 'all')
           _buildActiveFiltersBar(theme),
 
-        // Drill-down breadcrumb (list/grid only, when inside a parent tag)
-        if (_drillPath.isNotEmpty &&
-            _viewMode != _TagViewMode.tree &&
-            _searchController.text.isEmpty)
-          _buildDrillBreadcrumb(theme),
-
         // Tags list, grid or tree
         Expanded(
           child: _buildTagsContent(),
@@ -2740,81 +2773,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
           ),
       ],
-    );
-  }
-
-  /// Breadcrumb for drill-down navigation: "All Tags › parent › child".
-  /// Tapping a segment jumps to that level; tapping "All Tags" returns to root.
-  Widget _buildDrillBreadcrumb(ThemeData theme) {
-    final l10n = AppLocalizations.of(context)!;
-
-    final segments = <Widget>[];
-
-    Widget crumb(String label, VoidCallback? onTap, {required bool isLast}) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
-              color: isLast
-                  ? theme.colorScheme.onSurface
-                  : theme.colorScheme.primary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      );
-    }
-
-    Widget separator() => Icon(
-          PhosphorIconsLight.caretRight,
-          size: 14,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-        );
-
-    // Root crumb ("All Tags").
-    segments.add(crumb(
-      l10n.allTags,
-      _drillPath.isEmpty ? null : () => _drillUp(toIndex: -1),
-      isLast: _drillPath.isEmpty,
-    ));
-
-    for (var i = 0; i < _drillPath.length; i++) {
-      final isLast = i == _drillPath.length - 1;
-      segments.add(separator());
-      segments.add(crumb(
-        _drillPath[i],
-        isLast ? null : () => _drillUp(toIndex: i),
-        isLast: isLast,
-      ));
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.arrowLeft, size: 20),
-            tooltip: l10n.back,
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _drillUp(),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              child: Row(children: segments),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
