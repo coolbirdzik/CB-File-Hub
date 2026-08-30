@@ -21,8 +21,10 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/file_grid_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/file_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/folder_grid_item.dart';
@@ -92,6 +94,14 @@ Finder _findInlineRenameField() {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // The production preference is stored in SQLite, not SharedPreferences.
+  // Pin every E2E case to the clean-install default so local persisted state
+  // cannot make the suite exercise grid while CI exercises list/details.
+  setUp(() async {
+    await UserPreferences.instance.init();
+    await UserPreferences.instance.setViewMode(ViewMode.list);
+  });
 
   // ===========================================================================
   // Suite 1: Navigation

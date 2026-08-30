@@ -83,6 +83,7 @@ void assertFileRowExists(String absolutePath) {
 /// On **desktop**, a single tap only toggles selection; navigation uses **double-tap**
 /// (see folder grid/list items in `folder_list/components`).
 Future<void> tapFolderRow(WidgetTester tester, String absolutePath) async {
+  final gridFinder = find.byKey(ValueKey('folder-grid-item-$absolutePath'));
   final finder = _resolveFileOrFolderFinder(
     absolutePath,
     gridKeyPrefix: 'folder-grid-item',
@@ -101,11 +102,16 @@ Future<void> tapFolderRow(WidgetTester tester, String absolutePath) async {
   // card's center can land outside the actual interaction layer at some zoom
   // levels, making both taps only select (or miss) instead of navigating.
   // Target the same hit surface a user double-clicks on: the folder body.
-  final interactionLayer = find.descendant(
-    of: finder,
-    matching: find.byType(OptimizedInteractionLayer),
-  );
-  final tapTarget = _hasKey(interactionLayer) ? interactionLayer.first : finder;
+  Finder tapTarget = finder;
+  if (_hasKey(gridFinder)) {
+    final interactionLayer = find.descendant(
+      of: gridFinder,
+      matching: find.byType(OptimizedInteractionLayer),
+    );
+    if (_hasKey(interactionLayer)) {
+      tapTarget = interactionLayer.first;
+    }
+  }
 
   await tester.tap(tapTarget, warnIfMissed: false);
   await tester.pump(const Duration(milliseconds: 100));
