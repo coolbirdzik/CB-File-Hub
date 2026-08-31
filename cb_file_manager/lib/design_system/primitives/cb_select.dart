@@ -291,8 +291,9 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
     if (s.disabled) {
       final bool outlined = widget.variant == CbSelectVariant.outlined;
       return _CbSelectPaint(
-        background:
-            outlined ? c.surfaceSunken.withValues(alpha: 0.5) : Colors.transparent,
+        background: outlined
+            ? c.surfaceSunken.withValues(alpha: 0.5)
+            : Colors.transparent,
         border: outlined ? c.strokeSubtle : Colors.transparent,
         foreground: c.textDisabled,
         chevron: c.textDisabled,

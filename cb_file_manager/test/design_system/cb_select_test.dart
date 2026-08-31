@@ -180,7 +180,8 @@ void main() {
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
 
-    expect(t.getRect(find.byType(ListView)).bottom, lessThanOrEqualTo(trigger.top));
+    expect(t.getRect(find.byType(ListView)).bottom,
+        lessThanOrEqualTo(trigger.top));
   });
 
   testWidgets('survives the unbounded width a Row or Wrap hands it', (t) async {
