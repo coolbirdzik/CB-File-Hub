@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
@@ -881,15 +882,15 @@ void showDeleteTagDialog(
                 children: [
                   Text(AppLocalizations.of(context)!.selectTagToRemove),
                   const SizedBox(height: 16),
-                  DropdownButton<String>(
-                    isExpanded: true,
+                  CbSelect<String>(
+                    expand: true,
                     value: selectedTag,
-                    items: tags.map((tag) {
-                      return DropdownMenuItem<String>(
-                        value: tag,
-                        child: Text(tag),
-                      );
-                    }).toList(),
+                    placeholder:
+                        AppLocalizations.of(context)!.selectTagToRemove,
+                    items: [
+                      for (final tag in tags)
+                        CbSelectItem<String>(value: tag, label: tag),
+                    ],
                     onChanged: (value) {
                       setState(() {
                         selectedTag = value;

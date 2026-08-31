@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -13,7 +14,6 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../e2e/cb_e2e_config.dart';
-import '../../../design_system/primitives/cb_tooltip.dart';
 
 import '../../../bloc/ai_agent/ai_agent_event.dart';
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights_cubit.dart';
@@ -2834,56 +2834,27 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
+                CbSelect<String>(
+                  key: const ValueKey<String>('cleaner-apps-drive-picker'),
                   width: 190,
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: theme.dividerColor),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      key: const ValueKey<String>(
-                        'cleaner-apps-drive-picker',
+                  size: CbSelectSize.lg,
+                  value: selectedDrive?.path,
+                  placeholder: l.diskCleanerSelectDrives,
+                  enabled: canChangeDrive,
+                  onChanged: _selectAppInsightsDrive,
+                  items: [
+                    for (final drive in _drives)
+                      CbSelectItem<String>(
+                        value: drive.path,
+                        // The menu has room for the free space, the 190px
+                        // trigger does not.
+                        label: l.diskCleanerDriveFree(
+                          _driveDisplayName(drive),
+                          _fmt(drive.freeBytes),
+                        ),
+                        triggerLabel: _driveDisplayName(drive),
                       ),
-                      value: selectedDrive?.path,
-                      isExpanded: true,
-                      isDense: true,
-                      icon: const Icon(Icons.expand_more_rounded, size: 19),
-                      hint: Text(l.diskCleanerSelectDrives),
-                      onChanged:
-                          canChangeDrive ? _selectAppInsightsDrive : null,
-                      selectedItemBuilder: (context) => _drives
-                          .map(
-                            (drive) => Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _driveDisplayName(drive),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(growable: false),
-                      items: _drives
-                          .map(
-                            (drive) => DropdownMenuItem<String>(
-                              value: drive.path,
-                              child: Text(
-                                l.diskCleanerDriveFree(
-                                  _driveDisplayName(drive),
-                                  _fmt(drive.freeBytes),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                  ),
+                  ],
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
@@ -4147,44 +4118,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   ),
                 ),
                 if (_oldLargeEvidenceExpanded && evidence.totalCount > 0)
-                  Container(
-                    height: 30,
-                    padding: const EdgeInsets.symmetric(horizontal: 7),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      border: Border.all(
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: 0.7,
+                  CbSelect<OldLargeEvidenceFilter>(
+                    size: CbSelectSize.sm,
+                    value: _oldLargeEvidenceFilter,
+                    onChanged: selectFilter,
+                    items: [
+                      for (final filter in OldLargeEvidenceFilter.values)
+                        CbSelectItem<OldLargeEvidenceFilter>(
+                          value: filter,
+                          label:
+                              '${filterLabel(filter)} (${filterCount(filter)})',
                         ),
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<OldLargeEvidenceFilter>(
-                        value: _oldLargeEvidenceFilter,
-                        isDense: true,
-                        icon: Icon(
-                          PhosphorIconsLight.caretDown,
-                          size: 14,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        onChanged: selectFilter,
-                        items: OldLargeEvidenceFilter.values
-                            .map(
-                              (filter) =>
-                                  DropdownMenuItem<OldLargeEvidenceFilter>(
-                                value: filter,
-                                child: Text(
-                                  '${filterLabel(filter)} (${filterCount(filter)})',
-                                ),
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                    ),
+                    ],
                   ),
                 const SizedBox(width: 4),
                 IconButton(

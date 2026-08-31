@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/config/language_controller.dart';
@@ -533,21 +534,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: AppLocalizations.of(context)!.fileThumbnailFit,
           subtitle: AppLocalizations.of(context)!.fileThumbnailFitDescription,
           icon: PhosphorIconsLight.imageSquare,
-          trailing: DropdownButton<FileThumbnailFitMode>(
+          trailing: CbSelect<FileThumbnailFitMode>(
             value: _fileThumbnailFitMode,
-            onChanged: (mode) {
-              if (mode != null) {
-                _updateFileThumbnailFitMode(mode);
-              }
-            },
+            onChanged: _updateFileThumbnailFitMode,
             items: [
-              DropdownMenuItem(
+              CbSelectItem(
                 value: FileThumbnailFitMode.cover,
-                child: Text(AppLocalizations.of(context)!.thumbnailFitCover),
+                label: AppLocalizations.of(context)!.thumbnailFitCover,
               ),
-              DropdownMenuItem(
+              CbSelectItem(
                 value: FileThumbnailFitMode.contain,
-                child: Text(AppLocalizations.of(context)!.thumbnailFitContain),
+                label: AppLocalizations.of(context)!.thumbnailFitContain,
               ),
             ],
           ),
@@ -556,21 +553,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: AppLocalizations.of(context)!.tagThumbnailFit,
           subtitle: AppLocalizations.of(context)!.tagThumbnailFitDescription,
           icon: PhosphorIconsLight.image,
-          trailing: DropdownButton<TagThumbnailFitMode>(
+          trailing: CbSelect<TagThumbnailFitMode>(
             value: _tagThumbnailFitMode,
-            onChanged: (mode) {
-              if (mode != null) {
-                _updateTagThumbnailFitMode(mode);
-              }
-            },
+            onChanged: _updateTagThumbnailFitMode,
             items: [
-              DropdownMenuItem(
+              CbSelectItem(
                 value: TagThumbnailFitMode.contain,
-                child: Text(AppLocalizations.of(context)!.thumbnailFitContain),
+                label: AppLocalizations.of(context)!.thumbnailFitContain,
               ),
-              DropdownMenuItem(
+              CbSelectItem(
                 value: TagThumbnailFitMode.cover,
-                child: Text(AppLocalizations.of(context)!.thumbnailFitCover),
+                label: AppLocalizations.of(context)!.thumbnailFitCover,
               ),
             ],
           ),
@@ -1821,24 +1814,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          DropdownButton<int>(
+          CbSelect.fromValues<int>(
+            values: values,
             value: current,
-            isDense: true,
-            underline: const SizedBox.shrink(),
-            items: [
-              for (final v in values)
-                DropdownMenuItem<int>(
-                  value: v,
-                  child: Text(
-                    _formatTabInactiveThresholdLabel(v),
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-            ],
-            onChanged: (value) {
-              if (value == null) return;
-              _updateTabInactiveThresholdMinutes(value);
-            },
+            labelBuilder: _formatTabInactiveThresholdLabel,
+            onChanged: _updateTabInactiveThresholdMinutes,
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:io' as io;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1064,25 +1065,19 @@ class _RawDataDialogState extends State<_RawDataDialog> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(width: 8),
-            DropdownButton<int>(
+            CbSelect.fromValues<int>(
+              size: CbSelectSize.sm,
+              values: _availableRowsPerPage(),
               value: effectiveRowsPerPage,
+              labelBuilder: (value) => '$value',
               onChanged: _isPageLoading
                   ? null
                   : (value) async {
-                      if (value == null) return;
                       setState(() {
                         _rowsPerPage = value;
                       });
                       await _loadPage(offset: 0);
                     },
-              items: _availableRowsPerPage()
-                  .map(
-                    (value) => DropdownMenuItem<int>(
-                      value: value,
-                      child: Text('$value'),
-                    ),
-                  )
-                  .toList(),
             ),
           ],
         ),

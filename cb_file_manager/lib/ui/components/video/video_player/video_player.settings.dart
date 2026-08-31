@@ -197,26 +197,20 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     // Codec Selection
                     const Text('Codec:',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    DropdownButton<String>(
+                    CbSelect<String>(
                       value: _selectedCodec,
-                      isExpanded: true,
-                      dropdownColor:
-                          Theme.of(context).dialogTheme.backgroundColor ??
-                              Theme.of(context).colorScheme.surface,
+                      expand: true,
                       items: const [
-                        DropdownMenuItem(value: 'auto', child: Text('Auto')),
-                        DropdownMenuItem(value: 'h264', child: Text('H.264')),
-                        DropdownMenuItem(
-                            value: 'h265', child: Text('H.265/HEVC')),
-                        DropdownMenuItem(value: 'vp9', child: Text('VP9')),
-                        DropdownMenuItem(value: 'av1', child: Text('AV1')),
+                        CbSelectItem(value: 'auto', label: 'Auto'),
+                        CbSelectItem(value: 'h264', label: 'H.264'),
+                        CbSelectItem(value: 'h265', label: 'H.265/HEVC'),
+                        CbSelectItem(value: 'vp9', label: 'VP9'),
+                        CbSelectItem(value: 'av1', label: 'AV1'),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => _selectedCodec = value);
-                          setState(() => _selectedCodec = value);
-                          _saveSettings();
-                        }
+                        setDialogState(() => _selectedCodec = value);
+                        setState(() => _selectedCodec = value);
+                        _saveSettings();
                       },
                     ),
                     const SizedBox(height: 16),
@@ -224,34 +218,25 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     // Video Scale Mode
                     const Text('Video Scale Mode:',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    DropdownButton<String>(
+                    CbSelect<String>(
                       value: _videoScaleMode,
-                      isExpanded: true,
-                      dropdownColor:
-                          Theme.of(context).dialogTheme.backgroundColor ??
-                              Theme.of(context).colorScheme.surface,
+                      expand: true,
                       items: const [
-                        DropdownMenuItem(
-                            value: 'cover', child: Text('Cover (Fill & Crop)')),
-                        DropdownMenuItem(
-                            value: 'contain', child: Text('Contain (Fit All)')),
-                        DropdownMenuItem(
-                            value: 'fill', child: Text('Fill (Stretch)')),
-                        DropdownMenuItem(
-                            value: 'fitWidth', child: Text('Fit Width')),
-                        DropdownMenuItem(
-                            value: 'fitHeight', child: Text('Fit Height')),
-                        DropdownMenuItem(
-                            value: 'none', child: Text('None (Original Size)')),
-                        DropdownMenuItem(
-                            value: 'scaleDown', child: Text('Scale Down')),
+                        CbSelectItem(
+                            value: 'cover', label: 'Cover (Fill & Crop)'),
+                        CbSelectItem(
+                            value: 'contain', label: 'Contain (Fit All)'),
+                        CbSelectItem(value: 'fill', label: 'Fill (Stretch)'),
+                        CbSelectItem(value: 'fitWidth', label: 'Fit Width'),
+                        CbSelectItem(value: 'fitHeight', label: 'Fit Height'),
+                        CbSelectItem(
+                            value: 'none', label: 'None (Original Size)'),
+                        CbSelectItem(value: 'scaleDown', label: 'Scale Down'),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => _videoScaleMode = value);
-                          setState(() => _videoScaleMode = value);
-                          _saveSettings();
-                        }
+                        setDialogState(() => _videoScaleMode = value);
+                        setState(() => _videoScaleMode = value);
+                        _saveSettings();
                       },
                     ),
                     const SizedBox(height: 16),
@@ -283,47 +268,40 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     // Video Decoder
                     const Text('Video Decoder:',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    DropdownButton<String>(
+                    CbSelect<String>(
                       value: _videoDecoder,
-                      isExpanded: true,
-                      dropdownColor:
-                          Theme.of(context).dialogTheme.backgroundColor ??
-                              Theme.of(context).colorScheme.surface,
+                      expand: true,
                       items: const [
-                        DropdownMenuItem(value: 'auto', child: Text('Auto')),
-                        DropdownMenuItem(
-                            value: 'software', child: Text('Software')),
-                        DropdownMenuItem(
-                            value: 'hardware', child: Text('Hardware')),
+                        CbSelectItem(value: 'auto', label: 'Auto'),
+                        CbSelectItem(value: 'software', label: 'Software'),
+                        CbSelectItem(value: 'hardware', label: 'Hardware'),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() {
-                            _videoDecoder = value;
-                            if (value == 'software') {
-                              _hardwareAcceleration = false;
-                            }
-                            if (value == 'hardware') {
-                              _hardwareAcceleration = true;
-                            }
-                          });
-                          setState(() {
-                            _videoDecoder = value;
-                            if (value == 'software') {
-                              _hardwareAcceleration = false;
-                            }
-                            if (value == 'hardware') {
-                              _hardwareAcceleration = true;
-                            }
-                            if (_player != null) {
-                              _videoController = VideoController(
-                                _player!,
-                                configuration: _buildVideoControllerConfig(),
-                              );
-                            }
-                          });
-                          _saveSettings();
-                        }
+                        setDialogState(() {
+                          _videoDecoder = value;
+                          if (value == 'software') {
+                            _hardwareAcceleration = false;
+                          }
+                          if (value == 'hardware') {
+                            _hardwareAcceleration = true;
+                          }
+                        });
+                        setState(() {
+                          _videoDecoder = value;
+                          if (value == 'software') {
+                            _hardwareAcceleration = false;
+                          }
+                          if (value == 'hardware') {
+                            _hardwareAcceleration = true;
+                          }
+                          if (_player != null) {
+                            _videoController = VideoController(
+                              _player!,
+                              configuration: _buildVideoControllerConfig(),
+                            );
+                          }
+                        });
+                        _saveSettings();
                       },
                     ),
                     const SizedBox(height: 16),
@@ -331,25 +309,18 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     // Audio Decoder
                     const Text('Audio Decoder:',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    DropdownButton<String>(
+                    CbSelect<String>(
                       value: _audioDecoder,
-                      isExpanded: true,
-                      dropdownColor:
-                          Theme.of(context).dialogTheme.backgroundColor ??
-                              Theme.of(context).colorScheme.surface,
+                      expand: true,
                       items: const [
-                        DropdownMenuItem(value: 'auto', child: Text('Auto')),
-                        DropdownMenuItem(
-                            value: 'software', child: Text('Software')),
-                        DropdownMenuItem(
-                            value: 'hardware', child: Text('Hardware')),
+                        CbSelectItem(value: 'auto', label: 'Auto'),
+                        CbSelectItem(value: 'software', label: 'Software'),
+                        CbSelectItem(value: 'hardware', label: 'Hardware'),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => _audioDecoder = value);
-                          setState(() => _audioDecoder = value);
-                          _saveSettings();
-                        }
+                        setDialogState(() => _audioDecoder = value);
+                        setState(() => _audioDecoder = value);
+                        _saveSettings();
                       },
                     ),
                     const SizedBox(height: 16),
@@ -385,27 +356,20 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     // Subtitle Encoding
                     const Text('Subtitle Encoding:',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    DropdownButton<String>(
+                    CbSelect<String>(
                       value: _subtitleEncoding,
-                      isExpanded: true,
-                      dropdownColor:
-                          Theme.of(context).dialogTheme.backgroundColor ??
-                              Theme.of(context).colorScheme.surface,
+                      expand: true,
                       items: const [
-                        DropdownMenuItem(value: 'utf-8', child: Text('UTF-8')),
-                        DropdownMenuItem(
-                            value: 'utf-16', child: Text('UTF-16')),
-                        DropdownMenuItem(
-                            value: 'iso-8859-1', child: Text('ISO-8859-1')),
-                        DropdownMenuItem(
-                            value: 'windows-1252', child: Text('Windows-1252')),
+                        CbSelectItem(value: 'utf-8', label: 'UTF-8'),
+                        CbSelectItem(value: 'utf-16', label: 'UTF-16'),
+                        CbSelectItem(value: 'iso-8859-1', label: 'ISO-8859-1'),
+                        CbSelectItem(
+                            value: 'windows-1252', label: 'Windows-1252'),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => _subtitleEncoding = value);
-                          setState(() => _subtitleEncoding = value);
-                          _saveSettings();
-                        }
+                        setDialogState(() => _subtitleEncoding = value);
+                        setState(() => _subtitleEncoding = value);
+                        _saveSettings();
                       },
                     ),
                     const SizedBox(height: 16),
@@ -413,24 +377,18 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     // Video Output Format
                     const Text('Video Output Format:',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    DropdownButton<String>(
+                    CbSelect<String>(
                       value: _videoOutputFormat,
-                      isExpanded: true,
-                      dropdownColor:
-                          Theme.of(context).dialogTheme.backgroundColor ??
-                              Theme.of(context).colorScheme.surface,
+                      expand: true,
                       items: const [
-                        DropdownMenuItem(value: 'auto', child: Text('Auto')),
-                        DropdownMenuItem(
-                            value: 'yuv420p', child: Text('YUV420P')),
-                        DropdownMenuItem(value: 'rgb24', child: Text('RGB24')),
+                        CbSelectItem(value: 'auto', label: 'Auto'),
+                        CbSelectItem(value: 'yuv420p', label: 'YUV420P'),
+                        CbSelectItem(value: 'rgb24', label: 'RGB24'),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() => _videoOutputFormat = value);
-                          setState(() => _videoOutputFormat = value);
-                          _saveSettings();
-                        }
+                        setDialogState(() => _videoOutputFormat = value);
+                        setState(() => _videoOutputFormat = value);
+                        _saveSettings();
                       },
                     ),
                     const SizedBox(height: 16),

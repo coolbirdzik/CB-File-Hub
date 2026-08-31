@@ -24,12 +24,14 @@ Future<void> main(List<String> args) async {
     allLines = await File(paths.first).readAsLines();
   }
 
+  final jsonSummary = _failuresFromJson(allLines);
   final failed = <String>{};
   failed.addAll(_failuresFromExpanded(allLines));
-  failed.addAll(_failuresFromJson(allLines));
+  failed.addAll(jsonSummary.failedNames);
 
   _printBox(failed.toList()..sort(),
-      logPath: paths.isEmpty ? null : paths.first);
+      logPath: paths.isEmpty ? null : paths.first,
+      diagnosticsByTest: jsonSummary.diagnosticsByTest);
 }
 
 Set<String> _failuresFromExpanded(List<String> allLines) {
@@ -43,9 +45,10 @@ Set<String> _failuresFromExpanded(List<String> allLines) {
   return failed;
 }
 
-Set<String> _failuresFromJson(List<String> allLines) {
+_JsonFailureSummary _failuresFromJson(List<String> allLines) {
   final idToName = <int, String>{};
   final failed = <String>{};
+  final diagnosticsByTestId = <int, List<String>>{};
   for (final line in allLines) {
     final t = line.trim();
     if (t.isEmpty || !t.startsWith('{')) {
@@ -69,6 +72,18 @@ Set<String> _failuresFromJson(List<String> allLines) {
           idToName[id] = name;
         }
       }
+    } else if (type == 'error') {
+      final testID = j['testID'];
+      if (testID is! int) continue;
+      final error = j['error'];
+      final stackTrace = j['stackTrace'];
+      final diagnostics = diagnosticsByTestId.putIfAbsent(testID, () => []);
+      if (error is String && error.trim().isNotEmpty) {
+        diagnostics.add(error.trim());
+      }
+      if (stackTrace is String && stackTrace.trim().isNotEmpty) {
+        diagnostics.add(stackTrace.trim());
+      }
     } else if (type == 'testDone') {
       final result = j['result'] as String?;
       final testID = j['testID'];
@@ -80,10 +95,22 @@ Set<String> _failuresFromJson(List<String> allLines) {
       }
     }
   }
-  return failed;
+  final diagnosticsByTest = <String, List<String>>{};
+  for (final entry in diagnosticsByTestId.entries) {
+    final testName = idToName[entry.key] ?? 'testId=${entry.key}';
+    diagnosticsByTest[testName] = entry.value;
+  }
+  return _JsonFailureSummary(
+    failedNames: failed,
+    diagnosticsByTest: diagnosticsByTest,
+  );
 }
 
-void _printBox(List<String> failed, {String? logPath}) {
+void _printBox(
+  List<String> failed, {
+  String? logPath,
+  Map<String, List<String>> diagnosticsByTest = const {},
+}) {
   if (failed.isEmpty) {
     return;
   }
@@ -94,12 +121,31 @@ void _printBox(List<String> failed, {String? logPath}) {
   out.writeln('E2E FAILED / ERRORED (${failed.length}):');
   out.writeln(bar);
   for (final name in failed) {
-    out.writeln('  • $name');
+    out.writeln('  - $name');
+    final diagnostics = diagnosticsByTest[name];
+    if (diagnostics == null) continue;
+    for (final diagnostic in diagnostics) {
+      for (final line in const LineSplitter().convert(diagnostic)) {
+        out.writeln('      $line');
+      }
+    }
   }
   out.writeln(bar);
-  out.writeln('Full log: ${logPath ?? 'standard input'}');
-  out.writeln(
-      'Quick grep: findstr /C:"[E]" build\\e2e_last_run.log   (PowerShell: Select-String)');
-  out.writeln('JSON log:   make dev-test-e2e-json  → build/e2e_report.jsonl');
+  final displayedLogPath = logPath ?? 'standard input';
+  out.writeln('Full log: $displayedLogPath');
+  if (logPath != null) {
+    out.writeln('Quick grep: findstr /C:"\\"type\\":\\"error\\"" $logPath');
+  }
+  out.writeln('JSON log:   make dev-test-e2e-json -> build/e2e_report.jsonl');
   out.writeln('');
+}
+
+class _JsonFailureSummary {
+  final Set<String> failedNames;
+  final Map<String, List<String>> diagnosticsByTest;
+
+  const _JsonFailureSummary({
+    required this.failedNames,
+    required this.diagnosticsByTest,
+  });
 }

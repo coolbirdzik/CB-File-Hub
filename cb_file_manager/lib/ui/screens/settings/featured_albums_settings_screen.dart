@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/services/featured_albums_service.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
@@ -92,18 +93,14 @@ class _FeaturedAlbumsSettingsScreenState
         ),
         ListTile(
           title: const Text('Max featured albums'),
-          trailing: DropdownButton<int>(
+          trailing: CbSelect.fromValues<int>(
+            values: const [2, 4, 6, 8, 10],
             value: config.maxFeaturedAlbums,
-            items: [2, 4, 6, 8, 10]
-                .map((e) =>
-                    DropdownMenuItem(value: e, child: Text(e.toString())))
-                .toList(),
+            labelBuilder: (value) => value.toString(),
             onChanged: (value) {
-              if (value != null) {
-                final newConfig = FeaturedAlbumsConfig.fromJson(config.toJson())
-                  ..maxFeaturedAlbums = value;
-                _saveConfig(newConfig);
-              }
+              final newConfig = FeaturedAlbumsConfig.fromJson(config.toJson())
+                ..maxFeaturedAlbums = value;
+              _saveConfig(newConfig);
             },
           ),
         ),
