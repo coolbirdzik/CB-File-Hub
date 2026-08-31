@@ -96,7 +96,21 @@ jobs:
       - name: Run integration tests - app_e2e_test
         run: |
           cd ${{ env.PROJECT_DIR }}
-          flutter test integration_test/app_e2e_test.dart -d windows --dart-define=CB_E2E=true
+          # Keep the machine-readable test events after a failure. The default
+          # reporter only leaves GitHub with an aggregate count, which makes a
+          # Windows-only E2E regression impossible to diagnose from the job.
+          dart run tool/run_e2e_with_log.dart --json-report
+
+      - name: Upload app E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-e2e-diagnostics-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            ${{ env.PROJECT_DIR }}/build/e2e_report.jsonl
+            ${{ env.PROJECT_DIR }}/build/e2e_report/
+            ${{ env.PROJECT_DIR }}/build/e2e_failed_tests.txt
 
       - name: Stop stray cb_file_hub.exe (after app_e2e_test)
         if: always()

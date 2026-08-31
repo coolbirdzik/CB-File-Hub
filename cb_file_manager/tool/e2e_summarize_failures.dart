@@ -28,7 +28,8 @@ Future<void> main(List<String> args) async {
   failed.addAll(_failuresFromExpanded(allLines));
   failed.addAll(_failuresFromJson(allLines));
 
-  _printBox(failed.toList()..sort());
+  _printBox(failed.toList()..sort(),
+      logPath: paths.isEmpty ? null : paths.first);
 }
 
 Set<String> _failuresFromExpanded(List<String> allLines) {
@@ -82,7 +83,7 @@ Set<String> _failuresFromJson(List<String> allLines) {
   return failed;
 }
 
-void _printBox(List<String> failed) {
+void _printBox(List<String> failed, {String? logPath}) {
   if (failed.isEmpty) {
     return;
   }
@@ -96,7 +97,7 @@ void _printBox(List<String> failed) {
     out.writeln('  • $name');
   }
   out.writeln(bar);
-  out.writeln('Full log: cb_file_manager/build/e2e_last_run.log');
+  out.writeln('Full log: ${logPath ?? 'standard input'}');
   out.writeln(
       'Quick grep: findstr /C:"[E]" build\\e2e_last_run.log   (PowerShell: Select-String)');
   out.writeln('JSON log:   make dev-test-e2e-json  → build/e2e_report.jsonl');
