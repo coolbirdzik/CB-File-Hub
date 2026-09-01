@@ -449,7 +449,8 @@ jobs:
           PARTNER_CENTER_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
           PARTNER_CENTER_APP_ID: ${{ vars.PARTNER_CENTER_APP_ID }}
           PARTNER_CENTER_COMMIT_SUBMISSION: ${{ vars.PARTNER_CENTER_COMMIT_SUBMISSION }}
-          PARTNER_CENTER_TARGET_PUBLISH_MODE: ${{ vars.PARTNER_CENTER_TARGET_PUBLISH_MODE }}
+          # Defaults to Manual in partner_center_msix.mjs when unset.
+          PARTNER_CENTER_TARGET_PUBLISH_MODE: ${{ vars.PARTNER_CENTER_TARGET_PUBLISH_MODE || 'Manual' }}
         run: |
           SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
           echo "Partner Center draft prepared: $SUBMISSION_ID"

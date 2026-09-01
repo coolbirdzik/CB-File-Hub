@@ -1,7 +1,7 @@
 # CB File Hub
 
 [![Build and Test](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/build-test.yml)
-[![Release](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/cb-file-hub/actions/workflows/release.yml)
+[![Build and Release](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml/badge.svg)](https://github.com/coolbirdzik/CB-File-Hub/actions/workflows/release.yml)
 
 <p align="center">
   <img src="cb_file_manager/assets/images/logo_circle.png" alt="CB File Hub logo" width="180" />
