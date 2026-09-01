@@ -128,8 +128,20 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
         onTap: effectiveTap,
       );
 
-      // Last chip is Flexible so it truncates when path is deep.
-      items.add(isLast ? Flexible(child: chip) : chip);
+      // Every segment must be allowed to shrink. Windows CI paths commonly
+      // contain several long parent segments (for example RUNNER~1/AppData/
+      // Local/Temp/cb_e2e_*); keeping all parents inflexible makes the Row
+      // overflow before the final segment gets a chance to truncate.
+      items.add(
+        Flexible(
+          // Icons need roughly the same horizontal space as eight label
+          // characters. Account for that in the flex share so the root drive
+          // icon is not squeezed into a text-only allocation.
+          flex:
+              (seg.label.length + 4 + (seg.icon == null ? 0 : 8)).clamp(1, 100),
+          child: chip,
+        ),
+      );
     }
 
     return Row(
@@ -256,33 +268,24 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                 : BorderRadius.circular(14),
           ),
           child: Row(
-            // Last chip expands to fill its Flexible slot; others shrink-wrap.
-            mainAxisSize: widget.isLast ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
               if (seg.icon != null) ...[
                 Icon(seg.icon, size: 13, color: secondaryColor),
                 const SizedBox(width: 5),
               ],
-              if (widget.isLast)
-                Flexible(
-                  child: Text(
-                    seg.label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: textColor,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                )
-              else
-                Text(
+              Flexible(
+                child: Text(
                   seg.label,
                   style: TextStyle(
                     fontSize: 13,
-                    color: secondaryColor,
+                    fontWeight:
+                        widget.isLast ? FontWeight.w500 : FontWeight.normal,
+                    color: widget.isLast ? textColor : secondaryColor,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
               if (seg.badge != null) ...[
                 const SizedBox(width: 6),
                 Text(
@@ -348,33 +351,23 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
   }) {
     final seg = widget.segment;
     return Row(
-      // Last chip expands to fill its Flexible slot; others shrink-wrap.
-      mainAxisSize: widget.isLast ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       children: [
         if (seg.icon != null) ...[
           Icon(seg.icon, size: 13, color: secondaryColor),
           const SizedBox(width: 5),
         ],
-        if (widget.isLast)
-          Flexible(
-            child: Text(
-              seg.label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          )
-        else
-          Text(
+        Flexible(
+          child: Text(
             seg.label,
             style: TextStyle(
               fontSize: 13,
-              color: secondaryColor,
+              fontWeight: widget.isLast ? FontWeight.w500 : FontWeight.normal,
+              color: widget.isLast ? textColor : secondaryColor,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
+        ),
         if (seg.badge != null) ...[
           const SizedBox(width: 6),
           Text(

@@ -340,4 +340,39 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
     expect(activations, 3);
   });
+
+  testWidgets('deep Windows breadcrumbs stay within a narrow address bar',
+      (tester) async {
+    await tester.pumpWidget(
+      _desktopFluentHost(
+        brightness: Brightness.light,
+        child: const Center(
+          child: SizedBox(
+            width: 420,
+            child: BreadcrumbAddressBar(
+              segments: [
+                BreadcrumbSegment(
+                  label: 'C:',
+                  icon: PhosphorIconsLight.hardDrive,
+                ),
+                BreadcrumbSegment(label: 'Users'),
+                BreadcrumbSegment(label: 'RUNNER~1'),
+                BreadcrumbSegment(label: 'AppData'),
+                BreadcrumbSegment(label: 'Local'),
+                BreadcrumbSegment(label: 'Temp'),
+                BreadcrumbSegment(label: 'cb_e2e_batchmove_1328ba8f'),
+                BreadcrumbSegment(label: 'batch_dest'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(find.byType(BreadcrumbAddressBar)).width, 420);
+    expect(find.text('batch_dest'), findsOneWidget);
+  });
 }
