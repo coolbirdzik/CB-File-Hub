@@ -28,6 +28,28 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get moreOptions => 'More options';
+  @override
+  String get thirdPartyApps => 'Third-party apps';
+  @override
+  String get configureContextMenu => 'Configure context menu';
+  @override
+  String get contextMenuLayout => 'Context menu layout';
+  @override
+  String get contextMenuLayoutDescription =>
+      'Reorder or hide commands shown when you right-click';
+  @override
+  String get contextMenuLayoutHint =>
+      'Drag commands to reorder them. Hidden commands remain available here.';
+  @override
+  String get contextMenuForFiles => 'Files';
+  @override
+  String get contextMenuForFolders => 'Folders';
+  @override
+  String get contextMenuForMultipleItems => 'Multiple items';
+  @override
+  String get resetContextMenuLayout => 'Reset layout';
+  @override
+  String get contextMenuLayoutReset => 'Context menu layout was reset';
 
   // File operations
   @override
@@ -52,6 +74,15 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get setCoolBirdAsDefaultForVideosAndroidHint =>
       'Opening Settings. In "Open by default", enable CB File Hub for video files.';
+  @override
+  String get setCoolBirdAsDefaultForArchives =>
+      'Set CB File Hub as default for archive files';
+  @override
+  String get setCoolBirdAsDefaultForArchivesSuccess =>
+      'CB File Hub is now the default for archive files.';
+  @override
+  String get setCoolBirdAsDefaultForArchivesFailed =>
+      'Could not set CB File Hub as the default for archive files.';
   @override
   String get openFolder => 'Open Folder';
   @override
@@ -178,6 +209,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewModeTree => 'Tree';
 
   @override
+  String get viewModeTiles => 'Tiles';
+
+  @override
   String get previewPaneTitle => 'Preview';
 
   @override
@@ -187,7 +221,49 @@ class EnglishLocalizations implements AppLocalizations {
   String get previewNotSupported => 'Preview not available for this file type';
 
   @override
+  String get archiveSectionTitle => 'Archive';
+
+  @override
+  String get archiveBrowseTitle => 'Browse contents';
+
+  @override
+  String get archiveExtractHere => 'Extract here';
+
+  @override
+  String get archiveExtractTo => 'Extract to…';
+
+  @override
+  String get archiveExtractToTitle => 'Choose extraction folder';
+
+  @override
+  String get archiveExtractAll => 'Extract all';
+
+  @override
+  String get archiveExtracting => 'Extracting archive…';
+
+  @override
+  String get archiveExtractComplete => 'Archive extracted';
+
+  @override
+  String archiveExtractFailed(String error) => 'Extraction failed: $error';
+
+  @override
+  String get archiveEmpty => 'This archive is empty';
+
+  @override
+  String archivePreviewSummary(int count) => '$count item(s)';
+
+  @override
+  String archivePreviewMore(int count) => '… and $count more';
+
+  @override
   String get previewUnavailable => 'Preview not available';
+
+  @override
+  String get previewTextTruncated => 'Showing partial content';
+
+  @override
+  String get previewTextTooLarge => 'File is too large to preview';
 
   @override
   String get showPreview => 'Show preview';
@@ -513,6 +589,44 @@ class EnglishLocalizations implements AppLocalizations {
       'More themes are available in Settings.';
   @override
   String get themeOnboardingContinue => 'Continue';
+  @override
+  String get accentColor => 'Accent color';
+  @override
+  String currentAccentColor(String name) => 'Current accent: $name';
+  @override
+  String get fontColor => 'Font color';
+  @override
+  String currentFontColor(String name) => 'Current font color: $name';
+  @override
+  String get uiFont => 'Font family';
+  @override
+  String currentUiFont(String name) => 'Current font: $name';
+  @override
+  String get uiFontUnicodeHint =>
+      'Free Unicode fonts (Vietnamese + Latin Extended). Extra fonts download once and cache locally.';
+  @override
+  String get backdropMode => 'Backdrop mode';
+  @override
+  String get backdropModeDynamic => 'Dynamic';
+  @override
+  String get backdropModeWallpaper => 'Wallpaper';
+  @override
+  String get backdropModeDynamicDescription =>
+      'Using system dynamic acrylic backdrop.';
+  @override
+  String get backdropModeWallpaperDescription =>
+      'Using system wallpaper as backdrop.';
+  @override
+  String get noSystemWallpaperDetected => 'No system wallpaper detected';
+  @override
+  String get customBackdropImage => 'Custom';
+  @override
+  String get backdropImageNotFound => 'Image not found';
+  @override
+  String get desktopAcrylicStrength => 'Desktop acrylic strength';
+  @override
+  String desktopAcrylicStrengthDescription(int percentage) =>
+      'Adjust blur and tint intensity for desktop backdrop ($percentage%).';
   @override
   String get vietnameseLanguage => 'Vietnamese';
   @override
@@ -983,6 +1097,8 @@ class EnglishLocalizations implements AppLocalizations {
   String get useSystemDefaultForVideoEnabled =>
       'Videos will open with the system default app';
   @override
+  String get useSystemDefaultForVideoDisabled =>
+      'Videos will open in the in-app player';
   @override
   String get seekSpeed => 'Seek speed';
   @override
@@ -995,8 +1111,16 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Fast';
   @override
-  String get useSystemDefaultForVideoDisabled =>
-      'Videos will open in the in-app player';
+  String get openVideoInNewWindow => 'Open videos in a separate window';
+  @override
+  String get openVideoInNewWindowDescription =>
+      'Desktop only. Uses one separate in-app player window; opening another video replaces the current video in that window.';
+  @override
+  String get openVideoInNewWindowEnabled =>
+      'Videos will open in a separate player window';
+  @override
+  String get openVideoInNewWindowDisabled =>
+      'The video player will open in the current window';
   @override
   String get thumbnailCache => 'Thumbnail Cache';
   @override
@@ -1595,6 +1719,13 @@ class EnglishLocalizations implements AppLocalizations {
       'Enable/disable showing tags outside file list';
 
   @override
+  String get fileThumbnailFit => 'File thumbnail display';
+
+  @override
+  String get fileThumbnailFitDescription =>
+      'Choose whether file thumbnails fill the frame or show the full image';
+
+  @override
   String get tagThumbnailFit => 'Tag thumbnail display';
 
   @override
@@ -1927,6 +2058,82 @@ class EnglishLocalizations implements AppLocalizations {
   // UI labels
   @override
   String get noStorageLocationsFound => 'No storage locations found';
+  @override
+  String get driveGroupFixed => 'This PC';
+  @override
+  String get driveGroupRemovable => 'Removable';
+  @override
+  String get driveGroupNetwork => 'Network';
+  @override
+  String get driveGroupOther => 'Other';
+  @override
+  String get driveTapToBrowse => 'Tap to browse';
+  @override
+  String get driveRestrictedAccess => 'Restricted access';
+  @override
+  String get driveEject => 'Eject';
+  @override
+  String get driveEjectConfirmTitle => 'Eject drive?';
+  @override
+  String driveEjectConfirmMessage(String name) =>
+      'Safely remove "$name"? Make sure no files are in use.';
+  @override
+  String get driveEjectSuccess => 'Drive ejected';
+  @override
+  String driveEjectFailed(String error) => 'Unable to eject: $error';
+  @override
+  String get driveRename => 'Rename';
+  @override
+  String get driveRenameTitle => 'Rename volume';
+  @override
+  String get driveRenameHint => 'Volume label';
+  @override
+  String get driveRenameSuccess => 'Volume renamed';
+  @override
+  String driveRenameFailed(String error) => 'Unable to rename: $error';
+  @override
+  String get driveFormatConfirmTitle => 'Format drive?';
+  @override
+  String driveFormatConfirmMessage(String name) =>
+      'Open the system format tool for "$name"? This can erase all data on the volume.';
+  @override
+  String get driveOpenInCleaner => 'Open in Disk Cleaner';
+  @override
+  String get driveUsed => 'Used';
+  @override
+  String get driveFree => 'Free';
+  @override
+  String get driveTotal => 'Total';
+  @override
+  String get driveType => 'Type';
+  @override
+  String get driveFilesystem => 'File system';
+  @override
+  String get driveSerial => 'Serial';
+  @override
+  String get driveKindFixed => 'Local Disk';
+  @override
+  String get driveKindRemovable => 'Removable';
+  @override
+  String get driveKindNetwork => 'Network';
+  @override
+  String get driveKindOptical => 'Optical';
+  @override
+  String get driveKindRam => 'RAM Disk';
+  @override
+  String get driveKindInternal => 'Internal storage';
+  @override
+  String get driveKindUnknown => 'Storage';
+  @override
+  String get openInNewPane => 'Open in new pane';
+  @override
+  String get openInWindowsTerminal => 'Open in Windows Terminal';
+  @override
+  String get driveCleanup => 'Cleanup';
+  @override
+  String get driveFormat => 'Format';
+  @override
+  String get driveBitLocker => 'Turn on BitLocker';
   @override
   String get menuPinningOnlyLargeScreens =>
       'Menu pinning is only available on larger screens';
@@ -2731,6 +2938,30 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String videoLibraryCount(int count) => '$count libraries';
 
+  @override
+  String get libraryCover => 'Library Cover';
+
+  @override
+  String get changeCoverImage => 'Change Cover';
+
+  @override
+  String get removeCoverImage => 'Remove Cover';
+
+  @override
+  String get coverImageUpdated => 'Cover image updated';
+
+  @override
+  String get coverImageRemoved => 'Cover image removed';
+
+  @override
+  String get coverImageUpdateFailed => 'Failed to update cover image';
+
+  @override
+  String get lastScanLabel => 'Last scan';
+
+  @override
+  String get neverScanned => 'Never scanned';
+
   // Streaming and download dialogs
   @override
   String openFileTypeFile(String fileType) => 'Open $fileType File';
@@ -3022,6 +3253,9 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerSelectDrives => 'Select drives';
   @override
   String get diskCleanerScanAgain => 'Scan again';
+  @override
+  String get diskCleanerCachedResultStatus =>
+      'Showing the previous scan (cached result). Scan again to refresh.';
 
   // Disk Cleaner — extended UI strings
   @override
@@ -3034,6 +3268,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get diskCleanerCheckAllCleanable => 'Check all cleanable';
   @override
   String get diskCleanerUncheckAll => 'Uncheck all';
+
   @override
   String get diskCleanerColumnName => 'Name';
   @override
@@ -3164,18 +3399,56 @@ class EnglishLocalizations implements AppLocalizations {
   String diskCleanerDriveSummary(String path, String size, int count) =>
       '$path  $size  •  $count files';
   @override
+  String get diskCleanerGrowthTitle => 'Recently increased folders';
+  @override
+  String diskCleanerGrowthFilter(int count) => 'Recently increased ($count)';
+  @override
+  String diskCleanerGrowthIncrease(String size) => '+$size';
+  @override
+  String diskCleanerGrowthCurrentSize(String size) => 'Current size: $size';
+  @override
   String diskCleanerAgentPath(String path) => 'CB Agent: $path';
   @override
   String diskCleanerItemsBytes(int count, String size) =>
       '$count items • $size';
   @override
   String diskCleanerSizeFiles(String size, int files) => '$size • $files files';
+
+  @override
+  String diskCleanerRolledUpItems(int items) => '$items smaller items';
   @override
   String diskCleanerScannedProgress(String size, int files) =>
       '$size scanned • $files files';
   @override
   String get diskCleanerPieChartPendingScan =>
       'Pie chart will appear as soon as scan completes';
+  @override
+  String get diskCleanerIncrementalScanTitle => 'Incremental scan';
+  @override
+  String diskCleanerIncrementalScanProgress(int count) =>
+      'Updated $count changed folder(s)';
+  @override
+  String get diskCleanerFullScanFallback =>
+      'Incremental scan unavailable — full scan completed';
+  @override
+  String get diskCleanerOldLargeTitle => 'Old and large items';
+  @override
+  String get diskCleanerOldLargeSubtitle =>
+      'Review hints only. Filesystem timestamps do not prove an item is unused.';
+  @override
+  String get diskCleanerOldLargeAll => 'All';
+  @override
+  String get diskCleanerOldLargeFiles => 'Files';
+  @override
+  String get diskCleanerOldLargeFolders => 'Folders';
+  @override
+  String diskCleanerOldLargeLastActivity(String date) =>
+      'Last activity hint: $date';
+  @override
+  String get diskCleanerOldLargeReviewOnly => 'Review only';
+  @override
+  String get diskCleanerOldLargeEmpty =>
+      'No old, large files or folders were found.';
   @override
   String diskCleanerScanningPath(String path) => 'Scanning $path';
   @override
@@ -3252,6 +3525,297 @@ class EnglishLocalizations implements AppLocalizations {
   String diskCleanerPermanentDeletedWithSkipped(
           int count, String size, int skipped) =>
       'Permanently deleted $count items ($size). Skipped $skipped file(s) after delete failed.';
+
+  // Cleaner - drive picker, quick clean, junk reasons
+  @override
+  String get diskCleanerDriveLowSpace => 'Low space';
+  @override
+  String diskCleanerDriveCapacity(String used, String total, String free) =>
+      '$used of $total used · $free free';
+  @override
+  String diskCleanerLastScanFound(String when, String junk) =>
+      'Last scan $when · found $junk of junk';
+  @override
+  String get diskCleanerTimeJustNow => 'just now';
+  @override
+  String get diskCleanerTimeToday => 'today';
+  @override
+  String get diskCleanerTimeYesterday => 'yesterday';
+  @override
+  String diskCleanerTimeDaysAgo(int days) => '$days days ago';
+  @override
+  String diskCleanerTimeWeeksAgo(int weeks) =>
+      weeks == 1 ? 'a week ago' : '$weeks weeks ago';
+  @override
+  String diskCleanerTimeMonthsAgo(int months) =>
+      months <= 1 ? 'a month ago' : '$months months ago';
+  @override
+  String get diskCleanerQuickCleanHint =>
+      'Temporary files, caches and the Recycle Bin. Apps rebuild these on demand.';
+  @override
+  String get diskCleanerQuickCleanButton => 'Quick clean';
+  @override
+  String get diskCleanerQuickCleanScanning => 'Finding safe items...';
+  @override
+  String get diskCleanerQuickCleanNothing => 'Nothing safe to clean right now';
+  @override
+  String get diskCleanerQuickCleanReviewTitle => 'Review quick clean';
+  @override
+  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
+      '$count items in these groups, $size in total.';
+  @override
+  String get diskCleanerQuickCleanRecycleNote =>
+      'Everything goes to the Recycle Bin, so you can restore it from there.';
+  @override
+  String get diskCleanerCategoryWindowsTemp => 'Windows temporary files';
+  @override
+  String get diskCleanerCategoryBrowserCache => 'Browser caches';
+  @override
+  String get diskCleanerCategoryRecycleBin => 'Recycle Bin';
+  @override
+  String get diskCleanerCategoryThumbnailCache => 'Thumbnail cache';
+  @override
+  String get diskCleanerCategoryAppCache => 'App caches';
+  @override
+  String get diskCleanerCategoryCrashLogs => 'Crash dumps and logs';
+  @override
+  String get diskCleanerCategoryWindowsUpdate => 'Windows Update cache';
+  @override
+  String get diskCleanerCategoryPrefetch => 'Prefetch data';
+  @override
+  String get diskCleanerCategoryDeliveryOptimization =>
+      'Delivery Optimization files';
+  @override
+  String get diskCleanerCategoryDevCache => 'Developer caches';
+  @override
+  String get diskCleanerReasonWindowsTemp =>
+      'Left behind by apps. Safe to remove; nothing depends on it.';
+  @override
+  String get diskCleanerReasonBrowserCache =>
+      'Your browser rebuilds this on demand. Pages may load slightly slower once.';
+  @override
+  String get diskCleanerReasonRecycleBin =>
+      'Already deleted files waiting to be emptied.';
+  @override
+  String get diskCleanerReasonThumbnailCache =>
+      'Windows regenerates thumbnails the next time you open a folder.';
+  @override
+  String get diskCleanerReasonAppCache =>
+      'Temporary app data. Apps recreate it; you stay signed in.';
+  @override
+  String get diskCleanerReasonCrashLogs =>
+      'Diagnostic files from past crashes. Only useful for troubleshooting.';
+  @override
+  String get diskCleanerReasonWindowsUpdate =>
+      'Installers for updates that are already applied.';
+  @override
+  String get diskCleanerReasonPrefetch =>
+      'App launch hints. Windows rebuilds them over the next few launches.';
+  @override
+  String get diskCleanerReasonDeliveryOptimization =>
+      'Update files cached for sharing with other PCs on your network.';
+  @override
+  String get diskCleanerReasonDevCache =>
+      'Build and package caches. Your tools re-download or rebuild them.';
+  @override
+  String get diskCleanerReasonGeneric =>
+      'Matched a known junk location and is safe to remove.';
+
+  // Cleaner - tree preset views
+  @override
+  String get diskCleanerPresetTooltip => 'Filter the tree';
+  @override
+  String get diskCleanerPresetAll => 'Everything';
+  @override
+  String get diskCleanerPresetLargeFiles => 'Files over 1 GB';
+  @override
+  String get diskCleanerPresetLogsCaches => 'Logs and caches';
+  @override
+  String get diskCleanerPresetInstallers => 'Installers and archives';
+
+  // Cleaner - cleaned screen outcome
+  @override
+  String diskCleanerFreeSpaceBeforeAfter(String before, String after) =>
+      'Free space: $before → $after';
+  @override
+  String get diskCleanerGrowthWatchTitle => 'Growing since your last scan';
+  @override
+  String diskCleanerGrowthWatchLine(String path, String size) =>
+      '$path  +$size';
+
+  // Cleaner App Insights
+  @override
+  String get cleanerUtilitiesTitle => 'CB Agent Cleaner';
+  @override
+  String get cleanerUtilitiesSubtitle =>
+      'Utilities that help keep this PC fast and organized';
+  @override
+  String get cleanerUtilitiesStorageGroup => 'Storage';
+  @override
+  String get cleanerDiskUsageTitle => 'Disk usage';
+  @override
+  String get cleanerDiskUtilityDescription =>
+      'Inspect folders and safely clean confirmed junk';
+  @override
+  String get cleanerAppsTitle => 'Apps';
+  @override
+  String get cleanerAppsUtilityDescription =>
+      'Find large or rarely used apps and review their data';
+  @override
+  String get cleanerAppsLoading => 'Analyzing installed apps...';
+  @override
+  String get cleanerAppsUnavailable =>
+      'App insights will be available after the disk scan completes.';
+  @override
+  String cleanerAppsLoadFailed(String error) =>
+      'Could not analyze installed apps: $error';
+  @override
+  String get cleanerAppsPartialBanner => 'Results are still updating.';
+  @override
+  String get cleanerAppsSearchHint => 'Search apps';
+  @override
+  String get cleanerAppsFilterAll => 'All';
+  @override
+  String get cleanerAppsFilterAttention => 'Review';
+  @override
+  String get cleanerAppsFilterLarge => 'Large';
+  @override
+  String get cleanerAppsFilterStale => 'Rarely used';
+  @override
+  String get cleanerAppsFilterCleanable => 'Cleanable';
+  @override
+  String get cleanerAppsSortLabel => 'Sort';
+  @override
+  String get cleanerAppsSortSize => 'Largest first';
+  @override
+  String get cleanerAppsSortName => 'Name';
+  @override
+  String get cleanerAppsSortLastOpened => 'Oldest activity';
+  @override
+  String get cleanerAppsLargeThresholdLabel => 'Large app';
+  @override
+  String get cleanerAppsStaleThresholdLabel => 'Not seen';
+  @override
+  String cleanerAppsDays(int days) => '$days days';
+  @override
+  String get cleanerAppsSummaryFootprint => 'Confirmed footprint';
+  @override
+  String get cleanerAppsSummaryAttention => 'Worth reviewing';
+  @override
+  String get cleanerAppsSummaryLarge => 'Large apps';
+  @override
+  String get cleanerAppsSummaryStale => 'Not seen recently';
+  @override
+  String get cleanerAppsSummaryCleanable => 'Cleanable cache';
+  @override
+  String cleanerAppsThresholdAtLeast(String size) => '$size or larger';
+  @override
+  String cleanerAppsNotSeenForDays(int days) =>
+      'No recorded launch for $days days';
+  @override
+  String get cleanerAppsReviewableCache => 'Available for safe review';
+  @override
+  String cleanerAppsShowingCount(int count) => 'Showing $count apps';
+  @override
+  String get cleanerAppsNoResults => 'No apps match these filters.';
+  @override
+  String get cleanerAppsUnknown => 'Unknown';
+  @override
+  String cleanerAppsLastOpened(String date) => 'Last seen: $date';
+  @override
+  String cleanerAppsNotOpenedForDays(int days) => 'Not opened for $days days';
+  @override
+  String get cleanerAppsUsageUnknownCompact => 'No recent activity data';
+  @override
+  String get cleanerAppsAttentionBadge => 'Review';
+  @override
+  String get cleanerAppsViewOptions => 'View options';
+  @override
+  String cleanerAppsUsageEvidence(String source, String confidence) =>
+      '$source • $confidence';
+  @override
+  String cleanerAppsPossibleSize(String size) => 'Possible: $size';
+  @override
+  String cleanerAppsCleanableAmount(String size) => 'Cleanable: $size';
+  @override
+  String get cleanerAppsDetails => 'App details';
+  @override
+  String get cleanerAppsUsageEvidenceLabel => 'Usage evidence';
+  @override
+  String get cleanerAppsSelectApp => 'Select an app to view its storage.';
+  @override
+  String get cleanerAppsConfirmedFootprint => 'Confirmed';
+  @override
+  String get cleanerAppsPossibleFootprint => 'Possible';
+  @override
+  String get cleanerAppsStorageBreakdown => 'Storage breakdown';
+  @override
+  String get cleanerAppsNoStorageDetails =>
+      'No measured storage locations are available for this app.';
+  @override
+  String get cleanerAppsSharedFolders => 'Shared / unattributed large folders';
+  @override
+  String get cleanerAppsSharedFoldersDescription =>
+      'These folders are not assigned to one app and are never selected for cleanup.';
+  @override
+  String get cleanerAppsOpenFolder => 'Open folder';
+  @override
+  String get cleanerAppsManageInWindows => 'Manage in Windows';
+  @override
+  String get cleanerAppsReviewCleanable => 'Review cleanable data';
+  @override
+  String get cleanerAppsAskAgent => 'Ask CB Agent';
+  @override
+  String cleanerAppsVersion(String version) => 'Version $version';
+  @override
+  String cleanerAppsInstalledOrUpdated(String date) =>
+      'Installed or updated: $date';
+  @override
+  String get cleanerAppsSourceWin32 => 'Win32 app';
+  @override
+  String get cleanerAppsSourceStore => 'Microsoft Store app';
+  @override
+  String get cleanerAppsMeasurementMeasured => 'Measured';
+  @override
+  String get cleanerAppsMeasurementEstimated => 'Windows estimate';
+  @override
+  String get cleanerAppsMeasurementPartial => 'Partial';
+  @override
+  String get cleanerAppsMeasurementUnknown => 'Unknown size';
+  @override
+  String get cleanerAppsAttributionConfirmed => 'Confirmed';
+  @override
+  String get cleanerAppsAttributionPossible => 'Possible';
+  @override
+  String get cleanerAppsAttributionShared => 'Shared';
+  @override
+  String get cleanerAppsUsageUserAssist => 'Windows launch history';
+  @override
+  String get cleanerAppsUsagePrefetch => 'Windows Prefetch';
+  @override
+  String get cleanerAppsConfidenceHigh => 'High confidence';
+  @override
+  String get cleanerAppsConfidenceMedium => 'Medium confidence';
+  @override
+  String get cleanerAppsStorageInstall => 'Installation';
+  @override
+  String get cleanerAppsStorageLocalData => 'Local app data';
+  @override
+  String get cleanerAppsStorageRoamingData => 'Roaming app data';
+  @override
+  String get cleanerAppsStoragePackageData => 'Package data';
+  @override
+  String get cleanerAppsStorageProgramData => 'Shared program data';
+  @override
+  String get cleanerAppsStorageCache => 'Cache';
+  @override
+  String get cleanerAppsStorageLogs => 'Logs';
+  @override
+  String get cleanerAppsStorageShared => 'Shared storage';
+  @override
+  String get cleanerAppsStorageUnknown => 'Other storage';
+  @override
+  String get cleanerAppsCleanableBadge => 'Cleanable';
 
   @override
   String get aiThinking0 => 'Thinking...';

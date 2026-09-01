@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/models/ai/referenced_file.dart';
+import 'package:cb_file_manager/services/ai/content_reader.dart';
+import 'package:cb_file_manager/services/archive/archive_format.dart'
+    show ArchiveFormat, detectArchiveFormat;
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
+import 'package:path/path.dart' as p;
 
 /// Utility class for checking file types
 /// Now delegates to FileTypeRegistry for all file type detection
@@ -35,9 +41,16 @@ class FileTypeUtils {
     return FileTypeRegistry.isCategory(extension, FileCategory.audio);
   }
 
+  /// Get the display file name for a path, resolving archive virtual paths
+  /// (`#archive?file=…&inner=…`) to the entry name they point at.
+  static String getFileName(String filePath) {
+    return ArchivePathUtils.entryDisplayName(filePath) ??
+        filePath.split('/').last.split('\\').last;
+  }
+
   /// Get the file extension from a path
   static String getFileExtension(String filePath) {
-    final fileName = filePath.split('/').last.split('\\').last;
+    final fileName = getFileName(filePath);
     final lastDotIndex = fileName.lastIndexOf('.');
     if (lastDotIndex == -1) return '';
     return fileName.substring(lastDotIndex).toLowerCase();
@@ -45,10 +58,16 @@ class FileTypeUtils {
 
   /// Get the file name without extension
   static String getFileNameWithoutExtension(String filePath) {
-    final fileName = filePath.split('/').last.split('\\').last;
+    final fileName = getFileName(filePath);
     final lastDotIndex = fileName.lastIndexOf('.');
     if (lastDotIndex == -1) return fileName;
     return fileName.substring(0, lastDotIndex);
+  }
+
+  /// Check if a file is a PDF document.
+  static bool isPdfFile(String filePath) {
+    final extension = getFileExtension(filePath);
+    return FileTypeRegistry.isCategory(extension, FileCategory.pdf);
   }
 
   /// Check if a file is a document
@@ -72,8 +91,61 @@ class FileTypeUtils {
 
   /// Check if a file is an archive/compressed file
   static bool isArchiveFile(String filePath) {
+    return detectArchiveFormat(getFileName(filePath)) != ArchiveFormat.unknown;
+  }
+
+  /// Returns the archive-related extension, including compound forms like `.tar.gz`.
+  static String getArchiveExtension(String filePath) {
+    final lower = getFileName(filePath).toLowerCase();
+    for (final compound in [
+      '.tar.gz',
+      '.tar.bz2',
+      '.tar.xz',
+      '.tgz',
+      '.tbz2',
+      '.tbz',
+      '.txz',
+    ]) {
+      if (lower.endsWith(compound)) return compound;
+    }
+    return getFileExtension(filePath);
+  }
+
+  /// Check if a file is plain text or source code suitable for preview.
+  static bool isTextFile(String filePath) {
+    if (ContentReader.isTextFile(filePath)) return true;
+
     final extension = getFileExtension(filePath);
-    return FileTypeRegistry.isCategory(extension, FileCategory.archive);
+    if (extension.length > 1 &&
+        ReferencedFile.isTextExtension(extension.substring(1))) {
+      return true;
+    }
+
+    if (extension.isNotEmpty) {
+      final category = FileTypeRegistry.getCategory(extension);
+      if (category == FileCategory.text || category == FileCategory.code) {
+        return true;
+      }
+    }
+
+    return ContentReader.textBasenames.contains(
+      p.basename(filePath).toLowerCase(),
+    );
+  }
+
+  /// Whether text preview should use monospace/code layout (line numbers, no wrap).
+  static bool isCodeLikeTextFile(String filePath) {
+    const plainTextExtensions = {
+      '.txt',
+      '.md',
+      '.markdown',
+      '.log',
+      '.csv',
+      '.rtf',
+    };
+    final extension = getFileExtension(filePath);
+    if (plainTextExtensions.contains(extension)) return false;
+    return isTextFile(filePath);
   }
 
   /// Get the file type category

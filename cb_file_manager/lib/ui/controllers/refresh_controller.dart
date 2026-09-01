@@ -10,6 +10,7 @@ import 'package:cb_file_manager/ui/screens/system_screen_router.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 
 /// Controller for handling refresh operations in folder list screens
 ///
@@ -42,10 +43,12 @@ class RefreshController {
   }) async {
     // Flag to track refresh state
     bool isRefreshing = true;
+    StreamSubscription? refreshSubscription;
 
     void stopOnce() {
       if (!isRefreshing) return;
       isRefreshing = false;
+      refreshSubscription?.cancel();
       if (!isMounted()) return;
       onRefreshComplete();
     }
@@ -88,14 +91,21 @@ class RefreshController {
             FolderListRefresh(currentPath, forceRegenerateThumbnails: true));
       }
     } else {
-      // For regular paths, reload with thumbnail regeneration
+      // For regular paths, finish the visible refresh state as soon as the
+      // actual folder scan completes instead of holding it for a fixed delay.
+      bool sawRefreshStart =
+          folderListBloc.state.isRefreshing || folderListBloc.state.isLoading;
+      refreshSubscription = folderListBloc.stream.listen((state) {
+        if (state.isRefreshing || state.isLoading) {
+          sawRefreshStart = true;
+        } else if (sawRefreshStart) {
+          stopOnce();
+        }
+      });
       folderListBloc.add(FolderListRefresh(currentPath));
     }
 
-    // Set fixed timeout of 3 seconds (enough to ensure UI operations complete)
-    Future.delayed(const Duration(seconds: 3), stopOnce);
-
-    // Set longer timeout to ensure we don't get stuck
+    // Safety timeout for exceptional paths that do not publish completion.
     Future.delayed(const Duration(seconds: 15), stopOnce);
   }
 
@@ -184,6 +194,9 @@ class RefreshController {
             tabManagerBloc.add(UpdateTabPath(tabId, currentPath));
 
             // If this screen still uses FolderList, trigger bloc refresh to regenerate thumbnails
+            folderListBloc.add(FolderListRefresh(currentPath,
+                forceRegenerateThumbnails: true));
+          } else if (ArchivePathUtils.isArchiveBrowsePath(currentPath)) {
             folderListBloc.add(FolderListRefresh(currentPath,
                 forceRegenerateThumbnails: true));
           }

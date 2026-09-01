@@ -101,6 +101,18 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // These layers are invisible hit-test strips stacked over an item; they
+      // carry no label, so the semantics nodes they would emit are unusable by
+      // a screen reader (the item name is announced by the Text node instead).
+      // Emitting them is actively harmful on Windows: every list/grid item
+      // contributes 1-3 extra nodes that are created and destroyed as sliver
+      // slots recycle and as `isBeingRenamed` toggles. The engine batches those
+      // create/destroy pairs into a single ui::AXTreeUpdate, and the Windows
+      // AccessibilityBridge cannot serialize a batch where a node is dropped
+      // and its slot reclaimed in the same frame, producing a flood of
+      // "Failed to update ui::AXTree, error: <id> will not be in the tree and
+      // is not the new root" on selection/focus changes.
+      excludeFromSemantics: true,
       onTapDown: _handleTapDown,
       onTap: _handleTap,
       onTapCancel: _handleTapCancel,
@@ -124,6 +136,7 @@ class OptimizedFileIcon extends StatefulWidget {
   final IconData fallbackIcon;
   final Color? fallbackColor;
   final BorderRadius? borderRadius;
+  final BoxFit fit;
 
   const OptimizedFileIcon({
     Key? key,
@@ -134,6 +147,7 @@ class OptimizedFileIcon extends StatefulWidget {
     this.fallbackIcon = PhosphorIconsLight.file,
     this.fallbackColor,
     this.borderRadius,
+    this.fit = BoxFit.cover,
   }) : super(key: key);
 
   @override
@@ -195,6 +209,7 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
             videoPath: widget.file.path,
             width: widget.size,
             height: widget.size,
+            fit: widget.fit,
             fallbackBuilder: () => Icon(widget.fallbackIcon,
                 size: widget.size, color: widget.fallbackColor),
             key: ValueKey('video-thumbnail-${widget.file.path}'),
@@ -213,7 +228,7 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
             isImage: true,
             width: widget.size,
             height: widget.size,
-            fit: BoxFit.cover,
+            fit: widget.fit,
             fallbackBuilder: () => Icon(widget.fallbackIcon,
                 size: widget.size, color: widget.fallbackColor),
           ),

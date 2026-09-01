@@ -189,6 +189,15 @@ class FolderListDeleteItems extends FolderListEvent {
   List<Object> get props => [filePaths, folderPaths, permanent];
 }
 
+class FolderListRetryDeleteAsAdministrator extends FolderListEvent {
+  final List<String> failedPaths;
+
+  const FolderListRetryDeleteAsAdministrator(this.failedPaths);
+
+  @override
+  List<Object> get props => [failedPaths];
+}
+
 class FolderListBatchAddTag extends FolderListEvent {
   final List<String> filePaths;
   final String tag;

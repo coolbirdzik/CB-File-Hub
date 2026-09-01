@@ -1355,13 +1355,16 @@ class VideoThumbnailHelper {
           }
         } catch (e) {
           _log(
-              'VideoThumbnail: [Custom Mode] Extraction failed for $videoPath: $e');
+            'VideoThumbnail: [Custom Mode] Extraction failed for $videoPath: $e',
+            forceShow: true,
+          );
         }
 
         // Fallback to shell thumbnail only if custom mode extraction failed
         if (nativePath == null) {
           _log(
             'VideoThumbnail: [Custom Mode] Falling back to shell thumbnail for $videoPath',
+            forceShow: true,
           );
           try {
             nativePath = await FcNativeVideoThumbnail.generateThumbnail(
@@ -1644,12 +1647,16 @@ class VideoThumbnailHelper {
         if (cachedPath != null) {
           final cacheFile = File(cachedPath);
           if (await cacheFile.exists()) {
-            final value = _inMemoryPathCache.remove(key)!;
+            // The cache can be cleared while the file check is awaiting I/O.
+            final value = _inMemoryPathCache.remove(key);
+            if (value == null) {
+              continue;
+            }
             _inMemoryPathCache[key] = value;
             if (cacheKey != key) {
-              _inMemoryPathCache[cacheKey] = cachedPath;
+              _inMemoryPathCache[cacheKey] = value;
             }
-            return cachedPath;
+            return value;
           } else {
             _inMemoryPathCache.remove(key);
           }

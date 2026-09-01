@@ -10,12 +10,14 @@ import 'package:cb_file_manager/ui/screens/network_browsing/ftp_browser_screen.d
 import 'package:cb_file_manager/ui/screens/network_browsing/webdav_browser_screen.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
 import 'package:cb_file_manager/ui/screens/video_library/video_library_files_screen.dart';
+import 'package:cb_file_manager/ui/screens/video_library/video_library_settings_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/bloc/network_browsing/network_browsing_bloc.dart';
 import 'package:cb_file_manager/services/network_browsing/network_service_registry.dart';
 import 'package:cb_file_manager/ui/screens/home/home_screen.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/screens/album_management/album_management_screen.dart';
 import 'package:cb_file_manager/ui/screens/album_management/auto_rules_screen.dart';
 import 'package:cb_file_manager/ui/screens/album_management/album_detail_screen.dart';
@@ -82,7 +84,7 @@ class SystemScreenRouter {
       case '#gallery':
         return const GalleryHubScreen();
       case '#video':
-        return const VideoHubScreen();
+        return VideoHubScreen(tabId: tabId);
       case '#albums':
         return const AlbumManagementScreen();
       case '#auto-rules':
@@ -116,6 +118,8 @@ class SystemScreenRouter {
       return _handleAiChatRoute(path, tabId);
     } else if (path.startsWith('#album/')) {
       return _handleAlbumRoute(path);
+    } else if (path.startsWith('#video-library-settings/')) {
+      return _handleVideoLibrarySettingsRoute(path, tabId);
     } else if (path.startsWith('#video-library/')) {
       return _handleVideoLibraryRoute(path, tabId);
     } else if (path.startsWith('#image?')) {
@@ -125,6 +129,9 @@ class SystemScreenRouter {
     } else if (path.startsWith('#network/')) {
       _loggedKeys.add(cacheKey);
       return _handleNetworkPath(context, path, tabId);
+    } else if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+      // Virtual archive browse paths are rendered by TabbedFolderListScreen.
+      return null;
     }
 
     // Fallback for unknown system paths
@@ -207,6 +214,29 @@ class SystemScreenRouter {
           }
           if (snapshot.hasData && snapshot.data != null) {
             return VideoLibraryFilesScreen(
+              library: snapshot.data!,
+              tabId: tabId,
+            );
+          }
+          return const Center(child: Text('Video library not found'));
+        },
+      );
+    }
+    return const Center(child: Text('Invalid video library ID'));
+  }
+
+  static Widget _handleVideoLibrarySettingsRoute(String path, String tabId) {
+    final libraryIdStr = path.substring('#video-library-settings/'.length);
+    final libraryId = int.tryParse(libraryIdStr);
+    if (libraryId != null) {
+      return FutureBuilder<VideoLibrary?>(
+        future: VideoLibraryService().getLibraryById(libraryId),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasData && snapshot.data != null) {
+            return VideoLibrarySettingsScreen(
               library: snapshot.data!,
               tabId: tabId,
             );

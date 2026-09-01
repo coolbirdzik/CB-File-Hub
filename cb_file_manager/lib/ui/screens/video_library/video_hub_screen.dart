@@ -3,10 +3,12 @@ import 'package:cb_file_manager/models/objectbox/video_library.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/video_library/create_video_library_dialog.dart';
-import 'package:cb_file_manager/ui/screens/video_library/video_library_settings_screen.dart';
+import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_cover.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_helpers.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
+import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/navigation_bar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:io';
@@ -14,7 +16,9 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 
 /// Video Hub Screen - Main screen for managing video libraries
 class VideoHubScreen extends StatefulWidget {
-  const VideoHubScreen({Key? key}) : super(key: key);
+  final String tabId;
+
+  const VideoHubScreen({Key? key, required this.tabId}) : super(key: key);
 
   @override
   State<VideoHubScreen> createState() => _VideoHubScreenState();
@@ -22,6 +26,8 @@ class VideoHubScreen extends StatefulWidget {
 
 class _VideoHubScreenState extends State<VideoHubScreen> {
   final VideoLibraryService _service = VideoLibraryService();
+  final TextEditingController _addressController =
+      TextEditingController(text: '#video');
   List<VideoLibrary> _libraries = [];
   Map<int, int> _videoCounts = {};
   bool _isLoading = true;
@@ -32,6 +38,12 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   void initState() {
     super.initState();
     _refreshData();
+  }
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
   }
 
   /// Refresh both libraries and video counts.
@@ -154,16 +166,18 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   }
 
   void _navigateToSettings(VideoLibrary library) {
-    Navigator.of(context)
-        .push(
-      MaterialPageRoute(
-        builder: (context) => VideoLibrarySettingsScreen(library: library),
-      ),
-    )
-        .then((_) {
-      // Refresh libraries after returning from settings
-      _refreshData();
-    });
+    // Navigate within current tab so settings stays inside the tab (like the
+    // library files screen) instead of covering the app with a pushed route.
+    final localizations = AppLocalizations.of(context)!;
+    final tabManager = context.read<TabManagerBloc>();
+    final activeTab = tabManager.state.activeTab;
+
+    if (activeTab != null) {
+      final path = '#video-library-settings/${library.id}';
+      TabNavigator.updateTabPath(context, activeTab.id, path);
+      tabManager.add(UpdateTabName(activeTab.id,
+          '${library.name} — ${localizations.videoLibrarySettings}'));
+    }
   }
 
   @override
@@ -199,6 +213,25 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
           : (isLightMode
               ? theme.colorScheme.surfaceContainerLowest
               : theme.scaffoldBackgroundColor),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: isDesktopPlatform ? Colors.transparent : null,
+        elevation: isDesktopPlatform ? 0 : null,
+        title: PathNavigationBar(
+          tabId: widget.tabId,
+          pathController: _addressController,
+          onPathSubmitted: (_) {},
+          currentPath: '#video',
+          tabPath: '#video',
+          enablePathEditing: false,
+          breadcrumbSegments: [
+            BreadcrumbSegment(
+              label: localizations.videoGallery,
+              icon: PhosphorIconsLight.filmStrip,
+            ),
+          ],
+        ),
+      ),
       body: Container(
         decoration: isDesktopPlatform
             ? const BoxDecoration(color: Colors.transparent)
@@ -555,6 +588,7 @@ class _LibraryCardContent extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             color: isLightMode
@@ -564,80 +598,54 @@ class _LibraryCardContent extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with menu
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Cover banner with overlaid menu
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Icon(
-                      PhosphorIconsLight.filmStrip,
-                      color: cardColor,
-                      size: 32,
+                    VideoLibraryCover(
+                      coverImagePath: library.coverImagePath,
+                      placeholderIcon: PhosphorIconsLight.filmStrip,
+                      accentColor: cardColor,
                     ),
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'settings') {
-                          onSettings();
-                        } else if (value == 'delete') {
-                          onDelete();
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        PopupMenuItem(
-                          value: 'settings',
-                          child: Row(
-                            children: [
-                              const Icon(PhosphorIconsLight.gear),
-                              const SizedBox(width: 8),
-                              Text(localizations.settings),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(PhosphorIconsLight.trash,
-                                  color: Theme.of(ctx).colorScheme.error),
-                              const SizedBox(width: 8),
-                              Text(localizations.delete),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: _LibraryMenuButton(
+                        onSettings: onSettings,
+                        onDelete: onDelete,
+                        settingsLabel: localizations.settings,
+                        deleteLabel: localizations.delete,
+                      ),
                     ),
                   ],
                 ),
               ),
 
               // Library info
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      library.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (library.description != null) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        library.name,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        library.description!,
+                        style: Theme.of(context).textTheme.bodySmall,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (library.description != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          library.description!,
-                          style: Theme.of(context).textTheme.bodySmall,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
               ),
 
@@ -679,6 +687,68 @@ class _LibraryCardContent extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Translucent circular menu button overlaid on the library cover banner.
+class _LibraryMenuButton extends StatelessWidget {
+  final VoidCallback onSettings;
+  final VoidCallback onDelete;
+  final String settingsLabel;
+  final String deleteLabel;
+
+  const _LibraryMenuButton({
+    required this.onSettings,
+    required this.onDelete,
+    required this.settingsLabel,
+    required this.deleteLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        shape: BoxShape.circle,
+      ),
+      child: PopupMenuButton<String>(
+        onSelected: (value) {
+          if (value == 'settings') {
+            onSettings();
+          } else if (value == 'delete') {
+            onDelete();
+          }
+        },
+        icon: const Icon(
+          Icons.more_vert,
+          size: 18,
+          color: Colors.white,
+        ),
+        itemBuilder: (ctx) => [
+          PopupMenuItem(
+            value: 'settings',
+            child: Row(
+              children: [
+                const Icon(PhosphorIconsLight.gear),
+                const SizedBox(width: 8),
+                Text(settingsLabel),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.trash,
+                    color: Theme.of(ctx).colorScheme.error),
+                const SizedBox(width: 8),
+                Text(deleteLabel),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

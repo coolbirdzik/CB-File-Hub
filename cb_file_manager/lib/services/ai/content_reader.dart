@@ -39,6 +39,7 @@ class ContentReader {
   static const Set<String> textExtensions = {
     '.txt',
     '.md',
+    '.markdown',
     '.json',
     '.xml',
     '.yaml',
@@ -48,32 +49,48 @@ class ContentReader {
     '.ini',
     '.cfg',
     '.conf',
+    '.config',
     '.toml',
     '.html',
     '.htm',
     '.css',
     '.js',
+    '.mjs',
+    '.cjs',
     '.ts',
     '.dart',
     '.py',
     '.java',
     '.kt',
+    '.scala',
+    '.groovy',
     '.swift',
     '.c',
     '.cpp',
+    '.cc',
+    '.cxx',
     '.h',
+    '.hpp',
+    '.cs',
     '.rs',
     '.go',
     '.rb',
+    '.pl',
+    '.pm',
     '.php',
     '.sh',
+    '.bash',
+    '.zsh',
+    '.fish',
     '.bat',
+    '.cmd',
     '.ps1',
     '.sql',
     '.jsx',
     '.tsx',
     '.vue',
     '.svelte',
+    '.astro',
     '.scss',
     '.sass',
     '.less',
@@ -85,7 +102,35 @@ class ContentReader {
     '.gradle',
     '.cmake',
     '.makefile',
+    '.proto',
+    '.graphql',
+    '.r',
+    '.lua',
+    '.lock',
+    '.patch',
+    '.diff',
   };
+
+  /// Basenames (no extension) treated as text files.
+  static const Set<String> textBasenames = {
+    'makefile',
+    'gnumakefile',
+    'dockerfile',
+    'gemfile',
+    'rakefile',
+    'procfile',
+    'vagrantfile',
+    'brewfile',
+    'cmakelists.txt',
+    'license',
+    'readme',
+  };
+
+  /// Maximum file size for preview pane reads (512 KB).
+  static const int previewMaxFileSize = 512 * 1024;
+
+  /// Maximum characters shown in preview pane (128 KB).
+  static const int previewMaxChars = 128 * 1024;
 
   /// LRU cache: path → FileContent. Ordered by most-recently-used last.
   final Map<String, FileContent> _cache = {};
@@ -96,7 +141,41 @@ class ContentReader {
   /// Returns `true` if the file extension indicates a text file.
   static bool isTextFile(String path) {
     final ext = _extensionOf(path);
-    return textExtensions.contains(ext);
+    if (textExtensions.contains(ext)) return true;
+
+    final basename = _basenameOf(path);
+    return textBasenames.contains(basename);
+  }
+
+  /// Reads text content for the preview pane (no cache, higher limits).
+  Future<FileContent> readForPreview(String path) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) return FileContent.empty;
+
+      final stat = await file.stat();
+      if (stat.size > previewMaxFileSize) {
+        return FileContent(
+          text: '',
+          totalLength: stat.size,
+          isTruncated: true,
+        );
+      }
+
+      final content = await _readWithEncodingFallbackStatic(file);
+      final totalLength = content.length;
+      final truncated = totalLength > previewMaxChars;
+      final text = truncated ? content.substring(0, previewMaxChars) : content;
+
+      return FileContent(
+        text: text,
+        totalLength: totalLength,
+        isTruncated: truncated,
+      );
+    } catch (e) {
+      AppLogger.debug('[ContentReader] Failed to preview $path: $e');
+      return FileContent.empty;
+    }
   }
 
   /// Reads the text content of a file, up to [maxChars] characters.
@@ -200,5 +279,12 @@ class ContentReader {
     final lastDot = path.lastIndexOf('.');
     if (lastDot < 0) return '';
     return path.substring(lastDot).toLowerCase();
+  }
+
+  static String _basenameOf(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final slash = normalized.lastIndexOf('/');
+    final name = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+    return name.toLowerCase();
   }
 }

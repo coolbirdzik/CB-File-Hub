@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -431,23 +432,20 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Service Selection Dropdown
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedService,
-                        decoration: InputDecoration(
-                          labelText: l10n.serviceType,
-                          border: const OutlineInputBorder(),
-                        ),
+                      CbSelect<String>(
+                        label: l10n.serviceType,
+                        expand: true,
+                        value: _selectedService,
                         items: const [
-                          DropdownMenuItem(value: 'SMB', child: Text('SMB')),
-                          DropdownMenuItem(value: 'FTP', child: Text('FTP')),
-                          DropdownMenuItem(
-                              value: 'WebDAV', child: Text('WebDAV')),
+                          CbSelectItem(value: 'SMB', label: 'SMB'),
+                          CbSelectItem(value: 'FTP', label: 'FTP'),
+                          CbSelectItem(value: 'WebDAV', label: 'WebDAV'),
                         ],
                         onChanged: isLoading
                             ? null
                             : (value) {
                                 setState(() {
-                                  _selectedService = value!;
+                                  _selectedService = value;
                                   _updateDefaultPort();
                                   _loadSavedHosts();
                                 });

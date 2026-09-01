@@ -15,6 +15,31 @@ class FileIconHelper {
   // Cache for app paths by extension
   static final Map<String, String> _appPathCache = {};
 
+  static Future<String?> _defaultWindowsHandlerForExtension(
+      String extension) async {
+    final dottedExt = extension.startsWith('.') ? extension : '.$extension';
+    final appPath = await WindowsAppIcon.getAssociatedAppPath(dottedExt);
+    if (appPath != null && appPath.isNotEmpty && File(appPath).existsSync()) {
+      return appPath;
+    }
+    return null;
+  }
+
+  static Future<Widget?> _windowsIconFromAppPath(
+      String appPath, double size) async {
+    if (appPath.isEmpty || !File(appPath).existsSync()) return null;
+    final nativeIcon = await WindowsAppIcon.extractIconFromFile(appPath);
+    if (nativeIcon == null) return null;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: RawImage(
+        image: nativeIcon,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
   // ─── Extension-keyed icon cache (batch-warmed, sync lookup) ───────────────
   /// Stores pre-rendered icon widgets keyed by "${extension}_$size".
   static final Map<String, Widget> _extensionIconCache = {};
@@ -84,6 +109,7 @@ class FileIconHelper {
       height: size.toDouble(),
       child: Image.memory(
         bmpBytes,
+        excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
         width: size.toDouble(),
         height: size.toDouble(),
         fit: BoxFit.contain,
@@ -251,26 +277,16 @@ class FileIconHelper {
       // Check cache first
       if (_appPathCache.containsKey(extension)) {
         appPath = _appPathCache[extension];
-      } else {
-        // Get the default application path for this extension (Windows only)
-        if (Platform.isWindows) {
-          appPath = await WindowsAppIcon.getAssociatedAppPath(extension);
-          if (appPath != null && appPath.isNotEmpty) {
-            _appPathCache[extension] = appPath;
-          }
+      } else if (Platform.isWindows) {
+        appPath = await _defaultWindowsHandlerForExtension(extension);
+        if (appPath != null && appPath.isNotEmpty) {
+          _appPathCache[extension] = appPath;
         }
       }
 
       if (appPath != null && appPath.isNotEmpty) {
-        // Get the default app info
-        final apps = await ExternalAppHelper.getInstalledAppsForFile(file.path);
-        if (apps.isNotEmpty) {
-          // Use the first app icon
-          final Widget appIcon = SizedBox(
-            width: size,
-            height: size,
-            child: apps[0].icon,
-          );
+        final appIcon = await _windowsIconFromAppPath(appPath, size);
+        if (appIcon != null) {
           _iconCache[cacheKey] = appIcon;
           return appIcon;
         }
@@ -321,29 +337,15 @@ class FileIconHelper {
       // Check cache first
       if (_appPathCache.containsKey(extension)) {
         appPath = _appPathCache[extension];
-      } else {
-        // Get the default application path for this extension (Windows only)
-        if (Platform.isWindows) {
-          appPath = await WindowsAppIcon.getAssociatedAppPath(extension);
-          if (appPath != null && appPath.isNotEmpty) {
-            _appPathCache[extension] = appPath;
-          }
+      } else if (Platform.isWindows) {
+        appPath = await _defaultWindowsHandlerForExtension(extension);
+        if (appPath != null && appPath.isNotEmpty) {
+          _appPathCache[extension] = appPath;
         }
       }
 
       if (appPath != null && appPath.isNotEmpty) {
-        // Sử dụng phương thức public để lấy biểu tượng ứng dụng
-        final tempFile =
-            File('temp.$extension'); // Dummy file với extension cần thiết
-        final apps =
-            await ExternalAppHelper.getInstalledAppsForFile(tempFile.path);
-        if (apps.isNotEmpty) {
-          return SizedBox(
-            width: size,
-            height: size,
-            child: apps[0].icon,
-          );
-        }
+        return await _windowsIconFromAppPath(appPath, size);
       }
     } catch (e) {
       debugPrint('Error getting default app icon: $e');

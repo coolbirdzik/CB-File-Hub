@@ -58,6 +58,10 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
     final onClose = widget.onClose ?? _onCloseDefault;
     return FluentBackground.appBar(
       context: context,
+      // The bar floats over black video content and its foreground is white,
+      // so the scrim stays dark whatever the app theme is — a light
+      // scaffoldBackgroundColor here would wash the icons out.
+      backgroundColor: Colors.black.withValues(alpha: widget.opacity),
       title: _buildTitle(),
       leading: _isDesktopPlatform
           ? IconButton(
@@ -92,11 +96,26 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
       ],
     );
 
-    // Allow dragging the window by the title area on desktop
+    // AppBar otherwise lays the title out at only its intrinsic height (about
+    // the height of the icon/text). Fill the toolbar vertically so the whole
+    // visible title strip is draggable, including its empty top/bottom space.
     if (_isDesktopPlatform) {
-      return DragToMoveArea(child: content);
+      return DragToMoveArea(
+        child: SizedBox(
+          height: kToolbarHeight,
+          child: content,
+        ),
+      );
     }
     return content;
+  }
+
+  ThemeData _darkFacadeOf(ThemeData theme) {
+    if (theme.brightness == Brightness.dark) return theme;
+    return theme.copyWith(
+      brightness: Brightness.dark,
+      colorScheme: theme.colorScheme.copyWith(brightness: Brightness.dark),
+    );
   }
 
   List<Widget> _buildActions(VoidCallback onClose) {
@@ -110,7 +129,9 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
     // Add window controls for desktop platforms
     if (widget.showWindowControls && _isDesktopPlatform) {
       actions.add(WindowCaptionButtons(
-        theme: Theme.of(context),
+        // Caption glyphs pick their colour from brightness; keep the app's
+        // accent but read it as dark so they stay visible on the dark bar.
+        theme: _darkFacadeOf(Theme.of(context)),
         onClose: onClose,
       ));
     }

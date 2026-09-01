@@ -343,7 +343,7 @@ class VideoLibraryService {
   }) async {
     try {
       final videos = await getAllVideos(folderPath, recursive: recursive);
-      return addFilesToLibrary(
+      return await addFilesToLibrary(
         libraryId,
         videos.map((file) => file.path).toList(growable: false),
       );
@@ -457,7 +457,7 @@ class VideoLibraryService {
       if (!directories.contains(directoryPath)) {
         directories.add(directoryPath);
         config.directoriesList = directories;
-        return updateLibraryConfig(config);
+        return await updateLibraryConfig(config);
       }
       return true;
     } catch (error) {
@@ -479,7 +479,7 @@ class VideoLibraryService {
       final directories = config.directoriesList;
       directories.remove(directoryPath);
       config.directoriesList = directories;
-      return updateLibraryConfig(config);
+      return await updateLibraryConfig(config);
     } catch (error) {
       debugPrint('Error removing directory from library: $error');
       return false;

@@ -20,6 +20,8 @@ add_executable(${BINARY_NAME} WIN32
   "smb_native_thumbnail_plugin.h"
   "app_icon_plugin.cpp"
   "app_icon_plugin.h"
+  "app_insights_plugin.cpp"
+  "app_insights_plugin.h"
   "shell_context_menu_plugin.cpp"
   "shell_context_menu_plugin.h"
   "file_operations_plugin.cpp"
@@ -52,6 +54,7 @@ target_link_libraries(${BINARY_NAME} PRIVATE smb_native)
 target_link_libraries(${BINARY_NAME} PRIVATE "comctl32.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "ole32.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "shell32.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "windowsapp.lib")
 
 # Copy smb_native runtime next to the app executable.
 add_custom_command(TARGET ${BINARY_NAME} POST_BUILD

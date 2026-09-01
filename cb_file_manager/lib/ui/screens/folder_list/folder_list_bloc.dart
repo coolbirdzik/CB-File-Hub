@@ -20,6 +20,8 @@ import 'package:cb_file_manager/ui/screens/folder_list/bloc/tag_search_event.dar
     as tag;
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
+import 'package:cb_file_manager/services/archive/archive_service.dart';
 
 /// FolderListBloc is a Facade that composes three specialized BLoCs:
 ///
@@ -40,6 +42,11 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   StreamSubscription? _opsSubscription;
   StreamSubscription? _tagSubscription;
   StreamSubscription? _tagChangeSubscription;
+
+  /// Non-null while the tab is browsing inside an archive (`#archive?…`).
+  /// The virtual listing is produced here, not by [FileNavigationBloc], so
+  /// child-bloc state merges must not overwrite it while this is set.
+  String? _archiveBrowsePath;
 
   FolderListBloc() : super(FolderListState('/')) {
     // ── Initialize child BLoCs ──────────────────────────────────
@@ -64,6 +71,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     on<ClearSearchAndFilters>(_onClearSearchAndFilters);
     on<FolderListDeleteFiles>(_onDeleteFiles);
     on<FolderListDeleteItems>(_onDeleteItems);
+    on<FolderListRetryDeleteAsAdministrator>(
+      _onRetryDeleteAsAdministrator,
+    );
     on<FolderListReloadCurrentFolder>(_onReloadCurrentFolder);
     on<FolderListDeleteTagGlobally>(_onDeleteTagGlobally);
     on<CopyFile>(_onCopyFile);
@@ -125,7 +135,16 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     emit(state.copyWith(isLoading: true));
   }
 
-  void _onLoad(FolderListLoad event, Emitter<FolderListState> emit) {
+  Future<void> _onLoad(
+      FolderListLoad event, Emitter<FolderListState> emit) async {
+    final path = event.path;
+    if (ArchivePathUtils.isArchiveBrowsePath(path)) {
+      await _loadArchiveBrowsePath(path, emit);
+      return;
+    }
+
+    _archiveBrowsePath = null;
+
     // Emit a loading state synchronously here (in addition to the one
     // FileNavigationBloc emits) so the UI shows a skeleton immediately.
     // Without this, there is a multi-hop async gap — FolderListLoad forwards
@@ -136,7 +155,6 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     //
     // Skip virtual paths (e.g. #video-library/...) which are owned by
     // specialized blocs and don't go through this listing path.
-    final path = event.path;
     if (!path.startsWith('#')) {
       emit(state.copyWith(
         isLoading: true,
@@ -150,7 +168,90 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     _navigationBloc.add(nav.FileNavigationLoad(path));
   }
 
+  Future<void> _loadArchiveBrowsePath(
+    String path,
+    Emitter<FolderListState> emit,
+  ) async {
+    final location = ArchivePathUtils.parse(path);
+    if (location == null) {
+      _archiveBrowsePath = null;
+      emit(state.copyWith(
+        isLoading: false,
+        error: 'Invalid archive path',
+      ));
+      return;
+    }
+
+    // Claim ownership of the listing before the first await so a concurrent
+    // FileNavigationBloc emit (directory watcher, in-flight scan of the folder
+    // we navigated away from) cannot clobber the virtual entries.
+    _archiveBrowsePath = path;
+
+    // A repeat load of the same location (the tab listener and the opener both
+    // request it) must not blank the list that is already on screen.
+    final isSameLocation = state.currentPath.path == path;
+
+    emit(state.copyWith(
+      isLoading: true,
+      isRefreshing: false,
+      error: null,
+      currentPath: Directory(path),
+      folders: isSameLocation ? null : const [],
+      files: isSameLocation ? null : const [],
+      filteredFiles: const [],
+      searchResults: const [],
+      currentFilter: null,
+      currentSearchQuery: null,
+      currentSearchTag: null,
+    ));
+
+    try {
+      final listing = await locator<ArchiveService>().listDirectory(
+        archiveFilePath: location.archiveFile,
+        innerPath: location.innerPath,
+        buildVirtualPath: ({
+          required archiveFile,
+          required innerPath,
+          required entryName,
+          required isDirectory,
+        }) {
+          return ArchivePathUtils.build(
+            archiveFile: archiveFile,
+            innerPath: innerPath,
+          );
+        },
+      );
+
+      // Drop the result if the user already navigated elsewhere while the
+      // archive was being read.
+      if (isClosed || _archiveBrowsePath != path) return;
+      emit(state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        error: null,
+        currentPath: Directory(path),
+        folders: listing.folders,
+        files: listing.files,
+        filteredFiles: const [],
+        searchResults: const [],
+      ));
+    } catch (e) {
+      if (isClosed || _archiveBrowsePath != path) return;
+      emit(state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        error: e.toString(),
+        folders: const [],
+        files: const [],
+      ));
+    }
+  }
+
   void _onRefresh(FolderListRefresh event, Emitter<FolderListState> emit) {
+    if (ArchivePathUtils.isArchiveBrowsePath(event.path)) {
+      add(FolderListLoad(event.path));
+      return;
+    }
     _navigationBloc.add(nav.FileNavigationRefresh(
       event.path,
       forceRegenerateThumbnails: event.forceRegenerateThumbnails,
@@ -172,6 +273,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     FolderListLoadDrives event,
     Emitter<FolderListState> emit,
   ) {
+    _archiveBrowsePath = null;
     _navigationBloc.add(const nav.FileNavigationLoadDrives());
   }
 
@@ -212,6 +314,15 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       folderPaths: event.folderPaths,
       permanent: event.permanent,
     ));
+  }
+
+  void _onRetryDeleteAsAdministrator(
+    FolderListRetryDeleteAsAdministrator event,
+    Emitter<FolderListState> emit,
+  ) {
+    _operationsBloc.add(
+      ops.FileOperationsRetryDeleteAsAdministrator(event.failedPaths),
+    );
   }
 
   void _onCopyFile(CopyFile event, Emitter<FolderListState> emit) {
@@ -352,6 +463,19 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
   void _onNavStateChanged(FileNavigationState navState) {
     if (isClosed) return;
+
+    // While browsing an archive the listing is owned by _loadArchiveBrowsePath.
+    // Only display preferences may flow through from the navigation bloc.
+    if (_archiveBrowsePath != null) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      emit(state.copyWith(
+        viewMode: navState.viewMode,
+        sortOption: navState.sortOption,
+        gridZoomLevel: navState.gridZoomLevel,
+      ));
+      return;
+    }
+
     final hasActiveTagSearch = state.currentSearchTag != null;
 
     // ignore: invalid_use_of_visible_for_testing_member
@@ -403,11 +527,23 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     emit(state.copyWith(
       error: opsState.error,
       clipboardRevision: opsState.clipboardRevision,
+      retryableElevatedDeletePaths: opsState.retryableElevatedDeletePaths,
     ));
   }
 
   void _onTagStateChanged(TagSearchState tagState) {
     if (isClosed) return;
+
+    // Tag search does not apply inside an archive; merging its loading/error
+    // flags would hide or replace the virtual listing.
+    if (_archiveBrowsePath != null) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      emit(state.copyWith(
+        fileTags: tagState.fileTags,
+        allUniqueTags: tagState.allUniqueTags,
+      ));
+      return;
+    }
 
     // Child tags are surfaced as virtual folders at the front of the results so
     // opening a parent tag lists its sub-tags (as folders) alongside its own

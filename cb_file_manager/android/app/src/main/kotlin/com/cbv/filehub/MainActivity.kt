@@ -89,6 +89,7 @@ class MainActivity : FlutterActivity() {
 
         // Register MemoryManagementPlugin
         flutterEngine.plugins.add(MemoryManagementPlugin())
+        flutterEngine.plugins.add(StorageVolumesPlugin())
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {

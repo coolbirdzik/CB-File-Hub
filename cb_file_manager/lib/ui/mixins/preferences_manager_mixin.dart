@@ -7,6 +7,7 @@ import 'package:cb_file_manager/helpers/files/folder_sort_manager.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 
 /// Mixin for managing user preferences related to folder list display
@@ -93,10 +94,11 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
                 folderPreferencePath,
               ) ??
               await prefs.getPreviewPaneWidth();
-      final effectiveViewMode =
-          !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
-              ? ViewMode.grid
-              : loadedViewMode;
+      final effectiveViewMode = ViewModeUtils.normalize(
+        !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
+            ? ViewMode.grid
+            : loadedViewMode,
+      );
 
       if (mounted) {
         final maxZoom = GridZoomConstraints.maxGridSizeForContext(
@@ -169,39 +171,40 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   }
 
   /// Toggle between view modes
-  /// (list -> grid -> gridPreview (desktop) -> details -> columns (desktop) -> tree -> list)
+  /// (list -> tiles -> grid -> details -> columns (desktop) -> tree -> list)
   void toggleViewMode() {
     setState(() {
       if (viewMode == ViewMode.list) {
+        viewMode = ViewMode.tiles;
+      } else if (viewMode == ViewMode.tiles) {
         viewMode = ViewMode.grid;
-      } else if (viewMode == ViewMode.grid) {
-        viewMode = isDesktopPlatform ? ViewMode.gridPreview : ViewMode.details;
-      } else if (viewMode == ViewMode.gridPreview) {
+      } else if (viewMode == ViewMode.grid ||
+          viewMode == ViewMode.gridPreview) {
         viewMode = ViewMode.details;
       } else if (viewMode == ViewMode.details) {
         viewMode = isDesktopPlatform ? ViewMode.columns : ViewMode.tree;
       } else if (viewMode == ViewMode.columns) {
         viewMode = ViewMode.tree;
       } else {
-        // tree (or any unhandled) → list
         viewMode = ViewMode.list;
       }
     });
 
-    folderListBloc.add(SetViewMode(viewMode));
-    saveViewModeSetting(viewMode);
+    folderListBloc.add(SetViewMode(ViewModeUtils.normalize(viewMode)));
+    saveViewModeSetting(ViewModeUtils.normalize(viewMode));
   }
 
   /// Set view mode directly to a specific mode
   void setViewMode(ViewMode mode, {String? tabId}) {
+    final resolved = ViewModeUtils.normalize(
+      !isDesktopPlatform && mode == ViewMode.gridPreview ? ViewMode.grid : mode,
+    );
     setState(() {
-      viewMode = !isDesktopPlatform && mode == ViewMode.gridPreview
-          ? ViewMode.grid
-          : mode;
+      viewMode = resolved;
     });
 
-    folderListBloc.add(SetViewMode(viewMode));
-    saveViewModeSetting(viewMode);
+    folderListBloc.add(SetViewMode(resolved));
+    saveViewModeSetting(resolved);
   }
 
   /// Handle grid zoom level change
@@ -245,38 +248,42 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
           ViewMode.columns,
           ViewMode.details,
           ViewMode.list,
+          ViewMode.tiles,
         }
       : const {
           ViewMode.tree,
           ViewMode.details,
           ViewMode.list,
+          ViewMode.tiles,
         };
 
   /// Handle a unified "view scale" delta from Ctrl+scroll.
   ///
   /// [delta] - `+1` moves toward the spacious end (wider modes / bigger grid
   /// items), `-1` toward the dense end. Walks the full
-  /// tree↔column↔detail↔list↔grid spectrum, transitioning view mode and/or
-  /// adjusting the grid zoom level as needed.
+  /// tree↔column↔detail↔list↔tiles↔grid spectrum, transitioning view mode
+  /// and/or adjusting the grid zoom level as needed.
   void handleViewScaleChange(int delta) {
     if (delta == 0) return;
+    final currentMode = ViewModeUtils.normalize(folderListBloc.state.viewMode);
+    final currentZoom = folderListBloc.state.gridZoomLevel;
     final maxZoom = GridZoomConstraints.maxGridSizeForContext(
       context,
       mode: GridSizeMode.referenceWidth,
     );
     final result = ViewModeSpectrum.step(
-      currentMode: viewMode,
-      currentZoom: gridZoomLevel,
+      currentMode: currentMode,
+      currentZoom: currentZoom,
       supported: spectrumSupportedModes,
       delta: delta,
       minZoom: UserPreferences.minGridZoomLevel,
       maxZoom: maxZoom,
     );
 
-    if (result.mode != viewMode) {
+    if (result.mode != currentMode) {
       setViewMode(result.mode);
     }
-    if (result.gridZoomLevel != gridZoomLevel) {
+    if (result.gridZoomLevel != currentZoom) {
       folderListBloc.add(SetGridZoom(result.gridZoomLevel));
       saveGridZoomSetting(result.gridZoomLevel);
     }

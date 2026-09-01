@@ -748,14 +748,12 @@ class FileOperations {
               // rename() fails across different drives/filesystems
               // Fall back to copy + delete
               debugPrint('rename() failed, falling back to copy+delete: $e');
-              result =
-                  await File(uniquePath).writeAsBytes(await file.readAsBytes());
+              result = await file.copy(uniquePath);
               await file.delete();
             }
           } else {
             // Copy operation
-            result =
-                await File(uniquePath).writeAsBytes(await file.readAsBytes());
+            result = await file.copy(uniquePath);
           }
         } else if (item is Directory) {
           final directory = item;
@@ -787,8 +785,7 @@ class FileOperations {
               }
 
               // Copy the file
-              await File(newEntityPath)
-                  .writeAsBytes(await entity.readAsBytes());
+              await entity.copy(newEntityPath);
             } else if (entity is Directory) {
               // Create directory
               await Directory(newEntityPath).create(recursive: true);

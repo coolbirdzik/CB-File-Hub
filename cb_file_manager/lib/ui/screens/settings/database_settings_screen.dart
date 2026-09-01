@@ -3,6 +3,7 @@ import 'dart:io' as io;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -116,56 +117,6 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
       _totalFileCount = allFiles.length;
     } catch (e) {
       debugPrint('Error loading database statistics: $e');
-    }
-  }
-
-  // ignore: unused_element
-  Future<void> _toggleDatabaseEnabled(bool value) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      await _preferences.setUsingDatabaseStorage(value);
-
-      if (value && !_isUsingDatabase) {
-        // Switch from JSON to Database - migrate the data
-        final migratedCount = await TagManager.migrateFromJsonToDatabase();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content:
-                    Text('Migrated $migratedCount files to SQLite database')),
-          );
-        }
-      }
-
-      _isUsingDatabase = value;
-
-      // Reload statistics
-      await _loadStatistics();
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error toggling Database: $e');
-
-      // Revert the change
-      await _preferences.setUsingDatabaseStorage(!value);
-      _isUsingDatabase = !value;
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
@@ -1114,25 +1065,19 @@ class _RawDataDialogState extends State<_RawDataDialog> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(width: 8),
-            DropdownButton<int>(
+            CbSelect.fromValues<int>(
+              size: CbSelectSize.sm,
+              values: _availableRowsPerPage(),
               value: effectiveRowsPerPage,
+              labelBuilder: (value) => '$value',
               onChanged: _isPageLoading
                   ? null
                   : (value) async {
-                      if (value == null) return;
                       setState(() {
                         _rowsPerPage = value;
                       });
                       await _loadPage(offset: 0);
                     },
-              items: _availableRowsPerPage()
-                  .map(
-                    (value) => DropdownMenuItem<int>(
-                      value: value,
-                      child: Text('$value'),
-                    ),
-                  )
-                  .toList(),
             ),
           ],
         ),

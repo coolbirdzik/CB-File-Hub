@@ -22,10 +22,14 @@ class VideoPlayerFullScreen extends StatefulWidget {
   /// Android content:// URI when opened via "Open with" / default app.
   final String? contentUri;
 
+  /// Reports the loaded media's `width` / `height` / `duration`.
+  final void Function(Map<String, dynamic> metadata)? onVideoMetadata;
+
   VideoPlayerFullScreen({
     Key? key,
     this.file,
     this.contentUri,
+    this.onVideoMetadata,
   })  : assert(file != null || (contentUri != null && contentUri.isNotEmpty)),
         super(key: key);
 
@@ -196,6 +200,7 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
 
   void _onVideoInitialized(Map<String, dynamic> metadata) {
     setState(() => _videoMetadata = metadata);
+    widget.onVideoMetadata?.call(metadata);
     if (Platform.isAndroid || Platform.isIOS) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
           overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
@@ -232,6 +237,10 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
   Widget _buildPlayer(BuildContext context) {
     if (widget.file != null) {
       return VideoPlayer.file(
+        // Keyed by source: switching files builds a fresh player instead of
+        // tearing down and re-opening the live one (which races pending
+        // callbacks into "Player has been disposed").
+        key: ValueKey<String>(widget.file!.path),
         file: widget.file!,
         autoPlay: true,
         showControls: true,

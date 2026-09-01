@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
-import 'theme_factory.dart';
+
+import '../design_system/cb_theme_builder.dart';
+import '../design_system/tokens/cb_color_tokens.dart';
+import 'app_toast_theme.dart';
+import 'app_ui_font.dart';
+
+export 'app_ui_font.dart';
 
 enum AppThemeType {
   light,
@@ -18,8 +24,29 @@ enum AppAccentColor {
   purple,
 }
 
+/// User-selectable primary text colour.
+///
+/// [system] keeps design-token defaults. [accent] tracks the current accent
+/// colour. The remaining values mirror [AppAccentColor] so example / body
+/// text can use the same palette.
+enum AppFontColor {
+  system,
+  accent,
+  blue,
+  teal,
+  green,
+  lime,
+  yellow,
+  orange,
+  red,
+  magenta,
+  purple,
+}
+
 class ThemeConfig {
   static const AppAccentColor defaultAccentColor = AppAccentColor.blue;
+  static const AppFontColor defaultFontColor = AppFontColor.system;
+  static const AppUiFont defaultUiFont = AppUiFontConfig.defaultFont;
 
   static const Map<AppThemeType, String> themeNames = {
     AppThemeType.light: 'Light',
@@ -36,6 +63,20 @@ class ThemeConfig {
     AppAccentColor.red: 'Red',
     AppAccentColor.magenta: 'Magenta',
     AppAccentColor.purple: 'Purple',
+  };
+
+  static const Map<AppFontColor, String> fontColorNames = {
+    AppFontColor.system: 'Default',
+    AppFontColor.accent: 'Accent',
+    AppFontColor.blue: 'Blue',
+    AppFontColor.teal: 'Teal',
+    AppFontColor.green: 'Green',
+    AppFontColor.lime: 'Lime',
+    AppFontColor.yellow: 'Yellow',
+    AppFontColor.orange: 'Orange',
+    AppFontColor.red: 'Red',
+    AppFontColor.magenta: 'Magenta',
+    AppFontColor.purple: 'Purple',
   };
 
   static const Map<AppAccentColor, Color> accentSeedColors = {
@@ -55,69 +96,152 @@ class ThemeConfig {
         accentSeedColors[defaultAccentColor]!;
   }
 
-  static ThemeData getTheme(
-    AppThemeType themeType, {
-    AppAccentColor accentColor = defaultAccentColor,
-  }) {
-    switch (themeType) {
-      case AppThemeType.light:
-        return getLightTheme(accentColor: accentColor);
-      case AppThemeType.dark:
-        return getDarkTheme(accentColor: accentColor);
+  static AppAccentColor? accentForFontColor(AppFontColor fontColor) {
+    switch (fontColor) {
+      case AppFontColor.system:
+      case AppFontColor.accent:
+        return null;
+      case AppFontColor.blue:
+        return AppAccentColor.blue;
+      case AppFontColor.teal:
+        return AppAccentColor.teal;
+      case AppFontColor.green:
+        return AppAccentColor.green;
+      case AppFontColor.lime:
+        return AppAccentColor.lime;
+      case AppFontColor.yellow:
+        return AppAccentColor.yellow;
+      case AppFontColor.orange:
+        return AppAccentColor.orange;
+      case AppFontColor.red:
+        return AppAccentColor.red;
+      case AppFontColor.magenta:
+        return AppAccentColor.magenta;
+      case AppFontColor.purple:
+        return AppAccentColor.purple;
     }
   }
 
-  static ThemeData getLightTheme({
+  /// Readable text tone for [fontColor] on the active surface.
+  ///
+  /// Returns null for [AppFontColor.system] so tokens keep their defaults.
+  static Color? resolveFontColor(
+    AppFontColor fontColor,
+    Brightness brightness, {
     AppAccentColor accentColor = defaultAccentColor,
   }) {
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: getAccentSeedColor(accentColor),
-      brightness: Brightness.light,
-      background: const Color(0xFFFFFFFF),
-      surface: const Color(0xFFFFFFFF),
-    );
+    final AppAccentColor? seedAccent;
+    if (fontColor == AppFontColor.system) {
+      seedAccent = null;
+    } else if (fontColor == AppFontColor.accent) {
+      seedAccent = accentColor;
+    } else {
+      seedAccent = accentForFontColor(fontColor);
+    }
+    if (seedAccent == null) return null;
+    return CbAccentRamp.from(getAccentSeedColor(seedAccent), brightness).text;
+  }
 
-    final theme = ThemeFactory.createTheme(
-      colorScheme: colorScheme,
+  /// Swatch colour shown in the settings picker (letter "A" example).
+  static Color fontColorSwatch(
+    AppFontColor fontColor, {
+    required Brightness brightness,
+    required AppAccentColor accentColor,
+    required Color fallback,
+  }) {
+    return resolveFontColor(
+          fontColor,
+          brightness,
+          accentColor: accentColor,
+        ) ??
+        fallback;
+  }
+
+  static ThemeData getTheme(
+    AppThemeType themeType, {
+    AppAccentColor accentColor = defaultAccentColor,
+    AppFontColor fontColor = defaultFontColor,
+    AppUiFont uiFont = defaultUiFont,
+  }) {
+    switch (themeType) {
+      case AppThemeType.light:
+        return getLightTheme(
+          accentColor: accentColor,
+          fontColor: fontColor,
+          uiFont: uiFont,
+        );
+      case AppThemeType.dark:
+        return getDarkTheme(
+          accentColor: accentColor,
+          fontColor: fontColor,
+          uiFont: uiFont,
+        );
+    }
+  }
+
+  /// Component themes that live outside the design system but still need to
+  /// ride along on [ThemeData]. [CbThemeBuilder] owns the extension list, so
+  /// anything extra is passed in here rather than bolted on afterwards with
+  /// `copyWith` (which would drop [CbTokens]).
+  static const List<ThemeExtension> _extraExtensions = [
+    AppToastTheme(
+      iconBoxSize: 30.0,
+      iconSize: 18.0,
+      iconBoxRadius: 8.0,
+      containerRadius: 12.0,
+      hPadding: 12.0,
+      vPadding: 10.0,
+      maxWidth: 360.0,
+      blurSigmaDesktopLight: 18.0,
+      blurSigmaDesktopDark: 10.0,
+      blurSigmaMobile: 8.0,
+      surfaceOpacity: 0.82,
+      borderOpacity: 0.22,
+      shadowOpacityLight: 0.16,
+      shadowOpacityDark: 0.40,
+      iconAccentOpacity: 0.14,
+      durationSuccess: Duration(milliseconds: 2200),
+      durationInfo: Duration(milliseconds: 2200),
+      durationWarning: Duration(milliseconds: 2600),
+      durationError: Duration(milliseconds: 3200),
+    ),
+  ];
+
+  static ThemeData getLightTheme({
+    AppAccentColor accentColor = defaultAccentColor,
+    AppFontColor fontColor = defaultFontColor,
+    AppUiFont uiFont = defaultUiFont,
+  }) {
+    final base = CbThemeBuilder.build(
       brightness: Brightness.light,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
+      accent: getAccentSeedColor(accentColor),
+      textColor: resolveFontColor(
+        fontColor,
+        Brightness.light,
+        accentColor: accentColor,
       ),
+      extraExtensions: _extraExtensions,
     );
-
-    return theme.copyWith(
-      scaffoldBackgroundColor: const Color(0xFFFFFFFF),
-      canvasColor: const Color(0xFFFFFFFF),
-    );
+    return AppUiFontConfig.applyToTheme(base, uiFont);
   }
 
   static ThemeData getDarkTheme({
     AppAccentColor accentColor = defaultAccentColor,
+    AppFontColor fontColor = defaultFontColor,
+    AppUiFont uiFont = defaultUiFont,
   }) {
-    final colorScheme = ThemeFactory.createColorScheme(
-      seedColor: getAccentSeedColor(accentColor),
+    final base = CbThemeBuilder.build(
       brightness: Brightness.dark,
-      background: const Color(0xFF0E0E0E),
-      surface: const Color(0xFF181818),
-    );
-
-    return ThemeFactory.createTheme(
-      colorScheme: colorScheme,
-      brightness: Brightness.dark,
-      options: const ThemeOptions(
-        borderRadius: 20.0,
-        elevation: 0.0,
-        useMaterial3: true,
-        cardElevation: 0.0,
+      accent: getAccentSeedColor(accentColor),
+      textColor: resolveFontColor(
+        fontColor,
+        Brightness.dark,
+        accentColor: accentColor,
       ),
+      extraExtensions: _extraExtensions,
     );
+    return AppUiFontConfig.applyToTheme(base, uiFont);
   }
-
-  static ThemeData get lightTheme => getLightTheme();
-  static ThemeData get darkTheme => getDarkTheme();
 
   // --------------------------------------------------------------------
   // Theme tokens and helpers

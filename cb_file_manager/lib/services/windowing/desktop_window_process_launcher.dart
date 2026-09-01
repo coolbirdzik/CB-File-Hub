@@ -10,6 +10,9 @@ class DesktopWindowProcessLauncher {
     int? activeIndex,
     bool startHidden = false,
     String windowRole = 'normal',
+    double? initialPositionX,
+    double? initialPositionY,
+    bool startDragging = false,
   }) async {
     if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       return false;
@@ -23,6 +26,11 @@ class DesktopWindowProcessLauncher {
       env[WindowStartupPayload.envSecondaryWindowKey] = '1';
       env[WindowStartupPayload.envStartHiddenKey] = startHidden ? '1' : '0';
       env[WindowStartupPayload.envWindowRoleKey] = windowRole;
+      env[WindowStartupPayload.envStartDraggingKey] = startDragging ? '1' : '0';
+      if (initialPositionX != null && initialPositionY != null) {
+        env[WindowStartupPayload.envWindowPositionXKey] = '$initialPositionX';
+        env[WindowStartupPayload.envWindowPositionYKey] = '$initialPositionY';
+      }
 
       if (tabs.isNotEmpty) {
         final payload = <String, dynamic>{

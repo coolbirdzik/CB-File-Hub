@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/design_system_config.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
@@ -24,6 +26,77 @@ class StorageSectionWidget extends StatefulWidget {
   @override
   State<StorageSectionWidget> createState() => _StorageSectionWidgetState();
 }
+
+/// Shows the shared confirmation used before opening a storage location that
+/// requires administrator access.
+void showStorageAdminAccessDialog(
+  BuildContext context, {
+  required Directory drive,
+  required void Function(String path, String name) onNavigate,
+}) {
+  if (_isFluentDesktopShellActive) {
+    fluent.showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => fluent.ContentDialog(
+        title: Semantics(
+          header: true,
+          child: Text(context.tr.adminAccessRequired),
+        ),
+        content: Text(context.tr.driveRequiresAdmin(drive.path)),
+        actions: [
+          Semantics(
+            button: true,
+            label: context.tr.cancel,
+            child: fluent.Button(
+              onPressed: () => RouteUtils.safePopDialog(dialogContext),
+              child: Text(context.tr.cancel),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: context.tr.ok,
+            child: fluent.FilledButton(
+              autofocus: true,
+              onPressed: () {
+                RouteUtils.safePopDialog(dialogContext);
+                onNavigate(drive.path, drive.path.split(r'\')[0]);
+              },
+              child: Text(context.tr.ok),
+            ),
+          ),
+        ],
+      ),
+    );
+    return;
+  }
+
+  RouteUtils.showAcrylicDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(context.tr.adminAccessRequired),
+      content: Text(context.tr.driveRequiresAdmin(drive.path)),
+      actions: [
+        TextButton(
+          onPressed: () => RouteUtils.safePopDialog(context),
+          child: Text(context.tr.cancel),
+        ),
+        TextButton(
+          onPressed: () {
+            RouteUtils.safePopDialog(context);
+            onNavigate(drive.path, drive.path.split(r'\')[0]);
+          },
+          child: Text(context.tr.ok),
+        ),
+      ],
+    ),
+  );
+}
+
+bool get _isFluentDesktopShellActive =>
+    (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
+    DesignSystemConfig.enableFluentDesktopShell &&
+    !DesignSystemConfig.enableLegacyMaterialDesktopShell;
 
 class _StorageSectionWidgetState extends State<StorageSectionWidget> {
   bool _isExpanded = false;
@@ -60,6 +133,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
             child: Material(
               color: Colors.transparent,
               child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -74,7 +148,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
                 ),
                 leading: Icon(
                   PhosphorIconsLight.hardDrives,
-                  size: 22,
+                  size: 20,
                   color: theme.colorScheme.primary,
                 ),
                 title: Text(
@@ -204,25 +278,10 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
   }
 
   void _showAdminAccessDialog(BuildContext context, Directory drive) {
-    RouteUtils.showAcrylicDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.tr.adminAccessRequired),
-        content: Text(context.tr.driveRequiresAdmin(drive.path)),
-        actions: [
-          TextButton(
-            onPressed: () => RouteUtils.safePopDialog(context),
-            child: Text(context.tr.cancel),
-          ),
-          TextButton(
-            onPressed: () {
-              RouteUtils.safePopDialog(context);
-              widget.onNavigate(drive.path, drive.path.split(r'\')[0]);
-            },
-            child: Text(context.tr.ok),
-          ),
-        ],
-      ),
+    showStorageAdminAccessDialog(
+      context,
+      drive: drive,
+      onNavigate: widget.onNavigate,
     );
   }
 

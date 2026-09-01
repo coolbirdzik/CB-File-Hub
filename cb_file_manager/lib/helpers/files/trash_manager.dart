@@ -9,6 +9,8 @@ import '../../utils/app_logger.dart';
 import 'recycle_bin_reader.dart' as direct_reader;
 import 'windows_file_operations.dart';
 
+const int defaultPermanentDeleteConcurrency = 8;
+
 /// A class that manages the trash bin functionality with platform-specific implementation
 class TrashManager {
   static final TrashManager _instance = TrashManager._internal();
@@ -583,45 +585,100 @@ class TrashManager {
     return succeeded;
   }
 
-  /// Permanently delete multiple files/folders using a single native
-  /// `IFileOperation` batch call on Windows. Returns the set of paths that
-  /// were successfully deleted. Falls back to per-path Dart `delete()` on
-  /// other platforms or if the native call fails.
+  /// Permanently delete multiple files/folders directly with bounded
+  /// concurrency.
+  ///
+  /// Permanent deletion does not need Recycle Bin or Shell integration.
+  /// Direct filesystem calls avoid the COM startup cost and long Shell
+  /// timeouts that made Shift+Delete feel slow, especially for one small file.
+  /// Returns the set of paths that were successfully deleted.
   Future<Set<String>> deleteMultiplePermanently(
     List<String> filePaths, {
     int chunkSize = 200,
     void Function(String currentPath, int done, int total)? onChunkStart,
     void Function(int done, int total)? onChunkDone,
+    void Function(String path, Object error)? onError,
     Duration? timeoutOverride,
   }) async {
     if (filePaths.isEmpty) return <String>{};
 
-    if (Platform.isWindows && WindowsFileOperations.isAvailable) {
-      return _runDeleteBatch(
-        filePaths,
-        permanent: true,
-        chunkSize: chunkSize,
-        onChunkStart: onChunkStart,
-        onChunkDone: onChunkDone,
-        timeoutOverride: timeoutOverride,
-      );
+    final succeeded = <String>{};
+    var nextIndex = 0;
+    var done = 0;
+    final concurrency =
+        chunkSize.clamp(1, defaultPermanentDeleteConcurrency).toInt();
+
+    Future<void> worker() async {
+      while (nextIndex < filePaths.length) {
+        final index = nextIndex++;
+        final path = filePaths[index];
+        onChunkStart?.call(path, done, filePaths.length);
+
+        try {
+          final type = await FileSystemEntity.type(path, followLinks: false);
+          switch (type) {
+            case FileSystemEntityType.directory:
+              await Directory(path).delete(recursive: true);
+              break;
+            case FileSystemEntityType.file:
+              await File(path).delete();
+              break;
+            case FileSystemEntityType.link:
+              await Link(path).delete();
+              break;
+            case FileSystemEntityType.notFound:
+              // Deletion is idempotent. A path that disappeared between the
+              // confirmation dialog and this worker is already deleted.
+              break;
+            default:
+              throw FileSystemException(
+                'Unsupported filesystem entity type',
+                path,
+              );
+          }
+          succeeded.add(path);
+        } catch (e, st) {
+          onError?.call(path, e);
+          AppLogger.warning(
+            '[TrashManager] Direct permanent delete failed: $path',
+            error: e,
+            stackTrace: st,
+          );
+        } finally {
+          done++;
+          onChunkDone?.call(done, filePaths.length);
+        }
+      }
     }
 
+    await Future.wait(
+      List.generate(
+        concurrency.clamp(1, filePaths.length).toInt(),
+        (_) => worker(),
+      ),
+    );
+    return succeeded;
+  }
+
+  /// Retries an already-approved permanent deletion through Windows Shell
+  /// with an explicit elevation request. No ownership or ACL changes are made.
+  Future<Set<String>> retryPermanentDeleteAsAdministrator(
+    List<String> failedPaths,
+  ) async {
+    if (!Platform.isWindows || failedPaths.isEmpty) return <String>{};
+
+    final exactPaths = failedPaths.toSet().toList(growable: false);
+    await WindowsFileOperations.deleteItems(
+      sources: exactPaths,
+      permanent: true,
+      silent: true,
+      requireElevation: true,
+      timeout: const Duration(minutes: 2),
+    );
+
     final succeeded = <String>{};
-    int done = 0;
-    for (final path in filePaths) {
-      try {
-        final type = FileSystemEntity.typeSync(path);
-        if (type == FileSystemEntityType.directory) {
-          await Directory(path).delete(recursive: true);
-          succeeded.add(path);
-        } else if (type == FileSystemEntityType.file) {
-          await File(path).delete();
-          succeeded.add(path);
-        }
-      } catch (_) {}
-      done++;
-      onChunkDone?.call(done, filePaths.length);
+    for (final path in exactPaths) {
+      if (_isPathGoneAfterDelete(path)) succeeded.add(path);
     }
     return succeeded;
   }

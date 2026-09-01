@@ -20,6 +20,7 @@ import '../../../utils/item_interaction_style.dart';
 import 'package:cb_file_manager/services/file_metadata_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
 class FileDetailsItem extends StatefulWidget {
   final File file;
@@ -120,25 +121,26 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
     final bool isCtrlPressed =
         keyboard.isControlPressed || keyboard.isMetaPressed;
 
-    // Log selection attempt
-    debugPrint("File selection: ${widget.file.path}");
-    debugPrint("Shift: $isShiftPressed, Ctrl: $isCtrlPressed");
+    // _handleFileSelection is desktop-only (see the onTap gate). On desktop a
+    // plain click must replace the selection with this file (matching the grid,
+    // whose `isSelectionMode` is forced false on desktop); Ctrl+click adds /
+    // toggles; Shift extends the range. Reading isSelectionMode from the bloc
+    // directly would re-enable multi-add after the first selection and diverge
+    // from grid behavior.
+    final bool shouldCtrlSelect = isCtrlPressed;
 
     // Visual update for immediate feedback
     if (!isShiftPressed) {
       setState(() {
-        if (!isCtrlPressed) {
-          // Single selection without Ctrl: this item will be selected
-          _visuallySelected = true;
-        } else {
+        if (shouldCtrlSelect) {
           // Ctrl+click: toggle this item's selection
           _visuallySelected = !_visuallySelected;
+        } else {
+          // Plain click: this item becomes the sole selection
+          _visuallySelected = true;
         }
       });
     }
-
-    final bool shouldCtrlSelect =
-        isCtrlPressed || (widget.lastSelectedPath != null && !isShiftPressed);
 
     // Call toggleFileSelection with appropriate parameters
     widget.toggleFileSelection(
@@ -495,13 +497,6 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                           widget.onTap!(widget.file, true);
                         }
                       : null,
-                  onLongPress: widget.isDesktopMode
-                      ? () {
-                          if (!_visuallySelected) {
-                            _handleFileSelection();
-                          }
-                        }
-                      : null,
                   onLongPressStart: !widget.isDesktopMode
                       ? (d) {
                           HapticFeedback.mediumImpact();
@@ -547,7 +542,7 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
         renameController.renamingPath == widget.file.path;
 
     final textWidget = Text(
-      path.basename(widget.file.path),
+      FileTypeUtils.getFileName(widget.file.path),
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         fontWeight: _visuallySelected ? FontWeight.bold : FontWeight.normal,
@@ -610,14 +605,20 @@ class _OptimizedFileIconState extends State<_OptimizedFileIcon>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return OptimizedFileIcon(
-      file: widget.file,
-      isVideo: widget.isVideo,
-      isImage: widget.isImage,
-      size: 24,
-      fallbackIcon: widget.icon,
-      fallbackColor: widget.color,
-      borderRadius: BorderRadius.circular(2),
+    return ValueListenableBuilder<FileThumbnailFitMode>(
+      valueListenable: UserPreferences.instance.fileThumbnailFitMode,
+      builder: (context, fitMode, _) => OptimizedFileIcon(
+        file: widget.file,
+        isVideo: widget.isVideo,
+        isImage: widget.isImage,
+        size: 24,
+        fit: fitMode == FileThumbnailFitMode.contain
+            ? BoxFit.contain
+            : BoxFit.cover,
+        fallbackIcon: widget.icon,
+        fallbackColor: widget.color,
+        borderRadius: BorderRadius.circular(2),
+      ),
     );
   }
 }

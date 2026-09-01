@@ -323,7 +323,7 @@ class AlbumService {
     try {
       final imageFiles = await getAllImages(folderPath, recursive: recursive);
       final filePaths = imageFiles.map((file) => file.path).toList();
-      return addFilesToAlbum(albumId, filePaths);
+      return await addFilesToAlbum(albumId, filePaths);
     } catch (error) {
       debugPrint('Error adding folder to album: $error');
       return 0;

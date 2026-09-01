@@ -8,6 +8,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/index.dart'
     as tab_components;
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
 import 'package:cb_file_manager/ui/widgets/app_progress_indicator.dart';
@@ -46,7 +47,8 @@ class FolderContentRouter {
 
     // Route system paths except the special inline tag-search variant
     if (currentPath.startsWith('#') &&
-        !currentPath.startsWith('#search?tag=')) {
+        !currentPath.startsWith('#search?tag=') &&
+        !ArchivePathUtils.isArchiveBrowsePath(currentPath)) {
       final systemWidget = _buildSystemScreen(
         context: context,
         currentPath: currentPath,

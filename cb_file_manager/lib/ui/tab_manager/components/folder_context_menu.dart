@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
 
 import 'dart:async';
 import 'dart:io';
@@ -107,6 +107,23 @@ class FolderContextMenu {
     ValueChanged<String>? onAfterFileCreated,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final createSections = Platform.isWindows && !_isMobilePlatform()
+        ? _buildLazyWindowsCreateSections(
+            context: context,
+            currentPath: currentPath,
+            folderListBloc: folderListBloc,
+            onCreateFolder: onCreateFolder,
+            inlineRenameController: inlineRenameController,
+            onAfterFileCreated: onAfterFileCreated,
+          )
+        : await _buildCreateSections(
+            context: context,
+            currentPath: currentPath,
+            folderListBloc: folderListBloc,
+            onCreateFolder: onCreateFolder,
+            inlineRenameController: inlineRenameController,
+            onAfterFileCreated: onAfterFileCreated,
+          );
     return [
       ContextMenuSection(
         actions: [
@@ -125,6 +142,13 @@ class FolderContextMenu {
                     onSelected: (_) => onViewModeChanged(ViewMode.list),
                   ),
                   ContextMenuAction(
+                    id: 'view_tiles',
+                    label: l10n.viewModeTiles,
+                    icon: PhosphorIconsLight.gridNine,
+                    isChecked: currentViewMode == ViewMode.tiles,
+                    onSelected: (_) => onViewModeChanged(ViewMode.tiles),
+                  ),
+                  ContextMenuAction(
                     id: 'view_grid',
                     label: l10n.viewModeGrid,
                     icon: PhosphorIconsLight.squaresFour,
@@ -138,15 +162,6 @@ class FolderContextMenu {
                     isChecked: currentViewMode == ViewMode.details,
                     onSelected: (_) => onViewModeChanged(ViewMode.details),
                   ),
-                  if (!_isMobilePlatform())
-                    ContextMenuAction(
-                      id: 'view_grid_preview',
-                      label: l10n.viewModeGridPreview,
-                      icon: PhosphorIconsLight.layout,
-                      isChecked: currentViewMode == ViewMode.gridPreview,
-                      onSelected: (_) =>
-                          onViewModeChanged(ViewMode.gridPreview),
-                    ),
                 ],
               ),
             ],
@@ -260,14 +275,7 @@ class FolderContextMenu {
           ),
         ],
       ),
-      ...await _buildCreateSections(
-        context: context,
-        currentPath: currentPath,
-        folderListBloc: folderListBloc,
-        onCreateFolder: onCreateFolder,
-        inlineRenameController: inlineRenameController,
-        onAfterFileCreated: onAfterFileCreated,
-      ),
+      ...createSections,
       ContextMenuSection(
         title: l10n.moreOptions,
         actions: [
@@ -291,6 +299,47 @@ class FolderContextMenu {
             label: l10n.properties,
             icon: PhosphorIconsLight.info,
             onSelected: (_) => _showFolderProperties(context, currentPath),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  static List<ContextMenuSection> _buildLazyWindowsCreateSections({
+    required BuildContext context,
+    required String currentPath,
+    FolderListBloc? folderListBloc,
+    required Future<void> Function(String) onCreateFolder,
+    InlineRenameController? inlineRenameController,
+    ValueChanged<String>? onAfterFileCreated,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return <ContextMenuSection>[
+      ContextMenuSection(
+        title: l10n.create,
+        actions: <ContextMenuAction>[
+          ContextMenuAction(
+            id: 'new_submenu',
+            label: 'New',
+            icon: PhosphorIconsLight.filePlus,
+            loadChildSections: (_) async {
+              final sections = await _buildCreateSections(
+                context: context,
+                currentPath: currentPath,
+                folderListBloc: folderListBloc,
+                onCreateFolder: onCreateFolder,
+                inlineRenameController: inlineRenameController,
+                onAfterFileCreated: onAfterFileCreated,
+              );
+              for (final section in sections) {
+                for (final action in section.actions) {
+                  if (action.id == 'new_submenu') {
+                    return action.childSections ?? const <ContextMenuSection>[];
+                  }
+                }
+              }
+              return const <ContextMenuSection>[];
+            },
           ),
         ],
       ),

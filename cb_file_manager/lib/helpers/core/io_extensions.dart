@@ -9,21 +9,25 @@ import 'dart:io';
 // packages
 import 'package:path/path.dart' as path;
 
+// project
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
+
 /// Extension methods for File objects
 extension FileExtension on File {
   /// Get the file extension without the dot (.)
   String extension() {
-    return path.extension(this.path).replaceAll('.', '');
+    return path.extension(basename()).replaceAll('.', '');
   }
 
   /// Get the basename of the file (filename with extension)
   String basename() {
-    return path.basename(this.path);
+    return ArchivePathUtils.entryDisplayName(this.path) ??
+        path.basename(this.path);
   }
 
   /// Get the filename without extension
   String basenameWithoutExtension() {
-    return path.basenameWithoutExtension(this.path);
+    return path.basenameWithoutExtension(basename());
   }
 
   /// Get the parent directory path
@@ -56,7 +60,8 @@ extension FileExtension on File {
 extension DirectoryExtension on Directory {
   /// Get the basename of the directory (last part of the path)
   String basename() {
-    return path.basename(this.path);
+    return ArchivePathUtils.entryDisplayName(this.path) ??
+        path.basename(this.path);
   }
 
   /// Get the parent directory path
@@ -89,7 +94,8 @@ extension DirectoryExtension on Directory {
 extension FileSystemEntityExtension on FileSystemEntity {
   /// Get the basename of the entity (last part of the path)
   String basename() {
-    return this.path.split(Platform.isWindows ? r'\' : '/').last;
+    return ArchivePathUtils.entryDisplayName(this.path) ??
+        this.path.split(Platform.isWindows ? r'\' : '/').last;
   }
 
   /// Check if the entity is a directory

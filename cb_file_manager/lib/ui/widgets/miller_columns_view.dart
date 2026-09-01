@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/bloc/selection/selection.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
@@ -495,7 +496,7 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
     final bool isBeingRenamed = renameController != null &&
         renameController.renamingPath == widget.folder.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
-    final String name = widget.folder.path.split(Platform.pathSeparator).last;
+    final String name = FileTypeUtils.getFileName(widget.folder.path);
 
     return ValueListenableBuilder<bool>(
       valueListenable: _isHovering,
@@ -688,19 +689,25 @@ class _MillerFileRowState extends State<_MillerFileRow> {
         height: 20,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: ThumbnailLoader(
-            filePath: widget.file.path,
-            isVideo: isVideo,
-            isImage: isImage,
-            width: 20,
-            height: 20,
-            borderRadius: BorderRadius.circular(4),
-            fallbackBuilder: () => Icon(
-              isVideo
-                  ? PhosphorIconsLight.videoCamera
-                  : PhosphorIconsLight.image,
-              size: 18,
-              color: theme.colorScheme.primary,
+          child: ValueListenableBuilder<FileThumbnailFitMode>(
+            valueListenable: UserPreferences.instance.fileThumbnailFitMode,
+            builder: (context, fitMode, _) => ThumbnailLoader(
+              filePath: widget.file.path,
+              isVideo: isVideo,
+              isImage: isImage,
+              width: 20,
+              height: 20,
+              fit: fitMode == FileThumbnailFitMode.contain
+                  ? BoxFit.contain
+                  : BoxFit.cover,
+              borderRadius: BorderRadius.circular(4),
+              fallbackBuilder: () => Icon(
+                isVideo
+                    ? PhosphorIconsLight.videoCamera
+                    : PhosphorIconsLight.image,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -730,7 +737,7 @@ class _MillerFileRowState extends State<_MillerFileRow> {
     final bool isBeingRenamed = renameController != null &&
         renameController.renamingPath == widget.file.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
-    final String name = widget.file.path.split(Platform.pathSeparator).last;
+    final String name = FileTypeUtils.getFileName(widget.file.path);
 
     return ValueListenableBuilder<bool>(
       valueListenable: _isHovering,

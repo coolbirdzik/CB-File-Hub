@@ -424,6 +424,48 @@ class FileTypeRegistry {
       mimeType: 'application/x-bzip2',
       extensions: const ['.bz2'],
     ),
+    '.tgz': FileTypeInfo(
+      category: FileCategory.archive,
+      icon: PhosphorIconsLight.archive,
+      color: Colors.amber.shade700,
+      mimeType: 'application/gzip',
+      extensions: const ['.tgz', '.tar.gz'],
+    ),
+    '.tar.gz': FileTypeInfo(
+      category: FileCategory.archive,
+      icon: PhosphorIconsLight.archive,
+      color: Colors.amber.shade700,
+      mimeType: 'application/gzip',
+      extensions: const ['.tgz', '.tar.gz'],
+    ),
+    '.tbz2': FileTypeInfo(
+      category: FileCategory.archive,
+      icon: PhosphorIconsLight.archive,
+      color: Colors.amber.shade700,
+      mimeType: 'application/x-bzip2',
+      extensions: const ['.tbz2', '.tar.bz2', '.tbz'],
+    ),
+    '.tar.bz2': FileTypeInfo(
+      category: FileCategory.archive,
+      icon: PhosphorIconsLight.archive,
+      color: Colors.amber.shade700,
+      mimeType: 'application/x-bzip2',
+      extensions: const ['.tbz2', '.tar.bz2', '.tbz'],
+    ),
+    '.txz': FileTypeInfo(
+      category: FileCategory.archive,
+      icon: PhosphorIconsLight.archive,
+      color: Colors.amber.shade700,
+      mimeType: 'application/x-xz',
+      extensions: const ['.txz', '.tar.xz'],
+    ),
+    '.tar.xz': FileTypeInfo(
+      category: FileCategory.archive,
+      icon: PhosphorIconsLight.archive,
+      color: Colors.amber.shade700,
+      mimeType: 'application/x-xz',
+      extensions: const ['.txz', '.tar.xz'],
+    ),
 
     // Text files
     '.txt': const FileTypeInfo(

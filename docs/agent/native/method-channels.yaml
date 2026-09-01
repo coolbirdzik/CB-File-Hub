@@ -1,0 +1,182 @@
+schema_version: 1
+verified_at: 2026-08-09
+verified_revision: "7f40c2a+working-tree"
+path_base: workspace_root
+
+registration:
+  windows_entrypoint: cb_file_manager/windows/runner/flutter_window.cpp
+  build_manifest: cb_file_manager/windows/runner/CMakeLists.txt
+  rule: "A new Windows plugin must be compiled, registered, wrapped in Dart, and tested."
+
+channels:
+  cb_file_manager/app_insights:
+    dart:
+      - cb_file_manager/lib/services/app_insights/windows_app_insights_platform.dart
+    windows:
+      - cb_file_manager/windows/runner/app_insights_plugin.cpp
+      - cb_file_manager/windows/runner/app_insights_plugin.h
+    methods:
+      - readWin32UninstallEntries
+      - readUserAssist
+      - resolveUserAssistTargets
+      - readMsixPackages
+    invariants:
+      - "Inventory and usage failures may produce partial results instead of hiding successful sources."
+      - "Unknown usage evidence must remain unknown."
+
+  cb_file_manager/shell_context_menu:
+    dart:
+      - cb_file_manager/lib/helpers/files/windows_shell_context_menu.dart
+      - cb_file_manager/lib/ui/components/common/shared_file_context_menu.dart
+    windows:
+      - cb_file_manager/windows/runner/shell_context_menu_plugin.cpp
+      - cb_file_manager/windows/runner/shell_context_menu_plugin.h
+    methods:
+      - showContextMenu
+      - showMergedMenu
+      - showCombinedMenu
+      - invokeVerb
+      - loadThirdPartyMenu
+      - loadContextMenuSubmenu
+      - invokeContextMenuCommand
+      - releaseContextMenuSession
+    invariants:
+      - "Session IDs and command IDs are valid only for the exact native Shell session."
+      - "Lazy submenu initialization must preserve WM_INITMENUPOPUP behavior."
+
+  cb_file_manager/file_operations:
+    dart:
+      - cb_file_manager/lib/helpers/files/windows_file_operations.dart
+      - cb_file_manager/lib/helpers/files/trash_manager.dart
+    windows:
+      - cb_file_manager/windows/runner/file_operations_plugin.cpp
+      - cb_file_manager/windows/runner/file_operations_plugin.h
+    methods:
+      - copyItems
+      - moveItems
+      - deleteItems
+      - enumerateRecycleBin
+    delete_items_payload:
+      required:
+        - sources
+        - permanent
+        - silent
+      optional:
+        - timeoutMs
+        - requireElevation
+    invariants:
+      - "Recycle Bin and permanent deletion are distinct user choices."
+      - "Callers must retain exact targets and approval semantics."
+      - "requireElevation is valid only for a user-triggered retry of already-approved permanent-delete failures."
+      - "Elevated deletion must not take ownership, modify ACLs, or broaden the supplied source paths."
+
+  cb_file_manager/app_icon:
+    dart:
+      - cb_file_manager/lib/helpers/files/windows_app_icon.dart
+      - cb_file_manager/lib/services/progress/desktop_app_icon_progress_service.dart
+    windows:
+      - cb_file_manager/windows/runner/app_icon_plugin.cpp
+      - cb_file_manager/windows/runner/app_icon_plugin.h
+    methods:
+      - extractIconFromFile
+      - getAssociatedAppPath
+      - getAppsForExtension
+      - getInstalledAppBrands
+      - setSelfAsDefaultForVideo
+      - registerFileAssociations
+      - extractIconsForExtensions
+      - setTaskbarProgress
+      - clearTaskbarProgress
+
+  cb_file_manager/window_utils:
+    dart:
+      - cb_file_manager/lib/services/windowing/windows_native_tab_drag_drop_service.dart
+      - cb_file_manager/lib/services/windowing/windows_explorer_drag_drop_service.dart
+      - cb_file_manager/lib/services/windowing/window_acrylic_service.dart
+    windows:
+      - cb_file_manager/windows/runner/window_utils_plugin.cpp
+      - cb_file_manager/windows/runner/window_utils_plugin.h
+    methods:
+      - allowForegroundWindow
+      - forceActivateWindow
+      - startWindowDragIfMouseDown
+      - startNativeTabDrag
+      - startNativeFileDrag
+      - setNativeFullScreen
+      - isNativeFullScreen
+      - setNativeCaptionVisible
+      - setNativeSystemMenuVisible
+      - setWindowsSystemBackdrop
+      - fitWindowToWorkArea
+    callbacks:
+      - onNativeTabDragHover
+      - onNativeTabDrop
+      - onNativeFileDrop
+
+  fc_native_video_thumbnail:
+    dart:
+      - cb_file_manager/lib/helpers/media/fc_native_video_thumbnail.dart
+    windows:
+      - cb_file_manager/windows/runner/fc_native_video_thumbnail_plugin.cpp
+      - cb_file_manager/windows/runner/fc_native_video_thumbnail_plugin.h
+    methods:
+      - getVideoThumbnail
+      - setVisibleThumbnails
+      - setFocusedThumbnail
+      - getVideoDuration
+      - generateThumbnailAtPercentage
+
+  smb_native_thumbnail:
+    dart:
+      - cb_file_manager/lib/helpers/network/smb_native_thumbnail_helper.dart
+    windows:
+      - cb_file_manager/windows/runner/smb_native_thumbnail_plugin.cpp
+      - cb_file_manager/windows/runner/smb_native_thumbnail_plugin.h
+
+  cb_file_manager/storage_volumes:
+    dart:
+      - cb_file_manager/lib/services/drive/android_storage_volumes.dart
+      - cb_file_manager/lib/services/drive/drive_inventory_service.dart
+    android:
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/StorageVolumesPlugin.kt
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/MainActivity.kt
+    methods:
+      - listVolumes
+      - ejectVolume
+      - renameVolume
+    list_volumes_result_item:
+      required:
+        - path
+        - isPrimary
+        - isRemovable
+      optional:
+        - label
+        - uuid
+        - description
+        - totalBytes
+        - freeBytes
+        - filesystem
+        - canEject
+    eject_volume_payload:
+      required:
+        - path
+      optional:
+        - uuid
+    rename_volume_payload:
+      required:
+        - path
+        - label
+      optional:
+        - uuid
+    invariants:
+      - "Primary or emulated internal storage must never be ejected through this channel."
+      - "Partial volume rows are allowed when StatFs or StorageVolume fields are unavailable."
+      - "renameVolume may open a system settings intent when the OS denies direct label changes."
+
+review_checklist:
+  - "Update Dart argument encoding and native argument decoding together."
+  - "Update Dart result decoding and native result encoding together."
+  - "Register a new plugin in flutter_window.cpp."
+  - "Add new C++ files to runner/CMakeLists.txt."
+  - "Mock the exact channel and method name in focused Dart tests."
+  - "Build the Windows runner for C++ or registration changes."

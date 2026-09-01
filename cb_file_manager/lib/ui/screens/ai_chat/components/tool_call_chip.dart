@@ -26,8 +26,11 @@ class _ToolCallChipState extends State<ToolCallChip> {
     final theme = Theme.of(context);
     final call = widget.toolCall;
     final isSuccess = call.success;
-    final accent =
-        isSuccess ? theme.colorScheme.primary : theme.colorScheme.error;
+    final accent = call.isRunning
+        ? theme.colorScheme.tertiary
+        : isSuccess
+            ? theme.colorScheme.primary
+            : theme.colorScheme.error;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
@@ -47,13 +50,23 @@ class _ToolCallChipState extends State<ToolCallChip> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               child: Row(
                 children: [
-                  Icon(
-                    isSuccess
-                        ? PhosphorIconsLight.checkCircle
-                        : PhosphorIconsLight.xCircle,
-                    size: 14,
-                    color: accent,
-                  ),
+                  if (call.isRunning)
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: accent,
+                      ),
+                    )
+                  else
+                    Icon(
+                      isSuccess
+                          ? PhosphorIconsLight.checkCircle
+                          : PhosphorIconsLight.xCircle,
+                      size: 14,
+                      color: accent,
+                    ),
                   const SizedBox(width: 6),
                   Icon(
                     PhosphorIconsLight.wrench,
@@ -62,14 +75,32 @@ class _ToolCallChipState extends State<ToolCallChip> {
                   ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      call.toolName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'monospace',
-                        color: theme.colorScheme.onSurface,
-                      ),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            call.toolName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'monospace',
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (call.isRunning) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            'Running',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: accent,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   Icon(

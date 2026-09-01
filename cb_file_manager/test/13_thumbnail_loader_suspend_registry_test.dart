@@ -1,4 +1,7 @@
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/widgets/lazy_video_thumbnail.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -64,6 +67,25 @@ void main() {
         () {
       expect(ThumbnailLoader.debugSuspendedTabCount(), 0);
       expect(ThumbnailLoader.isPathSuspended('anything'), isFalse);
+    });
+
+    test('13.07 file thumbnails default to cover', () {
+      const imageThumbnail = ThumbnailLoader(
+        filePath: 'image.jpg',
+        isVideo: false,
+        isImage: true,
+      );
+      const videoThumbnail = LazyVideoThumbnail(
+        videoPath: 'video.mp4',
+        fallbackBuilder: SizedBox.shrink,
+      );
+
+      expect(imageThumbnail.fit, BoxFit.cover);
+      expect(videoThumbnail.fit, BoxFit.cover);
+      expect(
+        UserPreferences.instance.fileThumbnailFitMode.value,
+        FileThumbnailFitMode.cover,
+      );
     });
   });
 }

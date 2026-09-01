@@ -585,6 +585,14 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
     if (path.isEmpty || isDrivesPath(path)) {
       return l10n?.drivesTab ?? 'Drives';
     }
+    // Named system screens get their localized title instead of leaking the
+    // raw hash path into the tab strip after back/forward navigation.
+    if (path.startsWith('#')) {
+      switch (path) {
+        case '#video':
+          return l10n?.videoHubTitle ?? 'Video Hub';
+      }
+    }
     final tag = UriUtils.extractTagFromSearchPath(path);
     if (tag != null) {
       return 'Tag: $tag';

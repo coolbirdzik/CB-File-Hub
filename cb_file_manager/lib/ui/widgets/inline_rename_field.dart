@@ -51,6 +51,9 @@ class _InlineRenameFieldState extends State<InlineRenameField> {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final surface = theme.colorScheme.surface;
+    final focusedSurface = theme.colorScheme.surfaceContainer;
+    final outline = theme.colorScheme.outline;
+    final outlineVariant = theme.colorScheme.outlineVariant;
     final onSurface = theme.colorScheme.onSurface;
 
     final effectiveStyle = widget.textStyle ??
@@ -98,23 +101,27 @@ class _InlineRenameFieldState extends State<InlineRenameField> {
                   vertical: 4,
                 ),
                 filled: true,
-                fillColor: surface,
+                fillColor: WidgetStateColor.resolveWith((states) {
+                  return states.contains(WidgetState.focused)
+                      ? focusedSurface
+                      : surface;
+                }),
                 border: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: primary.withValues(alpha: 0.5),
-                    width: 1.5,
+                    color: outlineVariant,
+                    width: 1,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: primary.withValues(alpha: 0.5),
-                    width: 1.5,
+                    color: outlineVariant,
+                    width: 1,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: primary, width: 2),
+                  borderSide: BorderSide(color: outline, width: 1),
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),

@@ -250,6 +250,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
 
                           // Workspace indicator + Input
                           ChatInputBar(
+                            onStop: () => _bloc.add(const StopGeneration()),
                             onSend: (text, files) => _bloc
                                 .add(SendMessage(text, referencedFiles: files)),
                             isLoading: state.isLoading,

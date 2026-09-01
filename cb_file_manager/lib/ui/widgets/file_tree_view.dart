@@ -62,20 +62,22 @@ class _FileTreeViewState extends State<FileTreeView> {
   @override
   void didUpdateWidget(covariant FileTreeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _maybeRebuildRoots();
+    _maybeRebuildRoots(
+      force: oldWidget.state.isRefreshing && !widget.state.isRefreshing,
+    );
   }
 
   /// Rebuild the root nodes only when the underlying directory listing
   /// changes. We can't compare Lists directly (they're new instances on
   /// every state copy), so we use a cheap signature: path + count + last
   /// path for folders and files.
-  void _maybeRebuildRoots() {
+  void _maybeRebuildRoots({bool force = false}) {
     final folders = widget.state.folders;
     final files = widget.state.files;
     final sig = '${widget.state.currentPath.path}'
         '|f${folders.length}:${folders.isEmpty ? "" : folders.last.path}'
         '|x${files.length}:${files.isEmpty ? "" : files.last.path}';
-    if (sig == _rootSignature && _roots.isNotEmpty) return;
+    if (!force && sig == _rootSignature && _roots.isNotEmpty) return;
 
     _rootSignature = sig;
     _roots = [

@@ -70,6 +70,9 @@ static std::string ResolveExeViaApplicationsKey(const std::string& exeName);
 static std::string ResolveProgIdToExe(const std::wstring& progId);
 
 static bool SetSelfAsDefaultForVideo(const std::string& exePath);
+static bool RegisterFileAssociations(const std::string& exePath,
+                                     const std::vector<std::string>& extensions,
+                                     bool setAsDefault);
 static std::vector<std::string> GetInstalledAppBrands();
 
 // static
@@ -177,6 +180,31 @@ void AppIconPlugin::HandleMethodCall(
       list.push_back(flutter::EncodableValue(b));
     }
     result->Success(flutter::EncodableValue(list));
+    return;
+  } else if (method_call.method_name().compare("registerFileAssociations") == 0) {
+    const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (arguments) {
+      auto exe_it = arguments->find(flutter::EncodableValue("exePath"));
+      auto exts_it = arguments->find(flutter::EncodableValue("extensions"));
+      if (exe_it != arguments->end() && exts_it != arguments->end()) {
+        std::string exePath = std::get<std::string>(exe_it->second);
+        const auto& extList = std::get<flutter::EncodableList>(exts_it->second);
+        std::vector<std::string> extensions;
+        extensions.reserve(extList.size());
+        for (const auto& e : extList) {
+          extensions.push_back(std::get<std::string>(e));
+        }
+        bool setAsDefault = false;
+        auto def_it = arguments->find(flutter::EncodableValue("setAsDefault"));
+        if (def_it != arguments->end()) {
+          setAsDefault = std::get<bool>(def_it->second);
+        }
+        bool ok = RegisterFileAssociations(exePath, extensions, setAsDefault);
+        result->Success(flutter::EncodableValue(ok));
+        return;
+      }
+    }
+    result->Error("INVALID_ARGUMENTS", "Invalid or missing exePath/extensions");
     return;
   } else if (method_call.method_name().compare("setSelfAsDefaultForVideo") == 0) {
     const auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
@@ -345,6 +373,87 @@ bool AppIconPlugin::ExtractIconFromFile(
   return success;
 }
 
+static std::string ParseExeFromCommand(const wchar_t* cmd);
+
+static bool IsCbFileHubProgId(const std::wstring& progId) {
+  if (progId.empty()) return false;
+  if (progId.rfind(L"CBFileHub.", 0) == 0) return true;
+  std::wstring lower = progId;
+  for (wchar_t& c : lower) {
+    if (c >= L'A' && c <= L'Z') c = c - L'A' + L'a';
+  }
+  return lower.rfind(L"applications\\cb_file_hub.exe", 0) == 0;
+}
+
+static bool IsShellProxyExecutable(const std::string& path) {
+  if (path.empty()) return false;
+  size_t last = path.find_last_of("/\\");
+  std::string name = (last != std::string::npos) ? path.substr(last + 1) : path;
+  for (auto& c : name) c = (char)tolower((unsigned char)c);
+  return name == "explorer.exe";
+}
+
+static std::wstring QueryDefaultProgId(const wchar_t* ext) {
+  if (!ext || !*ext) return L"";
+
+  wchar_t progId[512] = {0};
+  DWORD progIdSize = (DWORD)(sizeof(progId) / sizeof(progId[0]));
+  if (SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_PROGID, ext, NULL,
+                                  progId, &progIdSize)) &&
+      progId[0]) {
+    return std::wstring(progId);
+  }
+
+  std::wstring extKey = L"Software\\Classes\\";
+  extKey += ext;
+  wchar_t value[512] = {0};
+  for (HKEY root : {HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE}) {
+    HKEY hKey = NULL;
+    if (RegOpenKeyExW(root, extKey.c_str(), 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+      continue;
+    }
+    DWORD valueSize = sizeof(value);
+    if (RegQueryValueExW(hKey, NULL, NULL, NULL, (LPBYTE)value, &valueSize) ==
+            ERROR_SUCCESS &&
+        value[0]) {
+      RegCloseKey(hKey);
+      return std::wstring(value);
+    }
+    RegCloseKey(hKey);
+  }
+
+  std::wstring userChoiceKey =
+      L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\";
+  userChoiceKey += ext;
+  userChoiceKey += L"\\UserChoice";
+  HKEY hUserChoice = NULL;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER, userChoiceKey.c_str(), 0, KEY_READ,
+                    &hUserChoice) == ERROR_SUCCESS) {
+    wchar_t ucProgId[512] = {0};
+    DWORD ucSize = sizeof(ucProgId);
+    if (RegQueryValueExW(hUserChoice, L"ProgId", NULL, NULL, (LPBYTE)ucProgId,
+                         &ucSize) == ERROR_SUCCESS &&
+        ucProgId[0]) {
+      RegCloseKey(hUserChoice);
+      return std::wstring(ucProgId);
+    }
+    RegCloseKey(hUserChoice);
+  }
+
+  return L"";
+}
+
+static std::string ResolveOpenCommandForExtension(const wchar_t* ext) {
+  if (!ext || !*ext) return "";
+  wchar_t openCmd[2048] = {0};
+  DWORD openCmdSize = (DWORD)(sizeof(openCmd) / sizeof(openCmd[0]));
+  if (!SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_COMMAND, ext, NULL,
+                                   openCmd, &openCmdSize))) {
+    return "";
+  }
+  return ParseExeFromCommand(openCmd);
+}
+
 std::string AppIconPlugin::GetAssociatedAppPath(const std::string& extension) {
   // Ensure extension starts with dot
   std::string ext = extension;
@@ -363,35 +472,49 @@ std::string AppIconPlugin::GetAssociatedAppPath(const std::string& extension) {
     return "";
   }
 
-  // Get executable path for this file extension
-  wchar_t execPath[MAX_PATH] = { 0 };
+  // 1. Resolve the user's default ProgId (Settings → Default apps / UserChoice).
+  const std::wstring defaultProgId = QueryDefaultProgId(wExtension.data());
+  if (!defaultProgId.empty()) {
+    const std::string fromProgId = ResolveProgIdToExe(defaultProgId);
+    if (!fromProgId.empty()) {
+      if (IsCbFileHubProgId(defaultProgId) || !IsShellProxyExecutable(fromProgId)) {
+        return fromProgId;
+      }
+    }
+  }
+
+  // 2. Fall back to the shell "open" command for this extension.
+  const std::string fromOpenCommand =
+      ResolveOpenCommandForExtension(wExtension.data());
+  if (!fromOpenCommand.empty() && !IsShellProxyExecutable(fromOpenCommand)) {
+    return fromOpenCommand;
+  }
+
+  // 3. Last resort: ASSOCSTR_EXECUTABLE.
+  wchar_t execPath[MAX_PATH] = {0};
   DWORD execPathSize = MAX_PATH;
-
-  HRESULT hr = AssocQueryStringW(
-      ASSOCF_NONE,
-      ASSOCSTR_EXECUTABLE,
-      wExtension.data(),
-      NULL,
-      execPath,
-      &execPathSize
-  );
-
-  if (FAILED(hr)) {
-    return "";
+  if (!SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_EXECUTABLE,
+                                   wExtension.data(), NULL, execPath,
+                                   &execPathSize))) {
+    return fromOpenCommand;
   }
 
-  // Convert result to UTF-8
-  int utf8Size = WideCharToMultiByte(CP_UTF8, 0, execPath, -1, nullptr, 0, NULL, NULL);
+  int utf8Size =
+      WideCharToMultiByte(CP_UTF8, 0, execPath, -1, nullptr, 0, NULL, NULL);
   if (utf8Size == 0) {
-    return "";
+    return fromOpenCommand;
   }
-  
   std::vector<char> utf8Path(utf8Size);
-  if (WideCharToMultiByte(CP_UTF8, 0, execPath, -1, utf8Path.data(), utf8Size, NULL, NULL) == 0) {
-    return "";
+  if (WideCharToMultiByte(CP_UTF8, 0, execPath, -1, utf8Path.data(), utf8Size,
+                          NULL, NULL) == 0) {
+    return fromOpenCommand;
   }
-  
-  return std::string(utf8Path.data());
+
+  std::string result(utf8Path.data());
+  if (IsShellProxyExecutable(result)) {
+    return fromOpenCommand;
+  }
+  return result;
 }
 
 static std::string GetDisplayNameFromPath(const std::string& path) {
@@ -682,46 +805,136 @@ static std::vector<std::string> GetInstalledAppBrands() {
   return brands;
 }
 
-static bool SetSelfAsDefaultForVideo(const std::string& exePath) {
-  if (exePath.empty()) return false;
-  size_t last = exePath.find_last_of("/\\");
-  std::string exeName = (last != std::string::npos) ? exePath.substr(last + 1) : exePath;
-  if (exeName.empty()) return false;
-
-  int exeWide = MultiByteToWideChar(CP_UTF8, 0, exePath.c_str(), -1, nullptr, 0);
-  if (exeWide == 0) return false;
-  std::vector<wchar_t> wExe(exeWide);
-  if (MultiByteToWideChar(CP_UTF8, 0, exePath.c_str(), -1, wExe.data(), exeWide) == 0) return false;
-
-  int nameWide = MultiByteToWideChar(CP_UTF8, 0, exeName.c_str(), -1, nullptr, 0);
-  if (nameWide == 0) return false;
-  std::vector<wchar_t> wName(nameWide);
-  if (MultiByteToWideChar(CP_UTF8, 0, exeName.c_str(), -1, wName.data(), nameWide) == 0) return false;
-
-  std::wstring cmdVal = L"\"" + std::wstring(wExe.data()) + L"\" \"%1\"";
-  std::wstring appProgId = L"Applications\\" + std::wstring(wName.data());
-
-  std::wstring cmdKey = L"SOFTWARE\\Classes\\" + appProgId + L"\\shell\\open\\command";
-  HKEY hCmd = NULL;
-  if (RegCreateKeyExW(HKEY_CURRENT_USER, cmdKey.c_str(), 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hCmd, NULL) != ERROR_SUCCESS)
+static bool SetRegString(HKEY root,
+                         const std::wstring& subKey,
+                         const wchar_t* valueName,
+                         const std::wstring& data) {
+  HKEY hKey = NULL;
+  if (RegCreateKeyExW(root, subKey.c_str(), 0, NULL, REG_OPTION_NON_VOLATILE,
+                      KEY_WRITE, NULL, &hKey, NULL) != ERROR_SUCCESS) {
     return false;
-  bool ok = (RegSetValueExW(hCmd, NULL, 0, REG_SZ, (const BYTE*)cmdVal.c_str(), (DWORD)((cmdVal.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS);
-  RegCloseKey(hCmd);
-  if (!ok) return false;
+  }
+  const bool ok =
+      RegSetValueExW(hKey, valueName, 0, REG_SZ, (const BYTE*)data.c_str(),
+                     (DWORD)((data.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
+  RegCloseKey(hKey);
+  return ok;
+}
 
-  static const wchar_t* videoExts[] = {
-    L".mp4", L".mkv", L".avi", L".mov", L".wmv", L".flv", L".webm", L".m4v",
-    L".mpeg", L".mpg", L".ogv", L".3gp", L".ts", L".m2ts", L".divx"
-  };
-  for (const wchar_t* ext : videoExts) {
-    std::wstring extKey = std::wstring(L"SOFTWARE\\Classes\\") + ext;
-    HKEY hExt = NULL;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, extKey.c_str(), 0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hExt, NULL) == ERROR_SUCCESS) {
-      RegSetValueExW(hExt, NULL, 0, REG_SZ, (const BYTE*)appProgId.c_str(), (DWORD)((appProgId.size() + 1) * sizeof(wchar_t)));
-      RegCloseKey(hExt);
+static std::wstring ProgIdForExtension(const std::wstring& ext) {
+  std::wstring suffix = ext;
+  if (!suffix.empty() && suffix[0] == L'.') {
+    suffix = suffix.substr(1);
+  }
+  for (wchar_t& c : suffix) {
+    if (c == L'.') {
+      c = L'_';
     }
   }
-  return true;
+  return L"CBFileHub.File." + suffix;
+}
+
+static bool RegisterFileAssociations(const std::string& exePathUtf8,
+                                     const std::vector<std::string>& extensionsUtf8,
+                                     bool setAsDefault) {
+  if (exePathUtf8.empty() || extensionsUtf8.empty()) {
+    return false;
+  }
+
+  int exeWide = MultiByteToWideChar(CP_UTF8, 0, exePathUtf8.c_str(), -1, nullptr, 0);
+  if (exeWide == 0) {
+    return false;
+  }
+  std::vector<wchar_t> wExe(exeWide);
+  if (MultiByteToWideChar(CP_UTF8, 0, exePathUtf8.c_str(), -1, wExe.data(), exeWide) == 0) {
+    return false;
+  }
+  const std::wstring exePath(wExe.data());
+
+  size_t last = exePathUtf8.find_last_of("/\\");
+  const std::string exeNameUtf8 =
+      (last != std::string::npos) ? exePathUtf8.substr(last + 1) : exePathUtf8;
+  if (exeNameUtf8.empty()) {
+    return false;
+  }
+  int nameWide = MultiByteToWideChar(CP_UTF8, 0, exeNameUtf8.c_str(), -1, nullptr, 0);
+  if (nameWide == 0) {
+    return false;
+  }
+  std::vector<wchar_t> wName(nameWide);
+  if (MultiByteToWideChar(CP_UTF8, 0, exeNameUtf8.c_str(), -1, wName.data(), nameWide) == 0) {
+    return false;
+  }
+  const std::wstring exeName(wName.data());
+
+  const std::wstring openCmd = L"\"" + exePath + L"\" \"%1\"";
+  const std::wstring appProgId = L"Applications\\" + exeName;
+  const std::wstring capsKey = L"Software\\COOLBIRDZIK\\CB File Hub\\Capabilities";
+
+  if (!SetRegString(HKEY_CURRENT_USER,
+                    L"Software\\Classes\\" + appProgId + L"\\shell\\open\\command",
+                    NULL, openCmd)) {
+    return false;
+  }
+  SetRegString(HKEY_CURRENT_USER, L"Software\\Classes\\" + appProgId,
+               L"FriendlyAppName", L"CB File Hub");
+  SetRegString(HKEY_CURRENT_USER, capsKey, L"ApplicationName", L"CB File Hub");
+  SetRegString(HKEY_CURRENT_USER, capsKey, L"ApplicationDescription",
+               L"CB File Hub file manager");
+
+  bool any = false;
+  for (const auto& extUtf8 : extensionsUtf8) {
+    int extWide = MultiByteToWideChar(CP_UTF8, 0, extUtf8.c_str(), -1, nullptr, 0);
+    if (extWide == 0) {
+      continue;
+    }
+    std::vector<wchar_t> wExt(extWide);
+    if (MultiByteToWideChar(CP_UTF8, 0, extUtf8.c_str(), -1, wExt.data(), extWide) == 0) {
+      continue;
+    }
+    std::wstring ext(wExt.data());
+    if (ext.empty()) {
+      continue;
+    }
+    if (ext[0] != L'.') {
+      ext = L"." + ext;
+    }
+
+    const std::wstring progId = ProgIdForExtension(ext);
+    const std::wstring displayName = L"CB File Hub " + ext + L" File";
+    const std::wstring progBase = L"Software\\Classes\\" + progId;
+
+    SetRegString(HKEY_CURRENT_USER, progBase, NULL, displayName);
+    SetRegString(HKEY_CURRENT_USER, progBase + L"\\shell\\open\\command", NULL, openCmd);
+    SetRegString(HKEY_CURRENT_USER, progBase + L"\\DefaultIcon", NULL, exePath + L",0");
+    SetRegString(HKEY_CURRENT_USER, L"Software\\Classes\\" + ext + L"\\OpenWithList",
+                 exeName.c_str(), L"");
+    SetRegString(HKEY_CURRENT_USER, L"Software\\Classes\\" + ext + L"\\OpenWithProgids",
+                 progId.c_str(), L"");
+    SetRegString(HKEY_CURRENT_USER, capsKey + L"\\FileAssociations", ext.c_str(), progId);
+
+    if (setAsDefault) {
+      SetRegString(HKEY_CURRENT_USER, L"Software\\Classes\\" + ext, NULL, progId);
+    }
+    any = true;
+  }
+
+  SetRegString(HKEY_CURRENT_USER, L"Software\\RegisteredApplications",
+               L"CB File Hub", capsKey);
+  return any;
+}
+
+static bool SetSelfAsDefaultForVideo(const std::string& exePath) {
+  static const char* kVideoExts[] = {
+      ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v",
+      ".mpeg", ".mpg", ".ogv", ".3gp", ".ts", ".m2ts", ".divx",
+  };
+  std::vector<std::string> extensions;
+  extensions.reserve(sizeof(kVideoExts) / sizeof(kVideoExts[0]));
+  for (const char* ext : kVideoExts) {
+    extensions.emplace_back(ext);
+  }
+  return RegisterFileAssociations(exePath, extensions, true);
 }
 
 // ---------------------------------------------------------------------------

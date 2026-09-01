@@ -573,7 +573,7 @@ class SharedActionBar {
     Function(ViewMode)? onViewModeSelected,
     VoidCallback? onPreviewPaneToggled,
     bool isPreviewPaneVisible = true,
-    bool showPreviewModeOption = false,
+    bool showDesktopViewModes = false,
     List<PopupMenuEntry<String>>? additionalMoreOptions,
     Function(String)? onAdditionalMoreOptionSelected,
   }) {
@@ -664,7 +664,7 @@ class SharedActionBar {
     );
 
     // Add grid size popover if in grid mode
-    if ((viewMode == ViewMode.grid || viewMode == ViewMode.gridPreview) &&
+    if (viewMode == ViewMode.grid &&
         currentGridZoomLevel != null &&
         onGridZoomChanged != null) {
       final bool isMobile = Platform.isAndroid || Platform.isIOS;
@@ -709,9 +709,7 @@ class SharedActionBar {
           ),
         );
       }
-    } else if ((viewMode == ViewMode.grid ||
-            viewMode == ViewMode.gridPreview) &&
-        onGridSizePressed != null) {
+    } else if (viewMode == ViewMode.grid && onGridSizePressed != null) {
       // Legacy fallback
       actions.add(
         IconButton(
@@ -722,10 +720,10 @@ class SharedActionBar {
       );
     }
 
-    if (viewMode == ViewMode.gridPreview && onPreviewPaneToggled != null) {
+    if (onPreviewPaneToggled != null) {
       actions.add(
         IconButton(
-          icon: const Icon(PhosphorIconsLight.splitVertical),
+          icon: const Icon(PhosphorIconsLight.sidebar),
           tooltip: isPreviewPaneVisible ? l10n.hidePreview : l10n.showPreview,
           onPressed: onPreviewPaneToggled,
         ),
@@ -782,6 +780,36 @@ class SharedActionBar {
             ),
           ),
           PopupMenuItem<ViewMode>(
+            value: ViewMode.tiles,
+            child: Row(
+              children: [
+                Icon(
+                  PhosphorIconsLight.gridNine,
+                  size: 20,
+                  color: viewMode == ViewMode.tiles
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  l10n.viewModeTiles,
+                  style: TextStyle(
+                    fontWeight: viewMode == ViewMode.tiles
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: viewMode == ViewMode.tiles
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                ),
+                const Spacer(),
+                if (viewMode == ViewMode.tiles)
+                  Icon(PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary, size: 20),
+              ],
+            ),
+          ),
+          PopupMenuItem<ViewMode>(
             value: ViewMode.grid,
             child: Row(
               children: [
@@ -811,37 +839,6 @@ class SharedActionBar {
               ],
             ),
           ),
-          if (showPreviewModeOption)
-            PopupMenuItem<ViewMode>(
-              value: ViewMode.gridPreview,
-              child: Row(
-                children: [
-                  Icon(
-                    PhosphorIconsLight.splitVertical,
-                    size: 20,
-                    color: viewMode == ViewMode.gridPreview
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    l10n.viewModeGridPreview,
-                    style: TextStyle(
-                      fontWeight: viewMode == ViewMode.gridPreview
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: viewMode == ViewMode.gridPreview
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (viewMode == ViewMode.gridPreview)
-                    Icon(PhosphorIconsLight.check,
-                        color: Theme.of(context).colorScheme.primary, size: 20),
-                ],
-              ),
-            ),
           PopupMenuItem<ViewMode>(
             value: ViewMode.details,
             child: Row(
@@ -872,7 +869,7 @@ class SharedActionBar {
               ],
             ),
           ),
-          if (showPreviewModeOption)
+          if (showDesktopViewModes)
             PopupMenuItem<ViewMode>(
               value: ViewMode.columns,
               child: Row(

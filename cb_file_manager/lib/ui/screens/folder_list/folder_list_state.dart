@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:equatable/equatable.dart';
 
 // Define view modes
-enum ViewMode { list, grid, details, gridPreview, columns, tree }
+enum ViewMode { list, grid, details, gridPreview, columns, tree, tiles }
 
 // Define sort options
 enum SortOption {
@@ -249,6 +249,7 @@ class FolderListState extends Equatable {
   final bool searchRecursive; // Flag for recursive search operations
   final int
       clipboardRevision; // Revision counter to trigger rebuild on clipboard changes
+  final List<String> retryableElevatedDeletePaths;
 
   FolderListState(
     String initialPath, {
@@ -277,6 +278,7 @@ class FolderListState extends Equatable {
     this.isGlobalSearch = false,
     this.searchRecursive = false,
     this.clipboardRevision = 0,
+    this.retryableElevatedDeletePaths = const [],
   })  : currentPath = Directory(initialPath),
         folders = folders ?? [],
         files = files ?? [],
@@ -324,6 +326,7 @@ class FolderListState extends Equatable {
     bool? isGlobalSearch,
     bool? searchRecursive,
     int? clipboardRevision,
+    List<String>? retryableElevatedDeletePaths,
   }) {
     return FolderListState(
       currentPath?.path ?? this.currentPath.path,
@@ -363,6 +366,8 @@ class FolderListState extends Equatable {
       isGlobalSearch: isGlobalSearch ?? this.isGlobalSearch,
       searchRecursive: searchRecursive ?? this.searchRecursive,
       clipboardRevision: clipboardRevision ?? this.clipboardRevision,
+      retryableElevatedDeletePaths:
+          retryableElevatedDeletePaths ?? this.retryableElevatedDeletePaths,
     );
   }
 
@@ -392,6 +397,7 @@ class FolderListState extends Equatable {
         isSearchByMedia,
         isGlobalSearch,
         searchRecursive,
+        retryableElevatedDeletePaths,
         // NOTE: clipboardRevision is intentionally excluded from props
         // to prevent full rebuild when clipboard changes (copy/cut operations)
         // Only items affected by cut should show visual feedback

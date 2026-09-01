@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/config/language_controller.dart';
@@ -25,6 +26,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
 import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_section.dart';
+import 'package:cb_file_manager/ui/screens/settings/context_menu_layout_settings_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
@@ -55,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Show file tags setting
   bool _showFileTags = true;
+  FileThumbnailFitMode _fileThumbnailFitMode = FileThumbnailFitMode.cover;
   TagThumbnailFitMode _tagThumbnailFitMode = TagThumbnailFitMode.contain;
   bool _rememberTabWorkspace = false;
   // Tab inactive threshold (in minutes). 0 means auto-suspend disabled.
@@ -63,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Use system default app for video (false = in-app player by default)
   bool _useSystemDefaultForVideo = false;
+  bool _openVideoInNewWindow = true;
   bool _isThemeExpanded = false;
   bool _isLanguageExpanded = false;
   String _appVersion = '';
@@ -122,11 +126,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final thumbnailMode = await _preferences.getThumbnailMode();
       final maxConcurrency = await _preferences.getMaxThumbnailConcurrency();
       final showFileTags = await _preferences.getShowFileTags();
+      final fileThumbnailFitMode = await _preferences.getFileThumbnailFitMode();
       final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
       final rememberTabWorkspace =
           await _preferences.getRememberTabWorkspaceEnabled();
       final useSystemDefaultForVideo =
           await _preferences.getUseSystemDefaultForVideo();
+      final openVideoInNewWindow = await _preferences.getOpenVideoInNewWindow();
       final tabInactiveMinutes =
           await _preferences.getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
@@ -138,9 +144,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _thumbnailMode = thumbnailMode;
           _maxConcurrency = maxConcurrency;
           _showFileTags = showFileTags;
+          _fileThumbnailFitMode = fileThumbnailFitMode;
           _tagThumbnailFitMode = tagThumbnailFitMode;
           _rememberTabWorkspace = rememberTabWorkspace;
           _useSystemDefaultForVideo = useSystemDefaultForVideo;
+          _openVideoInNewWindow = openVideoInNewWindow;
           _tabInactiveThresholdMinutes = tabInactiveMinutes;
           _isLoading = false;
         });
@@ -236,6 +244,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _updateFileThumbnailFitMode(FileThumbnailFitMode mode) async {
+    final saved = await _preferences.setFileThumbnailFitMode(mode);
+    if (saved && mounted) {
+      setState(() {
+        _fileThumbnailFitMode = mode;
+      });
+    }
+  }
+
   Future<void> _updateRememberTabWorkspace(bool enabled) async {
     await _preferences.setRememberTabWorkspaceEnabled(enabled);
     if (!enabled) {
@@ -262,6 +279,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _tabInactiveThresholdMinutes = clamped;
       });
+    }
+  }
+
+  Future<void> _updateOpenVideoInNewWindow(bool value) async {
+    await _preferences.setOpenVideoInNewWindow(value);
+    setState(() => _openVideoInNewWindow = value);
+    if (mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      AppToast.success(
+        context,
+        value
+            ? l10n.openVideoInNewWindowEnabled
+            : l10n.openVideoInNewWindowDisabled,
+      );
     }
   }
 
@@ -500,24 +531,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         _buildCompactSettingTile(
+          title: AppLocalizations.of(context)!.fileThumbnailFit,
+          subtitle: AppLocalizations.of(context)!.fileThumbnailFitDescription,
+          icon: PhosphorIconsLight.imageSquare,
+          trailing: CbSelect<FileThumbnailFitMode>(
+            value: _fileThumbnailFitMode,
+            onChanged: _updateFileThumbnailFitMode,
+            items: [
+              CbSelectItem(
+                value: FileThumbnailFitMode.cover,
+                label: AppLocalizations.of(context)!.thumbnailFitCover,
+              ),
+              CbSelectItem(
+                value: FileThumbnailFitMode.contain,
+                label: AppLocalizations.of(context)!.thumbnailFitContain,
+              ),
+            ],
+          ),
+        ),
+        _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.tagThumbnailFit,
           subtitle: AppLocalizations.of(context)!.tagThumbnailFitDescription,
           icon: PhosphorIconsLight.image,
-          trailing: DropdownButton<TagThumbnailFitMode>(
+          trailing: CbSelect<TagThumbnailFitMode>(
             value: _tagThumbnailFitMode,
-            onChanged: (mode) {
-              if (mode != null) {
-                _updateTagThumbnailFitMode(mode);
-              }
-            },
+            onChanged: _updateTagThumbnailFitMode,
             items: [
-              DropdownMenuItem(
+              CbSelectItem(
                 value: TagThumbnailFitMode.contain,
-                child: Text(AppLocalizations.of(context)!.thumbnailFitContain),
+                label: AppLocalizations.of(context)!.thumbnailFitContain,
               ),
-              DropdownMenuItem(
+              CbSelectItem(
                 value: TagThumbnailFitMode.cover,
-                child: Text(AppLocalizations.of(context)!.thumbnailFitCover),
+                label: AppLocalizations.of(context)!.thumbnailFitCover,
               ),
             ],
           ),
@@ -531,6 +577,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _rememberTabWorkspace,
             onChanged: _updateRememberTabWorkspace,
           ),
+        ),
+        _buildCompactSettingTile(
+          title: AppLocalizations.of(context)!.contextMenuLayout,
+          subtitle: AppLocalizations.of(context)!.contextMenuLayoutDescription,
+          icon: PhosphorIconsLight.listDashes,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ContextMenuLayoutSettingsScreen(),
+              ),
+            );
+          },
         ),
         _buildTabInactiveThresholdTile(),
         _buildCompactSettingTile(
@@ -558,6 +616,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _updateUseSystemDefaultForVideo,
           ),
         ),
+        if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          _buildCompactSettingTile(
+            title: AppLocalizations.of(context)!.openVideoInNewWindow,
+            subtitle:
+                AppLocalizations.of(context)!.openVideoInNewWindowDescription,
+            icon: PhosphorIconsLight.appWindow,
+            trailing: Switch(
+              value: _openVideoInNewWindow,
+              onChanged: _updateOpenVideoInNewWindow,
+            ),
+          ),
         // Thumbnail Mode Selection
         Padding(
           padding: const EdgeInsets.all(16),
@@ -1745,24 +1814,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          DropdownButton<int>(
+          CbSelect.fromValues<int>(
+            values: values,
             value: current,
-            isDense: true,
-            underline: const SizedBox.shrink(),
-            items: [
-              for (final v in values)
-                DropdownMenuItem<int>(
-                  value: v,
-                  child: Text(
-                    _formatTabInactiveThresholdLabel(v),
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-            ],
-            onChanged: (value) {
-              if (value == null) return;
-              _updateTabInactiveThresholdMinutes(value);
-            },
+            labelBuilder: _formatTabInactiveThresholdLabel,
+            onChanged: _updateTabInactiveThresholdMinutes,
           ),
         ],
       ),
@@ -1869,6 +1925,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               }),
               _buildAccentColorControl(themeProvider),
+              _buildFontColorControl(themeProvider),
+              _buildUiFontControl(themeProvider),
               if (showDesktopAcrylicControl) ...[
                 _buildBackdropModeControl(themeProvider),
                 _buildDesktopAcrylicStrengthControl(themeProvider),
@@ -1887,19 +1945,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final accents =
         ThemeConfig.accentSeedColors.entries.toList(growable: false);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Accent Color',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            l10n.accentColor,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-            'Current accent: $selectedAccentName',
+            l10n.currentAccentColor(selectedAccentName),
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
@@ -1954,25 +2013,211 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildFontColorControl(ThemeProvider themeProvider) {
+    final selectedFont = themeProvider.currentFontColor;
+    final selectedFontName =
+        ThemeConfig.fontColorNames[selectedFont] ?? selectedFont.name;
+    final fonts = AppFontColor.values.toList(growable: false);
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final currentAccent = themeProvider.currentAccentColor;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.fontColor,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.currentFontColor(selectedFontName),
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: fonts.map((fontColor) {
+              final isSelected = fontColor == selectedFont;
+              final letterColor = ThemeConfig.fontColorSwatch(
+                fontColor,
+                brightness: theme.brightness,
+                accentColor: currentAccent,
+                fallback: theme.colorScheme.onSurface,
+              );
+              return Tooltip(
+                message:
+                    ThemeConfig.fontColorNames[fontColor] ?? fontColor.name,
+                child: InkWell(
+                  onTap: () =>
+                      context.read<ThemeProvider>().setFontColor(fontColor),
+                  borderRadius: BorderRadius.circular(99),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline.withValues(alpha: 0.35),
+                        width: isSelected ? 2 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.18),
+                                blurRadius: 6,
+                                spreadRadius: 0.2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      'A',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: letterColor,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUiFontControl(ThemeProvider themeProvider) {
+    final selected = themeProvider.currentUiFont;
+    final selectedName =
+        AppUiFontConfig.displayNames[selected] ?? selected.name;
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.uiFont,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.currentUiFont(selectedName),
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.uiFontUnicodeHint,
+            style: TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: AppUiFont.values.map((font) {
+              final isSelected = font == selected;
+              final name = AppUiFontConfig.displayNames[font] ?? font.name;
+              return Tooltip(
+                message: name,
+                child: InkWell(
+                  onTap: () => context.read<ThemeProvider>().setUiFont(font),
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                          : theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.outline.withValues(alpha: 0.28),
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: AppUiFontConfig.previewStyle(font).copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          AppUiFontConfig.previewSample,
+                          style: AppUiFontConfig.previewStyle(
+                            font,
+                            fontSize: 12,
+                          ).copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBackdropModeControl(ThemeProvider themeProvider) {
     final theme = Theme.of(context);
     final mode = themeProvider.backdropMode;
     final imagePath = themeProvider.backdropImagePath;
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Backdrop Mode',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            l10n.backdropMode,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
             mode == AcrylicBackdropMode.wallpaper
-                ? 'Using system wallpaper as backdrop.'
-                : 'Using system dynamic acrylic backdrop.',
+                ? l10n.backdropModeWallpaperDescription
+                : l10n.backdropModeDynamicDescription,
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
@@ -1982,7 +2227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Row(
             children: [
               _buildModeChip(
-                label: 'Dynamic',
+                label: l10n.backdropModeDynamic,
                 icon: PhosphorIconsLight.monitor,
                 isSelected: mode == AcrylicBackdropMode.dynamic,
                 onTap: () =>
@@ -1990,7 +2235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(width: 8),
               _buildModeChip(
-                label: 'Wallpaper',
+                label: l10n.backdropModeWallpaper,
                 icon: PhosphorIconsLight.image,
                 isSelected: mode == AcrylicBackdropMode.wallpaper,
                 onTap: () => themeProvider
@@ -2006,7 +2251,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Text(
                     imagePath != null && imagePath.isNotEmpty
                         ? imagePath.split(Platform.pathSeparator).last
-                        : 'No system wallpaper detected',
+                        : l10n.noSystemWallpaperDetected,
                     style: TextStyle(
                       fontSize: 12,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -2021,8 +2266,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => themeProvider.refreshSystemWallpaper(),
                     icon: const Icon(PhosphorIconsLight.arrowsClockwise,
                         size: 14),
-                    label:
-                        const Text('Refresh', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.refresh,
+                        style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
@@ -2045,7 +2290,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     },
                     icon: const Icon(PhosphorIconsLight.folderOpen, size: 14),
-                    label: const Text('Custom', style: TextStyle(fontSize: 12)),
+                    label: Text(l10n.customBackdropImage,
+                        style: const TextStyle(fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
@@ -2067,7 +2313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: theme.colorScheme.errorContainer,
                       alignment: Alignment.center,
                       child: Text(
-                        'Image not found',
+                        l10n.backdropImageNotFound,
                         style: TextStyle(
                           fontSize: 11,
                           color: theme.colorScheme.onErrorContainer,
@@ -2139,19 +2385,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDesktopAcrylicStrengthControl(ThemeProvider themeProvider) {
     final value = themeProvider.desktopAcrylicStrength;
     final percentage = (value * 100).round();
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Desktop Acrylic Strength',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            l10n.desktopAcrylicStrength,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-            'Adjust blur and tint intensity for desktop backdrop ($percentage%).',
+            l10n.desktopAcrylicStrengthDescription(percentage),
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,

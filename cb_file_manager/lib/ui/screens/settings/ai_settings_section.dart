@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -525,28 +526,20 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!isEdit) ...[
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedPresetName,
-                    decoration: InputDecoration(
-                      labelText: l.providerPreset,
-                      prefixIcon: const Icon(PhosphorIconsLight.robot),
-                    ),
-                    hint: Text(l.selectProviderPreset),
-                    isExpanded: true,
-                    menuMaxHeight: 360,
-                    items: sortedProviderPresets
-                        .map(
-                          (preset) => DropdownMenuItem<String>(
-                            value: preset.name,
-                            child: Text(
-                              preset.name,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
+                  CbSelect<String>(
+                    label: l.providerPreset,
+                    placeholder: l.selectProviderPreset,
+                    expand: true,
+                    value: _selectedPresetName,
+                    items: [
+                      for (final preset in sortedProviderPresets)
+                        CbSelectItem<String>(
+                          value: preset.name,
+                          label: preset.name,
+                          icon: PhosphorIconsLight.robot,
+                        ),
+                    ],
                     onChanged: (value) {
-                      if (value == null) return;
                       final preset = sortedProviderPresets.firstWhere(
                         (preset) => preset.name == value,
                       );
@@ -741,36 +734,33 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                                   ? 'Required'
                                   : null,
                             )
-                          : DropdownButtonFormField<String>(
-                              // ignore: deprecated_member_use
-                              value: _availableModels
+                          // `FormField` keeps the select inside the same
+                          // validation pass as the text fields around it now
+                          // that it no longer carries its own.
+                          : FormField<String>(
+                              initialValue: _availableModels
                                       .contains(_modelController.text)
                                   ? _modelController.text
                                   : null,
-                              decoration: InputDecoration(
-                                labelText: l.defaultModel,
-                              ),
-                              isExpanded: true,
-                              hint: Text(l.selectModel),
-                              items: _availableModels
-                                  .map((m) => DropdownMenuItem(
-                                        value: m,
-                                        child: Text(
-                                          m,
-                                          style: const TextStyle(fontSize: 13),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ))
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value != null) {
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null,
+                              builder: (field) => CbSelect<String>(
+                                label: l.defaultModel,
+                                placeholder: l.selectModel,
+                                expand: true,
+                                value: field.value,
+                                errorText: field.errorText,
+                                items: [
+                                  for (final m in _availableModels)
+                                    CbSelectItem<String>(value: m, label: m),
+                                ],
+                                onChanged: (value) {
+                                  field.didChange(value);
                                   setState(() {
                                     _modelController.text = value;
                                   });
-                                }
-                              },
-                              validator: (v) =>
-                                  v == null || v.isEmpty ? 'Required' : null,
+                                },
+                              ),
                             ),
                     ),
                     const SizedBox(width: 8),

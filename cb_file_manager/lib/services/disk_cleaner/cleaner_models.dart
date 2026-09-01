@@ -3,6 +3,8 @@
 /// All types here are platform-agnostic and contain no Flutter, BLoC, or LLM
 /// dependencies, so they are safe to ship into an isolate.
 
+import '../app_insights/app_insights_models.dart';
+
 /// Safety level for a [CleanerCategory].
 ///
 /// - [safe] — almost certainly junk; can be deleted without thinking.
@@ -106,6 +108,17 @@ class CleanerPathRule {
   /// When true, recurse into subdirectories. Default true.
   final bool recursive;
 
+  /// Stable names, executable names, or package identifiers that can be used
+  /// to associate this rule with exactly one installed application.
+  ///
+  /// Hints are deliberately optional. A rule without an unambiguous owner is
+  /// still valid Cleaner data, but App Insights must not attribute it to an
+  /// application or offer it from that application's cleanup review.
+  final List<String> appOwnerHints;
+
+  /// How App Insights should describe storage matched by this rule.
+  final AppStorageKind? storageKind;
+
   const CleanerPathRule({
     required this.source,
     this.includeGlobs,
@@ -113,6 +126,8 @@ class CleanerPathRule {
     this.minAge,
     this.emptyOnly = true,
     this.recursive = true,
+    this.appOwnerHints = const <String>[],
+    this.storageKind,
   });
 }
 

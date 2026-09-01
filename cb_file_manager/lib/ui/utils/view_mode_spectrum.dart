@@ -1,4 +1,5 @@
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 
 /// Result of a single spectrum step: the resolved view mode and grid zoom level.
@@ -25,7 +26,7 @@ class ViewSpectrumResult {
 /// single linear "view scale" spectrum, ordered from densest to most spacious:
 ///
 /// ```
-/// tree → columns → details → list → grid(maxZoom) → ... → grid(minZoom)
+/// tree → columns → details → list → tiles → grid(maxZoom) → ... → grid(minZoom)
 /// (densest)                                                  (most spacious)
 /// ```
 ///
@@ -34,9 +35,8 @@ class ViewSpectrumResult {
 /// ends. This is the shared engine that drives Ctrl+scroll on every
 /// file-listing page.
 ///
-/// [ViewMode.gridPreview] is never a spectrum stop: callers exclude it from
-/// [supported] and treat a current `gridPreview` mode as `grid` for zoom
-/// purposes (see [step]).
+/// [ViewMode.gridPreview] is deprecated: treat it as [ViewMode.grid] and control
+/// preview via a separate pane visibility toggle.
 class ViewModeSpectrum {
   /// Canonical dense → spacious order of the non-grid modes.
   static const List<ViewMode> nonGridOrder = [
@@ -44,6 +44,7 @@ class ViewModeSpectrum {
     ViewMode.columns,
     ViewMode.details,
     ViewMode.list,
+    ViewMode.tiles,
   ];
 
   /// Builds the ordered list of non-grid stops a page supports, in canonical
@@ -79,12 +80,7 @@ class ViewModeSpectrum {
     final int safeMax = maxZoom < minZoom ? minZoom : maxZoom;
     final int clampedZoom = currentZoom.clamp(minZoom, safeMax).toInt();
 
-    // gridPreview is excluded from the spectrum: only adjust zoom, stay put.
-    if (currentMode == ViewMode.gridPreview) {
-      final int nextZoom =
-          (clampedZoom - delta).clamp(minZoom, safeMax).toInt();
-      return ViewSpectrumResult(ViewMode.gridPreview, nextZoom);
-    }
+    final normalizedMode = ViewModeUtils.normalize(currentMode);
 
     final List<ViewMode> nonGrid = nonGridStops(supported);
 
@@ -98,11 +94,11 @@ class ViewModeSpectrum {
     final int totalStops = nonGrid.length + gridStopCount;
 
     int currentIndex;
-    if (currentMode == ViewMode.grid) {
+    if (normalizedMode == ViewMode.grid) {
       // Grid stop index: zoom == safeMax → first grid stop (nonGrid.length).
       currentIndex = nonGrid.length + (safeMax - clampedZoom);
     } else {
-      final int idx = nonGrid.indexOf(currentMode);
+      final int idx = nonGrid.indexOf(normalizedMode);
       if (idx >= 0) {
         currentIndex = idx;
       } else {

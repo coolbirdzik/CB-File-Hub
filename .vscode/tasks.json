@@ -1,0 +1,494 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "just",
+      "type": "shell",
+      "command": "just",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: deps",
+      "type": "shell",
+      "command": "just deps",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: fetch-llama",
+      "type": "shell",
+      "command": "just fetch-llama",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: doctor",
+      "type": "shell",
+      "command": "just doctor",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: clean",
+      "type": "shell",
+      "command": "just clean",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: deep-clean",
+      "type": "shell",
+      "command": "just deep-clean",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: analyze",
+      "type": "shell",
+      "command": "just analyze",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$dart-analyze"
+    },
+    {
+      "label": "just: format",
+      "type": "shell",
+      "command": "just format",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: verify",
+      "type": "shell",
+      "command": "just verify",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$dart-analyze"
+    },
+    {
+      "label": "just: verify-format",
+      "type": "shell",
+      "command": "just verify-format",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: test",
+      "type": "shell",
+      "command": "just test",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$dart-test"
+    },
+    {
+      "label": "just: kill-cb",
+      "type": "shell",
+      "command": "just kill-cb",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e",
+      "type": "shell",
+      "command": "just e2e",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e (suite)",
+      "type": "shell",
+      "command": "just e2e \"${input:e2eSuite}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: dashboard",
+      "type": "shell",
+      "command": "just dashboard",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-list",
+      "type": "shell",
+      "command": "just e2e-list",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-parallel",
+      "type": "shell",
+      "command": "just e2e-parallel",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-parallel (suite)",
+      "type": "shell",
+      "command": "just e2e-parallel \"${input:e2eSuite}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-serial",
+      "type": "shell",
+      "command": "just e2e-serial",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-plain",
+      "type": "shell",
+      "command": "just e2e-plain",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-failed",
+      "type": "shell",
+      "command": "just e2e-failed",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-clean",
+      "type": "shell",
+      "command": "just e2e-clean",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: e2e-file",
+      "type": "shell",
+      "command": "just e2e-file \"${input:e2eFile}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: windows",
+      "type": "shell",
+      "command": "just windows",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: windows-msi",
+      "type": "shell",
+      "command": "just windows-msi",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: windows-msix",
+      "type": "shell",
+      "command": "just windows-msix",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: windows-msix-store",
+      "type": "shell",
+      "command": "just windows-msix-store",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: android",
+      "type": "shell",
+      "command": "just android",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: android-aab",
+      "type": "shell",
+      "command": "just android-aab",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: linux",
+      "type": "shell",
+      "command": "just linux",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: macos",
+      "type": "shell",
+      "command": "just macos",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: ios",
+      "type": "shell",
+      "command": "just ios",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: all",
+      "type": "shell",
+      "command": "just all",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: version",
+      "type": "shell",
+      "command": "just version",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: version-info",
+      "type": "shell",
+      "command": "just version-info",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: next-patch",
+      "type": "shell",
+      "command": "just next-patch",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: next-minor",
+      "type": "shell",
+      "command": "just next-minor",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: next-major",
+      "type": "shell",
+      "command": "just next-major",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: update-version",
+      "type": "shell",
+      "command": "just update-version \"${input:newVersion}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: bump-patch",
+      "type": "shell",
+      "command": "just bump-patch",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: bump-minor",
+      "type": "shell",
+      "command": "just bump-minor",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: bump-major",
+      "type": "shell",
+      "command": "just bump-major",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: bump-build",
+      "type": "shell",
+      "command": "just bump-build",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: release-patch",
+      "type": "shell",
+      "command": "just release-patch",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: release-minor",
+      "type": "shell",
+      "command": "just release-minor",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: release-major",
+      "type": "shell",
+      "command": "just release-major",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: retag",
+      "type": "shell",
+      "command": "just retag \"${input:tag}\" \"${input:remote}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: retag-one",
+      "type": "shell",
+      "command": "just retag-one \"${input:tag}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: git-status",
+      "type": "shell",
+      "command": "just git-status",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: git-push",
+      "type": "shell",
+      "command": "just git-push",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "just: git-push-tags",
+      "type": "shell",
+      "command": "just git-push-tags",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "e2eSuite",
+      "type": "promptString",
+      "description": "E2E suite or test-name filter (leave empty for all)",
+      "default": ""
+    },
+    {
+      "id": "e2eFile",
+      "type": "promptString",
+      "description": "E2E test file name",
+      "default": "app_e2e_test"
+    },
+    {
+      "id": "newVersion",
+      "type": "promptString",
+      "description": "New version (x.y.z)"
+    },
+    {
+      "id": "tag",
+      "type": "promptString",
+      "description": "Git tag"
+    },
+    {
+      "id": "remote",
+      "type": "promptString",
+      "description": "Git remote",
+      "default": "origin"
+    }
+  ]
+}

@@ -17,6 +17,8 @@ enum AcrylicBackdropMode {
 class ThemeProvider extends ChangeNotifier {
   static const String _themeKey = 'app_theme';
   static const String _accentColorKey = 'app_accent_color';
+  static const String _fontColorKey = 'app_font_color';
+  static const String _uiFontKey = 'app_ui_font';
   static const String _desktopAcrylicStrengthKey = 'desktop_acrylic_strength';
   static const String _backdropModeKey = 'acrylic_backdrop_mode';
   static const String _backdropImagePathKey = 'acrylic_backdrop_image_path';
@@ -25,12 +27,16 @@ class ThemeProvider extends ChangeNotifier {
 
   AppThemeType _currentTheme = AppThemeType.light;
   AppAccentColor _currentAccentColor = ThemeConfig.defaultAccentColor;
+  AppFontColor _currentFontColor = ThemeConfig.defaultFontColor;
+  AppUiFont _currentUiFont = ThemeConfig.defaultUiFont;
   double _desktopAcrylicStrength = _defaultDesktopAcrylicStrength;
   AcrylicBackdropMode _backdropMode = AcrylicBackdropMode.dynamic;
   String? _backdropImagePath;
 
   AppThemeType get currentTheme => _currentTheme;
   AppAccentColor get currentAccentColor => _currentAccentColor;
+  AppFontColor get currentFontColor => _currentFontColor;
+  AppUiFont get currentUiFont => _currentUiFont;
   double get desktopAcrylicStrength => _desktopAcrylicStrength;
   AcrylicBackdropMode get backdropMode => _backdropMode;
   String? get backdropImagePath => _backdropImagePath;
@@ -38,10 +44,14 @@ class ThemeProvider extends ChangeNotifier {
   ThemeData get themeData => ThemeConfig.getTheme(
         _currentTheme,
         accentColor: _currentAccentColor,
+        fontColor: _currentFontColor,
+        uiFont: _currentUiFont,
       );
   fluent.FluentThemeData get fluentThemeData => FluentThemeConfig.getTheme(
         _currentTheme,
         accentColor: _currentAccentColor,
+        fontColor: _currentFontColor,
+        uiFont: _currentUiFont,
         acrylicStrength: _desktopAcrylicStrength,
         preferTransparentBackdrop: _backdropMode == AcrylicBackdropMode.dynamic,
       );
@@ -57,9 +67,6 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   bool get isDarkMode => themeMode == ThemeMode.dark;
-
-  ThemeData get lightTheme => ThemeConfig.lightTheme;
-  ThemeData get darkTheme => ThemeConfig.darkTheme;
 
   ThemeProvider() {
     _loadTheme();
@@ -85,6 +92,10 @@ class ThemeProvider extends ChangeNotifier {
     final themeString = prefs.getString(_themeKey) ?? 'light';
     final accentString =
         prefs.getString(_accentColorKey) ?? ThemeConfig.defaultAccentColor.name;
+    final fontColorString =
+        prefs.getString(_fontColorKey) ?? ThemeConfig.defaultFontColor.name;
+    final uiFontString =
+        prefs.getString(_uiFontKey) ?? ThemeConfig.defaultUiFont.name;
     final acrylicStrength = prefs.getDouble(_desktopAcrylicStrengthKey) ??
         _defaultDesktopAcrylicStrength;
     final backdropModeStr = prefs.getString(_backdropModeKey);
@@ -94,6 +105,14 @@ class ThemeProvider extends ChangeNotifier {
     _currentAccentColor = AppAccentColor.values.firstWhere(
       (accent) => accent.name == accentString,
       orElse: () => ThemeConfig.defaultAccentColor,
+    );
+    _currentFontColor = AppFontColor.values.firstWhere(
+      (fontColor) => fontColor.name == fontColorString,
+      orElse: () => ThemeConfig.defaultFontColor,
+    );
+    _currentUiFont = AppUiFont.values.firstWhere(
+      (uiFont) => uiFont.name == uiFontString,
+      orElse: () => ThemeConfig.defaultUiFont,
     );
     _desktopAcrylicStrength =
         acrylicStrength.clamp(_minimumDesktopAcrylicStrength, 2.0).toDouble();
@@ -130,6 +149,32 @@ class ThemeProvider extends ChangeNotifier {
     if (!persist) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accentColorKey, accentColor.name);
+  }
+
+  Future<void> setFontColor(
+    AppFontColor fontColor, {
+    bool persist = true,
+  }) async {
+    if (_currentFontColor == fontColor) return;
+    _currentFontColor = fontColor;
+    notifyListeners();
+
+    if (!persist) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_fontColorKey, fontColor.name);
+  }
+
+  Future<void> setUiFont(
+    AppUiFont uiFont, {
+    bool persist = true,
+  }) async {
+    if (_currentUiFont == uiFont) return;
+    _currentUiFont = uiFont;
+    notifyListeners();
+
+    if (!persist) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_uiFontKey, uiFont.name);
   }
 
   // Legacy method for backward compatibility

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import '../../../components/common/shared_file_context_menu.dart';
@@ -17,6 +18,8 @@ import 'package:cb_file_manager/ui/tab_manager/components/tag_context_menu.dart'
 import '../../../utils/item_interaction_style.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
+import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
+import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
 class FolderItem extends StatefulWidget {
   final Directory folder;
@@ -51,6 +54,8 @@ class _FolderItemState extends State<FolderItem> {
 
   // Lazy, cached folder stat to avoid I/O during fast scrolls
   late Future<FileStat> _folderStatFuture;
+  late Future<int?> _folderSizeFuture;
+  int _folderSizeGeneration = 0;
   static final Map<String, FileStat> _folderStatCache = <String, FileStat>{};
   static const int _maxCacheSize = 100;
 
@@ -62,10 +67,12 @@ class _FolderItemState extends State<FolderItem> {
   void initState() {
     super.initState();
     _folderStatFuture = _getFolderStatLazy();
+    _folderSizeFuture = _getFolderSizeLazy();
   }
 
   @override
   void dispose() {
+    _folderSizeGeneration++;
     _isHovering.dispose();
     super.dispose();
   }
@@ -74,15 +81,19 @@ class _FolderItemState extends State<FolderItem> {
   void didUpdateWidget(FolderItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.folder.path != widget.folder.path) {
+      _folderSizeGeneration++;
       _folderStatFuture = _getFolderStatLazy();
+      _folderSizeFuture = _getFolderSizeLazy();
     }
   }
 
   Future<FileStat> _getFolderStatLazy() async {
     final path = widget.folder.path;
 
-    // Skip stat for virtual network / tag paths to prevent errors and jank
-    if (path.startsWith('#network/') || path.startsWith('#search')) {
+    // Skip stat for virtual network / tag / archive paths to prevent errors and jank
+    if (path.startsWith('#network/') ||
+        path.startsWith('#search') ||
+        ArchivePathUtils.isArchiveBrowsePath(path)) {
       return Future.error('Virtual folder - no stat needed');
     }
 
@@ -100,6 +111,18 @@ class _FolderItemState extends State<FolderItem> {
     }
     _folderStatCache[path] = stat;
     return stat;
+  }
+
+  Future<int?> _getFolderSizeLazy() async {
+    final path = widget.folder.path;
+    final generation = _folderSizeGeneration;
+    if (path.startsWith('#network/') || path.startsWith('#search')) {
+      return null;
+    }
+    return LazyPathSizeCalculator.calculateDirectory(
+      path,
+      isCancelled: () => !mounted || generation != _folderSizeGeneration,
+    );
   }
 
   /// Leading icon: for a child-tag "folder" show its thumbnail (or a
@@ -336,19 +359,36 @@ class _FolderItemState extends State<FolderItem> {
                                     future: _folderStatFuture,
                                     builder: (context, snapshot) {
                                       if (snapshot.hasData) {
-                                        return Text(
-                                          snapshot.data!.modified
-                                              .toString()
-                                              .split('.')[0],
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.7),
-                                              ),
+                                        return FutureBuilder<int?>(
+                                          future: _folderSizeFuture,
+                                          builder: (context, sizeSnapshot) {
+                                            final modified = snapshot
+                                                .data!.modified
+                                                .toString()
+                                                .split('.')[0];
+                                            final size = sizeSnapshot.data;
+                                            final suffix = sizeSnapshot
+                                                        .connectionState ==
+                                                    ConnectionState.waiting
+                                                ? '  •  Calculating size...'
+                                                : size == null
+                                                    ? ''
+                                                    : '  •  ${FormatUtils.formatFileSize(size)}';
+                                            return Text(
+                                              '$modified$suffix',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(alpha: 0.7),
+                                                  ),
+                                            );
+                                          },
                                         );
                                       } else if (snapshot.hasError) {
                                         // For network folders or stat errors
@@ -398,11 +438,13 @@ class _FolderItemState extends State<FolderItem> {
                             _handleFolderSelection();
                           }
                         },
-                        onLongPress: () {
-                          if (widget.toggleFolderSelection != null) {
-                            _handleFolderSelection();
-                          }
-                        },
+                        onLongPress: !widget.isDesktopMode
+                            ? () {
+                                if (widget.toggleFolderSelection != null) {
+                                  _handleFolderSelection();
+                                }
+                              }
+                            : null,
                         onTertiaryTapUp: (_) {
                           context
                               .read<TabManagerBloc>()
@@ -413,6 +455,7 @@ class _FolderItemState extends State<FolderItem> {
                     // Interactive layer cho tên (navigate)
                     if (!isBeingRenamed)
                       Positioned(
+                        key: const ValueKey('name-hit-area'),
                         left: 80,
                         top: 0,
                         right: 0,
@@ -453,24 +496,32 @@ class _FolderItemState extends State<FolderItem> {
                           },
                         ),
                       ),
-                    // Selection indicator
-                    if (widget.isSelected)
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 3,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: widget.isDesktopMode
-                                ? const BorderRadius.horizontal(
-                                    left: Radius.circular(12),
-                                  )
-                                : BorderRadius.zero,
-                          ),
+                    // Selection indicator. Kept unconditionally in the Stack so
+                    // selection only flips a paint property instead of adding or
+                    // removing a child (see file_item.dart for the AXTree
+                    // rationale).
+                    Positioned(
+                      key: const ValueKey('selection-indicator'),
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 3,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: widget.isSelected
+                              ? BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: widget.isDesktopMode
+                                      ? const BorderRadius.horizontal(
+                                          left: Radius.circular(12),
+                                        )
+                                      : BorderRadius.zero,
+                                )
+                              : const BoxDecoration(),
+                          child: const SizedBox.expand(),
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),

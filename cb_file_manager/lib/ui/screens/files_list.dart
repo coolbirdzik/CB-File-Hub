@@ -135,31 +135,34 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// Toggle between view modes (list -> grid -> details -> list)
+  /// Toggle between view modes (list -> tiles -> grid -> details -> list)
   void toggleViewMode() {
     setState(() {
-      // Cycle through view modes: list -> grid -> grid preview -> details -> list
       if (viewMode == ViewMode.list) {
+        viewMode = ViewMode.tiles;
+      } else if (viewMode == ViewMode.tiles) {
         viewMode = ViewMode.grid;
-      } else if (viewMode == ViewMode.grid) {
-        viewMode = isDesktopPlatform ? ViewMode.gridPreview : ViewMode.details;
-      } else if (viewMode == ViewMode.gridPreview) {
+      } else if (viewMode == ViewMode.grid ||
+          viewMode == ViewMode.gridPreview) {
         viewMode = ViewMode.details;
-      } else {
+      } else if (viewMode == ViewMode.details) {
         viewMode = ViewMode.list;
       }
     });
 
-    folderListBloc.add(SetViewMode(viewMode));
-    saveViewModeSetting(viewMode);
+    folderListBloc.add(SetViewMode(
+        viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode));
+    saveViewModeSetting(
+        viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode);
   }
 
   /// Set view mode directly to a specific mode
   void setViewMode(ViewMode mode, {String? tabId}) {
+    final resolved = mode == ViewMode.gridPreview ? ViewMode.grid : mode;
     setState(() {
       viewMode = !isDesktopPlatform && mode == ViewMode.gridPreview
           ? ViewMode.grid
-          : mode;
+          : resolved;
     });
 
     folderListBloc.add(SetViewMode(viewMode));

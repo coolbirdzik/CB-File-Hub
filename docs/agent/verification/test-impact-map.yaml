@@ -1,0 +1,179 @@
+schema_version: 1
+verified_at: 2026-08-09
+path_base: workspace_root
+command_working_directory: cb_file_manager
+# Feature ids mirror docs/agent/feature-map.yaml.
+
+ci_order:
+  - "dart format --output=none --set-exit-if-changed ."
+  - "flutter analyze"
+  - "flutter test"
+  - "flutter test integration_test -d windows --dart-define=CB_E2E=true"
+  - "flutter build windows"
+
+features:
+  tabbed_file_browser:
+    paths:
+      - cb_file_manager/lib/ui/tab_manager/
+      - cb_file_manager/lib/ui/screens/folder_list/
+      - cb_file_manager/lib/bloc/selection/
+    focused_tests:
+      - "flutter test test/05_navigation_test.dart"
+      - "flutter test test/10_tab_activity_manager_test.dart"
+      - "flutter test test/helpers/files/windows_file_operations_test.dart test/ui/screens/folder_list/file_operations_bloc_test.dart"
+    windows_build_required_for_native_changes: true
+    e2e_recommended: true
+
+  ai_agent:
+    paths:
+      - cb_file_manager/lib/bloc/ai_agent/
+      - cb_file_manager/lib/services/ai/
+      - cb_file_manager/lib/ui/screens/ai_chat/
+    focused_tests:
+      - "flutter test test/16_cleaner_scan_registry_test.dart"
+      - "flutter test test/17_ai_agent_stop_test.dart"
+      - "flutter test test/18_app_storage_tool_test.dart"
+      - "flutter test test/19_cleaner_scan_advice_test.dart"
+
+  cb_agent_cleaner:
+    paths:
+      - cb_file_manager/lib/services/disk_cleaner/
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/
+      - cb_file_manager/lib/helpers/files/trash_manager.dart
+    focused_tests:
+      - "flutter test test/19_cleaner_scan_advice_test.dart"
+      - "flutter test test/services/disk_cleaner/cleaner_growth_history_service_test.dart"
+      - "flutter test test/services/disk_cleaner/disk_cleaner_isolate_test.dart"
+      - "flutter test test/services/disk_cleaner/disk_tree_selection_test.dart"
+      - "flutter test test/services/disk_cleaner/full_disk_scan_prune_test.dart"
+      - "flutter test test/services/disk_cleaner/usn_journal_test.dart"
+      - "flutter test test/helpers/files/trash_manager_test.dart"
+      - "flutter test test/helpers/files/windows_file_operations_test.dart"
+      - "flutter test test/ui/screens/cb_agent_cleaner/cb_agent_cleaner_app_mode_safety_test.dart"
+    manual_checks:
+      - "Confirm the preview contains only the exact approved targets."
+      - "Confirm click, Ctrl-click, Shift-click, and Space follow Explorer-style selection while remaining responsive on a large tree."
+      - "Confirm Recycle Bin and permanent delete remain visibly distinct."
+      - "After Select drives then rescanning the same drive, confirm unchanged paths are served from the cached tree and only changed folders refresh."
+
+  cleaner_app_insights:
+    paths:
+      - cb_file_manager/lib/services/app_insights/
+      - cb_file_manager/lib/bloc/cleaner_app_insights/
+      - cb_file_manager/lib/ui/screens/cb_agent_cleaner/cleaner_apps_view.dart
+    focused_tests:
+      - "flutter test test/services/app_insights/windows_app_inventory_service_test.dart"
+      - "flutter test test/services/app_insights/app_storage_analyzer_test.dart"
+      - "flutter test test/bloc/cleaner_app_insights_cubit_test.dart"
+      - "flutter test test/ui/screens/cb_agent_cleaner/cleaner_apps_view_test.dart"
+      - "flutter test test/18_app_storage_tool_test.dart"
+    windows_build_required_for_native_changes: true
+
+  windows_shell_context_menu:
+    paths:
+      - cb_file_manager/lib/helpers/files/windows_shell_context_menu.dart
+      - cb_file_manager/lib/ui/components/common/shared_file_context_menu.dart
+      - cb_file_manager/windows/runner/shell_context_menu_plugin.cpp
+    focused_tests:
+      - "flutter test test/helpers/files/windows_shell_context_menu_test.dart"
+      - "flutter test test/ui/components/common/shared_file_context_menu_test.dart"
+    windows_build_required: true
+    manual_checks:
+      - "Confirm the root menu opens immediately."
+      - "Open a third-party nested submenu and invoke a command on the exact selection."
+
+  local_ai_runtime:
+    paths:
+      - cb_file_manager/lib/services/local_ai/
+      - scripts/fetch_llama_runtime.sh
+      - cb_file_manager/windows/runner/CMakeLists.txt
+    focused_tests:
+      - "flutter test test/14_local_ai_advisor_service_test.dart"
+    windows_build_required_for_packaging_changes: true
+    prerequisites:
+      - "Run just fetch-llama before a direct Flutter Windows build on a clean checkout."
+
+  persistence:
+    paths:
+      - cb_file_manager/lib/models/database/
+      - cb_file_manager/lib/helpers/core/user_preferences.dart
+    focused_tests:
+      - "flutter test"
+    notes:
+      - "Persistence changes are broad; run the full unit/widget suite."
+
+  network_browsing:
+    paths:
+      - cb_file_manager/lib/bloc/network_browsing/
+      - cb_file_manager/lib/services/network_browsing/
+      - cb_file_manager/lib/services/network_credentials_service.dart
+      - mobile_smb_native/
+    focused_tests:
+      - "flutter test"
+    notes:
+      - "Stub coverage: deepen focused tests when this area is actively changed."
+      - "Prefer path-scoped unit tests over full suite once dedicated coverage exists."
+    e2e_recommended: true
+
+  media_streaming:
+    paths:
+      - cb_file_manager/lib/services/streaming/
+      - cb_file_manager/lib/ui/screens/media_gallery/video_player_full_screen.dart
+    focused_tests:
+      - "flutter test"
+    notes:
+      - "Stub coverage: deepen focused tests when this area is actively changed."
+      - "Validate remote/SMB playback sessions manually when proxy lifetime changes."
+
+  gallery_and_tags:
+    paths:
+      - cb_file_manager/lib/ui/screens/gallery_hub/
+      - cb_file_manager/lib/ui/screens/media_gallery/
+      - cb_file_manager/lib/ui/screens/tag_management/
+      - cb_file_manager/lib/helpers/tags/
+    focused_tests:
+      - "flutter test"
+    notes:
+      - "Stub coverage: deepen focused tests when this area is actively changed."
+
+  localization:
+    paths:
+      - cb_file_manager/lib/config/languages/app_localizations.dart
+      - cb_file_manager/lib/config/languages/english_localizations.dart
+      - cb_file_manager/lib/config/languages/vietnamese_localizations.dart
+    required_companions:
+      - cb_file_manager/lib/config/languages/app_localizations.dart
+      - cb_file_manager/lib/config/languages/english_localizations.dart
+      - cb_file_manager/lib/config/languages/vietnamese_localizations.dart
+    minimum_checks:
+      - "dart format --output=none --set-exit-if-changed lib/config/languages"
+      - "flutter analyze"
+
+  drive_manager:
+    paths:
+      - cb_file_manager/lib/services/drive/
+      - cb_file_manager/lib/ui/tab_manager/components/drive_view.dart
+      - cb_file_manager/android/app/src/main/kotlin/com/cbv/filehub/StorageVolumesPlugin.kt
+    focused_tests:
+      - "flutter test test/services/drive/drive_info_test.dart"
+      - "flutter test test/services/drive/drive_inventory_service_test.dart"
+    manual_checks:
+      - "Confirm removable USB/SD shows an eject action and system/primary volumes do not."
+      - "Confirm Android drive cards show free/used space after StorageVolumesPlugin registration."
+      - "Confirm rename and eject ask for confirmation and refresh the drive list."
+
+  archive_support:
+    paths:
+      - cb_file_manager/lib/services/archive/
+      - cb_file_manager/lib/ui/controllers/archive_operations_handler.dart
+      - cb_file_manager/lib/ui/dialogs/archive_browser_dialog.dart
+      - cb_file_manager/lib/ui/widgets/archive_preview.dart
+    focused_tests:
+      - "flutter test test/services/archive/archive_service_test.dart"
+      - "flutter test test/helpers/files/archive_path_utils_test.dart"
+
+notes:
+  - "Focused checks accelerate iteration; they do not prove runtime UX."
+  - "Do not terminate a user's running application merely to obtain a build result."
+  - "If LNK1168 locks the normal output, use a temporary build target and serialized MSBuild."
+  - "Legacy verification aliases: navigation_and_tabs -> tabbed_file_browser; cleaner -> cb_agent_cleaner."

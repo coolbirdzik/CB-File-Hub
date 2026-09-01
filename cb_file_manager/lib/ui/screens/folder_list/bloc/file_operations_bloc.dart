@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart'
     show FileOperations;
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
+import 'package:cb_file_manager/services/directory_listing_cache_service.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_event.dart';
 import 'package:path/path.dart' as path;
@@ -15,29 +18,42 @@ class FileOperationsState extends Equatable {
   final int clipboardRevision;
   final String? error;
   final bool isProcessing;
+  final List<String> retryableElevatedDeletePaths;
 
   const FileOperationsState({
     this.clipboardRevision = 0,
     this.error,
     this.isProcessing = false,
+    this.retryableElevatedDeletePaths = const [],
   });
 
   FileOperationsState copyWith({
     int? clipboardRevision,
-    Object? error,
+    Object? error = _unset,
     bool? isProcessing,
+    Object? retryableElevatedDeletePaths = _unset,
   }) {
     return FileOperationsState(
       clipboardRevision: clipboardRevision ?? this.clipboardRevision,
-      error: error is String ? error : (error == _unset ? null : this.error),
+      error: error == _unset ? this.error : error as String?,
       isProcessing: isProcessing ?? this.isProcessing,
+      retryableElevatedDeletePaths: retryableElevatedDeletePaths == _unset
+          ? this.retryableElevatedDeletePaths
+          : List<String>.unmodifiable(
+              retryableElevatedDeletePaths as List<String>,
+            ),
     );
   }
 
   static const _unset = Object();
 
   @override
-  List<Object?> get props => [clipboardRevision, error, isProcessing];
+  List<Object?> get props => [
+        clipboardRevision,
+        error,
+        isProcessing,
+        retryableElevatedDeletePaths,
+      ];
 }
 
 class FileOperationsBloc
@@ -55,6 +71,9 @@ class FileOperationsBloc
     on<FileOperationsPaste>(_onPaste);
     on<FileOperationsDeleteFiles>(_onDeleteFiles);
     on<FileOperationsDeleteItems>(_onDeleteItems);
+    on<FileOperationsRetryDeleteAsAdministrator>(
+      _onRetryDeleteAsAdministrator,
+    );
     on<FileOperationsRename>(_onRename);
     on<FileOperationsClearClipboard>(_onClearClipboard);
   }
@@ -138,6 +157,20 @@ class FileOperationsBloc
         },
       );
 
+      if (isCut) {
+        final movedSourcePaths = <String>[];
+        for (final item in clipboardItems) {
+          final type = await FileSystemEntity.type(
+            item.path,
+            followLinks: false,
+          );
+          if (type == FileSystemEntityType.notFound) {
+            movedSourcePaths.add(item.path);
+          }
+        }
+        DirectoryListingCacheService.instance.removePaths(movedSourcePaths);
+      }
+
       _progressController.succeed(
         progressId,
         detail:
@@ -169,6 +202,10 @@ class FileOperationsBloc
   ) async {
     final targetPaths = event.filePaths.toSet();
     if (targetPaths.isEmpty) return;
+    emit(state.copyWith(
+      error: null,
+      retryableElevatedDeletePaths: const <String>[],
+    ));
     final firstPath = event.filePaths.first;
     final destinationLabel = event.permanent ? 'permanently' : 'to Trash Bin';
 
@@ -190,6 +227,7 @@ class FileOperationsBloc
     final trashManager = TrashManager();
     int completed = 0;
     final List<String> failed = [];
+    final failureErrors = <String, Object>{};
     final progressThrottle = _ProgressUpdateThrottle();
 
     navigationBloc.add(FileNavigationRemovePaths(targetPaths));
@@ -210,6 +248,7 @@ class FileOperationsBloc
                 ),
               );
             },
+            onError: (path, error) => failureErrors[path] = error,
           )
         : await trashManager.moveMultipleToTrashBatched(
             pathsList,
@@ -232,14 +271,19 @@ class FileOperationsBloc
     completed = pathsList.length;
 
     if (failed.isNotEmpty) {
+      final failureMessage = formatDeleteFailure(
+        failedPaths: failed,
+        errorsByPath: failureErrors,
+      );
       _progressController.fail(
         progressId,
-        detail:
-            'Failed to delete ${failed.length} item${failed.length > 1 ? 's' : ''}',
+        detail: failureMessage,
       );
       emit(state.copyWith(
-        error:
-            'Failed to delete ${failed.length} item${failed.length > 1 ? 's' : ''}',
+        error: failureMessage,
+        retryableElevatedDeletePaths: event.permanent
+            ? _accessDeniedPaths(failed, failureErrors)
+            : const <String>[],
       ));
     } else {
       _progressController.succeed(
@@ -247,7 +291,10 @@ class FileOperationsBloc
         detail:
             '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} ${event.filePaths.length} file${event.filePaths.length > 1 ? 's' : ''}',
       );
-      emit(state.copyWith(error: null));
+      emit(state.copyWith(
+        error: null,
+        retryableElevatedDeletePaths: const <String>[],
+      ));
     }
 
     // Refresh
@@ -261,6 +308,10 @@ class FileOperationsBloc
   ) async {
     final Set<String> targets = {...event.filePaths, ...event.folderPaths};
     if (targets.isEmpty) return;
+    emit(state.copyWith(
+      error: null,
+      retryableElevatedDeletePaths: const <String>[],
+    ));
 
     final total = event.filePaths.length + event.folderPaths.length;
     final orderedTargets = <String>[...event.filePaths, ...event.folderPaths];
@@ -289,6 +340,7 @@ class FileOperationsBloc
     final trashManager = TrashManager();
     int completed = 0;
     final List<String> failed = [];
+    final failureErrors = <String, Object>{};
     final progressThrottle = _ProgressUpdateThrottle();
 
     navigationBloc.add(FileNavigationRemovePaths(targets));
@@ -315,6 +367,7 @@ class FileOperationsBloc
                 ),
               );
             },
+            onError: (path, error) => failureErrors[path] = error,
           )
         : await trashManager.moveMultipleToTrashBatched(
             pathsList,
@@ -342,14 +395,19 @@ class FileOperationsBloc
     }
 
     if (failed.isNotEmpty) {
+      final failureMessage = formatDeleteFailure(
+        failedPaths: failed,
+        errorsByPath: failureErrors,
+      );
       _progressController.fail(
         progressId,
-        detail:
-            'Failed to delete ${failed.length} item${failed.length > 1 ? 's' : ''}',
+        detail: failureMessage,
       );
       emit(state.copyWith(
-        error:
-            'Failed to delete ${failed.length} item${failed.length > 1 ? 's' : ''}',
+        error: failureMessage,
+        retryableElevatedDeletePaths: event.permanent
+            ? _accessDeniedPaths(failed, failureErrors)
+            : const <String>[],
       ));
     } else {
       _progressController.succeed(
@@ -357,7 +415,72 @@ class FileOperationsBloc
         detail:
             '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} $total item${total > 1 ? 's' : ''}',
       );
-      emit(state.copyWith(error: null));
+      emit(state.copyWith(
+        error: null,
+        retryableElevatedDeletePaths: const <String>[],
+      ));
+    }
+
+    final navState = navigationBloc.state;
+    navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
+  }
+
+  Future<void> _onRetryDeleteAsAdministrator(
+    FileOperationsRetryDeleteAsAdministrator event,
+    Emitter<FileOperationsState> emit,
+  ) async {
+    final exactRetryPaths = retainApprovedRetryPaths(
+      approvedPaths: state.retryableElevatedDeletePaths,
+      requestedPaths: event.failedPaths,
+    ).toSet();
+    if (exactRetryPaths.isEmpty) return;
+
+    emit(state.copyWith(
+      error: null,
+      isProcessing: true,
+      retryableElevatedDeletePaths: const <String>[],
+    ));
+
+    final paths = exactRetryPaths.toList(growable: false);
+    final progressId = _progressController.begin(
+      title: paths.length == 1
+          ? 'Deleting "${path.basename(paths.first)}" as administrator'
+          : 'Deleting ${paths.length} items as administrator',
+      total: paths.length,
+      detail: 'Waiting for Windows administrator approval',
+      isIndeterminate: true,
+      kind: OperationProgressKind.delete,
+      sourcePath: paths.first,
+    );
+
+    final succeeded =
+        await TrashManager().retryPermanentDeleteAsAdministrator(paths);
+    final failed = paths.where((path) => !succeeded.contains(path)).toList();
+
+    if (succeeded.isNotEmpty) {
+      navigationBloc.add(FileNavigationRemovePaths(succeeded));
+    }
+
+    if (failed.isEmpty) {
+      final message = paths.length == 1
+          ? 'Deleted "${paths.first}" as administrator.'
+          : 'Deleted ${paths.length} items as administrator.';
+      _progressController.succeed(progressId, detail: message);
+      emit(state.copyWith(
+        error: null,
+        isProcessing: false,
+        retryableElevatedDeletePaths: const <String>[],
+      ));
+    } else {
+      final message = failed.length == 1
+          ? 'Administrator delete was cancelled or failed for "${failed.first}".'
+          : 'Administrator delete was cancelled or failed for ${failed.length} items.';
+      _progressController.fail(progressId, detail: message);
+      emit(state.copyWith(
+        error: message,
+        isProcessing: false,
+        retryableElevatedDeletePaths: failed,
+      ));
     }
 
     final navState = navigationBloc.state;
@@ -413,6 +536,53 @@ class FileOperationsBloc
         ? path.basename(sourcePath)
         : '${path.basename(sourcePath)} and ${itemCount - 1} more';
     return '$action $sourceLabel from ${path.dirname(sourcePath)} to $destinationPath';
+  }
+
+  static String formatDeleteFailure({
+    required List<String> failedPaths,
+    required Map<String, Object> errorsByPath,
+  }) {
+    if (failedPaths.isEmpty) return 'Delete failed';
+
+    final firstPath = failedPaths.first;
+    final error = errorsByPath[firstPath];
+    final itemLabel = failedPaths.length == 1
+        ? '"$firstPath"'
+        : '${failedPaths.length} items; first failure: "$firstPath"';
+
+    if (error is FileSystemException && error.osError?.errorCode == 5) {
+      return 'Could not delete $itemLabel: Access denied. Check folder permissions or run the app as administrator.';
+    }
+
+    if (error is FileSystemException) {
+      final reason = error.osError?.message.trim();
+      if (reason != null && reason.isNotEmpty) {
+        return 'Could not delete $itemLabel: $reason.';
+      }
+    }
+
+    return 'Could not delete $itemLabel.';
+  }
+
+  static List<String> _accessDeniedPaths(
+    List<String> failedPaths,
+    Map<String, Object> errorsByPath,
+  ) {
+    return failedPaths.where((path) {
+      final error = errorsByPath[path];
+      return error is FileSystemException && error.osError?.errorCode == 5;
+    }).toList(growable: false);
+  }
+
+  static List<String> retainApprovedRetryPaths({
+    required List<String> approvedPaths,
+    required List<String> requestedPaths,
+  }) {
+    final approved = approvedPaths.toSet();
+    return requestedPaths
+        .where(approved.contains)
+        .toSet()
+        .toList(growable: false);
   }
 }
 

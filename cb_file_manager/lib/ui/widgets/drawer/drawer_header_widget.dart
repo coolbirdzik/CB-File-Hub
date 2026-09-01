@@ -20,31 +20,32 @@ class DrawerHeaderWidget extends StatelessWidget {
     final topPadding = MediaQuery.of(context).padding.top + 16;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(18, topPadding, 14, 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            cs.primaryContainer.withValues(alpha: 0.55),
-            cs.surfaceContainerHighest.withValues(alpha: 0.75),
-          ],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomRight: Radius.circular(20),
-        ),
-      ),
+      padding: EdgeInsets.fromLTRB(18, topPadding, 14, isPinned ? 12 : 16),
+      decoration: isPinned
+          ? null
+          : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  cs.primaryContainer.withValues(alpha: 0.55),
+                  cs.surfaceContainerHighest.withValues(alpha: 0.75),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomRight: Radius.circular(20),
+              ),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              // Logo with shadow effect
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(16),
+                  color: cs.primary.withValues(alpha: isPinned ? 0.10 : 0.14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Image.asset(
                   'assets/images/logo.png',
@@ -57,7 +58,6 @@ class DrawerHeaderWidget extends StatelessWidget {
                   ),
                 ),
               ),
-
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 12),
@@ -71,20 +71,20 @@ class DrawerHeaderWidget extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Pin button (hidden on small screens)
               if (!isSmallScreen)
                 IconButton(
                   icon: Icon(
                     isPinned
-                        ? PhosphorIconsLight.pushPin
+                        ? PhosphorIconsFill.pushPin
                         : PhosphorIconsLight.pushPin,
-                    color: cs.onSurfaceVariant,
+                    color: isPinned ? cs.primary : cs.onSurfaceVariant,
                     size: 20,
                   ),
                   tooltip: isPinned ? context.tr.unpinMenu : context.tr.pinMenu,
                   style: IconButton.styleFrom(
-                    backgroundColor: cs.surface.withValues(alpha: 0.7),
+                    backgroundColor: cs.onSurface.withValues(
+                      alpha: isPinned ? 0.05 : 0.06,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -95,10 +95,7 @@ class DrawerHeaderWidget extends StatelessWidget {
                 ),
             ],
           ),
-
           const SizedBox(height: 10),
-
-          // Subtitle
           Text(
             'File Management Made Simple',
             style: TextStyle(

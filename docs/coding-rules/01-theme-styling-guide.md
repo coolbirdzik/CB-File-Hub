@@ -5,20 +5,34 @@ CoolBird FM Flutter app follows strict theming rules to ensure consistent UI acr
 
 ## Core Principles
 
+> **The design system supersedes parts of this guide.** See
+> [`ui-patterns/06-design-system.md`](../ui-patterns/06-design-system.md).
+> New code should use `context.cbColors` and the `Cb*` tokens/primitives.
+> `theme.colorScheme.*` still works — it is now derived from the same tokens —
+> so existing screens remain correct until they are migrated.
+
 ### 1. Use Theme Colors
-**NEVER** hardcode colors. Always use `theme.colorScheme.*`
+**NEVER** hardcode colors. Prefer `context.cbColors.*` (semantic tokens);
+`theme.colorScheme.*` is acceptable in un-migrated code.
 
 ### 2. Use Semantic Spacing
-Use consistent spacing values, not arbitrary numbers.
+Use the `CbSpacing` / `CbRadii` / `CbSizes` scales, not arbitrary numbers.
 
 ### 3. Use Remix Icons
 Prefer Remix Icons with `_line` suffix for consistency.
 
-### 4. Follow Material Design 3
-Leverage Material 3 color system and components.
+### 4. Follow the CoolBird design system
+Build from `Cb*` primitives rather than Material widgets. Material 3 components
+are still themed correctly, but they are the legacy path — see the design
+system doc for what Material behaviour is deliberately switched off
+(`surfaceTint`, ink ripple, `ColorScheme.fromSeed`).
 
-### 5. Flat Design — No Shadows, No Borders (Default)
-Prefer flat design. Avoid drop shadows and borders by default. Use spacing, backgrounds, and subtle gradients for separation. Only add borders for explicit exceptions (inputs/focus/dividers).
+### 5. Depth is a hairline border plus a shadow
+Elevation comes from `CbElevation` shadows and 1px `c.stroke` borders, applied
+through `CbSurface`'s levels — **not** from tinted surfaces. Keep surfaces
+neutral; do not reintroduce `surfaceTint`. Flat (`CbSurfaceLevel.flat`) remains
+the default for in-page content; reserve shadows for things that genuinely
+float (menus, popovers, dialogs, toasts).
 
 ## Color System
 

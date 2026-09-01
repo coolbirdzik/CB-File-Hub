@@ -347,6 +347,8 @@ docs/                   Feature and UI implementation notes
 ## Documentation
 
 - [Project agent instructions](AGENTS.md)
+- [Agent architecture graph](docs/agent/index.md)
+- [Technical documentation](docs/technical/index.md)
 - [Feature notes](docs/features/)
 - [UI pattern notes](docs/ui-patterns/)
 - [Build script](scripts/build.sh)

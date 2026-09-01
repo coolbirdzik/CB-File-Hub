@@ -33,8 +33,10 @@ class ScrollableTabBar extends StatefulWidget {
   final Set<String> selectedTabIds;
   final ValueChanged<DesktopTabDragData>? onTabDragStarted;
   final VoidCallback? onTabDragEnded;
-  final Future<void> Function(DesktopTabDragData data)?
-      onNativeTabDragRequested;
+  final Future<void> Function(
+    DesktopTabDragData data,
+    Offset globalPosition,
+  )? onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
   final List<Widget> leadingCaptionActions;
@@ -128,22 +130,13 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
                 return Listener(
                   onPointerSignal: (PointerSignalEvent event) {
                     if (event is PointerScrollEvent) {
-                      final keys = HardwareKeyboard.instance.logicalKeysPressed;
-                      final isShiftPressed =
-                          HardwareKeyboard.instance.isShiftPressed ||
-                              keys.contains(LogicalKeyboardKey.shiftLeft) ||
-                              keys.contains(LogicalKeyboardKey.shiftRight);
-
-                      // Only scroll the tab strip when a horizontal scroll is
-                      // requested (trackpad swipe) or when the user holds Shift.
-                      // Do not map vertical wheel scrolling to horizontal by
-                      // default so vertical scroll can pass through naturally.
+                      // Support both horizontal trackpad gestures and the
+                      // vertical mouse wheel while the pointer is over the tab
+                      // strip.
                       final delta = event.scrollDelta.dx.abs() > 0
                           ? event.scrollDelta.dx
-                          : (isShiftPressed ? event.scrollDelta.dy : 0.0);
+                          : event.scrollDelta.dy;
 
-                      // Always consume the wheel event over the tab strip so
-                      // the content underneath does not scroll vertically.
                       GestureBinding.instance.pointerSignalResolver
                           .register(event, (_) {});
 
@@ -267,8 +260,10 @@ class _ModernTabBar extends StatefulWidget {
   final Set<String> selectedTabIds;
   final ValueChanged<DesktopTabDragData>? onTabDragStarted;
   final VoidCallback? onTabDragEnded;
-  final Future<void> Function(DesktopTabDragData data)?
-      onNativeTabDragRequested;
+  final Future<void> Function(
+    DesktopTabDragData data,
+    Offset globalPosition,
+  )? onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
   final ThemeData theme;
@@ -496,9 +491,12 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     _handleNativeReorderMove(data, details.globalPosition);
   }
 
-  Future<void> _handleNativeDetachRequest(DesktopTabDragData data) async {
+  Future<void> _handleNativeDetachRequest(
+    DesktopTabDragData data,
+    Offset globalPosition,
+  ) async {
     try {
-      await widget.onNativeTabDragRequested?.call(data);
+      await widget.onNativeTabDragRequested?.call(data, globalPosition);
     } finally {
       _endDrag();
     }
@@ -1227,7 +1225,10 @@ class _NativeTabDragHandle extends StatefulWidget {
   final void Function(DesktopTabDragData data, Offset globalPosition)?
       onDragMove;
   final ValueChanged<DesktopTabDragData>? onDragFinished;
-  final Future<void> Function(DesktopTabDragData data) onDetachRequested;
+  final Future<void> Function(
+    DesktopTabDragData data,
+    Offset globalPosition,
+  ) onDetachRequested;
   final Widget child;
 
   const _NativeTabDragHandle({
@@ -1281,7 +1282,11 @@ class _NativeTabDragHandleState extends State<_NativeTabDragHandle> {
 
         if (delta.dy.abs() >= _detachDistance) {
           _detaching = true;
-          unawaited(widget.onDetachRequested(widget.data).whenComplete(_reset));
+          unawaited(
+            widget
+                .onDetachRequested(widget.data, e.position)
+                .whenComplete(_reset),
+          );
           return;
         }
 

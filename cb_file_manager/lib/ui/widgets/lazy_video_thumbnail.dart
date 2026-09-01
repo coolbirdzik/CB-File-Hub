@@ -20,6 +20,9 @@ class LazyVideoThumbnail extends StatefulWidget {
   /// Height of the thumbnail
   final double height;
 
+  /// How the generated frame is inscribed into the available thumbnail area.
+  final BoxFit fit;
+
   /// Builder function that returns a widget to show when thumbnail is loading or on error
   final Widget Function() fallbackBuilder;
 
@@ -40,6 +43,7 @@ class LazyVideoThumbnail extends StatefulWidget {
     required this.videoPath,
     this.width = 160,
     this.height = 120,
+    this.fit = BoxFit.cover,
     required this.fallbackBuilder,
     this.keepAlive = true,
     this.placeholderOnly = false,
@@ -630,11 +634,17 @@ class _LazyVideoThumbnailState extends State<LazyVideoThumbnail>
         height: widget.height,
         child: Image.file(
           File(thumbnailPath),
+          // Decorative: the file name next to it is what a screen reader
+          // announces. Image would otherwise add a semantics node that appears
+          // when the thumbnail lands and disappears as tiles recycle, and the
+          // Windows AccessibilityBridge drops any ui::AXTreeUpdate that creates
+          // and destroys nodes in one frame.
+          excludeFromSemantics: true,
           key: ValueKey(
               'thumbnail-${widget.videoPath}-${thumbnailPath.hashCode}-$_thumbnailVersion'),
           width: widget.width,
           height: widget.height,
-          fit: BoxFit.cover,
+          fit: widget.fit,
           filterQuality: FilterQuality.low,
           errorBuilder: (context, error, stackTrace) {
             // Use the helper's throttled log method

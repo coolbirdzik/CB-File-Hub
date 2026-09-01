@@ -222,7 +222,8 @@ class Win32SmbHelper {
           final encodedPath = Uri.encodeFull(uncPath).replaceAll('%5C', '\\');
           if (encodedPath != uncPath) {
             debugPrint('Trying with encoded path: $encodedPath');
-            return _fastUncPathToTemp(encodedPath, tempFilePath, maxBytes);
+            return await _fastUncPathToTemp(
+                encodedPath, tempFilePath, maxBytes);
           }
         } catch (e) {
           debugPrint('Error encoding path: $e');

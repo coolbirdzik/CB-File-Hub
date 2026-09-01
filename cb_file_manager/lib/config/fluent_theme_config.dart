@@ -1,6 +1,7 @@
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 
+import '../design_system/cb_tokens.dart';
 import 'theme_config.dart';
 
 /// Fluent theme mapping that preserves existing app theme preferences.
@@ -10,21 +11,21 @@ class FluentThemeConfig {
   static fluent.FluentThemeData getTheme(
     AppThemeType themeType, {
     AppAccentColor accentColor = ThemeConfig.defaultAccentColor,
+    AppFontColor fontColor = ThemeConfig.defaultFontColor,
+    AppUiFont uiFont = ThemeConfig.defaultUiFont,
     double acrylicStrength = 1.00,
     bool preferTransparentBackdrop = false,
   }) {
     final materialTheme = ThemeConfig.getTheme(
       themeType,
       accentColor: accentColor,
+      fontColor: fontColor,
+      uiFont: uiFont,
     );
     final fluentAccentColor = _resolveAccentColor(accentColor);
     final isDark = materialTheme.brightness == Brightness.dark;
     final double normalizedStrength =
         acrylicStrength.clamp(0.0, 2.0).toDouble();
-    const Color fluentLightBackground2 = Color(0xFFF4F5F8);
-    const Color fluentLightBackground3 = Color(0xFFFFFFFF);
-    const Color fluentLightCard = Color(0xFFF0F1F5);
-
     double opacityByStrength({
       required double solidAtMin,
       required double glassAtMax,
@@ -32,43 +33,45 @@ class FluentThemeConfig {
       return solidAtMin + (glassAtMax - solidAtMin) * normalizedStrength;
     }
 
-    final scaffoldBase =
-        isDark ? materialTheme.colorScheme.surface : fluentLightBackground3;
-    final cardBase = isDark ? materialTheme.cardColor : fluentLightCard;
-    final menuBase =
-        isDark ? materialTheme.colorScheme.surface : fluentLightBackground2;
+    // Keep both hosts on the same semantic surface ramp. Home inherits the
+    // Material bridge canvas from the tab shell, so the Fluent scaffold must
+    // use the same Cb canvas rather than an independent Fluent neutral.
+    final colors = materialTheme.cb.colors;
+    final scaffoldBase = colors.canvas;
+    final cardBase = colors.surfaceRaised;
+    final menuBase = colors.surfaceOverlay;
 
     final scaffoldColor = scaffoldBase.withValues(
       alpha: isDark
           ? opacityByStrength(
-              solidAtMin: 0.90,
-              glassAtMax: preferTransparentBackdrop ? 0.12 : 0.16,
+              solidAtMin: 0.96,
+              glassAtMax: preferTransparentBackdrop ? 0.76 : 0.88,
             )
           : opacityByStrength(
-              solidAtMin: 0.99,
-              glassAtMax: preferTransparentBackdrop ? 0.62 : 0.92,
+              solidAtMin: 0.995,
+              glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
             ),
     );
     final cardColor = cardBase.withValues(
       alpha: isDark
           ? opacityByStrength(
-              solidAtMin: 0.96,
-              glassAtMax: preferTransparentBackdrop ? 0.46 : 0.56,
+              solidAtMin: 0.98,
+              glassAtMax: preferTransparentBackdrop ? 0.84 : 0.94,
             )
           : opacityByStrength(
-              solidAtMin: 0.98,
-              glassAtMax: preferTransparentBackdrop ? 0.76 : 0.90,
+              solidAtMin: 0.99,
+              glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
             ),
     );
     final menuColor = menuBase.withValues(
       alpha: isDark
           ? opacityByStrength(
-              solidAtMin: 0.98,
-              glassAtMax: preferTransparentBackdrop ? 0.58 : 0.68,
+              solidAtMin: 0.995,
+              glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
             )
           : opacityByStrength(
-              solidAtMin: 0.99,
-              glassAtMax: preferTransparentBackdrop ? 0.82 : 0.92,
+              solidAtMin: 0.995,
+              glassAtMax: preferTransparentBackdrop ? 0.90 : 0.98,
             ),
     );
 
@@ -79,23 +82,23 @@ class FluentThemeConfig {
       acrylicBackgroundColor: scaffoldBase.withValues(
         alpha: isDark
             ? opacityByStrength(
-                solidAtMin: 0.95,
-                glassAtMax: preferTransparentBackdrop ? 0.50 : 0.62,
+                solidAtMin: 0.98,
+                glassAtMax: preferTransparentBackdrop ? 0.82 : 0.92,
               )
             : opacityByStrength(
-                solidAtMin: 0.98,
-                glassAtMax: preferTransparentBackdrop ? 0.72 : 0.90,
+                solidAtMin: 0.99,
+                glassAtMax: preferTransparentBackdrop ? 0.88 : 0.97,
               ),
       ),
       micaBackgroundColor: scaffoldBase.withValues(
         alpha: isDark
             ? opacityByStrength(
-                solidAtMin: 0.90,
-                glassAtMax: preferTransparentBackdrop ? 0.32 : 0.42,
+                solidAtMin: 0.96,
+                glassAtMax: preferTransparentBackdrop ? 0.70 : 0.82,
               )
             : opacityByStrength(
-                solidAtMin: 0.97,
-                glassAtMax: preferTransparentBackdrop ? 0.68 : 0.88,
+                solidAtMin: 0.99,
+                glassAtMax: preferTransparentBackdrop ? 0.84 : 0.96,
               ),
       ),
       menuColor: menuColor,

@@ -28,6 +28,28 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get moreOptions => 'Tùy chọn khác';
+  @override
+  String get thirdPartyApps => 'Ứng dụng bên thứ ba';
+  @override
+  String get configureContextMenu => 'Tùy chỉnh menu ngữ cảnh';
+  @override
+  String get contextMenuLayout => 'Bố cục menu ngữ cảnh';
+  @override
+  String get contextMenuLayoutDescription =>
+      'Sắp xếp hoặc ẩn các lệnh hiện khi nhấp chuột phải';
+  @override
+  String get contextMenuLayoutHint =>
+      'Kéo các lệnh để đổi thứ tự. Lệnh đã ẩn vẫn có thể bật lại tại đây.';
+  @override
+  String get contextMenuForFiles => 'Tệp';
+  @override
+  String get contextMenuForFolders => 'Thư mục';
+  @override
+  String get contextMenuForMultipleItems => 'Nhiều mục';
+  @override
+  String get resetContextMenuLayout => 'Đặt lại bố cục';
+  @override
+  String get contextMenuLayoutReset => 'Đã đặt lại bố cục menu ngữ cảnh';
 
   // File operations
   @override
@@ -52,6 +74,15 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get setCoolBirdAsDefaultForVideosAndroidHint =>
       'Đang mở Cài đặt. Trong "Mở theo mặc định", bật CB File Hub cho file video.';
+  @override
+  String get setCoolBirdAsDefaultForArchives =>
+      'Đặt CB File Hub làm mặc định cho tệp nén';
+  @override
+  String get setCoolBirdAsDefaultForArchivesSuccess =>
+      'CB File Hub đã là ứng dụng mặc định cho tệp nén.';
+  @override
+  String get setCoolBirdAsDefaultForArchivesFailed =>
+      'Không thể đặt CB File Hub làm mặc định cho tệp nén.';
   @override
   String get openFolder => 'Mở thư mục';
   @override
@@ -176,6 +207,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get viewModeTree => 'Cây';
 
   @override
+  String get viewModeTiles => 'Thẻ';
+
+  @override
   String get previewPaneTitle => 'Xem trước';
 
   @override
@@ -185,7 +219,49 @@ class VietnameseLocalizations implements AppLocalizations {
   String get previewNotSupported => 'Chưa hỗ trợ xem trước loại tệp này';
 
   @override
+  String get archiveSectionTitle => 'Tệp nén';
+
+  @override
+  String get archiveBrowseTitle => 'Xem nội dung';
+
+  @override
+  String get archiveExtractHere => 'Giải nén tại đây';
+
+  @override
+  String get archiveExtractTo => 'Giải nén vào…';
+
+  @override
+  String get archiveExtractToTitle => 'Chọn thư mục giải nén';
+
+  @override
+  String get archiveExtractAll => 'Giải nén tất cả';
+
+  @override
+  String get archiveExtracting => 'Đang giải nén…';
+
+  @override
+  String get archiveExtractComplete => 'Giải nén xong';
+
+  @override
+  String archiveExtractFailed(String error) => 'Giải nén thất bại: $error';
+
+  @override
+  String get archiveEmpty => 'Tệp nén trống';
+
+  @override
+  String archivePreviewSummary(int count) => '$count mục';
+
+  @override
+  String archivePreviewMore(int count) => '… và $count mục nữa';
+
+  @override
   String get previewUnavailable => 'Không thể xem trước';
+
+  @override
+  String get previewTextTruncated => 'Hiển thị một phần nội dung';
+
+  @override
+  String get previewTextTooLarge => 'Tệp quá lớn để xem trước';
 
   @override
   String get showPreview => 'Hiện xem trước';
@@ -508,6 +584,44 @@ class VietnameseLocalizations implements AppLocalizations {
       'Bạn có thể chọn thêm nhiều giao diện khác trong Cài đặt.';
   @override
   String get themeOnboardingContinue => 'Tiếp tục';
+  @override
+  String get accentColor => 'Màu nhấn';
+  @override
+  String currentAccentColor(String name) => 'Màu nhấn hiện tại: $name';
+  @override
+  String get fontColor => 'Màu chữ';
+  @override
+  String currentFontColor(String name) => 'Màu chữ hiện tại: $name';
+  @override
+  String get uiFont => 'Phông chữ';
+  @override
+  String currentUiFont(String name) => 'Phông chữ hiện tại: $name';
+  @override
+  String get uiFontUnicodeHint =>
+      'Font miễn phí, hỗ trợ Unicode (tiếng Việt + Latin mở rộng). Font bổ sung tải một lần rồi lưu máy.';
+  @override
+  String get backdropMode => 'Chế độ nền';
+  @override
+  String get backdropModeDynamic => 'Động';
+  @override
+  String get backdropModeWallpaper => 'Hình nền';
+  @override
+  String get backdropModeDynamicDescription =>
+      'Dùng nền acrylic động của hệ thống.';
+  @override
+  String get backdropModeWallpaperDescription =>
+      'Dùng hình nền máy tính làm nền ứng dụng.';
+  @override
+  String get noSystemWallpaperDetected => 'Không tìm thấy hình nền hệ thống';
+  @override
+  String get customBackdropImage => 'Tùy chọn';
+  @override
+  String get backdropImageNotFound => 'Không tìm thấy ảnh';
+  @override
+  String get desktopAcrylicStrength => 'Độ mạnh acrylic máy tính';
+  @override
+  String desktopAcrylicStrengthDescription(int percentage) =>
+      'Điều chỉnh độ mờ và độ đậm nền máy tính ($percentage%).';
   @override
   String get vietnameseLanguage => 'Tiếng Việt';
   @override
@@ -1006,6 +1120,8 @@ class VietnameseLocalizations implements AppLocalizations {
   String get useSystemDefaultForVideoEnabled =>
       'Video sẽ mở bằng ứng dụng mặc định của hệ thống';
   @override
+  String get useSystemDefaultForVideoDisabled =>
+      'Video sẽ mở bằng trình phát trong app';
   @override
   String get seekSpeed => 'Tốc độ tua video';
   @override
@@ -1018,8 +1134,16 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get seekSpeedFast => 'Nhanh';
   @override
-  String get useSystemDefaultForVideoDisabled =>
-      'Video sẽ mở bằng trình phát trong app';
+  String get openVideoInNewWindow => 'Mở video ở cửa sổ riêng';
+  @override
+  String get openVideoInNewWindowDescription =>
+      'Chỉ trên desktop. Dùng một cửa sổ trình phát riêng; khi mở video khác, video trong cửa sổ đó sẽ được thay thế.';
+  @override
+  String get openVideoInNewWindowEnabled =>
+      'Video sẽ mở trong một cửa sổ trình phát riêng';
+  @override
+  String get openVideoInNewWindowDisabled =>
+      'Trình phát video sẽ mở trong cửa sổ hiện tại';
   @override
   String get thumbnailCache => 'Bộ nhớ đệm hình thu nhỏ';
   @override
@@ -1595,6 +1719,13 @@ class VietnameseLocalizations implements AppLocalizations {
       'Bật/tắt hiển thị tag bên ngoài danh sách file';
 
   @override
+  String get fileThumbnailFit => 'Cách hiển thị thumbnail file';
+
+  @override
+  String get fileThumbnailFitDescription =>
+      'Chọn thumbnail phủ đầy khung hoặc hiển thị toàn bộ ảnh';
+
+  @override
   String get tagThumbnailFit => 'Cách hiển thị thumbnail tag';
 
   @override
@@ -1924,6 +2055,82 @@ class VietnameseLocalizations implements AppLocalizations {
   // UI labels
   @override
   String get noStorageLocationsFound => 'Không tìm thấy vị trí lưu trữ nào';
+  @override
+  String get driveGroupFixed => 'Máy tính này';
+  @override
+  String get driveGroupRemovable => 'Ổ tháo lắp';
+  @override
+  String get driveGroupNetwork => 'Mạng';
+  @override
+  String get driveGroupOther => 'Khác';
+  @override
+  String get driveTapToBrowse => 'Chạm để duyệt';
+  @override
+  String get driveRestrictedAccess => 'Truy cập bị hạn chế';
+  @override
+  String get driveEject => 'Đẩy ra';
+  @override
+  String get driveEjectConfirmTitle => 'Đẩy ổ đĩa ra?';
+  @override
+  String driveEjectConfirmMessage(String name) =>
+      'Gỡ an toàn "$name"? Hãy đảm bảo không có tệp nào đang được dùng.';
+  @override
+  String get driveEjectSuccess => 'Đã đẩy ổ đĩa ra';
+  @override
+  String driveEjectFailed(String error) => 'Không thể đẩy ra: $error';
+  @override
+  String get driveRename => 'Đổi tên';
+  @override
+  String get driveRenameTitle => 'Đổi tên volume';
+  @override
+  String get driveRenameHint => 'Nhãn volume';
+  @override
+  String get driveRenameSuccess => 'Đã đổi tên volume';
+  @override
+  String driveRenameFailed(String error) => 'Không thể đổi tên: $error';
+  @override
+  String get driveFormatConfirmTitle => 'Định dạng ổ đĩa?';
+  @override
+  String driveFormatConfirmMessage(String name) =>
+      'Mở công cụ định dạng hệ thống cho "$name"? Thao tác có thể xóa toàn bộ dữ liệu trên volume.';
+  @override
+  String get driveOpenInCleaner => 'Mở trong Disk Cleaner';
+  @override
+  String get driveUsed => 'Đã dùng';
+  @override
+  String get driveFree => 'Còn trống';
+  @override
+  String get driveTotal => 'Tổng';
+  @override
+  String get driveType => 'Loại';
+  @override
+  String get driveFilesystem => 'Hệ thống tệp';
+  @override
+  String get driveSerial => 'Serial';
+  @override
+  String get driveKindFixed => 'Ổ đĩa cục bộ';
+  @override
+  String get driveKindRemovable => 'Ổ tháo lắp';
+  @override
+  String get driveKindNetwork => 'Mạng';
+  @override
+  String get driveKindOptical => 'Ổ quang';
+  @override
+  String get driveKindRam => 'Ổ RAM';
+  @override
+  String get driveKindInternal => 'Bộ nhớ trong';
+  @override
+  String get driveKindUnknown => 'Lưu trữ';
+  @override
+  String get openInNewPane => 'Mở trong khung mới';
+  @override
+  String get openInWindowsTerminal => 'Mở trong Windows Terminal';
+  @override
+  String get driveCleanup => 'Dọn dẹp';
+  @override
+  String get driveFormat => 'Định dạng';
+  @override
+  String get driveBitLocker => 'Bật BitLocker';
   @override
   String get menuPinningOnlyLargeScreens =>
       'Ghim menu chỉ có trên màn hình lớn hơn';
@@ -2725,6 +2932,30 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String videoLibraryCount(int count) => '$count thư viện';
 
+  @override
+  String get libraryCover => 'Ảnh Bìa Thư Viện';
+
+  @override
+  String get changeCoverImage => 'Đổi Ảnh Bìa';
+
+  @override
+  String get removeCoverImage => 'Xóa Ảnh Bìa';
+
+  @override
+  String get coverImageUpdated => 'Đã cập nhật ảnh bìa';
+
+  @override
+  String get coverImageRemoved => 'Đã xóa ảnh bìa';
+
+  @override
+  String get coverImageUpdateFailed => 'Không thể cập nhật ảnh bìa';
+
+  @override
+  String get lastScanLabel => 'Quét lần cuối';
+
+  @override
+  String get neverScanned => 'Chưa quét lần nào';
+
   // Streaming and download dialogs
   @override
   String openFileTypeFile(String fileType) => 'Mở tệp $fileType';
@@ -3018,6 +3249,9 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerSelectDrives => 'Chọn ổ đĩa';
   @override
   String get diskCleanerScanAgain => 'Quét lại';
+  @override
+  String get diskCleanerCachedResultStatus =>
+      'Đang hiển thị kết quả quét trước (bản lưu đệm). Nhấn Quét lại để làm mới.';
 
   // Disk Cleaner — extended UI strings
   @override
@@ -3030,6 +3264,7 @@ class VietnameseLocalizations implements AppLocalizations {
   String get diskCleanerCheckAllCleanable => 'Chọn tất cả có thể dọn';
   @override
   String get diskCleanerUncheckAll => 'Bỏ chọn tất cả';
+
   @override
   String get diskCleanerColumnName => 'Tên';
   @override
@@ -3160,17 +3395,57 @@ class VietnameseLocalizations implements AppLocalizations {
   String diskCleanerDriveSummary(String path, String size, int count) =>
       '$path  $size  •  $count tệp';
   @override
+  String get diskCleanerGrowthTitle => 'Thư mục tăng gần đây';
+  @override
+  String diskCleanerGrowthFilter(int count) => 'Tăng gần đây ($count)';
+  @override
+  String diskCleanerGrowthIncrease(String size) => '+$size';
+  @override
+  String diskCleanerGrowthCurrentSize(String size) =>
+      'Dung lượng hiện tại: $size';
+  @override
   String diskCleanerAgentPath(String path) => 'CB Agent: $path';
   @override
   String diskCleanerItemsBytes(int count, String size) => '$count mục • $size';
   @override
   String diskCleanerSizeFiles(String size, int files) => '$size • $files tệp';
+
+  @override
+  String diskCleanerRolledUpItems(int items) => '$items mục nhỏ hơn';
   @override
   String diskCleanerScannedProgress(String size, int files) =>
       'Đã quét $size • $files tệp';
   @override
   String get diskCleanerPieChartPendingScan =>
       'Biểu đồ sẽ xuất hiện ngay khi quét xong';
+  @override
+  String get diskCleanerIncrementalScanTitle => 'Quét phần thay đổi';
+  @override
+  String diskCleanerIncrementalScanProgress(int count) =>
+      'Đã cập nhật $count thư mục thay đổi';
+  @override
+  String get diskCleanerFullScanFallback =>
+      'Không thể quét phần thay đổi — đã quét lại toàn bộ ổ đĩa';
+  @override
+  String get diskCleanerOldLargeTitle =>
+      'Tệp và thư mục lớn, lâu không hoạt động';
+  @override
+  String get diskCleanerOldLargeSubtitle =>
+      'Chỉ là gợi ý để xem xét. Dấu thời gian hệ thống không khẳng định mục đó không còn được dùng.';
+  @override
+  String get diskCleanerOldLargeAll => 'Tất cả';
+  @override
+  String get diskCleanerOldLargeFiles => 'Tệp';
+  @override
+  String get diskCleanerOldLargeFolders => 'Thư mục';
+  @override
+  String diskCleanerOldLargeLastActivity(String date) =>
+      'Gợi ý hoạt động gần nhất: $date';
+  @override
+  String get diskCleanerOldLargeReviewOnly => 'Chỉ xem xét';
+  @override
+  String get diskCleanerOldLargeEmpty =>
+      'Không tìm thấy tệp hoặc thư mục lớn nào lâu không hoạt động.';
   @override
   String diskCleanerScanningPath(String path) => 'Đang quét $path';
   @override
@@ -3249,6 +3524,298 @@ class VietnameseLocalizations implements AppLocalizations {
   String diskCleanerPermanentDeletedWithSkipped(
           int count, String size, int skipped) =>
       'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp sau khi xóa thất bại.';
+
+  // Cleaner - chon o dia, don nhanh, ly do rac
+  @override
+  String get diskCleanerDriveLowSpace => 'Sắp đầy';
+  @override
+  String diskCleanerDriveCapacity(String used, String total, String free) =>
+      'Đã dùng $used trên $total · còn trống $free';
+  @override
+  String diskCleanerLastScanFound(String when, String junk) =>
+      'Quét lần trước $when · tìm thấy $junk rác';
+  @override
+  String get diskCleanerTimeJustNow => 'vừa xong';
+  @override
+  String get diskCleanerTimeToday => 'hôm nay';
+  @override
+  String get diskCleanerTimeYesterday => 'hôm qua';
+  @override
+  String diskCleanerTimeDaysAgo(int days) => '$days ngày trước';
+  @override
+  String diskCleanerTimeWeeksAgo(int weeks) => '$weeks tuần trước';
+  @override
+  String diskCleanerTimeMonthsAgo(int months) => '$months tháng trước';
+  @override
+  String get diskCleanerQuickCleanHint =>
+      'Tệp tạm, bộ nhớ đệm và Thùng rác. Ứng dụng sẽ tự tạo lại khi cần.';
+  @override
+  String get diskCleanerQuickCleanButton => 'Dọn nhanh';
+  @override
+  String get diskCleanerQuickCleanScanning => 'Đang tìm mục an toàn...';
+  @override
+  String get diskCleanerQuickCleanNothing =>
+      'Hiện không có mục nào an toàn để dọn';
+  @override
+  String get diskCleanerQuickCleanReviewTitle => 'Xem lại trước khi dọn nhanh';
+  @override
+  String diskCleanerQuickCleanReviewSubtitle(int count, String size) =>
+      '$count mục trong các nhóm này, tổng cộng $size.';
+  @override
+  String get diskCleanerQuickCleanRecycleNote =>
+      'Tất cả sẽ được chuyển vào Thùng rác, bạn có thể khôi phục từ đó.';
+  @override
+  String get diskCleanerCategoryWindowsTemp => 'Tệp tạm của Windows';
+  @override
+  String get diskCleanerCategoryBrowserCache => 'Bộ nhớ đệm trình duyệt';
+  @override
+  String get diskCleanerCategoryRecycleBin => 'Thùng rác';
+  @override
+  String get diskCleanerCategoryThumbnailCache => 'Bộ nhớ đệm ảnh thu nhỏ';
+  @override
+  String get diskCleanerCategoryAppCache => 'Bộ nhớ đệm ứng dụng';
+  @override
+  String get diskCleanerCategoryCrashLogs => 'Tệp sự cố và nhật ký';
+  @override
+  String get diskCleanerCategoryWindowsUpdate => 'Bộ nhớ đệm Windows Update';
+  @override
+  String get diskCleanerCategoryPrefetch => 'Dữ liệu Prefetch';
+  @override
+  String get diskCleanerCategoryDeliveryOptimization =>
+      'Tệp Delivery Optimization';
+  @override
+  String get diskCleanerCategoryDevCache => 'Bộ nhớ đệm lập trình';
+  @override
+  String get diskCleanerReasonWindowsTemp =>
+      'Do ứng dụng để lại. Xóa an toàn, không có gì phụ thuộc vào chúng.';
+  @override
+  String get diskCleanerReasonBrowserCache =>
+      'Trình duyệt sẽ tự tạo lại. Lần đầu mở trang có thể chậm hơn một chút.';
+  @override
+  String get diskCleanerReasonRecycleBin =>
+      'Các tệp đã xóa đang chờ được dọn sạch.';
+  @override
+  String get diskCleanerReasonThumbnailCache =>
+      'Windows sẽ tạo lại ảnh thu nhỏ khi bạn mở thư mục lần sau.';
+  @override
+  String get diskCleanerReasonAppCache =>
+      'Dữ liệu tạm của ứng dụng. Ứng dụng sẽ tạo lại và bạn vẫn giữ đăng nhập.';
+  @override
+  String get diskCleanerReasonCrashLogs =>
+      'Tệp chẩn đoán từ các lần treo trước, chỉ hữu ích khi cần gỡ lỗi.';
+  @override
+  String get diskCleanerReasonWindowsUpdate =>
+      'Bộ cài của các bản cập nhật đã được áp dụng xong.';
+  @override
+  String get diskCleanerReasonPrefetch =>
+      'Dữ liệu tăng tốc khởi động. Windows sẽ dựng lại sau vài lần mở ứng dụng.';
+  @override
+  String get diskCleanerReasonDeliveryOptimization =>
+      'Tệp cập nhật lưu sẵn để chia sẻ với máy khác trong mạng của bạn.';
+  @override
+  String get diskCleanerReasonDevCache =>
+      'Bộ nhớ đệm build và gói. Công cụ của bạn sẽ tải lại hoặc dựng lại.';
+  @override
+  String get diskCleanerReasonGeneric =>
+      'Khớp với vị trí rác đã biết và có thể xóa an toàn.';
+
+  // Cleaner - bo loc nhanh cho cay thu muc
+  @override
+  String get diskCleanerPresetTooltip => 'Lọc cây thư mục';
+  @override
+  String get diskCleanerPresetAll => 'Tất cả';
+  @override
+  String get diskCleanerPresetLargeFiles => 'Tệp trên 1 GB';
+  @override
+  String get diskCleanerPresetLogsCaches => 'Nhật ký và bộ nhớ đệm';
+  @override
+  String get diskCleanerPresetInstallers => 'Bộ cài và tệp nén';
+
+  // Cleaner - ket qua sau khi don
+  @override
+  String diskCleanerFreeSpaceBeforeAfter(String before, String after) =>
+      'Dung lượng trống: $before → $after';
+  @override
+  String get diskCleanerGrowthWatchTitle => 'Đang tăng kể từ lần quét trước';
+  @override
+  String diskCleanerGrowthWatchLine(String path, String size) =>
+      '$path  +$size';
+
+  // Cleaner App Insights
+  @override
+  String get cleanerUtilitiesTitle => 'CB Agent Cleaner';
+  @override
+  String get cleanerUtilitiesSubtitle =>
+      'Các tiện ích giúp máy tính gọn gàng và hoạt động tốt hơn';
+  @override
+  String get cleanerUtilitiesStorageGroup => 'Dung lượng';
+  @override
+  String get cleanerDiskUsageTitle => 'Dung lượng ổ đĩa';
+  @override
+  String get cleanerDiskUtilityDescription =>
+      'Xem thư mục lớn và dọn rác đã được xác nhận an toàn';
+  @override
+  String get cleanerAppsTitle => 'Ứng dụng';
+  @override
+  String get cleanerAppsUtilityDescription =>
+      'Tìm ứng dụng lớn, ít dùng và xem dữ liệu liên quan';
+  @override
+  String get cleanerAppsLoading => 'Đang phân tích ứng dụng đã cài...';
+  @override
+  String get cleanerAppsUnavailable =>
+      'Thông tin ứng dụng sẽ có sau khi quét ổ đĩa hoàn tất.';
+  @override
+  String cleanerAppsLoadFailed(String error) =>
+      'Không thể phân tích ứng dụng đã cài: $error';
+  @override
+  String get cleanerAppsPartialBanner => 'Dữ liệu vẫn đang được cập nhật.';
+  @override
+  String get cleanerAppsSearchHint => 'Tìm ứng dụng';
+  @override
+  String get cleanerAppsFilterAll => 'Tất cả';
+  @override
+  String get cleanerAppsFilterAttention => 'Nên xem';
+  @override
+  String get cleanerAppsFilterLarge => 'Nặng';
+  @override
+  String get cleanerAppsFilterStale => 'Ít mở';
+  @override
+  String get cleanerAppsFilterCleanable => 'Dọn được';
+  @override
+  String get cleanerAppsSortLabel => 'Sắp xếp';
+  @override
+  String get cleanerAppsSortSize => 'Lớn nhất trước';
+  @override
+  String get cleanerAppsSortName => 'Tên';
+  @override
+  String get cleanerAppsSortLastOpened => 'Hoạt động cũ nhất';
+  @override
+  String get cleanerAppsLargeThresholdLabel => 'Ứng dụng lớn';
+  @override
+  String get cleanerAppsStaleThresholdLabel => 'Lâu chưa thấy';
+  @override
+  String cleanerAppsDays(int days) => '$days ngày';
+  @override
+  String get cleanerAppsSummaryFootprint => 'Dung lượng đã xác nhận';
+  @override
+  String get cleanerAppsSummaryAttention => 'Nên xem lại';
+  @override
+  String get cleanerAppsSummaryLarge => 'Ứng dụng lớn';
+  @override
+  String get cleanerAppsSummaryStale => 'Lâu chưa thấy mở';
+  @override
+  String get cleanerAppsSummaryCleanable => 'Cache có thể dọn';
+  @override
+  String cleanerAppsThresholdAtLeast(String size) => 'Từ $size trở lên';
+  @override
+  String cleanerAppsNotSeenForDays(int days) =>
+      'Không ghi nhận lần mở trong $days ngày';
+  @override
+  String get cleanerAppsReviewableCache => 'Có thể xem lại an toàn';
+  @override
+  String cleanerAppsShowingCount(int count) => 'Đang hiển thị $count ứng dụng';
+  @override
+  String get cleanerAppsNoResults => 'Không có ứng dụng phù hợp bộ lọc.';
+  @override
+  String get cleanerAppsUnknown => 'Không rõ';
+  @override
+  String cleanerAppsLastOpened(String date) => 'Thấy mở gần nhất: $date';
+  @override
+  String cleanerAppsNotOpenedForDays(int days) => '$days ngày chưa mở';
+  @override
+  String get cleanerAppsUsageUnknownCompact => 'Chưa có dữ liệu mở';
+  @override
+  String get cleanerAppsAttentionBadge => 'Nên xem';
+  @override
+  String get cleanerAppsViewOptions => 'Tùy chọn hiển thị';
+  @override
+  String cleanerAppsUsageEvidence(String source, String confidence) =>
+      '$source • $confidence';
+  @override
+  String cleanerAppsPossibleSize(String size) => 'Có thể thuộc app: $size';
+  @override
+  String cleanerAppsCleanableAmount(String size) => 'Có thể dọn: $size';
+  @override
+  String get cleanerAppsDetails => 'Chi tiết ứng dụng';
+  @override
+  String get cleanerAppsUsageEvidenceLabel => 'Bằng chứng sử dụng';
+  @override
+  String get cleanerAppsSelectApp =>
+      'Chọn một ứng dụng để xem dung lượng lưu trữ.';
+  @override
+  String get cleanerAppsConfirmedFootprint => 'Đã xác nhận';
+  @override
+  String get cleanerAppsPossibleFootprint => 'Có thể thuộc app';
+  @override
+  String get cleanerAppsStorageBreakdown => 'Phân bổ dung lượng';
+  @override
+  String get cleanerAppsNoStorageDetails =>
+      'Chưa có vị trí lưu trữ đo được cho ứng dụng này.';
+  @override
+  String get cleanerAppsSharedFolders =>
+      'Thư mục lớn dùng chung / chưa xác định';
+  @override
+  String get cleanerAppsSharedFoldersDescription =>
+      'Các thư mục này không được gán cho riêng một ứng dụng và không bao giờ được chọn để dọn.';
+  @override
+  String get cleanerAppsOpenFolder => 'Mở thư mục';
+  @override
+  String get cleanerAppsManageInWindows => 'Quản lý trong Windows';
+  @override
+  String get cleanerAppsReviewCleanable => 'Xem dữ liệu có thể dọn';
+  @override
+  String get cleanerAppsAskAgent => 'Hỏi CB Agent';
+  @override
+  String cleanerAppsVersion(String version) => 'Phiên bản $version';
+  @override
+  String cleanerAppsInstalledOrUpdated(String date) =>
+      'Đã cài hoặc cập nhật: $date';
+  @override
+  String get cleanerAppsSourceWin32 => 'Ứng dụng Win32';
+  @override
+  String get cleanerAppsSourceStore => 'Ứng dụng Microsoft Store';
+  @override
+  String get cleanerAppsMeasurementMeasured => 'Đã đo';
+  @override
+  String get cleanerAppsMeasurementEstimated => 'Windows ước tính';
+  @override
+  String get cleanerAppsMeasurementPartial => 'Một phần';
+  @override
+  String get cleanerAppsMeasurementUnknown => 'Không rõ dung lượng';
+  @override
+  String get cleanerAppsAttributionConfirmed => 'Đã xác nhận';
+  @override
+  String get cleanerAppsAttributionPossible => 'Có thể thuộc app';
+  @override
+  String get cleanerAppsAttributionShared => 'Dùng chung';
+  @override
+  String get cleanerAppsUsageUserAssist => 'Lịch sử mở của Windows';
+  @override
+  String get cleanerAppsUsagePrefetch => 'Windows Prefetch';
+  @override
+  String get cleanerAppsConfidenceHigh => 'Độ tin cậy cao';
+  @override
+  String get cleanerAppsConfidenceMedium => 'Độ tin cậy trung bình';
+  @override
+  String get cleanerAppsStorageInstall => 'Thư mục cài đặt';
+  @override
+  String get cleanerAppsStorageLocalData => 'Dữ liệu ứng dụng cục bộ';
+  @override
+  String get cleanerAppsStorageRoamingData => 'Dữ liệu ứng dụng roaming';
+  @override
+  String get cleanerAppsStoragePackageData => 'Dữ liệu gói ứng dụng';
+  @override
+  String get cleanerAppsStorageProgramData => 'Dữ liệu chương trình dùng chung';
+  @override
+  String get cleanerAppsStorageCache => 'Bộ nhớ đệm';
+  @override
+  String get cleanerAppsStorageLogs => 'Nhật ký';
+  @override
+  String get cleanerAppsStorageShared => 'Dung lượng dùng chung';
+  @override
+  String get cleanerAppsStorageUnknown => 'Dung lượng khác';
+  @override
+  String get cleanerAppsCleanableBadge => 'Có thể dọn';
 
   @override
   String get aiThinking0 => 'Đang suy nghĩ...';

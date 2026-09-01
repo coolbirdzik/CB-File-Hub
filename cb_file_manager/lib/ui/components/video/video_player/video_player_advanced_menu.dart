@@ -76,107 +76,115 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: const Icon(PhosphorIconsLight.dotsThreeVertical,
-          color: Colors.white, size: 24),
-      color: Colors.black.withValues(alpha: 0.9),
-      tooltip: 'Advanced Controls',
-      onSelected: (String value) {
-        switch (value) {
-          case 'screenshot':
-            onScreenshot?.call();
-            break;
-          case 'audio_tracks':
-            if (Platform.isWindows) onAudioTracks?.call();
-            break;
-          case 'subtitles':
-            onSubtitles?.call();
-            break;
-          case 'speed':
-            onSpeed?.call();
-            break;
-          case 'pip':
-            onPip?.call();
-            break;
-          case 'filters':
-            onFilters?.call();
-            break;
-          case 'sleep_timer':
-            onSleepTimer?.call();
-            break;
-          case 'settings':
-            onSettings?.call();
-            break;
-        }
-      },
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
-          value: 'screenshot',
-          child: _VideoPlayerMenuTile(
-            icon: PhosphorIconsLight.camera,
-            title: AppLocalizations.of(context)!.takeScreenshot,
-          ),
-        ),
-        if (Platform.isWindows)
-          const PopupMenuItem<String>(
-            value: 'audio_tracks',
+    // PopupMenuButton creates its own Tooltip/OverlayPortal. Keep its
+    // traversal anchor on a dedicated semantics node just like CbTooltip does
+    // for the neighboring player buttons; otherwise Windows can reject rapid
+    // AXTree updates while playback rebuilds the controls.
+    return Semantics(
+      container: true,
+      child: PopupMenuButton<String>(
+        icon: const Icon(PhosphorIconsLight.dotsThreeVertical,
+            color: Colors.white, size: 24),
+        color: Colors.black.withValues(alpha: 0.9),
+        tooltip: 'Advanced Controls',
+        onSelected: (String value) {
+          switch (value) {
+            case 'screenshot':
+              onScreenshot?.call();
+              break;
+            case 'audio_tracks':
+              if (Platform.isWindows) onAudioTracks?.call();
+              break;
+            case 'subtitles':
+              onSubtitles?.call();
+              break;
+            case 'speed':
+              onSpeed?.call();
+              break;
+            case 'pip':
+              onPip?.call();
+              break;
+            case 'filters':
+              onFilters?.call();
+              break;
+            case 'sleep_timer':
+              onSleepTimer?.call();
+              break;
+            case 'settings':
+              onSettings?.call();
+              break;
+          }
+        },
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          PopupMenuItem<String>(
+            value: 'screenshot',
             child: _VideoPlayerMenuTile(
-              icon: PhosphorIconsLight.musicNotes,
-              title: 'Audio Tracks',
+              icon: PhosphorIconsLight.camera,
+              title: AppLocalizations.of(context)!.takeScreenshot,
             ),
           ),
-        PopupMenuItem<String>(
-          value: 'subtitles',
-          enabled: hasSubtitles,
-          child: _VideoPlayerMenuTile(
-            icon: PhosphorIconsLight.subtitles,
-            title: 'Subtitles',
-            iconColor: hasSubtitles ? Colors.white : Colors.grey,
-            titleColor: hasSubtitles ? Colors.white : Colors.grey,
+          if (Platform.isWindows)
+            const PopupMenuItem<String>(
+              value: 'audio_tracks',
+              child: _VideoPlayerMenuTile(
+                icon: PhosphorIconsLight.musicNotes,
+                title: 'Audio Tracks',
+              ),
+            ),
+          PopupMenuItem<String>(
+            value: 'subtitles',
+            enabled: hasSubtitles,
+            child: _VideoPlayerMenuTile(
+              icon: PhosphorIconsLight.subtitles,
+              title: 'Subtitles',
+              iconColor: hasSubtitles ? Colors.white : Colors.grey,
+              titleColor: hasSubtitles ? Colors.white : Colors.grey,
+            ),
           ),
-        ),
-        PopupMenuItem<String>(
-          value: 'speed',
-          child: _VideoPlayerMenuTile(
-            icon: PhosphorIconsLight.speedometer,
-            title: 'Playback Speed (${playbackSpeed}x)',
+          PopupMenuItem<String>(
+            value: 'speed',
+            child: _VideoPlayerMenuTile(
+              icon: PhosphorIconsLight.speedometer,
+              title: 'Playback Speed (${playbackSpeed}x)',
+            ),
           ),
-        ),
-        PopupMenuItem<String>(
-          value: 'pip',
-          child: _VideoPlayerMenuTile(
-            icon: isPictureInPicture
-                ? PhosphorIconsLight.pictureInpicture
-                : PhosphorIconsLight.pictureInpicture,
-            title: isPictureInPicture ? 'Exit PiP' : 'Picture in Picture',
+          PopupMenuItem<String>(
+            value: 'pip',
+            child: _VideoPlayerMenuTile(
+              icon: isPictureInPicture
+                  ? PhosphorIconsLight.pictureInpicture
+                  : PhosphorIconsLight.pictureInpicture,
+              title: isPictureInPicture ? 'Exit PiP' : 'Picture in Picture',
+            ),
           ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'filters',
-          child: _VideoPlayerMenuTile(
-            icon: PhosphorIconsLight.slidersHorizontal,
-            title: 'Video Filters',
+          const PopupMenuItem<String>(
+            value: 'filters',
+            child: _VideoPlayerMenuTile(
+              icon: PhosphorIconsLight.slidersHorizontal,
+              title: 'Video Filters',
+            ),
           ),
-        ),
-        PopupMenuItem<String>(
-          value: 'sleep_timer',
-          child: _VideoPlayerMenuTile(
-            icon: PhosphorIconsLight.moon,
-            title:
-                sleepDuration != null ? 'Sleep Timer (Active)' : 'Sleep Timer',
-            iconColor: sleepDuration != null ? Colors.orange : Colors.white,
-            titleColor: sleepDuration != null ? Colors.orange : Colors.white,
+          PopupMenuItem<String>(
+            value: 'sleep_timer',
+            child: _VideoPlayerMenuTile(
+              icon: PhosphorIconsLight.moon,
+              title: sleepDuration != null
+                  ? 'Sleep Timer (Active)'
+                  : 'Sleep Timer',
+              iconColor: sleepDuration != null ? Colors.orange : Colors.white,
+              titleColor: sleepDuration != null ? Colors.orange : Colors.white,
+            ),
           ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(
-          value: 'settings',
-          child: _VideoPlayerMenuTile(
-            icon: PhosphorIconsLight.gear,
-            title: 'Video Settings',
+          const PopupMenuDivider(),
+          const PopupMenuItem<String>(
+            value: 'settings',
+            child: _VideoPlayerMenuTile(
+              icon: PhosphorIconsLight.gear,
+              title: 'Video Settings',
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

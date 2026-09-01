@@ -89,10 +89,6 @@ verify:
 verify-format:
     cd {{project_dir}} && dart format --output=none --set-exit-if-changed .
 
-# Analyze only
-verify-analyze:
-    cd {{project_dir}} && {{flutter}} analyze
-
 # =============================================================================
 # Testing
 # =============================================================================
@@ -108,9 +104,6 @@ kill-cb:
     taskkill //F //IM "CB File Hub.exe" //T 2>/dev/null || true
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'Get-Process | Where-Object { ($_.ProcessName -match "^(cb_file_hub|CB File Hub)$") -or ($_.Path -and $_.Path -like "*cb_file_manager*build*windows*") } | Stop-Process -Force -ErrorAction SilentlyContinue' 2>/dev/null || true
 
-# Kill stray E2E app instances
-kill-e2e: kill-cb
-
 # E2E single-process: build once, run all (or one suite). Fastest for local iteration.
 # Generates dashboard at cb_file_manager/build/e2e_dashboard/index.html when done.
 #
@@ -121,7 +114,7 @@ kill-e2e: kill-cb
 # See `just e2e-list` for available test names.
 #
 # Options: just e2e "rename" true true               (full_startup, full_screenshots)
-e2e suite="" full_startup="false" full_screenshots="false" no_open="false": kill-e2e
+e2e suite="" full_startup="false" full_screenshots="false" no_open="false": kill-cb
     cd {{project_dir}} && {{flutter}} test integration_test/app_e2e_test.dart --no-pub -d {{e2e_device}} --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST={{ if full_startup == "true" { "false" } else { "true" } }} --dart-define=CB_E2E_FULL_SCREENSHOTS={{full_screenshots}} --reporter {{test_reporter}} --file-reporter json:build/e2e_report.jsonl {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} || true
     cd {{project_dir}} && dart run tool/e2e_dashboard.dart --build-dir build
     @echo ""
@@ -149,29 +142,29 @@ _open-dashboard:
 #   - args: just e2e-parallel "" 4
 #   - env:  CB_E2E_MAX_PARALLEL=4 just e2e-parallel
 # Options: just e2e-parallel Navigation  |  just e2e-parallel "" 4 true true true
-e2e-parallel suite="" max_parallel="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-e2e
+e2e-parallel suite="" max_parallel="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-cb
     cd {{project_dir}} && dart run tool/e2e_parallel.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if max_parallel != "" { "--max-parallel " + max_parallel } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # E2E serial runner (debug exact order)
-e2e-serial suite="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-e2e
+e2e-serial suite="" rerun="false" no_open="false" full_startup="false" full_screenshots="false": kill-cb
     cd {{project_dir}} && dart run tool/e2e_allure.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }} {{ if rerun == "true" { "--rerun-failed" } else { "" } }} {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # E2E plain output (no dashboard, useful for debugging)
-e2e-plain full_startup="false" full_screenshots="false": kill-e2e
+e2e-plain full_startup="false" full_screenshots="false": kill-cb
     cd {{project_dir}} && dart run tool/run_e2e_with_log.dart {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # Rerun only previously-failed E2E tests
-e2e-failed no_open="false" full_startup="false" full_screenshots="false": kill-e2e
+e2e-failed no_open="false" full_startup="false" full_screenshots="false": kill-cb
     cd {{project_dir}} && dart run tool/e2e_allure.dart --rerun-failed {{ if no_open == "true" { "--no-open" } else { "" } }} {{ if full_startup == "true" { "--full-startup" } else { "" } }} {{ if full_screenshots == "true" { "--full-screenshots" } else { "" } }}
 
 # flutter clean + pub get + E2E (fix MSB3073 / bad build)
-e2e-clean full_startup="false" full_screenshots="false": kill-e2e
+e2e-clean full_startup="false" full_screenshots="false": kill-cb
     cd {{project_dir}} && {{flutter}} clean
     cd {{project_dir}} && {{flutter}} pub get
     cd {{project_dir}} && {{flutter}} test integration_test -d {{e2e_device}} --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST={{ if full_startup == "true" { "false" } else { "true" } }} --dart-define=CB_E2E_FULL_SCREENSHOTS={{full_screenshots}} --reporter {{test_reporter}}
 
 # Run E2E by test file name
-e2e-file file suite="": kill-e2e
+e2e-file file suite="": kill-cb
     cd {{project_dir}} && dart run tool/e2e_parallel.dart --file {{file}} {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }}
 
 # =============================================================================
@@ -313,39 +306,3 @@ git-push:
 # Push tags to origin
 git-push-tags:
     git push --tags
-
-# =============================================================================
-# Makefile-compatible names (so old muscle memory still works)
-# =============================================================================
-
-# just dev-test-e2e-single                 → all suites, single process + dashboard
-# just dev-test-e2e-single Navigation      → one suite + dashboard
-dev-test-e2e-single suite="": (e2e suite)
-
-# just dev-test-e2e-only
-dev-test-e2e-only: kill-e2e
-    cd {{project_dir}} && dart run tool/run_e2e_with_log.dart
-
-# just dev-test-e2e-failed
-dev-test-e2e-failed: kill-e2e
-    cd {{project_dir}} && dart run tool/e2e_allure.dart --rerun-failed
-
-# just dev-test-e2e-clean
-dev-test-e2e-clean: kill-e2e
-    cd {{project_dir}} && {{flutter}} clean
-    cd {{project_dir}} && {{flutter}} pub get
-    cd {{project_dir}} && {{flutter}} test integration_test -d {{e2e_device}} --dart-define=CB_E2E=true --dart-define=CB_E2E_FAST=true --dart-define=CB_E2E_FULL_SCREENSHOTS=false --reporter {{test_reporter}}
-
-# just dev-test                            → unit + widget tests
-dev-test: test
-
-# just dev-test-unit
-dev-test-unit: test
-
-# just dev-test-e2e                        → parallel E2E + dashboard
-# just dev-test-e2e Navigation             → one suite parallel
-dev-test-e2e suite="": kill-e2e
-    cd {{project_dir}} && dart run tool/e2e_parallel.dart {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }}
-
-# just kill-e2e-app
-kill-e2e-app: kill-e2e

@@ -27,19 +27,25 @@ import 'providers/theme_provider.dart';
 import 'config/theme_config.dart';
 import 'config/fluent_theme_config.dart';
 import 'config/design_system_config.dart';
+import 'design_system/cb_font_licenses.dart';
+import 'design_system/desktop_acrylic_theme_bridge.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'config/language_controller.dart';
 import 'config/languages/app_localizations_delegate.dart';
 import 'services/streaming_service_manager.dart';
 import 'ui/utils/safe_navigation_wrapper.dart';
 import 'ui/utils/desktop_acrylic_backdrop.dart';
+import 'ui/utils/app_busy_cursor.dart';
 import 'core/service_locator.dart';
 import 'e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
+import 'package:cb_file_manager/ui/screens/media_gallery/video_window_app.dart';
+import 'package:cb_file_manager/ui/controllers/archive_navigation.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'services/windowing/window_startup_payload.dart';
+import 'services/windowing/video_window_service.dart';
 import 'services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'services/windowing/window_acrylic_service.dart';
 import 'ui/screens/progress_window/progress_window_screen.dart';
@@ -52,15 +58,45 @@ import 'dev/dev_overlay.dart';
 // in the same process (each testWidgets block re-enters runCbFileApp).
 GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Error patterns to suppress (Flutter engine-level noise that doesn't affect functionality)
-const List<String> _debugLogSuppressList = <String>[
-  'accessibility_bridge.cc', // Windows AXTree update errors
-  'Failed to update ui::AXTree',
-  'Nodes left pending',
-];
+// Dart-side log noise to drop. This only intercepts `print` calls made inside
+// the zone installed in [main]; it cannot touch engine output.
+//
+// Note for future maintainers: this list used to carry 'accessibility_bridge.cc',
+// 'Failed to update ui::AXTree' and 'Nodes left pending'. Those lines are emitted
+// by FML_LOG in the C++ engine (shell/platform/common/accessibility_bridge.cc)
+// straight to the process stderr, so they never pass through a Dart print zone
+// and listing them here did nothing. The AXTree flood is instead reduced at the
+// source by keeping the file/folder item semantics tree stable — see
+// `excludeFromSemantics` in ui/components/common/optimized_interaction_handler.dart
+// and the unconditional selection indicators in
+// ui/screens/folder_list/components/{file,folder}_item.dart.
+const List<String> _debugLogSuppressList = <String>[];
 
 /// Launch file path from OS (e.g. double-click when app is default for video)
 List<String> _launchPaths = [];
+
+/// Takes the first desktop video passed by the OS (for example through a
+/// Windows file association). That process is already the video's dedicated
+/// window, so it must boot directly into [VideoWindowApp] instead of first
+/// building the file-manager shell and pushing a route inside it.
+String? _takeDesktopLaunchVideoPath() {
+  if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    return null;
+  }
+
+  for (var index = 0; index < _launchPaths.length; index++) {
+    final candidate = _launchPaths[index].trim();
+    if (candidate.isEmpty || !FileTypeUtils.isVideoFile(candidate)) continue;
+    try {
+      if (!File(candidate).existsSync()) continue;
+    } catch (_) {
+      continue;
+    }
+    _launchPaths.removeAt(index);
+    return candidate;
+  }
+  return null;
+}
 
 void _handleLaunchFiles() {
   if (_launchPaths.isEmpty) return;
@@ -68,11 +104,15 @@ void _handleLaunchFiles() {
   if (p.isEmpty) return;
   try {
     final f = File(p);
-    if (f.existsSync() && FileTypeUtils.isVideoFile(p)) {
+    if (!f.existsSync()) return;
+    final ctx = navigatorKey.currentContext;
+    if (FileTypeUtils.isVideoFile(p)) {
       navigatorKey.currentState?.push(MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => VideoPlayerFullScreen(file: f),
       ));
+    } else if (FileTypeUtils.isArchiveFile(p) && ctx != null) {
+      ArchiveNavigation.openBrowse(ctx, archiveFilePath: p);
     }
   } catch (_) {}
 }
@@ -140,6 +180,14 @@ void main(List<String> args) {
 Future<void> runCbFileApp() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (Platform.isWindows) {
+    unawaited(ExternalAppHelper.ensureWindowsFileAssociations());
+  }
+
+  // Bundled Inter / JetBrains Mono are OFL-licensed; the licence has to ship
+  // with them. Lazy — the text is only read if the user opens the licence page.
+  registerCbFontLicenses();
+
   // E2E serialization: block until the previous test's teardown is complete.
   // This prevents DirectoryWatcherService from racing against _deleteDirectorySafe().
   if (kCbE2E) {
@@ -171,11 +219,43 @@ Future<void> runCbFileApp() async {
   final env = Platform.environment;
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final environmentVideoPath = VideoWindowService.startupVideoPath();
+  final commandLineVideoPath =
+      environmentVideoPath == null ? _takeDesktopLaunchVideoPath() : null;
+
+  // Windows starts a new process for a file-association launch. If the player
+  // already exists, hand the video to it and close this redundant process
+  // before constructing another Flutter window.
+  if (commandLineVideoPath != null &&
+      await VideoWindowService.tryPlayInExistingWindow(commandLineVideoPath)) {
+    try {
+      await windowManager.ensureInitialized();
+      await windowManager.destroy();
+    } catch (_) {}
+    exit(0);
+  }
+
+  final startupVideoPath = environmentVideoPath ?? commandLineVideoPath;
+  final isDedicatedVideoWindow = startupVideoPath != null;
   final isSecondaryWindow =
-      env[WindowStartupPayload.envSecondaryWindowKey] == '1';
+      env[WindowStartupPayload.envSecondaryWindowKey] == '1' ||
+          isDedicatedVideoWindow;
   final startHidden = env[WindowStartupPayload.envStartHiddenKey] == '1';
-  final windowRole =
-      (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
+  final initialWindowPositionX = double.tryParse(
+    env[WindowStartupPayload.envWindowPositionXKey] ?? '',
+  );
+  final initialWindowPositionY = double.tryParse(
+    env[WindowStartupPayload.envWindowPositionYKey] ?? '',
+  );
+  final initialWindowPosition =
+      initialWindowPositionX != null && initialWindowPositionY != null
+          ? Offset(initialWindowPositionX, initialWindowPositionY)
+          : null;
+  final startDraggingWindow =
+      env[WindowStartupPayload.envStartDraggingKey] == '1';
+  final windowRole = isDedicatedVideoWindow
+      ? 'video'
+      : (env[WindowStartupPayload.envWindowRoleKey] ?? 'normal').trim();
   final isPip = env['CB_PIP_MODE'] == '1';
   final isProgressWindow = windowRole == 'progress' && isDesktopPlatform;
 
@@ -273,7 +353,7 @@ Future<void> runCbFileApp() async {
 
     if (!isPip && !isProgressWindow) {
       final windowOptions = WindowOptions(
-        center: true,
+        center: initialWindowPosition == null,
         backgroundColor: Colors.transparent,
         titleBarStyle: TitleBarStyle.hidden,
         windowButtonVisibility: !Platform.isWindows,
@@ -304,10 +384,15 @@ Future<void> runCbFileApp() async {
           } else {
             try {
               await windowManager.setSkipTaskbar(false);
+              if (initialWindowPosition != null) {
+                await windowManager.setPosition(initialWindowPosition);
+              }
               await windowManager.show();
               await windowManager.focus();
               await WindowsNativeTabDragDropService.forceActivateWindow();
-              unawaited(windowManager.center());
+              if (initialWindowPosition == null) {
+                unawaited(windowManager.center());
+              }
             } catch (_) {}
           }
         } else {
@@ -508,6 +593,32 @@ Future<void> runCbFileApp() async {
     return;
   }
 
+  // Dedicated video player window (desktop): boot straight into the player.
+  if (startupVideoPath != null) {
+    // This process booted on the deferred "secondary window" path, so the bits
+    // the player actually needs must be initialized here.
+    if (Platform.isWindows && !kCbE2EFast) {
+      try {
+        await MediaKitAudioHelper.initialize();
+      } catch (_) {}
+    }
+    try {
+      await locator<UserPreferences>().init();
+    } catch (_) {}
+    try {
+      await locator<LanguageController>().initialize();
+    } catch (_) {}
+
+    if (VideoWindowService.startupInitiallyMaximized()) {
+      try {
+        await windowManager.maximize();
+      } catch (_) {}
+    }
+
+    runApp(VideoWindowApp(initialPath: startupVideoPath));
+    return;
+  }
+
   final WindowStartupPayload? startupPayload =
       kCbE2E && CbE2EConfig.startupPayload != null
           ? CbE2EConfig.startupPayload
@@ -521,6 +632,22 @@ Future<void> runCbFileApp() async {
       ),
     ),
   );
+
+  if (isSecondaryWindow &&
+      startDraggingWindow &&
+      !isProgressWindow &&
+      !startHidden) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        Future<void>.delayed(
+          const Duration(milliseconds: 16),
+          () async {
+            await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
+          },
+        ),
+      );
+    });
+  }
 
   if (isSecondaryWindow &&
       !isProgressWindow &&
@@ -743,7 +870,11 @@ class _CBFileAppState extends State<CBFileApp>
   ThemeData _resolveMaterialLightTheme(ThemeProvider provider) {
     final isDarkTheme = provider.currentTheme == AppThemeType.dark;
     return isDarkTheme
-        ? ThemeConfig.getLightTheme(accentColor: provider.currentAccentColor)
+        ? ThemeConfig.getLightTheme(
+            accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
+          )
         : provider.themeData;
   }
 
@@ -751,7 +882,11 @@ class _CBFileAppState extends State<CBFileApp>
     final isDarkTheme = provider.currentTheme == AppThemeType.dark;
     return isDarkTheme
         ? provider.themeData
-        : ThemeConfig.getDarkTheme(accentColor: provider.currentAccentColor);
+        : ThemeConfig.getDarkTheme(
+            accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
+          );
   }
 
   fluent.FluentThemeData _resolveFluentLightTheme(ThemeProvider provider) {
@@ -760,6 +895,8 @@ class _CBFileAppState extends State<CBFileApp>
         ? FluentThemeConfig.getTheme(
             AppThemeType.light,
             accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
             acrylicStrength: provider.desktopAcrylicStrength,
             preferTransparentBackdrop:
                 provider.backdropMode == AcrylicBackdropMode.dynamic,
@@ -774,166 +911,12 @@ class _CBFileAppState extends State<CBFileApp>
         : FluentThemeConfig.getTheme(
             AppThemeType.dark,
             accentColor: provider.currentAccentColor,
+            fontColor: provider.currentFontColor,
+            uiFont: provider.currentUiFont,
             acrylicStrength: provider.desktopAcrylicStrength,
             preferTransparentBackdrop:
                 provider.backdropMode == AcrylicBackdropMode.dynamic,
           );
-  }
-
-  ThemeData _createDesktopAcrylicMaterialBridgeTheme(
-    ThemeData baseTheme,
-    Brightness brightness,
-    double strength,
-    bool preferTransparentBackdrop,
-  ) {
-    final double normalizedStrength = strength.clamp(0.0, 2.0).toDouble();
-    final bool isLightMode = brightness == Brightness.light;
-    const Color fluentLightBackground2 = Color(0xFFF3F4F7);
-    const Color fluentLightBackground3 = Color(0xFFFFFFFF);
-
-    double opacityByStrength({
-      required double solidAtMin,
-      required double glassAtMax,
-    }) {
-      return solidAtMin + (glassAtMax - solidAtMin) * normalizedStrength;
-    }
-
-    final scaffoldOpacity = brightness == Brightness.dark
-        ? opacityByStrength(
-            solidAtMin: 0.90,
-            glassAtMax: preferTransparentBackdrop ? 0.24 : 0.34,
-          )
-        : opacityByStrength(
-            solidAtMin: 0.99,
-            glassAtMax: preferTransparentBackdrop ? 0.62 : 0.92,
-          );
-    final appBarOpacity = brightness == Brightness.dark
-        ? opacityByStrength(
-            solidAtMin: 0.94,
-            glassAtMax: preferTransparentBackdrop ? 0.36 : 0.46,
-          )
-        : opacityByStrength(
-            solidAtMin: 0.99,
-            glassAtMax: preferTransparentBackdrop ? 0.70 : 0.93,
-          );
-    final surfaceOpacity = brightness == Brightness.dark
-        ? opacityByStrength(
-            solidAtMin: 0.88,
-            glassAtMax: preferTransparentBackdrop ? 0.30 : 0.40,
-          )
-        : opacityByStrength(
-            solidAtMin: 0.99,
-            glassAtMax: preferTransparentBackdrop ? 0.72 : 0.90,
-          );
-    final containerOpacity = brightness == Brightness.dark
-        ? opacityByStrength(
-            solidAtMin: 0.84,
-            glassAtMax: preferTransparentBackdrop ? 0.28 : 0.36,
-          )
-        : opacityByStrength(
-            solidAtMin: 0.98,
-            glassAtMax: preferTransparentBackdrop ? 0.68 : 0.88,
-          );
-    final lowContainerOpacity = brightness == Brightness.dark
-        ? opacityByStrength(
-            solidAtMin: 0.80,
-            glassAtMax: preferTransparentBackdrop ? 0.24 : 0.32,
-          )
-        : opacityByStrength(
-            solidAtMin: 0.98,
-            glassAtMax: preferTransparentBackdrop ? 0.62 : 0.86,
-          );
-    final lowestContainerOpacity = brightness == Brightness.dark
-        ? opacityByStrength(
-            solidAtMin: 0.76,
-            glassAtMax: preferTransparentBackdrop ? 0.20 : 0.28,
-          )
-        : opacityByStrength(
-            solidAtMin: 0.97,
-            glassAtMax: preferTransparentBackdrop ? 0.56 : 0.84,
-          );
-
-    final colorScheme = baseTheme.colorScheme;
-    const Color lightSurfaceBase = fluentLightBackground3;
-    const Color lightContainerBase = fluentLightBackground2;
-    final Color effectiveSurfaceBase =
-        isLightMode ? lightSurfaceBase : colorScheme.surface;
-    final Color effectiveContainerBase =
-        isLightMode ? lightContainerBase : colorScheme.surfaceContainer;
-
-    final bridgedColorScheme = colorScheme.copyWith(
-      surface: effectiveSurfaceBase.withValues(alpha: surfaceOpacity),
-      surfaceBright:
-          (isLightMode ? lightSurfaceBase : colorScheme.surfaceBright)
-              .withValues(alpha: surfaceOpacity),
-      surfaceDim: (isLightMode ? lightContainerBase : colorScheme.surfaceDim)
-          .withValues(alpha: surfaceOpacity),
-      surfaceContainer:
-          effectiveContainerBase.withValues(alpha: containerOpacity),
-      surfaceContainerHigh:
-          effectiveContainerBase.withValues(alpha: containerOpacity),
-      surfaceContainerHighest:
-          effectiveContainerBase.withValues(alpha: containerOpacity),
-      surfaceContainerLow:
-          effectiveSurfaceBase.withValues(alpha: lowContainerOpacity),
-      surfaceContainerLowest:
-          effectiveSurfaceBase.withValues(alpha: lowestContainerOpacity),
-      inverseSurface:
-          colorScheme.inverseSurface.withValues(alpha: surfaceOpacity),
-      surfaceTint: Colors.transparent,
-    );
-
-    final cardColor =
-        effectiveContainerBase.withValues(alpha: containerOpacity);
-    final dialogColor = effectiveContainerBase;
-    // Menus and dropdown overlays stay solid even when page chrome uses acrylic.
-    final Color menuColor = effectiveContainerBase;
-
-    return baseTheme.copyWith(
-      colorScheme: bridgedColorScheme,
-      scaffoldBackgroundColor:
-          baseTheme.scaffoldBackgroundColor.withValues(alpha: scaffoldOpacity),
-      canvasColor: menuColor,
-      cardColor: cardColor,
-      cardTheme: baseTheme.cardTheme.copyWith(
-        color: cardColor,
-      ),
-      dialogTheme: baseTheme.dialogTheme.copyWith(
-        backgroundColor: dialogColor,
-      ),
-      popupMenuTheme: baseTheme.popupMenuTheme.copyWith(
-        color: menuColor,
-        elevation: 4,
-        shadowColor: Colors.black54,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: isLightMode
-                ? Colors.black.withValues(alpha: 0.08)
-                : Colors.white.withValues(alpha: 0.08),
-            width: 1,
-          ),
-        ),
-      ),
-      dropdownMenuTheme: baseTheme.dropdownMenuTheme.copyWith(
-        menuStyle: (baseTheme.dropdownMenuTheme.menuStyle ?? const MenuStyle())
-            .copyWith(
-          backgroundColor: WidgetStatePropertyAll(menuColor),
-          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        ),
-      ),
-      bottomSheetTheme: baseTheme.bottomSheetTheme.copyWith(
-        backgroundColor: dialogColor,
-        modalBackgroundColor: dialogColor,
-      ),
-      appBarTheme: baseTheme.appBarTheme.copyWith(
-        backgroundColor: (baseTheme.appBarTheme.backgroundColor ??
-                baseTheme.scaffoldBackgroundColor)
-            .withValues(alpha: appBarOpacity),
-        surfaceTintColor: Colors.transparent,
-      ),
-    );
   }
 
   bool _resolveNativeBackdropDarkMode(ThemeProvider provider) {
@@ -1007,19 +990,21 @@ class _CBFileAppState extends State<CBFileApp>
     final darkTheme = _resolveMaterialDarkTheme(themeProvider);
     final acrylicStrength = themeProvider.desktopAcrylicStrength;
     final resolvedLightTheme = _useDesktopAcrylicVisuals
-        ? _createDesktopAcrylicMaterialBridgeTheme(
-            lightTheme,
-            Brightness.light,
-            acrylicStrength,
-            themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
+        ? createDesktopAcrylicMaterialBridgeTheme(
+            baseTheme: lightTheme,
+            brightness: Brightness.light,
+            strength: acrylicStrength,
+            preferTransparentBackdrop:
+                themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
           )
         : lightTheme;
     final resolvedDarkTheme = _useDesktopAcrylicVisuals
-        ? _createDesktopAcrylicMaterialBridgeTheme(
-            darkTheme,
-            Brightness.dark,
-            acrylicStrength,
-            themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
+        ? createDesktopAcrylicMaterialBridgeTheme(
+            baseTheme: darkTheme,
+            brightness: Brightness.dark,
+            strength: acrylicStrength,
+            preferTransparentBackdrop:
+                themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
           )
         : darkTheme;
 
@@ -1043,7 +1028,9 @@ class _CBFileAppState extends State<CBFileApp>
         Locale('en', ''),
       ],
       builder: (context, child) {
-        final wrappedChild = child ?? const SizedBox.shrink();
+        final wrappedChild = AppBusyCursorOverlay(
+          child: child ?? const SizedBox.shrink(),
+        );
         if (!_useDesktopAcrylicVisuals) return wrappedChild;
         return DesktopAcrylicBackdrop(
           brightness: Theme.of(context).brightness,
@@ -1079,7 +1066,9 @@ class _CBFileAppState extends State<CBFileApp>
         // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use
         // [ScaffoldMessenger.of] for snackbars — wrap so those lookups succeed.
         final shell = ScaffoldMessenger(
-          child: child ?? const SizedBox.shrink(),
+          child: AppBusyCursorOverlay(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
         final brightness = fluent.FluentTheme.of(context).brightness;
         final resolvedTheme = brightness == Brightness.dark
@@ -1089,11 +1078,12 @@ class _CBFileAppState extends State<CBFileApp>
         // Always wrap with Material Theme so ScrollbarThemeData is available
         // for Material Scrollbar widgets under the Fluent UI shell.
         final materialTheme = _useDesktopAcrylicVisuals
-            ? _createDesktopAcrylicMaterialBridgeTheme(
-                resolvedTheme,
-                brightness,
-                themeProvider.desktopAcrylicStrength,
-                themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
+            ? createDesktopAcrylicMaterialBridgeTheme(
+                baseTheme: resolvedTheme,
+                brightness: brightness,
+                strength: themeProvider.desktopAcrylicStrength,
+                preferTransparentBackdrop:
+                    themeProvider.backdropMode == AcrylicBackdropMode.dynamic,
               )
             : resolvedTheme;
 
@@ -1147,9 +1137,6 @@ class _CBFileAppState extends State<CBFileApp>
     final app =
         isDevOverlayEnabled ? DevOverlay(child: appContent) : appContent;
 
-    if (Platform.isWindows) {
-      return ExcludeSemantics(child: app);
-    }
     return app;
   }
 }

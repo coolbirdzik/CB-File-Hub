@@ -21,12 +21,15 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/file_grid_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/file_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/folder_grid_item.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/components/folder_item.dart';
+import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 
 import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
@@ -82,8 +85,23 @@ Future<bool> _confirmDeleteDialog(
   return false;
 }
 
+Finder _findInlineRenameField() {
+  return find.descendant(
+    of: find.byType(InlineRenameField),
+    matching: find.byType(TextField),
+  );
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // The production preference is stored in SQLite, not SharedPreferences.
+  // Pin every E2E case to the clean-install default so local persisted state
+  // cannot make the suite exercise grid while CI exercises list/details.
+  setUp(() async {
+    await UserPreferences.instance.init();
+    await UserPreferences.instance.setViewMode(ViewMode.list);
+  });
 
   // ===========================================================================
   // Suite 1: Navigation
@@ -360,11 +378,12 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.f2);
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // F2 starts inline rename; a path TextField (hint: Path) may also be present.
-        final textFields = find.byType(TextField);
-        expect(textFields, findsAtLeastNWidgets(1),
+        // Target the inline editor specifically; the address bar may also
+        // contain a TextField and must not receive the new filename.
+        final renameField = _findInlineRenameField();
+        expect(renameField, findsOneWidget,
             reason: 'Inline rename TextField not found');
-        await et.enterText(textFields.at(0), newName, detail: 'type_new_name');
+        await et.enterText(renameField, newName, detail: 'type_new_name');
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await et.pumpAndSettle(const Duration(seconds: 3));

@@ -1507,6 +1507,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
                 context,
                 sourcePath: item.actualFilePath,
                 preferredTabName: p.basename(p.dirname(item.actualFilePath)),
+                openContainingFolder: true,
               ),
             ),
           if (isDesktopPlatform)

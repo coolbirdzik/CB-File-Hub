@@ -6,9 +6,11 @@ import '../../helpers/files/trash_manager.dart';
 import '../../helpers/tags/tag_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
+import '../disk_cleaner/cleaner_categories.dart';
 import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
+import 'cleaner_scan_registry.dart';
 import 'disk_cleaner_skill.dart';
 import '../video_library_service.dart';
 
@@ -73,6 +75,7 @@ class ToolExecutor {
     'clean_disk_junk',
     'get_pending_cleanup_review',
     'get_current_cleaner_scan',
+    'get_current_app_storage',
   };
 
   static const _toolAliases = {
@@ -264,6 +267,8 @@ class ToolExecutor {
           return _getPendingCleanupReview(call.arguments);
         case 'get_current_cleaner_scan':
           return _getCurrentCleanerScan(call.arguments);
+        case 'get_current_app_storage':
+          return _getCurrentAppStorage(call.arguments);
         default:
           return ToolResult(
             toolName: call.name,
@@ -1226,9 +1231,33 @@ class ToolExecutor {
   // Disk Cleaner skill tools
   // ---------------------------------------------------------------------------
 
-  /// In-memory cache of scan results keyed by scan_id. LRU eviction at 5.
-  static final Map<String, _CachedScan> _scanCache = {};
-  static const int _maxScanCacheSize = 5;
+  /// In-memory cache of scan results keyed by scan_id and isolated by tab.
+  static final CleanerScanRegistry _scanRegistry = CleanerScanRegistry();
+
+  ToolCall normalizeCall(ToolCall call) {
+    if (call.name != 'scan_disk_junk' && call.name != 'clean_disk_junk') {
+      return call;
+    }
+
+    final arguments = Map<String, dynamic>.from(call.arguments);
+    final normalizedCategories =
+        _normalizeCleanerCategories(arguments['categories']);
+    if (normalizedCategories != null) {
+      arguments['categories'] = normalizedCategories;
+    }
+
+    if (call.name == 'clean_disk_junk') {
+      final resolvedScanId = _scanRegistry.resolveId(
+        arguments['scan_id'],
+        ownerTabId: ownerTabId,
+      );
+      if (resolvedScanId != null) {
+        arguments['scan_id'] = resolvedScanId;
+      }
+    }
+
+    return ToolCall(name: call.name, arguments: arguments);
+  }
 
   Future<ToolResult> _listDiskJunkCategories(Map<String, dynamic> args) async {
     if (!Platform.isWindows) {
@@ -1305,8 +1334,13 @@ class ToolExecutor {
       );
     }
 
+    final normalizedArgs = normalizeCall(ToolCall(
+      name: 'scan_disk_junk',
+      arguments: args,
+    )).arguments;
+
     // Parse arguments
-    final drivesArg = args['drives'];
+    final drivesArg = normalizedArgs['drives'];
     final List<String> drives;
     if (drivesArg is List) {
       drives = drivesArg.map((e) => e.toString()).toList();
@@ -1314,7 +1348,7 @@ class ToolExecutor {
       drives = const ['C:\\'];
     }
 
-    final categoriesArg = args['categories'];
+    final categoriesArg = normalizedArgs['categories'];
     final List<String> categories;
     if (categoriesArg is List) {
       categories = categoriesArg.map((e) => e.toString()).toList();
@@ -1354,39 +1388,15 @@ class ToolExecutor {
       // Generate scan_id and cache the report
       final scanId =
           'sc_${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
-      _cacheScan(scanId, report);
-
-      // Build output
-      final buffer = StringBuffer();
-      buffer.writeln('Scan complete. scan_id=$scanId');
-      buffer.writeln('Drives: ${report.drivesScanned.join(', ')}');
-      buffer.writeln(
-          'Total: ${report.totalCount} items, ${_formatSize(report.totalBytes)}');
-      buffer.writeln();
-      buffer.writeln('By category:');
-      for (final entry in report.itemsByCategory.entries) {
-        final items = entry.value;
-        final catBytes = items.fold<int>(0, (s, i) => s + i.sizeBytes);
-        final sample = items.isNotEmpty ? items.first.path : '';
-        buffer.writeln(
-            '- ${entry.key}: ${items.length} items, ${_formatSize(catBytes)}${sample.isNotEmpty ? ' (sample: $sample)' : ''}');
-      }
-
-      if (report.warnings.isNotEmpty) {
-        buffer.writeln();
-        buffer.writeln('Warnings:');
-        for (final w in report.warnings) {
-          buffer.writeln('- $w');
-        }
-      }
-
-      buffer.writeln();
-      buffer.writeln(
-          'To clean: call clean_disk_junk with scan_id="$scanId" and categories:[...] to clean specific categories.');
+      _scanRegistry.store(
+        scanId,
+        report,
+        ownerTabId: ownerTabId,
+      );
 
       return ToolResult(
         toolName: 'scan_disk_junk',
-        output: _truncate(buffer.toString().trim()),
+        output: formatJunkScanReport(report, scanId),
       );
     } catch (e) {
       service.emitAgentActivity(DiskCleanerAgentActivity(
@@ -1402,6 +1412,71 @@ class ToolExecutor {
     }
   }
 
+  /// Formats a junk scan as evidence for a recommendation, not as a cleanup
+  /// instruction. Kept public so the output contract can be tested without
+  /// touching the Windows filesystem.
+  String formatJunkScanReport(ScanReport report, String scanId) {
+    final buffer = StringBuffer();
+    buffer.writeln('JUNK SCAN ANALYSIS');
+    buffer.writeln('scan_id=$scanId');
+    buffer.writeln('Drives: ${report.drivesScanned.join(', ')}');
+    buffer.writeln(
+        'Total rule-matched junk: ${report.totalCount} items, ${_formatSize(report.totalBytes)}');
+
+    final categories = report.itemsByCategory.entries.toList()
+      ..sort((a, b) {
+        final aBytes =
+            a.value.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+        final bBytes =
+            b.value.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+        return bBytes.compareTo(aBytes);
+      });
+
+    buffer.writeln();
+    buffer.writeln('Categories ranked by reclaimable size:');
+    if (categories.isEmpty) {
+      buffer.writeln('  (none)');
+    }
+    for (final entry in categories) {
+      final category = CleanerCategories.byId(entry.key);
+      final items = entry.value.toList()
+        ..sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+      final bytes = items.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+      final safety = category?.safety ?? CleanerSafety.careful;
+      buffer.writeln(
+        '- ${category?.displayName ?? entry.key} [id=${entry.key}, safety=${safety.name}]: '
+        '${items.length} items, ${_formatSize(bytes)}. '
+        '${category?.description ?? 'Unknown cleaner category.'}',
+      );
+      buffer.writeln('  recommendation: ${_categoryRecommendation(safety)}');
+      for (final item in items.take(3)) {
+        buffer.writeln(
+          '  largest: ${item.path} [${item.isContainerOnly ? 'folder contents' : 'file/folder'}, '
+          '${_formatSize(item.sizeBytes)}, owner=${_junkOwner(entry.key, item.path)}]',
+        );
+      }
+      if (items.length > 3) {
+        buffer.writeln('  ... ${items.length - 3} more in this category');
+      }
+    }
+
+    if (report.warnings.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('Coverage warnings:');
+      for (final warning in report.warnings) {
+        buffer.writeln('- $warning');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln(
+        'RESPONSE REQUIREMENT: Summarize the ranked findings in normal '
+        'language. Include path, size, owner/category, CLEAN/REVIEW/KEEP, and '
+        'reason. This scan is analysis-only. Do not call clean_disk_junk unless '
+        'the user explicitly confirms cleanup after seeing the findings.');
+    return _truncate(buffer.toString().trim());
+  }
+
   Future<ToolResult> _cleanDiskJunk(Map<String, dynamic> args) async {
     if (!Platform.isWindows) {
       return const ToolResult(
@@ -1411,27 +1486,32 @@ class ToolExecutor {
       );
     }
 
-    final scanId = args['scan_id'] as String? ?? '';
-    if (scanId.isEmpty) {
-      return const ToolResult(
-        toolName: 'clean_disk_junk',
-        output: 'Error: "scan_id" argument required. Run scan_disk_junk first.',
-        success: false,
-      );
-    }
-
-    final cached = _scanCache[scanId];
+    final normalizedCall = normalizeCall(ToolCall(
+      name: 'clean_disk_junk',
+      arguments: args,
+    ));
+    final normalizedArgs = normalizedCall.arguments;
+    final scanId = _scanRegistry.resolveId(
+      normalizedArgs['scan_id'],
+      ownerTabId: ownerTabId,
+    );
+    final cached = scanId == null ? null : _scanRegistry[scanId];
     if (cached == null) {
-      return const ToolResult(
+      final requestedScanId =
+          normalizedArgs['scan_id']?.toString().trim() ?? '';
+      final usedPlaceholder =
+          CleanerScanRegistry.isPlaceholder(requestedScanId);
+      return ToolResult(
         toolName: 'clean_disk_junk',
-        output:
-            'Error: scan_id not found or expired. Run scan_disk_junk again.',
+        output: usedPlaceholder
+            ? 'Error: No current junk scan is available. Run scan_disk_junk first.'
+            : 'Error: scan_id not found, expired, or belongs to another tab. Run scan_disk_junk again.',
         success: false,
       );
     }
 
     // Filter by categories if specified
-    final categoriesArg = args['categories'];
+    final categoriesArg = normalizedArgs['categories'];
     final List<String>? filterCategories;
     if (categoriesArg is List && categoriesArg.isNotEmpty) {
       filterCategories = categoriesArg.map((e) => e.toString()).toList();
@@ -1439,8 +1519,8 @@ class ToolExecutor {
       filterCategories = null;
     }
 
-    final permanent = args['permanent'] as bool? ?? false;
-    final maxItems = args['max_items'] as int? ?? 10000;
+    final permanent = normalizedArgs['permanent'] as bool? ?? false;
+    final maxItems = normalizedArgs['max_items'] as int? ?? 10000;
 
     // Collect items to clean
     var items = cached.report.allItems;
@@ -1492,7 +1572,7 @@ class ToolExecutor {
       }
 
       // Remove from cache after successful clean
-      _scanCache.remove(scanId);
+      _scanRegistry.remove(scanId!);
 
       return ToolResult(
         toolName: 'clean_disk_junk',
@@ -1602,6 +1682,7 @@ class ToolExecutor {
     }
 
     final maxItems = (args['max_items'] as int?)?.clamp(5, 50) ?? 20;
+    final sectionLimit = maxItems > 8 ? 8 : maxItems;
     final includeSelected = args['include_selected'] as bool? ?? true;
     final root = context.root;
     final selectedNode = context.selectedPath == null
@@ -1611,37 +1692,57 @@ class ToolExecutor {
         ? null
         : _findDiskTreeNode(root, context.chartPath!);
 
+    final largestFiles = <DiskTreeNode>[];
+    final largestFolders = <DiskTreeNode>[];
     final junkNodes = <DiskTreeNode>[];
     final selectedNodes = <DiskTreeNode>[];
     var selectedBytes = 0;
     var selectedCount = 0;
 
-    void collect(DiskTreeNode node) {
+    void collect(DiskTreeNode node, {bool coveredByJunkAncestor = false}) {
       if (node.fullPath.isNotEmpty && node.isSelectedForDeletion) {
         selectedNodes.add(node);
         selectedBytes += node.sizeBytes;
         selectedCount++;
       }
-      if (node.fullPath.isNotEmpty && (node.isJunk || node.hasJunkChildren)) {
-        junkNodes.add(node);
+
+      if (node.fullPath.isNotEmpty && !identical(node, root)) {
+        _offerLargest(
+          node.isFile ? largestFiles : largestFolders,
+          node,
+          sectionLimit,
+        );
+      }
+
+      final isCanonicalJunk = node.isJunk && !coveredByJunkAncestor;
+      if (node.fullPath.isNotEmpty && isCanonicalJunk) {
+        _offerLargest(junkNodes, node, sectionLimit);
       }
       for (final child in node.children) {
-        collect(child);
+        collect(
+          child,
+          coveredByJunkAncestor: coveredByJunkAncestor || node.isJunk,
+        );
       }
     }
 
     collect(root);
-    junkNodes.sort((a, b) => b.junkBytes.compareTo(a.junkBytes));
     selectedNodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
 
-    final topChildren = root.children.toList()
-      ..sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
-
     final buffer = StringBuffer();
-    buffer.writeln('CURRENT CLEANER SCAN');
+    buffer.writeln(context.isCached
+        ? 'PREVIOUS CACHED CLEANER SCAN'
+        : 'CURRENT CLEANER SCAN');
     buffer.writeln('Owner tab: ${context.ownerTabId}');
-    buffer.writeln('Updated: ${context.updatedAt.toIso8601String()}');
-    buffer.writeln('Status: ${context.isScanning ? "scanning" : "ready"}');
+    buffer.writeln('Context published: ${context.updatedAt.toIso8601String()}');
+    buffer.writeln(
+        'Status: ${context.isCached ? "previous cached result" : context.isScanning ? "scanning" : "ready"}');
+    if (context.isCached) {
+      buffer.writeln(
+          'Freshness: previous cached result; this is not a current scan.');
+      buffer.writeln(
+          'Refresh: Use Scan again to refresh before relying on this data.');
+    }
     buffer.writeln(
         'Root: ${root.fullPath} (${_formatSize(root.sizeBytes)}, ${root.fileCount} files)');
     buffer.writeln('Junk marked: ${_formatSize(root.junkBytes)}');
@@ -1657,28 +1758,32 @@ class ToolExecutor {
     }
 
     buffer.writeln();
-    buffer.writeln('Top directories by size:');
-    if (topChildren.isEmpty) {
+    buffer.writeln('Largest folders (size is evidence, not deletion safety):');
+    if (largestFolders.isEmpty) {
       buffer.writeln('  (none)');
     } else {
-      for (final node in topChildren.take(maxItems)) {
-        buffer.writeln('  - ${_formatDiskTreeNode(node)}');
-      }
-      if (topChildren.length > maxItems) {
-        buffer.writeln('  ... ${topChildren.length - maxItems} more');
+      for (final node in largestFolders) {
+        buffer.writeln('  - ${_formatSpaceConsumer(node)}');
       }
     }
 
     buffer.writeln();
-    buffer.writeln('Top junk candidates:');
+    buffer.writeln('Largest files (size is evidence, not deletion safety):');
+    if (largestFiles.isEmpty) {
+      buffer.writeln('  (none)');
+    } else {
+      for (final node in largestFiles) {
+        buffer.writeln('  - ${_formatSpaceConsumer(node)}');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln('Rule-backed cleanup candidates:');
     if (junkNodes.isEmpty) {
       buffer.writeln('  (none marked as junk)');
     } else {
-      for (final node in junkNodes.take(maxItems)) {
-        buffer.writeln('  - ${_formatDiskTreeNode(node)}');
-      }
-      if (junkNodes.length > maxItems) {
-        buffer.writeln('  ... ${junkNodes.length - maxItems} more');
+      for (final node in junkNodes) {
+        buffer.writeln('  - ${_formatCleanupCandidate(node)}');
       }
     }
 
@@ -1688,17 +1793,189 @@ class ToolExecutor {
       if (selectedNodes.isEmpty) {
         buffer.writeln('  (none selected)');
       } else {
-        for (final node in selectedNodes.take(maxItems)) {
+        for (final node in selectedNodes.take(sectionLimit)) {
           buffer.writeln('  - ${_formatDiskTreeNode(node)}');
         }
-        if (selectedNodes.length > maxItems) {
-          buffer.writeln('  ... ${selectedNodes.length - maxItems} more');
+        if (selectedNodes.length > sectionLimit) {
+          buffer.writeln('  ... ${selectedNodes.length - sectionLimit} more');
         }
       }
     }
 
+    buffer.writeln();
+    buffer.writeln(
+        'RESPONSE REQUIREMENT: Answer with a readable ranked report, '
+        'not JSON. Explain what each item belongs to and label it CLEAN, REVIEW, '
+        'or KEEP with a reason. Do not call clean_disk_junk for an analysis or '
+        'recommendation request.');
+
     return ToolResult(
       toolName: 'get_current_cleaner_scan',
+      output: _truncate(buffer.toString().trim()),
+    );
+  }
+
+  ToolResult _getCurrentAppStorage(Map<String, dynamic> args) {
+    final service = DiskCleanerService.instance;
+    final context = service.getCleanerScanContext(ownerTabId: ownerTabId);
+    final report = context?.appStorageReport;
+    if (context == null || report == null) {
+      return const ToolResult(
+        toolName: 'get_current_app_storage',
+        output:
+            'No App Insights report is available for this Cleaner tab. Ask the user to finish a disk scan and open the Apps view first.',
+      );
+    }
+    if (!context.appInsightsSharedWithAgent) {
+      return const ToolResult(
+        toolName: 'get_current_app_storage',
+        output:
+            'App Insights has not been shared with CB Agent. Ask the user to click Ask CB Agent in the Apps view.',
+      );
+    }
+
+    final filter = (args['filter'] as String? ?? 'all').toLowerCase();
+    final requestedAppId = (args['app_id'] as String?)?.trim();
+    final maxApps = (args['max_apps'] as int?)?.clamp(1, 50) ?? 20;
+    final wantsPaths = args['include_paths'] as bool? ?? false;
+    final mayIncludePaths = wantsPaths &&
+        requestedAppId != null &&
+        requestedAppId.isNotEmpty &&
+        requestedAppId == context.selectedAppId;
+    const staleThreshold = Duration(days: 180);
+    const largeThresholdBytes = 1024 * 1024 * 1024;
+    final now = DateTime.now();
+
+    var profiles = report.apps.toList(growable: false);
+    if (requestedAppId != null && requestedAppId.isNotEmpty) {
+      profiles = profiles
+          .where((profile) => profile.app.id == requestedAppId)
+          .toList(growable: false);
+    } else {
+      switch (filter) {
+        case 'large':
+          profiles = profiles
+              .where(
+                (profile) => profile.bestKnownSizeBytes >= largeThresholdBytes,
+              )
+              .toList(growable: false);
+          break;
+        case 'stale':
+          profiles = profiles
+              .where(
+                (profile) => profile.isStale(
+                  now: now,
+                  threshold: staleThreshold,
+                ),
+              )
+              .toList(growable: false);
+          break;
+        case 'cleanable':
+          profiles = profiles
+              .where((profile) => profile.cleanableBytes > 0)
+              .toList(growable: false);
+          break;
+        case 'all':
+          break;
+        default:
+          return ToolResult(
+            toolName: 'get_current_app_storage',
+            output:
+                'Invalid filter "$filter". Use all, large, stale, or cleanable.',
+            success: false,
+          );
+      }
+    }
+
+    profiles.sort(
+      (a, b) => b.bestKnownSizeBytes.compareTo(a.bestKnownSizeBytes),
+    );
+
+    final staleCount = report.apps
+        .where(
+          (profile) => profile.isStale(
+            now: now,
+            threshold: staleThreshold,
+          ),
+        )
+        .length;
+    final largeCount = report.apps
+        .where(
+          (profile) => profile.bestKnownSizeBytes >= largeThresholdBytes,
+        )
+        .length;
+
+    final buffer = StringBuffer();
+    buffer.writeln('CURRENT CLEANER APP STORAGE');
+    buffer.writeln('Drive: ${report.drivePath}');
+    buffer.writeln('Generated: ${report.generatedAt.toIso8601String()}');
+    buffer.writeln('Coverage: ${report.isPartial ? "partial" : "complete"}');
+    buffer.writeln(
+      'Apps: ${report.apps.length}; confirmed footprint: ${_formatSize(report.confirmedSizeBytes)}; '
+      'large: $largeCount; not seen for 180+ days: $staleCount; '
+      'cleanable app data: ${_formatSize(report.cleanableBytes)}',
+    );
+    buffer.writeln(
+      'Last-opened values are local Windows evidence estimates. Unknown means no reliable evidence was found.',
+    );
+
+    if (profiles.isEmpty) {
+      buffer.writeln('No apps match the requested filter.');
+    } else {
+      buffer.writeln();
+      buffer.writeln('Matching apps:');
+      for (final profile in profiles.take(maxApps)) {
+        final app = profile.app;
+        final usage = profile.usage;
+        final lastOpenedAt = usage.lastOpenedAt;
+        final lastOpened = lastOpenedAt == null || lastOpenedAt.isAfter(now)
+            ? 'unknown'
+            : '${now.difference(lastOpenedAt).inDays} days ago '
+                '(${usage.source?.name ?? "unknown"}, ${usage.confidence?.name ?? "unknown"})';
+        final possible = profile.possibleSizeBytes > 0
+            ? ', possible=${_formatSize(profile.possibleSizeBytes)}'
+            : '';
+        final cleanable = profile.cleanableBytes > 0
+            ? ', cleanable=${_formatSize(profile.cleanableBytes)}'
+            : '';
+        buffer.writeln(
+          '- ${app.displayName} [id=${app.id}, source=${app.source.name}, '
+          'size=${_formatSize(profile.bestKnownSizeBytes)}, quality=${profile.measurementQuality.name}$possible$cleanable, '
+          'last_opened=$lastOpened]',
+        );
+        for (final entry in profile.entries) {
+          final description =
+              '${entry.kind.name}: ${_formatSize(entry.sizeBytes)} '
+              '[${entry.attributionConfidence.name}, ${entry.measurementQuality.name}${entry.isCleanable ? ", cleanable" : ""}]';
+          if (mayIncludePaths) {
+            buffer.writeln('  - $description ${entry.path}');
+          } else {
+            buffer.writeln('  - $description');
+          }
+        }
+      }
+      if (profiles.length > maxApps) {
+        buffer.writeln('... ${profiles.length - maxApps} more matching apps');
+      }
+    }
+
+    if (report.sharedOrUnattributed.isNotEmpty) {
+      final sharedBytes = report.sharedOrUnattributed.fold<int>(
+        0,
+        (sum, entry) => sum + entry.sizeBytes,
+      );
+      buffer.writeln();
+      buffer.writeln(
+        'Shared or unattributed large folders: ${report.sharedOrUnattributed.length}, ${_formatSize(sharedBytes)}. '
+        'They are informational and never cleanup targets.',
+      );
+    }
+    if (report.warnings.isNotEmpty) {
+      buffer.writeln('Warnings: ${report.warnings.join("; ")}');
+    }
+
+    return ToolResult(
+      toolName: 'get_current_app_storage',
       output: _truncate(buffer.toString().trim()),
     );
   }
@@ -1721,6 +1998,97 @@ class ToolExecutor {
             : '');
     final selected = node.isSelectedForDeletion ? ', selected' : '';
     return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, ${node.fileCount} files$junk$selected]';
+  }
+
+  void _offerLargest(
+    List<DiskTreeNode> nodes,
+    DiskTreeNode candidate,
+    int limit,
+  ) {
+    nodes.add(candidate);
+    nodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+    if (nodes.length > limit) {
+      nodes.removeLast();
+    }
+  }
+
+  String _formatSpaceConsumer(DiskTreeNode node) {
+    final type = node.isFile ? 'file' : 'folder';
+    if (node.isJunk) {
+      final categoryId = node.junkCategoryId!;
+      final category = CleanerCategories.byId(categoryId);
+      final safety = category?.safety ?? CleanerSafety.careful;
+      return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
+          'owner=${_junkOwner(categoryId, node.fullPath)}, '
+          'category=${category?.displayName ?? categoryId}, '
+          '${_categoryRecommendation(safety)}]';
+    }
+    return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
+        'owner=${_pathOwner(node.fullPath)}, REVIEW: Large size alone does not '
+        'make this safe to delete; keep it unless the user recognizes it.]';
+  }
+
+  String _formatCleanupCandidate(DiskTreeNode node) {
+    final categoryId = node.junkCategoryId!;
+    final category = CleanerCategories.byId(categoryId);
+    final safety = category?.safety ?? CleanerSafety.careful;
+    final type = node.isFile ? 'file' : 'folder';
+    return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, '
+        'owner=${_junkOwner(categoryId, node.fullPath)}, '
+        'category=${category?.displayName ?? categoryId} ($categoryId), '
+        'safety=${safety.name}, ${_categoryRecommendation(safety)}]';
+  }
+
+  String _categoryRecommendation(CleanerSafety safety) {
+    switch (safety) {
+      case CleanerSafety.safe:
+        return 'CLEAN: Usually safe because the OS or app can recreate it.';
+      case CleanerSafety.careful:
+        return 'REVIEW: Usually removable, but inspect the side effects first.';
+      case CleanerSafety.risky:
+        return 'KEEP: Do not clean by default; rebuilding may be slow or costly.';
+    }
+  }
+
+  String _junkOwner(String categoryId, String path) {
+    final category = CleanerCategories.byId(categoryId);
+    if (category == null) return 'Unknown';
+
+    final upperPath = path.toUpperCase();
+    final hints = <String>[];
+    for (final rule in category.rules) {
+      for (final hint in rule.appOwnerHints) {
+        final normalized = hint.trim();
+        if (normalized.isEmpty || normalized.toLowerCase().endsWith('.exe')) {
+          continue;
+        }
+        if (!hints.contains(normalized)) hints.add(normalized);
+      }
+    }
+    for (final hint in hints) {
+      final tokens = RegExp(r'[A-Za-z0-9]+')
+          .allMatches(hint.toUpperCase())
+          .map((match) => match.group(0)!)
+          .where((token) => token.length > 1);
+      if (tokens.isNotEmpty && tokens.every(upperPath.contains)) return hint;
+    }
+    return hints.isNotEmpty ? hints.take(3).join(' / ') : category.displayName;
+  }
+
+  String _pathOwner(String path) {
+    final normalized = path.replaceAll('/', r'\').toUpperCase();
+    if (normalized.contains(r'\WINDOWS\')) return 'Windows system';
+    if (normalized.contains(r'\PROGRAM FILES\') ||
+        normalized.contains(r'\PROGRAM FILES (X86)\')) {
+      return 'Installed application';
+    }
+    if (normalized.contains(r'\USERS\') &&
+        (normalized.contains(r'\DOWNLOADS\') ||
+            normalized.endsWith(r'\DOWNLOADS'))) {
+      return 'User Downloads';
+    }
+    if (normalized.contains(r'\APPDATA\')) return 'Application data';
+    return 'User or application data (unclassified)';
   }
 
   /// Resolves Windows known folders so paths in the review can be shown as
@@ -1769,11 +2137,27 @@ class ToolExecutor {
     return '${segments[0]}\\${segments[1]}\\${segments[2]}';
   }
 
-  static void _cacheScan(String scanId, ScanReport report) {
-    if (_scanCache.length >= _maxScanCacheSize) {
-      _scanCache.remove(_scanCache.keys.first);
+  static List<String>? _normalizeCleanerCategories(Object? value) {
+    if (value is! List) return null;
+
+    final normalized = <String>[];
+    void add(String category) {
+      if (!normalized.contains(category)) {
+        normalized.add(category);
+      }
     }
-    _scanCache[scanId] = _CachedScan(report: report);
+
+    for (final raw in value) {
+      final category = raw.toString().trim().toLowerCase();
+      if (category == 'cache') {
+        add('browser_cache');
+        add('thumbnail_cache');
+        add('app_cache');
+      } else if (category.isNotEmpty) {
+        add(category);
+      }
+    }
+    return normalized;
   }
 
   // ---------------------------------------------------------------------------
@@ -1915,12 +2299,6 @@ call:tool_call, unquoted keys, or invented tool names.
 - When done, respond with normal text (NO tool_call blocks).
 ${DiskCleanerSkill.isAvailable ? DiskCleanerSkill.skillBlock : ''}
 ''';
-}
-
-class _CachedScan {
-  final ScanReport report;
-  final DateTime cachedAt;
-  _CachedScan({required this.report}) : cachedAt = DateTime.now();
 }
 
 class _RootStat {

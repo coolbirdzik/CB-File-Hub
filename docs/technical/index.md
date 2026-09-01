@@ -1,6 +1,8 @@
 # Technical Docs — Index
 
-Below is the list of technical documents that have been split into smaller sections (ordered). Open any file to read detailed content.
+These pages explain the architecture for maintainers. Coding agents should use
+the source-linked [Agent Graph](../agent/index.md) as their primary router and
+return here for narrative background.
 
 1. [01-ai-overview.md](01-ai-overview.md) — AI technical overview and system summary.
 2. [02-execution-flow.md](02-execution-flow.md) — App startup sequence and service bootstrapping.
@@ -12,6 +14,7 @@ Below is the list of technical documents that have been split into smaller secti
 8. [08-logging-testing-platform.md](08-logging-testing-platform.md) — Logging, testing tools, and platform notes.
 9. [09-gotchas-extension.md](09-gotchas-extension.md) — Known gotchas, workarounds, and extension checklist.
 
-If you'd like, I can also add a link from `docs/index.md` to this technical index.
+The implementation is authoritative. When a technical page conflicts with the
+Agent Graph or source, update the page as part of the same change.
 
-_Generated: 2025-12-19_
+_Last reviewed: 2026-08-08_

@@ -11,6 +11,7 @@ void main() {
         ViewMode.columns,
         ViewMode.details,
         ViewMode.list,
+        ViewMode.tiles,
       };
 
       expect(
@@ -51,6 +52,16 @@ void main() {
           delta: 1,
           maxZoom: 5,
         ),
+        const ViewSpectrumResult(ViewMode.tiles, 4),
+      );
+      expect(
+        ViewModeSpectrum.step(
+          currentMode: ViewMode.tiles,
+          currentZoom: 4,
+          supported: supported,
+          delta: 1,
+          maxZoom: 5,
+        ),
         const ViewSpectrumResult(ViewMode.grid, 5),
       );
       expect(
@@ -84,11 +95,22 @@ void main() {
         ViewMode.columns,
         ViewMode.details,
         ViewMode.list,
+        ViewMode.tiles,
       };
 
       expect(
         ViewModeSpectrum.step(
           currentMode: ViewMode.grid,
+          currentZoom: 5,
+          supported: supported,
+          delta: -1,
+          maxZoom: 5,
+        ),
+        const ViewSpectrumResult(ViewMode.tiles, 5),
+      );
+      expect(
+        ViewModeSpectrum.step(
+          currentMode: ViewMode.tiles,
           currentZoom: 5,
           supported: supported,
           delta: -1,
@@ -163,12 +185,44 @@ void main() {
       );
     });
 
-    test('gridPreview stays in gridPreview and only changes zoom', () {
+    test('tiles mode steps to grid or list on ctrl+scroll delta', () {
       const supported = {
         ViewMode.tree,
         ViewMode.columns,
         ViewMode.details,
         ViewMode.list,
+        ViewMode.tiles,
+      };
+
+      expect(
+        ViewModeSpectrum.step(
+          currentMode: ViewMode.tiles,
+          currentZoom: 4,
+          supported: supported,
+          delta: 1,
+          maxZoom: 5,
+        ),
+        const ViewSpectrumResult(ViewMode.grid, 5),
+      );
+      expect(
+        ViewModeSpectrum.step(
+          currentMode: ViewMode.tiles,
+          currentZoom: 4,
+          supported: supported,
+          delta: -1,
+          maxZoom: 5,
+        ),
+        const ViewSpectrumResult(ViewMode.list, 4),
+      );
+    });
+
+    test('legacy gridPreview is treated as grid in the spectrum', () {
+      const supported = {
+        ViewMode.tree,
+        ViewMode.columns,
+        ViewMode.details,
+        ViewMode.list,
+        ViewMode.tiles,
       };
 
       expect(
@@ -179,20 +233,17 @@ void main() {
           delta: 1,
           maxZoom: 5,
         ),
-        const ViewSpectrumResult(ViewMode.gridPreview, 3),
+        const ViewSpectrumResult(ViewMode.grid, 3),
       );
       expect(
         ViewModeSpectrum.step(
           currentMode: ViewMode.gridPreview,
-          currentZoom: UserPreferences.minGridZoomLevel,
+          currentZoom: 5,
           supported: supported,
-          delta: 1,
+          delta: -1,
           maxZoom: 5,
         ),
-        const ViewSpectrumResult(
-          ViewMode.gridPreview,
-          UserPreferences.minGridZoomLevel,
-        ),
+        const ViewSpectrumResult(ViewMode.tiles, 5),
       );
     });
   });

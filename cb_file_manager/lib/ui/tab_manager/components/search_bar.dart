@@ -62,10 +62,20 @@ class _SearchBarState extends State<SearchBar> {
   final LayerLink _suggestionsLink = LayerLink();
   final Object _tapRegionGroupId = Object();
   bool _isSearchingTags = false;
+  bool _isSearchFocused = false;
   List<String> _suggestedTags = [];
   bool _isGlobalSearch = false;
   bool _useRegex = false;
   double _suggestionsWidth = 320;
+
+  static const double _barHeight = 40;
+  static const double _barRadius = 20;
+  static const double _actionIconSize = 18;
+  // Tight line-box height for the search text. Forcing this exact height on
+  // the field keeps the text and caret optically centered; the Material input
+  // decorator otherwise reserves extra space below the line and the caret
+  // ends up hugging the bottom of the pill.
+  static const double _textLineHeight = 20;
 
   // Stores the active autocomplete overlay.
   OverlayEntry? _overlayEntry;
@@ -154,7 +164,11 @@ class _SearchBarState extends State<SearchBar> {
   }
 
   void _onSearchFocusChanged() {
-    if (!_searchFocusNode.hasFocus) {
+    final hasFocus = _searchFocusNode.hasFocus;
+    if (_isSearchFocused != hasFocus) {
+      setState(() => _isSearchFocused = hasFocus);
+    }
+    if (!hasFocus) {
       _removeOverlay();
     }
   }
@@ -603,6 +617,14 @@ class _SearchBarState extends State<SearchBar> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final localizations = AppLocalizations.of(context)!;
+    final Color baseSearchFill =
+        isDark ? Colors.grey[850]! : theme.colorScheme.surface;
+    final Color focusedSearchFill = Color.alphaBlend(
+      isDark
+          ? Colors.white.withValues(alpha: 0.06)
+          : Colors.black.withValues(alpha: 0.035),
+      baseSearchFill,
+    );
 
     return TapRegion(
       groupId: _tapRegionGroupId,
@@ -612,115 +634,157 @@ class _SearchBarState extends State<SearchBar> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: double.infinity,
-          height: 48,
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          height: _barHeight,
           decoration: BoxDecoration(
-            color: isDark ? Colors.grey[850] : theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: const [],
-            border: Border.all(
-              color: _isSearchingTags
-                  ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                  : theme.colorScheme.outline.withValues(alpha: 0.3),
-              width: 1,
-            ),
+            color: _isSearchFocused ? focusedSearchFill : baseSearchFill,
+            borderRadius: BorderRadius.circular(_barRadius),
           ),
           child: Row(
             children: [
-              const SizedBox(width: 4),
+              const SizedBox(width: 10),
               // Animated icon that changes between search and tag
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  return ScaleTransition(scale: animation, child: child);
-                },
-                child: _isSearchingTags
-                    ? Icon(
-                        PhosphorIconsLight.shoppingBagOpen,
-                        key: const ValueKey('tagIcon'),
-                        color: theme.colorScheme.primary,
-                      )
-                    : Icon(
-                        PhosphorIconsLight.magnifyingGlass,
-                        key: const ValueKey('searchIcon'),
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+              SizedBox(
+                width: _actionIconSize,
+                height: _actionIconSize,
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder:
+                        (Widget child, Animation<double> animation) {
+                      return ScaleTransition(scale: animation, child: child);
+                    },
+                    child: _isSearchingTags
+                        ? Icon(
+                            PhosphorIconsLight.shoppingBagOpen,
+                            key: const ValueKey('tagIcon'),
+                            color: theme.colorScheme.primary,
+                            size: _actionIconSize,
+                          )
+                        : Icon(
+                            PhosphorIconsLight.magnifyingGlass,
+                            key: const ValueKey('searchIcon'),
+                            color: theme.colorScheme.onSurfaceVariant,
+                            size: _actionIconSize,
+                          ),
+                  ),
+                ),
               ),
               Expanded(
-                child: Focus(
-                  // Handle navigation keys for the autocomplete overlay.
-                  onKeyEvent: (FocusNode node, KeyEvent event) {
-                    if (event is KeyDownEvent &&
-                        event.logicalKey == LogicalKeyboardKey.escape) {
-                      // ESC closes tag suggestions first, then closes search mode.
-                      if (_overlayEntry != null) {
-                        _removeOverlay();
-                      } else {
-                        widget.onCloseSearch();
-                      }
-                      return KeyEventResult.handled;
-                    }
-
-                    if (_overlayEntry != null &&
-                        _currentTags.isNotEmpty &&
-                        _isSearchingTags) {
-                      if (event is KeyDownEvent) {
-                        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                          setState(() {
-                            if (_selectedTagIndex < _currentTags.length - 1) {
-                              _selectedTagIndex++;
-                            } else {
-                              _selectedTagIndex = 0;
-                            }
-                          });
-                          _updateOverlay();
-                          return KeyEventResult.handled;
-                        } else if (event.logicalKey ==
-                            LogicalKeyboardKey.arrowUp) {
-                          setState(() {
-                            if (_selectedTagIndex > 0) {
-                              _selectedTagIndex--;
-                            } else {
-                              _selectedTagIndex = _currentTags.length - 1;
-                            }
-                          });
-                          _updateOverlay();
-                          return KeyEventResult.handled;
-                        } else if ((event.logicalKey ==
-                                    LogicalKeyboardKey.enter ||
-                                event.logicalKey == LogicalKeyboardKey.tab) &&
-                            _selectedTagIndex >= 0) {
-                          // Select the highlighted tag with Enter or Tab.
-                          _applySelectedTag(_currentTags[_selectedTagIndex]);
+                child: SizedBox(
+                  height: _barHeight,
+                  child: Focus(
+                    // Handle navigation keys for the autocomplete overlay.
+                    onKeyEvent: (FocusNode node, KeyEvent event) {
+                      if (event is KeyDownEvent &&
+                          event.logicalKey == LogicalKeyboardKey.escape) {
+                        // ESC closes tag suggestions first, then closes search mode.
+                        if (_overlayEntry != null) {
                           _removeOverlay();
-                          return KeyEventResult.handled;
+                        } else {
+                          widget.onCloseSearch();
+                        }
+                        return KeyEventResult.handled;
+                      }
+
+                      if (_overlayEntry != null &&
+                          _currentTags.isNotEmpty &&
+                          _isSearchingTags) {
+                        if (event is KeyDownEvent) {
+                          if (event.logicalKey ==
+                              LogicalKeyboardKey.arrowDown) {
+                            setState(() {
+                              if (_selectedTagIndex < _currentTags.length - 1) {
+                                _selectedTagIndex++;
+                              } else {
+                                _selectedTagIndex = 0;
+                              }
+                            });
+                            _updateOverlay();
+                            return KeyEventResult.handled;
+                          } else if (event.logicalKey ==
+                              LogicalKeyboardKey.arrowUp) {
+                            setState(() {
+                              if (_selectedTagIndex > 0) {
+                                _selectedTagIndex--;
+                              } else {
+                                _selectedTagIndex = _currentTags.length - 1;
+                              }
+                            });
+                            _updateOverlay();
+                            return KeyEventResult.handled;
+                          } else if ((event.logicalKey ==
+                                      LogicalKeyboardKey.enter ||
+                                  event.logicalKey == LogicalKeyboardKey.tab) &&
+                              _selectedTagIndex >= 0) {
+                            // Select the highlighted tag with Enter or Tab.
+                            _applySelectedTag(_currentTags[_selectedTagIndex]);
+                            _removeOverlay();
+                            return KeyEventResult.handled;
+                          }
                         }
                       }
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: _isSearchingTags
-                          ? localizations.searchHintTextTags
-                          : widget.hintText ?? localizations.searchHintText,
-                      hintStyle: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.7),
-                        fontSize: 14,
+                      return KeyEventResult.ignored;
+                    },
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: SizedBox(
+                          height: _textLineHeight,
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: SizedBox(
+                                  height: 16,
+                                  width: double.infinity,
+                                  child: EditableText(
+                                    controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      height: 1,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                    strutStyle: const StrutStyle(
+                                      fontSize: 15,
+                                      height: 1,
+                                      forceStrutHeight: true,
+                                    ),
+                                    cursorColor: theme.colorScheme.primary,
+                                    backgroundCursorColor: Colors.transparent,
+                                    selectionColor: theme.colorScheme.primary
+                                        .withValues(alpha: 0.28),
+                                    cursorHeight: 16,
+                                    maxLines: 1,
+                                    textAlign: TextAlign.start,
+                                    textInputAction: TextInputAction.search,
+                                    onSubmitted: (_) => _performSearch(),
+                                  ),
+                                ),
+                              ),
+                              if (_searchController.text.isEmpty)
+                                IgnorePointer(
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _isSearchingTags
+                                          ? localizations.searchHintTextTags
+                                          : widget.hintText ??
+                                              localizations.searchHintText,
+                                      style: TextStyle(
+                                        color: theme
+                                            .colorScheme.onSurfaceVariant
+                                            .withValues(alpha: 0.7),
+                                        fontSize: 15,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
-                      isDense: true,
                     ),
-                    onSubmitted: (_) => _performSearch(),
                   ),
                 ),
               ),

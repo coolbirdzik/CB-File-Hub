@@ -5,6 +5,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "fc_native_video_thumbnail_plugin.h"
 #include "app_icon_plugin.h"
+#include "app_insights_plugin.h"
 #include "shell_context_menu_plugin.h"
 #include "file_operations_plugin.h"
 #include "window_utils_plugin.h"
@@ -45,6 +46,14 @@ bool FlutterWindow::OnCreate()
   AppIconPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarManager::GetInstance()
           ->GetRegistrar<flutter::PluginRegistrarWindows>(icon_registrar));
+
+  // Manually register the read-only Windows app inventory plugin.
+  auto app_insights_registrar =
+      flutter_controller_->engine()->GetRegistrarForPlugin("AppInsightsPlugin");
+  AppInsightsPlugin::RegisterWithRegistrar(
+      flutter::PluginRegistrarManager::GetInstance()
+          ->GetRegistrar<flutter::PluginRegistrarWindows>(
+              app_insights_registrar));
 
   // Manually register Shell Context Menu plugin
   auto shell_menu_registrar =

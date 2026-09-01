@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,18 +6,32 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as pathlib;
 
 import '../../core/service_locator.dart';
+import '../../helpers/files/archive_path_utils.dart';
+import '../../helpers/files/external_app_helper.dart';
 import '../../services/windowing/desktop_windowing_service.dart';
 import '../../services/windowing/window_startup_payload.dart';
+import '../controllers/file_operations_handler.dart';
+import '../screens/folder_list/folder_list_bloc.dart';
 import '../tab_manager/core/tab_manager.dart';
+import 'file_type_utils.dart';
+import 'video_playback_launcher.dart';
 
 class EntityOpenActions {
   static void openInNewTab(
     BuildContext context, {
     required String sourcePath,
     String? preferredTabName,
+    bool openContainingFolder = false,
   }) {
-    final target =
-        _resolveTarget(sourcePath, preferredTabName: preferredTabName);
+    if (!openContainingFolder && _tryOpenFileDirectly(context, sourcePath)) {
+      return;
+    }
+
+    final target = _resolveTarget(
+      sourcePath,
+      preferredTabName: preferredTabName,
+      openContainingFolder: openContainingFolder,
+    );
     if (target == null) return;
 
     TabNavigator.openTab(
@@ -31,9 +46,23 @@ class EntityOpenActions {
     BuildContext context, {
     required String sourcePath,
     String? preferredTabName,
+    bool openContainingFolder = false,
+    bool forceNewWindow = false,
   }) async {
-    final target =
-        _resolveTarget(sourcePath, preferredTabName: preferredTabName);
+    if (!openContainingFolder &&
+        _tryOpenFileDirectly(
+          context,
+          sourcePath,
+          forceNewWindow: forceNewWindow,
+        )) {
+      return true;
+    }
+
+    final target = _resolveTarget(
+      sourcePath,
+      preferredTabName: preferredTabName,
+      openContainingFolder: openContainingFolder,
+    );
     if (target == null) return false;
 
     final isDesktop =
@@ -97,9 +126,59 @@ class EntityOpenActions {
     tabBloc.add(OpenSplitPane(tabId: activeTab.id, path: target.path));
   }
 
+  /// Opens [sourcePath] the same way Enter / double-click does when it points
+  /// to a file that cannot be browsed as a folder (i.e. anything but an
+  /// archive). Returns true when the open was handled here.
+  static bool _tryOpenFileDirectly(
+    BuildContext context,
+    String sourcePath, {
+    bool forceNewWindow = false,
+  }) {
+    final trimmed = sourcePath.trim();
+    if (trimmed.isEmpty || trimmed.startsWith('#')) return false;
+    if (ArchivePathUtils.isArchiveEntryPath(trimmed)) return false;
+
+    final entityType = FileSystemEntity.typeSync(trimmed, followLinks: false);
+    if (entityType != FileSystemEntityType.file) return false;
+    // Archives are browsable, so they keep opening as a new tab / window.
+    if (FileTypeUtils.isArchiveFile(trimmed)) return false;
+
+    // Shift+Enter on a video: always a brand new player window, never the
+    // one that is already open.
+    if (forceNewWindow && FileTypeUtils.isVideoFile(trimmed)) {
+      unawaited(
+        VideoPlaybackLauncher.open(
+          context,
+          file: File(trimmed),
+          forceNewWindow: true,
+        ),
+      );
+      return true;
+    }
+
+    FolderListBloc? folderListBloc;
+    try {
+      folderListBloc = BlocProvider.of<FolderListBloc>(context);
+    } catch (_) {
+      folderListBloc = null;
+    }
+
+    if (folderListBloc != null) {
+      FileOperationsHandler.onFileTap(
+        context: context,
+        file: File(trimmed),
+        folderListBloc: folderListBloc,
+      );
+    } else {
+      ExternalAppHelper.openFileWithApp(trimmed, 'shell_open');
+    }
+    return true;
+  }
+
   static _ResolvedOpenTarget? _resolveTarget(
     String sourcePath, {
     String? preferredTabName,
+    bool openContainingFolder = false,
   }) {
     final trimmed = sourcePath.trim();
     if (trimmed.isEmpty) return null;
@@ -116,6 +195,16 @@ class EntityOpenActions {
     if (entityType == FileSystemEntityType.notFound) return null;
 
     if (entityType == FileSystemEntityType.file) {
+      // Archives are browsable containers: open the archive itself in the new
+      // tab / window instead of its containing folder.
+      if (!openContainingFolder && FileTypeUtils.isArchiveFile(trimmed)) {
+        return _ResolvedOpenTarget(
+          path: ArchivePathUtils.build(archiveFile: trimmed),
+          tabName: preferredTabName ?? pathlib.basename(trimmed),
+          highlightedFileName: null,
+        );
+      }
+
       final file = File(trimmed);
       final parentPath = file.parent.path;
       return _ResolvedOpenTarget(

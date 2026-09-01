@@ -14,6 +14,8 @@ import '../../../components/common/optimized_interaction_handler.dart';
 import '../../../utils/item_interaction_style.dart';
 import 'package:cb_file_manager/services/file_metadata_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
+import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
 class FolderDetailsItem extends StatefulWidget {
   final Directory folder;
@@ -46,6 +48,8 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
   bool _isHovering = false;
   bool _visuallySelected = false;
   FileStat? _fileStat;
+  Future<int?>? _folderSizeFuture;
+  int _folderSizeGeneration = 0;
 
   /// Tag name when this "folder" is actually a child tag (`#search?tag=`).
   String? get _tagName => UriUtils.extractTagFromSearchPath(widget.folder.path);
@@ -55,6 +59,7 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
     super.initState();
     _visuallySelected = widget.isSelected;
     _loadFolderStats();
+    _folderSizeFuture = _loadFolderSize();
   }
 
   @override
@@ -67,8 +72,27 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
     }
 
     if (widget.folder.path != oldWidget.folder.path) {
+      _folderSizeGeneration++;
       _loadFolderStats();
+      _folderSizeFuture = _loadFolderSize();
     }
+  }
+
+  @override
+  void dispose() {
+    _folderSizeGeneration++;
+    super.dispose();
+  }
+
+  Future<int?> _loadFolderSize() async {
+    final generation = _folderSizeGeneration;
+    if (_tagName != null || widget.folder.path.startsWith('#network/')) {
+      return null;
+    }
+    return LazyPathSizeCalculator.calculateDirectory(
+      widget.folder.path,
+      isCancelled: () => !mounted || generation != _folderSizeGeneration,
+    );
   }
 
   Future<void> _loadFolderStats() async {
@@ -225,9 +249,24 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12.0, vertical: 10.0),
-                          child: const Text(
-                            '', // Folders don't typically show size in explorer
-                            overflow: TextOverflow.ellipsis,
+                          child: FutureBuilder<int?>(
+                            future: _folderSizeFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Text(
+                                  'Calculating...',
+                                  overflow: TextOverflow.ellipsis,
+                                );
+                              }
+                              final size = snapshot.data;
+                              return Text(
+                                size == null
+                                    ? '—'
+                                    : FormatUtils.formatFileSize(size),
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -398,12 +437,6 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                     }
                     if (widget.onTap != null) {
                       widget.onTap!(widget.folder.path);
-                    }
-                  },
-                  onLongPress: () {
-                    if (widget.isDesktopMode &&
-                        widget.toggleFolderSelection != null) {
-                      _handleFolderSelection();
                     }
                   },
                   onLongPressStart: !widget.isDesktopMode

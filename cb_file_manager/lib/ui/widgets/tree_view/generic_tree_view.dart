@@ -337,31 +337,46 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
       controller: widget.scrollController,
       itemCount: rows.length,
       itemExtent: widget.itemExtent,
+      addSemanticIndexes: false,
       itemBuilder: (context, index) {
         final row = rows[index];
         switch (row.kind) {
           case FlatRowKind.loading:
-            return TreePlaceholderRow(
-              kind: row.kind,
-              depth: row.depth,
-              indentPerDepth: widget.indentPerDepth,
+            return KeyedSubtree(
+              key: ValueKey<String>('row-loading-${row.parent?.id ?? index}'),
+              child: TreePlaceholderRow(
+                kind: row.kind,
+                depth: row.depth,
+                indentPerDepth: widget.indentPerDepth,
+              ),
             );
           case FlatRowKind.error:
-            return TreePlaceholderRow(
-              kind: row.kind,
-              depth: row.depth,
-              indentPerDepth: widget.indentPerDepth,
-              onTap: row.parent == null ? null : () => _retryLoad(row.parent!),
+            return KeyedSubtree(
+              key: ValueKey<String>(
+                'row-error-${row.parent?.id ?? index}',
+              ),
+              child: TreePlaceholderRow(
+                kind: row.kind,
+                depth: row.depth,
+                indentPerDepth: widget.indentPerDepth,
+                onTap:
+                    row.parent == null ? null : () => _retryLoad(row.parent!),
+              ),
             );
           case FlatRowKind.truncated:
-            return TreePlaceholderRow(
-              kind: row.kind,
-              depth: row.depth,
-              indentPerDepth: widget.indentPerDepth,
-              extraCount: row.extraCount,
-              onTap: row.parent == null
-                  ? null
-                  : () => _bumpChildLimit(row.parent!),
+            return KeyedSubtree(
+              key: ValueKey<String>(
+                'row-truncated-${row.parent?.id ?? index}-${row.extraCount ?? 0}',
+              ),
+              child: TreePlaceholderRow(
+                kind: row.kind,
+                depth: row.depth,
+                indentPerDepth: widget.indentPerDepth,
+                extraCount: row.extraCount,
+                onTap: row.parent == null
+                    ? null
+                    : () => _bumpChildLimit(row.parent!),
+              ),
             );
           case FlatRowKind.node:
             final node = row.node!;
@@ -406,7 +421,10 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
                 child: shell,
               );
             }
-            return shell;
+            return KeyedSubtree(
+              key: ValueKey('row-${node.id}'),
+              child: shell,
+            );
         }
       },
     );

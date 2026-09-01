@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/services/album_auto_rule_service.dart';
 import 'package:cb_file_manager/services/album_service.dart';
@@ -741,18 +742,14 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         ),
         const SizedBox(height: 16),
         if (widget.fixedAlbum == null)
-          DropdownButtonFormField<Album>(
-            initialValue: _selectedAlbum,
-            decoration: const InputDecoration(
-              labelText: 'Target Album',
-              border: OutlineInputBorder(),
-            ),
-            items: _albums.map((album) {
-              return DropdownMenuItem(
-                value: album,
-                child: Text(album.name),
-              );
-            }).toList(),
+          CbSelect<Album>(
+            label: 'Target Album',
+            expand: true,
+            value: _selectedAlbum,
+            items: [
+              for (final album in _albums)
+                CbSelectItem<Album>(value: album, label: album.name),
+            ],
             onChanged: (album) => setState(() => _selectedAlbum = album),
           )
         else
@@ -769,20 +766,19 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
           children: [
             Expanded(
               flex: 2,
-              child: DropdownButtonFormField<RuleCondition>(
-                initialValue: _selectedCondition,
-                decoration: const InputDecoration(
-                  labelText: 'Condition',
-                  border: OutlineInputBorder(),
-                ),
-                items: RuleCondition.values.map((condition) {
-                  return DropdownMenuItem(
-                    value: condition,
-                    child: Text(_getConditionDisplayName(condition)),
-                  );
-                }).toList(),
+              child: CbSelect<RuleCondition>(
+                label: 'Condition',
+                expand: true,
+                value: _selectedCondition,
+                items: [
+                  for (final condition in RuleCondition.values)
+                    CbSelectItem<RuleCondition>(
+                      value: condition,
+                      label: _getConditionDisplayName(condition),
+                    ),
+                ],
                 onChanged: (condition) =>
-                    setState(() => _selectedCondition = condition!),
+                    setState(() => _selectedCondition = condition),
               ),
             ),
             const SizedBox(width: 16),
@@ -1137,18 +1133,14 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
-        DropdownButtonFormField<Album>(
-          initialValue: _selectedAlbum,
-          decoration: const InputDecoration(
-            labelText: 'Target Album',
-            border: OutlineInputBorder(),
-          ),
-          items: _albums.map((album) {
-            return DropdownMenuItem(
-              value: album,
-              child: Text(album.name),
-            );
-          }).toList(),
+        CbSelect<Album>(
+          label: 'Target Album',
+          expand: true,
+          value: _selectedAlbum,
+          items: [
+            for (final album in _albums)
+              CbSelectItem<Album>(value: album, label: album.name),
+          ],
           onChanged: (album) => setState(() => _selectedAlbum = album),
         ),
         const SizedBox(height: 16),
@@ -1156,20 +1148,19 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
           children: [
             Expanded(
               flex: 2,
-              child: DropdownButtonFormField<RuleCondition>(
-                initialValue: _selectedCondition,
-                decoration: const InputDecoration(
-                  labelText: 'Condition',
-                  border: OutlineInputBorder(),
-                ),
-                items: RuleCondition.values.map((condition) {
-                  return DropdownMenuItem(
-                    value: condition,
-                    child: Text(_getConditionDisplayName(condition)),
-                  );
-                }).toList(),
+              child: CbSelect<RuleCondition>(
+                label: 'Condition',
+                expand: true,
+                value: _selectedCondition,
+                items: [
+                  for (final condition in RuleCondition.values)
+                    CbSelectItem<RuleCondition>(
+                      value: condition,
+                      label: _getConditionDisplayName(condition),
+                    ),
+                ],
                 onChanged: (condition) =>
-                    setState(() => _selectedCondition = condition!),
+                    setState(() => _selectedCondition = condition),
               ),
             ),
             const SizedBox(width: 16),

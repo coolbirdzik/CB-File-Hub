@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
@@ -25,6 +26,7 @@ class FolderGridItem extends StatefulWidget {
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
+  final ValueListenable<bool?>? immediateSelectionListenable;
 
   const FolderGridItem({
     Key? key,
@@ -35,6 +37,7 @@ class FolderGridItem extends StatefulWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.clearSelectionMode,
+    this.immediateSelectionListenable,
   }) : super(key: key);
 
   @override
@@ -43,7 +46,6 @@ class FolderGridItem extends StatefulWidget {
 
 class _FolderGridItemState extends State<FolderGridItem> {
   bool _isHovering = false;
-  bool _visuallySelected = false;
 
   /// Tag name when this "folder" is actually a child tag (path `#search?tag=`),
   /// otherwise null. A tag behaves like a folder in the results grid.
@@ -52,22 +54,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
   /// Display label: the tag name for tag "folders", else the folder basename.
   String get _displayName => _tagName ?? widget.folder.basename();
 
-  @override
-  void initState() {
-    super.initState();
-    _visuallySelected = widget.isSelected;
-  }
-
-  @override
-  void didUpdateWidget(FolderGridItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Only update when external selection state changes
-    if (widget.isSelected != oldWidget.isSelected) {
-      _visuallySelected = widget.isSelected;
-    }
-  }
-
-  // Handle folder selection with immediate visual feedback
+  // Handle folder selection.
   void _handleFolderSelection() {
     if (widget.toggleFolderSelection == null) return;
 
@@ -82,43 +69,40 @@ class _FolderGridItemState extends State<FolderGridItem> {
     // Ctrl+click, so the old selection was never cleared.
     final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
-    // Visual update depends on the selection type
-    if (!isShiftPressed) {
-      if (!shouldCtrlSelect) {
-        _visuallySelected = true;
-      } else {
-        _visuallySelected = !_visuallySelected;
-      }
-    }
-
     widget.toggleFolderSelection!(widget.folder.path,
         shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
+    final immediateSelection = widget.immediateSelectionListenable;
+    if (immediateSelection == null) {
+      return _buildItem(context, widget.isSelected);
+    }
 
-    final Color overlayColor = ItemInteractionStyle.thumbnailOverlayColor(
-      theme: Theme.of(context),
-      isDesktopMode: widget.isDesktopMode,
-      isSelected: _visuallySelected,
-      isHovering: _isHovering,
+    return ValueListenableBuilder<bool?>(
+      valueListenable: immediateSelection,
+      builder: (context, immediateValue, _) =>
+          _buildItem(context, immediateValue ?? widget.isSelected),
     );
+  }
+
+  Widget _buildItem(BuildContext context, bool isVisuallySelected) {
+    final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
 
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
-    final Color borderColor = _visuallySelected
+    final Color borderColor = isVisuallySelected
         ? primary
         : _isHovering
             ? primary.withValues(alpha: 0.55)
             : primary.withValues(alpha: 0.35);
-    final Color tabColor = _visuallySelected
+    final Color tabColor = isVisuallySelected
         ? primary.withValues(alpha: 0.25)
         : _isHovering
             ? primary.withValues(alpha: 0.12)
             : primary.withValues(alpha: 0.08);
-    final Color bodyColor = _visuallySelected
+    final Color bodyColor = isVisuallySelected
         ? primary.withValues(alpha: 0.08)
         : primary.withValues(alpha: 0.03);
     const double borderWidth = 1.5;
@@ -147,7 +131,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
                   borderWidth: borderWidth,
                   bodyRadius: bodyRadius,
                   tabRadius: tabRadius,
-                  overlayColor: overlayColor,
                   interactionLayer: OptimizedInteractionLayer(
                     onTap: () {
                       widget.onNavigate(widget.folder.path);
@@ -158,9 +141,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
                       }
                       widget.onNavigate(widget.folder.path);
                     },
-                    onLongPress: widget.isDesktopMode
-                        ? () => _showFolderContextMenu(context, null)
-                        : null,
                     onLongPressStart: !widget.isDesktopMode
                         ? (details) {
                             HapticFeedback.mediumImpact();
@@ -191,8 +171,9 @@ class _FolderGridItemState extends State<FolderGridItem> {
                     style: TextStyle(
                       fontSize: GridZoomConstraints.gridItemFilenameFontSize,
                       color: theme.colorScheme.onSurface,
-                      fontWeight:
-                          _visuallySelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isVisuallySelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -225,7 +206,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
                   borderWidth: borderWidth,
                   bodyRadius: bodyRadius,
                   tabRadius: tabRadius,
-                  overlayColor: overlayColor,
                   interactionLayer: OptimizedInteractionLayer(
                     onTap: () {
                       if (widget.isDesktopMode &&
@@ -241,9 +221,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
                       }
                       widget.onNavigate(widget.folder.path);
                     },
-                    onLongPress: widget.isDesktopMode
-                        ? () => _showFolderContextMenu(context, null)
-                        : null,
                     onLongPressStart: !widget.isDesktopMode
                         ? (details) {
                             HapticFeedback.mediumImpact();
@@ -266,7 +243,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
                 child: Padding(
                   padding:
                       const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-                  child: _buildNameWidget(context),
+                  child: _buildNameWidget(context, isVisuallySelected),
                 ),
               ),
             ],
@@ -284,7 +261,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
     required double borderWidth,
     required double bodyRadius,
     required double tabRadius,
-    required Color overlayColor,
     required Widget interactionLayer,
   }) {
     return Column(
@@ -333,10 +309,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
                 fit: StackFit.expand,
                 children: [
                   FolderThumbnail(folder: widget.folder),
-                  if (overlayColor != Colors.transparent)
-                    IgnorePointer(
-                      child: Container(color: overlayColor),
-                    ),
                   Positioned.fill(child: interactionLayer),
                 ],
               ),
@@ -386,7 +358,10 @@ class _FolderGridItemState extends State<FolderGridItem> {
     );
   }
 
-  Widget _buildNameWidget(BuildContext context) {
+  Widget _buildNameWidget(
+    BuildContext context,
+    bool isVisuallySelected,
+  ) {
     // Check if this item is being renamed inline (desktop only)
     final renameController = InlineRenameScope.maybeOf(context);
     final isBeingRenamed = renameController != null &&
@@ -400,7 +375,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
       style: TextStyle(
         fontSize: GridZoomConstraints.gridItemFilenameFontSize,
         color: Theme.of(context).colorScheme.onSurface,
-        fontWeight: _visuallySelected ? FontWeight.bold : FontWeight.w500,
+        fontWeight: isVisuallySelected ? FontWeight.bold : FontWeight.w500,
       ),
     );
 
@@ -416,7 +391,7 @@ class _FolderGridItemState extends State<FolderGridItem> {
                 fontSize: GridZoomConstraints.gridItemFilenameFontSize,
                 color: Theme.of(context).colorScheme.onSurface,
                 fontWeight:
-                    _visuallySelected ? FontWeight.bold : FontWeight.w500,
+                    isVisuallySelected ? FontWeight.bold : FontWeight.w500,
               ),
               textAlign: TextAlign.center,
               maxLines: 2,

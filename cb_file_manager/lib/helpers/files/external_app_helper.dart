@@ -1,10 +1,17 @@
 import 'dart:io';
+import 'dart:ffi' show nullptr;
+import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:win32/win32.dart' as win32;
 import 'windows_app_icon.dart';
+import 'windows_shell_context_menu.dart';
+import 'package:path/path.dart' as p;
 import 'dart:ui' as ui;
+import 'package:cb_file_manager/ui/utils/app_busy_cursor.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
+import 'file_type_registry.dart';
 import '../core/user_preferences.dart';
 
 class AppInfo {
@@ -176,8 +183,15 @@ class ExternalAppHelper {
     }
   }
 
-  /// Open file with a specific app
-  static Future<bool> openFileWithApp(
+  /// Open file with a specific app.
+  ///
+  /// Runs inside a busy-cursor scope: launching a handler is the slow part of
+  /// a double-click, so the pointer stays busy until the process is up.
+  static Future<bool> openFileWithApp(String filePath, String packageName) {
+    return AppBusyCursor.run(() => _openFileWithApp(filePath, packageName));
+  }
+
+  static Future<bool> _openFileWithApp(
       String filePath, String packageName) async {
     try {
       if (Platform.isAndroid) {
@@ -189,12 +203,7 @@ class ExternalAppHelper {
       } else if (Platform.isWindows) {
         // Special case for shell_open
         if (packageName == 'shell_open') {
-          await Process.start(
-            'explorer',
-            [filePath],
-            mode: ProcessStartMode.detached,
-          );
-          return true;
+          return await _openWithWindowsDefault(filePath);
         } else {
           // On Windows, the packageName is actually the path to the executable
           await Process.start(
@@ -253,15 +262,8 @@ class ExternalAppHelper {
     try {
       final List<AppInfo> apps = [];
       final extension = filePath.split('.').last.toLowerCase();
-
-      // On Windows, offer CB File Hub Video Player as an option for video files
-      if (Platform.isWindows && FileTypeUtils.isVideoFile(filePath)) {
-        apps.add(AppInfo(
-          packageName: '__cb_video_player__',
-          appName: 'CB File Hub Video Player',
-          icon: const Icon(PhosphorIconsLight.playCircle, size: 36),
-        ));
-      }
+      final isVideo = FileTypeUtils.isVideoFile(filePath);
+      final isArchive = FileTypeUtils.isArchiveFile(filePath);
 
       // Prefer: scan registry by file format (OpenWithList + App Paths)
       final scanned = await WindowsAppIcon.getAppsForExtension(extension);
@@ -270,6 +272,7 @@ class ExternalAppHelper {
           final path = e['path'] ?? '';
           final name = e['name'] ?? _getAppNameFromPath(path);
           if (path.isEmpty) continue;
+          if (_isSelfExecutable(path)) continue;
           if (File(path).existsSync()) {
             apps.add(AppInfo(
               packageName: path,
@@ -278,26 +281,45 @@ class ExternalAppHelper {
             ));
           }
         }
+      } else {
+        String? associatedAppPath =
+            await WindowsAppIcon.getAssociatedAppPath('.$extension');
+        if (associatedAppPath != null &&
+            associatedAppPath.isNotEmpty &&
+            !_isSelfExecutable(associatedAppPath)) {
+          final String appName = _getAppNameFromPath(associatedAppPath);
+          final Widget appIcon = await _getWindowsAppIcon(associatedAppPath);
+          apps.add(AppInfo(
+            packageName: associatedAppPath,
+            appName: appName,
+            icon: appIcon,
+          ));
+        }
+      }
+
+      if (Platform.isWindows && isVideo) {
+        apps.add(AppInfo(
+          packageName: '__cb_video_player__',
+          appName: 'CB File Hub Video Player',
+          icon: const Icon(PhosphorIconsLight.playCircle, size: 36),
+        ));
+      }
+
+      if (Platform.isWindows && isArchive) {
+        apps.add(AppInfo(
+          packageName: '__cb_archive_browse__',
+          appName: 'CB File Hub (Browse archive)',
+          icon: const Icon(PhosphorIconsLight.archive, size: 36),
+        ));
+      }
+
+      if (apps.isNotEmpty) {
         apps.add(AppInfo(
           packageName: 'shell_open',
           appName: 'Default Program',
           icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 36),
         ));
         return apps;
-      }
-
-      // Fallback: associated app when getAppsForExtension returns empty.
-      // Other apps are fetched from Windows (OpenWithList, App Paths) via getAppsForExtension.
-      String? associatedAppPath =
-          await WindowsAppIcon.getAssociatedAppPath(extension);
-      if (associatedAppPath != null && associatedAppPath.isNotEmpty) {
-        final String appName = _getAppNameFromPath(associatedAppPath);
-        final Widget appIcon = await _getWindowsAppIcon(associatedAppPath);
-        apps.add(AppInfo(
-          packageName: associatedAppPath,
-          appName: appName,
-          icon: appIcon,
-        ));
       }
 
       apps.add(AppInfo(
@@ -309,6 +331,16 @@ class ExternalAppHelper {
       return apps;
     } catch (e) {
       return [];
+    }
+  }
+
+  static bool _isSelfExecutable(String path) {
+    if (!Platform.isWindows || path.isEmpty) return false;
+    try {
+      return p.normalize(path).toLowerCase() ==
+          p.normalize(Platform.resolvedExecutable).toLowerCase();
+    } catch (_) {
+      return false;
     }
   }
 
@@ -405,16 +437,16 @@ class ExternalAppHelper {
     }
   }
 
-  /// Open file with system default app (no chooser). Windows: explorer; Android: ACTION_VIEW.
-  static Future<bool> openWithSystemDefault(String filePath) async {
+  /// Open file with system default app (no chooser).
+  /// Windows: Shell "open" verb (respects WinRAR etc.); Android: ACTION_VIEW.
+  static Future<bool> openWithSystemDefault(String filePath) {
+    return AppBusyCursor.run(() => _openWithSystemDefault(filePath));
+  }
+
+  static Future<bool> _openWithSystemDefault(String filePath) async {
     try {
       if (Platform.isWindows) {
-        await Process.start(
-          'explorer',
-          [filePath],
-          mode: ProcessStartMode.detached,
-        );
-        return true;
+        return await _openWithWindowsDefault(filePath);
       }
       if (Platform.isAndroid) {
         final r = await _channel
@@ -424,6 +456,56 @@ class ExternalAppHelper {
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Launches [filePath] with the Windows default handler (WinRAR, 7-Zip, …).
+  static Future<bool> _openWithWindowsDefault(String filePath) async {
+    final normalizedPath = p.normalize(File(filePath).absolute.path);
+    if (!File(normalizedPath).existsSync()) {
+      return false;
+    }
+
+    // ShellExecute "open" is the canonical path for the user's default ProgId.
+    if (_shellExecuteOpen(normalizedPath)) {
+      return true;
+    }
+
+    try {
+      await Process.start(
+        'cmd',
+        ['/c', 'start', '', normalizedPath],
+        mode: ProcessStartMode.detached,
+      );
+      return true;
+    } catch (_) {
+      // Fall through.
+    }
+
+    return WindowsShellContextMenu.invokeVerb(
+      paths: [normalizedPath],
+      verb: 'open',
+    );
+  }
+
+  static bool _shellExecuteOpen(String filePath) {
+    final verb = 'open'.toNativeUtf16();
+    final file = filePath.toNativeUtf16();
+    try {
+      final result = win32.ShellExecute(
+        0,
+        verb,
+        file,
+        nullptr,
+        nullptr,
+        win32.SW_SHOWNORMAL,
+      );
+      return result > 32;
+    } catch (_) {
+      return false;
+    } finally {
+      calloc.free(verb);
+      calloc.free(file);
     }
   }
 
@@ -476,6 +558,27 @@ class ExternalAppHelper {
     } catch (_) {
       return false;
     }
+  }
+
+  static bool _windowsAssociationsEnsured = false;
+
+  /// Registers archive/video extensions in HKCU so CB File Hub appears in
+  /// Windows Open-with and Default-apps lists.
+  static Future<void> ensureWindowsFileAssociations() async {
+    if (!Platform.isWindows || _windowsAssociationsEnsured) return;
+    _windowsAssociationsEnsured = true;
+
+    final archiveExts =
+        FileTypeRegistry.getExtensionsForCategory(FileCategory.archive);
+    final videoExts =
+        FileTypeRegistry.getExtensionsForCategory(FileCategory.video);
+    final extensions = {...archiveExts, ...videoExts}.toList(growable: false);
+    if (extensions.isEmpty) return;
+
+    await WindowsAppIcon.registerFileAssociations(
+      exePath: Platform.resolvedExecutable,
+      extensions: extensions,
+    );
   }
 
   // ─── Brand Detection (for create-file dialog) ────────────────────────────────

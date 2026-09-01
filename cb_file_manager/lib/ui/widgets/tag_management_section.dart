@@ -407,7 +407,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16.0),
               borderSide: BorderSide(
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                color: theme.colorScheme.outline.withValues(alpha: 0.48),
                 width: 1,
               ),
             ),
@@ -421,11 +421,14 @@ class _TagManagementSectionState extends State<TagManagementSection> {
             ),
             prefixIcon: const Icon(PhosphorIconsLight.tag, size: 24),
             filled: true,
-            fillColor: isDarkMode
-                ? theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.7)
-                : theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.3),
+            fillColor: WidgetStateColor.resolveWith((states) {
+              final focused = states.contains(WidgetState.focused);
+              return theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: isDarkMode
+                    ? (focused ? 0.82 : 0.7)
+                    : (focused ? 0.44 : 0.3),
+              );
+            }),
           ),
           style: const TextStyle(fontSize: 18),
           onChanged: (updatedTags) async {
@@ -656,17 +659,20 @@ class PopularTagsWidget extends StatelessWidget {
 class RecentTagsWidget extends StatelessWidget {
   final Function(String) onTagSelected;
   final int limit;
+  final Future<List<String>> Function(int limit)? loadRecentTags;
 
   const RecentTagsWidget({
     Key? key,
     required this.onTagSelected,
     this.limit = 20,
+    this.loadRecentTags,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<String>>(
-      future: TagManager.getRecentTags(limit: limit),
+      future:
+          loadRecentTags?.call(limit) ?? TagManager.getRecentTags(limit: limit),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();

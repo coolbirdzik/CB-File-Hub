@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:cb_file_manager/ui/components/common/optimized_interaction_handler.dart';
 
 /// Desktop often uses [ViewMode.grid] (saved in preferences). Grid rows use
 /// `file-grid-item-*` / `folder-grid-item-*`; list/details use `file-item-*` / `folder-item-*`.
@@ -82,6 +83,7 @@ void assertFileRowExists(String absolutePath) {
 /// On **desktop**, a single tap only toggles selection; navigation uses **double-tap**
 /// (see folder grid/list items in `folder_list/components`).
 Future<void> tapFolderRow(WidgetTester tester, String absolutePath) async {
+  final gridFinder = find.byKey(ValueKey('folder-grid-item-$absolutePath'));
   final finder = _resolveFileOrFolderFinder(
     absolutePath,
     gridKeyPrefix: 'folder-grid-item',
@@ -95,9 +97,25 @@ Future<void> tapFolderRow(WidgetTester tester, String absolutePath) async {
   }
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle(const Duration(milliseconds: 300));
-  await tester.tap(finder, warnIfMissed: false);
+
+  // Grid folder keys wrap the entire card, including the filename area. The
+  // card's center can land outside the actual interaction layer at some zoom
+  // levels, making both taps only select (or miss) instead of navigating.
+  // Target the same hit surface a user double-clicks on: the folder body.
+  Finder tapTarget = finder;
+  if (_hasKey(gridFinder)) {
+    final interactionLayer = find.descendant(
+      of: gridFinder,
+      matching: find.byType(OptimizedInteractionLayer),
+    );
+    if (_hasKey(interactionLayer)) {
+      tapTarget = interactionLayer.first;
+    }
+  }
+
+  await tester.tap(tapTarget, warnIfMissed: false);
   await tester.pump(const Duration(milliseconds: 100));
-  await tester.tap(finder, warnIfMissed: false);
+  await tester.tap(tapTarget, warnIfMissed: false);
 }
 
 /// Returns the center [Offset] of a file or folder row (grid or list).
@@ -448,9 +466,15 @@ Future<void> openBackgroundContextMenu(
   if (tapPosition != null) {
     position = tapPosition;
   } else {
-    // Try ListView first (list/details mode), then GridView (grid mode),
-    // finally Scaffold as last resort.
-    var target = find.byType(ListView);
+    // Prefer the explicit file-browser background target. Generic ListView
+    // finders can resolve to the sidebar, address suggestions, or another
+    // unrelated scrollable when the shell layout changes.
+    var target = find.byKey(
+      const ValueKey<String>('file-browser-background-context-target'),
+    );
+    if (target.evaluate().isEmpty) {
+      target = find.byType(ListView);
+    }
     if (target.evaluate().isEmpty) {
       target = find.byType(GridView);
     }

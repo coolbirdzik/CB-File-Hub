@@ -1,32 +1,45 @@
-## Logging Framework
+# Logging, Testing, and Platform Notes
 
-- **CRITICAL RULE** Never use `print()` statements in production code. Always use the logging framework.
-- **Implementation** Import `utils/app_logger.dart` and use appropriate log levels:
+## Logging
+
+- `utils/app_logger.dart` is preferred for structured operational logging where
+  severity, error objects, or stack traces matter.
+- `print()`, `debugPrint()`, and existing targeted diagnostics are permitted by
+  this repository's analyzer conventions. Do not perform broad logging rewrites
+  unrelated to the task.
+- Never log credentials, access tokens, private prompts, or unredacted sensitive
+  paths.
+- Example structured logging:
 
   ```dart
   import 'package:cb_file_manager/utils/app_logger.dart';
 
-  AppLogger.debug('Detailed debug info');
-  AppLogger.info('General messages');
-  AppLogger.warning('Warnings');
-  AppLogger.error('Error message', error: e, stackTrace: st);
-  AppLogger.fatal('Fatal errors');
+  AppLogger.info('Operation started');
+  AppLogger.warning('Operation degraded', error: error);
+  AppLogger.error('Operation failed', error: error, stackTrace: stackTrace);
   ```
 
-- **Benefits** Structured logging with timestamps, colors, method traces, stack traces, and configurable log levels.
-- **Configuration** Based on `logger` package; supports runtime log level adjustment via `AppLogger.setLevel(Level.info)`.
+Use the level that matches operational severity. Preserve the original error
+and stack trace when they are available.
 
-## Testing & Tooling
+## Testing and tooling
 
-- **Test Harness** See `test/` and scripts documented in `docs/quality/01-testing-strategy.md`; infra includes `run_tests.dart`, `stable_tests.dart`, and CI-ready runners.
-- **Desktop E2E** `integration_test/` on Windows (`--dart-define=CB_E2E=true`), Makefile `dev-test-e2e`, reporters, and CI — see `docs/quality/02-e2e-desktop-integration.md`.
-- **Coverage Focus** Navigation flows and core widgets presently covered; expand for new galleries or services when modified.
-- **Diagnostics** Use `AppLogger.debug()` for verbose logging during development; toggle log levels as needed.
+- Run workspace recipes from the root with `just`; run direct Flutter/Dart
+  commands from `cb_file_manager/`.
+- CI order is format check, analyze, unit/widget tests, Windows E2E, then build.
+- Desktop E2E uses `integration_test/` with `--dart-define=CB_E2E=true`.
+- Focused commands by feature are listed in the
+  [test-impact map](../agent/verification/test-impact-map.yaml).
+- Automated checks do not prove perceived latency, native menu behavior, or
+  other runtime UX. Report manual confirmation separately.
 
-## Platform Notes
+## Platform notes
 
-- **Desktop** `window_manager` ensures minimum window size, hidden title bar, and maximized start on Windows.
-- **Mobile** Startup configures full system UI overlays and leverages platform storage permissions via `PermissionStateService`.
-- **PiP Mode** Environment variable `CB_PIP_MODE=1` triggers lightweight PiP-only window bootstrap.
+- Desktop startup configures window roles, native title-bar behavior, backdrop,
+  and multi-window services.
+- Mobile startup configures system UI and permission-sensitive behavior.
+- `CB_PIP_MODE=1` triggers the lightweight PiP process path.
+- Windows MethodChannel contracts are indexed in
+  [method-channels.yaml](../agent/native/method-channels.yaml).
 
-_Last reviewed: 2025-10-25_
+_Last reviewed: 2026-08-08_

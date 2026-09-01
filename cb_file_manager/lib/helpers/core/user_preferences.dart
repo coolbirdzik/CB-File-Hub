@@ -22,6 +22,11 @@ enum TagThumbnailFitMode {
   cover,
 }
 
+enum FileThumbnailFitMode {
+  cover,
+  contain,
+}
+
 /// A class to manage user preferences for the application
 class UserPreferences {
   // Singleton instance with getter
@@ -41,6 +46,8 @@ class UserPreferences {
 
   final ValueNotifier<TagThumbnailFitMode> tagThumbnailFitMode =
       ValueNotifier<TagThumbnailFitMode>(TagThumbnailFitMode.contain);
+  final ValueNotifier<FileThumbnailFitMode> fileThumbnailFitMode =
+      ValueNotifier<FileThumbnailFitMode>(FileThumbnailFitMode.cover);
 
   // Stream that can be listened to for theme changes
   Stream<ThemeMode> get themeChangeStream => _themeChangeController.stream;
@@ -76,6 +83,7 @@ class UserPreferences {
       'use_system_default_for_video';
   static const String _preferredVideoPlayerAppKey =
       'preferred_video_player_app';
+  static const String _openVideoInNewWindowKey = 'open_video_in_new_window';
   static const String _recentPathsKey = 'recent_paths';
   static const String _sidebarPinnedPathsKey = 'sidebar_pinned_paths';
   static const String _rememberTabWorkspaceKey = 'remember_tab_workspace';
@@ -102,6 +110,8 @@ class UserPreferences {
   static const String _networkBrowserSortOptionKey =
       'network_browser_sort_option';
   static const String _tagThumbnailFitModeKey = 'tag_thumbnail_fit_mode';
+  static const String _fileThumbnailFitModeKey = 'file_thumbnail_fit_mode';
+  static const String _contextMenuLayoutKeyPrefix = 'context_menu_layout_';
 
   // Constants for grid zoom level
   static const int minGridZoomLevel = 2; // Largest thumbnails (2 per row)
@@ -169,6 +179,16 @@ class UserPreferences {
 
     try {
       final stored = await _databaseManager?.getStringPreference(
+        _fileThumbnailFitModeKey,
+        defaultValue: FileThumbnailFitMode.cover.name,
+      );
+      fileThumbnailFitMode.value = _parseFileThumbnailFitMode(stored);
+    } catch (_) {
+      fileThumbnailFitMode.value = FileThumbnailFitMode.cover;
+    }
+
+    try {
+      final stored = await _databaseManager?.getStringPreference(
         _tagThumbnailFitModeKey,
         defaultValue: TagThumbnailFitMode.contain.name,
       );
@@ -181,107 +201,6 @@ class UserPreferences {
   /// Check if preferences have been initialized
   bool isInitialized() {
     return _initialized;
-  }
-
-  /// Migrates SharedPreferences values into SQLite on first run.
-  // ignore: unused_element
-  Future<void> _migratePreferencesToDatabase() async {
-    try {
-      _databaseManager ??= DatabaseManager.getInstance();
-      await _databaseManager!.initialize();
-      _useDatabaseStorage = true;
-
-      // Only migrate if not already done
-      final migrationDone = await _databaseManager!.getBoolPreference(
-        'migration_done',
-        defaultValue: false,
-      );
-
-      if (migrationDone != true) {
-        // View mode
-        final viewMode = await getViewMode();
-        await _databaseManager!.saveIntPreference(_viewModeKey, viewMode.index);
-
-        // Sort option
-        final sortOption = await getSortOption();
-        await _databaseManager!
-            .saveIntPreference(_sortOptionKey, sortOption.index);
-
-        // Grid zoom level
-        final gridZoom = await getGridZoomLevel();
-        await _databaseManager!.saveIntPreference(_gridZoomLevelKey, gridZoom);
-
-        // Last folder
-        final lastFolder = await getLastAccessedFolder();
-        if (lastFolder != null) {
-          await _databaseManager!
-              .saveStringPreference(_lastFolderKey, lastFolder);
-        }
-
-        // Image gallery thumbnail size
-        final imageGallerySize = await getImageGalleryThumbnailSize();
-        await _databaseManager!.saveDoublePreference(
-          _imageGalleryThumbnailSizeKey,
-          imageGallerySize,
-        );
-
-        // Video gallery thumbnail size
-        final videoGallerySize = await getVideoGalleryThumbnailSize();
-        await _databaseManager!.saveDoublePreference(
-          _videoGalleryThumbnailSizeKey,
-          videoGallerySize,
-        );
-
-        // Video player volume
-        final volume = await getVideoPlayerVolume();
-        await _databaseManager!
-            .saveDoublePreference(_videoPlayerVolumeKey, volume);
-
-        // Video player mute
-        final mute = await getVideoPlayerMute();
-        await _databaseManager!.saveBoolPreference(_videoPlayerMuteKey, mute);
-
-        // Drawer pinned
-        final drawerPinned = await getDrawerPinned();
-        await _databaseManager!
-            .saveBoolPreference(_drawerPinnedKey, drawerPinned);
-
-        // Theme preference
-        final theme = await getThemePreference();
-        await _databaseManager!
-            .saveIntPreference(_themePreferenceKey, theme.index);
-
-        // Search tip shown
-        final searchTipShown = await getSearchTipShown();
-        await _databaseManager!
-            .saveBoolPreference(_keySearchTipShown, searchTipShown);
-
-        // Video thumbnail settings
-        final timestamp = await getVideoThumbnailTimestamp();
-        await _databaseManager!
-            .saveIntPreference(_videoThumbnailTimestampKey, timestamp);
-
-        final percentage = await getVideoThumbnailPercentage();
-        await _databaseManager!
-            .saveIntPreference(_videoThumbnailPercentageKey, percentage);
-
-        // Show file tags setting
-        final showFileTags = await getShowFileTags();
-        await _databaseManager!
-            .saveBoolPreference(_showFileTagsKey, showFileTags);
-
-        // Preview pane settings
-        final previewPaneVisible = await getPreviewPaneVisible();
-        await _databaseManager!
-            .saveBoolPreference(_previewPaneVisibleKey, previewPaneVisible);
-        final previewPaneWidth = await getPreviewPaneWidth();
-        await _databaseManager!
-            .saveDoublePreference(_previewPaneWidthKey, previewPaneWidth);
-
-        // Mark migration as done
-        await _databaseManager!.saveBoolPreference('migration_done', true);
-      }
-    } catch (_) {}
   }
 
   /// Backward-compatible no-op. Preferences are always stored in SQLite.
@@ -769,6 +688,24 @@ class UserPreferences {
 
   Future<bool> clearDesktopQuickCreateItemIds() async {
     return await _deletePreference(_desktopQuickCreateItemIdsKey);
+  }
+
+  Future<String?> getContextMenuLayoutJson(String targetKey) async {
+    return _getPreference<String>('$_contextMenuLayoutKeyPrefix$targetKey');
+  }
+
+  Future<bool> setContextMenuLayoutJson(
+    String targetKey,
+    String jsonValue,
+  ) async {
+    return _savePreference<String>(
+      '$_contextMenuLayoutKeyPrefix$targetKey',
+      jsonValue,
+    );
+  }
+
+  Future<bool> clearContextMenuLayout(String targetKey) async {
+    return _deletePreference('$_contextMenuLayoutKeyPrefix$targetKey');
   }
 
   Future<bool> getAllowFileExtensionRename() async {
@@ -1264,6 +1201,34 @@ class UserPreferences {
     );
   }
 
+  Future<FileThumbnailFitMode> getFileThumbnailFitMode() async {
+    final stored = await _getPreference<String>(
+      _fileThumbnailFitModeKey,
+      defaultValue: FileThumbnailFitMode.cover.name,
+    );
+    final mode = _parseFileThumbnailFitMode(stored);
+    fileThumbnailFitMode.value = mode;
+    return mode;
+  }
+
+  Future<bool> setFileThumbnailFitMode(FileThumbnailFitMode mode) async {
+    final saved = await _savePreference<String>(
+      _fileThumbnailFitModeKey,
+      mode.name,
+    );
+    if (saved) {
+      fileThumbnailFitMode.value = mode;
+    }
+    return saved;
+  }
+
+  FileThumbnailFitMode _parseFileThumbnailFitMode(String? value) {
+    return FileThumbnailFitMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => FileThumbnailFitMode.cover,
+    );
+  }
+
   /// Get max thumbnail generation concurrency
   Future<int> getMaxThumbnailConcurrency() async {
     return await _getPreference<int>(
@@ -1678,6 +1643,20 @@ class UserPreferences {
 
   Future<bool> setUseSystemDefaultForVideo(bool value) async {
     return await _savePreference<bool>(_useSystemDefaultForVideoKey, value);
+  }
+
+  /// Desktop only: use one separate built-in player window instead of pushing
+  /// a full-screen route inside the current window. Default true.
+  Future<bool> getOpenVideoInNewWindow() async {
+    return await _getPreference<bool>(
+          _openVideoInNewWindowKey,
+          defaultValue: true,
+        ) ??
+        true;
+  }
+
+  Future<bool> setOpenVideoInNewWindow(bool value) async {
+    return await _savePreference<bool>(_openVideoInNewWindowKey, value);
   }
 
   /// Preferred external app identifier for video playback.

@@ -1,26 +1,37 @@
-## Data & Persistence
+# Data and Persistence
 
-- **Database**: ObjectBox (`cb_file_manager/lib/models/objectbox/` and `objectbox.g.dart`) stores:
-    - **Tags**: `FileTag` entities.
-    - **Metadata**: `Album`, `AlbumFile`, `VideoLibrary`, `VideoLibraryFile`.
-    - **Network**: `NetworkCredentials`.
-    - **Preferences**: `UserPreference` entities for synced settings.
+## Active storage
 
-- **Hybrid Preferences**: `cb_file_manager/lib/helpers/core/user_preferences.dart` implements a hybrid strategy:
-    - **Bootstrap**: Uses `SharedPreferences` to store critical startup flags like `use_objectbox_storage`.
-    - **Storage**: Uses ObjectBox as the primary backend for all other settings if enabled, falling back to `SharedPreferences` if necessary.
+- **Database:** SQLite through `lib/models/database/database_manager.dart` and
+  `lib/models/database/sqlite_database_provider.dart`.
+- **Structured data:** tags, hierarchy, folder display preferences, thumbnails,
+  albums, video libraries, network credentials, AI provider configuration, and
+  related metadata use SQLite tables.
+- **Legacy naming:** model files under `lib/models/objectbox/` remain as
+  compatibility paths. `ObjectBoxDatabaseProvider` is an alias of the SQLite
+  provider; do not introduce ObjectBox-specific behavior based on directory
+  names.
 
-- **Settings Management**:
-    - **View State**: Persists `view_mode`, `sort_option`, `grid_zoom_level`.
-    - **Preview Pane**: Stores `preview_pane_visible` and `preview_pane_width` for desktop layouts.
-    - **Navigation**: Saves `last_accessed_folder`, `recent_paths`.
-    - **Sidebar**: `sidebar_pinned_paths` maintains the user's pinned directories.
-    - **Workspace**: `remember_tab_workspace`, `last_opened_tab_path`, and `drawer_section_states_by_tab` restore the previous session state.
+## Preferences and secrets
 
-- **Credential Vault**: `cb_file_manager/lib/services/network_credentials_service.dart` securely manages SMB/FTP/WebDAV authentication details via ObjectBox.
+- `lib/helpers/core/user_preferences.dart` bridges SharedPreferences
+  bootstrap/legacy state and SQLite-backed preferences.
+- Several UI surfaces retain direct SharedPreferences state for lightweight
+  presentation settings and migrations.
+- Local AI secrets use `flutter_secure_storage`; do not move secrets into plain
+  preferences or logs.
 
-- **Caching**: 
-    - **Thumbnails**: `cb_file_manager/lib/helpers/media/video_thumbnail_helper.dart` and `folder_thumbnail_service.dart` manage disk and memory caches.
-    - **Network**: `network_file_cache_service.dart` handles temporary storage for streamed content.
+## Domain consumers
 
-_Last reviewed: 2026-03-07_
+- `lib/services/network_credentials_service.dart` persists network credential
+  records through the active SQLite database layer.
+- `lib/services/album_service.dart` and
+  `lib/services/video_library_service.dart` persist media collections.
+- `lib/services/ai/ai_provider_service.dart` persists provider configuration.
+- Thumbnail and network-media services also maintain filesystem caches whose
+  lifetime is separate from the database.
+
+See the persistence graph in [system-map.md](../agent/system-map.md) and the
+`persistence` entry in [feature-map.yaml](../agent/feature-map.yaml).
+
+_Last reviewed: 2026-08-08_

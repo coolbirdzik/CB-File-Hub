@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -24,12 +26,16 @@ import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_contro
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/miller_columns_view.dart';
 import 'package:cb_file_manager/ui/widgets/file_tree_view.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
   static const double _gridSpacing = 8.0;
   static const double _gridAspectRatio = 0.8;
   static const double _gridReferenceWidth = 960.0;
+  static const double _tilesSpacing = 8.0;
+  static const double _tilesMaxCrossAxisExtent = 280.0;
+  static const double _tilesMainAxisExtent = 76.0;
 
   static double _gridItemWidthForZoom(int zoomLevel) {
     final clamped = zoomLevel.clamp(
@@ -161,6 +167,7 @@ class FileListViewBuilder {
     required VoidCallback onPreviewPaneToggled,
     ScrollController? scrollController,
     GlobalKey Function(String path)? itemKeyForPath,
+    ValueListenable<bool?> Function(String path)? immediateSelectionForPath,
     String? tabId,
     bool isMasonryLayout = false,
     ValueChanged<int?>? onGridCrossAxisCountChanged,
@@ -191,9 +198,11 @@ class FileListViewBuilder {
         (tabId != null &&
             MobileFileActionsController.forTab(tabId).isMasonryLayout);
 
-    // Use separate builders for each view type to prevent complete tree rebuilds
-    if (displayState.viewMode == ViewMode.gridPreview && isDesktopPlatform) {
-      return _buildGridPreviewView(
+    final resolvedViewMode = ViewModeUtils.normalize(displayState.viewMode);
+
+    final Widget contentView;
+    if (resolvedViewMode == ViewMode.tiles) {
+      contentView = _buildTilesView(
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -205,29 +214,18 @@ class FileListViewBuilder {
         dragSelectionController: dragSelectionController,
         showFileTags: showFileTags,
         showContextMenu: showContextMenu,
-        toggleSelectionMode: toggleSelectionMode,
         showDeleteTagDialog: showDeleteTagDialog,
         showAddTagToFileDialog: showAddTagToFileDialog,
         onDeleteFile: onDeleteFile,
         onDeleteFiles: onDeleteFiles,
-        isPreviewPaneVisible: isPreviewPaneVisible,
-        previewPaneWidthListenable: previewPaneWidthListenable,
-        onZoomLevelChanged: onZoomLevelChanged,
-        onPreviewPaneWidthChanged: onPreviewPaneWidthChanged,
-        onPreviewPaneWidthCommitted: onPreviewPaneWidthCommitted,
-        onPreviewPaneToggled: onPreviewPaneToggled,
-        onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
-        onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
         onStartFileDrag: onStartFileDrag,
         onMoveItemsToFolder: onMoveItemsToFolder,
         scrollController: scrollController,
-        itemKeyForPath: itemKeyForPath,
+        onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+        onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
       );
-    }
-
-    if (displayState.viewMode == ViewMode.grid ||
-        displayState.viewMode == ViewMode.gridPreview) {
-      return _buildGridView(
+    } else if (resolvedViewMode == ViewMode.grid) {
+      contentView = _buildGridView(
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -252,9 +250,10 @@ class FileListViewBuilder {
         onMoveItemsToFolder: onMoveItemsToFolder,
         scrollController: scrollController,
         itemKeyForPath: itemKeyForPath,
+        immediateSelectionForPath: immediateSelectionForPath,
       );
-    } else if (displayState.viewMode == ViewMode.columns && isDesktopPlatform) {
-      return MillerColumnsView(
+    } else if (resolvedViewMode == ViewMode.columns && isDesktopPlatform) {
+      contentView = MillerColumnsView(
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -274,8 +273,8 @@ class FileListViewBuilder {
         scrollController: scrollController,
         itemKeyForPath: itemKeyForPath,
       );
-    } else if (displayState.viewMode == ViewMode.details) {
-      return _buildDetailsView(
+    } else if (resolvedViewMode == ViewMode.details) {
+      contentView = _buildDetailsView(
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -297,8 +296,8 @@ class FileListViewBuilder {
         onStartFileDrag: onStartFileDrag,
         onMoveItemsToFolder: onMoveItemsToFolder,
       );
-    } else if (displayState.viewMode == ViewMode.tree) {
-      return FileTreeView(
+    } else if (resolvedViewMode == ViewMode.tree) {
+      contentView = FileTreeView(
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -310,7 +309,7 @@ class FileListViewBuilder {
         showContextMenu: showContextMenu,
       );
     } else {
-      return _buildListView(
+      contentView = _buildListView(
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -332,6 +331,21 @@ class FileListViewBuilder {
         itemKeyForPath: itemKeyForPath,
       );
     }
+
+    if (isPreviewPaneVisible && isDesktopPlatform) {
+      return _wrapWithPreviewPane(
+        contentView: contentView,
+        state: displayState,
+        selectionState: selectionState,
+        onFileTap: onFileTap,
+        onPreviewPaneToggled: onPreviewPaneToggled,
+        previewPaneWidthListenable: previewPaneWidthListenable,
+        onPreviewPaneWidthChanged: onPreviewPaneWidthChanged,
+        onPreviewPaneWidthCommitted: onPreviewPaneWidthCommitted,
+      );
+    }
+
+    return contentView;
   }
 
   /// Build grid view for files and folders
@@ -363,6 +377,7 @@ class FileListViewBuilder {
         onMoveItemsToFolder,
     ScrollController? scrollController,
     GlobalKey Function(String path)? itemKeyForPath,
+    ValueListenable<bool?> Function(String path)? immediateSelectionForPath,
   }) {
     final itemSelectionMode =
         selectionState.isSelectionMode && !isDesktopPlatform;
@@ -378,6 +393,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();
@@ -539,6 +557,9 @@ class FileListViewBuilder {
                                                   .lastSelectedPath,
                                               clearSelectionMode:
                                                   clearSelection,
+                                              immediateSelectionListenable:
+                                                  immediateSelectionForPath
+                                                      ?.call(folder.path),
                                             ),
                                           ),
                                         ),
@@ -588,6 +609,9 @@ class FileListViewBuilder {
                                               onDeleteFile: onDeleteFile,
                                               onDeleteFiles: onDeleteFiles,
                                               showFileTags: showFileTags,
+                                              immediateSelectionListenable:
+                                                  immediateSelectionForPath
+                                                      ?.call(file.path),
                                             ),
                                           ),
                                         ),
@@ -710,6 +734,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();
@@ -828,6 +855,9 @@ class FileListViewBuilder {
           child: BlocBuilder<SelectionBloc, SelectionState>(
             builder: (context, selectionState) {
               return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
                 onTap: () {
                   if (selectionState.isSelectionMode) {
                     clearSelection();
@@ -1012,7 +1042,9 @@ class FileListViewBuilder {
     );
   }
 
-  static Widget _buildGridPreviewView({
+  /// Build tiles view — multi-column layout with icon + metadata per item.
+  /// Ctrl+scroll spectrum is handled by the outer [CtrlScrollZoom] wrapper.
+  static Widget _buildTilesView({
     required FolderListState state,
     required SelectionState selectionState,
     required bool isDesktopPlatform,
@@ -1024,126 +1056,267 @@ class FileListViewBuilder {
         toggleFolderSelection,
     required VoidCallback clearSelection,
     required TabbedFolderDragSelectionController dragSelectionController,
-    required bool showFileTags,
     required Function(BuildContext, Offset) showContextMenu,
-    required VoidCallback toggleSelectionMode,
+    required bool showFileTags,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
     Future<void> Function(BuildContext, File)? onDeleteFile,
     Future<void> Function(BuildContext, List<String>)? onDeleteFiles,
-    required bool isPreviewPaneVisible,
-    required ValueListenable<double> previewPaneWidthListenable,
-    required ValueChanged<int> onZoomLevelChanged,
-    required ValueChanged<double> onPreviewPaneWidthChanged,
-    required ValueChanged<double> onPreviewPaneWidthCommitted,
-    required VoidCallback onPreviewPaneToggled,
-    ValueChanged<int?>? onGridCrossAxisCountChanged,
-    ValueChanged<double?>? onGridItemMainAxisExtentChanged,
     ValueChanged<List<String>>? onStartFileDrag,
     Future<void> Function(List<String> sources, String destinationFolder)?
         onMoveItemsToFolder,
     ScrollController? scrollController,
     GlobalKey Function(String path)? itemKeyForPath,
+    ValueChanged<int?>? onGridCrossAxisCountChanged,
+    ValueChanged<double?>? onGridItemMainAxisExtentChanged,
+  }) {
+    final itemSelectionMode =
+        selectionState.isSelectionMode && !isDesktopPlatform;
+    return Stack(
+      key: dragSelectionController.stackKey,
+      clipBehavior: Clip.none,
+      children: [
+        FluentBackground(
+          blurAmount: 8.0,
+          opacity: 0.0,
+          backgroundColor: Colors.transparent,
+          enableBlur: false,
+          child: BlocBuilder<SelectionBloc, SelectionState>(
+            builder: (context, selectionState) {
+              return GestureDetector(
+                key: const ValueKey<String>(
+                  'file-browser-background-context-target',
+                ),
+                onTap: () {
+                  if (selectionState.isSelectionMode) {
+                    clearSelection();
+                  }
+                },
+                onSecondaryTapUp: (details) {
+                  showContextMenu(context, details.globalPosition);
+                },
+                onLongPressStart: !isDesktopPlatform
+                    ? (details) {
+                        HapticFeedback.mediumImpact();
+                        showContextMenu(context, details.globalPosition);
+                      }
+                    : null,
+                onPanStart: isDesktopPlatform
+                    ? (details) {
+                        final focused = FocusManager.instance.primaryFocus;
+                        final focusedContext = focused?.context;
+                        if (focusedContext != null) {
+                          final isEditableText =
+                              focusedContext.widget is EditableText ||
+                                  focusedContext.findAncestorWidgetOfExactType<
+                                          EditableText>() !=
+                                      null;
+                          if (isEditableText) {
+                            return;
+                          }
+                        }
+                        dragSelectionController.start(details.localPosition);
+                      }
+                    : null,
+                onPanUpdate: isDesktopPlatform
+                    ? (details) {
+                        dragSelectionController.update(details.localPosition);
+                      }
+                    : null,
+                onPanEnd: isDesktopPlatform
+                    ? (details) {
+                        dragSelectionController.end();
+                      }
+                    : null,
+                behavior: HitTestBehavior.translucent,
+                child: RepaintBoundary(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final availableWidth = math.max(
+                        0.0,
+                        constraints.maxWidth - (_tilesSpacing * 2),
+                      );
+                      final crossAxisCount = math.max(
+                        1,
+                        ((availableWidth + _tilesSpacing) /
+                                (_tilesMaxCrossAxisExtent + _tilesSpacing))
+                            .floor(),
+                      );
+                      onGridCrossAxisCountChanged?.call(crossAxisCount);
+                      onGridItemMainAxisExtentChanged
+                          ?.call(_tilesMainAxisExtent + _tilesSpacing);
+
+                      return GridView.builder(
+                        controller: scrollController,
+                        physics: const ClampingScrollPhysics(),
+                        cacheExtent: 800,
+                        padding: const EdgeInsets.all(_tilesSpacing),
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: _tilesMaxCrossAxisExtent,
+                          mainAxisExtent: _tilesMainAxisExtent,
+                          crossAxisSpacing: _tilesSpacing,
+                          mainAxisSpacing: _tilesSpacing,
+                        ),
+                        itemCount: state.folders.length + state.files.length,
+                        itemBuilder: (context, index) {
+                          final String itemPath = index < state.folders.length
+                              ? state.folders[index].path
+                              : state.files[index - state.folders.length].path;
+                          final bool isSelected =
+                              selectionState.isPathSelected(itemPath);
+
+                          return LayoutBuilder(
+                            builder: (context, constraints) {
+                              if (isDesktopPlatform) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
+                                  try {
+                                    final RenderBox? renderBox = context
+                                        .findRenderObject() as RenderBox?;
+                                    if (renderBox != null &&
+                                        renderBox.hasSize &&
+                                        renderBox.attached) {
+                                      final position =
+                                          renderBox.localToGlobal(Offset.zero);
+                                      dragSelectionController
+                                          .registerItemPosition(
+                                        itemPath,
+                                        Rect.fromLTWH(
+                                          position.dx,
+                                          position.dy,
+                                          renderBox.size.width,
+                                          renderBox.size.height,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    debugPrint(
+                                        'Layout error in tiles view: $e');
+                                  }
+                                });
+                              }
+
+                              if (index < state.folders.length) {
+                                final folder =
+                                    state.folders[index] as Directory;
+                                return _wrapFileDragDrop(
+                                  isDesktopPlatform: isDesktopPlatform,
+                                  isFolder: true,
+                                  path: folder.path,
+                                  selectionState: selectionState,
+                                  onStartFileDrag: onStartFileDrag,
+                                  onMoveItemsToFolder: onMoveItemsToFolder,
+                                  child: Container(
+                                    key: itemKeyForPath?.call(folder.path),
+                                    child: KeyedSubtree(
+                                      key: ValueKey(
+                                          'folder-tile-${folder.path}'),
+                                      child: RepaintBoundary(
+                                        child:
+                                            folder_list_components.FolderItem(
+                                          key: ValueKey(
+                                              'folder-tile-item-${folder.path}'),
+                                          folder: folder,
+                                          onTap: onNavigateToPath,
+                                          isSelected: isSelected,
+                                          toggleFolderSelection:
+                                              toggleFolderSelection,
+                                          isDesktopMode: isDesktopPlatform,
+                                          lastSelectedPath:
+                                              selectionState.lastSelectedPath,
+                                          showItemBackground: true,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final file = state
+                                  .files[index - state.folders.length] as File;
+                              return _wrapFileDragDrop(
+                                isDesktopPlatform: isDesktopPlatform,
+                                isFolder: false,
+                                path: file.path,
+                                selectionState: selectionState,
+                                onStartFileDrag: onStartFileDrag,
+                                child: Container(
+                                  key: itemKeyForPath?.call(file.path),
+                                  child: KeyedSubtree(
+                                    key: ValueKey('file-tile-${file.path}'),
+                                    child: RepaintBoundary(
+                                      child: folder_list_components.FileItem(
+                                        key: ValueKey(
+                                            'file-tile-item-${file.path}'),
+                                        file: file,
+                                        state: state,
+                                        isSelectionMode: itemSelectionMode,
+                                        isSelected: isSelected,
+                                        toggleFileSelection:
+                                            toggleFileSelection,
+                                        showDeleteTagDialog:
+                                            showDeleteTagDialog,
+                                        showAddTagToFileDialog:
+                                            showAddTagToFileDialog,
+                                        onDeleteFile: onDeleteFile,
+                                        onDeleteFiles: onDeleteFiles,
+                                        onFileTap: onFileTap,
+                                        isDesktopMode: isDesktopPlatform,
+                                        lastSelectedPath:
+                                            selectionState.lastSelectedPath,
+                                        showFileTags: showFileTags,
+                                        showItemBackground: true,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        dragSelectionController.buildOverlay(),
+      ],
+    );
+  }
+
+  static Widget _wrapWithPreviewPane({
+    required Widget contentView,
+    required FolderListState state,
+    required SelectionState selectionState,
+    required Function(File, bool) onFileTap,
+    required VoidCallback onPreviewPaneToggled,
+    required ValueListenable<double> previewPaneWidthListenable,
+    required ValueChanged<double> onPreviewPaneWidthChanged,
+    required ValueChanged<double> onPreviewPaneWidthCommitted,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (!isPreviewPaneVisible) {
-          return _buildGridView(
-            state: state,
-            selectionState: selectionState,
-            isDesktopPlatform: isDesktopPlatform,
-            onNavigateToPath: onNavigateToPath,
-            onFileTap: onFileTap,
-            toggleFileSelection: toggleFileSelection,
-            toggleFolderSelection: toggleFolderSelection,
-            clearSelection: clearSelection,
-            dragSelectionController: dragSelectionController,
-            showFileTags: showFileTags,
-            showContextMenu: showContextMenu,
-            toggleSelectionMode: toggleSelectionMode,
-            onZoomLevelChanged: onZoomLevelChanged,
-            showDeleteTagDialog: showDeleteTagDialog,
-            showAddTagToFileDialog: showAddTagToFileDialog,
-            onDeleteFile: onDeleteFile,
-            onDeleteFiles: onDeleteFiles,
-            isMasonryLayout: false,
-            onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
-            onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
-            onStartFileDrag: onStartFileDrag,
-            onMoveItemsToFolder: onMoveItemsToFolder,
-            scrollController: scrollController,
-            itemKeyForPath: itemKeyForPath,
-          );
-        }
-
         const double minPreviewWidth = 280.0;
-        const double minGridWidth = 360.0;
+        const double minContentWidth = 240.0;
         final double maxPreviewWidthByRatio = constraints.maxWidth * 0.8;
-        final double maxPreviewWidthByGrid =
-            constraints.maxWidth - minGridWidth;
+        final double maxPreviewWidthByContent =
+            constraints.maxWidth - minContentWidth;
         final double maxPreviewWidth = math.max(
           0.0,
-          math.min(maxPreviewWidthByRatio, maxPreviewWidthByGrid),
+          math.min(maxPreviewWidthByRatio, maxPreviewWidthByContent),
         );
         if (maxPreviewWidth <= 0.0) {
-          return _buildGridView(
-            state: state,
-            selectionState: selectionState,
-            isDesktopPlatform: isDesktopPlatform,
-            onNavigateToPath: onNavigateToPath,
-            onFileTap: onFileTap,
-            toggleFileSelection: toggleFileSelection,
-            toggleFolderSelection: toggleFolderSelection,
-            clearSelection: clearSelection,
-            dragSelectionController: dragSelectionController,
-            showFileTags: showFileTags,
-            showContextMenu: showContextMenu,
-            toggleSelectionMode: toggleSelectionMode,
-            onZoomLevelChanged: onZoomLevelChanged,
-            showDeleteTagDialog: showDeleteTagDialog,
-            showAddTagToFileDialog: showAddTagToFileDialog,
-            onDeleteFile: onDeleteFile,
-            onDeleteFiles: onDeleteFiles,
-            isMasonryLayout: false,
-            onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
-            onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
-            onStartFileDrag: onStartFileDrag,
-            onMoveItemsToFolder: onMoveItemsToFolder,
-            scrollController: scrollController,
-            itemKeyForPath: itemKeyForPath,
-          );
+          return contentView;
         }
         final double effectiveMinPreviewWidth =
             math.min(minPreviewWidth, maxPreviewWidth);
-        final gridView = _buildGridView(
-          state: state,
-          selectionState: selectionState,
-          isDesktopPlatform: isDesktopPlatform,
-          onNavigateToPath: onNavigateToPath,
-          onFileTap: onFileTap,
-          toggleFileSelection: toggleFileSelection,
-          toggleFolderSelection: toggleFolderSelection,
-          clearSelection: clearSelection,
-          dragSelectionController: dragSelectionController,
-          showFileTags: showFileTags,
-          showContextMenu: showContextMenu,
-          toggleSelectionMode: toggleSelectionMode,
-          onZoomLevelChanged: onZoomLevelChanged,
-          showDeleteTagDialog: showDeleteTagDialog,
-          showAddTagToFileDialog: showAddTagToFileDialog,
-          onDeleteFile: onDeleteFile,
-          onDeleteFiles: onDeleteFiles,
-          isMasonryLayout: false,
-          onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
-          onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
-          onStartFileDrag: onStartFileDrag,
-          onMoveItemsToFolder: onMoveItemsToFolder,
-          scrollController: scrollController,
-          itemKeyForPath: itemKeyForPath,
-        );
 
-        return _GridPreviewLayout(
-          gridView: gridView,
+        return _PreviewPaneLayout(
+          contentView: contentView,
           state: state,
           selectionState: selectionState,
           onFileTap: onFileTap,
@@ -1160,8 +1333,8 @@ class FileListViewBuilder {
   }
 }
 
-class _GridPreviewLayout extends StatefulWidget {
-  final Widget gridView;
+class _PreviewPaneLayout extends StatefulWidget {
+  final Widget contentView;
   final FolderListState state;
   final SelectionState selectionState;
   final Function(File, bool) onFileTap;
@@ -1173,8 +1346,8 @@ class _GridPreviewLayout extends StatefulWidget {
   final double maxPreviewWidth;
   final double availableWidth;
 
-  const _GridPreviewLayout({
-    required this.gridView,
+  const _PreviewPaneLayout({
+    required this.contentView,
     required this.state,
     required this.selectionState,
     required this.onFileTap,
@@ -1188,10 +1361,10 @@ class _GridPreviewLayout extends StatefulWidget {
   });
 
   @override
-  State<_GridPreviewLayout> createState() => _GridPreviewLayoutState();
+  State<_PreviewPaneLayout> createState() => _PreviewPaneLayoutState();
 }
 
-class _GridPreviewLayoutState extends State<_GridPreviewLayout> {
+class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
   double? _dragStartX;
   double? _dragStartWidth;
   double? _dragPreviewWidth;
@@ -1235,7 +1408,7 @@ class _GridPreviewLayoutState extends State<_GridPreviewLayout> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<double>(
       valueListenable: widget.previewPaneWidthListenable,
-      child: widget.gridView,
+      child: widget.contentView,
       builder: (context, currentWidth, child) {
         final double effectivePreviewWidth =
             currentWidth.clamp(widget.minPreviewWidth, widget.maxPreviewWidth);
@@ -1283,53 +1456,35 @@ class _GridPreviewLayoutState extends State<_GridPreviewLayout> {
                           bottom: 0,
                           right: 0,
                           width: ghostWidth,
-                          child: Container(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.04),
-                          ),
-                        ),
-                      Positioned(
-                        top: 8,
-                        bottom: 8,
-                        right: indicatorRight,
-                        child: Container(
-                          width: 3,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withValues(alpha: 0.75),
-                                Colors.transparent,
-                              ],
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerRight,
+                                end: Alignment.centerLeft,
+                                colors: [
+                                  Theme.of(context).shadowColor.withValues(
+                                        alpha: 0.04,
+                                      ),
+                                  Colors.transparent,
+                                ],
+                              ),
                             ),
-                            boxShadow: const [],
-                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                      ),
                       Positioned(
                         top: 0,
                         bottom: 0,
-                        right: (indicatorRight - 14)
-                            .clamp(0.0, widget.availableWidth - 28),
+                        right: indicatorRight.clamp(0.0, widget.availableWidth),
                         child: Center(
                           child: Container(
-                            width: 28,
-                            height: 6,
+                            width: 1,
+                            height: 56,
                             decoration: BoxDecoration(
                               color: Theme.of(context)
                                   .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.85),
-                              borderRadius: BorderRadius.circular(999),
-                              boxShadow: const [],
+                                  .onSurface
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                         ),
@@ -1345,13 +1500,11 @@ class _GridPreviewLayoutState extends State<_GridPreviewLayout> {
   }
 }
 
-class _PreviewResizeHandle extends StatelessWidget {
+class _PreviewResizeHandle extends StatefulWidget {
   final GestureDragStartCallback onPanStart;
   final GestureDragUpdateCallback onPanUpdate;
   final GestureDragEndCallback onPanEnd;
-  static const double _handleWidth = 12.0;
-  static const double _indicatorWidth = 3.0;
-  static const double _indicatorHeight = 96.0;
+  static const double _handleWidth = 6.0;
 
   const _PreviewResizeHandle({
     required this.onPanStart,
@@ -1362,23 +1515,48 @@ class _PreviewResizeHandle extends StatelessWidget {
   static double get handleWidth => _handleWidth;
 
   @override
+  State<_PreviewResizeHandle> createState() => _PreviewResizeHandleState();
+}
+
+class _PreviewResizeHandleState extends State<_PreviewResizeHandle> {
+  bool _hovering = false;
+  bool _dragging = false;
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final active = _hovering || _dragging;
+    final lineColor = active
+        ? theme.colorScheme.onSurface.withValues(alpha: isDark ? 0.16 : 0.1)
+        : Colors.transparent;
+
     return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
       cursor: SystemMouseCursors.resizeLeftRight,
       child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+        behavior: HitTestBehavior.translucent,
         dragStartBehavior: DragStartBehavior.down,
-        onPanStart: onPanStart,
-        onPanUpdate: onPanUpdate,
-        onPanEnd: onPanEnd,
+        onPanStart: (details) {
+          setState(() => _dragging = true);
+          widget.onPanStart(details);
+        },
+        onPanUpdate: widget.onPanUpdate,
+        onPanEnd: (details) {
+          setState(() => _dragging = false);
+          widget.onPanEnd(details);
+        },
         child: SizedBox(
-          width: _handleWidth,
+          width: _PreviewResizeHandle._handleWidth,
           child: Center(
-            child: Container(
-              width: _indicatorWidth,
-              height: _indicatorHeight,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              width: active ? 1.5 : 0,
+              height: active ? 56 : 0,
               decoration: BoxDecoration(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.7),
+                color: lineColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

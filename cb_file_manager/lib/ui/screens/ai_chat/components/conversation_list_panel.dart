@@ -4,12 +4,15 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../bloc/ai_agent/ai_agent.dart';
 import '../../../../config/languages/app_localizations.dart';
+import '../../../../design_system/primitives/cb_tooltip.dart';
 import '../../../../models/ai/ai_conversation.dart';
 
-/// Side panel listing saved conversations, styled with acrylic/frosted-glass
-/// to match the desktop Fluent design system.
+/// Side drawer listing saved conversations.
 ///
-/// Displayed as the left column inside the chat screen when toggled.
+/// Deliberately flat: a solid theme surface, one hairline edge, no blur,
+/// shadow or gradient. Slides in over the chat from the left; the caller
+/// decides its width (a fixed column on desktop, two thirds on narrow
+/// layouts).
 class ConversationListPanel extends StatelessWidget {
   final VoidCallback onClose;
 
@@ -20,55 +23,44 @@ class ConversationListPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return BlocBuilder<AiAgentBloc, AiAgentState>(
       buildWhen: (prev, curr) =>
           prev.conversations != curr.conversations ||
           prev.conversationId != curr.conversationId,
       builder: (context, state) {
-        final isDark = theme.brightness == Brightness.dark;
-
-        return Container(
-          width: 260,
+        return DecoratedBox(
           decoration: BoxDecoration(
-            // Subtle tint — the native window acrylic shows through since
-            // the scaffold background is transparent.
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.22),
+            // Same surface the app's other side menus use.
+            color: scheme.surfaceContainerLow,
             border: Border(
-              right: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.07),
-              ),
+              right: BorderSide(color: scheme.outlineVariant),
             ),
           ),
           child: Column(
             children: [
-              // Header
+              // Header — same height as the chat header so the two align.
               SizedBox(
-                height: 52,
+                height: 44,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
                   child: Row(
                     children: [
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           l.conversations,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSurface,
-                            letterSpacing: 0.1,
+                            letterSpacing: 0.4,
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                       ),
-                      _AcrylicIconButton(
+                      _FlatIconButton(
                         icon: PhosphorIconsLight.plus,
                         tooltip: l.newConversation,
-                        isDark: isDark,
                         onPressed: () {
                           context
                               .read<AiAgentBloc>()
@@ -76,25 +68,16 @@ class ConversationListPanel extends StatelessWidget {
                           onClose();
                         },
                       ),
-                      const SizedBox(width: 2),
-                      _AcrylicIconButton(
+                      _FlatIconButton(
                         icon: PhosphorIconsLight.x,
-                        size: 15,
-                        isDark: isDark,
                         onPressed: onClose,
                       ),
-                      const SizedBox(width: 2),
                     ],
                   ),
                 ),
               ),
 
-              Container(
-                height: 1,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.07)
-                    : Colors.black.withValues(alpha: 0.06),
-              ),
+              Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
 
               // Conversation list
               Expanded(
@@ -105,9 +88,8 @@ class ConversationListPanel extends StatelessWidget {
                           child: Text(
                             l.noConversations,
                             style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.65),
-                              fontSize: 12,
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 13,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -121,7 +103,6 @@ class ConversationListPanel extends StatelessWidget {
                           return _ConversationTile(
                             conversation: conv,
                             isActive: conv.id == state.conversationId,
-                            isDark: isDark,
                             onTap: () {
                               if (conv.id != state.conversationId) {
                                 context
@@ -148,79 +129,57 @@ class ConversationListPanel extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Acrylic-style icon button (no ripple, subtle hover)
+// Flat icon button — hover tint only, no ripple or elevation
 // ---------------------------------------------------------------------------
 
-class _AcrylicIconButton extends StatefulWidget {
+class _FlatIconButton extends StatefulWidget {
   final IconData icon;
-  final double size;
   final String? tooltip;
-  final bool isDark;
   final VoidCallback? onPressed;
 
-  const _AcrylicIconButton({
+  const _FlatIconButton({
     required this.icon,
-    required this.isDark,
-    this.size = 17,
     this.tooltip,
     this.onPressed,
   });
 
   @override
-  State<_AcrylicIconButton> createState() => _AcrylicIconButtonState();
+  State<_FlatIconButton> createState() => _FlatIconButtonState();
 }
 
-class _AcrylicIconButtonState extends State<_AcrylicIconButton> {
+class _FlatIconButtonState extends State<_FlatIconButton> {
   bool _hovered = false;
-  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final bg = _pressed
-        ? (widget.isDark
-            ? Colors.white.withValues(alpha: 0.14)
-            : Colors.black.withValues(alpha: 0.10))
-        : _hovered
-            ? (widget.isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06))
-            : Colors.transparent;
+    final scheme = Theme.of(context).colorScheme;
 
     Widget btn = MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() {
-        _hovered = false;
-        _pressed = false;
-      }),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
         onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 80),
+        child: Container(
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(5),
+            color: _hovered
+                ? scheme.onSurface.withValues(alpha: 0.07)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
           ),
-          child: Center(
-            child: Icon(
-              widget.icon,
-              size: widget.size,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
-            ),
+          child: Icon(
+            widget.icon,
+            size: 16,
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ),
     );
 
     if (widget.tooltip != null) {
-      btn = Tooltip(message: widget.tooltip!, child: btn);
+      btn = CbTooltip(message: widget.tooltip!, child: btn);
     }
     return btn;
   }
@@ -233,14 +192,12 @@ class _AcrylicIconButtonState extends State<_AcrylicIconButton> {
 class _ConversationTile extends StatefulWidget {
   final AiConversationSummary conversation;
   final bool isActive;
-  final bool isDark;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ConversationTile({
     required this.conversation,
     required this.isActive,
-    required this.isDark,
     required this.onTap,
     required this.onDelete,
   });
@@ -255,16 +212,17 @@ class _ConversationTileState extends State<_ConversationTile> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
 
+    // Selection styling mirrors the app's navigation tiles: a rounded
+    // secondaryContainer fill, no border or accent bar.
+    final foreground =
+        widget.isActive ? scheme.onSecondaryContainer : scheme.onSurface;
     final Color bg;
     if (widget.isActive) {
-      bg = theme.colorScheme.primary
-          .withValues(alpha: widget.isDark ? 0.22 : 0.13);
+      bg = scheme.secondaryContainer;
     } else if (_hovered) {
-      bg = widget.isDark
-          ? Colors.white.withValues(alpha: 0.06)
-          : Colors.black.withValues(alpha: 0.04);
+      bg = scheme.onSurface.withValues(alpha: 0.05);
     } else {
       bg = Colors.transparent;
     }
@@ -273,102 +231,72 @@ class _ConversationTileState extends State<_ConversationTile> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(6),
-            border: widget.isActive
-                ? Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.22),
-                  )
-                : null,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                PhosphorIconsLight.chatCircle,
-                size: 15,
-                color: widget.isActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.65),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.conversation.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: widget.isActive
-                            ? FontWeight.w500
-                            : FontWeight.normal,
-                        color: widget.isActive
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Row(
-                      children: [
-                        if (widget.conversation.initialPath.isNotEmpty) ...[
-                          Icon(
-                            PhosphorIconsLight.folder,
-                            size: 10,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.45),
-                          ),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(
-                              widget.conversation.initialPathShort,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.55),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          _relativeDate(widget.conversation.updatedAt),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.45),
-                          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.conversation.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: widget.isActive
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: foreground,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _subtitle(widget.conversation),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: widget.isActive
+                              ? foreground.withValues(alpha: 0.75)
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              if (_hovered || widget.isActive)
-                _DeleteButton(
-                  tooltip: l.deleteConversation,
-                  isDark: widget.isDark,
-                  onPressed: widget.onDelete,
-                )
-              else
-                const SizedBox(width: 24),
-            ],
+                // Reserve the slot so titles don't reflow on hover.
+                SizedBox(
+                  width: 24,
+                  child: _hovered
+                      ? _DeleteButton(
+                          tooltip: l.deleteConversation,
+                          onPressed: widget.onDelete,
+                        )
+                      : null,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  static String _subtitle(AiConversationSummary conv) {
+    final date = _relativeDate(conv.updatedAt);
+    if (conv.initialPath.isEmpty) return date;
+    return '${conv.initialPathShort} · $date';
   }
 
   static String _relativeDate(DateTime dt) {
@@ -387,12 +315,10 @@ class _ConversationTileState extends State<_ConversationTile> {
 
 class _DeleteButton extends StatefulWidget {
   final String tooltip;
-  final bool isDark;
   final VoidCallback onPressed;
 
   const _DeleteButton({
     required this.tooltip,
-    required this.isDark,
     required this.onPressed,
   });
 
@@ -405,9 +331,9 @@ class _DeleteButtonState extends State<_DeleteButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
 
-    return Tooltip(
+    return CbTooltip(
       message: widget.tooltip,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
@@ -415,25 +341,13 @@ class _DeleteButtonState extends State<_DeleteButton> {
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           onTap: widget.onPressed,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 80),
+          child: SizedBox(
             width: 24,
             height: 24,
-            decoration: BoxDecoration(
-              color: _hovered
-                  ? theme.colorScheme.error.withValues(alpha: 0.16)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Center(
-              child: Icon(
-                PhosphorIconsLight.trash,
-                size: 13,
-                color: _hovered
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.55),
-              ),
+            child: Icon(
+              PhosphorIconsLight.trash,
+              size: 14,
+              color: _hovered ? scheme.error : scheme.onSurfaceVariant,
             ),
           ),
         ),

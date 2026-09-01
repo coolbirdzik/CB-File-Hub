@@ -33,6 +33,9 @@ class WindowStartupPayload {
   static const String envSecondaryWindowKey = 'CB_SECONDARY_WINDOW';
   static const String envStartHiddenKey = 'CB_START_HIDDEN';
   static const String envWindowRoleKey = 'CB_WINDOW_ROLE';
+  static const String envWindowPositionXKey = 'CB_WINDOW_POSITION_X';
+  static const String envWindowPositionYKey = 'CB_WINDOW_POSITION_Y';
+  static const String envStartDraggingKey = 'CB_START_DRAGGING';
 
   // Progress window IPC
   static const String envProgressIpcPortKey = 'CB_PROGRESS_IPC_PORT';
