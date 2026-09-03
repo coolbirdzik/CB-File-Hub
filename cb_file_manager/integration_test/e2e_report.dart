@@ -35,6 +35,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
 
 import 'e2e_keys.dart' as keys;
+import 'e2e_sandbox_paths.dart';
 
 // ---------------------------------------------------------------------------
 // Internal state
@@ -51,6 +52,15 @@ class _Entry {
       required this.filename,
       required this.ts});
 }
+
+/// Upper bound for every settle performed by this reporter.
+///
+/// `pumpAndSettle` defaults to a ten minute timeout. A screen that never stops
+/// animating — a video thumbnail placeholder still waiting on its decoder, for
+/// example — therefore blocks a capture run for ten minutes per frame before
+/// the surrounding try/catch can fall back to a plain pump. Capturing a
+/// still-loading frame is always preferable to losing the run.
+const Duration kE2ESettleTimeout = Duration(seconds: 12);
 
 final List<_Entry> _log = [];
 Directory? _reportDir;
@@ -123,6 +133,8 @@ Future<void> captureE2EScreenshot(
         kCbE2EFast
             ? const Duration(milliseconds: 100)
             : const Duration(seconds: 1),
+        EnginePhase.sendSemanticsUpdate,
+        kE2ESettleTimeout,
       );
     } catch (_) {
       await tester.pump(
@@ -307,7 +319,11 @@ class E2ETester {
 
   Future<void> _settleAfterAction() async {
     try {
-      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 100),
+        EnginePhase.sendSemanticsUpdate,
+        kE2ESettleTimeout,
+      );
     } catch (_) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -384,7 +400,15 @@ class E2ETester {
   /// [pumpAndSettle] does NOT auto-screenshot — it is a timing wait, not a
   /// user-visible action. Use [screenshotSettled] when you also need a frame.
   Future<void> pumpAndSettle([Duration? duration]) async {
-    await tester.pumpAndSettle(duration ?? const Duration(days: 1));
+    try {
+      await tester.pumpAndSettle(
+        duration ?? const Duration(milliseconds: 100),
+        EnginePhase.sendSemanticsUpdate,
+        kE2ESettleTimeout,
+      );
+    } catch (_) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -615,7 +639,8 @@ Future<Uint8List?> _capturePngBytes(WidgetTester tester, String slug) async {
 
 Future<void> _ensureReportDir() async {
   if (_reportDir != null) return;
-  _reportDir = Directory(p.join(Directory.current.path, 'build', 'e2e_report'));
+  _reportDir =
+      Directory(p.join(await _reportRootPath(), 'build', 'e2e_report'));
   _screenshotsDir = Directory(p.join(_reportDir!.path, 'screenshots'));
   await _screenshotsDir!.create(recursive: true);
   if (kDebugMode) {
@@ -623,6 +648,55 @@ Future<void> _ensureReportDir() async {
   }
   await _loadManifest();
 }
+
+/// Root the report tree is written under.
+///
+/// On desktop the test process runs from the Flutter project directory, so
+/// `build/e2e_report` lands next to the other build artifacts. On Android the
+/// process runs inside the app sandbox where `Directory.current` is `/` and
+/// not writable, so the report goes to the app's own external files directory
+/// instead — a location `adb pull` can fetch after the run (see
+/// `scripts/capture_screenshots.*`).
+Future<String> _reportRootPath() async {
+  if (!Platform.isAndroid) return Directory.current.path;
+
+  // Ask the platform for the app's external files directory. This has to go
+  // through the pre-sandbox provider: the sandbox redirects every path_provider
+  // call into a throwaway temp dir the host cannot reach. Going through the
+  // plugin also matters because `Android/data/<package>/files` is created by
+  // the framework — a fresh install leaves it absent, and the app cannot mkdir
+  // it itself under scoped storage.
+  try {
+    final external =
+        await E2ESandboxPaths.platformProvider.getExternalStoragePath();
+    if (external != null && external.isNotEmpty) {
+      final root = Directory(p.join(external, 'cb_e2e'));
+      root.createSync(recursive: true);
+      return root.path;
+    }
+  } catch (_) {
+    // Fall through to the fixed candidates below.
+  }
+
+  for (final base in kAndroidReportRoots) {
+    try {
+      Directory(base).createSync(recursive: true);
+      return base;
+    } catch (_) {
+      // Try the next candidate.
+    }
+  }
+
+  return Directory.current.path;
+}
+
+/// Fallback on-device roots for the Android report tree, most preferred first.
+/// Only used when the platform cannot report an external files directory.
+const List<String> kAndroidReportRoots = <String>[
+  '/sdcard/Android/data/com.cbv.filehub/files/cb_e2e',
+  '/storage/emulated/0/Android/data/com.cbv.filehub/files/cb_e2e',
+  '/sdcard/Download/cb_e2e',
+];
 
 // ---------------------------------------------------------------------------
 // Manifest — persists screenshot log + test results across process runs so

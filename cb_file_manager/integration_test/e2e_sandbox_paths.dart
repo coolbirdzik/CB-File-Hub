@@ -33,6 +33,14 @@ class E2ESandboxPaths extends PathProviderPlatform {
   /// True while a sandbox override is installed.
   static bool get isInstalled => _active != null;
 
+  /// The provider that was active before the sandbox was installed.
+  ///
+  /// E2E infrastructure that has to reach the device's real directories — the
+  /// screenshot report needs a location `adb pull` can read — goes through this
+  /// instead of [PathProviderPlatform.instance], which the sandbox owns.
+  static PathProviderPlatform get platformProvider =>
+      _previous ?? PathProviderPlatform.instance;
+
   /// Absolute path of the current sandbox root, or null when not installed.
   static String? get rootPath => _active?._root.path;
 

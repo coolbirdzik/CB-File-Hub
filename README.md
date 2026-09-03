@@ -308,9 +308,9 @@ screenshots/auto/desktop/
 screenshots/auto/android/
 ```
 
-The screenshot scripts use a dedicated showcase E2E flow and export only the final hero frames for each featured scenario, not every intermediate test step.
+The screenshot scripts use a dedicated showcase E2E flow and export only the final hero frames for each featured scenario, not every intermediate test step. Desktop and Android run different scene lists, because the two shells look nothing alike: desktop captures the multi-pane workspace, Android captures the home, file grid, tab manager, and tag screens that feed the four mobile promo slots.
 
-Android requires a connected device or running emulator visible in `flutter devices`.
+Android requires a connected device or running emulator visible in `flutter devices`. The test process writes its frames inside the app sandbox, so the script pulls them off the device with `adb` before copying them into `screenshots/auto/android/`.
 
 Generate promotional artwork from the captured screenshots:
 

@@ -9,6 +9,7 @@ import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/services/featured_albums_service.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -21,6 +22,10 @@ import 'e2e_helpers.dart';
 import 'e2e_keys.dart';
 import 'e2e_report.dart';
 import 'e2e_sandbox_paths.dart';
+
+/// True when the showcase run targets a phone/tablet shell instead of the
+/// desktop shell.
+final bool kShowcaseMobileTarget = Platform.isAndroid || Platform.isIOS;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -35,12 +40,20 @@ void main() {
     await E2ESandboxPaths.uninstall();
   });
 
+  // The desktop scenes below rely on the multi-pane desktop shell (AI side
+  // panel, tag tree, disk cleaner). On phones the app renders a completely
+  // different shell, so mobile targets get their own scene list instead.
+  if (kShowcaseMobileTarget) {
+    registerMobileShowcase();
+    return;
+  }
+
   group('Showcase', () {
     testWidgets('file browser', (WidgetTester tester) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_showcase_files_');
       final media = await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
 
       CbE2EConfig.startupPayload = WindowStartupPayload(
         tabs: <WindowTabPayload>[WindowTabPayload(path: dir.path)],
@@ -56,10 +69,14 @@ void main() {
         expectFileRowVisible(media.heroImage);
         expectFileRowVisible(media.heroVideo);
 
-        final gridIcon = find.byIcon(Icons.grid_view);
-        if (gridIcon.evaluate().isNotEmpty) {
-          await et.tap(gridIcon.first, detail: 'grid_layout');
-          await et.pumpAndSettle(const Duration(seconds: 2));
+        await switchToGridView(tester, et);
+
+        // Select an image so the preview pane on the right renders content
+        // instead of its "Select a file to preview" placeholder.
+        final heroTile = find.text(p.basename(media.heroImage));
+        if (heroTile.evaluate().isNotEmpty) {
+          await et.tap(heroTile.first, detail: 'select_hero_image');
+          await tester.pumpAndSettle(const Duration(seconds: 2));
         }
 
         await et.screenshot('result');
@@ -73,7 +90,7 @@ void main() {
       final dir = await Directory.systemTemp.createTemp('cb_showcase_gallery_');
       final media = await seedShowcaseLibrary(dir);
       await seedShowcaseAlbum(media);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
 
       CbE2EConfig.startupPayload = const WindowStartupPayload(
         tabs: <WindowTabPayload>[WindowTabPayload(path: '#gallery')],
@@ -96,7 +113,7 @@ void main() {
       final dir = await Directory.systemTemp.createTemp('cb_showcase_album_');
       final media = await seedShowcaseLibrary(dir);
       final albumId = await seedShowcaseAlbum(media);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
 
       CbE2EConfig.startupPayload = WindowStartupPayload(
         tabs: <WindowTabPayload>[WindowTabPayload(path: '#album/$albumId')],
@@ -122,7 +139,7 @@ void main() {
       final dir =
           await Directory.systemTemp.createTemp('cb_showcase_ai_search_');
       final media = await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
       await seedAiConversationWithResults(
         workspacePath: dir.path,
         userQuery: 'Find duplicate videos and large files',
@@ -159,7 +176,7 @@ void main() {
       final dir =
           await Directory.systemTemp.createTemp('cb_showcase_ai_approval_');
       await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
       await seedAiConversationWithApproval(
         workspacePath: dir.path,
         userQuery: 'Delete all duplicate files in Photos',
@@ -198,7 +215,7 @@ void main() {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_showcase_ai_conv_');
       await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
       await seedAiMultiTurnConversation(workspacePath: dir.path);
 
       CbE2EConfig.startupPayload = WindowStartupPayload(
@@ -229,7 +246,7 @@ void main() {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_showcase_tags_');
       final media = await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
       await seedTags(media.images);
 
       // Open tags screen via system path
@@ -255,7 +272,7 @@ void main() {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_showcase_tagged_');
       final media = await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
       await seedTags(media.images);
 
       CbE2EConfig.startupPayload = const WindowStartupPayload(
@@ -267,17 +284,12 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('showcase tag tagged files');
 
-        // Wait for tag list to appear, then double-tap first tag to open its files
-        final tagFinder = find.byType(ListTile);
-        final exists = await tester.runAsync(() async {
-          await tester.pump(const Duration(seconds: 2));
-          return tagFinder.evaluate().isNotEmpty;
-        });
-        if (exists == true) {
-          await tester.tap(tagFinder.first);
-          await tester.pumpAndSettle(const Duration(seconds: 1));
-          await tester.tap(tagFinder.first);
-          await tester.pumpAndSettle(const Duration(seconds: 2));
+        // Selecting a leaf tag loads its files into the panel on the right.
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+        final tagRow = find.text('vacation');
+        if (tagRow.evaluate().isNotEmpty) {
+          await et.tap(tagRow.first, detail: 'open_tagged_files');
+          await tester.pumpAndSettle(const Duration(seconds: 3));
         }
 
         await et.screenshot('result');
@@ -293,7 +305,7 @@ void main() {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_showcase_tagtree_');
       final media = await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
       await seedTagHierarchy(media.images);
 
       CbE2EConfig.startupPayload = const WindowStartupPayload(
@@ -317,14 +329,22 @@ void main() {
           }
         }
 
-        // Expand the first few parent rows so the hierarchy is visible.
-        final caretIcons = find.byIcon(PhosphorIconsLight.caretRight);
-        final caretCount = caretIcons.evaluate().length;
-        for (var i = 0; i < caretCount && i < 3; i++) {
-          final caret = find.byIcon(PhosphorIconsLight.caretRight);
-          if (caret.evaluate().isEmpty) break;
-          await tester.tap(caret.first);
-          await tester.pumpAndSettle(const Duration(milliseconds: 400));
+        // The tree is a GenericTreeView with `expandOnRowTap: true`, so tapping
+        // a parent row expands it. Walk down the seeded hierarchy so the promo
+        // frame shows a real parent/child structure rather than collapsed roots.
+        for (final parent in const <String>['Media', 'Movies', 'Travel']) {
+          final row = find.text(parent);
+          if (row.evaluate().isEmpty) continue;
+          await et.tap(row.first, detail: 'expand_$parent');
+          await tester.pumpAndSettle(const Duration(milliseconds: 800));
+        }
+
+        // Land on a leaf that owns files so the row thumbnails and the tagged
+        // file panel both have content.
+        final leaf = find.text('Beach');
+        if (leaf.evaluate().isNotEmpty) {
+          await et.tap(leaf.first, detail: 'select_leaf_tag');
+          await tester.pumpAndSettle(const Duration(seconds: 2));
         }
 
         await et.screenshot('result');
@@ -340,7 +360,7 @@ void main() {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_showcase_cleaner_');
       await seedShowcaseLibrary(dir);
-      await seedWallpaperBackdrop(dir);
+      await seedWallpaperBackdrop();
 
       CbE2EConfig.startupPayload = const WindowStartupPayload(
         tabs: [WindowTabPayload(path: '#cb-agent-cleaner')],
@@ -349,7 +369,7 @@ void main() {
       try {
         await runCbFileApp();
         await tester.pump(const Duration(seconds: 5));
-        await et.init('showcase disk cleaner results');
+        await et.init('showcase disk cleaner');
         await tester.pump(const Duration(seconds: 2));
 
         await et.screenshot('result');
@@ -359,6 +379,231 @@ void main() {
       }
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Mobile showcase
+//
+// Four hero frames that mirror the four mobile promo slots produced by
+// `scripts/make_promo_images.py`: home, file grid, tabs, tags.
+// ---------------------------------------------------------------------------
+
+/// Settles the widget tree, but gives up after [timeout] instead of hanging.
+///
+/// Mobile scenes render video thumbnails whose placeholder keeps animating
+/// while the decoder works, so a plain `pumpAndSettle` can block for its full
+/// ten minute default before failing the run. Capturing a still-loading frame
+/// is far better than losing the whole capture.
+Future<void> settleOrPump(
+  WidgetTester tester, {
+  Duration timeout = const Duration(seconds: 8),
+}) async {
+  try {
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      timeout,
+    );
+  } catch (_) {
+    await tester.pump(const Duration(milliseconds: 500));
+  }
+}
+
+/// Creates the throwaway folder a mobile scene browses.
+///
+/// `Directory.systemTemp` resolves to the app's internal cache on Android, and
+/// the phone file browser lists nothing there — it works from the device's
+/// storage volumes. The app's own external files directory is a real volume
+/// path and needs no runtime permission, so scenes seed into that instead.
+Future<Directory> createMobileShowcaseDir(String prefix) async {
+  if (!Platform.isAndroid) {
+    return Directory.systemTemp.createTemp(prefix);
+  }
+  try {
+    final external =
+        await E2ESandboxPaths.platformProvider.getExternalStoragePath();
+    if (external != null && external.isNotEmpty) {
+      final base = Directory(p.join(external, 'showcase'))
+        ..createSync(recursive: true);
+      return await base.createTemp(prefix);
+    }
+  } catch (_) {
+    // Fall back to the temp dir below.
+  }
+  return Directory.systemTemp.createTemp(prefix);
+}
+
+/// Pumps in real time until [finder] matches, or [timeout] elapses.
+///
+/// `pumpAndSettle` only waits for animations; a folder listing arriving from a
+/// platform channel needs wall-clock time, which is why the phone file grid was
+/// captured empty.
+Future<bool> waitForVisible(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 20),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    if (finder.evaluate().isNotEmpty) return true;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await tester.pump();
+  }
+  return finder.evaluate().isNotEmpty;
+}
+
+void registerMobileShowcase() {
+  group('Mobile showcase', () {
+    testWidgets('mobile home', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await createMobileShowcaseDir('cb_mobile_home_');
+      await seedShowcaseLibrary(dir);
+      await seedMobileAppearance();
+
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: '#home')],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleOrPump(tester, timeout: const Duration(seconds: 12));
+        await et.init('mobile home');
+        await settleOrPump(tester);
+
+        await et.screenshot('result');
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    testWidgets('mobile file grid', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await createMobileShowcaseDir('cb_mobile_grid_');
+      final media = await seedShowcaseLibrary(dir);
+      await seedMobileAppearance();
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: media.photos.path)],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleOrPump(tester, timeout: const Duration(seconds: 12));
+        await et.init('mobile file grid');
+        // Mobile defaults to the grid view mode, so once the listing lands the
+        // thumbnails are already on screen; give them time to decode too.
+        await waitForVisible(tester, find.text(p.basename(media.heroPhoto)));
+        await settleOrPump(tester, timeout: const Duration(seconds: 10));
+
+        await et.screenshot('result');
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    testWidgets('mobile tabs', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await createMobileShowcaseDir('cb_mobile_tabs_');
+      final media = await seedShowcaseLibrary(dir);
+      await seedMobileAppearance();
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[
+          const WindowTabPayload(path: '#home'),
+          WindowTabPayload(path: media.photos.path),
+          WindowTabPayload(path: media.movies.path),
+        ],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleOrPump(tester, timeout: const Duration(seconds: 12));
+        await et.init('mobile tabs');
+
+        // The tab counter in the address bar opens the full-screen tab manager.
+        final tabCounter = find.ancestor(
+          of: find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Icon &&
+                widget.icon == PhosphorIconsLight.file &&
+                widget.size == 16,
+          ),
+          matching: find.byType(InkWell),
+        );
+        if (tabCounter.evaluate().isNotEmpty) {
+          await et.tap(tabCounter.first, detail: 'open_tab_manager');
+          await settleOrPump(tester, timeout: const Duration(seconds: 10));
+        }
+
+        await et.screenshot('result');
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    testWidgets('mobile tags', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await createMobileShowcaseDir('cb_mobile_tags_');
+      final media = await seedShowcaseLibrary(dir);
+      await seedMobileAppearance();
+      await seedTags(media.images);
+
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: '#tags')],
+      );
+
+      try {
+        await runCbFileApp();
+        await settleOrPump(tester, timeout: const Duration(seconds: 12));
+        await et.init('mobile tags');
+        await settleOrPump(tester);
+
+        await et.screenshot('result');
+        await et.pass();
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+  });
+}
+
+/// Mobile has no acrylic wallpaper backdrop, so it only needs the theme pinned
+/// so every captured frame matches the desktop showcase.
+Future<void> seedMobileAppearance() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('app_theme', 'light');
+  // The app defaults to Vietnamese; pin English so the mobile frames match the
+  // desktop ones the same promo run is built from.
+  await prefs.setString('selected_language', 'en');
+  // The E2E teardown clears this key, so without re-seeding it the theme
+  // onboarding route covers the app on every scene after the first.
+  await prefs.setBool('theme_onboarding_completed_v1', true);
+}
+
+/// Switches the active folder view to the thumbnail grid via the shared action
+/// bar's view-mode menu (the eye button). No-op when the menu is unavailable.
+Future<void> switchToGridView(WidgetTester tester, E2ETester et) async {
+  final eyeIcon = find.byIcon(PhosphorIconsLight.eye);
+  if (eyeIcon.evaluate().isEmpty) return;
+
+  await et.tap(eyeIcon.first, detail: 'view_mode_menu');
+  await tester.pumpAndSettle(const Duration(seconds: 1));
+
+  final gridItem = find.descendant(
+    of: find.byType(PopupMenuItem<ViewMode>),
+    matching: find.byIcon(PhosphorIconsLight.squaresFour),
+  );
+  if (gridItem.evaluate().isEmpty) {
+    // Menu never opened — close whatever is on screen and keep the list view.
+    await tester.tapAt(const Offset(20, 400));
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    return;
+  }
+
+  await et.tap(gridItem.first, detail: 'grid_view_mode');
+  await tester.pumpAndSettle(const Duration(seconds: 3));
 }
 
 class ShowcaseMedia {
@@ -380,6 +625,12 @@ class ShowcaseMedia {
 
   String get heroImage => images.first;
   String get heroVideo => videos.first;
+
+  /// First image inside `Photos/`, for scenes whose tab opens that folder.
+  String get heroPhoto => images.firstWhere(
+        (path) => p.isWithin(photos.path, path),
+        orElse: () => images.first,
+      );
 }
 
 Future<ShowcaseMedia> seedShowcaseLibrary(Directory root) async {
@@ -387,33 +638,67 @@ Future<ShowcaseMedia> seedShowcaseLibrary(Directory root) async {
   final photos = Directory(p.join(root.path, 'Photos'))..createSync();
   final albums = Directory(p.join(root.path, 'Albums'))..createSync();
 
-  final images = <String>[
-    p.join(root.path, 'cover_ocean.jpg'),
-    p.join(root.path, 'cover_sunset.jpg'),
-    p.join(photos.path, 'vacation_01.jpg'),
-    p.join(photos.path, 'vacation_02.jpg'),
-    p.join(movies.path, 'poster_01.jpg'),
-    p.join(movies.path, 'poster_02.jpg'),
+  // A promo frame reads as an empty app when the seeded folder only holds a
+  // handful of files, so the library is deliberately dense and uses names a
+  // real photo/video library would have.
+  const rootImages = <_SeedImage>[
+    _SeedImage('cover_ocean.jpg', 1600, 900, SeedPalette.ocean),
+    _SeedImage('cover_sunset.jpg', 1600, 900, SeedPalette.sunset),
+    _SeedImage('cover_forest.jpg', 1600, 900, SeedPalette.forest),
+    _SeedImage('cover_night_city.jpg', 1600, 900, SeedPalette.violet),
+  ];
+  const photoImages = <_SeedImage>[
+    _SeedImage('beach_sunrise.jpg', 1600, 1067, SeedPalette.sunset),
+    _SeedImage('harbour_lights.jpg', 1600, 1067, SeedPalette.ocean),
+    _SeedImage('forest_trail.jpg', 1400, 1050, SeedPalette.forest),
+    _SeedImage('city_rooftops.jpg', 1600, 1067, SeedPalette.violet),
+    _SeedImage('desert_dunes.jpg', 1500, 1000, SeedPalette.sunset),
+    _SeedImage('lake_reflection.jpg', 1600, 1067, SeedPalette.ocean),
+    _SeedImage('mountain_ridge.jpg', 1400, 1050, SeedPalette.forest),
+    _SeedImage('night_market.jpg', 1500, 1000, SeedPalette.violet),
+    _SeedImage('vacation_01.jpg', 1200, 900, SeedPalette.forest),
+    _SeedImage('vacation_02.jpg', 1200, 900, SeedPalette.violet),
+  ];
+  const movieImages = <_SeedImage>[
+    _SeedImage('poster_northern_lights.jpg', 800, 1200, SeedPalette.ocean),
+    _SeedImage('poster_desert_run.jpg', 800, 1200, SeedPalette.sunset),
+    _SeedImage('poster_deep_forest.jpg', 800, 1200, SeedPalette.forest),
+    _SeedImage('poster_after_dark.jpg', 800, 1200, SeedPalette.violet),
   ];
 
-  seedImage(images[0], width: 1280, height: 720, palette: SeedPalette.ocean);
-  seedImage(images[1], width: 1280, height: 720, palette: SeedPalette.sunset);
-  seedImage(images[2], width: 1200, height: 900, palette: SeedPalette.forest);
-  seedImage(images[3], width: 1200, height: 900, palette: SeedPalette.violet);
-  seedImage(images[4], width: 720, height: 1080, palette: SeedPalette.sunset);
-  seedImage(images[5], width: 720, height: 1080, palette: SeedPalette.ocean);
+  final images = <String>[];
+  for (final entry in <MapEntry<Directory, List<_SeedImage>>>[
+    MapEntry(root, rootImages),
+    MapEntry(photos, photoImages),
+    MapEntry(movies, movieImages),
+  ]) {
+    for (final spec in entry.value) {
+      final path = p.join(entry.key.path, spec.name);
+      seedImage(path,
+          width: spec.width, height: spec.height, palette: spec.palette);
+      images.add(path);
+    }
+  }
 
   final videos = <String>[
     p.join(root.path, 'trailer.mp4'),
+    p.join(root.path, 'teaser_cut.mp4'),
     p.join(movies.path, 'feature_film.mp4'),
+    p.join(movies.path, 'behind_the_scenes.mp4'),
+    p.join(photos.path, 'timelapse_sunset.mp4'),
   ];
-  seedVideo(videos[0]);
-  seedVideo(videos[1]);
+  for (final video in videos) {
+    seedVideo(video);
+  }
 
   File(p.join(albums.path, 'curation_notes.txt')).writeAsStringSync(
       'Weekend picks, favorite scenes, and smart album rules.');
+  File(p.join(albums.path, 'shot_list.txt')).writeAsStringSync(
+      'Golden hour at the harbour, rooftop skyline, night market crowd.');
   File(p.join(root.path, 'README.txt')).writeAsStringSync(
       'Showcase media library generated for screenshot automation.');
+  File(p.join(root.path, 'export_settings.json'))
+      .writeAsStringSync('{"format":"jpeg","quality":92,"longEdge":2560}');
 
   return ShowcaseMedia(
     root: root,
@@ -427,23 +712,37 @@ Future<ShowcaseMedia> seedShowcaseLibrary(Directory root) async {
 
 Future<int> seedShowcaseAlbum(ShowcaseMedia media) async {
   await AlbumService.instance.initialize();
-  final album = await AlbumService.instance.createAlbum(
-    name: 'Weekend Picks ${DateTime.now().microsecondsSinceEpoch}',
-    description: 'Curated images and videos for showcase screenshots',
-    coverImagePath: media.heroImage,
-    colorTheme: 'blue',
-  );
+  const albumName = 'Weekend Picks';
 
-  if (album == null) {
-    throw StateError('Failed to create showcase album');
+  // Every scene in a run shares one sandbox database, so the album a previous
+  // scene created is still there. Album names are unique, so reuse it rather
+  // than making the name unique with a timestamp — that suffix ends up on
+  // screen in the gallery and album promo frames.
+  final existing = await AlbumService.instance.getAllAlbums();
+  final matches = existing.where((album) => album.name == albumName);
+
+  final int albumId;
+  if (matches.isNotEmpty) {
+    albumId = matches.first.id;
+  } else {
+    final album = await AlbumService.instance.createAlbum(
+      name: albumName,
+      description: 'Curated images and videos for showcase screenshots',
+      coverImagePath: media.heroImage,
+      colorTheme: 'blue',
+    );
+    if (album == null) {
+      throw StateError('Failed to create showcase album');
+    }
+    albumId = album.id;
   }
 
   await AlbumService.instance.addFilesToAlbum(
-    album.id,
+    albumId,
     <String>[...media.images, ...media.videos],
   );
-  await FeaturedAlbumsService.instance.addToFeatured(album.id);
-  return album.id;
+  await FeaturedAlbumsService.instance.addToFeatured(albumId);
+  return albumId;
 }
 
 // ---------------------------------------------------------------------------
@@ -699,15 +998,32 @@ Future<void> seedTagHierarchy(List<String> filePaths) async {
     await hierarchy.addChild(pair[0], pair[1]);
   }
 
-  // Attach a few leaf tags onto files so the library isn't empty.
-  for (final path in filePaths.take(3)) {
-    await TagManager.addTag(path, 'Beach');
-    await TagManager.addTag(path, 'Action');
+  // Attach files to every node so the tree rows render real thumbnails
+  // instead of bare colour dots, and the tagged-file panel is never empty.
+  final assignable = filePaths.toList();
+  if (assignable.isNotEmpty) {
+    final nodes = allTags.toList()..sort();
+    for (var i = 0; i < assignable.length; i++) {
+      final tag = nodes[i % nodes.length];
+      await TagManager.addTag(assignable[i], tag);
+      if (i < 6) {
+        await TagManager.addTag(assignable[i], 'Beach');
+      }
+      if (i < 4) {
+        await TagManager.addTag(assignable[i], 'Action');
+      }
+    }
   }
 }
 
-Future<void> seedWallpaperBackdrop(Directory root) async {
-  final wallpaperPath = p.join(root.path, 'showcase_wallpaper.jpg');
+Future<void> seedWallpaperBackdrop({String theme = 'light'}) async {
+  // Deliberately outside the seeded library: that folder is what the file
+  // browser scenes render, and a stray wallpaper file would be captured in the
+  // promo frame alongside the real media.
+  final backdropDir = Directory(
+    p.join(Directory.systemTemp.path, 'cb_showcase_backdrop'),
+  )..createSync(recursive: true);
+  final wallpaperPath = p.join(backdropDir.path, 'showcase_wallpaper.jpg');
   seedImage(
     wallpaperPath,
     width: 1920,
@@ -719,7 +1035,18 @@ Future<void> seedWallpaperBackdrop(Directory root) async {
   await prefs.setString('acrylic_backdrop_mode', 'wallpaper');
   await prefs.setString('acrylic_backdrop_image_path', wallpaperPath);
   await prefs.setDouble('desktop_acrylic_strength', 0.85);
-  await prefs.setString('app_theme', 'light');
+  await prefs.setString('app_theme', theme);
+  await prefs.setString('selected_language', 'en');
+}
+
+/// One generated placeholder image in the showcase library.
+class _SeedImage {
+  final String name;
+  final int width;
+  final int height;
+  final SeedPalette palette;
+
+  const _SeedImage(this.name, this.width, this.height, this.palette);
 }
 
 enum SeedPalette { ocean, sunset, forest, violet, wallpaper }
@@ -809,19 +1136,30 @@ void seedVideo(String outputPath) {
 }
 
 String _sampleVideoPath() {
+  const sampleName = 'file_example_MP4_1920_18MG.mp4';
+  final candidates = <String>[];
+
   try {
     final scriptStr = Platform.script.toString();
     final scriptPath = scriptStr.startsWith('file:///')
         ? Uri.parse(scriptStr).toFilePath()
         : scriptStr;
-    return p.join(
-      p.dirname(scriptPath),
-      'samples',
-      'file_example_MP4_1920_18MG.mp4',
-    );
+    candidates.add(p.join(p.dirname(scriptPath), 'samples', sampleName));
   } catch (_) {
-    return '';
+    // Platform.script is not always a usable file URI; fall through.
   }
+
+  // `flutter test` runs from the Flutter project root, where the sample lives
+  // next to the integration tests. Without this the videos fall back to a 32
+  // byte stub and every video tile renders as an empty placeholder.
+  candidates.add(
+    p.join(Directory.current.path, 'integration_test', 'samples', sampleName),
+  );
+
+  for (final candidate in candidates) {
+    if (File(candidate).existsSync()) return candidate;
+  }
+  return '';
 }
 
 class _Rgb {

@@ -229,6 +229,11 @@ class _BreadcrumbChip extends StatefulWidget {
 }
 
 class _BreadcrumbChipState extends State<_BreadcrumbChip> {
+  /// Below these widths the leading icon and the trailing badge cost more
+  /// horizontal space than the label they decorate, so they are dropped.
+  static const double _minWidthForIcon = 48;
+  static const double _minWidthForBadge = 84;
+
   bool _hovering = false;
 
   @override
@@ -267,36 +272,53 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                 ? FluentSurfaceTokens.controlRadius
                 : BorderRadius.circular(14),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              if (seg.icon != null) ...[
-                Icon(seg.icon, size: 13, color: secondaryColor),
-                const SizedBox(width: 5),
-              ],
-              Flexible(
-                child: Text(
-                  seg.label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight:
-                        widget.isLast ? FontWeight.w500 : FontWeight.normal,
-                    color: widget.isLast ? textColor : secondaryColor,
+          // The parent shares the address bar width across every crumb, so a
+          // deep path on a narrow window can squeeze one chip down to a few
+          // pixels. The icon and the badge gap are fixed width and overflow
+          // once that happens, so they are dropped before the label is.
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final available = constraints.maxWidth;
+              final showIcon =
+                  seg.icon != null && available >= _minWidthForIcon;
+              final showBadge =
+                  seg.badge != null && available >= _minWidthForBadge;
+
+              return Row(
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  if (showIcon) ...[
+                    Icon(seg.icon, size: 13, color: secondaryColor),
+                    const SizedBox(width: 5),
+                  ],
+                  Flexible(
+                    child: Text(
+                      seg.label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            widget.isLast ? FontWeight.w500 : FontWeight.normal,
+                        color: widget.isLast ? textColor : secondaryColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (seg.badge != null) ...[
-                const SizedBox(width: 6),
-                Text(
-                  seg.badge!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: secondaryColor,
-                  ),
-                ),
-              ],
-            ],
+                  if (showBadge) ...[
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        seg.badge!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: secondaryColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ),

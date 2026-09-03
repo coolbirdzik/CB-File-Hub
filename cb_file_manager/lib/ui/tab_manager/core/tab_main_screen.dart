@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -135,6 +136,11 @@ class _TabMainScreenState extends State<TabMainScreen> {
 
     // Desktop skips permission screen entirely.
     if (_isDesktopPlatform()) return;
+
+    // E2E runs reinstall the app before every capture, which resets the runtime
+    // permissions. Without this the explainer route sits on top of every screen
+    // the run is trying to exercise.
+    if (kCbE2E) return;
 
     await _showPermissionExplainerIfNeeded();
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -9,6 +10,11 @@ class PermissionStateService {
   static final PermissionStateService instance = PermissionStateService._();
 
   Future<bool> hasStorageOrPhotosPermission() async {
+    // An E2E run reinstalls the app for every pass, so the runtime permissions
+    // are always missing and every folder listing would fail. The run only
+    // browses directories the app owns, which need no permission anyway.
+    if (kCbE2E) return true;
+
     if (Platform.isAndroid) {
       try {
         final videos = await Permission.videos.isGranted;

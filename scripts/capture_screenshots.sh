@@ -59,6 +59,65 @@ clean_report() {
   mkdir -p "$REPORT_SCREENSHOTS_DIR"
 }
 
+# On Android the test process runs inside the app sandbox, so e2e_report.dart
+# writes its frames to the app's external files dir on the device. These must be
+# pulled back to the host report dir before they can be copied out.
+ANDROID_REPORT_ROOTS=(
+  '/sdcard/Android/data/com.cbv.filehub/files/cb_e2e/build/e2e_report'
+  '/storage/emulated/0/Android/data/com.cbv.filehub/files/cb_e2e/build/e2e_report'
+  '/sdcard/Download/cb_e2e/build/e2e_report'
+)
+
+adb_args() {
+  if [ -z "$ANDROID_DEVICE" ] || [ "$ANDROID_DEVICE" = "android" ]; then
+    return 0
+  fi
+  printf -- '-s\n%s\n' "$ANDROID_DEVICE"
+}
+
+clear_android_report() {
+  local -a args=()
+  while IFS= read -r line; do args+=("$line"); done < <(adb_args)
+  local root
+  for root in "${ANDROID_REPORT_ROOTS[@]}"; do
+    adb "${args[@]}" shell rm -rf "$root" >/dev/null 2>&1 || true
+  done
+}
+
+pull_android_report() {
+  local -a args=()
+  while IFS= read -r line; do args+=("$line"); done < <(adb_args)
+  local root
+  for root in "${ANDROID_REPORT_ROOTS[@]}"; do
+    if adb "${args[@]}" shell ls "$root/screenshots" >/dev/null 2>&1; then
+      adb "${args[@]}" pull "$root/screenshots" "$REPORT_DIR" >/dev/null 2>&1 && return 0
+    fi
+  done
+  return 1
+}
+
+# `flutter test` uninstalls the app when the run ends, which wipes the frames
+# with it, so the pull has to happen while the test is still executing.
+ANDROID_WATCHER_PID=""
+
+start_android_report_watcher() {
+  (
+    while true; do
+      pull_android_report || true
+      sleep 0.4
+    done
+  ) &
+  ANDROID_WATCHER_PID=$!
+}
+
+stop_android_report_watcher() {
+  if [ -n "$ANDROID_WATCHER_PID" ]; then
+    kill "$ANDROID_WATCHER_PID" 2>/dev/null || true
+    wait "$ANDROID_WATCHER_PID" 2>/dev/null || true
+    ANDROID_WATCHER_PID=""
+  fi
+}
+
 copy_screenshots() {
   local platform="$1"
   local output_dir="$OUTPUT_ROOT/$platform"
@@ -95,7 +154,12 @@ run_capture() {
 
   print_info "Capturing $platform screenshots on device: $device"
   clean_report
+  if [ "$platform" = "android" ]; then
+    clear_android_report
+    start_android_report_watcher
+  fi
 
+  local test_status=0
   (
     cd "$PROJECT_DIR"
     if [ -n "$TEST_NAME" ]; then
@@ -114,9 +178,21 @@ run_capture() {
         --dart-define=CB_E2E_FULL_SCREENSHOTS="$FULL_SCREENSHOTS" \
         --reporter expanded
     fi
-  )
+  ) || test_status=$?
 
+  if [ "$platform" = "android" ]; then
+    pull_android_report || true
+    stop_android_report_watcher
+  fi
+
+  # Copy whatever was captured before reporting the failure: a single broken
+  # scene should not cost the frames every other scene produced.
   copy_screenshots "$platform"
+
+  if [ "$test_status" -ne 0 ]; then
+    print_error "flutter test failed for $platform"
+    exit "$test_status"
+  fi
 }
 
 main() {

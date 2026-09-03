@@ -13,7 +13,8 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DESKTOP_SOURCE = ROOT / "screenshots" / "auto" / "desktop"
-DEFAULT_MOBILE_SOURCE = ROOT / "screenshots"
+DEFAULT_MOBILE_SOURCE = ROOT / "screenshots" / "auto" / "android"
+LEGACY_MOBILE_SOURCE = ROOT / "screenshots"
 DEFAULT_OUTPUT = ROOT / "screenshots" / "promo"
 
 DESKTOP_SIZE = (2400, 1350)
@@ -31,6 +32,24 @@ DESKTOP_SOURCE_NAMES = [
     "014_showcase_tag_management_result.png",
     "018_showcase_tag_tree_result.png",
     "020_showcase_disk_cleaner_result.png",
+]
+
+# Hero frames from the "Mobile showcase" group of
+# integration_test/showcase_screenshots_e2e_test.dart, in promo-slot order.
+MOBILE_SOURCE_NAMES = [
+    "002_mobile_home_result.png",
+    "004_mobile_file_grid_result.png",
+    "006_mobile_tabs_result.png",
+    "008_mobile_tags_result.png",
+]
+
+# Hand-captured device screenshots kept as a fallback for checkouts that have
+# not run the Android capture yet.
+LEGACY_MOBILE_SOURCE_NAMES = [
+    "android_main.png",
+    "android_grid_file.png",
+    "android_tab.png",
+    "android_tag.png",
 ]
 
 
@@ -56,14 +75,14 @@ DESKTOP_SPECS = [
 
 MOBILE_SPECS = [
     PromoSpec("mobile_home", "Your file hub on mobile", "Browse and organize files with a touch-first layout.", (54, 166, 255)),
-    PromoSpec("mobile_grid", "Large libraries, still fast", "File grids stay clean and scannable on small screens.", (250, 169, 64)),
+    PromoSpec("mobile_grid", "Large libraries, still fast", "Thumbnails, names, and sizes stay readable on a phone screen.", (250, 169, 64)),
     PromoSpec("mobile_tabs", "Tabs that travel with you", "Switch views without losing your place.", (138, 112, 255)),
     PromoSpec("mobile_tags", "Tags on the go", "Group files into workflows wherever you are.", (92, 219, 149)),
 ]
 
 TABLET7_SPECS = [
     PromoSpec("tablet7_home", "Your file hub on tablets", "Browse and organize files on a roomy 7-inch layout.", (54, 166, 255)),
-    PromoSpec("tablet7_grid", "Scan large libraries faster", "A wider file grid keeps media collections easy to browse.", (250, 169, 64)),
+    PromoSpec("tablet7_grid", "Scan large libraries faster", "A roomier file list keeps media collections easy to browse.", (250, 169, 64)),
     PromoSpec("tablet7_tabs", "Keep more context open", "Switch tabs and folders without losing your place.", (138, 112, 255)),
     PromoSpec("tablet7_tags", "Organize from the couch", "Use tags to group files into clearer tablet workflows.", (92, 219, 149)),
 ]
@@ -82,14 +101,14 @@ DESKTOP_SPECS_VI = [
 
 MOBILE_SPECS_VI = [
     PromoSpec("mobile_trang_chu", "File hub trên điện thoại", "Duyệt và sắp xếp tập tin với giao diện tối ưu cho cảm ứng.", (54, 166, 255)),
-    PromoSpec("mobile_luoi_file", "Thư viện lớn vẫn nhanh", "Lưới tập tin vẫn gọn gàng và dễ quét trên màn hình nhỏ.", (250, 169, 64)),
+    PromoSpec("mobile_luoi_file", "Thư viện lớn vẫn nhanh", "Thumbnail, tên và dung lượng vẫn dễ đọc trên màn hình điện thoại.", (250, 169, 64)),
     PromoSpec("mobile_tab", "Tab đi cùng bạn", "Chuyển qua lại giữa các chế độ xem mà không mất vị trí đang duyệt.", (138, 112, 255)),
     PromoSpec("mobile_tag", "Gắn tag mọi nơi", "Gom tập tin thành các workflow rõ ràng ngay trên điện thoại.", (92, 219, 149)),
 ]
 
 TABLET7_SPECS_VI = [
     PromoSpec("tablet7_trang_chu", "File hub trên máy tính bảng", "Duyệt và sắp xếp tập tin trên giao diện 7 inch rộng rãi.", (54, 166, 255)),
-    PromoSpec("tablet7_luoi_file", "Quét thư viện lớn nhanh hơn", "Lưới tập tin rộng giúp bộ sưu tập media dễ duyệt hơn.", (250, 169, 64)),
+    PromoSpec("tablet7_luoi_file", "Quét thư viện lớn nhanh hơn", "Danh sách rộng rãi giúp bộ sưu tập media dễ duyệt hơn.", (250, 169, 64)),
     PromoSpec("tablet7_tab", "Giữ nhiều ngữ cảnh đang mở", "Chuyển tab và thư mục mà không mất vị trí đang duyệt.", (138, 112, 255)),
     PromoSpec("tablet7_tag", "Sắp xếp thoải mái hơn", "Dùng tag để gom tập tin thành workflow rõ ràng trên tablet.", (92, 219, 149)),
 ]
@@ -363,13 +382,16 @@ def discover_desktop_sources(path: Path) -> list[Path]:
 
 
 def discover_mobile_sources(path: Path) -> list[Path]:
-    preferred = [
-        path / "android_main.png",
-        path / "android_grid_file.png",
-        path / "android_tab.png",
-        path / "android_tag.png",
+    candidates = [
+        (path, MOBILE_SOURCE_NAMES),
+        (path, LEGACY_MOBILE_SOURCE_NAMES),
+        (LEGACY_MOBILE_SOURCE, LEGACY_MOBILE_SOURCE_NAMES),
     ]
-    return [item for item in preferred if item.exists()]
+    for base, names in candidates:
+        found = [base / name for name in names if (base / name).exists()]
+        if found:
+            return found
+    return []
 
 
 def build_parser() -> argparse.ArgumentParser:

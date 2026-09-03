@@ -86,11 +86,13 @@ class MobileFileActionsController {
       backgroundColor: Colors.transparent,
       builder: (context) => SafeArea(
         top: false,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
+        // Material rather than a DecoratedBox: the sheet's ListTiles paint
+        // their ink splashes on the nearest Material ancestor, so a plain
+        // coloured box above them hides every splash and highlight.
+        child: Material(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -260,11 +262,13 @@ class MobileFileActionsController {
       backgroundColor: Colors.transparent,
       builder: (context) => SafeArea(
         top: false,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
+        // Material rather than a DecoratedBox: the sheet's ListTiles paint
+        // their ink splashes on the nearest Material ancestor, so a plain
+        // coloured box above them hides every splash and highlight.
+        child: Material(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          clipBehavior: Clip.antiAlias,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -351,11 +355,10 @@ class MobileFileActionsController {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
+      builder: (context) => Material(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
