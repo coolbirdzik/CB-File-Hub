@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../helpers/core/user_preferences.dart';
+import '../../../../helpers/core/path_utils.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 class DesktopPipWindow extends StatefulWidget {
@@ -164,7 +165,7 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
     String openSrc = src;
     if (Platform.isWindows) {
       if (type == 'smb') {
-        openSrc = _normalizeToFileUri(_smbToUnc(src));
+        openSrc = smbMrlToUnc(src);
       } else if (type == 'file') {
         // Use explicit file:// URI to avoid edge-cases with backslashes.
         openSrc = _normalizeToFileUri(src);
@@ -750,22 +751,6 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
     // Best-effort save; may not always complete before process exit
     unawaited(_saveCurrentSize());
     _sendState(closing: true);
-  }
-
-  // Helpers copied from main player to support SMB -> UNC on Windows
-  String _smbToUnc(String smbUrl) {
-    try {
-      final uri = Uri.parse(smbUrl);
-      final host = uri.host;
-      final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      if (host.isEmpty || segs.isEmpty) {
-        return smbUrl.replaceFirst('smb://', r'\\').replaceAll('/', r'\\');
-      }
-      final path = segs.join(r'\\');
-      return r'\\' + host + r'\\' + path;
-    } catch (_) {
-      return smbUrl.replaceFirst('smb://', r'\\').replaceAll('/', r'\\');
-    }
   }
 
   String _normalizeToFileUri(String path) {

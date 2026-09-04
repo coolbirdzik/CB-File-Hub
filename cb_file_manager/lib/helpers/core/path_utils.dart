@@ -38,3 +38,17 @@ String smbTabPathToUNC(String tabPath) {
   }
   return buffer.toString();
 }
+
+/// Converts an SMB URI to a Windows UNC path.
+///
+/// The result is deliberately a path, rather than a `file://` URI: media_kit's
+/// URI parser treats IPv4 UNC hosts in a file URI as a local path.
+String smbMrlToUnc(String smbMrl) {
+  final uri = Uri.tryParse(smbMrl);
+  if (uri == null || !uri.isScheme('smb') || uri.host.isEmpty) {
+    return smbMrl;
+  }
+
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty);
+  return <String>[uri.host, ...segments].join(r'\').replaceFirst('', r'\\');
+}

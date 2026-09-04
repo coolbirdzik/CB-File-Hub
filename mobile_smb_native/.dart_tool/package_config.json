@@ -47,7 +47,7 @@
       "name": "flutter",
       "rootUri": "file:///C:/dev/flutter/packages/flutter",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.11"
     },
     {
       "name": "flutter_lints",
@@ -59,7 +59,7 @@
       "name": "flutter_test",
       "rootUri": "file:///C:/dev/flutter/packages/flutter_test",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.11"
     },
     {
       "name": "leak_tracker",
@@ -87,9 +87,9 @@
     },
     {
       "name": "matcher",
-      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/matcher-0.12.18",
+      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/matcher-0.12.20",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.10"
     },
     {
       "name": "material_color_utilities",
@@ -99,7 +99,7 @@
     },
     {
       "name": "meta",
-      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/meta-1.17.0",
+      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/meta-1.19.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
     },
@@ -119,7 +119,7 @@
       "name": "sky_engine",
       "rootUri": "file:///C:/dev/flutter/bin/cache/pkg/sky_engine",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.11"
     },
     {
       "name": "source_span",
@@ -153,15 +153,15 @@
     },
     {
       "name": "test_api",
-      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/test_api-0.7.8",
+      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/test_api-0.7.12",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.10"
     },
     {
       "name": "vector_math",
-      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/vector_math-2.2.0",
+      "rootUri": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache/hosted/pub.dev/vector_math-2.4.2",
       "packageUri": "lib/",
-      "languageVersion": "3.1"
+      "languageVersion": "3.10"
     },
     {
       "name": "vm_service",
@@ -177,8 +177,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.11.0",
+  "generatorVersion": "3.13.2",
   "flutterRoot": "file:///C:/dev/flutter",
-  "flutterVersion": "3.41.0",
+  "flutterVersion": "3.47.2",
   "pubCache": "file:///C:/Users/ngtan/AppData/Local/Pub/Cache"
 }

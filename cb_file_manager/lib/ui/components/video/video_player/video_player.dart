@@ -31,6 +31,7 @@ import 'package:cb_file_manager/ui/state/video_ui_state.dart';
 
 import '../../../../helpers/files/file_type_registry.dart';
 import '../../../../helpers/core/user_preferences.dart';
+import '../../../../helpers/core/path_utils.dart';
 import '../../../../helpers/network/win32_smb_helper.dart';
 import '../../streaming/stream_speed_indicator.dart';
 import '../../streaming/buffer_info_widget.dart';
@@ -1007,14 +1008,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     if (!kIsWeb && Platform.isWindows) {
       // On Windows desktop, convert SMB to UNC path
-      final uncPath = _smbToUnc(widget.smbMrl!);
-      final fileUri = _normalizeToFileUri(uncPath);
+      final uncPath = smbMrlToUnc(widget.smbMrl!);
       debugPrint('VideoPlayer: Converted SMB to UNC: $uncPath');
-      debugPrint('VideoPlayer: Using file URI: $fileUri');
+      debugPrint('VideoPlayer: Opening UNC path directly');
 
       try {
         await _player!
-            .open(Media(fileUri))
+            .open(Media(uncPath))
             .timeout(const Duration(seconds: 12));
         if (widget.autoPlay) {
           await _player!.play();
@@ -1084,39 +1084,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       widget.onVideoInitialized?.call(_videoMetadata!);
       widget.onInitialized?.call();
     }
-  }
-
-  // Convert smb:// URL to Windows UNC path
-  String _smbToUnc(String smbUrl) {
-    try {
-      final uri = Uri.parse(smbUrl);
-      final host = uri.host;
-      final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      if (host.isEmpty || segs.isEmpty) {
-        return smbUrl.replaceFirst('smb://', r'\\').replaceAll('/', r'\\');
-      }
-      final path = segs.join(r'\\');
-      return r'\\' + host + r'\\' + path;
-    } catch (_) {
-      return smbUrl.replaceFirst('smb://', r'\\').replaceAll('/', r'\\');
-    }
-  }
-
-  // Normalize Windows paths to file:// URI for media_kit/mpv
-  String _normalizeToFileUri(String path) {
-    if (Platform.isWindows) {
-      if (path.startsWith('\\\\')) {
-        // UNC: \\server\share\path -> file://server/share/path
-        final cleaned = path.replaceAll('\\', '/');
-        final withoutLeading =
-            cleaned.startsWith('//') ? cleaned.substring(2) : cleaned;
-        return 'file://$withoutLeading';
-      }
-      // Local drive: C:\path -> file:///C:/path
-      final cleaned = path.replaceAll('\\', '/');
-      return 'file:///$cleaned';
-    }
-    return path;
   }
 
   void _testSmbUrlFormat(String url) {

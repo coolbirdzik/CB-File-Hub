@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../video_player/video_player_utils.dart';
+import '../../../../helpers/core/path_utils.dart';
 
 /// Modeless, draggable PiP overlay for Windows (in‑process), using media_kit.
 ///
@@ -105,7 +106,7 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
 
     if (Platform.isWindows) {
       if (type == 'smb') {
-        src = _normalizeToFileUri(_smbToUnc(src));
+        src = smbMrlToUnc(src);
       } else if (type == 'file') {
         src = _normalizeToFileUri(src);
       }
@@ -386,21 +387,6 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
         ),
       ]),
     );
-  }
-
-  String _smbToUnc(String smbUrl) {
-    try {
-      final uri = Uri.parse(smbUrl);
-      final host = uri.host;
-      final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
-      if (host.isEmpty || segs.isEmpty) {
-        return smbUrl.replaceFirst('smb://', r'\\').replaceAll('/', r'\\');
-      }
-      final path = segs.join(r'\\');
-      return r'\\' + host + r'\\' + path;
-    } catch (_) {
-      return smbUrl.replaceFirst('smb://', r'\\').replaceAll('/', r'\\');
-    }
   }
 
   String _normalizeToFileUri(String path) {

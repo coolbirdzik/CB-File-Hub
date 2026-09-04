@@ -155,7 +155,7 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
       initiallyExpanded: widget.expanded,
       onStateChanged: _handleStateChanged,
       animationDuration: _FluentDrawerTokens.sectionTransition,
-      headerBackgroundColor: WidgetStateProperty.resolveWith<Color>(
+      headerBackgroundColor: WidgetStateColor.resolveWith(
         (states) => _fluentDrawerStateFill(
           theme,
           states,
