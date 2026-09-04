@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/files/windows_shell_context_menu.dart';
 import 'package:cb_file_manager/services/drive/drive_actions.dart';
@@ -887,40 +888,31 @@ class _DriveViewState extends State<DriveView> {
 
   Future<void> _promptRename(BuildContext context, DriveInfo drive) async {
     final l10n = AppLocalizations.of(context)!;
-    final controller = TextEditingController(text: drive.label);
-    final confirmed = await showDialog<bool>(
+    final anchorRect = cbAnchorRectOf(context);
+    final newLabel = await showCbInlineRename(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(l10n.driveRenameTitle),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(hintText: l10n.driveRenameHint),
-            maxLength: 32,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(l10n.cancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(l10n.driveRename),
-            ),
-          ],
-        );
-      },
+      title: l10n.driveRenameTitle,
+      subtitle: drive.displayName,
+      initialValue: drive.label,
+      icon: PhosphorIconsLight.hardDrives,
+      hintText: l10n.renameShortcutHint,
+      cancelLabel: l10n.cancel,
+      confirmLabel: l10n.driveRename,
+      anchorRect: anchorRect,
+      // Windows volume labels cap out at 32 characters.
+      maxLength: 32,
+      validator: (value) =>
+          value.trim().isEmpty ? l10n.renameNameRequired : null,
     );
-    if (confirmed != true || !context.mounted) return;
+    if (newLabel == null || !context.mounted) return;
     final toast = AppToast.capture(context);
-    final ok = await DriveActions.rename(drive, controller.text);
+    final ok = await DriveActions.rename(drive, newLabel);
     if (!context.mounted) return;
     if (ok) {
       toast.info(l10n.driveRenameSuccess);
       await _reloadDriveEntries(force: true);
     } else {
-      toast.error(l10n.driveRenameFailed(controller.text));
+      toast.error(l10n.driveRenameFailed(newLabel));
     }
   }
 

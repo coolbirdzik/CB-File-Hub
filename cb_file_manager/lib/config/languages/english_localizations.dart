@@ -1887,6 +1887,17 @@ class EnglishLocalizations implements AppLocalizations {
   String currentNameLabel(String name) => 'Current name: $name';
   @override
   String get newNameLabel => 'New name';
+
+  @override
+  String get renameShortcutHint => 'Enter to save · Esc to cancel';
+
+  @override
+  String get renameNameRequired => 'Name cannot be empty';
+
+  @override
+  String get renameInvalidCharacters =>
+      'A name cannot contain \\ / : * ? " < > |';
+
   @override
   String renamedFileTo(String newName) => 'Renamed file to "$newName"';
   @override

@@ -1886,6 +1886,17 @@ class VietnameseLocalizations implements AppLocalizations {
   String currentNameLabel(String name) => 'Tên hiện tại: $name';
   @override
   String get newNameLabel => 'Tên mới';
+
+  @override
+  String get renameShortcutHint => 'Enter để lưu · Esc để huỷ';
+
+  @override
+  String get renameNameRequired => 'Tên không được để trống';
+
+  @override
+  String get renameInvalidCharacters =>
+      'Tên không được chứa \\ / : * ? " < > |';
+
   @override
   String renamedFileTo(String newName) => 'Đã đổi tên tệp thành "$newName"';
   @override

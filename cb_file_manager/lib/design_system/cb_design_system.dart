@@ -27,6 +27,7 @@ export 'cb_tokens.dart';
 export 'fluent_surface_tokens.dart';
 export 'primitives/cb_button.dart';
 export 'primitives/cb_dialog.dart';
+export 'primitives/cb_inline_rename.dart';
 export 'primitives/cb_pressable.dart';
 export 'primitives/cb_select.dart';
 export 'primitives/cb_surface.dart';

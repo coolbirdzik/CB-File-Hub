@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
@@ -13,6 +14,7 @@ import 'package:cb_file_manager/ui/dialogs/thumbnail_browser_dialog.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
+import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/soft_checkbox.dart';
@@ -158,13 +160,22 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   // Selection state
   final Set<String> _selectedTags = {};
 
-  // Single-vs-double click detection (per tag)
-  Timer? _singleTapTimer;
+  // Single-vs-double click detection (per tag). A timestamp rather than a
+  // timer: nothing has to happen when the window closes, so there is no work
+  // to schedule.
+  static const Duration _doubleTapWindow = Duration(milliseconds: 250);
+  DateTime? _lastTagTapAt;
   String? _pendingSingleTapTag;
 
   // Inline rename state (desktop)
   String? _editingTag;
   TextEditingController? _editingTagController;
+  FocusNode? _editingTagFocusNode;
+
+  /// Live validation message for the tag being renamed. Non-null blocks the
+  /// commit, so a collision is caught while typing rather than surfacing as a
+  /// toast after the editor has already closed.
+  String? _editingTagError;
 
   /// Check if running on desktop platform
   bool get _isDesktop {
@@ -219,64 +230,90 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     });
   }
 
+  /// Keyboard shortcuts for the tags page.
+  ///
+  /// Delegates to [BrowserLikeKeyboardShortcuts.handleBasic] rather than
+  /// re-deriving each binding, so a tag behaves under the keyboard the way a
+  /// file does — F2 renames, Delete deletes, Escape backs out — instead of
+  /// this page quietly supporting a different, smaller set.
   bool _onKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) {
-      // Still track modifier state on any event type.
+    // Modifier state drives ctrl/shift-click selection, so it has to track
+    // every event, handled or not, and before any early return.
+    final bool ctrl = HardwareKeyboard.instance.isControlPressed;
+    final bool shift = HardwareKeyboard.instance.isShiftPressed;
+    if (ctrl != _isCtrlPressed || shift != _isShiftPressed) {
       setState(() {
-        _isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
-        _isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+        _isCtrlPressed = ctrl;
+        _isShiftPressed = shift;
       });
+    }
+
+    // A dialog or the rename popover is on top: its own focus owns the
+    // keyboard, and F2 or Delete firing behind it would act on the page the
+    // user cannot currently see.
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
       return false;
     }
 
-    final isCtrlOrMetaPressed = HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isMetaPressed;
+    // While a tag is open in the files pane, the tag-level bindings would act
+    // on the wrong thing.
+    final bool browsingTags = _selectedTagForFiles == null;
+    final String? renameTarget = browsingTags ? _keyboardTagTarget : null;
 
-    // Ctrl+A — select all tags.
-    if (isCtrlOrMetaPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyA &&
-        _selectedTagForFiles == null &&
-        _editingTag == null &&
-        !_isTextInputFocused()) {
-      _selectAllFilteredTags();
-      return true;
-    }
+    final result = BrowserLikeKeyboardShortcuts.handleBasic(
+      isDesktop: _isDesktop,
+      event: event,
+      onEscape: _handleEscapeShortcut,
+      onRefresh: browsingTags ? _refreshTags : _refreshSelectedTagFiles,
+      onSelectAll:
+          browsingTags && _editingTag == null ? _selectAllFilteredTags : null,
+      onSearch: browsingTags ? _toggleSearch : null,
+      onRename: renameTarget == null
+          ? null
+          : () {
+              if (_isDesktop) {
+                _startTagRename(renameTarget);
+              } else {
+                _showRenameDialog(renameTarget);
+              }
+            },
+      onDelete: browsingTags && _editingTag == null && _selectedTags.isNotEmpty
+          ? (_) {
+              // Tags have no trash, so Shift carries no extra meaning here.
+              if (_selectedTags.length > 1) {
+                _confirmBulkDeleteTags();
+              } else {
+                _confirmDeleteTag(_selectedTags.first);
+              }
+            }
+          : null,
+    );
 
-    // Ctrl+F — toggle search bar.
-    if (isCtrlOrMetaPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyF &&
-        _selectedTagForFiles == null &&
-        !_isTextInputFocused()) {
-      _toggleSearch();
-      return true;
-    }
-
-    // F5 / Ctrl+R — refresh tags.
-    final isRefresh = event.logicalKey == LogicalKeyboardKey.f5 ||
-        (isCtrlOrMetaPressed && event.logicalKey == LogicalKeyboardKey.keyR);
-    if (isRefresh && !_isTextInputFocused()) {
-      if (_selectedTagForFiles == null) {
-        _refreshTags();
-      } else {
-        _refreshSelectedTagFiles();
-      }
-      return true;
-    }
-
-    setState(() {
-      _isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
-      _isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
-    });
-    return false;
+    return result == KeyEventResult.handled;
   }
 
-  bool _isTextInputFocused() {
-    final focusedContext = FocusManager.instance.primaryFocus?.context;
-    if (focusedContext == null) {
-      return false;
+  /// The tag F2 acts on: the focused one, or a lone selection when nothing
+  /// carries focus. With several tags selected there is no single answer, so
+  /// the shortcut stays off rather than guessing.
+  String? get _keyboardTagTarget {
+    if (_editingTag != null) return null;
+    if (_focusedTag != null) return _focusedTag;
+    return _selectedTags.length == 1 ? _selectedTags.first : null;
+  }
+
+  /// Escape unwinds one layer at a time, innermost first.
+  void _handleEscapeShortcut() {
+    if (_editingTag != null) {
+      _cancelTagRename();
+      return;
     }
-    return focusedContext.widget is EditableText ||
-        focusedContext.findAncestorWidgetOfExactType<EditableText>() != null;
+    if (_selectedTags.isNotEmpty) {
+      _deselectAllTags();
+      return;
+    }
+    if (_isSearching) {
+      _toggleSearch();
+    }
   }
 
   void _setDefaultViewMode() {
@@ -469,11 +506,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   void dispose() {
     _tagReloadDebounce?.cancel();
     _tagChangeSubscription?.cancel();
-    _singleTapTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _searchController.removeListener(_filterTags);
     _searchController.dispose();
     _addressController.dispose();
+    _editingTagController?.dispose();
+    _editingTagFocusNode?.dispose();
     super.dispose();
   }
 
@@ -900,23 +938,31 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       return;
     }
 
-    // If there's a pending single-tap on the SAME tag, treat as double-click
-    if (_singleTapTimer?.isActive == true && _pendingSingleTapTag == tag) {
-      _singleTapTimer!.cancel();
+    // Select on the frame the click lands. Selection is feedback, not an
+    // action, and holding it back for a double-click window is what made every
+    // click on this page feel late — a quarter second in the list, and closer
+    // to half in the grid, where the InkWell's own double-tap window stacked on
+    // top of it.
+    _selectTag(tag);
+
+    // Only *opening* the tag has to wait and see whether a second click is
+    // coming. Detecting that here, rather than handing `onDoubleTap` to the
+    // gesture recogniser, is what keeps the tap itself immediate.
+    final DateTime now = DateTime.now();
+    final DateTime? last = _lastTagTapAt;
+    final bool isSecondClick = last != null &&
+        _pendingSingleTapTag == tag &&
+        now.difference(last) <= _doubleTapWindow;
+
+    if (isSecondClick) {
+      _lastTagTapAt = null;
       _pendingSingleTapTag = null;
       _activateTag(tag);
       return;
     }
 
-    // Cancel any pending tap on a different tag and start a new timer
-    _singleTapTimer?.cancel();
+    _lastTagTapAt = now;
     _pendingSingleTapTag = tag;
-    _singleTapTimer = Timer(const Duration(milliseconds: 250), () {
-      if (mounted && _pendingSingleTapTag == tag) {
-        _selectTag(tag);
-        _pendingSingleTapTag = null;
-      }
-    });
   }
 
   /// Select a tag (click to select, similar to file/folder selection)
@@ -1236,25 +1282,121 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   /// Start inline rename for desktop
   void _startTagRename(String tag) {
+    // Re-entering on the same tag would swap in a fresh controller, throwing
+    // away what has been typed and orphaning the old one.
+    if (_editingTag == tag) return;
+    if (_editingTag != null) {
+      _cancelTagRename();
+    }
     setState(() {
       _editingTag = tag;
-      _editingTagController = TextEditingController(text: tag);
+      _editingTagError = null;
+      _editingTagController = TextEditingController(text: tag)
+        ..selection = TextSelection(baseOffset: 0, extentOffset: tag.length);
+      _editingTagFocusNode = FocusNode();
     });
+  }
+
+  /// Drops the inline editor's state.
+  ///
+  /// The controller and focus node are disposed a frame later: the field is
+  /// still mounted when this runs, and disposing a focus node it listens to
+  /// fires a blur that would re-enter the commit path.
+  void _clearTagEditingState() {
+    final controller = _editingTagController;
+    final focusNode = _editingTagFocusNode;
+    _editingTag = null;
+    _editingTagController = null;
+    _editingTagFocusNode = null;
+    _editingTagError = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller?.dispose();
+      focusNode?.dispose();
+    });
+  }
+
+  /// Abandon the rename, keeping the original name.
+  void _cancelTagRename() {
+    if (_editingTag == null) return;
+    setState(_clearTagEditingState);
+  }
+
+  /// Focus left the field. A name the user cannot commit is discarded rather
+  /// than left blocking the row — they clicked away from it.
+  void _finishTagRenameOnBlur(String tag) {
+    if (_editingTag == null) return;
+    if (_editingTagError != null) {
+      _cancelTagRename();
+      return;
+    }
+    _commitTagRename(tag);
+  }
+
+  /// Live feedback while renaming: empty names and collisions with an existing
+  /// tag are rejected as they are typed.
+  void _onTagRenameChanged(String oldTag, String value) {
+    final localizations = AppLocalizations.of(context)!;
+    final trimmed = value.trim();
+
+    String? error;
+    if (trimmed.isEmpty) {
+      error = localizations.renameNameRequired;
+    } else if (trimmed.toLowerCase() != oldTag.toLowerCase() &&
+        _allTags.any((t) => t.toLowerCase() == trimmed.toLowerCase())) {
+      error = localizations.tagAlreadyExists(trimmed);
+    }
+
+    if (error != _editingTagError) {
+      setState(() => _editingTagError = error);
+    }
+  }
+
+  /// The inline tag editor, shared by the list, grid and tree rows so all
+  /// three read as the same control.
+  Widget _buildTagRenameField(
+    String tag, {
+    required double fontSize,
+    FontWeight fontWeight = FontWeight.w500,
+    TextAlign textAlign = TextAlign.start,
+    int maxLines = 1,
+  }) {
+    final controller = _editingTagController;
+    final focusNode = _editingTagFocusNode;
+    if (controller == null || focusNode == null) {
+      return const SizedBox.shrink();
+    }
+
+    return CbInlineRenameField(
+      controller: controller,
+      focusNode: focusNode,
+      textStyle: TextStyle(fontSize: fontSize, fontWeight: fontWeight),
+      textAlign: textAlign,
+      maxLines: maxLines,
+      dense: maxLines == 1,
+      hasError: _editingTagError != null,
+      // Tags are free-form labels, not paths — none of the filesystem's
+      // character rules apply to them.
+      restrictToFilesystemSafeCharacters: false,
+      onChanged: (value) => _onTagRenameChanged(tag, value),
+      onCommit: () => _commitTagRename(tag),
+      onCancel: _cancelTagRename,
+      onBlur: () => _finishTagRenameOnBlur(tag),
+    );
   }
 
   /// Commit tag rename
   Future<void> _commitTagRename(String oldTag) async {
     if (_editingTagController == null || _editingTag == null) return;
 
+    // A name the field is already flagging stays on screen so the user can fix
+    // it, rather than closing the editor and throwing the typing away.
+    if (_editingTagError != null) return;
+
     final newTag = _editingTagController!.text.trim();
 
     // Clear editing state FIRST to prevent the next tag at the same index
     // from entering edit mode when the list rebuilds after rename.
-    _editingTag = null;
-    final controller = _editingTagController;
-    _editingTagController = null;
-    setState(() {});
-    controller?.dispose();
+    setState(_clearTagEditingState);
 
     if (newTag.isEmpty || newTag == oldTag) return;
 
@@ -1415,39 +1557,27 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
   }
 
-  /// Show rename dialog for mobile
-  Future<void> _showRenameDialog(String tag) async {
+  /// Rename a tag through the inline popover.
+  ///
+  /// Pass [anchorRect] (see `cbAnchorRectOf`) when the caller knows which row
+  /// was acted on, so the editor opens against that chip instead of the
+  /// middle of the screen.
+  Future<void> _showRenameDialog(String tag, {Rect? anchorRect}) async {
     final localizations = AppLocalizations.of(context)!;
 
-    final newTag = await RouteUtils.showAcrylicDialog<String>(
+    final newTag = await showCbInlineRename(
       context: context,
-      builder: (dialogContext) {
-        final controller = TextEditingController(text: tag);
-        return AlertDialog(
-          title: Text(localizations.renameTag),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: localizations.tagName,
-              hintText: localizations.enterNewTagName,
-            ),
-            onSubmitted: (value) =>
-                Navigator.of(dialogContext).pop(value.trim()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(localizations.cancel),
-            ),
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(controller.text.trim()),
-              child: Text(localizations.rename),
-            ),
-          ],
-        );
-      },
+      title: localizations.renameTag,
+      subtitle: tag,
+      initialValue: tag,
+      icon: PhosphorIconsLight.tag,
+      iconColor: TagColorManager.instance.getTagColor(tag),
+      hintText: localizations.renameShortcutHint,
+      cancelLabel: localizations.cancel,
+      confirmLabel: localizations.rename,
+      anchorRect: anchorRect,
+      validator: (value) =>
+          value.trim().isEmpty ? localizations.renameNameRequired : null,
     );
 
     if (newTag != null && newTag.isNotEmpty && newTag != tag) {
@@ -1721,30 +1851,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     setState(() {});
     AppToast.success(context, localizations.tagColorUpdated(tag));
-  }
-
-  KeyEventResult _handleInlineRenameKey(
-      FocusNode node, KeyEvent event, String tag) {
-    if (event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      _commitTagRename(tag);
-      return KeyEventResult.handled;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
-      setState(() {
-        _editingTag = null;
-        _editingTagController?.dispose();
-        _editingTagController = null;
-      });
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
   }
 
   void _toggleSearch() {
@@ -3353,53 +3459,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 ],
               ),
               title: isEditing && _editingTagController != null
-                  ? Focus(
-                      onKeyEvent: (node, event) =>
-                          _handleInlineRenameKey(node, event, tag),
-                      child: TextField(
-                        controller: _editingTagController,
-                        autofocus: true,
-                        textInputAction: TextInputAction.done,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          border: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outlineVariant,
-                            ),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outlineVariant,
-                            ),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outline,
-                            ),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          filled: true,
-                          fillColor: WidgetStateColor.resolveWith((states) {
-                            return states.contains(WidgetState.focused)
-                                ? theme.colorScheme.surfaceContainer
-                                : theme.colorScheme.surface;
-                          }),
-                        ),
-                        cursorColor: theme.colorScheme.primary,
-                        onEditingComplete: () => _commitTagRename(tag),
-                        onSubmitted: (_) => _commitTagRename(tag),
-                        onTapOutside: (_) => _commitTagRename(tag),
-                      ),
-                    )
+                  ? _buildTagRenameField(tag, fontSize: 14)
                   : GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       child: Column(
@@ -3673,18 +3733,23 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         itemBuilder: (context, node, depth) {
           final tag = node.data;
           final tagColor = TagColorManager.instance.getTagColor(tag);
-          return _buildTagTreeDragDropRow(
+          final isEditing = _editingTag == tag;
+          final row = _TagTreeRowContent(
             tag: tag,
-            child: _TagTreeRowContent(
-              tag: tag,
-              tagColor: tagColor,
-              thumbnailSize: treeLayout.thumbnailSize,
-              fontSize: treeLayout.fontSize,
-              spacing: treeLayout.spacing,
-              buildThumbnail: (size) =>
-                  _buildTagThumbnailOrDot(tag, tagColor, size: size),
-            ),
+            tagColor: tagColor,
+            thumbnailSize: treeLayout.thumbnailSize,
+            fontSize: treeLayout.fontSize,
+            spacing: treeLayout.spacing,
+            buildThumbnail: (size) =>
+                _buildTagThumbnailOrDot(tag, tagColor, size: size),
+            renameField: isEditing
+                ? _buildTagRenameField(tag, fontSize: treeLayout.fontSize)
+                : null,
           );
+          // Dragging a row that is being edited would fight text selection,
+          // and the tree's own tap handling would steal the caret.
+          if (isEditing) return row;
+          return _buildTagTreeDragDropRow(tag: tag, child: row);
         },
       ),
     );
@@ -4079,8 +4144,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       color: Colors.transparent,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16.0),
+                        // No `onDoubleTap`: registering one makes the
+                        // recogniser hold every tap for its ~300ms window
+                        // before reporting it. _handleTagTap does the
+                        // double-click detection itself instead.
                         onTap: isEditing ? null : () => _handleTagTap(tag),
-                        onDoubleTap: isEditing ? null : () => _activateTag(tag),
                         onLongPress:
                             isEditing ? null : () => _showTagOptions(tag),
                         onSecondaryTapUp: isEditing
@@ -4252,139 +4320,38 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                 if (isEditing &&
                                                     _editingTagController !=
                                                         null)
-                                                  SizedBox(
-                                                    width: double.infinity,
-                                                    child: Stack(
-                                                      alignment:
-                                                          Alignment.center,
-                                                      children: [
-                                                        Opacity(
-                                                          opacity: 0,
-                                                          child: Text(
-                                                            tag,
-                                                            style: TextStyle(
-                                                                fontSize:
-                                                                    fontSize,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600),
-                                                            textAlign: TextAlign
-                                                                .center,
-                                                            maxLines: 2,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ),
-                                                        Positioned.fill(
-                                                          child: Focus(
-                                                            onKeyEvent: (node,
-                                                                    event) =>
-                                                                _handleInlineRenameKey(
-                                                                    node,
-                                                                    event,
-                                                                    tag),
-                                                            child: TextField(
-                                                              controller:
-                                                                  _editingTagController,
-                                                              autofocus: true,
-                                                              textInputAction:
-                                                                  TextInputAction
-                                                                      .done,
-                                                              style: TextStyle(
-                                                                  fontSize:
-                                                                      fontSize,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                  color: theme
-                                                                      .colorScheme
-                                                                      .onSurface),
-                                                              textAlign:
-                                                                  TextAlign
-                                                                      .center,
-                                                              maxLines: 2,
-                                                              decoration:
-                                                                  InputDecoration(
-                                                                isDense: true,
-                                                                contentPadding:
-                                                                    const EdgeInsets
-                                                                        .symmetric(
-                                                                        horizontal:
-                                                                            4,
-                                                                        vertical:
-                                                                            2),
-                                                                border:
-                                                                    OutlineInputBorder(
-                                                                  borderSide:
-                                                                      BorderSide(
-                                                                    color: theme
-                                                                        .colorScheme
-                                                                        .outlineVariant,
-                                                                  ),
-                                                                  borderRadius:
-                                                                      BorderRadius
-                                                                          .circular(
-                                                                              2),
-                                                                ),
-                                                                enabledBorder:
-                                                                    OutlineInputBorder(
-                                                                  borderSide:
-                                                                      BorderSide(
-                                                                    color: theme
-                                                                        .colorScheme
-                                                                        .outlineVariant,
-                                                                  ),
-                                                                  borderRadius:
-                                                                      BorderRadius
-                                                                          .circular(
-                                                                              2),
-                                                                ),
-                                                                focusedBorder:
-                                                                    OutlineInputBorder(
-                                                                  borderSide:
-                                                                      BorderSide(
-                                                                    color: theme
-                                                                        .colorScheme
-                                                                        .outline,
-                                                                  ),
-                                                                  borderRadius:
-                                                                      BorderRadius
-                                                                          .circular(
-                                                                              2),
-                                                                ),
-                                                                filled: true,
-                                                                fillColor: WidgetStateColor
-                                                                    .resolveWith(
-                                                                        (states) {
-                                                                  return states.contains(
-                                                                          WidgetState
-                                                                              .focused)
-                                                                      ? theme
-                                                                          .colorScheme
-                                                                          .surfaceContainer
-                                                                      : theme
-                                                                          .colorScheme
-                                                                          .surface;
-                                                                }),
-                                                              ),
-                                                              cursorColor: theme
-                                                                  .colorScheme
-                                                                  .primary,
-                                                              onEditingComplete:
-                                                                  () =>
-                                                                      _commitTagRename(
-                                                                          tag),
-                                                              onSubmitted: (_) =>
-                                                                  _commitTagRename(
-                                                                      tag),
-                                                              onTapOutside: (_) =>
-                                                                  _commitTagRename(
-                                                                      tag),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
+                                                  // Lifted into the overlay so
+                                                  // a long tag wraps over the
+                                                  // cards below instead of
+                                                  // squeezing this card's
+                                                  // thumbnail or being cut off.
+                                                  CbInlineRenameOverlay(
+                                                    active: true,
+                                                    label: Text(
+                                                      tag,
+                                                      style: TextStyle(
+                                                        fontSize: fontSize,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: theme.colorScheme
+                                                            .onSurface,
+                                                      ),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    editorBuilder: (context) =>
+                                                        _buildTagRenameField(
+                                                      tag,
+                                                      fontSize: fontSize,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      maxLines:
+                                                          cbInlineRenameMaxLines,
                                                     ),
                                                   )
                                                 else
@@ -5476,6 +5443,9 @@ class _TagTreeRowContent extends StatelessWidget {
   final double spacing;
   final Widget Function(double size) buildThumbnail;
 
+  /// Replaces the label while this row is being renamed.
+  final Widget? renameField;
+
   const _TagTreeRowContent({
     Key? key,
     required this.tag,
@@ -5484,6 +5454,7 @@ class _TagTreeRowContent extends StatelessWidget {
     required this.fontSize,
     required this.spacing,
     required this.buildThumbnail,
+    this.renameField,
   }) : super(key: key);
 
   @override
@@ -5494,16 +5465,17 @@ class _TagTreeRowContent extends StatelessWidget {
         buildThumbnail(thumbnailSize),
         SizedBox(width: spacing),
         Expanded(
-          child: Text(
-            tag,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: renameField ??
+              Text(
+                tag,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w500,
+                  color: theme.colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
         ),
       ],
     );

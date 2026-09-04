@@ -11,6 +11,7 @@ import '../../../config/languages/app_localizations.dart';
 import 'address_bar_menu.dart';
 import '../../../helpers/files/archive_path_utils.dart';
 import '../../../ui/components/common/breadcrumb_address_bar.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 
 /// Navigation bar component that includes back/forward buttons and path input field
 class PathNavigationBar extends StatefulWidget {
@@ -251,7 +252,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
       required String tooltip,
       required VoidCallback? onPressed,
     }) {
-      return fluent.Tooltip(
+      return CbFluentTooltip(
         message: tooltip,
         child: fluent.IconButton(
           // Let Fluent's IconTheme apply the state-resolved foreground color.

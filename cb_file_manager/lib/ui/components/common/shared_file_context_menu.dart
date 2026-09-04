@@ -34,6 +34,7 @@ import '../../../helpers/files/windows_shell_context_menu.dart';
 import '../../../helpers/files/context_menu_layout_preferences.dart';
 import '../../../e2e/cb_e2e_config.dart';
 import '../../controllers/inline_rename_controller.dart';
+import '../../../design_system/primitives/cb_inline_rename.dart';
 import '../../../core/service_locator.dart';
 import '../../../helpers/core/user_preferences.dart';
 import '../../utils/entity_open_actions.dart';
@@ -1999,6 +2000,7 @@ Future<void> _renameEntity({
     context: context,
     entity: entity,
     folderListBloc: folderListBloc,
+    anchorRect: cbAnchorRectOf(context),
   );
 }
 

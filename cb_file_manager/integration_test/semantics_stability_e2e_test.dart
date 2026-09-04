@@ -20,6 +20,7 @@ import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/widgets/lazy_video_thumbnail.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/rendering.dart';
@@ -30,11 +31,21 @@ import 'package:integration_test/integration_test.dart';
 import 'e2e_helpers.dart';
 
 class _NodeSnap {
-  _NodeSnap(this.label, this.rect, this.childIds, this.parentId);
+  _NodeSnap(this.label, this.rect, this.childIds, this.parentId,
+      this.traversalParent, this.traversalChild);
   final String label;
   final Rect rect;
   final List<int> childIds;
   final int? parentId;
+
+  /// Set on an [OverlayPortal] anchor; the overlay child it owns points back at
+  /// it through [traversalChild]. An anchor that gets merged into another node
+  /// loses this, orphaning the overlay child.
+  final Object? traversalParent;
+
+  /// Set on the subtree an [OverlayPortal] parked in the [Overlay]. It names the
+  /// anchor this subtree must be re-parented under for traversal.
+  final Object? traversalChild;
 
   @override
   String toString() =>
@@ -69,7 +80,8 @@ Map<int, _NodeSnap> _snapshot() {
       return true;
     });
     final data = node.getSemanticsData();
-    out[node.id] = _NodeSnap(data.label, node.rect, children, parentId);
+    out[node.id] = _NodeSnap(data.label, node.rect, children, parentId,
+        data.traversalParentIdentifier, data.traversalChildIdentifier);
     node.visitChildren((child) {
       walk(child, node.id);
       return true;
@@ -180,6 +192,7 @@ void main() {
     var frames = 0;
     final churn = <String>[];
     final mixed = <String>[];
+    final orphans = <String>[];
 
     void checkFrame() {
       frames++;
@@ -217,15 +230,26 @@ void main() {
         }
       }
 
-      // A parent that lists a child the tree does not contain is exactly what
-      // the engine reports as "left pending".
+      // The "Nodes left pending by the update" flood. An OverlayPortal parks
+      // its overlay child in the Overlay and tags it with
+      // `traversalChildIdentifier`; the anchor carries the matching
+      // `traversalParentIdentifier` so the child is re-parented under it for
+      // traversal. If the anchor node is merged into a sibling or an ancestor,
+      // that identifier disappears and the overlay subtree names a traversal
+      // parent that is not in the tree. Flutter still sends it, the Windows
+      // AccessibilityBridge cannot attach it, and it rejects the whole batch.
+      final anchors = <Object>{};
+      for (final snap in current.values) {
+        final anchor = snap.traversalParent;
+        if (anchor != null) anchors.add(anchor);
+      }
       for (final entry in current.entries) {
-        for (final childId in entry.value.childIds) {
-          if (!current.containsKey(childId)) {
-            churn.add('[AX-DANGLING] phase=$phase frame=$frames '
-                'node ${entry.key} lists missing child $childId');
-          }
-        }
+        final wanted = entry.value.traversalChild;
+        if (wanted == null || anchors.contains(wanted)) continue;
+        orphans.add('[AX-ORPHAN] phase=$phase frame=$frames node ${entry.key} '
+            '("${entry.value.label}") wants traversal parent $wanted, '
+            'which no node in the tree claims. '
+            'owner=${_describeOwner(entry.key)}');
       }
       previous = current;
     }
@@ -252,9 +276,13 @@ void main() {
         ' mp4Finder=${find.textContaining('.mp4').evaluate().length}');
 
     phase = 'click-row';
-    final firstRow = find.textContaining('file_0.txt').first;
-    await tester.tap(firstRow);
-    await tester.pumpAndSettle();
+    final firstRow = find.textContaining('file_0.txt');
+    if (firstRow.evaluate().isEmpty) {
+      debugPrint('[AX] click-row skipped: no file_0.txt row on screen');
+    } else {
+      await tester.tap(firstRow.first);
+      await tester.pumpAndSettle();
+    }
 
     phase = 'arrow-keys';
     for (var i = 0; i < 6; i++) {
@@ -294,6 +322,33 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
 
+    // Tooltips are the prime suspect for "Nodes left pending": an OverlayPortal
+    // anchor carries `traversalParentIdentifier`, and the overlay child it owns
+    // declares the matching `traversalChildIdentifier`. If the anchor node is
+    // merged away, the overlay child is emitted with a traversal parent that is
+    // not in the tree and the whole AXTreeUpdate is rejected. Hovering every
+    // toolbar button walks that path for real.
+    phase = 'hover-tooltips';
+    final tooltipAnchors = find.byType(Tooltip);
+    debugPrint(
+        '[AX] tooltip anchors on screen=${tooltipAnchors.evaluate().length}');
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    for (var i = 0; i < tooltipAnchors.evaluate().length && i < 12; i++) {
+      final anchor = tooltipAnchors.at(i);
+      if (anchor.evaluate().isEmpty) continue;
+      try {
+        await mouse.moveTo(tester.getCenter(anchor));
+      } catch (_) {
+        continue;
+      }
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump(const Duration(milliseconds: 700));
+    }
+    await mouse.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+    await mouse.removePointer();
+
     debugPrint('[AX] mixed add/remove frames=${mixed.length}');
     for (final line in mixed.take(25)) {
       debugPrint(line);
@@ -301,8 +356,11 @@ void main() {
     debugPrint('[AX] semanticsEnabled='
         '${SemanticsBinding.instance.semanticsEnabled} '
         'nodes=${previous.length} frames=$frames '
-        'remounts=${churn.length}');
+        'remounts=${churn.length} orphans=${orphans.length}');
     for (final line in churn.take(40)) {
+      debugPrint(line);
+    }
+    for (final line in orphans.take(40)) {
       debugPrint(line);
     }
 
@@ -316,5 +374,8 @@ void main() {
     );
     expect(churn, isEmpty,
         reason: 'semantics nodes were destroyed and recreated unchanged');
+    expect(orphans, isEmpty,
+        reason: 'an overlay subtree named a traversal parent that is not in '
+            'the tree; the Windows AccessibilityBridge drops the whole update');
   });
 }

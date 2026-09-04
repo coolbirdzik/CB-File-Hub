@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
@@ -95,8 +96,12 @@ List<ContextMenuSection> _buildTagContextMenuSections(
           id: 'rename',
           label: l10n.renameTag,
           icon: PhosphorIconsLight.pencilSimple,
-          onSelected: (ctx) =>
-              showRenameTagDialog(ctx, tag, onChanged: onChanged),
+          onSelected: (ctx) => showRenameTagDialog(
+            ctx,
+            tag,
+            onChanged: onChanged,
+            anchorRect: cbAnchorRectOf(ctx),
+          ),
         ),
         ContextMenuAction(
           id: 'color',
@@ -164,37 +169,22 @@ Future<void> showRenameTagDialog(
   BuildContext context,
   String tag, {
   VoidCallback? onChanged,
+  Rect? anchorRect,
 }) async {
   final l10n = AppLocalizations.of(context)!;
 
-  final newTag = await RouteUtils.showAcrylicDialog<String>(
+  final newTag = await showCbInlineRename(
     context: context,
-    builder: (dialogContext) {
-      final controller = TextEditingController(text: tag);
-      return AlertDialog(
-        title: Text(l10n.renameTag),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: l10n.tagName,
-            hintText: l10n.enterNewTagName,
-          ),
-          onSubmitted: (value) => Navigator.of(dialogContext).pop(value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: Text(l10n.rename),
-          ),
-        ],
-      );
-    },
+    title: l10n.renameTag,
+    subtitle: tag,
+    initialValue: tag,
+    icon: PhosphorIconsLight.tag,
+    iconColor: TagColorManager.instance.getTagColor(tag),
+    hintText: l10n.renameShortcutHint,
+    cancelLabel: l10n.cancel,
+    confirmLabel: l10n.rename,
+    anchorRect: anchorRect,
+    validator: (value) => value.trim().isEmpty ? l10n.renameNameRequired : null,
   );
 
   if (newTag == null || newTag.isEmpty || newTag == tag) return;

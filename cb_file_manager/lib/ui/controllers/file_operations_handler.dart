@@ -23,6 +23,8 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// Handles file operations such as opening files with appropriate viewers
 class FileOperationsHandler {
@@ -334,10 +336,16 @@ class FileOperationsHandler {
     AppToast.info(context, message);
   }
 
+  /// Opens the inline rename popover for [entity].
+  ///
+  /// Used where the name cannot be edited in place — the trash bin, the
+  /// cleaner, mobile. Pass [anchorRect] (see `cbAnchorRectOf`) to have the
+  /// popover open against the row instead of the middle of the window.
   static Future<void> showRenameDialog({
     required BuildContext context,
     required FileSystemEntity entity,
     FolderListBloc? folderListBloc,
+    Rect? anchorRect,
   }) async {
     FolderListBloc? bloc = folderListBloc;
     if (bloc == null) {
@@ -366,16 +374,23 @@ class FileOperationsHandler {
         ? currentName
         : path.basenameWithoutExtension(currentName);
 
-    final rawName = await showDialog<String>(
+    final extension = path.extension(currentName);
+    final rawName = await showCbInlineRename(
       context: context,
-      builder: (dialogContext) => _RenameEntityDialog(
-        title: isFile ? l10n.renameFileTitle : l10n.renameFolderTitle,
-        currentNameLabel: isFile ? l10n.currentNameLabel(currentName) : null,
-        newNameLabel: l10n.newNameLabel,
-        cancelLabel: l10n.cancel.toUpperCase(),
-        confirmLabel: l10n.rename.toUpperCase(),
-        initialValue: isFile ? initialValue : currentName,
-      ),
+      title: isFile ? l10n.renameFileTitle : l10n.renameFolderTitle,
+      subtitle: currentName,
+      initialValue: isFile ? initialValue : currentName,
+      // The extension rides along dimmed inside the field when it is not the
+      // user's to edit, so the resulting name is never a surprise.
+      lockedSuffix: isFile && !allowFileExtensionRename && extension.isNotEmpty
+          ? extension
+          : null,
+      icon: isFile ? PhosphorIconsLight.file : PhosphorIconsLight.folder,
+      hintText: l10n.renameShortcutHint,
+      cancelLabel: l10n.cancel,
+      confirmLabel: l10n.rename,
+      anchorRect: anchorRect,
+      validator: (value) => _validateEntityName(l10n, value),
     );
 
     if (rawName == null) {
@@ -400,6 +415,16 @@ class FileOperationsHandler {
             : l10n.renamedFolderTo(newName));
       } catch (_) {}
     } finally {}
+  }
+
+  /// Rejects the names a filesystem would, before the user commits to them.
+  static String? _validateEntityName(AppLocalizations l10n, String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return l10n.renameNameRequired;
+    if (cbInvalidNameChars.hasMatch(trimmed)) {
+      return l10n.renameInvalidCharacters;
+    }
+    return null;
   }
 
   static String _resolveRenameTargetName({
@@ -626,87 +651,5 @@ class FileOperationsHandler {
       if (!context.mounted) return;
       AppToast.error(context, e.toString());
     }
-  }
-}
-
-class _RenameEntityDialog extends StatefulWidget {
-  final String title;
-  final String? currentNameLabel;
-  final String newNameLabel;
-  final String cancelLabel;
-  final String confirmLabel;
-  final String initialValue;
-
-  const _RenameEntityDialog({
-    required this.title,
-    required this.newNameLabel,
-    required this.cancelLabel,
-    required this.confirmLabel,
-    required this.initialValue,
-    this.currentNameLabel,
-  });
-
-  @override
-  State<_RenameEntityDialog> createState() => _RenameEntityDialogState();
-}
-
-class _RenameEntityDialogState extends State<_RenameEntityDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-    _controller.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: _controller.text.length,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    Navigator.pop(context, _controller.text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textField = TextField(
-      controller: _controller,
-      decoration: InputDecoration(
-        labelText: widget.newNameLabel,
-        border: const OutlineInputBorder(),
-      ),
-      autofocus: true,
-      onSubmitted: (_) => _submit(),
-    );
-
-    return AlertDialog(
-      title: Text(widget.title),
-      content: widget.currentNameLabel != null
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(widget.currentNameLabel!),
-                const SizedBox(height: 16),
-                textField,
-              ],
-            )
-          : textField,
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(widget.cancelLabel),
-        ),
-        TextButton(
-          onPressed: _submit,
-          child: Text(widget.confirmLabel),
-        ),
-      ],
-    );
   }
 }

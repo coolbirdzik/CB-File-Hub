@@ -145,26 +145,10 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
 
     _archiveBrowsePath = null;
 
-    // Emit a loading state synchronously here (in addition to the one
-    // FileNavigationBloc emits) so the UI shows a skeleton immediately.
-    // Without this, there is a multi-hop async gap — FolderListLoad forwards
-    // to FileNavigationBloc, which emits isLoading:true on its own event
-    // queue, which then propagates back via the stream subscription. During
-    // that gap the UI can rebuild with the previous (non-loading, possibly
-    // empty) state and briefly flash "empty folder" until the scan finishes.
-    //
-    // Skip virtual paths (e.g. #video-library/...) which are owned by
-    // specialized blocs and don't go through this listing path.
-    if (!path.startsWith('#')) {
-      emit(state.copyWith(
-        isLoading: true,
-        isRefreshing: false,
-        error: null,
-        folders: const [],
-        files: const [],
-        filteredFiles: const [],
-      ));
-    }
+    // FileNavigationBloc exclusively owns the loading lifecycle. Do not emit a
+    // second loading state here: duplicate drive-open events are intentionally
+    // deduped by the child bloc, and a late duplicate can otherwise set this
+    // facade back to loading after the child already published the listing.
     _navigationBloc.add(nav.FileNavigationLoad(path));
   }
 

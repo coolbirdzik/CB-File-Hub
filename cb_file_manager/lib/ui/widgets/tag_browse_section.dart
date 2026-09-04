@@ -1,15 +1,20 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
+import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
+import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 
 /// Layout used by [TagBrowseSection].
@@ -47,6 +52,7 @@ class TagBrowseSection extends StatefulWidget {
     required this.onTagSelected,
     this.selectedTags = const <String>[],
     this.maxHeight = 260,
+    this.fillHeight = false,
   }) : super(key: key);
 
   /// Called with the original-cased tag name when a row is tapped.
@@ -55,8 +61,14 @@ class TagBrowseSection extends StatefulWidget {
   /// Tags already assigned in the host dialog (shown with a check mark).
   final List<String> selectedTags;
 
-  /// Height budget for the scrollable tree/grid area.
+  /// Height budget for the scrollable tree/grid area. Ignored when
+  /// [fillHeight] is set.
   final double maxHeight;
+
+  /// When true the tree/grid area expands to fill whatever vertical room the
+  /// parent gives it (the host must supply a bounded height, e.g. by putting
+  /// this widget inside an [Expanded]) instead of capping at [maxHeight].
+  final bool fillHeight;
 
   @override
   State<TagBrowseSection> createState() => _TagBrowseSectionState();
@@ -65,6 +77,22 @@ class TagBrowseSection extends StatefulWidget {
 class _TagBrowseSectionState extends State<TagBrowseSection> {
   /// Persisted layout choice so the dialog reopens in the same mode.
   static const String _viewModePrefsKey = 'tag_browse_view_mode';
+
+  /// Persisted grid item size (higher level = more columns = smaller tiles).
+  static const String _gridZoomPrefsKey = 'tag_browse_grid_zoom_level';
+
+  /// Tile-size mapping for the grid. Same shape as the file browser zoom
+  /// formula (GridZoomConstraints.itemWidthForZoom) but against a dialog-sized
+  /// reference width, so a given level yields tiles that fit a modal instead
+  /// of full-screen ones.
+  static const double _gridReferenceWidth = 560;
+  static const double _gridSpacing = 8;
+  static const double _minTileExtent = 56;
+
+  /// Upper bound of the size slider. Capped below
+  /// [UserPreferences.maxGridZoomLevel] because past this level the tiles are
+  /// already at [_minTileExtent] and further steps would change nothing.
+  static const int _maxGridZoom = 10;
 
   final _hierarchyManager = TagHierarchyManager.instance;
   final _thumbnailManager = TagThumbnailManager.instance;
@@ -83,6 +111,10 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   final List<String> _gridPath = <String>[];
 
   TagBrowseViewMode _viewMode = TagBrowseViewMode.tree;
+
+  /// Grid item size, in "columns at [_gridReferenceWidth]" units.
+  int _gridZoomLevel = UserPreferences.defaultGridZoomLevel;
+
   String _query = '';
   bool _isLoading = true;
 
@@ -98,24 +130,58 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   void initState() {
     super.initState();
     _load();
-    _loadViewMode();
+    _loadLayoutPrefs();
     _hierarchyManager.addListener(_handleHierarchyChanged);
   }
 
-  Future<void> _loadViewMode() async {
+  Future<void> _loadLayoutPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final stored = prefs.getString(_viewModePrefsKey);
-      if (stored == null || !mounted) return;
-      final mode = TagBrowseViewMode.values.firstWhere(
-        (value) => value.name == stored,
-        orElse: () => TagBrowseViewMode.tree,
-      );
-      if (mode == _viewMode) return;
-      setState(() => _viewMode = mode);
+      final storedMode = prefs.getString(_viewModePrefsKey);
+      final storedZoom = prefs.getInt(_gridZoomPrefsKey);
+      if (!mounted) return;
+      final mode = storedMode == null
+          ? _viewMode
+          : TagBrowseViewMode.values.firstWhere(
+              (value) => value.name == storedMode,
+              orElse: () => TagBrowseViewMode.tree,
+            );
+      final zoom = (storedZoom ?? _gridZoomLevel)
+          .clamp(UserPreferences.minGridZoomLevel, _maxGridZoom)
+          .toInt();
+      if (mode == _viewMode && zoom == _gridZoomLevel) return;
+      setState(() {
+        _viewMode = mode;
+        _gridZoomLevel = zoom;
+      });
     } catch (error) {
-      AppLogger.warning('[TagBrowse] Failed to read view mode: $error');
+      AppLogger.warning('[TagBrowse] Failed to read layout prefs: $error');
     }
+  }
+
+  /// Applies a new grid item size and remembers it for the next open.
+  Future<void> _setGridZoomLevel(int value) async {
+    final next =
+        value.clamp(UserPreferences.minGridZoomLevel, _maxGridZoom).toInt();
+    if (next == _gridZoomLevel) return;
+    setState(() => _gridZoomLevel = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_gridZoomPrefsKey, next);
+    } catch (error) {
+      AppLogger.warning('[TagBrowse] Failed to persist grid zoom: $error');
+    }
+  }
+
+  /// Width budget for a single grid tile at the current zoom level.
+  double get _gridTileExtent {
+    final zoom =
+        _gridZoomLevel.clamp(UserPreferences.minGridZoomLevel, _maxGridZoom);
+    final totalSpacing = _gridSpacing * (zoom - 1);
+    return math.max(
+      _minTileExtent,
+      (_gridReferenceWidth - totalSpacing) / zoom,
+    );
   }
 
   Future<void> _setViewMode(TagBrowseViewMode mode) async {
@@ -422,6 +488,46 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     final gridEntries = isGrid ? _gridEntries() : const <String>[];
     final isEmpty = isGrid ? gridEntries.isEmpty : rows.isEmpty;
 
+    // When the host asks us to fill, the panel goes in an Expanded and takes
+    // every pixel the parent left over; otherwise it shrink-wraps up to
+    // maxHeight.
+    final panel = Container(
+      constraints: widget.fillHeight
+          ? null
+          : BoxConstraints(maxHeight: widget.maxHeight),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  l10n.noTagsFound,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: isGrid
+                  ? _buildGrid(gridEntries)
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      shrinkWrap: true,
+                      itemCount: rows.length,
+                      itemBuilder: (context, index) => _buildRow(rows[index]),
+                    ),
+            ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -430,6 +536,10 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
             Expanded(child: _buildSearchField(l10n, theme)),
             const SizedBox(width: 8),
             _buildViewModeToggle(l10n, theme),
+            if (isGrid) ...[
+              const SizedBox(width: 8),
+              _buildGridSizeButton(l10n, theme),
+            ],
           ],
         ),
         if (isGrid && _query.trim().isEmpty && _gridPath.isNotEmpty) ...[
@@ -437,42 +547,72 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
           _buildBreadcrumb(l10n, theme),
         ],
         const SizedBox(height: 10),
-        Container(
-          constraints: BoxConstraints(maxHeight: widget.maxHeight),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+        if (widget.fillHeight) Expanded(child: panel) else panel,
+      ],
+    );
+  }
+
+  /// Grid item-size control, mirroring the tags screen: a slider popover on
+  /// desktop and the shared bottom sheet on touch.
+  Widget _buildGridSizeButton(AppLocalizations l10n, ThemeData theme) {
+    final zoom = _gridZoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, _maxGridZoom)
+        .toInt();
+    final decoration = BoxDecoration(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(13),
+      border: Border.all(
+        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+      ),
+    );
+    final icon = Icon(
+      PhosphorIconsLight.squaresFour,
+      size: 17,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    if (!_isDesktop) {
+      return Container(
+        padding: const EdgeInsets.all(3),
+        decoration: decoration,
+        child: CbTooltip(
+          message: l10n.adjustGridSizeTooltip,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => SharedActionBar.showGridSizeDialog(
+              context,
+              currentGridSize: zoom,
+              minGridSize: UserPreferences.minGridZoomLevel,
+              maxGridSize: _maxGridZoom,
+              onApply: _setGridZoomLevel,
+            ),
+            child: SizedBox(width: 34, height: 34, child: icon),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: decoration,
+      child: PopupMenuButton<void>(
+        tooltip: l10n.adjustGridSizeTooltip,
+        padding: EdgeInsets.zero,
+        offset: const Offset(0, 42),
+        itemBuilder: (context) => [
+          PopupMenuItem<void>(
+            enabled: false,
+            padding: EdgeInsets.zero,
+            child: GridSizeSliderMenu(
+              currentValue: zoom,
+              minValue: UserPreferences.minGridZoomLevel,
+              maxValue: _maxGridZoom,
+              onChanged: _setGridZoomLevel,
             ),
           ),
-          child: isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Text(
-                      l10n.noTagsFound,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                )
-              : ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: isGrid
-                      ? _buildGrid(gridEntries)
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          shrinkWrap: true,
-                          itemCount: rows.length,
-                          itemBuilder: (context, index) =>
-                              _buildRow(rows[index]),
-                        ),
-                ),
-        ),
-      ],
+        ],
+        child: SizedBox(width: 34, height: 34, child: icon),
+      ),
     );
   }
 
@@ -483,7 +623,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
       String tooltip,
     ) {
       final isActive = _viewMode == mode;
-      return Tooltip(
+      return CbTooltip(
         message: tooltip,
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -599,17 +739,23 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   }
 
   Widget _buildGrid(List<String> entries) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      shrinkWrap: true,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 132,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.86,
+    return CtrlScrollZoom(
+      // Explorer convention: scrolling down shrinks the tiles (more columns).
+      onDelta: _isDesktop
+          ? (delta) => _setGridZoomLevel(_gridZoomLevel + delta)
+          : null,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(8),
+        shrinkWrap: true,
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _gridTileExtent,
+          mainAxisSpacing: _gridSpacing,
+          crossAxisSpacing: _gridSpacing,
+          childAspectRatio: 0.86,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) => _buildGridTile(entries[index]),
       ),
-      itemCount: entries.length,
-      itemBuilder: (context, index) => _buildGridTile(entries[index]),
     );
   }
 
@@ -706,7 +852,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   /// one-tap way in (also the only way on touch, where there is no double-tap).
   Widget _buildOpenChildrenButton(String normalized, int childCount) {
     final theme = Theme.of(context);
-    return Tooltip(
+    return CbTooltip(
       message: '$childCount',
       child: InkWell(
         borderRadius: BorderRadius.circular(9),

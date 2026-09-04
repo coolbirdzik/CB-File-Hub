@@ -9,6 +9,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
@@ -393,12 +394,17 @@ class _FileGridItemState extends State<FileGridItem> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildNameWidget(
-                          context,
-                          theme,
-                          fileName,
-                          isBeingRenamed,
-                          renameController,
+                        // Flexible, not fixed: the band's height is budgeted
+                        // for the plain label, and the inline editor's border
+                        // and padding make it taller than that.
+                        Flexible(
+                          child: _buildNameWidget(
+                            context,
+                            theme,
+                            fileName,
+                            isBeingRenamed,
+                            renameController,
+                          ),
                         ),
                         if (widget.showFileTags && widget.state != null) ...[
                           const SizedBox(height: 2),
@@ -432,29 +438,32 @@ class _FileGridItemState extends State<FileGridItem> {
       overflow: TextOverflow.ellipsis,
     );
 
-    if (isBeingRenamed &&
-        renameController != null &&
-        renameController.textController != null) {
-      return Row(
-        children: [
-          Expanded(
-            child: InlineRenameField(
-              controller: renameController,
-              onCommit: () => renameController.commitRename(context),
-              onCancel: () => renameController.cancelRename(),
-              textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-            ),
-          ),
-        ],
-      );
-    }
-
-    return _buildFileInteractionLayer(
+    final label = _buildFileInteractionLayer(
       context,
       key: ValueKey('file-grid-name-hit-area-${widget.file.path}'),
       child: textWidget,
+    );
+
+    if (!isBeingRenamed ||
+        renameController == null ||
+        renameController.textController == null) {
+      return label;
+    }
+
+    // The editor is lifted into the overlay so the whole name stays readable:
+    // the tile's name band only budgets two ellipsised lines, and a name being
+    // typed must never be the thing that gets cut off.
+    return CbInlineRenameOverlay(
+      active: true,
+      label: label,
+      editorBuilder: (context) => InlineRenameField(
+        controller: renameController,
+        onCommit: () => renameController.commitRename(context),
+        onCancel: () => renameController.cancelRename(),
+        textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
+        textAlign: TextAlign.center,
+        maxLines: cbInlineRenameMaxLines,
+      ),
     );
   }
 

@@ -39,7 +39,10 @@ class BrowserLikeKeyboardShortcuts {
     }
 
     final key = event.logicalKey;
-    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+    // The command modifier is Cmd on macOS and Ctrl everywhere else. Checking
+    // only Ctrl left every Cmd shortcut dead on a Mac.
+    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+        (Platform.isMacOS && HardwareKeyboard.instance.isMetaPressed);
     final isShift = HardwareKeyboard.instance.isShiftPressed;
 
     if (key == LogicalKeyboardKey.escape && onEscape != null) {

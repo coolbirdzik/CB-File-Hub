@@ -212,14 +212,6 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     return state.files.any((file) => FileTypeUtils.isMediaFile(file.path));
   }
 
-  bool _isTextInputFocused() {
-    final focused = FocusManager.instance.primaryFocus;
-    final focusedContext = focused?.context;
-    if (focusedContext == null) return false;
-    if (focusedContext.widget is EditableText) return true;
-    return focusedContext.findAncestorWidgetOfExactType<EditableText>() != null;
-  }
-
   bool _isPointerInsideFocusedEditableText(PointerDownEvent event) {
     final focused = FocusManager.instance.primaryFocus;
     final focusedContext = focused?.context;
@@ -1356,7 +1348,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
             if (isDesktopPlatform) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
-                if (_isTextInputFocused()) {
+                if (BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
                   if (_isPointerInsideFocusedEditableText(event)) {
                     return;
                   }

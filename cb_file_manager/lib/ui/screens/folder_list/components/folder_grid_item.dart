@@ -6,6 +6,7 @@ import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../components/common/shared_file_context_menu.dart';
@@ -380,24 +381,23 @@ class _FolderGridItemState extends State<FolderGridItem> {
     );
 
     if (isBeingRenamed && renameController.textController != null) {
-      return Row(
-        children: [
-          Expanded(
-            child: InlineRenameField(
-              controller: renameController,
-              onCommit: () => renameController.commitRename(context),
-              onCancel: () => renameController.cancelRename(),
-              textStyle: TextStyle(
-                fontSize: GridZoomConstraints.gridItemFilenameFontSize,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight:
-                    isVisuallySelected ? FontWeight.bold : FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-            ),
+      // Lifted into the overlay: the tile's name band budgets two ellipsised
+      // lines, which is not enough to show a name while it is being typed.
+      return CbInlineRenameOverlay(
+        active: true,
+        label: textWidget,
+        editorBuilder: (context) => InlineRenameField(
+          controller: renameController,
+          onCommit: () => renameController.commitRename(context),
+          onCancel: () => renameController.cancelRename(),
+          textStyle: TextStyle(
+            fontSize: GridZoomConstraints.gridItemFilenameFontSize,
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: isVisuallySelected ? FontWeight.bold : FontWeight.w500,
           ),
-        ],
+          textAlign: TextAlign.center,
+          maxLines: cbInlineRenameMaxLines,
+        ),
       );
     }
 

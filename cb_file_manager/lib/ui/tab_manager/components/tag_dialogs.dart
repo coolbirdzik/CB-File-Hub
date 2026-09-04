@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
@@ -651,6 +652,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     required String title,
     String? subtitle,
     required Widget child,
+    bool expandChild = false,
   }) {
     final theme = Theme.of(context);
     return Container(
@@ -710,7 +712,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
             ],
           ),
           const SizedBox(height: 14),
-          child,
+          if (expandChild) Expanded(child: child) else child,
         ],
       ),
     );
@@ -770,46 +772,66 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
         if (_isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
-        // The browse tree gets whatever vertical room is left after the fixed
-        // sections, so resizing the dialog actually grows the tag list.
-        final browseHeight = (dialogSize.height - 520).clamp(160.0, 900.0);
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTagInputSection(l10n),
-              const SizedBox(height: 18),
-              _buildSectionCard(
-                icon: PhosphorIconsLight.sparkle,
-                title: 'Quick Picks',
-                subtitle: 'Choose from popular and recently used tags',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    PopularTagsWidget(
-                      onTagSelected: _addTag,
+        // The input + quick picks keep their natural height (scrolling on their
+        // own when the dialog is short) and the browse section takes all the
+        // room that is left, so the tag list always runs down to the bottom
+        // edge of the dialog and grows when the dialog is resized.
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final available = constraints.maxHeight;
+            final browseFloor = math.min(220.0, available * 0.45);
+            final topMaxHeight = math.max(0.0, available - browseFloor - 18);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: topMaxHeight),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTagInputSection(l10n),
+                        const SizedBox(height: 18),
+                        _buildSectionCard(
+                          icon: PhosphorIconsLight.sparkle,
+                          title: 'Quick Picks',
+                          subtitle:
+                              'Choose from popular and recently used tags',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              PopularTagsWidget(
+                                onTagSelected: _addTag,
+                              ),
+                              const SizedBox(height: 18),
+                              RecentTagsWidget(
+                                onTagSelected: _addTag,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 18),
-                    RecentTagsWidget(
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Expanded(
+                  child: _buildSectionCard(
+                    icon: PhosphorIconsLight.treeStructure,
+                    title: l10n.allTags,
+                    subtitle:
+                        'Browse the tag tree — expand a parent to pick its children.',
+                    expandChild: true,
+                    child: TagBrowseSection(
+                      selectedTags: _selectedTags,
                       onTagSelected: _addTag,
+                      fillHeight: true,
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              _buildSectionCard(
-                icon: PhosphorIconsLight.treeStructure,
-                title: l10n.allTags,
-                subtitle:
-                    'Browse the tag tree — expand a parent to pick its children.',
-                child: TagBrowseSection(
-                  selectedTags: _selectedTags,
-                  onTagSelected: _addTag,
-                  maxHeight: browseHeight,
-                ),
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         );
       },
       actions: [

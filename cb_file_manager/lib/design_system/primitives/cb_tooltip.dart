@@ -1,3 +1,4 @@
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 
 /// A Material tooltip whose accessibility anchor cannot be merged with a
@@ -52,6 +53,65 @@ class CbTooltip extends StatelessWidget {
         enableFeedback: enableFeedback,
         excludeFromSemantics: excludeFromSemantics,
         child: child,
+      ),
+    );
+  }
+}
+
+/// A Fluent tooltip whose child keeps its semantics identity when a mouse is
+/// first detected.
+///
+/// fluent_ui's [fluent.Tooltip] only wraps its child in a `GestureDetector` and
+/// a `MouseRegion` once `MouseTracker.mouseIsConnected` is true. On Windows that
+/// flips from false to true the first time a pointer arrives after launch, which
+/// changes the widget type sitting at that slot and remounts the entire child
+/// subtree. Every semantics node under every visible tooltip is destroyed and an
+/// equivalent one created in the same frame.
+///
+/// The Windows accessibility bridge cannot serialize a batch that drops ids and
+/// reclaims their slots at once, so it rejects the whole `ui::AXTree` update. It
+/// does not resynchronise afterwards, which is why a single bad frame turns into
+/// the endless, always-identical
+/// "Failed to update ui::AXTree, error: Nodes left pending by the update: ..."
+/// flood on stderr.
+///
+/// Three things together keep the tree stable across that reshape:
+///  * the child is held by a [GlobalKey], so it is reparented instead of rebuilt;
+///  * fluent's own `Semantics` wrapper is silenced, because it lives inside the
+///    reshaped slot and would still be handed a new id;
+///  * the tooltip text is published from a [Semantics] node placed outside the
+///    tooltip, which never moves.
+///
+/// See also [CbTooltip], the Material counterpart, which fixes a different
+/// semantics defect.
+class CbFluentTooltip extends StatefulWidget {
+  final String message;
+  final Widget child;
+
+  const CbFluentTooltip({
+    Key? key,
+    required this.message,
+    required this.child,
+  }) : super(key: key);
+
+  @override
+  State<CbFluentTooltip> createState() => _CbFluentTooltipState();
+}
+
+class _CbFluentTooltipState extends State<CbFluentTooltip> {
+  // Has to outlive the rebuild that inserts the MouseRegion, so it cannot be
+  // created inside build().
+  final GlobalKey _childKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      tooltip: widget.message,
+      child: fluent.Tooltip(
+        message: widget.message,
+        excludeFromSemantics: true,
+        child: KeyedSubtree(key: _childKey, child: widget.child),
       ),
     );
   }

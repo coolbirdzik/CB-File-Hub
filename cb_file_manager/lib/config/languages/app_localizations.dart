@@ -692,6 +692,9 @@ abstract class AppLocalizations {
   String get renameFolderTitle;
   String currentNameLabel(String name);
   String get newNameLabel;
+  String get renameShortcutHint;
+  String get renameNameRequired;
+  String get renameInvalidCharacters;
   String renamedFileTo(String newName);
   String renamedFolderTo(String newName);
   String get allowFileExtensionRename;

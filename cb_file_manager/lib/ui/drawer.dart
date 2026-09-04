@@ -23,6 +23,7 @@ import 'package:cb_file_manager/ui/widgets/drawer/drawer_navigation_item.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/storage_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/pinned_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 
 /// Returns a key that forces a Fluent drawer section to honor the active tab's
 /// persisted expansion state after a tab switch or expansion change.
@@ -605,7 +606,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                                           _fluentPinnedName(path),
                                           isStorage: true,
                                         ),
-                                        trailing: fluent.Tooltip(
+                                        trailing: CbFluentTooltip(
                                           message: context.tr.unpinFromSidebar,
                                           child: Semantics(
                                             button: true,
@@ -836,7 +837,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
             Semantics(
               button: true,
               label: pinLabel,
-              child: fluent.Tooltip(
+              child: CbFluentTooltip(
                 message: pinLabel,
                 child: fluent.IconButton(
                   icon: Icon(
@@ -1068,7 +1069,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     final theme = fluent.FluentTheme.of(context);
     final accent = theme.accentColor.defaultBrushFor(theme.brightness);
     return ExcludeSemantics(
-      child: fluent.Tooltip(
+      child: CbFluentTooltip(
         message: label,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(start: 2, end: 2),

@@ -40,6 +40,7 @@ import '../../components/common/operation_progress_overlay.dart';
 import '../components/tab_inactive_indicator.dart';
 import '../components/tab_always_active_indicator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 
 // Create a custom scroll behavior that supports mouse wheel scrolling
 class TabBarMouseScrollBehavior extends MaterialScrollBehavior {
@@ -391,7 +392,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     }
 
     if (_useFluentDesktopShell) {
-      return fluent.Tooltip(
+      return CbFluentTooltip(
         message: tooltip,
         child: fluent.IconButton(
           icon: Icon(
@@ -449,7 +450,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final tooltip = context.tr.cbAgent;
 
     if (_useFluentDesktopShell) {
-      return fluent.Tooltip(
+      return CbFluentTooltip(
         message: tooltip,
         child: fluent.IconButton(
           icon: Icon(PhosphorIconsLight.sparkle, color: iconColor, size: 20),
@@ -500,7 +501,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     }
 
     if (_useFluentDesktopShell) {
-      return fluent.Tooltip(
+      return CbFluentTooltip(
         message: tooltip,
         child: fluent.IconButton(
           icon: icon,
@@ -532,7 +533,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   Widget _buildEmptyTabAction(BuildContext context, ThemeData theme) {
     final label = context.tr.addNewTab;
     if (_useFluentDesktopShell) {
-      return fluent.Tooltip(
+      return CbFluentTooltip(
         message: label,
         child: Semantics(
           button: true,

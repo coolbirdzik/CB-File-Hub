@@ -17,6 +17,12 @@ class InlineRenameController extends ChangeNotifier {
   /// The path of the entity currently being renamed, or null if none.
   String? _renamingPath;
 
+  /// The extension the user is *not* editing, kept so the field can render it
+  /// dimmed beside the editable stem. Computed once at [startRename] because
+  /// deciding it needs a `typeSync` call, which has no business running in a
+  /// build method on every frame.
+  String? _lockedSuffix;
+
   /// The text editing controller for the rename field.
   TextEditingController? _textController;
 
@@ -41,6 +47,11 @@ class InlineRenameController extends ChangeNotifier {
   /// The focus node for the rename field.
   FocusNode? get focusNode => _focusNode;
 
+  /// The trailing run of the name held constant during this rename — the file
+  /// extension when extension renaming is off. Null for folders and whenever
+  /// the whole name is editable.
+  String? get lockedSuffix => _lockedSuffix;
+
   /// Start inline rename for the given entity path.
   void startRename(
     String entityPath, {
@@ -64,6 +75,10 @@ class InlineRenameController extends ChangeNotifier {
         isFile ? path.basenameWithoutExtension(entityPath) : baseName;
     final initialValue =
         isFile && allowFileExtensionRename ? baseName : nameWithoutExt;
+    final extension = isFile ? path.extension(entityPath) : '';
+    _lockedSuffix = isFile && !allowFileExtensionRename && extension.isNotEmpty
+        ? extension
+        : null;
 
     _textController = TextEditingController(text: initialValue);
     _focusNode = FocusNode();
@@ -151,6 +166,7 @@ class InlineRenameController extends ChangeNotifier {
 
     // But clear the renaming path immediately so UI updates
     _renamingPath = null;
+    _lockedSuffix = null;
     notifyListeners();
     callback?.call();
   }
@@ -161,6 +177,7 @@ class InlineRenameController extends ChangeNotifier {
     _focusNode?.dispose();
     _focusNode = null;
     _renamingPath = null;
+    _lockedSuffix = null;
     _onCancelled = null;
     _onCommitted = null;
   }
