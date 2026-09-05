@@ -16,14 +16,12 @@ class WindowsExplorerFileDropEvent {
   });
 }
 
-enum WindowsExplorerDragResult {
-  moved,
-  canceled,
-}
+enum WindowsExplorerDragResult { moved, canceled }
 
 class WindowsExplorerDragDropService {
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/window_utils');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/window_utils',
+  );
 
   static final StreamController<WindowsExplorerFileDropEvent> _dropController =
       StreamController<WindowsExplorerFileDropEvent>.broadcast();
@@ -32,7 +30,8 @@ class WindowsExplorerDragDropService {
       _dropController.stream;
 
   static Future<WindowsExplorerDragResult> startFileDrag(
-      List<String> paths) async {
+    List<String> paths,
+  ) async {
     if (!Platform.isWindows) return WindowsExplorerDragResult.canceled;
 
     final cleaned = paths
@@ -73,7 +72,8 @@ class WindowsExplorerDragDropService {
     final arg = call.arguments;
     if (arg is! Map) return true;
 
-    final paths = (arg['paths'] as List?)
+    final paths =
+        (arg['paths'] as List?)
             ?.whereType<String>()
             .map((path) => path.trim())
             .where((path) => path.isNotEmpty)
@@ -85,11 +85,13 @@ class WindowsExplorerDragDropService {
     final y = _toDouble(arg['globalY']);
     final effect = (arg['effect'] as String?) ?? 'move';
 
-    _dropController.add(WindowsExplorerFileDropEvent(
-      paths: paths,
-      globalPosition: Offset(x, y),
-      effect: effect,
-    ));
+    _dropController.add(
+      WindowsExplorerFileDropEvent(
+        paths: paths,
+        globalPosition: Offset(x, y),
+        effect: effect,
+      ),
+    );
     return true;
   }
 

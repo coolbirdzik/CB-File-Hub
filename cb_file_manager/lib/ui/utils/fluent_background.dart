@@ -19,20 +19,21 @@ class FluentBackground extends StatelessWidget {
   /// [enableBlur] allows turning off blur effect for low-end devices (default: true)
   /// [opacity] controls the opacity of the background color (default: 0.6)
   const FluentBackground({
-    Key? key,
+    super.key,
     required this.child,
     this.blurAmount = 15.0,
     this.backgroundColor,
     this.borderRadius,
     this.enableBlur = true,
     this.opacity = 0.6,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final defaultColor =
-        theme.scaffoldBackgroundColor.withValues(alpha: opacity);
+    final defaultColor = theme.scaffoldBackgroundColor.withValues(
+      alpha: opacity,
+    );
     final bgColor = backgroundColor ?? defaultColor;
 
     return ClipRRect(
@@ -42,10 +43,7 @@ class FluentBackground extends StatelessWidget {
           // Blur effect
           if (enableBlur)
             BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: blurAmount,
-                sigmaY: blurAmount,
-              ),
+              filter: ImageFilter.blur(sigmaX: blurAmount, sigmaY: blurAmount),
               child: Container(
                 decoration: BoxDecoration(
                   color: bgColor,
@@ -81,8 +79,9 @@ class FluentBackground extends StatelessWidget {
     double opacity = 0.5,
   }) {
     final theme = Theme.of(context);
-    final defaultColor =
-        theme.scaffoldBackgroundColor.withValues(alpha: opacity);
+    final defaultColor = theme.scaffoldBackgroundColor.withValues(
+      alpha: opacity,
+    );
     final bgColor = backgroundColor ?? defaultColor;
 
     return AppBar(
@@ -94,9 +93,7 @@ class FluentBackground extends StatelessWidget {
       flexibleSpace: ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: blurAmount, sigmaY: blurAmount),
-          child: Container(
-            color: bgColor,
-          ),
+          child: Container(color: bgColor),
         ),
       ),
       backgroundColor: Colors.transparent,
@@ -125,10 +122,7 @@ class FluentBackground extends StatelessWidget {
           // Blur effect
           if (enableBlur)
             BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: blurAmount,
-                sigmaY: blurAmount,
-              ),
+              filter: ImageFilter.blur(sigmaX: blurAmount, sigmaY: blurAmount),
               child: Container(
                 decoration: BoxDecoration(
                   color: bgColor,
@@ -145,10 +139,7 @@ class FluentBackground extends StatelessWidget {
             ),
 
           // Content with padding
-          Padding(
-            padding: padding,
-            child: child,
-          ),
+          Padding(padding: padding, child: child),
         ],
       ),
     );

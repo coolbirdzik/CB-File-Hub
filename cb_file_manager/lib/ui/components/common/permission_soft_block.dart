@@ -12,12 +12,12 @@ class PermissionSoftBlock extends StatelessWidget {
   final RequestCallback onRequest;
 
   const PermissionSoftBlock({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     required this.ctaLabel,
     required this.onRequest,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +56,7 @@ class PermissionSoftBlock extends StatelessWidget {
                     child: const Text('Mở Cài đặt'),
                   ),
                 ],
-              )
+              ),
             ],
           ),
         ),

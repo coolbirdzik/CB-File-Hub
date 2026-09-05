@@ -7,7 +7,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 
 class DebugTagsWidget extends StatefulWidget {
-  const DebugTagsWidget({Key? key}) : super(key: key);
+  const DebugTagsWidget({super.key});
 
   @override
   State<DebugTagsWidget> createState() => _DebugTagsWidgetState();
@@ -113,7 +113,8 @@ class _DebugTagsWidgetState extends State<DebugTagsWidget> {
       builder: (context) => AlertDialog(
         title: const Text('Clear All Tags'),
         content: Text(
-            'Are you sure you want to delete all ${_allTags.length} tags? This cannot be undone.'),
+          'Are you sure you want to delete all ${_allTags.length} tags? This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -179,7 +180,8 @@ class _DebugTagsWidgetState extends State<DebugTagsWidget> {
       final dbTags = await dbManager.getAllUniqueTags();
 
       setState(() {
-        _debugInfo = '''
+        _debugInfo =
+            '''
 === DEBUG TAGS SYSTEM ===
 SQLite enabled: $_useDatabase
 Total unique tags found: ${allTags.length}
@@ -277,13 +279,15 @@ Popular Tags: $popularTags
                               spacing: 8,
                               runSpacing: 8,
                               children: _allTags
-                                  .map((tag) => Chip(
-                                        label: Text(tag),
-                                        backgroundColor: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.2),
-                                      ))
+                                  .map(
+                                    (tag) => Chip(
+                                      label: Text(tag),
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.2),
+                                    ),
+                                  )
                                   .toList(),
                             ),
                         ],
@@ -309,14 +313,17 @@ Popular Tags: $popularTags
                               spacing: 8,
                               runSpacing: 8,
                               children: _popularTags.entries
-                                  .map((entry) => Chip(
-                                        label: Text(
-                                            '${entry.key} (${entry.value})'),
-                                        backgroundColor: Theme.of(context)
-                                            .colorScheme
-                                            .secondary
-                                            .withValues(alpha: 0.2),
-                                      ))
+                                  .map(
+                                    (entry) => Chip(
+                                      label: Text(
+                                        '${entry.key} (${entry.value})',
+                                      ),
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .secondary
+                                          .withValues(alpha: 0.2),
+                                    ),
+                                  )
                                   .toList(),
                             ),
                         ],

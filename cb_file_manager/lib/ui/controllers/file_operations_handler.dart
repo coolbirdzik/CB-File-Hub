@@ -132,12 +132,14 @@ class FileOperationsHandler {
       folderPaths.add(last);
     }
 
-    bloc.add(SelectItemsInRect(
-      folderPaths: folderPaths.toSet(),
-      filePaths: filePaths.toSet(),
-      isCtrlPressed: false,
-      isShiftPressed: true,
-    ));
+    bloc.add(
+      SelectItemsInRect(
+        folderPaths: folderPaths.toSet(),
+        filePaths: filePaths.toSet(),
+        isCtrlPressed: false,
+        isShiftPressed: true,
+      ),
+    );
   }
 
   /// Handle delete operation - shows confirmation dialog and dispatches delete event
@@ -151,7 +153,7 @@ class FileOperationsHandler {
     required bool permanent,
     required VoidCallback onClearSelection,
     void Function(Set<String> deletedPaths, String? nextFocusPath)?
-        onDeleteConfirmed,
+    onDeleteConfirmed,
   }) async {
     // Clone lists to avoid modifying the original lists from state
     final filesToDelete = List<String>.from(selectedFiles);
@@ -161,8 +163,10 @@ class FileOperationsHandler {
     if (filesToDelete.isEmpty &&
         foldersToDelete.isEmpty &&
         focusedPath != null) {
-      final focusedType =
-          await FileSystemEntity.type(focusedPath, followLinks: false);
+      final focusedType = await FileSystemEntity.type(
+        focusedPath,
+        followLinks: false,
+      );
       if (focusedType == FileSystemEntityType.directory) {
         foldersToDelete.add(focusedPath);
       } else {
@@ -218,11 +222,13 @@ class FileOperationsHandler {
       );
 
       if (confirmed == true) {
-        folderListBloc.add(FolderListDeleteItems(
-          filePaths: filesToDelete,
-          folderPaths: foldersToDelete,
-          permanent: true,
-        ));
+        folderListBloc.add(
+          FolderListDeleteItems(
+            filePaths: filesToDelete,
+            folderPaths: foldersToDelete,
+            permanent: true,
+          ),
+        );
         if (onDeleteConfirmed != null) {
           onDeleteConfirmed(pathsToDelete, nextFocusPath);
         } else {
@@ -240,7 +246,9 @@ class FileOperationsHandler {
           message: totalCount == 1
               ? localizations.moveToTrashConfirmMessage(firstItemName)
               : localizations.moveItemsToTrashConfirmation(
-                  totalCount, localizations.items),
+                  totalCount,
+                  localizations.items,
+                ),
           confirmText: localizations.deleteTitle,
           cancelText: localizations.cancel,
           previewPaths: previewPaths,
@@ -248,11 +256,13 @@ class FileOperationsHandler {
       );
 
       if (confirmed == true) {
-        folderListBloc.add(FolderListDeleteItems(
-          filePaths: filesToDelete,
-          folderPaths: foldersToDelete,
-          permanent: false,
-        ));
+        folderListBloc.add(
+          FolderListDeleteItems(
+            filePaths: filesToDelete,
+            folderPaths: foldersToDelete,
+            permanent: false,
+          ),
+        );
         if (onDeleteConfirmed != null) {
           onDeleteConfirmed(pathsToDelete, nextFocusPath);
         } else {
@@ -363,8 +373,8 @@ class FileOperationsHandler {
     final toast = AppToast.capture(context);
     final preferences = UserPreferences.instance;
     await preferences.init();
-    final allowFileExtensionRename =
-        await preferences.getAllowFileExtensionRename();
+    final allowFileExtensionRename = await preferences
+        .getAllowFileExtensionRename();
     if (!context.mounted) {
       return;
     }
@@ -410,9 +420,9 @@ class FileOperationsHandler {
       bloc.add(RenameFileOrFolder(entity, newName));
 
       try {
-        toast.success(isFile
-            ? l10n.renamedFileTo(newName)
-            : l10n.renamedFolderTo(newName));
+        toast.success(
+          isFile ? l10n.renamedFileTo(newName) : l10n.renamedFolderTo(newName),
+        );
       } catch (_) {}
     } finally {}
   }
@@ -474,15 +484,17 @@ class FileOperationsHandler {
     VideoThumbnailHelper.stopAllProcessing();
 
     if (ArchivePathUtils.isArchiveEntryPath(file.path)) {
-      unawaited(_openArchiveEntry(
-        context: context,
-        virtualFilePath: file.path,
-        folderListBloc: folderListBloc,
-        selectionBloc: selectionBloc,
-        currentFilter: currentFilter,
-        currentSearchTag: currentSearchTag,
-        onNavigateToPath: onNavigateToPath,
-      ));
+      unawaited(
+        _openArchiveEntry(
+          context: context,
+          virtualFilePath: file.path,
+          folderListBloc: folderListBloc,
+          selectionBloc: selectionBloc,
+          currentFilter: currentFilter,
+          currentSearchTag: currentSearchTag,
+          onNavigateToPath: onNavigateToPath,
+        ),
+      );
       return;
     }
 
@@ -496,7 +508,8 @@ class FileOperationsHandler {
         context,
         selectionBloc: selectionBloc,
       );
-      final SelectionState selectionSnapshot = (currentSelection == null ||
+      final SelectionState selectionSnapshot =
+          (currentSelection == null ||
               currentSelection.allSelectedPaths.isEmpty)
           ? SelectionState(
               selectedFilePaths: <String>{file.path},
@@ -509,13 +522,14 @@ class FileOperationsHandler {
       // 1) User-selected preferred external app for video (if set)
       // 2) System default app when setting enabled
       // 3) In-app player (default)
-      ExternalAppHelper.openWithPreferredVideoApp(file.path)
-          .then((openedPreferred) {
+      ExternalAppHelper.openWithPreferredVideoApp(file.path).then((
+        openedPreferred,
+      ) {
         if (openedPreferred) return;
 
-        locator<UserPreferences>()
-            .getUseSystemDefaultForVideo()
-            .then((useSystem) {
+        locator<UserPreferences>().getUseSystemDefaultForVideo().then((
+          useSystem,
+        ) {
           if (useSystem) {
             ExternalAppHelper.openWithSystemDefault(file.path).then((success) {
               if (!success && context.mounted) {
@@ -551,9 +565,11 @@ class FileOperationsHandler {
       List<File> imageFiles = [];
       int initialIndex = 0;
 
-      final bool canUseFilteredImages = currentFilter == 'image' &&
+      final bool canUseFilteredImages =
+          currentFilter == 'image' &&
           folderListBloc.state.filteredFiles.isNotEmpty;
-      final bool canUseFolderImages = currentFilter == null &&
+      final bool canUseFolderImages =
+          currentFilter == null &&
           currentSearchTag == null &&
           folderListBloc.state.files.isNotEmpty;
 
@@ -591,8 +607,9 @@ class FileOperationsHandler {
       }
     } else {
       // Unsupported in-app: delegate to the OS default app (user can pick via Open with).
-      ExternalAppHelper.openFileWithApp(file.path, 'shell_open')
-          .then((success) {
+      ExternalAppHelper.openFileWithApp(file.path, 'shell_open').then((
+        success,
+      ) {
         if (!success && context.mounted) {
           RouteUtils.showAcrylicDialog(
             context: context,

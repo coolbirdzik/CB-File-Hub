@@ -98,8 +98,9 @@ Widget _tile({
 }
 
 void main() {
-  testWidgets('the lifted editor wraps instead of cutting the name off',
-      (tester) async {
+  testWidgets('the lifted editor wraps instead of cutting the name off', (
+    tester,
+  ) async {
     final controller = _renaming(_longName);
 
     await tester.pumpWidget(_tile(controller: controller, renaming: true));
@@ -120,8 +121,9 @@ void main() {
     expect(controller.textController!.text, _longName);
   });
 
-  testWidgets('the lifted editor is mounted and focused on the first frame',
-      (tester) async {
+  testWidgets('the lifted editor is mounted and focused on the first frame', (
+    tester,
+  ) async {
     final controller = _renaming(_longName);
 
     // One frame only: the editor must be in the overlay immediately, or the
@@ -134,8 +136,9 @@ void main() {
     expect(controller.focusNode!.hasFocus, isTrue);
   });
 
-  testWidgets('a short name gets a one-line box, not the full cap',
-      (tester) async {
+  testWidgets('a short name gets a one-line box, not the full cap', (
+    tester,
+  ) async {
     const short = 'notes.txt';
     final controller = _renaming(short);
 
@@ -167,26 +170,30 @@ void main() {
     );
   });
 
-  testWidgets('growing past the band does not overflow the tile',
-      (tester) async {
+  testWidgets('growing past the band does not overflow the tile', (
+    tester,
+  ) async {
     final controller = _renaming(_longName);
 
-    await tester.pumpWidget(_tile(
-      controller: controller,
-      renaming: true,
-      bandHeight: GridZoomConstraints.gridItemNameAreaHeightWithTags,
-      below: const <Widget>[
-        SizedBox(height: 2),
-        SizedBox(height: 16, width: 60),
-      ],
-    ));
+    await tester.pumpWidget(
+      _tile(
+        controller: controller,
+        renaming: true,
+        bandHeight: GridZoomConstraints.gridItemNameAreaHeightWithTags,
+        below: const <Widget>[
+          SizedBox(height: 2),
+          SizedBox(height: 16, width: 60),
+        ],
+      ),
+    );
     await tester.pump();
 
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the label keeps the band while the editor is open',
-      (tester) async {
+  testWidgets('the label keeps the band while the editor is open', (
+    tester,
+  ) async {
     final controller = _renaming(_longName);
 
     await tester.pumpWidget(_tile(controller: controller, renaming: false));

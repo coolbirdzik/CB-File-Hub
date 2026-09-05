@@ -25,12 +25,12 @@ class FilePreviewPane extends StatelessWidget {
   final VoidCallback onClosePreview;
 
   const FilePreviewPane({
-    Key? key,
+    super.key,
     required this.state,
     required this.selectionState,
     required this.onOpenFile,
     required this.onClosePreview,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +40,9 @@ class FilePreviewPane extends StatelessWidget {
     final selectedPath = _resolveSelectedFilePath();
     final file = _resolvePreviewFile(selectedPath);
     final hasFile = file != null;
-    final displayName =
-        hasFile ? path.basename(file.path) : l10n.previewSelectFile;
+    final displayName = hasFile
+        ? path.basename(file.path)
+        : l10n.previewSelectFile;
 
     final panelTint = isDark
         ? theme.scaffoldBackgroundColor.withValues(alpha: 0.2)
@@ -69,8 +70,9 @@ class FilePreviewPane extends StatelessWidget {
                     stops: const [0.0, 0.35, 1.0],
                     colors: [
                       theme.shadowColor.withValues(alpha: isDark ? 0.1 : 0.04),
-                      theme.shadowColor
-                          .withValues(alpha: isDark ? 0.04 : 0.015),
+                      theme.shadowColor.withValues(
+                        alpha: isDark ? 0.04 : 0.015,
+                      ),
                       Colors.transparent,
                     ],
                   ),
@@ -86,9 +88,9 @@ class FilePreviewPane extends StatelessWidget {
                 showActions: hasFile,
                 onOpen: hasFile && onOpenFile != null
                     ? () => onOpenFile!.call(
-                          file,
-                          FileTypeUtils.isVideoFile(file.path),
-                        )
+                        file,
+                        FileTypeUtils.isVideoFile(file.path),
+                      )
                     : null,
                 openTooltip: l10n.open,
                 onClose: onClosePreview,
@@ -190,10 +192,7 @@ class FilePreviewPane extends StatelessWidget {
     }
 
     if (FileTypeUtils.isPdfFile(file.path)) {
-      return _PdfPreview(
-        key: ValueKey('preview-pdf-${file.path}'),
-        file: file,
-      );
+      return _PdfPreview(key: ValueKey('preview-pdf-${file.path}'), file: file);
     }
 
     if (FileTypeUtils.isTextFile(file.path)) {
@@ -232,9 +231,9 @@ class FilePreviewPane extends StatelessWidget {
       return File(selectedPath);
     }
     final matched = state.files.whereType<File>().firstWhere(
-          (file) => file.path == selectedPath,
-          orElse: () => File(selectedPath),
-        );
+      (file) => file.path == selectedPath,
+      orElse: () => File(selectedPath),
+    );
     if (!matched.existsSync()) return null;
     return matched;
   }
@@ -271,10 +270,7 @@ class _InAppFileViewerScreen extends StatelessWidget {
         file: file,
       );
     } else if (FileTypeUtils.isPdfFile(file.path)) {
-      body = _PdfPreview(
-        key: ValueKey('viewer-pdf-${file.path}'),
-        file: file,
-      );
+      body = _PdfPreview(key: ValueKey('viewer-pdf-${file.path}'), file: file);
     } else {
       body = Center(
         child: Text(
@@ -443,11 +439,7 @@ class _PreviewPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 28,
-              color: muted.withValues(alpha: 0.65),
-            ),
+            Icon(icon, size: 28, color: muted.withValues(alpha: 0.65)),
             const SizedBox(height: 14),
             Text(
               message,
@@ -481,7 +473,7 @@ class _PreviewPlaceholder extends StatelessWidget {
 class _TextFilePreview extends StatefulWidget {
   final File file;
 
-  const _TextFilePreview({Key? key, required this.file}) : super(key: key);
+  const _TextFilePreview({super.key, required this.file});
 
   @override
   State<_TextFilePreview> createState() => _TextFilePreviewState();
@@ -535,8 +527,9 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.2,
-                  color: theme.colorScheme.onSurfaceVariant
-                      .withValues(alpha: 0.32),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.32,
+                  ),
                 ),
               ),
             ),
@@ -561,11 +554,12 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
         final lineNumberDigits = lines.length.toString().length;
         final useMonospace =
             FileTypeUtils.isCodeLikeTextFile(widget.file.path) ||
-                _shouldSyntaxHighlight(widget.file.path);
+            _shouldSyntaxHighlight(widget.file.path);
         final textStyle = theme.textTheme.bodySmall?.copyWith(
           fontFamily: useMonospace ? 'Consolas' : null,
-          fontFamilyFallback:
-              useMonospace ? const ['Courier New', 'monospace'] : null,
+          fontFamilyFallback: useMonospace
+              ? const ['Courier New', 'monospace']
+              : null,
           fontSize: useMonospace ? 12 : 13,
           height: useMonospace ? 1.55 : 1.6,
           fontWeight: FontWeight.w400,
@@ -576,8 +570,10 @@ class _TextFilePreviewState extends State<_TextFilePreview> {
           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.34),
           fontFeatures: const [FontFeature.tabularFigures()],
         );
-        final gutterText =
-            _buildLineNumberColumn(lines.length, lineNumberDigits);
+        final gutterText = _buildLineNumberColumn(
+          lines.length,
+          lineNumberDigits,
+        );
         final highlightedSpan = _shouldSyntaxHighlight(widget.file.path)
             ? PreviewSyntaxHighlighter.buildHighlightedSpan(
                 source: content.text,
@@ -657,10 +653,7 @@ class _LineNumberGutter extends StatelessWidget {
   final String text;
   final TextStyle style;
 
-  const _LineNumberGutter({
-    required this.text,
-    required this.style,
-  });
+  const _LineNumberGutter({required this.text, required this.style});
 
   @override
   Widget build(BuildContext context) {
@@ -679,19 +672,14 @@ class _LineNumberGutter extends StatelessWidget {
           ),
         ),
       ),
-      child: Text(
-        text,
-        style: style,
-        textAlign: TextAlign.right,
-      ),
+      child: Text(text, style: style, textAlign: TextAlign.right),
     );
   }
 
   double _gutterWidth(String gutterText) {
-    final longestLine = gutterText.split('\n').fold<int>(
-          0,
-          (max, line) => line.length > max ? line.length : max,
-        );
+    final longestLine = gutterText
+        .split('\n')
+        .fold<int>(0, (max, line) => line.length > max ? line.length : max);
     return (longestLine * 7.2 + 22).clamp(32.0, 56.0);
   }
 }
@@ -727,7 +715,7 @@ class _PreviewTextBanner extends StatelessWidget {
 class _PdfPreview extends StatefulWidget {
   final File file;
 
-  const _PdfPreview({Key? key, required this.file}) : super(key: key);
+  const _PdfPreview({super.key, required this.file});
 
   @override
   State<_PdfPreview> createState() => _PdfPreviewState();
@@ -791,10 +779,7 @@ class _PdfPreviewState extends State<_PdfPreview> {
 class _ArchiveEntryPreview extends StatefulWidget {
   final String virtualPath;
 
-  const _ArchiveEntryPreview({
-    Key? key,
-    required this.virtualPath,
-  }) : super(key: key);
+  const _ArchiveEntryPreview({super.key, required this.virtualPath});
 
   @override
   State<_ArchiveEntryPreview> createState() => _ArchiveEntryPreviewState();
@@ -859,9 +844,7 @@ class _ArchiveEntryPreviewState extends State<_ArchiveEntryPreview> {
 
     final entryName = ArchivePathUtils.entryFileName(widget.virtualPath) ?? '';
     if (FileTypeUtils.isImageFile(entryName)) {
-      return InteractiveViewer(
-        child: Image.file(file, fit: BoxFit.contain),
-      );
+      return InteractiveViewer(child: Image.file(file, fit: BoxFit.contain));
     }
 
     if (FileTypeUtils.isTextFile(entryName)) {

@@ -84,8 +84,10 @@ class CleanerAppInsightsState extends Equatable {
     final staleThreshold = Duration(days: staleThresholdDays);
     for (final profile in report?.apps ?? const <AppStorageProfile>[]) {
       final isLarge = profile.bestKnownSizeBytes >= largeThresholdBytes;
-      final isStale =
-          profile.isStale(now: evaluatedAt, threshold: staleThreshold);
+      final isStale = profile.isStale(
+        now: evaluatedAt,
+        threshold: staleThreshold,
+      );
       if (isLarge) large++;
       if (isStale) stale++;
       if (isLarge && isStale) {
@@ -93,8 +95,12 @@ class CleanerAppInsightsState extends Equatable {
         attentionSize += profile.bestKnownSizeBytes;
       }
     }
-    return _memo.counters =
-        _AppCounters(large, stale, attention, attentionSize);
+    return _memo.counters = _AppCounters(
+      large,
+      stale,
+      attention,
+      attentionSize,
+    );
   }
 
   AppStorageProfile? get selectedProfile {
@@ -159,17 +165,17 @@ class CleanerAppInsightsState extends Equatable {
 
   @override
   List<Object?> get props => <Object?>[
-        status,
-        report,
-        searchQuery,
-        filter,
-        sort,
-        largeThresholdBytes,
-        staleThresholdDays,
-        selectedAppId,
-        evaluatedAt,
-        errorMessage,
-      ];
+    status,
+    report,
+    searchQuery,
+    filter,
+    sort,
+    largeThresholdBytes,
+    staleThresholdDays,
+    selectedAppId,
+    evaluatedAt,
+    errorMessage,
+  ];
 }
 
 List<AppStorageProfile> filterAndSortAppProfiles({
@@ -184,33 +190,32 @@ List<AppStorageProfile> filterAndSortAppProfiles({
   final normalizedQuery = searchQuery.trim().toLowerCase();
   final staleThreshold = Duration(days: staleThresholdDays);
 
-  final result = profiles.where((profile) {
-    if (normalizedQuery.isNotEmpty &&
-        !_matchesSearch(profile, normalizedQuery)) {
-      return false;
-    }
+  final result = profiles
+      .where((profile) {
+        if (normalizedQuery.isNotEmpty &&
+            !_matchesSearch(profile, normalizedQuery)) {
+          return false;
+        }
 
-    switch (filter) {
-      case CleanerAppFilter.all:
-        return true;
-      case CleanerAppFilter.attention:
-        return appNeedsAttention(
-          profile,
-          evaluatedAt: evaluatedAt,
-          largeThresholdBytes: largeThresholdBytes,
-          staleThresholdDays: staleThresholdDays,
-        );
-      case CleanerAppFilter.large:
-        return profile.bestKnownSizeBytes >= largeThresholdBytes;
-      case CleanerAppFilter.stale:
-        return profile.isStale(
-          now: evaluatedAt,
-          threshold: staleThreshold,
-        );
-      case CleanerAppFilter.cleanable:
-        return profile.cleanableBytes > 0;
-    }
-  }).toList(growable: false);
+        switch (filter) {
+          case CleanerAppFilter.all:
+            return true;
+          case CleanerAppFilter.attention:
+            return appNeedsAttention(
+              profile,
+              evaluatedAt: evaluatedAt,
+              largeThresholdBytes: largeThresholdBytes,
+              staleThresholdDays: staleThresholdDays,
+            );
+          case CleanerAppFilter.large:
+            return profile.bestKnownSizeBytes >= largeThresholdBytes;
+          case CleanerAppFilter.stale:
+            return profile.isStale(now: evaluatedAt, threshold: staleThreshold);
+          case CleanerAppFilter.cleanable:
+            return profile.cleanableBytes > 0;
+        }
+      })
+      .toList(growable: false);
 
   result.sort((left, right) {
     int comparison;
@@ -228,22 +233,22 @@ List<AppStorageProfile> filterAndSortAppProfiles({
           largeThresholdBytes: largeThresholdBytes,
           staleThresholdDays: staleThresholdDays,
         );
-        comparison = (rightAttention ? 1 : 0).compareTo(
-          leftAttention ? 1 : 0,
-        );
+        comparison = (rightAttention ? 1 : 0).compareTo(leftAttention ? 1 : 0);
         if (comparison == 0) {
-          comparison =
-              right.bestKnownSizeBytes.compareTo(left.bestKnownSizeBytes);
+          comparison = right.bestKnownSizeBytes.compareTo(
+            left.bestKnownSizeBytes,
+          );
         }
         break;
       case CleanerAppSort.sizeDescending:
-        comparison =
-            right.bestKnownSizeBytes.compareTo(left.bestKnownSizeBytes);
+        comparison = right.bestKnownSizeBytes.compareTo(
+          left.bestKnownSizeBytes,
+        );
         break;
       case CleanerAppSort.nameAscending:
-        comparison = left.app.displayName
-            .toLowerCase()
-            .compareTo(right.app.displayName.toLowerCase());
+        comparison = left.app.displayName.toLowerCase().compareTo(
+          right.app.displayName.toLowerCase(),
+        );
         break;
       case CleanerAppSort.lastOpenedOldest:
         comparison = _compareLastOpened(left, right);
@@ -251,9 +256,9 @@ List<AppStorageProfile> filterAndSortAppProfiles({
     }
 
     if (comparison != 0) return comparison;
-    comparison = left.app.displayName
-        .toLowerCase()
-        .compareTo(right.app.displayName.toLowerCase());
+    comparison = left.app.displayName.toLowerCase().compareTo(
+      right.app.displayName.toLowerCase(),
+    );
     if (comparison != 0) return comparison;
     return left.app.id.compareTo(right.app.id);
   });
@@ -327,10 +332,7 @@ bool _matchesSearch(AppStorageProfile profile, String normalizedQuery) {
   return _searchHaystack(profile).contains(normalizedQuery);
 }
 
-int _compareLastOpened(
-  AppStorageProfile left,
-  AppStorageProfile right,
-) {
+int _compareLastOpened(AppStorageProfile left, AppStorageProfile right) {
   final leftDate = left.usage.lastOpenedAt;
   final rightDate = right.usage.lastOpenedAt;
   if (leftDate == null && rightDate == null) return 0;

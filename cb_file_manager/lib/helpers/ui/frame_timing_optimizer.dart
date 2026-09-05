@@ -34,7 +34,9 @@ class FrameTimingOptimizer {
 
       // Optimize Skia render pipeline
       await SystemChannels.skia.invokeMethod<void>(
-          'Skia.setResourceCacheMaxBytes', _maxResourceCacheBytes);
+        'Skia.setResourceCacheMaxBytes',
+        _maxResourceCacheBytes,
+      );
 
       // Register frame callback to ensure consistent frame timing
       SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -52,7 +54,8 @@ class FrameTimingOptimizer {
   void optimizeBeforeHeavyOperation() {
     if (!_initialized) {
       debugPrint(
-          'FrameTimingOptimizer: Warning - Called before initialization');
+        'FrameTimingOptimizer: Warning - Called before initialization',
+      );
       return;
     }
 

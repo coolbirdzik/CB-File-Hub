@@ -12,11 +12,12 @@ import '../../utils/route.dart';
 // Import TabData
 // Import TabMainScreen
 import 'network_connection_dialog.dart';
+
 // Import SMBBrowserScreen
 
 /// Screen to display and manage network connections
 class NetworkConnectionScreen extends StatefulWidget {
-  const NetworkConnectionScreen({Key? key}) : super(key: key);
+  const NetworkConnectionScreen({super.key});
 
   @override
   State<NetworkConnectionScreen> createState() =>
@@ -29,8 +30,8 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
     super.initState();
     // Request list of available services when screen initializes
     context.read<NetworkBrowsingBloc>().add(
-          const NetworkServicesListRequested(),
-        );
+      const NetworkServicesListRequested(),
+    );
   }
 
   @override
@@ -50,16 +51,22 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(PhosphorIconsLight.warning,
-                      size: 48, color: theme.colorScheme.error),
+                  Icon(
+                    PhosphorIconsLight.warning,
+                    size: 48,
+                    color: theme.colorScheme.error,
+                  ),
                   const SizedBox(height: 16),
-                  Text(l10n.errorWithMessage(
-                      state.errorMessage ?? l10n.unknownError)),
+                  Text(
+                    l10n.errorWithMessage(
+                      state.errorMessage ?? l10n.unknownError,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => context
-                        .read<NetworkBrowsingBloc>()
-                        .add(const NetworkServicesListRequested()),
+                    onPressed: () => context.read<NetworkBrowsingBloc>().add(
+                      const NetworkServicesListRequested(),
+                    ),
                     child: Text(l10n.tryAgain),
                   ),
                 ],
@@ -69,9 +76,9 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              context
-                  .read<NetworkBrowsingBloc>()
-                  .add(const NetworkServicesListRequested());
+              context.read<NetworkBrowsingBloc>().add(
+                const NetworkServicesListRequested(),
+              );
             },
             child: ListView(
               children: [
@@ -120,8 +127,11 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(PhosphorIconsLight.wifiSlash,
-                  size: 48, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                PhosphorIconsLight.wifiSlash,
+                size: 48,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(height: 16),
               Text(
                 l10n.noActiveNetworkConnections,
@@ -131,7 +141,9 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
               Text(
                 l10n.useAddButtonToAddConnection,
                 style: TextStyle(
-                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -162,15 +174,14 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
         }
 
         return ListTile(
-          leading: Icon(
-            service.serviceIcon,
-            color: theme.colorScheme.primary,
-          ),
+          leading: Icon(service.serviceIcon, color: theme.colorScheme.primary),
           title: Text(displayName, overflow: TextOverflow.ellipsis),
           subtitle: Text(subtitle),
           trailing: IconButton(
-            icon: Icon(PhosphorIconsLight.xCircle,
-                color: theme.colorScheme.error),
+            icon: Icon(
+              PhosphorIconsLight.xCircle,
+              color: theme.colorScheme.error,
+            ),
             onPressed: () => _disconnectService(path),
             tooltip: l10n.disconnect,
           ),
@@ -198,10 +209,7 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
         final service = services[index];
 
         return ListTile(
-          leading: Icon(
-            service.serviceIcon,
-            color: theme.colorScheme.primary,
-          ),
+          leading: Icon(service.serviceIcon, color: theme.colorScheme.primary),
           title: Text(service.serviceName),
           subtitle: Text(service.serviceDescription),
           onTap: () {
@@ -255,7 +263,8 @@ class _NetworkConnectionScreenState extends State<NetworkConnectionScreen> {
       } catch (_) {}
 
       debugPrint(
-          "NetworkConnectionScreen: Navigating in current tab to path: $path and name: $tabName");
+        "NetworkConnectionScreen: Navigating in current tab to path: $path and name: $tabName",
+      );
       _navigateInCurrentTab(path, tabName: tabName);
     }
     // Do not pop the navigator here, as it causes the crash.

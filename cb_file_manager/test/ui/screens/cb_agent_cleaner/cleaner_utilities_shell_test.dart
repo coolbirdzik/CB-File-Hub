@@ -41,8 +41,9 @@ Widget _buildShell({
 }
 
 void main() {
-  testWidgets('desktop shell exposes a scalable utility sidebar',
-      (tester) async {
+  testWidgets('desktop shell exposes a scalable utility sidebar', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -50,10 +51,7 @@ void main() {
 
     String? selected;
     await tester.pumpWidget(
-      _buildShell(
-        selectedId: 'diskCleaner',
-        onSelected: (id) => selected = id,
-      ),
+      _buildShell(selectedId: 'diskCleaner', onSelected: (id) => selected = id),
     );
 
     expect(
@@ -70,7 +68,9 @@ void main() {
     );
     expect(find.text('STORAGE'), findsOneWidget);
     expect(
-        find.byKey(const ValueKey<String>('utility-content')), findsOneWidget);
+      find.byKey(const ValueKey<String>('utility-content')),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.byKey(const ValueKey<String>('cleaner-utility-appInsights')),
@@ -78,8 +78,9 @@ void main() {
     expect(selected, 'appInsights');
   });
 
-  testWidgets('compact shell switches utilities through a popup',
-      (tester) async {
+  testWidgets('compact shell switches utilities through a popup', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(760, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -87,10 +88,7 @@ void main() {
 
     String? selected;
     await tester.pumpWidget(
-      _buildShell(
-        selectedId: 'diskCleaner',
-        onSelected: (id) => selected = id,
-      ),
+      _buildShell(selectedId: 'diskCleaner', onSelected: (id) => selected = id),
     );
 
     expect(
@@ -102,8 +100,9 @@ void main() {
       findsNothing,
     );
 
-    await tester
-        .tap(find.byKey(const ValueKey<String>('cleaner-utility-popup')));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('cleaner-utility-popup')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Apps').last);
     await tester.pumpAndSettle();

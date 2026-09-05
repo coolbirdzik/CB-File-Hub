@@ -11,12 +11,12 @@ class ErrorView extends StatelessWidget {
   final bool isNetworkPath;
 
   const ErrorView({
-    Key? key,
+    super.key,
     required this.errorMessage,
     required this.onRetry,
     required this.onGoBack,
     this.isNetworkPath = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -36,10 +36,7 @@ class ErrorView extends StatelessWidget {
           Text(
             errorMessage,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
           Row(

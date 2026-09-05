@@ -14,18 +14,12 @@ import 'package:path/path.dart' as path;
 enum ThemePreference {
   system, // Follow system theme
   light, // Force light theme
-  dark // Force dark theme
+  dark, // Force dark theme
 }
 
-enum TagThumbnailFitMode {
-  contain,
-  cover,
-}
+enum TagThumbnailFitMode { contain, cover }
 
-enum FileThumbnailFitMode {
-  cover,
-  contain,
-}
+enum FileThumbnailFitMode { cover, contain }
 
 /// A class to manage user preferences for the application
 class UserPreferences {
@@ -209,7 +203,9 @@ class UserPreferences {
     _useDatabaseStorage = true;
     // We still save the preference for potential future flags or legacy compatibility
     return await _savePreference<bool>(
-        _useDatabaseStorageKey, _useDatabaseStorage);
+      _useDatabaseStorageKey,
+      _useDatabaseStorage,
+    );
   }
 
   /// Backward-compatible no-op. Preferences are always stored in SQLite.
@@ -235,42 +231,40 @@ class UserPreferences {
   }
 
   /// Generic method to read a preference value from SQLite.
-  Future<T?> _getPreference<T>(
-    String key, {
-    T? defaultValue,
-  }) async {
+  Future<T?> _getPreference<T>(String key, {T? defaultValue}) async {
     await init();
     _databaseManager ??= DatabaseManager.getInstance();
 
     if (T == int) {
       return await _databaseManager!.getIntPreference(
-        key,
-        defaultValue: defaultValue as int?,
-      ) as T?;
+            key,
+            defaultValue: defaultValue as int?,
+          )
+          as T?;
     } else if (T == double) {
       return await _databaseManager!.getDoublePreference(
-        key,
-        defaultValue: defaultValue as double?,
-      ) as T?;
+            key,
+            defaultValue: defaultValue as double?,
+          )
+          as T?;
     } else if (T == bool) {
       return await _databaseManager!.getBoolPreference(
-        key,
-        defaultValue: defaultValue as bool?,
-      ) as T?;
+            key,
+            defaultValue: defaultValue as bool?,
+          )
+          as T?;
     } else if (T == String) {
       return await _databaseManager!.getStringPreference(
-        key,
-        defaultValue: defaultValue as String?,
-      ) as T?;
+            key,
+            defaultValue: defaultValue as String?,
+          )
+          as T?;
     }
     return defaultValue;
   }
 
   /// Generic method to persist a preference value into SQLite.
-  Future<bool> _savePreference<T>(
-    String key,
-    T value,
-  ) async {
+  Future<bool> _savePreference<T>(String key, T value) async {
     await init();
     _databaseManager ??= DatabaseManager.getInstance();
 
@@ -307,7 +301,9 @@ class UserPreferences {
     // Ensure the size is within bounds
     double validSize = size.clamp(minThumbnailSize, maxThumbnailSize);
     return await _savePreference<double>(
-        _imageGalleryThumbnailSizeKey, validSize);
+      _imageGalleryThumbnailSizeKey,
+      validSize,
+    );
   }
 
   /// Get video gallery thumbnail size (as grid count - higher means smaller thumbnails)
@@ -324,7 +320,9 @@ class UserPreferences {
     // Ensure the size is within bounds
     double validSize = size.clamp(minThumbnailSize, maxThumbnailSize);
     return await _savePreference<double>(
-        _videoGalleryThumbnailSizeKey, validSize);
+      _videoGalleryThumbnailSizeKey,
+      validSize,
+    );
   }
 
   /// Get the last accessed folder path with validation
@@ -410,10 +408,7 @@ class UserPreferences {
       bool changed = false;
       for (final p in rawPaths) {
         try {
-          final entityType = FileSystemEntity.typeSync(
-            p,
-            followLinks: false,
-          );
+          final entityType = FileSystemEntity.typeSync(p, followLinks: false);
           if (entityType != FileSystemEntityType.notFound) {
             validPaths.add(p);
           } else {
@@ -722,7 +717,8 @@ class UserPreferences {
 
   /// Get trash bin view mode preference
   Future<ViewMode> getTrashViewMode() async {
-    int index = await _getPreference<int>(
+    int index =
+        await _getPreference<int>(
           _trashViewModeKey,
           defaultValue: ViewMode.list.index,
         ) ??
@@ -740,7 +736,8 @@ class UserPreferences {
 
   /// Get trash bin sort option preference
   Future<SortOption> getTrashSortOption() async {
-    int index = await _getPreference<int>(
+    int index =
+        await _getPreference<int>(
           _trashSortOptionKey,
           defaultValue: SortOption.dateDesc.index,
         ) ??
@@ -759,8 +756,10 @@ class UserPreferences {
   /// Get trash bin grid zoom level preference
   Future<int> getTrashGridZoomLevel() async {
     final raw = await _getPreference<int>(_trashGridZoomLevelKey);
-    return (raw ?? defaultGridZoomLevel)
-        .clamp(minGridZoomLevel, maxGridZoomLevel);
+    return (raw ?? defaultGridZoomLevel).clamp(
+      minGridZoomLevel,
+      maxGridZoomLevel,
+    );
   }
 
   /// Save trash bin grid zoom level preference
@@ -772,8 +771,10 @@ class UserPreferences {
   /// Get tag management screen grid zoom level preference
   Future<int> getTagsGridZoomLevel() async {
     final raw = await _getPreference<int>(_tagsGridZoomLevelKey);
-    return (raw ?? defaultGridZoomLevel)
-        .clamp(minGridZoomLevel, maxGridZoomLevel);
+    return (raw ?? defaultGridZoomLevel).clamp(
+      minGridZoomLevel,
+      maxGridZoomLevel,
+    );
   }
 
   /// Save tag management screen grid zoom level preference
@@ -884,11 +885,8 @@ class UserPreferences {
 
   /// Get current view mode preference (list or grid)
   Future<ViewMode> getViewMode() async {
-    int viewModeIndex = await _getPreference<int>(
-          _viewModeKey,
-          defaultValue: 0,
-        ) ??
-        0;
+    int viewModeIndex =
+        await _getPreference<int>(_viewModeKey, defaultValue: 0) ?? 0;
     if (viewModeIndex < 0 || viewModeIndex >= ViewMode.values.length) {
       return ViewMode.list;
     }
@@ -902,11 +900,8 @@ class UserPreferences {
 
   /// Get current sort option preference
   Future<SortOption> getSortOption() async {
-    int sortOptionIndex = await _getPreference<int>(
-          _sortOptionKey,
-          defaultValue: 0,
-        ) ??
-        0;
+    int sortOptionIndex =
+        await _getPreference<int>(_sortOptionKey, defaultValue: 0) ?? 0;
     return SortOption.values[sortOptionIndex];
   }
 
@@ -930,10 +925,7 @@ class UserPreferences {
     return ViewMode.values[resolvedIndex];
   }
 
-  Future<bool> setVideoLibraryViewMode(
-    int libraryId,
-    ViewMode viewMode,
-  ) async {
+  Future<bool> setVideoLibraryViewMode(int libraryId, ViewMode viewMode) async {
     return await _savePreference<int>(
       '$_videoLibraryViewModePrefix$libraryId',
       viewMode.index,
@@ -965,9 +957,7 @@ class UserPreferences {
     );
   }
 
-  Future<ViewMode> getNetworkBrowserViewMode({
-    ViewMode? fallback,
-  }) async {
+  Future<ViewMode> getNetworkBrowserViewMode({ViewMode? fallback}) async {
     final index = await _getPreference<int>(
       _networkBrowserViewModeKey,
       defaultValue: fallback?.index ?? ViewMode.list.index,
@@ -986,9 +976,7 @@ class UserPreferences {
     );
   }
 
-  Future<SortOption> getNetworkBrowserSortOption({
-    SortOption? fallback,
-  }) async {
+  Future<SortOption> getNetworkBrowserSortOption({SortOption? fallback}) async {
     final index = await _getPreference<int>(
       _networkBrowserSortOptionKey,
       defaultValue: fallback?.index ?? SortOption.nameAsc.index,
@@ -1069,10 +1057,7 @@ class UserPreferences {
 
   /// Get drawer pinned state
   Future<bool> getDrawerPinned() async {
-    return await _getPreference<bool>(
-          _drawerPinnedKey,
-          defaultValue: false,
-        ) ??
+    return await _getPreference<bool>(_drawerPinnedKey, defaultValue: false) ??
         false;
   }
 
@@ -1083,11 +1068,8 @@ class UserPreferences {
 
   /// Get current theme preference
   Future<ThemePreference> getThemePreference() async {
-    int themeIndex = await _getPreference<int>(
-          _themePreferenceKey,
-          defaultValue: 0,
-        ) ??
-        0;
+    int themeIndex =
+        await _getPreference<int>(_themePreferenceKey, defaultValue: 0) ?? 0;
     return ThemePreference.values[themeIndex];
   }
 
@@ -1100,15 +1082,16 @@ class UserPreferences {
       case ThemePreference.dark:
         return ThemeMode.dark;
       case ThemePreference.system:
-      default:
         return ThemeMode.system;
     }
   }
 
   /// Save theme preference and notify listeners
   Future<bool> setThemePreference(ThemePreference preference) async {
-    bool result =
-        await _savePreference<int>(_themePreferenceKey, preference.index);
+    bool result = await _savePreference<int>(
+      _themePreferenceKey,
+      preference.index,
+    );
 
     if (result) {
       // Notify listeners about the theme change
@@ -1130,10 +1113,14 @@ class UserPreferences {
   /// Save video thumbnail timestamp preference
   Future<bool> setVideoThumbnailTimestamp(int seconds) async {
     // Ensure the timestamp is within bounds
-    final validTimestamp =
-        seconds.clamp(minVideoThumbnailTimestamp, maxVideoThumbnailTimestamp);
+    final validTimestamp = seconds.clamp(
+      minVideoThumbnailTimestamp,
+      maxVideoThumbnailTimestamp,
+    );
     return await _savePreference<int>(
-        _videoThumbnailTimestampKey, validTimestamp);
+      _videoThumbnailTimestampKey,
+      validTimestamp,
+    );
   }
 
   /// Get video thumbnail position preference (as percentage of video duration)
@@ -1149,9 +1136,13 @@ class UserPreferences {
   Future<bool> setVideoThumbnailPercentage(int percentage) async {
     // Ensure the percentage is within bounds
     final validPercentage = percentage.clamp(
-        minVideoThumbnailPercentage, maxVideoThumbnailPercentage);
+      minVideoThumbnailPercentage,
+      maxVideoThumbnailPercentage,
+    );
     return await _savePreference<int>(
-        _videoThumbnailPercentageKey, validPercentage);
+      _videoThumbnailPercentageKey,
+      validPercentage,
+    );
   }
 
   /// Get thumbnail generation mode preference
@@ -1168,8 +1159,9 @@ class UserPreferences {
   /// mode: 'fast' for OS built-in, 'custom' for FFmpeg with user timestamp
   Future<bool> setThumbnailMode(String mode) async {
     // Validate mode value
-    final validMode =
-        (mode == 'fast' || mode == 'custom') ? mode : defaultThumbnailMode;
+    final validMode = (mode == 'fast' || mode == 'custom')
+        ? mode
+        : defaultThumbnailMode;
     return await _savePreference<String>(_thumbnailModeKey, validMode);
   }
 
@@ -1240,10 +1232,14 @@ class UserPreferences {
 
   /// Save max thumbnail generation concurrency
   Future<bool> setMaxThumbnailConcurrency(int concurrency) async {
-    final validConcurrency =
-        concurrency.clamp(minThumbnailConcurrency, maxThumbnailConcurrency);
+    final validConcurrency = concurrency.clamp(
+      minThumbnailConcurrency,
+      maxThumbnailConcurrency,
+    );
     return await _savePreference<int>(
-        _maxThumbnailConcurrencyKey, validConcurrency);
+      _maxThumbnailConcurrencyKey,
+      validConcurrency,
+    );
   }
 
   /// Get the configured tab inactive threshold in minutes.
@@ -1291,8 +1287,10 @@ class UserPreferences {
     await _savePreference<String>(key, value);
   }
 
-  Future<String?> getVideoPlayerString(String key,
-      {String? defaultValue}) async {
+  Future<String?> getVideoPlayerString(
+    String key, {
+    String? defaultValue,
+  }) async {
     return await _getPreference<String>(key, defaultValue: defaultValue);
   }
 
@@ -1329,7 +1327,9 @@ class UserPreferences {
         final directory = await getApplicationDocumentsDirectory();
         final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
         filePath = path.join(
-            directory.path, 'cb_file_hub_preferences_$timestamp.json');
+          directory.path,
+          'cb_file_hub_preferences_$timestamp.json',
+        );
       }
 
       // Write to file
@@ -1345,13 +1345,13 @@ class UserPreferences {
   /// Import preferences from a JSON file
   Future<bool> importPreferences() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
+      if (picked?.path != null) {
+        final file = File(picked!.path!);
         final jsonString = await file.readAsString();
         final Map<String, dynamic> preferencesMap = jsonDecode(jsonString);
 
@@ -1379,7 +1379,7 @@ class UserPreferences {
   Future<String?> exportAllData() async {
     try {
       // Ask user to select export directory
-      String? customDir = await FilePicker.platform.getDirectoryPath(
+      String? customDir = await FilePicker.getDirectoryPath(
         dialogTitle: 'Select folder to save backup',
       );
 
@@ -1421,7 +1421,7 @@ class UserPreferences {
           final Map<String, dynamic> exportData = {
             'tags': tagsData,
             'exportDate': DateTime.now().toIso8601String(),
-            'version': '1.0'
+            'version': '1.0',
           };
 
           // Convert to JSON
@@ -1437,7 +1437,7 @@ class UserPreferences {
       final manifestData = {
         'exportDate': DateTime.now().toIso8601String(),
         'version': '1.0',
-        'components': {'preferences': true, 'database': databaseExported}
+        'components': {'preferences': true, 'database': databaseExported},
       };
 
       final manifestJsonString = jsonEncode(manifestData);
@@ -1455,7 +1455,7 @@ class UserPreferences {
   Future<bool> importAllData() async {
     try {
       // Ask user to select the export directory to import from
-      String? importDirPath = await FilePicker.platform.getDirectoryPath(
+      String? importDirPath = await FilePicker.getDirectoryPath(
         dialogTitle: 'Select backup folder to import',
       );
 
@@ -1559,10 +1559,11 @@ class UserPreferences {
 
     if (_preferences != null) {
       settings.addAll(
-          _preferences!.getKeys().fold<Map<String, dynamic>>({}, (map, key) {
-        map[key] = _preferences!.get(key);
-        return map;
-      }));
+        _preferences!.getKeys().fold<Map<String, dynamic>>({}, (map, key) {
+          map[key] = _preferences!.get(key);
+          return map;
+        }),
+      );
     }
 
     return settings;
@@ -1596,8 +1597,9 @@ class UserPreferences {
 
   /// Get column visibility settings for details view
   Future<ColumnVisibility> getColumnVisibility() async {
-    String? columnVisibilityJson =
-        await _getPreference<String>(_columnVisibilityKey);
+    String? columnVisibilityJson = await _getPreference<String>(
+      _columnVisibilityKey,
+    );
 
     if (columnVisibilityJson == null) {
       return const ColumnVisibility(); // Use default

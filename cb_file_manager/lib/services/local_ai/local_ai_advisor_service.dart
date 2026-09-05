@@ -81,14 +81,13 @@ class LocalAiAdvisorService {
     Future<Directory> Function()? documentsDirectoryProvider,
     LocalAiChatRuntime? chatRuntime,
     LocalAiChatRuntime? ggufChatRuntime,
-    required SharedPreferences prefs,
-  })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
-        _prefs = prefs,
-        _httpClient = httpClient ?? http.Client(),
-        _chatRuntime = chatRuntime ?? const GemmaLiteRtLocalAiChatRuntime(),
-        _ggufChatRuntime = ggufChatRuntime ?? GgufLlamaCppLocalAiChatRuntime(),
-        _documentsDirectoryProvider =
-            documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
+    required this._prefs,
+  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+       _httpClient = httpClient ?? http.Client(),
+       _chatRuntime = chatRuntime ?? const GemmaLiteRtLocalAiChatRuntime(),
+       _ggufChatRuntime = ggufChatRuntime ?? GgufLlamaCppLocalAiChatRuntime(),
+       _documentsDirectoryProvider =
+           documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
   /// The recommended model that can run in the current LiteRT-LM runtime.
   HuggingFaceModelEntry get pinnedModel =>
@@ -175,7 +174,8 @@ class LocalAiAdvisorService {
   }
 
   Future<List<HuggingFaceModelEntry>> _fetchFromHuggingFace(
-      String? token) async {
+    String? token,
+  ) async {
     // Stub: In a real implementation, query https://huggingface.co/api/models
     // with filters for compatible mobile/local agent artifacts.
     // Token is optional for public models - pass it in Authorization header if available.
@@ -229,9 +229,11 @@ class LocalAiAdvisorService {
     try {
       final list = jsonDecode(json) as List<dynamic>;
       return list
-          .map((e) => _normalizeInstalledModelPath(
-                InstalledLocalModel.fromJson(e as Map<String, dynamic>),
-              ))
+          .map(
+            (e) => _normalizeInstalledModelPath(
+              InstalledLocalModel.fromJson(e as Map<String, dynamic>),
+            ),
+          )
           .toList();
     } catch (e) {
       AppLogger.warning('[LocalAI] Failed to parse installed models', error: e);
@@ -270,9 +272,10 @@ class LocalAiAdvisorService {
   InstalledLocalModel? getSelectedModel() {
     final id = _prefs.getString(_selectedModelIdKey);
     if (id == null) return null;
-    return getInstalledModels()
-        .cast<InstalledLocalModel?>()
-        .firstWhere((m) => m?.catalogId == id, orElse: () => null);
+    return getInstalledModels().cast<InstalledLocalModel?>().firstWhere(
+      (m) => m?.catalogId == id,
+      orElse: () => null,
+    );
   }
 
   /// Marks a model as the active model for inference.
@@ -291,10 +294,12 @@ class LocalAiAdvisorService {
     AppLogger.info('[LocalAI] Installing model: ${entry.id}');
 
     final dir = await _documentsDirectoryProvider();
-    final modelDir = Directory(_normalizeLocalPath(
-      '${dir.path}${Platform.pathSeparator}local_ai_models'
-      '${Platform.pathSeparator}${entry.id.replaceAll('/', '_')}',
-    ));
+    final modelDir = Directory(
+      _normalizeLocalPath(
+        '${dir.path}${Platform.pathSeparator}local_ai_models'
+        '${Platform.pathSeparator}${entry.id.replaceAll('/', '_')}',
+      ),
+    );
     await modelDir.create(recursive: true);
 
     final modelPath = _normalizeLocalPath(
@@ -325,23 +330,27 @@ class LocalAiAdvisorService {
     final tempFile = File(tempPath);
     final sink = tempFile.openWrite();
 
-    onProgress(ModelDownloadProgress(
-      catalogId: entry.id,
-      downloadedBytes: 0,
-      totalBytes: totalBytes,
-      state: LocalModelDownloadState.downloading,
-    ));
+    onProgress(
+      ModelDownloadProgress(
+        catalogId: entry.id,
+        downloadedBytes: 0,
+        totalBytes: totalBytes,
+        state: LocalModelDownloadState.downloading,
+      ),
+    );
 
     try {
       await for (final chunk in response.stream) {
         downloadedBytes += chunk.length;
         sink.add(chunk);
-        onProgress(ModelDownloadProgress(
-          catalogId: entry.id,
-          downloadedBytes: downloadedBytes,
-          totalBytes: totalBytes,
-          state: LocalModelDownloadState.downloading,
-        ));
+        onProgress(
+          ModelDownloadProgress(
+            catalogId: entry.id,
+            downloadedBytes: downloadedBytes,
+            totalBytes: totalBytes,
+            state: LocalModelDownloadState.downloading,
+          ),
+        );
       }
     } catch (_) {
       await sink.close();
@@ -379,12 +388,14 @@ class LocalAiAdvisorService {
       await setSelectedModel(entry.id);
     }
 
-    onProgress(ModelDownloadProgress(
-      catalogId: entry.id,
-      downloadedBytes: installedSize,
-      totalBytes: totalBytes > 0 ? totalBytes : installedSize,
-      state: LocalModelDownloadState.completed,
-    ));
+    onProgress(
+      ModelDownloadProgress(
+        catalogId: entry.id,
+        downloadedBytes: installedSize,
+        totalBytes: totalBytes > 0 ? totalBytes : installedSize,
+        state: LocalModelDownloadState.completed,
+      ),
+    );
 
     AppLogger.info('[LocalAI] Model installed: ${entry.id}');
     return installed;
@@ -402,9 +413,9 @@ class LocalAiAdvisorService {
   Future<void> uninstallModel(String catalogId) async {
     final models = getInstalledModels();
     final target = models.cast<InstalledLocalModel?>().firstWhere(
-          (m) => m?.catalogId == catalogId,
-          orElse: () => null,
-        );
+      (m) => m?.catalogId == catalogId,
+      orElse: () => null,
+    );
 
     if (target == null) {
       AppLogger.warning('[LocalAI] Model not found for uninstall: $catalogId');
@@ -452,9 +463,7 @@ class LocalAiAdvisorService {
   /// against the Disk Cleaner safety rules before it can affect the UI.
   ///
   /// If no model is installed or the runtime is unavailable, returns an empty list.
-  Future<List<AdvisorSuggestion>> requestAdvisory(
-    List<JunkItem> items,
-  ) async {
+  Future<List<AdvisorSuggestion>> requestAdvisory(List<JunkItem> items) async {
     final model = getSelectedModel();
     if (model == null) {
       AppLogger.debug('[LocalAI] No model selected; skipping advisory');
@@ -462,7 +471,8 @@ class LocalAiAdvisorService {
     }
 
     AppLogger.info(
-        '[LocalAI] Requesting advisory for ${items.length} item(s) with model ${model.catalogId}');
+      '[LocalAI] Requesting advisory for ${items.length} item(s) with model ${model.catalogId}',
+    );
 
     // Stub: In a real implementation, serialize items to JSON, invoke the
     // runtime adapter (for example a LiteRT-LM binding), parse structured output,
@@ -491,6 +501,7 @@ class LocalAiAdvisorService {
   Stream<String> sendChatMessageStream({
     required String message,
     String? systemPrompt,
+    List<Map<String, String>>? messages,
   }) async* {
     final model = getSelectedModel();
     if (model == null) {
@@ -500,6 +511,16 @@ class LocalAiAdvisorService {
     final runtime = model.runtimeKind == LocalModelRuntimeKind.llamaCpp
         ? _ggufChatRuntime
         : _chatRuntime;
+
+    if (messages != null && runtime is LocalAiConversationRuntime) {
+      yield* (runtime as LocalAiConversationRuntime).sendConversationStream(
+        model: model,
+        messages: messages,
+        systemPrompt: systemPrompt,
+        maxTokens: getMaxContextTokens(),
+      );
+      return;
+    }
 
     yield* runtime.sendMessageStream(
       model: model,
@@ -600,10 +621,7 @@ class GemmaLiteRtLocalAiChatRuntime implements LocalAiChatRuntime {
         systemInstruction: systemPrompt,
         supportsFunctionCalls: false,
       );
-      await chat.addQueryChunk(gemma.Message.text(
-        text: message,
-        isUser: true,
-      ));
+      await chat.addQueryChunk(gemma.Message.text(text: message, isUser: true));
       await for (final response in chat.generateChatResponseAsync()) {
         final text = _responseToText(response);
         if (text.isNotEmpty) yield text;
@@ -630,9 +648,11 @@ class GemmaLiteRtLocalAiChatRuntime implements LocalAiChatRuntime {
       return jsonEncode({'name': response.name, 'arguments': response.args});
     }
     if (response is gemma.ParallelFunctionCallResponse) {
-      return jsonEncode(response.calls
-          .map((call) => {'name': call.name, 'arguments': call.args})
-          .toList());
+      return jsonEncode(
+        response.calls
+            .map((call) => {'name': call.name, 'arguments': call.args})
+            .toList(),
+      );
     }
     return '';
   }

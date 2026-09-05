@@ -13,10 +13,10 @@ class FileSearchDialog extends StatefulWidget {
   final String? initialSearchPath;
 
   const FileSearchDialog({
-    Key? key,
+    super.key,
     required this.albumId,
     this.initialSearchPath,
-  }) : super(key: key);
+  });
 
   @override
   State<FileSearchDialog> createState() => _FileSearchDialogState();
@@ -76,8 +76,10 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
       // Filter out files that are already in the album
       final filteredResults = <File>[];
       for (final file in results) {
-        final isInAlbum =
-            await _albumService.isFileInAlbum(widget.albumId, file.path);
+        final isInAlbum = await _albumService.isFileInAlbum(
+          widget.albumId,
+          file.path,
+        );
         if (!isInAlbum) {
           filteredResults.add(file);
         }
@@ -181,8 +183,10 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               file,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return Icon(PhosphorIconsLight.imageBroken,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant);
+                return Icon(
+                  PhosphorIconsLight.imageBroken,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                );
               },
             ),
           ),
@@ -231,8 +235,10 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               ),
               child: Row(
                 children: [
-                  const Icon(PhosphorIconsLight.magnifyingGlass,
-                      color: Colors.white),
+                  const Icon(
+                    PhosphorIconsLight.magnifyingGlass,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -302,48 +308,48 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               child: _isSearching
                   ? const Center(child: CircularProgressIndicator())
                   : _searchResults.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                PhosphorIconsLight.magnifyingGlass,
-                                size: 64,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _currentSearchQuery?.isEmpty == true
-                                    ? 'Loading images...'
-                                    : 'No images found',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ),
-                              if (_currentSearchQuery?.isNotEmpty == true)
-                                Text(
-                                  'Try a different search term',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                                ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            PhosphorIconsLight.magnifyingGlass,
+                            size: 64,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: _searchResults.length,
-                          itemBuilder: (context, index) {
-                            return _buildFileItem(_searchResults[index]);
-                          },
-                        ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _currentSearchQuery?.isEmpty == true
+                                ? 'Loading images...'
+                                : 'No images found',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          if (_currentSearchQuery?.isNotEmpty == true)
+                            Text(
+                              'Try a different search term',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        return _buildFileItem(_searchResults[index]);
+                      },
+                    ),
             ),
             // Action buttons
             Container(
@@ -351,7 +357,8 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant),
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
               ),
               child: Row(
@@ -363,8 +370,9 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed:
-                        _selectedFiles.isEmpty ? null : _addSelectedFiles,
+                    onPressed: _selectedFiles.isEmpty
+                        ? null
+                        : _addSelectedFiles,
                     child: Text(
                       'Add ${_selectedFiles.length} ${_selectedFiles.length == 1 ? 'Image' : 'Images'}',
                     ),

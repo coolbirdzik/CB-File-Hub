@@ -44,8 +44,11 @@ void main() {
       for (final accent in AppAccentColor.values) {
         final expected = ThemeConfig.getAccentSeedColor(accent);
         final theme = ThemeConfig.getLightTheme(accentColor: accent);
-        expect(theme.colorScheme.primary, expected,
-            reason: '$accent should reach the theme unmodified');
+        expect(
+          theme.colorScheme.primary,
+          expected,
+          reason: '$accent should reach the theme unmodified',
+        );
       }
     });
 
@@ -70,8 +73,11 @@ void main() {
           tokens.colors.accent.text,
           tokens.colors.surface,
         );
-        expect(ratio, greaterThanOrEqualTo(4.5),
-            reason: '$accent accent text should meet WCAG AA on surface');
+        expect(
+          ratio,
+          greaterThanOrEqualTo(4.5),
+          reason: '$accent accent text should meet WCAG AA on surface',
+        );
       }
     });
 
@@ -83,8 +89,10 @@ void main() {
             brightness,
           );
           expect(
-              _contrastRatio(ramp.onBase, ramp.base), greaterThanOrEqualTo(3.0),
-              reason: '$accent/$brightness label on a filled control');
+            _contrastRatio(ramp.onBase, ramp.base),
+            greaterThanOrEqualTo(3.0),
+            reason: '$accent/$brightness label on a filled control',
+          );
         }
       }
     });
@@ -97,24 +105,31 @@ void main() {
 
       final mid = light.lerp(dark, 0.5);
       expect(mid.brightness, Brightness.dark);
-      expect(mid.colors.surface,
-          Color.lerp(light.colors.surface, dark.colors.surface, 0.5));
+      expect(
+        mid.colors.surface,
+        Color.lerp(light.colors.surface, dark.colors.surface, 0.5),
+      );
 
       expect(light.lerp(dark, 0.0).colors.surface, light.colors.surface);
       expect(light.lerp(dark, 1.0).colors.surface, dark.colors.surface);
     });
 
-    testWidgets('context.cb falls back instead of throwing when unwired',
-        (tester) async {
+    testWidgets('context.cb falls back instead of throwing when unwired', (
+      tester,
+    ) async {
       late CbTokens seen;
-      await tester.pumpWidget(MaterialApp(
-        // Deliberately a bare theme with no CbTokens extension.
-        theme: ThemeData(useMaterial3: true),
-        home: Builder(builder: (context) {
-          seen = context.cb;
-          return const SizedBox();
-        }),
-      ));
+      await tester.pumpWidget(
+        MaterialApp(
+          // Deliberately a bare theme with no CbTokens extension.
+          theme: ThemeData(useMaterial3: true),
+          home: Builder(
+            builder: (context) {
+              seen = context.cb;
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
 
       expect(seen, same(CbTokens.fallback));
     });
@@ -122,17 +137,17 @@ void main() {
 
   group('CbButton', () {
     Widget host(Widget child) => MaterialApp(
-          theme: ThemeConfig.getLightTheme(),
-          home: Scaffold(body: Center(child: child)),
-        );
+      theme: ThemeConfig.getLightTheme(),
+      home: Scaffold(body: Center(child: child)),
+    );
 
-    testWidgets('fires onPressed and honours the token control height',
-        (tester) async {
+    testWidgets('fires onPressed and honours the token control height', (
+      tester,
+    ) async {
       var taps = 0;
-      await tester.pumpWidget(host(CbButton(
-        label: 'Delete',
-        onPressed: () => taps++,
-      )));
+      await tester.pumpWidget(
+        host(CbButton(label: 'Delete', onPressed: () => taps++)),
+      );
 
       await tester.tap(find.text('Delete'));
       expect(taps, 1);
@@ -142,9 +157,9 @@ void main() {
     });
 
     testWidgets('a null onPressed makes the button inert', (tester) async {
-      await tester.pumpWidget(host(
-        const CbButton(label: 'Delete', onPressed: null),
-      ));
+      await tester.pumpWidget(
+        host(const CbButton(label: 'Delete', onPressed: null)),
+      );
 
       await tester.tap(find.text('Delete'));
       await tester.pump();
@@ -155,11 +170,11 @@ void main() {
 
     testWidgets('loading blocks presses and shows a spinner', (tester) async {
       var taps = 0;
-      await tester.pumpWidget(host(CbButton(
-        label: 'Scanning',
-        loading: true,
-        onPressed: () => taps++,
-      )));
+      await tester.pumpWidget(
+        host(
+          CbButton(label: 'Scanning', loading: true, onPressed: () => taps++),
+        ),
+      );
 
       await tester.tap(find.text('Scanning'));
       await tester.pump();
@@ -168,13 +183,14 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('icon-only buttons are square and expose their tooltip',
-        (tester) async {
-      await tester.pumpWidget(host(CbButton.icon(
-        icon: Icons.close,
-        tooltip: 'Close',
-        onPressed: () {},
-      )));
+    testWidgets('icon-only buttons are square and expose their tooltip', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        host(
+          CbButton.icon(icon: Icons.close, tooltip: 'Close', onPressed: () {}),
+        ),
+      );
 
       final size = tester.getSize(find.byType(CbButton));
       expect(size.width, size.height);
@@ -183,27 +199,30 @@ void main() {
   });
 
   group('CbSurface', () {
-    testWidgets('a flat surface casts no shadow; an overlay does',
-        (tester) async {
-      await tester.pumpWidget(MaterialApp(
-        theme: ThemeConfig.getLightTheme(),
-        home: const Scaffold(
-          body: Column(
-            children: [
-              CbSurface(
-                key: Key('flat'),
-                level: CbSurfaceLevel.flat,
-                child: SizedBox(width: 40, height: 40),
-              ),
-              CbSurface(
-                key: Key('overlay'),
-                level: CbSurfaceLevel.overlay,
-                child: SizedBox(width: 40, height: 40),
-              ),
-            ],
+    testWidgets('a flat surface casts no shadow; an overlay does', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeConfig.getLightTheme(),
+          home: const Scaffold(
+            body: Column(
+              children: [
+                CbSurface(
+                  key: Key('flat'),
+                  level: CbSurfaceLevel.flat,
+                  child: SizedBox(width: 40, height: 40),
+                ),
+                CbSurface(
+                  key: Key('overlay'),
+                  level: CbSurfaceLevel.overlay,
+                  child: SizedBox(width: 40, height: 40),
+                ),
+              ],
+            ),
           ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       BoxDecoration decorationOf(String key) {
@@ -250,6 +269,7 @@ class AppToastThemeProbe extends ThemeExtension<AppToastThemeProbe> {
 
   @override
   ThemeExtension<AppToastThemeProbe> lerp(
-          ThemeExtension<AppToastThemeProbe>? other, double t) =>
-      this;
+    ThemeExtension<AppToastThemeProbe>? other,
+    double t,
+  ) => this;
 }

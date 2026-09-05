@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
 class AndroidStorageVolumes {
   AndroidStorageVolumes._();
 
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/storage_volumes');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/storage_volumes',
+  );
 
   /// Lists mounted volumes with optional space metadata.
   static Future<List<AndroidStorageVolume>> listVolumes() async {
@@ -16,9 +17,10 @@ class AndroidStorageVolumes {
       if (raw == null) return const <AndroidStorageVolume>[];
       return raw
           .whereType<Map>()
-          .map((row) => AndroidStorageVolume.fromMap(
-                Map<String, dynamic>.from(row),
-              ))
+          .map(
+            (row) =>
+                AndroidStorageVolume.fromMap(Map<String, dynamic>.from(row)),
+          )
           .where((v) => v.path.isNotEmpty)
           .toList();
     } on MissingPluginException {
@@ -29,16 +31,15 @@ class AndroidStorageVolumes {
     }
   }
 
-  static Future<bool> ejectVolume({
-    required String path,
-    String? uuid,
-  }) async {
+  static Future<bool> ejectVolume({required String path, String? uuid}) async {
     try {
-      final ok =
-          await _channel.invokeMethod<bool>('ejectVolume', <String, dynamic>{
-        'path': path,
-        if (uuid != null && uuid.isNotEmpty) 'uuid': uuid,
-      });
+      final ok = await _channel.invokeMethod<bool>(
+        'ejectVolume',
+        <String, dynamic>{
+          'path': path,
+          if (uuid != null && uuid.isNotEmpty) 'uuid': uuid,
+        },
+      );
       return ok == true;
     } on MissingPluginException {
       return false;
@@ -54,12 +55,12 @@ class AndroidStorageVolumes {
     String? uuid,
   }) async {
     try {
-      final ok =
-          await _channel.invokeMethod<bool>('renameVolume', <String, dynamic>{
-        'path': path,
-        'label': label,
-        if (uuid != null && uuid.isNotEmpty) 'uuid': uuid,
-      });
+      final ok = await _channel
+          .invokeMethod<bool>('renameVolume', <String, dynamic>{
+            'path': path,
+            'label': label,
+            if (uuid != null && uuid.isNotEmpty) 'uuid': uuid,
+          });
       return ok == true;
     } on MissingPluginException {
       return false;

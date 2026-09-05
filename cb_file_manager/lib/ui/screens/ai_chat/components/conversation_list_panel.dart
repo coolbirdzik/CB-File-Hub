@@ -16,8 +16,7 @@ import '../../../../models/ai/ai_conversation.dart';
 class ConversationListPanel extends StatelessWidget {
   final VoidCallback onClose;
 
-  const ConversationListPanel({Key? key, required this.onClose})
-      : super(key: key);
+  const ConversationListPanel({super.key, required this.onClose});
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +33,7 @@ class ConversationListPanel extends StatelessWidget {
           decoration: BoxDecoration(
             // Same surface the app's other side menus use.
             color: scheme.surfaceContainerLow,
-            border: Border(
-              right: BorderSide(color: scheme.outlineVariant),
-            ),
+            border: Border(right: BorderSide(color: scheme.outlineVariant)),
           ),
           child: Column(
             children: [
@@ -62,9 +59,9 @@ class ConversationListPanel extends StatelessWidget {
                         icon: PhosphorIconsLight.plus,
                         tooltip: l.newConversation,
                         onPressed: () {
-                          context
-                              .read<AiAgentBloc>()
-                              .add(const NewConversation());
+                          context.read<AiAgentBloc>().add(
+                            const NewConversation(),
+                          );
                           onClose();
                         },
                       ),
@@ -105,16 +102,16 @@ class ConversationListPanel extends StatelessWidget {
                             isActive: conv.id == state.conversationId,
                             onTap: () {
                               if (conv.id != state.conversationId) {
-                                context
-                                    .read<AiAgentBloc>()
-                                    .add(SwitchConversation(conv.id));
+                                context.read<AiAgentBloc>().add(
+                                  SwitchConversation(conv.id),
+                                );
                               }
                               onClose();
                             },
                             onDelete: () {
-                              context
-                                  .read<AiAgentBloc>()
-                                  .add(DeleteConversation(conv.id));
+                              context.read<AiAgentBloc>().add(
+                                DeleteConversation(conv.id),
+                              );
                             },
                           );
                         },
@@ -137,11 +134,7 @@ class _FlatIconButton extends StatefulWidget {
   final String? tooltip;
   final VoidCallback? onPressed;
 
-  const _FlatIconButton({
-    required this.icon,
-    this.tooltip,
-    this.onPressed,
-  });
+  const _FlatIconButton({required this.icon, this.tooltip, this.onPressed});
 
   @override
   State<_FlatIconButton> createState() => _FlatIconButtonState();
@@ -169,11 +162,7 @@ class _FlatIconButtonState extends State<_FlatIconButton> {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Icon(
-            widget.icon,
-            size: 16,
-            color: scheme.onSurfaceVariant,
-          ),
+          child: Icon(widget.icon, size: 16, color: scheme.onSurfaceVariant),
         ),
       ),
     );
@@ -216,8 +205,9 @@ class _ConversationTileState extends State<_ConversationTile> {
 
     // Selection styling mirrors the app's navigation tiles: a rounded
     // secondaryContainer fill, no border or accent bar.
-    final foreground =
-        widget.isActive ? scheme.onSecondaryContainer : scheme.onSurface;
+    final foreground = widget.isActive
+        ? scheme.onSecondaryContainer
+        : scheme.onSurface;
     final Color bg;
     if (widget.isActive) {
       bg = scheme.secondaryContainer;
@@ -317,10 +307,7 @@ class _DeleteButton extends StatefulWidget {
   final String tooltip;
   final VoidCallback onPressed;
 
-  const _DeleteButton({
-    required this.tooltip,
-    required this.onPressed,
-  });
+  const _DeleteButton({required this.tooltip, required this.onPressed});
 
   @override
   State<_DeleteButton> createState() => _DeleteButtonState();

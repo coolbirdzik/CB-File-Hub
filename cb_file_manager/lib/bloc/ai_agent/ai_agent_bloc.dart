@@ -12,6 +12,8 @@ import '../../models/ai/ai_provider_model.dart';
 import '../../models/ai/ai_search_result.dart';
 import '../../models/ai/referenced_file.dart';
 import '../../services/ai/ai_approval.dart';
+import '../../services/ai/assistant_response_text.dart';
+import '../../services/ai/agent_tool_catalog.dart';
 import '../../services/ai/ai_chat_history_service.dart';
 import '../../services/ai/ai_provider_service.dart';
 import '../../services/ai/providers/ai_provider.dart';
@@ -44,23 +46,22 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   Completer<void>? _activeStreamCompleter;
 
   AiAgentBloc({
-    required AiProviderService providerService,
-    AiChatHistoryService? historyService,
-    LocalAiAdvisorService? localAiService,
+    required this._providerService,
+    this._historyService,
+    this._localAiService,
     ToolExecutor? toolExecutor,
     String? ownerTabId,
     List<String> thinkingPhrases = const ['Thinking...'],
     String waitingApproval = 'Waiting for your approval...',
     String runningToolTemplate = 'Running {}...',
-  })  : _providerService = providerService,
-        _historyService = historyService,
-        _localAiService = localAiService,
-        _toolExecutor = toolExecutor ?? ToolExecutor(ownerTabId: ownerTabId),
-        super(AiAgentState(
-          thinkingPhrases: thinkingPhrases,
-          waitingApproval: waitingApproval,
-          runningToolTemplate: runningToolTemplate,
-        )) {
+  }) : _toolExecutor = toolExecutor ?? ToolExecutor(ownerTabId: ownerTabId),
+       super(
+         AiAgentState(
+           thinkingPhrases: thinkingPhrases,
+           waitingApproval: waitingApproval,
+           runningToolTemplate: runningToolTemplate,
+         ),
+       ) {
     on<InitializeAiAgent>(_onInitialize);
     on<SendMessage>(_onSendMessage);
     on<StopGeneration>(_onStopGeneration);
@@ -95,12 +96,16 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         next.conversationId != null) {
       final title = _titleFromMessages(next.messages);
       _historyService
-          ?.saveConversation(next.conversationId!, title, next.messages,
-              initialPath: next.currentPath)
+          ?.saveConversation(
+            next.conversationId!,
+            title,
+            next.messages,
+            initialPath: next.currentPath,
+          )
           .then((_) {
-        // Refresh conversation list so sidebar stays current
-        add(const RefreshConversations());
-      });
+            // Refresh conversation list so sidebar stays current
+            add(const RefreshConversations());
+          });
     }
   }
 
@@ -127,11 +132,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     String conversationId;
     List<AiMessage> messages;
-    final normalizedWorkspacePath =
-        AiChatHistoryService.normalizeWorkspacePath(event.workspacePath);
+    final normalizedWorkspacePath = AiChatHistoryService.normalizeWorkspacePath(
+      event.workspacePath,
+    );
     if (normalizedWorkspacePath.isNotEmpty) {
-      final matchingSummary = await _historyService
-          ?.findLatestSummaryForPath(normalizedWorkspacePath);
+      final matchingSummary = await _historyService?.findLatestSummaryForPath(
+        normalizedWorkspacePath,
+      );
       if (matchingSummary != null) {
         conversationId = matchingSummary.id;
         messages =
@@ -150,17 +157,19 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       messages = [];
     }
 
-    emit(state.copyWith(
-      isProviderConfigured: hasProvider || catalogs.isNotEmpty,
-      messages: messages,
-      conversationId: conversationId,
-      conversations: summaries,
-      currentPath: event.workspacePath,
-      providerModelCatalogs: catalogs,
-      selectedProviderId: selection.providerId,
-      selectedModelName: selection.modelName,
-      isLoadingProviderModels: false,
-    ));
+    emit(
+      state.copyWith(
+        isProviderConfigured: hasProvider || catalogs.isNotEmpty,
+        messages: messages,
+        conversationId: conversationId,
+        conversations: summaries,
+        currentPath: event.workspacePath,
+        providerModelCatalogs: catalogs,
+        selectedProviderId: selection.providerId,
+        selectedModelName: selection.modelName,
+        isLoadingProviderModels: false,
+      ),
+    );
   }
 
   Future<void> _onSendMessage(
@@ -172,6 +181,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     final generationId = ++_generationSequence;
     _activeGenerationId = generationId;
+    _toolExecutor.beginTurn(
+      currentPath: state.currentPath,
+      isCancelled: () => _activeGenerationId != generationId,
+    );
 
     if (_isLocalAiSelected()) {
       await _onLocalAiSendMessage(event, emit, generationId);
@@ -194,7 +207,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     // Conversation messages sent to the API (grows with tool results)
     final apiMessages = <AiMessage>[
-      ...state.messages.where((m) => m.role != AiMessageRole.system),
+      ..._conversationForAgent(state.messages),
       AiMessage(
         id: _uuid.v4(),
         role: AiMessageRole.user,
@@ -207,21 +220,26 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final activity = <String>[];
     final allToolCalls = <AiToolCall>[];
 
-    emit(state.copyWith(
-      messages: displayMessages,
-      isLoading: true,
-      clearError: true,
-      thinkingText: state.thinkingPhrases.isNotEmpty
-          ? state.thinkingPhrases[0]
-          : 'Thinking...',
-      clearToolActivity: true,
-      clearCurrentToolCalls: true,
-      clearApproval: true,
-    ));
+    emit(
+      state.copyWith(
+        messages: displayMessages,
+        isLoading: true,
+        clearError: true,
+        thinkingText: state.thinkingPhrases.isNotEmpty
+            ? state.thinkingPhrases[0]
+            : 'Thinking...',
+        clearToolActivity: true,
+        clearCurrentToolCalls: true,
+        clearApproval: true,
+      ),
+    );
 
     try {
       final systemPrompt = _buildSystemPrompt();
       int toolRound = 0;
+      var repairAttempts = 0;
+      final seenToolSignatures = <String>{};
+      final executedMutations = <String>{};
       // Messages shown in the UI (grows with explanation + results)
       List<AiMessage> uiMessages = List.from(displayMessages);
 
@@ -230,11 +248,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         toolRound++;
 
         activity.add('> Calling AI provider (round $toolRound)...');
-        emit(state.copyWith(
-          thinkingText:
-              state.thinkingPhrases[toolRound % state.thinkingPhrases.length],
-          toolActivity: List.of(activity),
-        ));
+        emit(
+          state.copyWith(
+            thinkingText:
+                state.thinkingPhrases[toolRound % state.thinkingPhrases.length],
+            toolActivity: List.of(activity),
+          ),
+        );
 
         // Call AI (non-streaming for tool rounds, streaming for final)
         final preparedContext = _prepareContextForProvider(
@@ -243,15 +263,17 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           activity: activity,
         );
         // Capture raw payload for debug "View raw payload" inspection
-        emit(state.copyWith(
-          lastApiPayload: _buildPayloadSnapshot(
-            messages: preparedContext.messages,
-            systemPrompt: preparedContext.systemPrompt,
-            providerId: state.selectedProviderId,
-            modelName: state.selectedModelName,
-            stream: false,
+        emit(
+          state.copyWith(
+            lastApiPayload: _buildPayloadSnapshot(
+              messages: preparedContext.messages,
+              systemPrompt: preparedContext.systemPrompt,
+              providerId: state.selectedProviderId,
+              modelName: state.selectedModelName,
+              stream: false,
+            ),
           ),
-        ));
+        );
         final result = await _providerService.chat(
           preparedContext.messages,
           systemPrompt: preparedContext.systemPrompt,
@@ -264,16 +286,35 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
         // Check if AI wants to call tools
         if (!ToolExecutor.hasToolCalls(responseText)) {
-          // No tool calls - stream this as the final answer
-          await _streamFinalAnswer(
-            emit,
-            apiMessages: apiMessages,
-            uiMessages: uiMessages,
-            allToolCalls: allToolCalls,
-            activity: activity,
-            systemPrompt: systemPrompt,
-            providerId: result.providerId,
-            generationId: generationId,
+          final content = _stripJsonBlocks(_stripToolCallTags(responseText));
+          final results = _parseSearchResults(
+            stripAssistantReasoning(responseText),
+          );
+          emit(
+            state.copyWith(
+              messages: [
+                ...uiMessages,
+                AiMessage(
+                  id: _uuid.v4(),
+                  role: AiMessageRole.assistant,
+                  content: content.isEmpty
+                      ? '(The model returned no answer.)'
+                      : content,
+                  reasoning: extractAssistantReasoning(responseText),
+                  timestamp: DateTime.now(),
+                  toolCalls: allToolCalls.isEmpty
+                      ? null
+                      : List.of(allToolCalls),
+                  searchResults: results.isEmpty ? null : results,
+                ),
+              ],
+              results: results,
+              isLoading: false,
+              clearThinking: true,
+              clearCurrentToolCalls: true,
+              clearToolActivity: true,
+              activeProviderId: result.providerId,
+            ),
           );
           return; // Done
         }
@@ -282,33 +323,56 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         // If hasToolCalls() returned true but parsing yields nothing, the LLM
         // produced a malformed block - display the stripped content directly
         // without re-querying (to avoid infinite loops).
-        final calls = ToolExecutor.parseToolCalls(responseText)
-            .map(_toolExecutor.normalizeCall)
-            .toList(growable: false);
-        if (calls.isEmpty) {
-          final displayContent =
-              _stripJsonBlocks(_stripToolCallTags(responseText));
-          emit(state.copyWith(
-            messages: [
-              ...uiMessages,
-              AiMessage(
-                id: _uuid.v4(),
-                role: AiMessageRole.assistant,
-                content: displayContent,
-                timestamp: DateTime.now(),
-                toolCalls:
-                    allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
-              ),
-            ],
-            isLoading: false,
-            clearThinking: true,
-            toolActivity: List.of(activity),
-          ));
-          return;
+        final preparedCalls = _prepareAgentCalls(
+          ToolExecutor.parseToolCalls(responseText),
+        );
+        final calls = preparedCalls.calls;
+        if (calls.isEmpty || preparedCalls.errors.isNotEmpty) {
+          if (++repairAttempts > 2) {
+            activity.add(
+              '> Tool request could not be repaired; requesting an explanation.',
+            );
+            break;
+          }
+          apiMessages.add(
+            AiMessage(
+              id: _uuid.v4(),
+              role: AiMessageRole.assistant,
+              content: stripAssistantReasoning(responseText),
+              timestamp: DateTime.now(),
+            ),
+          );
+          apiMessages.add(
+            AiMessage(
+              id: _uuid.v4(),
+              role: AiMessageRole.user,
+              content:
+                  '<tool_result>${jsonEncode({'ok': false, 'error': preparedCalls.errors.isEmpty ? 'Malformed tool call. Use exactly <tool_call>{"name":"known_tool","arguments":{...}}</tool_call> with valid JSON.' : preparedCalls.errors.join(' '), 'next_step': 'Correct the request using the tool catalog. No tools in this round executed.'})}</tool_result>',
+              timestamp: DateTime.now(),
+            ),
+          );
+          continue;
         }
+        repairAttempts = 0;
 
         // Step 1: Extract agent's explanation text (before any tool call blocks)
         // and show it in the UI as an assistant message, added to API so LLM knows
+        final signature = _toolRoundSignature(calls);
+        if (calls.any(
+              (call) => executedMutations.contains(_toolRoundSignature([call])),
+            ) ||
+            !seenToolSignatures.add(signature)) {
+          activity.add('> Repeated tool call stopped.');
+          break;
+        }
+        apiMessages.add(
+          AiMessage(
+            id: _uuid.v4(),
+            role: AiMessageRole.assistant,
+            content: stripAssistantReasoning(responseText),
+            timestamp: DateTime.now(),
+          ),
+        );
         final explanationText = _stripToolCallTags(responseText).trim();
 
         // Build updated UI message list: append explanation text if any
@@ -321,7 +385,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             timestamp: DateTime.now(),
           );
           // Add to API messages so LLM knows we showed the text
-          apiMessages.add(explanationMsg);
+
           updatedUiMessages = [...uiMessages, explanationMsg];
         } else {
           updatedUiMessages = uiMessages;
@@ -335,17 +399,20 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         if (dangerousCalls.isNotEmpty) {
           // Show thinking text while waiting for approval
           activity.add('> Waiting for your approval...');
-          emit(state.copyWith(
-            messages: updatedUiMessages,
-            thinkingText: state.waitingApproval,
-            toolActivity: List.of(activity),
-          ));
+          emit(
+            state.copyWith(
+              messages: updatedUiMessages,
+              thinkingText: state.waitingApproval,
+              toolActivity: List.of(activity),
+            ),
+          );
 
           // Build a single combined approval request
           final combinedRequest = _buildCombinedApprovalRequest(dangerousCalls);
 
-          activity
-              .add('> Approval required: ${dangerousCalls.length} action(s)');
+          activity.add(
+            '> Approval required: ${dangerousCalls.length} action(s)',
+          );
           emit(state.copyWith(toolActivity: List.of(activity)));
 
           final approved = await _requestApproval(emit, combinedRequest);
@@ -353,10 +420,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
           if (!approved) {
             activity.add('  Rejected: User rejected all actions');
-            emit(state.copyWith(
-              toolActivity: List.of(activity),
-              clearThinking: true,
-            ));
+            emit(
+              state.copyWith(
+                toolActivity: List.of(activity),
+                clearThinking: true,
+              ),
+            );
 
             // Report blocked dangerous tools
             final rejectBuffer = StringBuffer();
@@ -365,24 +434,31 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
                 '<tool_result name="${call.name}">\nBlocked: User rejected.\n</tool_result>',
               );
             }
-            rejectBuffer
-                .writeln('STOP: User rejected all actions. Do not proceed.');
-            apiMessages.add(AiMessage(
-              id: _uuid.v4(),
-              role: AiMessageRole.user,
-              content: rejectBuffer.toString(),
-              timestamp: DateTime.now(),
-            ));
+            rejectBuffer.writeln(
+              'STOP: User rejected all actions. Do not proceed.',
+            );
+            apiMessages.add(
+              AiMessage(
+                id: _uuid.v4(),
+                role: AiMessageRole.user,
+                content: rejectBuffer.toString(),
+                timestamp: DateTime.now(),
+              ),
+            );
             // Continue loop - LLM will produce a final answer explaining the rejection
-            continue;
+            break;
           }
 
           activity.add('  Approved: All actions approved');
-          emit(state.copyWith(
-            toolActivity: List.of(activity),
-            thinkingText: state.runningToolTemplate
-                .replaceFirst('{}', dangerousCalls.first.name),
-          ));
+          emit(
+            state.copyWith(
+              toolActivity: List.of(activity),
+              thinkingText: state.runningToolTemplate.replaceFirst(
+                '{}',
+                dangerousCalls.first.name,
+              ),
+            ),
+          );
         }
 
         // Step 3: Execute all tool calls (dangerous ones are already approved)
@@ -392,16 +468,24 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           if (ToolExecutor.dangerousTools.contains(call.name)) {
             activity.add('  Approved: ${call.name} (pre-approved)');
             _addRunningToolCall(allToolCalls, call);
-            emit(state.copyWith(
-              thinkingText:
-                  state.runningToolTemplate.replaceFirst('{}', call.name),
-              toolActivity: List.of(activity),
-              currentToolCalls: List.of(allToolCalls),
-            ));
+            emit(
+              state.copyWith(
+                thinkingText: state.runningToolTemplate.replaceFirst(
+                  '{}',
+                  call.name,
+                ),
+                toolActivity: List.of(activity),
+                currentToolCalls: List.of(allToolCalls),
+              ),
+            );
 
             // Execute the dangerous tool without asking again
             final toolResult = await _toolExecutor.execute(call);
             _ensureGenerationActive(generationId);
+            if (toolResult.success) {
+              executedMutations.add(_toolRoundSignature([call]));
+              seenToolSignatures.clear();
+            }
 
             _completeRunningToolCall(
               allToolCalls,
@@ -411,73 +495,108 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             );
 
             activity.add(
-                '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
-            emit(state.copyWith(
-              toolActivity: List.of(activity),
-              currentToolCalls: List.of(allToolCalls),
-            ));
+              '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}',
+            );
+            emit(
+              state.copyWith(
+                toolActivity: List.of(activity),
+                currentToolCalls: List.of(allToolCalls),
+              ),
+            );
 
             toolResultBuffer.writeln(
-              '<tool_result name="${call.name}">\n${toolResult.output}\n</tool_result>',
+              '<tool_result name="${call.name}">${jsonEncode({'ok': toolResult.success, 'output': toolResult.output})}</tool_result>',
             );
+            if (!toolResult.success) {
+              toolResultBuffer.writeln(
+                '<tool_result>{"ok":false,"error":"Remaining calls in this round were not executed because an earlier call failed. Correct the failure before continuing."}</tool_result>',
+              );
+              break;
+            }
             continue;
           }
 
-          activity
-              .add('> Tool: ${call.name}(${_summarizeArgs(call.arguments)})');
-          emit(state.copyWith(
-            thinkingText:
-                state.runningToolTemplate.replaceFirst('{}', call.name),
-            toolActivity: List.of(activity),
-            currentToolCalls: List.of(allToolCalls)
-              ..add(_runningToolCall(call)),
-          ));
+          activity.add(
+            '> Tool: ${call.name}(${_summarizeArgs(call.arguments)})',
+          );
+          emit(
+            state.copyWith(
+              thinkingText: state.runningToolTemplate.replaceFirst(
+                '{}',
+                call.name,
+              ),
+              toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls)
+                ..add(_runningToolCall(call)),
+            ),
+          );
 
           final toolResult = await _toolExecutor.execute(call);
           _ensureGenerationActive(generationId);
+          if (toolResult.success &&
+              ToolExecutor.dangerousTools.contains(call.name)) {
+            executedMutations.add(_toolRoundSignature([call]));
+            seenToolSignatures
+                .clear(); // Re-inspect paths after a successful change.
+          }
 
-          allToolCalls.add(AiToolCall(
-            toolName: call.name,
-            arguments: jsonEncode(call.arguments),
-            result: toolResult.output,
-            success: toolResult.success,
-          ));
+          allToolCalls.add(
+            AiToolCall(
+              toolName: call.name,
+              arguments: jsonEncode(call.arguments),
+              result: toolResult.output,
+              success: toolResult.success,
+            ),
+          );
 
           activity.add(
-              '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
-          emit(state.copyWith(
-            toolActivity: List.of(activity),
-            currentToolCalls: List.of(allToolCalls),
-          ));
+            '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}',
+          );
+          emit(
+            state.copyWith(
+              toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls),
+            ),
+          );
 
           toolResultBuffer.writeln(
-            '<tool_result name="${call.name}">\n${toolResult.output}\n</tool_result>',
+            '<tool_result name="${call.name}">${jsonEncode({'ok': toolResult.success, 'output': toolResult.output})}</tool_result>',
           );
+          if (!toolResult.success) {
+            toolResultBuffer.writeln(
+              '<tool_result>{"ok":false,"error":"Remaining calls in this round were not executed because an earlier call failed. Correct the failure before continuing."}</tool_result>',
+            );
+            break;
+          }
         }
 
         // Feed tool results back to the AI
-        apiMessages.add(AiMessage(
-          id: _uuid.v4(),
-          role: AiMessageRole.user,
-          content: toolResultBuffer.toString(),
-          timestamp: DateTime.now(),
-        ));
+        apiMessages.add(
+          AiMessage(
+            id: _uuid.v4(),
+            role: AiMessageRole.user,
+            content: toolResultBuffer.toString(),
+            timestamp: DateTime.now(),
+          ),
+        );
 
         // Carry forward accumulated UI messages into next iteration
         uiMessages = updatedUiMessages;
       }
 
       // Max tool calls reached - ask for a final answer (streamed)
-      activity.add('> Max tool calls reached, requesting final answer...');
+      activity.add('> Tool loop stopped; requesting final answer...');
       emit(state.copyWith(toolActivity: List.of(activity)));
 
-      apiMessages.add(AiMessage(
-        id: _uuid.v4(),
-        role: AiMessageRole.user,
-        content:
-            'Please give your final answer now. Do not call any more tools.',
-        timestamp: DateTime.now(),
-      ));
+      apiMessages.add(
+        AiMessage(
+          id: _uuid.v4(),
+          role: AiMessageRole.user,
+          content:
+              'Please give your final answer now. Do not call any more tools.',
+          timestamp: DateTime.now(),
+        ),
+      );
 
       await _streamFinalAnswer(
         emit,
@@ -494,21 +613,25 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     } on AiProviderException catch (e) {
       if (_activeGenerationId != generationId) return;
       AppLogger.warning('[AiAgentBloc] Chat failed: ${e.message}');
-      emit(state.copyWith(
-        isLoading: false,
-        error: e.message,
-        clearThinking: true,
-        toolActivity: List.of(activity),
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: e.message,
+          clearThinking: true,
+          toolActivity: List.of(activity),
+        ),
+      );
     } catch (e) {
       if (_activeGenerationId != generationId) return;
       AppLogger.error('[AiAgentBloc] Unexpected error', error: e);
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'An unexpected error occurred: $e',
-        clearThinking: true,
-        toolActivity: List.of(activity),
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'An unexpected error occurred: $e',
+          clearThinking: true,
+          toolActivity: List.of(activity),
+        ),
+      );
     }
   }
 
@@ -519,11 +642,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   ) async {
     final localService = _localAiService;
     if (localService == null) {
-      emit(state.copyWith(
-        error: 'Local AI service is not available.',
-        isLoading: false,
-        clearThinking: true,
-      ));
+      emit(
+        state.copyWith(
+          error: 'Local AI service is not available.',
+          isLoading: false,
+          clearThinking: true,
+        ),
+      );
       return;
     }
 
@@ -538,7 +663,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     final apiContent = _buildApiContent(event.message, referencedFiles);
     final apiMessages = <AiMessage>[
-      ...state.messages.where((m) => m.role != AiMessageRole.system),
+      ..._conversationForAgent(state.messages),
       AiMessage(
         id: _uuid.v4(),
         role: AiMessageRole.user,
@@ -550,36 +675,42 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final activity = <String>[];
     final allToolCalls = <AiToolCall>[];
 
-    emit(state.copyWith(
-      messages: displayMessages,
-      isLoading: true,
-      clearError: true,
-      thinkingText: state.thinkingPhrases.isNotEmpty
-          ? state.thinkingPhrases[0]
-          : 'Thinking...',
-      clearToolActivity: true,
-      clearCurrentToolCalls: true,
-      clearApproval: true,
-      activeProviderId: _localAiProviderId,
-    ));
+    emit(
+      state.copyWith(
+        messages: displayMessages,
+        isLoading: true,
+        clearError: true,
+        thinkingText: state.thinkingPhrases.isNotEmpty
+            ? state.thinkingPhrases[0]
+            : 'Thinking...',
+        clearToolActivity: true,
+        clearCurrentToolCalls: true,
+        clearApproval: true,
+        activeProviderId: _localAiProviderId,
+      ),
+    );
 
     try {
       final systemPrompt = _buildSystemPrompt();
       var toolRound = 0;
+      var repairAttempts = 0;
       var uiMessages = List<AiMessage>.of(displayMessages);
       // Signatures of tool-call rounds already executed, to detect stuck loops
       // where a small local model keeps calling the same tool with the same
       // arguments without making progress.
       final seenToolSignatures = <String>{};
+      final executedMutations = <String>{};
 
       while (toolRound <= ToolExecutor.maxToolCalls) {
         toolRound++;
         activity.add('> Calling Local AI (round $toolRound)...');
-        emit(state.copyWith(
-          thinkingText:
-              state.thinkingPhrases[toolRound % state.thinkingPhrases.length],
-          toolActivity: List.of(activity),
-        ));
+        emit(
+          state.copyWith(
+            thinkingText:
+                state.thinkingPhrases[toolRound % state.thinkingPhrases.length],
+            toolActivity: List.of(activity),
+          ),
+        );
 
         final preparedContext = _prepareContextForProvider(
           apiMessages,
@@ -587,15 +718,17 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           activity: activity,
         );
         final localPrompt = _buildLocalTranscript(preparedContext.messages);
-        emit(state.copyWith(
-          lastApiPayload: _buildPayloadSnapshot(
-            messages: preparedContext.messages,
-            systemPrompt: preparedContext.systemPrompt,
-            providerId: _localAiProviderId,
-            modelName: state.selectedModelName,
-            stream: true,
+        emit(
+          state.copyWith(
+            lastApiPayload: _buildPayloadSnapshot(
+              messages: preparedContext.messages,
+              systemPrompt: preparedContext.systemPrompt,
+              providerId: _localAiProviderId,
+              modelName: state.selectedModelName,
+              stream: true,
+            ),
           ),
-        ));
+        );
 
         final streamingId = _uuid.v4();
         final streamingMsg = AiMessage(
@@ -606,29 +739,34 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
           isLoading: true,
         );
-        emit(state.copyWith(
-          messages: [...uiMessages, streamingMsg],
-          clearThinking: true,
-          toolActivity: List.of(activity),
-          activeProviderId: _localAiProviderId,
-        ));
+        emit(
+          state.copyWith(
+            messages: [...uiMessages, streamingMsg],
+            clearThinking: true,
+            toolActivity: List.of(activity),
+            activeProviderId: _localAiProviderId,
+          ),
+        );
 
         final rawBuffer = StringBuffer();
         await _consumeGenerationStream(
           generationId: generationId,
           stream: localService.sendChatMessageStream(
             message: localPrompt,
+            messages: _buildLocalChatMessages(preparedContext.messages),
             systemPrompt: preparedContext.systemPrompt,
           ),
           onChunk: (chunk) {
             // Status messages from GGUF runtime are prefixed with [STATUS].
             if (chunk.startsWith('[STATUS]')) {
               final statusText = chunk.substring(8); // Remove "[STATUS]" prefix
-              emit(state.copyWith(
-                thinkingText: statusText,
-                messages: [...uiMessages, streamingMsg],
-                activeProviderId: _localAiProviderId,
-              ));
+              emit(
+                state.copyWith(
+                  thinkingText: statusText,
+                  messages: [...uiMessages, streamingMsg],
+                  activeProviderId: _localAiProviderId,
+                ),
+              );
               return;
             }
 
@@ -640,32 +778,43 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             // displayText is empty. Don't show an empty bubble that would flash
             // and disappear when the round resolves into a tool call; keep the
             // thinking indicator instead.
-            if (displayText.isEmpty) {
-              emit(state.copyWith(
-                messages: uiMessages,
-                activeProviderId: _localAiProviderId,
-              ));
+            if (displayText.trim().isEmpty &&
+                extractAssistantReasoning(rawBuffer.toString()).isEmpty) {
+              emit(
+                state.copyWith(
+                  messages: uiMessages,
+                  thinkingText: state.thinkingPhrases.isNotEmpty
+                      ? state.thinkingPhrases.first
+                      : 'Thinking...',
+                  activeProviderId: _localAiProviderId,
+                ),
+              );
               return;
             }
-            emit(state.copyWith(
-              messages: [
-                ...uiMessages,
-                streamingMsg.copyWith(
-                  content: displayText,
-                  isLoading: true,
-                ),
-              ],
-              clearThinking: true,
-              activeProviderId: _localAiProviderId,
-            ));
+            emit(
+              state.copyWith(
+                messages: [
+                  ...uiMessages,
+                  streamingMsg.copyWith(
+                    content: displayText,
+                    reasoning: extractAssistantReasoning(rawBuffer.toString()),
+                    isLoading: true,
+                  ),
+                ],
+                clearThinking: true,
+                activeProviderId: _localAiProviderId,
+              ),
+            );
           },
         );
 
-        final responseText = rawBuffer.toString();
+        final reasoning = extractAssistantReasoning(rawBuffer.toString());
+        final responseText = stripAssistantReasoning(rawBuffer.toString());
         if (!ToolExecutor.hasToolCalls(responseText)) {
-          final rawContent = rawBuffer.toString();
-          final displayContent =
-              _stripJsonBlocks(_stripToolCallTags(rawContent));
+          final rawContent = responseText;
+          final displayContent = _stripJsonBlocks(
+            _stripToolCallTags(rawContent),
+          );
           final searchResults = _parseSearchResults(rawContent);
 
           if (searchResults.isNotEmpty) {
@@ -679,81 +828,105 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
                 ? '(The local model returned an empty response.)'
                 : displayContent,
             timestamp: streamingMsg.timestamp,
+            reasoning: extractAssistantReasoning(rawBuffer.toString()),
             searchResults: searchResults.isNotEmpty ? searchResults : null,
             toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
             isLoading: false,
           );
 
-          emit(state.copyWith(
-            messages: [...uiMessages, assistantMessage],
-            isLoading: false,
-            results: searchResults,
-            clearThinking: true,
-            clearToolActivity: true,
-            clearCurrentToolCalls: true,
-            clearApproval: true,
-            activeProviderId: _localAiProviderId,
-          ));
+          emit(
+            state.copyWith(
+              messages: [...uiMessages, assistantMessage],
+              isLoading: false,
+              results: searchResults,
+              clearThinking: true,
+              clearToolActivity: true,
+              clearCurrentToolCalls: true,
+              clearApproval: true,
+              activeProviderId: _localAiProviderId,
+            ),
+          );
           return;
         }
 
-        final calls = ToolExecutor.parseToolCalls(responseText)
-            .map(_toolExecutor.normalizeCall)
-            .toList(growable: false);
-        if (calls.isEmpty) {
-          final displayContent =
-              _stripJsonBlocks(_stripToolCallTags(responseText));
-          emit(state.copyWith(
-            messages: [
-              ...uiMessages,
-              AiMessage(
-                id: streamingId,
-                role: AiMessageRole.assistant,
-                content: displayContent,
-                timestamp: streamingMsg.timestamp,
-                toolCalls:
-                    allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
-              ),
-            ],
-            isLoading: false,
-            clearThinking: true,
-            toolActivity: List.of(activity),
-            activeProviderId: _localAiProviderId,
-          ));
-          return;
+        final preparedCalls = _prepareAgentCalls(
+          ToolExecutor.parseToolCalls(responseText),
+        );
+        final calls = preparedCalls.calls;
+        if (calls.isEmpty || preparedCalls.errors.isNotEmpty) {
+          if (++repairAttempts > 2) {
+            activity.add(
+              '> Tool request could not be repaired; requesting an explanation.',
+            );
+            break;
+          }
+          apiMessages.add(
+            AiMessage(
+              id: _uuid.v4(),
+              role: AiMessageRole.assistant,
+              content: stripAssistantReasoning(responseText),
+              timestamp: DateTime.now(),
+            ),
+          );
+          apiMessages.add(
+            AiMessage(
+              id: _uuid.v4(),
+              role: AiMessageRole.user,
+              content:
+                  '<tool_result>${jsonEncode({'ok': false, 'error': preparedCalls.errors.isEmpty ? 'Malformed tool call. Use exactly <tool_call>{"name":"known_tool","arguments":{...}}</tool_call> with valid JSON.' : preparedCalls.errors.join(' '), 'next_step': 'Correct the request using the tool catalog. No tools in this round executed.'})}</tool_result>',
+              timestamp: DateTime.now(),
+            ),
+          );
+          continue;
         }
+        repairAttempts = 0;
 
         // Detect a stuck loop: if this exact set of tool calls was already
         // executed in a previous round, the model is not making progress.
         // Break out and force a final answer instead of repeating up to the
         // maxToolCalls limit (which floods the UI with duplicate tool cards).
-        final roundSignature =
-            calls.map((c) => '${c.name}(${jsonEncode(c.arguments)})').join('|');
-        if (!seenToolSignatures.add(roundSignature)) {
-          activity
-              .add('> Repeated tool call detected; requesting final answer');
+        final roundSignature = _toolRoundSignature(calls);
+        if (calls.any(
+              (call) => executedMutations.contains(_toolRoundSignature([call])),
+            ) ||
+            !seenToolSignatures.add(roundSignature)) {
+          activity.add(
+            '> Repeated tool call detected; requesting final answer',
+          );
           emit(state.copyWith(toolActivity: List.of(activity)));
-          apiMessages.add(AiMessage(
-            id: _uuid.v4(),
-            role: AiMessageRole.user,
-            content: 'You already called these tools and received the results '
-                'above. Do not call any tools again. Give your final answer now '
-                'using the information you already have.',
-            timestamp: DateTime.now(),
-          ));
+          apiMessages.add(
+            AiMessage(
+              id: _uuid.v4(),
+              role: AiMessageRole.user,
+              content:
+                  'You already called these tools and received the results '
+                  'above. Do not call any tools again. Give your final answer now '
+                  'using the information you already have.',
+              timestamp: DateTime.now(),
+            ),
+          );
           break;
         }
 
+        apiMessages.add(
+          AiMessage(
+            id: streamingId,
+            role: AiMessageRole.assistant,
+            content: responseText,
+            timestamp: streamingMsg.timestamp,
+            reasoning: extractAssistantReasoning(rawBuffer.toString()),
+          ),
+        );
         final explanationText = _stripToolCallTags(responseText).trim();
         final List<AiMessage> updatedUiMessages;
-        if (explanationText.isNotEmpty) {
+        if (explanationText.isNotEmpty || reasoning.isNotEmpty) {
           final explanationMsg = AiMessage(
             id: streamingId,
             role: AiMessageRole.assistant,
             content: explanationText,
             timestamp: streamingMsg.timestamp,
+            reasoning: extractAssistantReasoning(rawBuffer.toString()),
           );
-          apiMessages.add(explanationMsg);
           updatedUiMessages = [...uiMessages, explanationMsg];
         } else {
           updatedUiMessages = uiMessages;
@@ -765,25 +938,30 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
         if (dangerousCalls.isNotEmpty) {
           activity.add('> Waiting for your approval...');
-          emit(state.copyWith(
-            messages: updatedUiMessages,
-            thinkingText: state.waitingApproval,
-            toolActivity: List.of(activity),
-          ));
+          emit(
+            state.copyWith(
+              messages: updatedUiMessages,
+              thinkingText: state.waitingApproval,
+              toolActivity: List.of(activity),
+            ),
+          );
 
           final combinedRequest = _buildCombinedApprovalRequest(dangerousCalls);
-          activity
-              .add('> Approval required: ${dangerousCalls.length} action(s)');
+          activity.add(
+            '> Approval required: ${dangerousCalls.length} action(s)',
+          );
           emit(state.copyWith(toolActivity: List.of(activity)));
 
           final approved = await _requestApproval(emit, combinedRequest);
           _ensureGenerationActive(generationId);
           if (!approved) {
             activity.add('  Rejected: User rejected all actions');
-            emit(state.copyWith(
-              toolActivity: List.of(activity),
-              clearThinking: true,
-            ));
+            emit(
+              state.copyWith(
+                toolActivity: List.of(activity),
+                clearThinking: true,
+              ),
+            );
 
             final rejectBuffer = StringBuffer();
             for (final call in dangerousCalls) {
@@ -791,23 +969,30 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
                 '<tool_result name="${call.name}">\nBlocked: User rejected.\n</tool_result>',
               );
             }
-            rejectBuffer
-                .writeln('STOP: User rejected all actions. Do not proceed.');
-            apiMessages.add(AiMessage(
-              id: _uuid.v4(),
-              role: AiMessageRole.user,
-              content: rejectBuffer.toString(),
-              timestamp: DateTime.now(),
-            ));
-            continue;
+            rejectBuffer.writeln(
+              'STOP: User rejected all actions. Do not proceed.',
+            );
+            apiMessages.add(
+              AiMessage(
+                id: _uuid.v4(),
+                role: AiMessageRole.user,
+                content: rejectBuffer.toString(),
+                timestamp: DateTime.now(),
+              ),
+            );
+            break;
           }
 
           activity.add('  Approved: All actions approved');
-          emit(state.copyWith(
-            toolActivity: List.of(activity),
-            thinkingText: state.runningToolTemplate
-                .replaceFirst('{}', dangerousCalls.first.name),
-          ));
+          emit(
+            state.copyWith(
+              toolActivity: List.of(activity),
+              thinkingText: state.runningToolTemplate.replaceFirst(
+                '{}',
+                dangerousCalls.first.name,
+              ),
+            ),
+          );
         }
 
         final toolResultBuffer = StringBuffer();
@@ -815,28 +1000,43 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           if (ToolExecutor.dangerousTools.contains(call.name)) {
             activity.add('  Approved: ${call.name} (pre-approved)');
             _addRunningToolCall(allToolCalls, call);
-            emit(state.copyWith(
-              messages: updatedUiMessages,
-              thinkingText:
-                  state.runningToolTemplate.replaceFirst('{}', call.name),
-              toolActivity: List.of(activity),
-              currentToolCalls: List.of(allToolCalls),
-            ));
+            emit(
+              state.copyWith(
+                messages: updatedUiMessages,
+                thinkingText: state.runningToolTemplate.replaceFirst(
+                  '{}',
+                  call.name,
+                ),
+                toolActivity: List.of(activity),
+                currentToolCalls: List.of(allToolCalls),
+              ),
+            );
           } else {
-            activity
-                .add('> Tool: ${call.name}(${_summarizeArgs(call.arguments)})');
-            emit(state.copyWith(
-              messages: updatedUiMessages,
-              thinkingText:
-                  state.runningToolTemplate.replaceFirst('{}', call.name),
-              toolActivity: List.of(activity),
-              currentToolCalls: List.of(allToolCalls)
-                ..add(_runningToolCall(call)),
-            ));
+            activity.add(
+              '> Tool: ${call.name}(${_summarizeArgs(call.arguments)})',
+            );
+            emit(
+              state.copyWith(
+                messages: updatedUiMessages,
+                thinkingText: state.runningToolTemplate.replaceFirst(
+                  '{}',
+                  call.name,
+                ),
+                toolActivity: List.of(activity),
+                currentToolCalls: List.of(allToolCalls)
+                  ..add(_runningToolCall(call)),
+              ),
+            );
           }
 
           final toolResult = await _toolExecutor.execute(call);
           _ensureGenerationActive(generationId);
+          if (toolResult.success &&
+              ToolExecutor.dangerousTools.contains(call.name)) {
+            executedMutations.add(_toolRoundSignature([call]));
+            seenToolSignatures
+                .clear(); // Re-inspect paths after a successful change.
+          }
 
           if (ToolExecutor.dangerousTools.contains(call.name)) {
             _completeRunningToolCall(
@@ -846,46 +1046,61 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
               success: toolResult.success,
             );
           } else {
-            allToolCalls.add(AiToolCall(
-              toolName: call.name,
-              arguments: jsonEncode(call.arguments),
-              result: toolResult.output,
-              success: toolResult.success,
-            ));
+            allToolCalls.add(
+              AiToolCall(
+                toolName: call.name,
+                arguments: jsonEncode(call.arguments),
+                result: toolResult.output,
+                success: toolResult.success,
+              ),
+            );
           }
 
           activity.add(
-              '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}');
-          emit(state.copyWith(
-            toolActivity: List.of(activity),
-            currentToolCalls: List.of(allToolCalls),
-          ));
+            '  ${toolResult.success ? "OK" : "FAIL"}: ${_truncateOutput(toolResult.output)}',
+          );
+          emit(
+            state.copyWith(
+              toolActivity: List.of(activity),
+              currentToolCalls: List.of(allToolCalls),
+            ),
+          );
 
           toolResultBuffer.writeln(
-            '<tool_result name="${call.name}">\n${toolResult.output}\n</tool_result>',
+            '<tool_result name="${call.name}">${jsonEncode({'ok': toolResult.success, 'output': toolResult.output})}</tool_result>',
           );
+          if (!toolResult.success) {
+            toolResultBuffer.writeln(
+              '<tool_result>{"ok":false,"error":"Remaining calls in this round were not executed because an earlier call failed. Correct the failure before continuing."}</tool_result>',
+            );
+            break;
+          }
         }
 
-        apiMessages.add(AiMessage(
-          id: _uuid.v4(),
-          role: AiMessageRole.user,
-          content: toolResultBuffer.toString(),
-          timestamp: DateTime.now(),
-        ));
+        apiMessages.add(
+          AiMessage(
+            id: _uuid.v4(),
+            role: AiMessageRole.user,
+            content: toolResultBuffer.toString(),
+            timestamp: DateTime.now(),
+          ),
+        );
 
         uiMessages = updatedUiMessages;
       }
 
-      activity.add('> Max tool calls reached, requesting final answer...');
+      activity.add('> Tool loop stopped; requesting final answer...');
       emit(state.copyWith(toolActivity: List.of(activity)));
 
-      apiMessages.add(AiMessage(
-        id: _uuid.v4(),
-        role: AiMessageRole.user,
-        content:
-            'Please give your final answer now. Do not call any more tools.',
-        timestamp: DateTime.now(),
-      ));
+      apiMessages.add(
+        AiMessage(
+          id: _uuid.v4(),
+          role: AiMessageRole.user,
+          content:
+              'Please give your final answer now. Do not call any more tools.',
+          timestamp: DateTime.now(),
+        ),
+      );
 
       final preparedContext = _prepareContextForProvider(
         apiMessages,
@@ -903,34 +1118,44 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
         isLoading: true,
       );
-      emit(state.copyWith(
-        messages: [...uiMessages, streamingMsg],
-        clearThinking: true,
-        activeProviderId: _localAiProviderId,
-      ));
+      emit(
+        state.copyWith(
+          messages: [...uiMessages, streamingMsg],
+          clearThinking: true,
+          activeProviderId: _localAiProviderId,
+        ),
+      );
 
       final rawBuffer = StringBuffer();
       await _consumeGenerationStream(
         generationId: generationId,
         stream: localService.sendChatMessageStream(
           message: localPrompt,
+          messages: _buildLocalChatMessages(preparedContext.messages),
           systemPrompt: preparedContext.systemPrompt,
         ),
         onChunk: (chunk) {
+          if (chunk.startsWith('[STATUS]')) {
+            emit(state.copyWith(thinkingText: chunk.substring(8)));
+            return;
+          }
           rawBuffer.write(chunk);
           final displayText = _stripJsonBlocks(
             _stripToolCallTagsStreaming(rawBuffer.toString()),
           );
-          emit(state.copyWith(
-            messages: [
-              ...uiMessages,
-              streamingMsg.copyWith(
-                content: displayText,
-                isLoading: true,
-              ),
-            ],
-            activeProviderId: _localAiProviderId,
-          ));
+          emit(
+            state.copyWith(
+              messages: [
+                ...uiMessages,
+                streamingMsg.copyWith(
+                  content: displayText,
+                  reasoning: extractAssistantReasoning(rawBuffer.toString()),
+                  isLoading: true,
+                ),
+              ],
+              activeProviderId: _localAiProviderId,
+            ),
+          );
         },
       );
 
@@ -939,35 +1164,46 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         role: AiMessageRole.assistant,
         content:
             _stripJsonBlocks(_stripToolCallTags(rawBuffer.toString())).isEmpty
-                ? '(The local model returned an empty response.)'
-                : _stripJsonBlocks(_stripToolCallTags(rawBuffer.toString())),
+            ? '(The local model returned an empty response.)'
+            : _stripJsonBlocks(_stripToolCallTags(rawBuffer.toString())),
         timestamp: streamingMsg.timestamp,
+        reasoning: extractAssistantReasoning(rawBuffer.toString()),
         toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
         isLoading: false,
       );
 
-      emit(state.copyWith(
-        messages: [...uiMessages, assistantMessage],
-        isLoading: false,
-        clearThinking: true,
-        clearToolActivity: true,
-        clearCurrentToolCalls: true,
-        clearApproval: true,
-        activeProviderId: _localAiProviderId,
-      ));
+      emit(
+        state.copyWith(
+          messages: [...uiMessages, assistantMessage],
+          isLoading: false,
+          clearThinking: true,
+          clearToolActivity: true,
+          clearCurrentToolCalls: true,
+          clearApproval: true,
+          activeProviderId: _localAiProviderId,
+        ),
+      );
     } on _GenerationStopped {
       return;
     } catch (e) {
       if (_activeGenerationId != generationId) return;
       AppLogger.error('[AiAgentBloc] Local AI inference failed', error: e);
-      emit(state.copyWith(
-        messages: displayMessages,
-        error: 'Local AI inference failed: $e',
-        isLoading: false,
-        clearThinking: true,
-        clearToolActivity: true,
-        activeProviderId: _localAiProviderId,
-      ));
+      emit(
+        state.copyWith(
+          messages: state.messages
+              .map(
+                (message) => message.isLoading
+                    ? message.copyWith(isLoading: false, error: e.toString())
+                    : message,
+              )
+              .toList(),
+          error: 'Local AI inference failed: $e',
+          isLoading: false,
+          clearThinking: true,
+          clearToolActivity: true,
+          activeProviderId: _localAiProviderId,
+        ),
+      );
     }
   }
 
@@ -1003,11 +1239,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     );
 
     // Show the empty streaming bubble immediately (clears thinking indicator).
-    emit(state.copyWith(
-      messages: [...uiMessages, streamingMsg],
-      clearThinking: true,
-      toolActivity: List.of(activity),
-    ));
+    emit(
+      state.copyWith(
+        messages: [...uiMessages, streamingMsg],
+        clearThinking: true,
+        toolActivity: List.of(activity),
+      ),
+    );
 
     final rawBuffer = StringBuffer();
     String resolvedProviderId = providerId ?? '';
@@ -1044,9 +1282,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             content: displayText,
             isLoading: true,
           );
-          emit(state.copyWith(
-            messages: [...uiMessages, updatedMsg],
-          ));
+          emit(state.copyWith(messages: [...uiMessages, updatedMsg]));
         },
       );
     } on AiProviderException {
@@ -1085,23 +1321,29 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final finalMsg = AiMessage(
       id: streamingId,
       role: AiMessageRole.assistant,
-      content: displayContent,
+      content: displayContent.isEmpty
+          ? '(The agent could not finish this request. Please retry with a narrower scope.)'
+          : displayContent,
+      reasoning: extractAssistantReasoning(rawContent),
       timestamp: streamingMsg.timestamp,
       searchResults: searchResults.isNotEmpty ? searchResults : null,
       toolCalls: allToolCalls.isNotEmpty ? List.of(allToolCalls) : null,
       isLoading: false,
     );
 
-    emit(state.copyWith(
-      messages: [...uiMessages, finalMsg],
-      isLoading: false,
-      results: searchResults,
-      activeProviderId:
-          resolvedProviderId.isNotEmpty ? resolvedProviderId : null,
-      clearThinking: true,
-      clearCurrentToolCalls: true,
-      toolActivity: List.of(activity),
-    ));
+    emit(
+      state.copyWith(
+        messages: [...uiMessages, finalMsg],
+        isLoading: false,
+        results: searchResults,
+        activeProviderId: resolvedProviderId.isNotEmpty
+            ? resolvedProviderId
+            : null,
+        clearThinking: true,
+        clearCurrentToolCalls: true,
+        toolActivity: List.of(activity),
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1129,21 +1371,34 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         // Support single path or array
         final pathArg = call.arguments['path'] as String?;
         final pathsArg = call.arguments['paths'] as List?;
-        final filePaths = pathsArg?.map((e) => e.toString()).toList() ??
+        final filePaths =
+            pathsArg?.map((e) => e.toString()).toList() ??
             (pathArg != null ? [pathArg] : ['(unknown)']);
         for (final p in filePaths) {
           final fn = p.split(Platform.pathSeparator).last;
           buffer.writeln('MOVE TO RECYCLE BIN: $fn\n$p');
         }
+      } else if (call.name == 'copy_file' || call.name == 'move_file') {
+        buffer.writeln(
+          '${call.name}: ${call.arguments['source']} → ${call.arguments['destination']}',
+        );
+      } else if (call.name == 'create_directory') {
+        buffer.writeln('CREATE DIRECTORY: ${call.arguments['path']}');
+      } else if (call.name == 'update_file_tags') {
+        buffer.writeln(
+          'UPDATE TAGS: ${call.arguments['path']}\nAdd: ${call.arguments['add'] ?? []}\nRemove: ${call.arguments['remove'] ?? []}',
+        );
       } else if (call.name == 'clean_disk_junk') {
         final scanId = call.arguments['scan_id'] as String? ?? '?';
         final permanent = call.arguments['permanent'] as bool? ?? false;
         final cats = call.arguments['categories'] as List?;
         final catsStr = cats != null ? cats.join(', ') : 'all scanned';
-        buffer
-            .writeln('CLEAN DISK JUNK: scan_id=$scanId, categories=[$catsStr]');
         buffer.writeln(
-            permanent ? 'Mode: PERMANENT DELETE' : 'Mode: Move to Recycle Bin');
+          'CLEAN DISK JUNK: scan_id=$scanId, categories=[$catsStr]',
+        );
+        buffer.writeln(
+          permanent ? 'Mode: PERMANENT DELETE' : 'Mode: Move to Recycle Bin',
+        );
       }
     }
 
@@ -1173,10 +1428,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       title = 'Agent wants to perform ${calls.length} actions';
     }
 
-    final allDangerous = calls.every((c) =>
-        c.name == 'run_command' ||
-        c.name == 'delete_file' ||
-        c.name == 'clean_disk_junk');
+    final allDangerous = calls.every(
+      (c) =>
+          c.name == 'run_command' ||
+          c.name == 'delete_file' ||
+          c.name == 'clean_disk_junk',
+    );
 
     final String confirmLabel;
     if (singleCall) {
@@ -1212,8 +1469,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     );
   }
 
-  ApprovalActionType _actionTypeForTool(String toolName,
-      {bool fileExists = false}) {
+  ApprovalActionType _actionTypeForTool(
+    String toolName, {
+    bool fileExists = false,
+  }) {
     switch (toolName) {
       case 'run_command':
         return ApprovalActionType.execute;
@@ -1243,25 +1502,20 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     for (final entry in args.entries) {
       final val = entry.value.toString();
       parts.add(
-          '${entry.key}: ${val.length > 40 ? '${val.substring(0, 40)}...' : val}');
+        '${entry.key}: ${val.length > 40 ? '${val.substring(0, 40)}...' : val}',
+      );
     }
     return parts.join(', ');
   }
 
   /// Known tool names - must match [ToolExecutor._knownTools].
-  static const _toolNames =
-      'list_directory|search_files|read_file|write_file|delete_file|'
-      'get_file_info|run_command|search_by_tag|get_file_tags|'
-      'list_all_tags|search_content|list_video_libraries|'
-      'get_video_library_files|list_albums|get_album_files|'
-      'list_disk_junk_categories|get_drive_space|scan_disk_junk|clean_disk_junk|'
-      'get_pending_cleanup_review|get_current_cleaner_scan|get_current_clean_cleaner_scan|'
-      'get_current_app_storage';
+  static String get _toolNames =>
+      AgentToolCatalog.names.map(RegExp.escape).join('|');
 
   /// Strips **complete** tool call blocks from text.
   /// Used for finished (non-streaming) responses.
   static String _stripToolCallTags(String text) {
-    var cleaned = text;
+    var cleaned = stripAssistantReasoning(text);
 
     // Tool result blocks fed back as conversation context. The model sometimes
     // echoes these back verbatim; they must never appear in the chat bubble.
@@ -1271,8 +1525,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     );
 
     // Format 1: <tool_call>...</tool_call>
-    cleaned =
-        cleaned.replaceAll(RegExp(r'<tool_call>[\s\S]*?</tool_call>'), '');
+    cleaned = cleaned.replaceAll(
+      RegExp(r'<tool_call>[\s\S]*?</tool_call>'),
+      '',
+    );
 
     // Format 1a: Gemma/LiteRT sometimes emits sentinel tokens instead of XML.
     cleaned = cleaned.replaceAll(
@@ -1281,15 +1537,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     );
 
     // Format 1b: bare Gemma call.
-    cleaned = cleaned.replaceAll(
-      RegExp(r'call:tool_call\s*\{[\s\S]*?\}'),
-      '',
-    );
+    cleaned = cleaned.replaceAll(RegExp(r'call:tool_call\s*\{[\s\S]*?\}'), '');
 
     // Format 2: ```json {"name":"known_tool",...} ```
     cleaned = cleaned.replaceAll(
       RegExp(
-          '```(?:json)?\\s*\\n?\\{\\s*"name"\\s*:\\s*"(?:$_toolNames)"[\\s\\S]*?\\}\\s*\\n?```'),
+        '```(?:json)?\\s*\\n?\\{\\s*"name"\\s*:\\s*"(?:$_toolNames)"[\\s\\S]*?\\}\\s*\\n?```',
+      ),
       '',
     );
 
@@ -1328,7 +1582,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     // ```json {"name":"tool" ... (no closing ```)
     cleaned = cleaned.replaceAll(
       RegExp(
-          '```(?:json)?\\s*\\n?\\{\\s*"name"\\s*:\\s*"(?:$_toolNames)"[\\s\\S]*\$'),
+        '```(?:json)?\\s*\\n?\\{\\s*"name"\\s*:\\s*"(?:$_toolNames)"[\\s\\S]*\$',
+      ),
       '',
     );
 
@@ -1412,18 +1667,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     return result;
   }
 
-  void _onClearChat(
-    ClearChat event,
-    Emitter<AiAgentState> emit,
-  ) {
+  void _onClearChat(ClearChat event, Emitter<AiAgentState> emit) {
     // "Clear chat" starts a fresh conversation (same as NewConversation).
     add(const NewConversation());
   }
 
-  void _onEditMessage(
-    EditMessage event,
-    Emitter<AiAgentState> emit,
-  ) {
+  void _onEditMessage(EditMessage event, Emitter<AiAgentState> emit) {
     if (state.isLoading) return;
 
     final trimmed = event.content.trim();
@@ -1438,14 +1687,16 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final referencedFiles =
         original.referencedFiles?.map((f) => f.path).toList() ?? const [];
 
-    emit(state.copyWith(
-      messages: state.messages.take(index).toList(),
-      results: const [],
-      clearError: true,
-      clearThinking: true,
-      clearToolActivity: true,
-      clearApproval: true,
-    ));
+    emit(
+      state.copyWith(
+        messages: state.messages.take(index).toList(),
+        results: const [],
+        clearError: true,
+        clearThinking: true,
+        clearToolActivity: true,
+        clearApproval: true,
+      ),
+    );
 
     add(SendMessage(trimmed, referencedFiles: referencedFiles));
   }
@@ -1470,10 +1721,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     UpdateCurrentPath event,
     Emitter<AiAgentState> emit,
   ) async {
-    final normalizedPath =
-        AiChatHistoryService.normalizeWorkspacePath(event.path);
-    final previousPath =
-        AiChatHistoryService.normalizeWorkspacePath(state.currentPath);
+    final normalizedPath = AiChatHistoryService.normalizeWorkspacePath(
+      event.path,
+    );
+    final previousPath = AiChatHistoryService.normalizeWorkspacePath(
+      state.currentPath,
+    );
 
     if (normalizedPath == previousPath) {
       if (state.currentPath != event.path) {
@@ -1487,46 +1740,48 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       return;
     }
 
-    final matchingSummary =
-        await _historyService?.findLatestSummaryForPath(normalizedPath);
+    final matchingSummary = await _historyService?.findLatestSummaryForPath(
+      normalizedPath,
+    );
     final summaries = await _historyService?.loadAllSummaries() ?? [];
 
     if (matchingSummary != null) {
       if (matchingSummary.id == state.conversationId) {
-        emit(state.copyWith(
-          currentPath: event.path,
-          conversations: summaries,
-        ));
+        emit(state.copyWith(currentPath: event.path, conversations: summaries));
         return;
       }
 
       final messages =
           await _historyService?.loadConversation(matchingSummary.id) ?? [];
-      emit(state.copyWith(
+      emit(
+        state.copyWith(
+          currentPath: event.path,
+          conversationId: matchingSummary.id,
+          messages: messages,
+          results: const [],
+          clearError: true,
+          clearThinking: true,
+          clearToolActivity: true,
+          clearApproval: true,
+          conversations: summaries,
+        ),
+      );
+      return;
+    }
+
+    emit(
+      state.copyWith(
         currentPath: event.path,
-        conversationId: matchingSummary.id,
-        messages: messages,
+        conversationId: _uuid.v4(),
+        messages: const [],
         results: const [],
         clearError: true,
         clearThinking: true,
         clearToolActivity: true,
         clearApproval: true,
         conversations: summaries,
-      ));
-      return;
-    }
-
-    emit(state.copyWith(
-      currentPath: event.path,
-      conversationId: _uuid.v4(),
-      messages: const [],
-      results: const [],
-      clearError: true,
-      clearThinking: true,
-      clearToolActivity: true,
-      clearApproval: true,
-      conversations: summaries,
-    ));
+      ),
+    );
   }
 
   Future<void> _onRetryLastMessage(
@@ -1552,11 +1807,13 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     }
 
     emit(state.copyWith(messages: messages, clearError: true));
-    add(SendMessage(
-      lastUserMessage.content,
-      referencedFiles:
-          lastUserMessage.referencedFiles?.map((f) => f.path).toList() ?? [],
-    ));
+    add(
+      SendMessage(
+        lastUserMessage.content,
+        referencedFiles:
+            lastUserMessage.referencedFiles?.map((f) => f.path).toList() ?? [],
+      ),
+    );
   }
 
   Future<void> _onProviderChanged(
@@ -1565,10 +1822,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   ) async {
     final hasProvider = await _providerService.hasConfiguredProvider;
     final localCatalogs = _mergeLocalAiCatalog(const []);
-    emit(state.copyWith(
-      isProviderConfigured: hasProvider || localCatalogs.isNotEmpty,
-      isLoadingProviderModels: hasProvider,
-    ));
+    emit(
+      state.copyWith(
+        isProviderConfigured: hasProvider || localCatalogs.isNotEmpty,
+        isLoadingProviderModels: hasProvider,
+      ),
+    );
     add(const RefreshProviderModels());
   }
 
@@ -1580,13 +1839,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     if (!hasProvider) {
       final localCatalogs = _mergeLocalAiCatalog(const []);
       if (localCatalogs.isEmpty) {
-        emit(state.copyWith(
-          isProviderConfigured: false,
-          providerModelCatalogs: const [],
-          clearSelectedProvider: true,
-          clearSelectedModel: true,
-          isLoadingProviderModels: false,
-        ));
+        emit(
+          state.copyWith(
+            isProviderConfigured: false,
+            providerModelCatalogs: const [],
+            clearSelectedProvider: true,
+            clearSelectedModel: true,
+            isLoadingProviderModels: false,
+          ),
+        );
         return;
       }
       // Show local AI catalog even when no remote providers configured
@@ -1595,19 +1856,21 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         selectedProviderId: state.selectedProviderId,
         selectedModelName: state.selectedModelName,
       );
-      emit(state.copyWith(
-        isProviderConfigured: true,
-        providerModelCatalogs: localCatalogs,
-        selectedProviderId: selection.providerId,
-        selectedModelName: selection.modelName,
-        isLoadingProviderModels: false,
-      ));
+      emit(
+        state.copyWith(
+          isProviderConfigured: true,
+          providerModelCatalogs: localCatalogs,
+          selectedProviderId: selection.providerId,
+          selectedModelName: selection.modelName,
+          isLoadingProviderModels: false,
+        ),
+      );
       return;
     }
 
     emit(state.copyWith(isLoadingProviderModels: true));
-    final remoteCatalogs =
-        await _providerService.getEnabledProviderModelCatalogs();
+    final remoteCatalogs = await _providerService
+        .getEnabledProviderModelCatalogs();
     final catalogs = _mergeLocalAiCatalog(remoteCatalogs);
     final selection = _resolveModelSelection(
       catalogs: catalogs,
@@ -1615,13 +1878,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       selectedModelName: state.selectedModelName,
     );
 
-    emit(state.copyWith(
-      isProviderConfigured: true,
-      providerModelCatalogs: catalogs,
-      selectedProviderId: selection.providerId,
-      selectedModelName: selection.modelName,
-      isLoadingProviderModels: false,
-    ));
+    emit(
+      state.copyWith(
+        isProviderConfigured: true,
+        providerModelCatalogs: catalogs,
+        selectedProviderId: selection.providerId,
+        selectedModelName: selection.modelName,
+        isLoadingProviderModels: false,
+      ),
+    );
   }
 
   Future<void> _onSelectChatModel(
@@ -1656,10 +1921,12 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     await _persistModelSelection(event.providerId, event.modelName);
 
-    emit(state.copyWith(
-      selectedProviderId: event.providerId,
-      selectedModelName: event.modelName,
-    ));
+    emit(
+      state.copyWith(
+        selectedProviderId: event.providerId,
+        selectedModelName: event.modelName,
+      ),
+    );
   }
 
   void _onApprove(ApproveAction event, Emitter<AiAgentState> emit) {
@@ -1678,10 +1945,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     }
   }
 
-  void _onStopGeneration(
-    StopGeneration event,
-    Emitter<AiAgentState> emit,
-  ) {
+  void _onStopGeneration(StopGeneration event, Emitter<AiAgentState> emit) {
     if (!state.isLoading) return;
 
     _activeGenerationId = null;
@@ -1698,10 +1962,7 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
               : call,
         )
         .toList(growable: false);
-    final messages = _finalizeStoppedMessages(
-      state.messages,
-      stoppedToolCalls,
-    );
+    final messages = _finalizeStoppedMessages(state.messages, stoppedToolCalls);
 
     final approval = _approvalCompleter;
     _approvalCompleter = null;
@@ -1715,13 +1976,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     }
     unawaited(_activeStreamSubscription?.cancel());
 
-    emit(state.copyWith(
-      messages: messages,
-      isLoading: false,
-      clearThinking: true,
-      clearApproval: true,
-      clearCurrentToolCalls: true,
-    ));
+    emit(
+      state.copyWith(
+        messages: messages,
+        isLoading: false,
+        clearThinking: true,
+        clearApproval: true,
+        clearCurrentToolCalls: true,
+      ),
+    );
   }
 
   Future<void> _onNewConversation(
@@ -1730,15 +1993,17 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   ) async {
     final newId = _uuid.v4();
     final summaries = await _historyService?.loadAllSummaries() ?? [];
-    emit(state.copyWith(
-      conversationId: newId,
-      messages: [],
-      results: [],
-      clearError: true,
-      clearThinking: true,
-      clearToolActivity: true,
-      conversations: summaries,
-    ));
+    emit(
+      state.copyWith(
+        conversationId: newId,
+        messages: [],
+        results: [],
+        clearError: true,
+        clearThinking: true,
+        clearToolActivity: true,
+        conversations: summaries,
+      ),
+    );
   }
 
   Future<void> _onSwitchConversation(
@@ -1758,17 +2023,19 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       }
     }
     final restoredPath = summary?.initialPath ?? '';
-    emit(state.copyWith(
-      conversationId: event.id,
-      messages: messages,
-      results: [],
-      clearError: true,
-      clearThinking: true,
-      clearToolActivity: true,
-      clearApproval: true,
-      conversations: summaries,
-      currentPath: restoredPath,
-    ));
+    emit(
+      state.copyWith(
+        conversationId: event.id,
+        messages: messages,
+        results: [],
+        clearError: true,
+        clearThinking: true,
+        clearToolActivity: true,
+        clearApproval: true,
+        conversations: summaries,
+        currentPath: restoredPath,
+      ),
+    );
   }
 
   Future<void> _onDeleteConversation(
@@ -1783,21 +2050,25 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       if (summaries.isNotEmpty) {
         final nextId = summaries.first.id;
         final messages = await _historyService?.loadConversation(nextId) ?? [];
-        emit(state.copyWith(
-          conversationId: nextId,
-          messages: messages,
-          results: [],
-          clearError: true,
-          conversations: summaries,
-        ));
+        emit(
+          state.copyWith(
+            conversationId: nextId,
+            messages: messages,
+            results: [],
+            clearError: true,
+            conversations: summaries,
+          ),
+        );
       } else {
-        emit(state.copyWith(
-          conversationId: _uuid.v4(),
-          messages: [],
-          results: [],
-          clearError: true,
-          conversations: const [],
-        ));
+        emit(
+          state.copyWith(
+            conversationId: _uuid.v4(),
+            messages: [],
+            results: [],
+            clearError: true,
+            conversations: const [],
+          ),
+        );
       }
     } else {
       emit(state.copyWith(conversations: summaries));
@@ -1878,10 +2149,10 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   }
 
   AiToolCall _runningToolCall(ToolCall call) => AiToolCall(
-        toolName: call.name,
-        arguments: jsonEncode(call.arguments),
-        isRunning: true,
-      );
+    toolName: call.name,
+    arguments: jsonEncode(call.arguments),
+    isRunning: true,
+  );
 
   void _addRunningToolCall(List<AiToolCall> calls, ToolCall call) {
     calls.add(_runningToolCall(call));
@@ -1916,20 +2187,25 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     final updated = List<AiMessage>.of(messages);
     if (updated.isNotEmpty && updated.last.isLoading) {
       final partial = updated.removeLast();
-      if (partial.content.trim().isNotEmpty) {
-        updated.add(partial.copyWith(
-          isLoading: false,
-          toolCalls: toolCalls.isNotEmpty ? toolCalls : null,
-        ));
+      if (partial.content.trim().isNotEmpty ||
+          (partial.reasoning?.trim().isNotEmpty ?? false)) {
+        updated.add(
+          partial.copyWith(
+            isLoading: false,
+            toolCalls: toolCalls.isNotEmpty ? toolCalls : null,
+          ),
+        );
       }
     } else if (toolCalls.isNotEmpty) {
-      updated.add(AiMessage(
-        id: _uuid.v4(),
-        role: AiMessageRole.assistant,
-        content: 'Stopped by user.',
-        timestamp: DateTime.now(),
-        toolCalls: toolCalls,
-      ));
+      updated.add(
+        AiMessage(
+          id: _uuid.v4(),
+          role: AiMessageRole.assistant,
+          content: 'Stopped by user.',
+          timestamp: DateTime.now(),
+          toolCalls: toolCalls,
+        ),
+      );
     }
     return updated;
   }
@@ -1945,28 +2221,31 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
 
     for (final path in paths) {
       final file = File(path);
-      final fileName =
-          path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).last;
-      final ext =
-          fileName.contains('.') ? fileName.split('.').last.toLowerCase() : '';
+      final fileName = path
+          .split(Platform.pathSeparator)
+          .where((s) => s.isNotEmpty)
+          .last;
+      final ext = fileName.contains('.')
+          ? fileName.split('.').last.toLowerCase()
+          : '';
 
       if (!await file.exists()) {
-        results.add(ReferencedFile(
-          path: path,
-          fileName: fileName,
-          isTextFile: ReferencedFile.isTextExtension(ext),
-          error: 'File not found',
-        ));
+        results.add(
+          ReferencedFile(
+            path: path,
+            fileName: fileName,
+            isTextFile: ReferencedFile.isTextExtension(ext),
+            error: 'File not found',
+          ),
+        );
         continue;
       }
 
       final isText = ReferencedFile.isTextExtension(ext);
       if (!isText) {
-        results.add(ReferencedFile(
-          path: path,
-          fileName: fileName,
-          isTextFile: false,
-        ));
+        results.add(
+          ReferencedFile(path: path, fileName: fileName, isTextFile: false),
+        );
         continue;
       }
 
@@ -1974,13 +2253,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
       try {
         final stat = await file.stat();
         if (stat.size > 1024 * 1024) {
-          results.add(ReferencedFile(
-            path: path,
-            fileName: fileName,
-            isTextFile: true,
-            contentLoaded: false,
-            error: 'File too large (>1MB)',
-          ));
+          results.add(
+            ReferencedFile(
+              path: path,
+              fileName: fileName,
+              isTextFile: true,
+              contentLoaded: false,
+              error: 'File too large (>1MB)',
+            ),
+          );
           continue;
         }
 
@@ -1991,13 +2272,15 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
           try {
             content = await file.readAsString(encoding: latin1);
           } catch (__) {
-            results.add(ReferencedFile(
-              path: path,
-              fileName: fileName,
-              isTextFile: true,
-              contentLoaded: false,
-              error: 'Cannot read (binary or unsupported encoding)',
-            ));
+            results.add(
+              ReferencedFile(
+                path: path,
+                fileName: fileName,
+                isTextFile: true,
+                contentLoaded: false,
+                error: 'Cannot read (binary or unsupported encoding)',
+              ),
+            );
             continue;
           }
         }
@@ -2010,21 +2293,25 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
             ? '$preview\n\n... (${lines.length - 200} more lines)'
             : preview;
 
-        results.add(ReferencedFile(
-          path: path,
-          fileName: fileName,
-          isTextFile: true,
-          content: displayContent,
-          contentLoaded: true,
-        ));
+        results.add(
+          ReferencedFile(
+            path: path,
+            fileName: fileName,
+            isTextFile: true,
+            content: displayContent,
+            contentLoaded: true,
+          ),
+        );
       } catch (e) {
-        results.add(ReferencedFile(
-          path: path,
-          fileName: fileName,
-          isTextFile: true,
-          contentLoaded: false,
-          error: 'Error reading: $e',
-        ));
+        results.add(
+          ReferencedFile(
+            path: path,
+            fileName: fileName,
+            isTextFile: true,
+            contentLoaded: false,
+            error: 'Error reading: $e',
+          ),
+        );
       }
     }
 
@@ -2058,7 +2345,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
         buffer.writeln('TYPE: .$ext (non-text file)');
         buffer.writeln('ACTION: Use get_file_info tool to get metadata');
         buffer.writeln(
-            'WARNING: Do NOT attempt to read or display this file - it is binary data');
+          'WARNING: Do NOT attempt to read or display this file - it is binary data',
+        );
       }
     }
     buffer.writeln('--- END REFERENCED FILES ---');
@@ -2066,11 +2354,107 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     return buffer.toString();
   }
 
+  ({List<ToolCall> calls, List<String> errors}) _prepareAgentCalls(
+    List<ToolCall> calls,
+  ) {
+    final prepared = <ToolCall>[];
+    final errors = <String>[];
+    if (calls.length > 8) {
+      return (
+        calls: prepared,
+        errors: ['At most 8 tool calls per round. Use sequential steps.'],
+      );
+    }
+    for (final call in calls) {
+      final error = _toolExecutor.validateCall(call);
+      if (error != null) {
+        errors.add(error);
+        continue;
+      }
+      try {
+        final resolved = _toolExecutor.prepareCall(call);
+        if (!prepared.any(
+          (existing) =>
+              _toolRoundSignature([existing]) ==
+              _toolRoundSignature([resolved]),
+        )) {
+          prepared.add(resolved);
+        }
+      } catch (error) {
+        errors.add(error.toString());
+      }
+    }
+    return (calls: prepared, errors: errors);
+  }
+
+  String _toolRoundSignature(List<ToolCall> calls) {
+    Object? canonical(Object? value) {
+      if (value is Map) {
+        final keys = value.keys.cast<String>().toList()..sort();
+        return {for (final key in keys) key: canonical(value[key])};
+      }
+      if (value is List) return value.map(canonical).toList();
+      return value;
+    }
+
+    return jsonEncode(
+      calls
+          .map(
+            (call) => {
+              'name': call.name,
+              'arguments': canonical(call.arguments),
+            },
+          )
+          .toList(),
+    );
+  }
+
+  List<AiMessage> _conversationForAgent(List<AiMessage> messages) {
+    final history = <AiMessage>[];
+    for (final message in messages) {
+      if (message.role == AiMessageRole.system) continue;
+      // Keep verified tool outcomes across user turns; reasoning is display-only.
+      if (message.toolCalls?.isNotEmpty == true) {
+        history.add(
+          AiMessage(
+            id: '${message.id}-tools',
+            role: AiMessageRole.user,
+            content:
+                '<tool_result>${jsonEncode(message.toolCalls!.map((tool) => {'name': tool.toolName, 'arguments': tool.arguments, 'ok': tool.success, 'output': tool.result}).toList())}</tool_result>',
+            timestamp: message.timestamp,
+          ),
+        );
+      }
+      final content = message.role == AiMessageRole.assistant
+          ? stripAssistantReasoning(message.content)
+          : message.content;
+      if (content.trim().isNotEmpty) {
+        history.add(message.copyWith(content: content));
+      }
+    }
+    return history;
+  }
+
+  List<Map<String, String>> _buildLocalChatMessages(List<AiMessage> messages) {
+    return messages
+        .map(
+          (message) => <String, String>{
+            'role': aiMessageRoleToApiString(message.role),
+            'content': message.role == AiMessageRole.assistant
+                ? stripAssistantReasoning(message.content)
+                : message.content,
+          },
+        )
+        .where((message) => message['content']!.trim().isNotEmpty)
+        .toList();
+  }
+
   String _buildLocalTranscript(List<AiMessage> messages) {
     final buffer = StringBuffer();
     buffer.writeln('Conversation transcript for local model inference.');
     buffer.writeln(
-        'If app data is needed, respond with the exact <tool_call> JSON block described in the system prompt. The app will execute it and send back <tool_result>.');
+      'If app data is needed, respond with the exact <tool_call> JSON block described in the system prompt. The app will execute it and send back <tool_result>.',
+    );
     buffer.writeln();
 
     for (final message in messages) {
@@ -2095,7 +2479,8 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
     }
 
     buffer.writeln(
-        'Continue the conversation. Use tools when the latest user request requires current app state, files, scan results, or cleanup actions.');
+      'Continue the conversation. Use tools when the latest user request requires current app state, files, scan results, or cleanup actions.',
+    );
     return buffer.toString();
   }
 
@@ -2113,215 +2498,20 @@ class AiAgentBloc extends Bloc<AiAgentEvent, AiAgentState> {
   }
 
   String _buildSystemPrompt() {
-    final userHome = Platform.environment['USERPROFILE'] ??
+    final home =
+        Platform.environment['USERPROFILE'] ??
         Platform.environment['HOME'] ??
-        'unknown';
-    final pathInfo = state.currentPath.isNotEmpty
-        ? 'The user is currently browsing: ${state.currentPath}\nWORKING DIRECTORY: ${state.currentPath}'
-        : 'No specific directory selected.\nWORKING DIRECTORY: $userHome';
-
-    // Build platform-specific paths info
-    final platformPathsInfo = _buildPlatformPathsInfo();
-
-    return '''$pathInfo
-Platform: ${Platform.operatingSystem}
-User home: $userHome
-
-$platformPathsInfo
-
-${ToolExecutor.toolDefinitions}
-
-RULES:
-- ALWAYS use the WORKING DIRECTORY as the default location for ALL file operations (create, delete, search, list, etc.) unless the user explicitly specifies a different path.
-- When the user says "here", "this folder", "current directory" or gives a relative path, resolve it relative to WORKING DIRECTORY.
-- Use tools to search. Do NOT guess file paths.
-- When the user asks about tags, ALWAYS use list_all_tags first, then search_by_tag.
-- When the user asks to find files by name, use search_files.
-- When the user asks to find files containing text, use search_content.
-- If the user is just chatting, respond normally without tools.
-- Always respond in the same language as the user.
-
-CRITICAL - TOOL EXECUTION:
-- When you need to create, modify, or delete files, or run commands: CALL THE TOOL DIRECTLY. Do NOT ask the user for permission in text.
-- The system has a built-in approval mechanism. When you call a dangerous tool (write_file, delete_file, run_command, clean_disk_junk), the system will AUTOMATICALLY show an approval dialog to the user BEFORE executing.
-- You MUST call the tool and let the system handle approval. NEVER say things like "Do you want me to do this?" or "Should I proceed?" — just call the tool.
-- If you want to explain what you're about to do, write your explanation FIRST, then call the tool in the same response.
-- Example: "I'll create 3 test files in the temp directory." followed by the tool_call block.
-
-CRITICAL - REFERENCED FILES:
-- Text files: content is already provided in the message under "--- REFERENCED FILES ---". Use it directly.
-- Non-text files (images, videos, audio, PDFs, etc.): You CANNOT read or display these files. Use get_file_info tool ONLY for metadata.
-- NEVER attempt to read, display, or process binary files (jpg, png, gif, mp4, mp3, pdf, zip, exe, etc.)
-- You are a TEXT-ONLY assistant. You cannot process images, videos, or other binary data.
-
-RESULT FORMAT:
-When you found files, include BOTH:
-1. A brief explanation in natural language
-2. A JSON results block listing ONLY the final matched files:
-
-```json
-[{"path": "C:\\exact\\path\\file.mp4", "relevance": 90, "explanation": "reason"}]
-```
-
-ONLY include files that actually match the user's query — NOT every file from tool outputs.
-Do NOT include the JSON block if no files match.
-''';
-  }
-
-  /// Builds information about CB File Hub's internal system paths and directory structure.
-  String _buildPlatformPathsInfo() {
-    final buffer = StringBuffer();
-    buffer.writeln('CB FILE HUB SYSTEM PATHS:');
-    buffer.writeln(
-        'The CB File Hub application stores its internal data in the following locations:');
-    buffer.writeln();
-
-    // App cache root directory
-    buffer.writeln('1. APP CACHE ROOT:');
-    if (Platform.isWindows) {
-      buffer.writeln('   - Location: %TEMP%\\cb_file_hub\\');
-      buffer.writeln(
-          '   - Example: C:\\Users\\<username>\\AppData\\Local\\Temp\\cb_file_hub\\');
-    } else if (Platform.isMacOS) {
-      buffer.writeln('   - Location: /var/folders/.../T/cb_file_hub/');
-      buffer.writeln('   - Example: /var/folders/xx/xxxxxxxxxx/T/cb_file_hub/');
-    } else if (Platform.isLinux) {
-      buffer.writeln('   - Location: /tmp/cb_file_hub/');
-    } else if (Platform.isAndroid) {
-      buffer.writeln(
-          '   - Location: /data/data/com.coolbird.cbfilehub/cache/cb_file_hub/');
-    } else if (Platform.isIOS) {
-      buffer.writeln('   - Location: <app_container>/tmp/cb_file_hub/');
-    }
-    buffer.writeln(
-        '   - Purpose: Root directory for all app cache and temporary files');
-    buffer.writeln();
-
-    // Subdirectories
-    buffer.writeln('2. CACHE SUBDIRECTORIES (under cb_file_hub):');
-    buffer.writeln('   - video_thumbnails/: Video thumbnail cache');
-    buffer.writeln('   - photo_thumbnails/: Photo thumbnail cache');
-    buffer.writeln(
-        '   - network_thumbnails/: Network file (SMB/FTP/WebDAV) thumbnail cache');
-    buffer.writeln('   - temp_files/: Temporary downloads and SMB file cache');
-    buffer.writeln();
-
-    // Database location
-    buffer.writeln('3. DATABASE AND PERSISTENT DATA:');
-    if (Platform.isWindows) {
-      buffer.writeln('   - Location: %USERPROFILE%\\Documents\\');
-      buffer.writeln('   - Example: C:\\Users\\<username>\\Documents\\');
-    } else if (Platform.isMacOS) {
-      buffer.writeln('   - Location: ~/Documents/');
-    } else if (Platform.isLinux) {
-      buffer.writeln('   - Location: ~/Documents/');
-    } else if (Platform.isAndroid) {
-      buffer.writeln(
-          '   - Location: /data/data/com.coolbird.cbfilehub/app_flutter/');
-    } else if (Platform.isIOS) {
-      buffer.writeln('   - Location: <app_container>/Documents/');
-    }
-    buffer.writeln('   - Files stored here:');
-    buffer.writeln(
-        '     * cb_file_hub.db: Main SQLite database (file metadata, tags, albums, settings)');
-    buffer.writeln('     * tag_colors.json: Tag color configuration');
-    buffer.writeln('     * album_auto_rules.json: Smart album rules');
-    buffer.writeln('     * featured_albums.json: Featured album configuration');
-    buffer.writeln('     * smart_albums.json: Smart album definitions');
-    buffer.writeln(
-        '     * video_library_cache.json: Video library metadata cache');
-    buffer.writeln();
-
-    // Platform-specific user directories
-    buffer.writeln('4. PLATFORM-SPECIFIC USER DIRECTORIES:');
-    if (Platform.isWindows) {
-      buffer.writeln('   - Pictures: %USERPROFILE%\\Pictures\\');
-      buffer.writeln('   - Downloads: %USERPROFILE%\\Downloads\\');
-      buffer.writeln('   - Documents: %USERPROFILE%\\Documents\\');
-    } else if (Platform.isMacOS) {
-      buffer.writeln('   - Pictures: ~/Pictures/');
-      buffer.writeln('   - Downloads: ~/Downloads/');
-      buffer.writeln('   - Documents: ~/Documents/');
-    } else if (Platform.isLinux) {
-      buffer.writeln('   - Pictures: ~/Pictures/');
-      buffer.writeln('   - Downloads: ~/Downloads/');
-      buffer.writeln('   - Documents: ~/Documents/');
-    } else if (Platform.isAndroid) {
-      buffer.writeln('   - Pictures: /storage/emulated/0/Pictures/');
-      buffer.writeln('   - Downloads: /storage/emulated/0/Download/');
-      buffer.writeln('   - Camera: /storage/emulated/0/DCIM/Camera/');
-      buffer.writeln('   - All Images: /storage/emulated/0/');
-    } else if (Platform.isIOS) {
-      buffer.writeln('   - All media: <app_container>/Documents/');
-      buffer.writeln(
-          '   - Note: iOS uses app sandbox, no direct access to system directories');
-    }
-    buffer.writeln();
-
-    // System screens
-    buffer.writeln('5. SYSTEM SCREENS (Virtual Navigation Paths):');
-    buffer.writeln(
-        'CB File Hub uses special paths starting with # for system screens. These are NOT file system paths.');
-    buffer.writeln();
-    buffer.writeln('STATIC SYSTEM SCREENS:');
-    buffer.writeln('   - #home: Home screen with quick access and favorites');
-    buffer.writeln('   - #tags: Tag management screen');
-    buffer.writeln('   - #gallery: Gallery hub for browsing photos');
-    buffer.writeln('   - #video: Video hub for browsing videos');
-    buffer.writeln('   - #albums: Album management screen');
-    buffer.writeln('   - #auto-rules: Smart album auto-rules configuration');
-    buffer.writeln('   - #trash: Trash bin / recycle bin');
-    buffer.writeln('   - #settings: Application settings');
-    buffer.writeln('   - #network: Network connection management');
-    buffer.writeln('   - #smb: SMB/CIFS network browser');
-    buffer.writeln('   - #ftp: FTP network browser');
-    buffer.writeln('   - #webdav: WebDAV network browser');
-    buffer.writeln('   - #ai-chat: AI chat screen (this screen you are in)');
-    buffer.writeln();
-    buffer.writeln('DYNAMIC SYSTEM SCREENS (with parameters):');
-    buffer.writeln(
-        '   - #video-library/{id}: Video library files screen for a specific library');
-    buffer.writeln(
-        '     Example: #video-library/1 opens video library with ID 1');
-    buffer
-        .writeln('   - #album/{id}: Album detail screen for a specific album');
-    buffer.writeln('     Example: #album/5 opens album with ID 5');
-    buffer.writeln(
-        '   - #image?path=...: Image viewer for a specific image file');
-    buffer.writeln('     Example: #image?path=C:\\Pictures\\photo.jpg');
-    buffer.writeln('   - #search?tag=...: Tag search results screen');
-    buffer.writeln(
-        '     Example: #search?tag=vacation shows all files tagged "vacation"');
-    buffer.writeln(
-        '   - #ai-chat?workspace=...: AI chat with specific workspace path');
-    buffer.writeln('     Example: #ai-chat?workspace=C:\\Projects');
-    buffer.writeln();
-    buffer.writeln('NETWORK PATHS:');
-    buffer.writeln('   - smb://server/share/path: SMB/CIFS network paths');
-    buffer.writeln('   - ftp://server/path: FTP network paths');
-    buffer.writeln('   - webdav://server/path: WebDAV network paths');
-    buffer.writeln('   - #network/...: Internal network path routing');
-    buffer.writeln();
-
-    // Important notes
-    buffer.writeln('IMPORTANT NOTES:');
-    buffer.writeln(
-        '- When users ask about "app data", "cache", or "thumbnails", they are referring to the cb_file_hub directory');
-    buffer.writeln(
-        '- When users ask about "database" or "tags", they are referring to files in the Documents directory');
-    buffer.writeln(
-        '- When users mention screens like "video library", "gallery", "albums", they are referring to system screens (# paths)');
-    buffer.writeln(
-        '- System screens (# paths) are virtual navigation paths, NOT file system directories');
-    buffer.writeln(
-        '- You CANNOT use file tools (list_directory, search_files, etc.) on system screen paths');
-    buffer.writeln('- Thumbnail caches can be safely cleared to free up space');
-    buffer.writeln(
-        '- The database file (cb_file_hub.db) should NOT be deleted as it contains all user data');
-    buffer.writeln('- Use get_file_info tool to check actual paths and sizes');
-    buffer.writeln();
-
-    return buffer.toString();
+        '';
+    final path = state.currentPath;
+    final working =
+        path.isNotEmpty && !path.startsWith('#') && !path.contains('://')
+        ? path
+        : home;
+    return AgentToolCatalog.prompt(
+      workingDirectory: working,
+      browsingPath: path,
+      platform: Platform.operatingSystem,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -2419,13 +2609,15 @@ Do NOT include the JSON block if no files match.
 
       seenPaths.add(cleanPath);
       final parts = cleanPath.split(RegExp(r'[/\\]'));
-      results.add(AiSearchResult(
-        path: cleanPath,
-        fileName: parts.isNotEmpty ? parts.last : cleanPath,
-        relevance: 0,
-        explanation: '',
-        verified: true,
-      ));
+      results.add(
+        AiSearchResult(
+          path: cleanPath,
+          fileName: parts.isNotEmpty ? parts.last : cleanPath,
+          relevance: 0,
+          explanation: '',
+          verified: true,
+        ),
+      );
     }
 
     if (results.isNotEmpty) {
@@ -2463,22 +2655,23 @@ Do NOT include the JSON block if no files match.
     required List<String> activity,
     bool aggressive = false,
   }) {
-    final targetLimit =
-        aggressive ? _hardContextCharLimit : _softContextCharLimit;
+    final targetLimit = aggressive
+        ? _hardContextCharLimit
+        : _softContextCharLimit;
     final totalChars = _estimateContextChars(messages, systemPrompt);
     if (totalChars <= targetLimit ||
         messages.length <= _minRecentMessagesToKeep) {
-      return _PreparedContext(
-        messages: messages,
-        systemPrompt: systemPrompt,
-      );
+      return _PreparedContext(messages: messages, systemPrompt: systemPrompt);
     }
 
     var recentCount = messages.length > 12 ? 12 : messages.length;
-    List<AiMessage> recentMessages =
-        messages.sublist(messages.length - recentCount);
-    List<AiMessage> olderMessages =
-        messages.sublist(0, messages.length - recentCount);
+    List<AiMessage> recentMessages = messages.sublist(
+      messages.length - recentCount,
+    );
+    List<AiMessage> olderMessages = messages.sublist(
+      0,
+      messages.length - recentCount,
+    );
 
     String summary = _buildCompactedSummary(olderMessages);
     String compactedPrompt = _appendCompactionSummary(systemPrompt, summary);
@@ -2524,19 +2717,23 @@ Do NOT include the JSON block if no files match.
       'stream': stream,
       'systemPrompt': systemPrompt,
       'messages': messages
-          .map((m) => {
-                'role': m.role.toString().split('.').last,
-                'content': m.content,
-                if (m.toolCalls != null && m.toolCalls!.isNotEmpty)
-                  'toolCalls': m.toolCalls!
-                      .map((tc) => {
-                            'name': tc.toolName,
-                            'arguments': tc.arguments,
-                            'result': tc.result,
-                            'success': tc.success,
-                          })
-                      .toList(),
-              })
+          .map(
+            (m) => {
+              'role': m.role.toString().split('.').last,
+              'content': m.content,
+              if (m.toolCalls != null && m.toolCalls!.isNotEmpty)
+                'toolCalls': m.toolCalls!
+                    .map(
+                      (tc) => {
+                        'name': tc.toolName,
+                        'arguments': tc.arguments,
+                        'result': tc.result,
+                        'success': tc.success,
+                      },
+                    )
+                    .toList(),
+            },
+          )
           .toList(),
       'capturedAt': DateTime.now().toIso8601String(),
     };
@@ -2643,8 +2840,10 @@ Do NOT include the JSON block if no files match.
         await prefs.setString(_lastModelNameKey, modelName);
       }
     } catch (e) {
-      AppLogger.warning('[AiAgentBloc] Failed to persist model selection',
-          error: e);
+      AppLogger.warning(
+        '[AiAgentBloc] Failed to persist model selection',
+        error: e,
+      );
     }
   }
 
@@ -2657,8 +2856,10 @@ Do NOT include the JSON block if no files match.
         modelName: prefs.getString(_lastModelNameKey),
       );
     } catch (e) {
-      AppLogger.warning('[AiAgentBloc] Failed to load model selection',
-          error: e);
+      AppLogger.warning(
+        '[AiAgentBloc] Failed to load model selection',
+        error: e,
+      );
       return const _ResolvedModelSelection();
     }
   }
@@ -2713,20 +2914,14 @@ class _ResolvedModelSelection {
   final String? providerId;
   final String? modelName;
 
-  const _ResolvedModelSelection({
-    this.providerId,
-    this.modelName,
-  });
+  const _ResolvedModelSelection({this.providerId, this.modelName});
 }
 
 class _PreparedContext {
   final List<AiMessage> messages;
   final String systemPrompt;
 
-  const _PreparedContext({
-    required this.messages,
-    required this.systemPrompt,
-  });
+  const _PreparedContext({required this.messages, required this.systemPrompt});
 }
 
 class _GenerationStopped implements Exception {

@@ -2,11 +2,7 @@ import 'dart:convert';
 
 import '../core/user_preferences.dart';
 
-enum ContextMenuLayoutTarget {
-  file,
-  folder,
-  multiSelection,
-}
+enum ContextMenuLayoutTarget { file, folder, multiSelection }
 
 const String contextMenuThirdPartyAppsId = 'third_party_apps';
 
@@ -75,9 +71,7 @@ class ContextMenuLayoutPreference {
     required this.hiddenIds,
   });
 
-  factory ContextMenuLayoutPreference.defaults(
-    ContextMenuLayoutTarget target,
-  ) {
+  factory ContextMenuLayoutPreference.defaults(ContextMenuLayoutTarget target) {
     return ContextMenuLayoutPreference(
       order: List<String>.of(defaultContextMenuLayoutFor(target)),
       hiddenIds: <String>{},
@@ -153,8 +147,9 @@ class ContextMenuLayoutPreferences {
   Future<ContextMenuLayoutPreference> load(
     ContextMenuLayoutTarget target,
   ) async {
-    final raw =
-        await UserPreferences.instance.getContextMenuLayoutJson(target.name);
+    final raw = await UserPreferences.instance.getContextMenuLayoutJson(
+      target.name,
+    );
     return ContextMenuLayoutPreference.fromJson(target, raw);
   }
 

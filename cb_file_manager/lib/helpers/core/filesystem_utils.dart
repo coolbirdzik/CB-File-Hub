@@ -27,8 +27,9 @@ Future<List<Directory>> getStorageList() async {
   List<Directory> paths = await getExternalStorageDirectories() ?? [];
   List<Directory> filteredPaths = []; // Use list literal instead of constructor
   for (Directory dir in paths) {
-    filteredPaths
-        .add(await getExternalStorageWithoutDataDir(dir.absolute.path));
+    filteredPaths.add(
+      await getExternalStorageWithoutDataDir(dir.absolute.path),
+    );
   }
   return filteredPaths;
 }
@@ -36,10 +37,15 @@ Future<List<Directory>> getStorageList() async {
 /// This function aims to get path like: `/storage/emulated/0/`
 /// not like `/storage/emulated/0/Android/data/package.name.example/files`
 Future<Directory> getExternalStorageWithoutDataDir(
-    String unfilteredPath) async {
+  String unfilteredPath,
+) async {
   PackageInfo packageInfo = await PackageInfo.fromPlatform();
-  String subPath =
-      pathlib.join("Android", "data", packageInfo.packageName, "files");
+  String subPath = pathlib.join(
+    "Android",
+    "data",
+    packageInfo.packageName,
+    "files",
+  );
   if (unfilteredPath.contains(subPath)) {
     String filteredPath = unfilteredPath.split(subPath).first;
     return Directory(filteredPath);
@@ -49,12 +55,14 @@ Future<Directory> getExternalStorageWithoutDataDir(
 }
 
 /// keepHidden: show files that start with .
-Future<List<FileSystemEntity>> getFoldersAndFiles(String path,
-    {changeCurrentPath = true,
-    Sorting sortedBy = Sorting.type,
-    reverse = false,
-    recursive = false,
-    keepHidden = false}) async {
+Future<List<FileSystemEntity>> getFoldersAndFiles(
+  String path, {
+  changeCurrentPath = true,
+  Sorting sortedBy = Sorting.type,
+  reverse = false,
+  recursive = false,
+  keepHidden = false,
+}) async {
   Directory dir = Directory(path);
   List<FileSystemEntity> files = [];
   try {
@@ -92,12 +100,14 @@ Future<List<FileSystemEntity>> getFoldersAndFiles(String path,
 }
 
 /// keepHidden: show files that start with .
-Stream<List<FileSystemEntity>> fileStream(String path,
-    {changeCurrentPath = true,
-    Sorting sortedBy = Sorting.type,
-    reverse = false,
-    recursive = false,
-    keepHidden = false}) async* {
+Stream<List<FileSystemEntity>> fileStream(
+  String path, {
+  changeCurrentPath = true,
+  Sorting sortedBy = Sorting.type,
+  reverse = false,
+  recursive = false,
+  keepHidden = false,
+}) async* {
   Directory path0 = Directory(path);
   List<FileSystemEntity> files = []; // Use list literal
   try {
@@ -106,23 +116,31 @@ Stream<List<FileSystemEntity>> fileStream(String path,
     // no elements inside that directory.
     if (path0.listSync(recursive: recursive).isNotEmpty) {
       if (!keepHidden) {
-        yield* path0.list(recursive: recursive).transform(
-            StreamTransformer.fromHandlers(
+        yield* path0
+            .list(recursive: recursive)
+            .transform(
+              StreamTransformer.fromHandlers(
                 handleData: (FileSystemEntity data, sink) {
-          debugPrint("filsytem_utils -> fileStream: $data");
-          files.add(data);
-          sink.add(files);
-        }));
+                  debugPrint("filsytem_utils -> fileStream: $data");
+                  files.add(data);
+                  sink.add(files);
+                },
+              ),
+            );
       } else {
-        yield* path0.list(recursive: recursive).transform(
-            StreamTransformer.fromHandlers(
+        yield* path0
+            .list(recursive: recursive)
+            .transform(
+              StreamTransformer.fromHandlers(
                 handleData: (FileSystemEntity data, sink) {
-          debugPrint("filsytem_utils -> fileStream: $data");
-          if (data.basename().startsWith('.')) {
-            files.add(data);
-            sink.add(files);
-          }
-        }));
+                  debugPrint("filsytem_utils -> fileStream: $data");
+                  if (data.basename().startsWith('.')) {
+                    files.add(data);
+                    sink.add(files);
+                  }
+                },
+              ),
+            );
       }
     } else {
       yield [];
@@ -138,12 +156,20 @@ Stream<List<FileSystemEntity>> fileStream(String path,
 /// [path]: start point
 ///
 /// [query]: regex or simple string
-Future<List<FileSystemEntity>> search(String path, String query,
-    {bool matchCase = false, recursive = true, bool hidden = false}) async {
+Future<List<FileSystemEntity>> search(
+  String path,
+  String query, {
+  bool matchCase = false,
+  recursive = true,
+  bool hidden = false,
+}) async {
   int start = DateTime.now().millisecondsSinceEpoch;
 
-  List<FileSystemEntity> entities =
-      await getFoldersAndFiles(path, recursive: recursive, keepHidden: hidden);
+  List<FileSystemEntity> entities = await getFoldersAndFiles(
+    path,
+    recursive: recursive,
+    keepHidden: hidden,
+  );
 
   // Cải thiện cách tìm kiếm để hoạt động tốt hơn với thư mục
   List<FileSystemEntity> results = entities.where((entity) {
@@ -157,7 +183,8 @@ Future<List<FileSystemEntity>> search(String path, String query,
     // Log kết quả tìm kiếm để dễ debug
     if (matches) {
       debugPrint(
-          "Found matching entity: ${entity.path}, type: ${entity is Directory ? 'Directory' : 'File'}");
+        "Found matching entity: ${entity.path}, type: ${entity is Directory ? 'Directory' : 'File'}",
+      );
     }
 
     return matches;
@@ -165,7 +192,8 @@ Future<List<FileSystemEntity>> search(String path, String query,
 
   int end = DateTime.now().millisecondsSinceEpoch;
   debugPrint(
-      "Search completed in ${end - start} ms, found ${results.length} items (${results.whereType<Directory>().length} directories)");
+    "Search completed in ${end - start} ms, found ${results.length} items (${results.whereType<Directory>().length} directories)",
+  );
 
   return results;
 }
@@ -175,15 +203,24 @@ Future<List<FileSystemEntity>> search(String path, String query,
 ///
 /// `path`: start point
 /// `query`: regex or simple string
-Stream<List<FileSystemEntity>> searchStream(String path, String query,
-    {bool matchCase = false, recursive = true, bool hidden = false}) async* {
-  yield* fileStream(path, recursive: recursive)
-      .transform(StreamTransformer.fromHandlers(handleData: (data, sink) {
-    // Filtering
-    data.retainWhere(
-        (test) => test.basename().toLowerCase().contains(query.toLowerCase()));
-    sink.add(data);
-  }));
+Stream<List<FileSystemEntity>> searchStream(
+  String path,
+  String query, {
+  bool matchCase = false,
+  recursive = true,
+  bool hidden = false,
+}) async* {
+  yield* fileStream(path, recursive: recursive).transform(
+    StreamTransformer.fromHandlers(
+      handleData: (data, sink) {
+        // Filtering
+        data.retainWhere(
+          (test) => test.basename().toLowerCase().contains(query.toLowerCase()),
+        );
+        sink.add(data);
+      },
+    ),
+  );
 }
 
 Future<int> getFreeSpace(String path) async {
@@ -227,20 +264,22 @@ List<Directory> splitPathToDirectories(String path) {
   return splittedPath.reversed.toList();
 }
 
-Future<List<FileSystemEntity>> sort(List<FileSystemEntity> elements, Sorting by,
-    {bool reverse = false}) async {
+Future<List<FileSystemEntity>> sort(
+  List<FileSystemEntity> elements,
+  Sorting by, {
+  bool reverse = false,
+}) async {
   try {
     switch (by) {
       case Sorting.type:
         if (!reverse) {
-          return elements
-            ..sort((f1, f2) {
-              // Use the runtime type instead of isDirectorySync() to avoid a
-              // synchronous stat() per comparison (O(n log n) blocking calls).
-              final bool isDir1 = f1 is Directory;
-              final bool isDir2 = f2 is Directory;
-              return isDir1 == isDir2 ? 0 : (isDir1 ? -1 : 1);
-            });
+          return elements..sort((f1, f2) {
+            // Use the runtime type instead of isDirectorySync() to avoid a
+            // synchronous stat() per comparison (O(n log n) blocking calls).
+            final bool isDir1 = f1 is Directory;
+            final bool isDir2 = f2 is Directory;
+            return isDir1 == isDir2 ? 0 : (isDir1 ? -1 : 1);
+          });
         } else {
           return (elements..sort()).reversed.toList();
         }
@@ -271,10 +310,7 @@ Future<List<Directory>> getAllWindowsDrives() async {
 
   final List<Directory?> results = await Future.wait(probes);
   // Preserve A→Z order while filtering misses.
-  return <Directory>[
-    for (final drive in results)
-      if (drive != null) drive,
-  ];
+  return <Directory>[for (final drive in results) ?drive];
 }
 
 /// Probe a single Windows drive letter and return a populated [Directory] when
@@ -294,9 +330,12 @@ Future<Directory?> _probeWindowsDrive(String driveLetter) async {
       await drive
           .list(followLinks: false)
           .first
-          .timeout(const Duration(milliseconds: 500), onTimeout: () {
-        throw TimeoutException('Permission check timed out');
-      });
+          .timeout(
+            const Duration(milliseconds: 500),
+            onTimeout: () {
+              throw TimeoutException('Permission check timed out');
+            },
+          );
 
       // Accessible. Tag with label when available.
       try {
@@ -334,8 +373,9 @@ Future<String> getDriveLabel(String drivePath) async {
 
     // Allocate memory for the buffers
     final volumeNameBuffer = calloc<Uint16>(win32.MAX_PATH + 1).cast<Utf16>();
-    final fileSystemNameBuffer =
-        calloc<Uint16>(win32.MAX_PATH + 1).cast<Utf16>();
+    final fileSystemNameBuffer = calloc<Uint16>(
+      win32.MAX_PATH + 1,
+    ).cast<Utf16>();
 
     // Volume serial number
     final volumeSerialNumber = calloc<Uint32>(1);
@@ -348,19 +388,19 @@ Future<String> getDriveLabel(String drivePath) async {
 
     try {
       // Get volume information
-      final result = win32.GetVolumeInformation(
-        drive.toNativeUtf16(),
-        volumeNameBuffer,
+      final ok = win32.GetVolumeInformation(
+        win32.PCWSTR(drive.toNativeUtf16()),
+        win32.PWSTR(volumeNameBuffer),
         win32.MAX_PATH + 1,
         volumeSerialNumber,
         maximumComponentLength,
         fileSystemFlags,
-        fileSystemNameBuffer,
+        win32.PWSTR(fileSystemNameBuffer),
         win32.MAX_PATH + 1,
-      );
+      ).value;
 
       String label = '';
-      if (result != 0) {
+      if (ok) {
         // Convert the buffer to a Dart string
         label = volumeNameBuffer.toDartString();
       }
@@ -393,10 +433,12 @@ Future<List<Directory>> getAdditionalAndroidPaths() async {
   try {
     final primary = Directory('/storage/emulated/0');
     if (await primary.exists()) {
-      await primary.list().first.timeout(const Duration(milliseconds: 500),
-          onTimeout: () {
-        throw TimeoutException('Access check timed out');
-      });
+      await primary.list().first.timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () {
+          throw TimeoutException('Access check timed out');
+        },
+      );
       result.add(primary);
     }
   } catch (_) {}
@@ -417,10 +459,12 @@ Future<List<Directory>> getAdditionalAndroidPaths() async {
             continue;
           }
           try {
-            await entry.list().first.timeout(const Duration(milliseconds: 500),
-                onTimeout: () {
-              throw TimeoutException('Access check timed out');
-            });
+            await entry.list().first.timeout(
+              const Duration(milliseconds: 500),
+              onTimeout: () {
+                throw TimeoutException('Access check timed out');
+              },
+            );
             result.add(entry);
           } catch (_) {}
         }
@@ -522,8 +566,10 @@ Future<List<File>> getAllVideos(String path, {bool recursive = true}) async {
   }
 
   // Normal path - scan the specified directory
-  List<FileSystemEntity> allFiles =
-      await getFoldersAndFiles(path, recursive: recursive);
+  List<FileSystemEntity> allFiles = await getFoldersAndFiles(
+    path,
+    recursive: recursive,
+  );
 
   List<File> videoFiles = allFiles.whereType<File>().where((file) {
     return FileTypeUtils.isVideoFile(file.path);
@@ -561,8 +607,10 @@ Future<List<File>> getAllImages(String path, {bool recursive = true}) async {
   }
 
   // Normal path - scan the specified directory
-  List<FileSystemEntity> allFiles =
-      await getFoldersAndFiles(path, recursive: recursive);
+  List<FileSystemEntity> allFiles = await getFoldersAndFiles(
+    path,
+    recursive: recursive,
+  );
 
   List<File> imageFiles = allFiles.whereType<File>().where((file) {
     return FileTypeUtils.isImageFile(file.path);
@@ -667,13 +715,10 @@ class FileOperations {
       const channel = MethodChannel('cb_file_manager/file_operations');
       final methodName = _isCut ? 'moveItems' : 'copyItems';
 
-      final result = await channel.invokeMethod<bool>(
-        methodName,
-        {
-          'sources': sources,
-          'destination': destinationPath,
-        },
-      );
+      final result = await channel.invokeMethod<bool>(methodName, {
+        'sources': sources,
+        'destination': destinationPath,
+      });
 
       return result;
     } catch (e) {
@@ -720,7 +765,8 @@ class FileOperations {
           while (exists) {
             String newName = '${baseName}_$counter$extension';
             uniquePath = pathlib.join(destinationPath, newName);
-            exists = await File(uniquePath).exists() ||
+            exists =
+                await File(uniquePath).exists() ||
                 await Directory(uniquePath).exists();
             counter++;
           }
@@ -773,8 +819,10 @@ class FileOperations {
 
           // Copy all contents recursively
           await for (final entity in directory.list(recursive: true)) {
-            final relativePath =
-                pathlib.relative(entity.path, from: directory.path);
+            final relativePath = pathlib.relative(
+              entity.path,
+              from: directory.path,
+            );
             final newEntityPath = pathlib.join(newDirectory.path, relativePath);
 
             if (entity is File) {
@@ -828,7 +876,9 @@ class FileOperations {
 
   // Rename a file or folder
   Future<FileSystemEntity?> rename(
-      FileSystemEntity entity, String newName) async {
+    FileSystemEntity entity,
+    String newName,
+  ) async {
     try {
       final directory = pathlib.dirname(entity.path);
       final newPath = pathlib.join(directory, newName);
@@ -839,7 +889,8 @@ class FileOperations {
 
       if (exists) {
         throw const FileSystemException(
-            'A file or folder with this name already exists');
+          'A file or folder with this name already exists',
+        );
       }
 
       // Perform rename operation

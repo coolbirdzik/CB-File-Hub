@@ -15,7 +15,7 @@ class GalleryTile extends StatelessWidget {
   final VoidCallback onLongPress;
 
   const GalleryTile({
-    Key? key,
+    super.key,
     required this.file,
     required this.isSelected,
     required this.isSelectionMode,
@@ -23,7 +23,7 @@ class GalleryTile extends StatelessWidget {
     required this.gridSize,
     required this.onTap,
     required this.onLongPress,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +39,9 @@ class GalleryTile extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.2),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.2,
+              ),
               child: Hero(
                 tag: file.path,
                 child: ThumbnailLoader(
@@ -74,8 +75,10 @@ class GalleryTile extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,

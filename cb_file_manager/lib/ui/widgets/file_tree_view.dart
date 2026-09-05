@@ -24,14 +24,14 @@ class FileTreeView extends StatefulWidget {
   final void Function(String path) onNavigateToPath;
   final void Function(File file, bool b) onFileTap;
   final void Function(String path, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final void Function(String path, {bool shiftSelect, bool ctrlSelect})
-      toggleFolderSelection;
+  toggleFolderSelection;
   final VoidCallback clearSelection;
   final void Function(BuildContext context, Offset position) showContextMenu;
 
   const FileTreeView({
-    Key? key,
+    super.key,
     required this.state,
     required this.selectionState,
     required this.isDesktopPlatform,
@@ -41,7 +41,7 @@ class FileTreeView extends StatefulWidget {
     required this.toggleFolderSelection,
     required this.clearSelection,
     required this.showContextMenu,
-  }) : super(key: key);
+  });
 
   @override
   State<FileTreeView> createState() => _FileTreeViewState();
@@ -74,28 +74,26 @@ class _FileTreeViewState extends State<FileTreeView> {
   void _maybeRebuildRoots({bool force = false}) {
     final folders = widget.state.folders;
     final files = widget.state.files;
-    final sig = '${widget.state.currentPath.path}'
+    final sig =
+        '${widget.state.currentPath.path}'
         '|f${folders.length}:${folders.isEmpty ? "" : folders.last.path}'
         '|x${files.length}:${files.isEmpty ? "" : files.last.path}';
     if (!force && sig == _rootSignature && _roots.isNotEmpty) return;
 
     _rootSignature = sig;
     _roots = [
-      ...folders.map((d) => TreeNode<FileSystemEntity>(
-            id: d.path,
-            data: d,
-            isLeaf: false,
-          )),
-      ...files.map((f) => TreeNode<FileSystemEntity>(
-            id: f.path,
-            data: f,
-            isLeaf: true,
-          )),
+      ...folders.map(
+        (d) => TreeNode<FileSystemEntity>(id: d.path, data: d, isLeaf: false),
+      ),
+      ...files.map(
+        (f) => TreeNode<FileSystemEntity>(id: f.path, data: f, isLeaf: true),
+      ),
     ];
   }
 
   Future<List<TreeNode<FileSystemEntity>>> _loadChildren(
-      TreeNode<FileSystemEntity> node) async {
+    TreeNode<FileSystemEntity> node,
+  ) async {
     final entity = node.data;
     if (entity is! Directory) return const [];
     return _scanDirectory(entity.path);
@@ -103,15 +101,22 @@ class _FileTreeViewState extends State<FileTreeView> {
 
   void _onTap(TreeNode<FileSystemEntity> node) {
     final entity = node.data;
-    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+    final isCtrl =
+        HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
     final isShift = HardwareKeyboard.instance.isShiftPressed;
     if (entity is Directory) {
-      widget.toggleFolderSelection(entity.path,
-          shiftSelect: isShift, ctrlSelect: isCtrl);
+      widget.toggleFolderSelection(
+        entity.path,
+        shiftSelect: isShift,
+        ctrlSelect: isCtrl,
+      );
     } else if (entity is File) {
-      widget.toggleFileSelection(entity.path,
-          shiftSelect: isShift, ctrlSelect: isCtrl);
+      widget.toggleFileSelection(
+        entity.path,
+        shiftSelect: isShift,
+        ctrlSelect: isCtrl,
+      );
     }
   }
 
@@ -235,15 +240,11 @@ List<TreeNode<FileSystemEntity>> _scanDirectoryRaw(String path) {
   files.sort(byName);
 
   return [
-    ...folders.map((d) => TreeNode<FileSystemEntity>(
-          id: d.path,
-          data: d,
-          isLeaf: false,
-        )),
-    ...files.map((f) => TreeNode<FileSystemEntity>(
-          id: f.path,
-          data: f,
-          isLeaf: true,
-        )),
+    ...folders.map(
+      (d) => TreeNode<FileSystemEntity>(id: d.path, data: d, isLeaf: false),
+    ),
+    ...files.map(
+      (f) => TreeNode<FileSystemEntity>(id: f.path, data: f, isLeaf: true),
+    ),
   ];
 }

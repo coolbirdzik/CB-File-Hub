@@ -79,12 +79,12 @@ class SelectItemsInRect extends SelectionEvent {
 
   @override
   List<Object?> get props => [
-        folderPaths,
-        filePaths,
-        isCtrlPressed,
-        isShiftPressed,
-        lastSelectedPath,
-      ];
+    folderPaths,
+    filePaths,
+    isCtrlPressed,
+    isShiftPressed,
+    lastSelectedPath,
+  ];
 }
 
 /// Event to select all files and folders in the current view
@@ -92,10 +92,7 @@ class SelectAll extends SelectionEvent {
   final List<String> allFilePaths;
   final List<String> allFolderPaths;
 
-  const SelectAll({
-    required this.allFilePaths,
-    required this.allFolderPaths,
-  });
+  const SelectAll({required this.allFilePaths, required this.allFolderPaths});
 
   @override
   List<Object?> get props => [allFilePaths, allFolderPaths];

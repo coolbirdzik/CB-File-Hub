@@ -18,15 +18,15 @@ void main() {
     testRoot = await Directory.systemTemp.createTemp('folder-sort-manager-');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(pathProviderChannel, (methodCall) async {
-      switch (methodCall.method) {
-        case 'getApplicationDocumentsDirectory':
-        case 'getApplicationSupportDirectory':
-        case 'getTemporaryDirectory':
-          return testRoot.path;
-        default:
-          return null;
-      }
-    });
+          switch (methodCall.method) {
+            case 'getApplicationDocumentsDirectory':
+            case 'getApplicationSupportDirectory':
+            case 'getTemporaryDirectory':
+              return testRoot.path;
+            default:
+              return null;
+          }
+        });
   });
 
   tearDownAll(() async {
@@ -39,37 +39,44 @@ void main() {
   });
 
   test(
-      '03.01 migrates legacy display preferences without rewriting thumbnail data',
-      () async {
-    final folder = await Directory(path.join(testRoot.path, 'legacy-folder'))
-        .create(recursive: true);
-    final legacyFile = File(path.join(folder.path, '.cbfile_config.json'));
-    await legacyFile.writeAsString(json.encode(<String, Object>{
-      'viewMode': ViewMode.grid.index,
-      'sortOption': SortOption.nameDesc.index,
-      'folderThumbnail': 'thumbnail.jpg',
-    }));
+    '03.01 migrates legacy display preferences without rewriting thumbnail data',
+    () async {
+      final folder = await Directory(
+        path.join(testRoot.path, 'legacy-folder'),
+      ).create(recursive: true);
+      final legacyFile = File(path.join(folder.path, '.cbfile_config.json'));
+      await legacyFile.writeAsString(
+        json.encode(<String, Object>{
+          'viewMode': ViewMode.grid.index,
+          'sortOption': SortOption.nameDesc.index,
+          'folderThumbnail': 'thumbnail.jpg',
+        }),
+      );
 
-    final manager = FolderSortManager();
-    expect(await manager.getFolderViewMode(folder.path), ViewMode.grid);
-    expect(await manager.getFolderSortOption(folder.path), SortOption.nameDesc);
+      final manager = FolderSortManager();
+      expect(await manager.getFolderViewMode(folder.path), ViewMode.grid);
+      expect(
+        await manager.getFolderSortOption(folder.path),
+        SortOption.nameDesc,
+      );
 
-    await manager.saveFolderViewMode(folder.path, ViewMode.details);
-    final legacy = json.decode(await legacyFile.readAsString()) as Map;
-    expect(legacy['folderThumbnail'], 'thumbnail.jpg');
-    expect(legacy['viewMode'], ViewMode.grid.index);
+      await manager.saveFolderViewMode(folder.path, ViewMode.details);
+      final legacy = json.decode(await legacyFile.readAsString()) as Map;
+      expect(legacy['folderThumbnail'], 'thumbnail.jpg');
+      expect(legacy['viewMode'], ViewMode.grid.index);
 
-    final database = await DatabaseManager.getInstance().getDatabase();
-    final stored = await database.query(
-      'folder_display_preferences',
-      where: 'path = ?',
-      whereArgs: <Object?>[
-        Platform.isWindows ? folder.path.toLowerCase() : folder.path,
-      ],
-    );
-    expect(stored.single['view_mode'], ViewMode.details.index);
-    expect(stored.single['sort_option'], SortOption.nameDesc.index);
-  });
+      final database = await DatabaseManager.getInstance().getDatabase();
+      final stored = await database.query(
+        'folder_display_preferences',
+        where: 'path = ?',
+        whereArgs: <Object?>[
+          Platform.isWindows ? folder.path.toLowerCase() : folder.path,
+        ],
+      );
+      expect(stored.single['view_mode'], ViewMode.details.index);
+      expect(stored.single['sort_option'], SortOption.nameDesc.index);
+    },
+  );
 
   test('03.02 persists virtual paths in SQLite', () async {
     const virtualPath = '#network/server/share';

@@ -34,13 +34,13 @@ class NetworkConnectionRequested extends NetworkBrowsingEvent {
 
   @override
   List<Object?> get props => [
-        serviceName,
-        host,
-        username,
-        password,
-        port,
-        additionalOptions,
-      ];
+    serviceName,
+    host,
+    username,
+    password,
+    port,
+    additionalOptions,
+  ];
 }
 
 /// Event to request the contents of a network directory
@@ -149,8 +149,13 @@ class NetworkDirectoryLoaded extends NetworkBrowsingEvent {
   });
 
   @override
-  List<Object> get props =>
-      [path, directories, files, isLoadingMore, requestId];
+  List<Object> get props => [
+    path,
+    directories,
+    files,
+    isLoadingMore,
+    requestId,
+  ];
 }
 
 /// Event emitted by the BLoC when a directory listing failed in the background.

@@ -43,9 +43,12 @@ class NetworkFileCacheService {
   }
 
   /// Buffer part of a network file
-  /// Returns a Future<File> with the cached file
-  Future<File> bufferPartialFile(String path, Stream<List<int>> fileStream,
-      {int? maxBytes}) async {
+  /// Returns a `Future<File>` with the cached file
+  Future<File> bufferPartialFile(
+    String path,
+    Stream<List<int>> fileStream, {
+    int? maxBytes,
+  }) async {
     final cacheKey = _getCacheKey(path);
 
     // Check if operation is already in progress
@@ -66,8 +69,11 @@ class NetworkFileCacheService {
   }
 
   /// Process the actual caching operation
-  Future<File> _doCacheFile(String key, Stream<List<int>> fileStream,
-      {int? maxBytes}) async {
+  Future<File> _doCacheFile(
+    String key,
+    Stream<List<int>> fileStream, {
+    int? maxBytes,
+  }) async {
     try {
       // Check if already cached
       final fileFromCache = await _cacheManager.getFileFromCache(key);
@@ -78,7 +84,8 @@ class NetworkFileCacheService {
       // Create a buffer to collect data
       final buffer = <int>[];
       int totalBytes = 0;
-      final maxSize = maxBytes ??
+      final maxSize =
+          maxBytes ??
           16 * 1024 * 1024 -
               8; // Slightly under 16MB for video streaming buffering
 
@@ -136,9 +143,10 @@ class NetworkFileCacheService {
   /// This allows for progressive loading/streaming of content
   /// Returns a StreamSubscription that should be canceled when done
   StreamSubscription<List<int>> bufferStreamAndForward(
-      String path,
-      Stream<List<int>> sourceStream,
-      StreamController<List<int>> targetController) {
+    String path,
+    Stream<List<int>> sourceStream,
+    StreamController<List<int>> targetController,
+  ) {
     final cacheKey = _getCacheKey(path);
     final buffer = <int>[];
     int totalBytes = 0;
@@ -216,7 +224,10 @@ class NetworkFileCacheService {
 
   /// Cache a thumbnail
   Future<File> cacheThumbnail(
-      String path, Uint8List thumbnailData, int size) async {
+    String path,
+    Uint8List thumbnailData,
+    int size,
+  ) async {
     final cacheKey = _getThumbnailCacheKey(path, size);
     final fileInfo = await _cacheManager.putFile(
       cacheKey,

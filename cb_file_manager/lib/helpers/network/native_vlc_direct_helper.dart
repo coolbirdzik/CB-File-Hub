@@ -32,7 +32,8 @@ class NativeVlcDirectHelper {
       }
 
       debugPrint(
-          'NativeVlcDirectHelper: Opening media with Native VLC Direct SMB streaming');
+        'NativeVlcDirectHelper: Opening media with Native VLC Direct SMB streaming',
+      );
       debugPrint('NativeVlcDirectHelper: SMB Path: $smbPath');
       debugPrint('NativeVlcDirectHelper: File Name: $fileName');
       debugPrint('NativeVlcDirectHelper: File Type: $fileType');
@@ -44,7 +45,8 @@ class NativeVlcDirectHelper {
         if (directLink != null && directLink.isNotEmpty) {
           finalSmbMrl = directLink;
           debugPrint(
-              'NativeVlcDirectHelper: Using direct SMB link from service');
+            'NativeVlcDirectHelper: Using direct SMB link from service',
+          );
         } else {
           final basePath = smbService.basePath;
           if (basePath.isEmpty) {
@@ -147,12 +149,15 @@ class NativeVlcDirectHelper {
     required ISmbService smbService,
   }) async {
     debugPrint(
-        'NativeVlcDirectHelper: Checking if can use Native VLC Direct...');
+      'NativeVlcDirectHelper: Checking if can use Native VLC Direct...',
+    );
     debugPrint('NativeVlcDirectHelper: File type: $fileType');
     debugPrint(
-        'NativeVlcDirectHelper: SMB service type: ${smbService.runtimeType}');
+      'NativeVlcDirectHelper: SMB service type: ${smbService.runtimeType}',
+    );
     debugPrint(
-        'NativeVlcDirectHelper: SMB service connected: ${smbService.isConnected}');
+      'NativeVlcDirectHelper: SMB service connected: ${smbService.isConnected}',
+    );
 
     // Kiểm tra file type
     if (!_isSupportedMediaType(fileType)) {
@@ -177,7 +182,8 @@ class NativeVlcDirectHelper {
     debugPrint('NativeVlcDirectHelper: ✅ Native SMB available');
 
     debugPrint(
-        'NativeVlcDirectHelper: ✅ All checks passed - can use Native VLC Direct');
+      'NativeVlcDirectHelper: ✅ All checks passed - can use Native VLC Direct',
+    );
     return true;
   }
 
@@ -220,7 +226,7 @@ class NativeVlcDirectHelper {
       'xvid',
       'ogv',
       'dv',
-      'mxf'
+      'mxf',
     ];
   }
 
@@ -249,7 +255,7 @@ class NativeVlcDirectHelper {
       'mid',
       'midi',
       'kar',
-      'rmi'
+      'rmi',
     ];
   }
 

@@ -135,8 +135,9 @@ String resolvePickedSuggestion(String draftText, String suggestion) {
     final childrenPart = draftText.substring(colonIndex + 1);
     if (parentPart.isNotEmpty) {
       final commaIndex = childrenPart.lastIndexOf(',');
-      final prefix =
-          commaIndex >= 0 ? childrenPart.substring(0, commaIndex + 1) : '';
+      final prefix = commaIndex >= 0
+          ? childrenPart.substring(0, commaIndex + 1)
+          : '';
       return '$parentPart:$prefix${suggestion.trim()}';
     }
   }
@@ -190,7 +191,7 @@ Widget buildTagSuggestionItem(
               width: 40,
               height: 40,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
@@ -236,8 +237,9 @@ Widget buildTagSuggestionItem(
                   'Parent: ${parents.join(", ")}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.7),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.7,
+                    ),
                     fontStyle: FontStyle.italic,
                   ),
                   maxLines: 1,
@@ -248,8 +250,9 @@ Widget buildTagSuggestionItem(
                   '${children.length} child${children.length > 1 ? "ren" : ""}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.7),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.7,
+                    ),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -291,8 +294,10 @@ void showAddTagToFileDialog(BuildContext context, String filePath) {
     },
   ).then((result) {
     if (result == true) {
-      AppLogger.info('[ManageTags][Dialog] Refresh triggered after save',
-          error: 'filePath=$filePath');
+      AppLogger.info(
+        '[ManageTags][Dialog] Refresh triggered after save',
+        error: 'filePath=$filePath',
+      );
       refreshParentUI(filePath);
       if (context.mounted) {
         final l10n = AppLocalizations.of(context)!;
@@ -344,8 +349,10 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   }
 
   Future<void> _loadTags() async {
-    AppLogger.info('[ManageTags][Dialog] Loading tags',
-        error: 'filePath=${widget.filePath}');
+    AppLogger.info(
+      '[ManageTags][Dialog] Loading tags',
+      error: 'filePath=${widget.filePath}',
+    );
     try {
       final tags = await TagManager.getTags(widget.filePath);
       if (!mounted) {
@@ -357,8 +364,10 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
         _selectedTags = List<String>.from(tags);
         _isLoading = false;
       });
-      AppLogger.info('[ManageTags][Dialog] Loaded tags',
-          error: 'filePath=${widget.filePath} tags=$tags');
+      AppLogger.info(
+        '[ManageTags][Dialog] Loaded tags',
+        error: 'filePath=${widget.filePath} tags=$tags',
+      );
     } catch (error, stackTrace) {
       AppLogger.error(
         '[ManageTags][Dialog] Failed to load tags',
@@ -440,8 +449,10 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
       _draftTagText = '';
       _tagSuggestions = <String>[];
     });
-    AppLogger.info('[ManageTags][Dialog] Tag added',
-        error: 'filePath=${widget.filePath} tag=$tag');
+    AppLogger.info(
+      '[ManageTags][Dialog] Tag added',
+      error: 'filePath=${widget.filePath} tag=$tag',
+    );
   }
 
   /// Parse and add tags in parent:child format.
@@ -476,17 +487,24 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     // Create hierarchy relationships asynchronously (fire and forget)
     createHierarchyRelationships(_hierarchyManager, parentName, childNames);
 
-    AppLogger.info('[ManageTags][Dialog] Hierarchy tags added',
-        error:
-            'filePath=${widget.filePath} parent=$parentName children=$childNames');
+    AppLogger.info(
+      '[ManageTags][Dialog] Hierarchy tags added',
+      error:
+          'filePath=${widget.filePath} parent=$parentName children=$childNames',
+    );
   }
 
   void _removeTag(String tag) {
+    final normalized = tag.trim().toLowerCase();
     setState(() {
-      _selectedTags = _selectedTags.where((value) => value != tag).toList();
+      _selectedTags = _selectedTags
+          .where((value) => value.trim().toLowerCase() != normalized)
+          .toList();
     });
-    AppLogger.info('[ManageTags][Dialog] Tag removed',
-        error: 'filePath=${widget.filePath} tag=$tag');
+    AppLogger.info(
+      '[ManageTags][Dialog] Tag removed',
+      error: 'filePath=${widget.filePath} tag=$tag',
+    );
   }
 
   void _commitDraftTag() {
@@ -508,9 +526,11 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
       return;
     }
 
-    AppLogger.info('[ManageTags][Dialog] Save pressed',
-        error:
-            'filePath=${widget.filePath} selectedTags=$_selectedTags draftTagText=$_draftTagText');
+    AppLogger.info(
+      '[ManageTags][Dialog] Save pressed',
+      error:
+          'filePath=${widget.filePath} selectedTags=$_selectedTags draftTagText=$_draftTagText',
+    );
 
     setState(() {
       _isSaving = true;
@@ -520,12 +540,16 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
       _commitDraftTag();
 
       final tagsToPersist = List<String>.from(_selectedTags);
-      AppLogger.info('[ManageTags][Dialog] Persisting tags',
-          error: 'filePath=${widget.filePath} tags=$tagsToPersist');
+      AppLogger.info(
+        '[ManageTags][Dialog] Persisting tags',
+        error: 'filePath=${widget.filePath} tags=$tagsToPersist',
+      );
 
       if (_hasChanges || _draftTagText.trim().isNotEmpty) {
-        final success =
-            await TagManager.setTags(widget.filePath, tagsToPersist);
+        final success = await TagManager.setTags(
+          widget.filePath,
+          tagsToPersist,
+        );
         if (!success) {
           throw Exception('Failed to persist tags for "${widget.filePath}"');
         }
@@ -635,8 +659,12 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
   /// Custom suggestion item with thumbnail (40x40), hierarchy context, and
   /// highlighted matching text.
-  Widget _buildSuggestionItem(BuildContext context, String suggestion,
-      bool isHighlighted, Color tagColor) {
+  Widget _buildSuggestionItem(
+    BuildContext context,
+    String suggestion,
+    bool isHighlighted,
+    Color tagColor,
+  ) {
     return buildTagSuggestionItem(
       context,
       suggestion,
@@ -659,8 +687,9 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.32),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.32,
+        ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
@@ -678,11 +707,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                   color: theme.colorScheme.primary.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
+                child: Icon(icon, size: 18, color: theme.colorScheme.primary),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -737,8 +762,9 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.24),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.24,
+              ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
@@ -800,13 +826,9 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              PopularTagsWidget(
-                                onTagSelected: _addTag,
-                              ),
+                              PopularTagsWidget(onTagSelected: _addTag),
                               const SizedBox(height: 18),
-                              RecentTagsWidget(
-                                onTagSelected: _addTag,
-                              ),
+                              RecentTagsWidget(onTagSelected: _addTag),
                             ],
                           ),
                         ),
@@ -825,6 +847,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
                     child: TagBrowseSection(
                       selectedTags: _selectedTags,
                       onTagSelected: _addTag,
+                      onTagDeselected: _removeTag,
                       fillHeight: true,
                     ),
                   ),
@@ -840,8 +863,10 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
             onPressed: _isSaving
                 ? null
                 : () {
-                    AppLogger.info('[ManageTags][Dialog] Close pressed',
-                        error: 'filePath=${widget.filePath}');
+                    AppLogger.info(
+                      '[ManageTags][Dialog] Close pressed',
+                      error: 'filePath=${widget.filePath}',
+                    );
                     Navigator.of(context, rootNavigator: true).pop(false);
                   },
             style: TextButton.styleFrom(
@@ -907,8 +932,9 @@ void showDeleteTagDialog(
                   CbSelect<String>(
                     expand: true,
                     value: selectedTag,
-                    placeholder:
-                        AppLocalizations.of(context)!.selectTagToRemove,
+                    placeholder: AppLocalizations.of(
+                      context,
+                    )!.selectTagToRemove,
                     items: [
                       for (final tag in tags)
                         CbSelectItem<String>(value: tag, label: tag),
@@ -934,8 +960,10 @@ void showDeleteTagDialog(
                   if (selectedTag != null) {
                     // Pre-extract all context-dependent values before async gap
                     final l10n = AppLocalizations.of(context)!;
-                    final bloc =
-                        BlocProvider.of<FolderListBloc>(context, listen: false);
+                    final bloc = BlocProvider.of<FolderListBloc>(
+                      context,
+                      listen: false,
+                    );
                     final toast = AppToast.capture(context);
                     final navigator = Navigator.of(context);
 
@@ -947,8 +975,9 @@ void showDeleteTagDialog(
                         bloc.add(RemoveTagFromFile(filePath, selectedTag!));
                       } catch (_) {}
 
-                      TagManager.instance
-                          .notifyTagChanged("tag_only:$filePath");
+                      TagManager.instance.notifyTagChanged(
+                        "tag_only:$filePath",
+                      );
 
                       try {
                         toast.success(l10n.tagDeleted(selectedTag!));
@@ -965,8 +994,9 @@ void showDeleteTagDialog(
                     } catch (_) {}
                   }
                 },
-                child:
-                    Text(AppLocalizations.of(context)!.removeTag.toUpperCase()),
+                child: Text(
+                  AppLocalizations.of(context)!.removeTag.toUpperCase(),
+                ),
               ),
             ],
           );
@@ -989,8 +1019,10 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   final hierarchyManager = TagHierarchyManager.instance;
   Future.wait([thumbnailManager.initialize(), hierarchyManager.initialize()]);
 
-  AppLogger.info('[ManageTags][BatchDialog] Opening batch dialog',
-      error: 'selectedFiles=$selectedFiles');
+  AppLogger.info(
+    '[ManageTags][BatchDialog] Opening batch dialog',
+    error: 'selectedFiles=$selectedFiles',
+  );
 
   void updateTagSuggestions(String text) async {
     tagSuggestions = await computeTagSuggestions(
@@ -1019,10 +1051,15 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     tagSuggestions = [];
 
     createHierarchyRelationships(
-        hierarchyManager, parsed.parentName, parsed.childNames);
+      hierarchyManager,
+      parsed.parentName,
+      parsed.childNames,
+    );
 
-    AppLogger.info('[ManageTags][BatchDialog] Hierarchy tags added',
-        error: 'parent=${parsed.parentName} children=${parsed.childNames}');
+    AppLogger.info(
+      '[ManageTags][BatchDialog] Hierarchy tags added',
+      error: 'parent=${parsed.parentName} children=${parsed.childNames}',
+    );
     return true;
   }
 
@@ -1069,8 +1106,10 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
     if (!context.mounted) return;
 
     selectedTags = commonTags;
-    AppLogger.info('[ManageTags][BatchDialog] Loaded common tags',
-        error: 'selectedFiles=$selectedFiles commonTags=$commonTags');
+    AppLogger.info(
+      '[ManageTags][BatchDialog] Loaded common tags',
+      error: 'selectedFiles=$selectedFiles commonTags=$commonTags',
+    );
 
     RouteUtils.showAcrylicDialog(
       context: context,
@@ -1089,8 +1128,10 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                   addTag(value);
                   tagSuggestions = [];
                 });
-                AppLogger.info('[ManageTags][BatchDialog] Tag submitted',
-                    error: 'selectedFiles=$selectedFiles tag=$value');
+                AppLogger.info(
+                  '[ManageTags][BatchDialog] Tag submitted',
+                  error: 'selectedFiles=$selectedFiles tag=$value',
+                );
               }
             }
 
@@ -1102,24 +1143,38 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                 addTag(tag);
                 tagSuggestions = [];
               });
-              AppLogger.info('[ManageTags][BatchDialog] Quick tag added',
-                  error: 'selectedFiles=$selectedFiles tag=$tag');
+              AppLogger.info(
+                '[ManageTags][BatchDialog] Quick tag added',
+                error: 'selectedFiles=$selectedFiles tag=$tag',
+              );
+            }
+
+            void handleTagDeselected(String tag) {
+              final normalized = tag.trim().toLowerCase();
+              setState(() {
+                selectedTags.removeWhere(
+                  (value) => value.trim().toLowerCase() == normalized,
+                );
+              });
             }
 
             return ResizableDialog(
               prefsKeyPrefix: 'batch_tags_dialog',
               minSize: const Size(460, 420),
               title: Text(
-                AppLocalizations.of(context)!
-                    .batchAddTags(selectedFiles.length),
+                AppLocalizations.of(
+                  context,
+                )!.batchAddTags(selectedFiles.length),
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               contentBuilder: (context, dialogSize) {
-                final browseHeight =
-                    (dialogSize.height - 510).clamp(160.0, 900.0);
+                final browseHeight = (dialogSize.height - 510).clamp(
+                  160.0,
+                  900.0,
+                );
                 return SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1133,33 +1188,35 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                           onSuggestionSelected: (tag) {
                             setState(() {
                               addTag(
-                                  resolvePickedSuggestion(draftTagText, tag));
+                                resolvePickedSuggestion(draftTagText, tag),
+                              );
                               tagSuggestions = [];
                             });
                           },
                           suggestionBuilder:
                               (context, suggestion, isHighlighted, tagColor) =>
                                   buildTagSuggestionItem(
-                            context,
-                            suggestion,
-                            isHighlighted,
-                            tagColor,
-                            thumbnailManager: thumbnailManager,
-                            hierarchyManager: hierarchyManager,
-                          ),
+                                    context,
+                                    suggestion,
+                                    isHighlighted,
+                                    tagColor,
+                                    thumbnailManager: thumbnailManager,
+                                    hierarchyManager: hierarchyManager,
+                                  ),
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16.0),
                             ),
                             labelText: AppLocalizations.of(context)!.tagName,
-                            hintText:
-                                AppLocalizations.of(context)!.enterTagName,
+                            hintText: AppLocalizations.of(
+                              context,
+                            )!.enterTagName,
                             prefixIcon: const Icon(PhosphorIconsLight.tag),
                             filled: true,
                             fillColor:
                                 Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.grey[800]
-                                    : Colors.grey[100],
+                                ? Colors.grey[800]
+                                : Colors.grey[100],
                           ),
                           onChanged: (updatedTags) {
                             setState(() {
@@ -1174,7 +1231,11 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                               tag: tag,
                               onDeleted: (removedTag) {
                                 setState(() {
-                                  selectedTags.remove(removedTag);
+                                  selectedTags.removeWhere(
+                                    (value) =>
+                                        value.trim().toLowerCase() ==
+                                        removedTag.trim().toLowerCase(),
+                                  );
                                 });
                               },
                               onSelected: (selectedTag) {},
@@ -1202,12 +1263,12 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                 return Chip(
                                   label: Text(tag),
                                   onDeleted: () {
-                                    setState(() {
-                                      selectedTags.remove(tag);
-                                    });
+                                    handleTagDeselected(tag);
                                   },
-                                  deleteIcon: const Icon(PhosphorIconsLight.x,
-                                      size: 16),
+                                  deleteIcon: const Icon(
+                                    PhosphorIconsLight.x,
+                                    size: 16,
+                                  ),
                                 );
                               }).toList(),
                             ),
@@ -1239,6 +1300,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       TagBrowseSection(
                         selectedTags: selectedTags,
                         onTagSelected: handleTagSelected,
+                        onTagDeselected: handleTagDeselected,
                         maxHeight: browseHeight,
                       ),
                     ],
@@ -1256,10 +1318,13 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                     style: TextButton.styleFrom(
                       textStyle: const TextStyle(fontSize: 16),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     child: Text(
-                        AppLocalizations.of(context)!.cancel.toUpperCase()),
+                      AppLocalizations.of(context)!.cancel.toUpperCase(),
+                    ),
                   ),
                 ),
                 TextFieldTapRegion(
@@ -1268,9 +1333,10 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                         ? null
                         : () async {
                             AppLogger.info(
-                                '[ManageTags][BatchDialog] Save pressed',
-                                error:
-                                    'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText');
+                              '[ManageTags][BatchDialog] Save pressed',
+                              error:
+                                  'selectedFiles=$selectedFiles selectedTags=$selectedTags draftTagText=$draftTagText',
+                            );
                             final l10n = AppLocalizations.of(context)!;
                             // Persistence happens through TagManager; UI refresh is
                             // driven by the coalesced tag-change notification fired in
@@ -1301,32 +1367,35 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                               // stall on large selections.
                               final existingTagsByFile =
                                   await TagManager.getTagsForFiles(
-                                      selectedFiles);
+                                    selectedFiles,
+                                  );
 
                               final Set<String> currentTagsSet =
                                   Set<String>.from(selectedTags);
                               final Set<String> commonTagsSet =
                                   Set<String>.from(commonTags);
-                              final commonTagsToRemove =
-                                  commonTagsSet.difference(currentTagsSet);
+                              final commonTagsToRemove = commonTagsSet
+                                  .difference(currentTagsSet);
 
                               for (final filePath in selectedFiles) {
                                 final existingTags =
                                     existingTagsByFile[filePath] ??
-                                        const <String>[];
+                                    const <String>[];
 
                                 final Set<String> originalTagsSet =
                                     Set<String>.from(existingTags);
-                                final updatedTags =
-                                    Set<String>.from(originalTagsSet);
+                                final updatedTags = Set<String>.from(
+                                  originalTagsSet,
+                                );
 
                                 updatedTags.removeAll(commonTagsToRemove);
                                 tagsRemoved += originalTagsSet
                                     .intersection(commonTagsToRemove)
                                     .length;
 
-                                final tagsToAdd =
-                                    currentTagsSet.difference(originalTagsSet);
+                                final tagsToAdd = currentTagsSet.difference(
+                                  originalTagsSet,
+                                );
                                 updatedTags.addAll(tagsToAdd);
                                 tagsAdded += tagsToAdd.length;
 
@@ -1335,15 +1404,18 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                 // refreshParentUIBatch(). Otherwise each file would
                                 // trigger a full folder-list reload.
                                 await TagManager.setTags(
-                                    filePath, updatedTags.toList(),
-                                    notify: false);
+                                  filePath,
+                                  updatedTags.toList(),
+                                  notify: false,
+                                );
                               }
 
                               refreshParentUIBatch();
                               AppLogger.info(
-                                  '[ManageTags][BatchDialog] Save completed',
-                                  error:
-                                      'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved');
+                                '[ManageTags][BatchDialog] Save completed',
+                                error:
+                                    'selectedFiles=$selectedFiles tagsAdded=$tagsAdded tagsRemoved=$tagsRemoved',
+                              );
 
                               try {
                                 toast.success(
@@ -1361,7 +1433,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                 error: 'selectedFiles=$selectedFiles error=$e',
                               );
                               AppLogger.warning(
-                                  'Error processing batch tags: $e');
+                                'Error processing batch tags: $e',
+                              );
                               try {
                                 toast.error(
                                   l10n.batchTagProcessingError(e.toString()),
@@ -1380,7 +1453,9 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                     style: ElevatedButton.styleFrom(
                       textStyle: const TextStyle(fontSize: 16),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                     child: isSaving
                         ? const SizedBox(
@@ -1389,7 +1464,8 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Text(
-                            AppLocalizations.of(context)!.save.toUpperCase()),
+                            AppLocalizations.of(context)!.save.toUpperCase(),
+                          ),
                   ),
                 ),
               ],
@@ -1403,8 +1479,11 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
 
 /// Dialog for managing all tags
 void showManageTagsDialog(
-    BuildContext context, List<String> allTags, String currentPath,
-    {List<String>? selectedFiles}) {
+  BuildContext context,
+  List<String> allTags,
+  String currentPath, {
+  List<String>? selectedFiles,
+}) {
   if (selectedFiles != null && selectedFiles.isNotEmpty) {
     showRemoveTagsDialog(context, selectedFiles);
     return;
@@ -1444,9 +1523,11 @@ class RemoveTagsChipDialog extends StatefulWidget {
   final List<String> filePaths;
   final VoidCallback onTagsRemoved;
 
-  const RemoveTagsChipDialog(
-      {Key? key, required this.filePaths, required this.onTagsRemoved})
-      : super(key: key);
+  const RemoveTagsChipDialog({
+    super.key,
+    required this.filePaths,
+    required this.onTagsRemoved,
+  });
 
   @override
   State<RemoveTagsChipDialog> createState() => _RemoveTagsChipDialogState();
@@ -1520,7 +1601,9 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
 
       for (final tagToRemove in _selectedTagsToRemove) {
         await BatchTagManager.removeTagFromFilesStatic(
-            widget.filePaths, tagToRemove);
+          widget.filePaths,
+          tagToRemove,
+        );
 
         try {
           for (final filePath in widget.filePaths) {
@@ -1532,10 +1615,12 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
       try {
         navigator.pop();
 
-        toast.success(l10n.removeTagsSuccess(
-          _selectedTagsToRemove.length,
-          widget.filePaths.length,
-        ));
+        toast.success(
+          l10n.removeTagsSuccess(
+            _selectedTagsToRemove.length,
+            widget.filePaths.length,
+          ),
+        );
 
         TagManager.clearCache();
 
@@ -1565,16 +1650,12 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
 
     return AlertDialog(
       title: Text(
-        AppLocalizations.of(context)!
-            .removeTagsFromFilesTitle(widget.filePaths.length),
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
+        AppLocalizations.of(
+          context,
+        )!.removeTagsFromFilesTitle(widget.filePaths.length),
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
       ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
       content: Container(
         width: double.maxFinite,
@@ -1590,14 +1671,15 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
             if (_isLoading)
               Expanded(
                 child: Center(
-                    child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(height: 16),
-                    Text(AppLocalizations.of(context)!.loadingTags)
-                  ],
-                )),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(AppLocalizations.of(context)!.loadingTags),
+                    ],
+                  ),
+                ),
               )
             else if (_commonTags.isEmpty && !_isLoading)
               Expanded(
@@ -1605,15 +1687,17 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(PhosphorIconsLight.info,
-                          size: 48, color: Colors.grey.shade400),
+                      Icon(
+                        PhosphorIconsLight.info,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 16),
                       Text(
-                        AppLocalizations.of(context)!
-                            .noCommonTagsAcrossSelectedFiles,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        AppLocalizations.of(
+                          context,
+                        )!.noCommonTagsAcrossSelectedFiles,
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(color: Colors.grey.shade600),
                         textAlign: TextAlign.center,
                       ),
@@ -1630,12 +1714,14 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
                         child: Text(
-                            AppLocalizations.of(context)!
-                                .tagsSelected(_selectedTagsToRemove.length),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                            )),
+                          AppLocalizations.of(
+                            context,
+                          )!.tagsSelected(_selectedTagsToRemove.length),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     const Text(
                       'Chọn thẻ chung để xóa:',
@@ -1659,8 +1745,9 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                         child: ListView(
                           padding: const EdgeInsets.all(8),
                           children: _commonTags.map((tag) {
-                            final isSelected =
-                                _selectedTagsToRemove.contains(tag);
+                            final isSelected = _selectedTagsToRemove.contains(
+                              tag,
+                            );
                             return CheckboxListTile(
                               title: Text(tag),
                               value: isSelected,
@@ -1682,8 +1769,9 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
       ),
       actions: [
         TextButton(
-          onPressed:
-              _isRemoving ? null : () => RouteUtils.safePopDialog(context),
+          onPressed: _isRemoving
+              ? null
+              : () => RouteUtils.safePopDialog(context),
           style: TextButton.styleFrom(
             textStyle: const TextStyle(fontSize: 16),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1691,7 +1779,8 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
           child: Text(AppLocalizations.of(context)!.cancel.toUpperCase()),
         ),
         ElevatedButton(
-          onPressed: _selectedTagsToRemove.isEmpty ||
+          onPressed:
+              _selectedTagsToRemove.isEmpty ||
                   _isRemoving ||
                   _commonTags.isEmpty
               ? null

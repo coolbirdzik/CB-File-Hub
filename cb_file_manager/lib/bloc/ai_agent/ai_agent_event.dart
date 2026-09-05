@@ -38,10 +38,7 @@ class EditMessage extends AiAgentEvent {
   final String messageId;
   final String content;
 
-  const EditMessage({
-    required this.messageId,
-    required this.content,
-  });
+  const EditMessage({required this.messageId, required this.content});
 
   @override
   List<Object?> get props => [messageId, content];
@@ -97,10 +94,7 @@ class SelectChatModel extends AiAgentEvent {
   final String providerId;
   final String modelName;
 
-  const SelectChatModel({
-    required this.providerId,
-    required this.modelName,
-  });
+  const SelectChatModel({required this.providerId, required this.modelName});
 
   @override
   List<Object?> get props => [providerId, modelName];

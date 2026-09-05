@@ -52,7 +52,7 @@ class _ResizeEdge {
 /// dialog re-centers on each open, which is what users expect from a modal.
 class ResizableDialog extends StatefulWidget {
   const ResizableDialog({
-    Key? key,
+    super.key,
     required this.contentBuilder,
     this.title,
     this.actions,
@@ -62,7 +62,7 @@ class ResizableDialog extends StatefulWidget {
     this.titlePadding = const EdgeInsets.fromLTRB(28, 20, 12, 0),
     this.contentPadding = const EdgeInsets.fromLTRB(28, 16, 28, 8),
     this.actionsPadding = const EdgeInsets.fromLTRB(20, 4, 20, 14),
-  }) : super(key: key);
+  });
 
   /// Builds the dialog body. Receives the current inner size (the dialog rect
   /// minus the header/actions padding is not subtracted — it is the full
@@ -183,7 +183,8 @@ class _ResizableDialogState extends State<ResizableDialog> {
       return Rect.fromLTWH(_margin, _margin, availableWidth, availableHeight);
     }
 
-    final requested = _size ??
+    final requested =
+        _size ??
         Size(
           viewport.width * widget.initialSizeFactor.width,
           viewport.height * widget.initialSizeFactor.height,
@@ -194,14 +195,14 @@ class _ResizableDialogState extends State<ResizableDialog> {
         .toDouble();
     final height = requested.height
         .clamp(
-            math.min(widget.minSize.height, availableHeight), availableHeight)
+          math.min(widget.minSize.height, availableHeight),
+          availableHeight,
+        )
         .toDouble();
 
-    final origin = _topLeft ??
-        Offset(
-          (viewport.width - width) / 2,
-          (viewport.height - height) / 2,
-        );
+    final origin =
+        _topLeft ??
+        Offset((viewport.width - width) / 2, (viewport.height - height) / 2);
 
     final left = origin.dx
         .clamp(_margin, math.max(_margin, viewport.width - _margin - width))
@@ -319,7 +320,8 @@ class _ResizableDialogState extends State<ResizableDialog> {
 
   Widget _buildDialogBody(Size size, Size viewport) {
     final theme = Theme.of(context);
-    final background = theme.dialogTheme.backgroundColor ??
+    final background =
+        theme.dialogTheme.backgroundColor ??
         theme.colorScheme.surfaceContainerHigh;
 
     return Stack(

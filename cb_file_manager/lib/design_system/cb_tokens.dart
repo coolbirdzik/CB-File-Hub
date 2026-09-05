@@ -20,9 +20,9 @@ class CbTokens extends ThemeExtension<CbTokens> {
   const CbTokens({required this.colors, required this.brightness});
 
   factory CbTokens.of(Brightness brightness, Color accent) => CbTokens(
-        colors: CbColorTokens.of(brightness, accent),
-        brightness: brightness,
-      );
+    colors: CbColorTokens.of(brightness, accent),
+    brightness: brightness,
+  );
 
   bool get isDark => brightness == Brightness.dark;
 
@@ -106,8 +106,10 @@ class CbTokens extends ThemeExtension<CbTokens> {
   /// in widget tests that pump a bare `MaterialApp`. Returning a usable set is
   /// better than throwing, since a missing extension is a wiring bug rather
   /// than something a widget can recover from.
-  static final CbTokens fallback =
-      CbTokens.of(Brightness.light, const Color(0xFF0078D4));
+  static final CbTokens fallback = CbTokens.of(
+    Brightness.light,
+    const Color(0xFF0078D4),
+  );
 }
 
 /// `context.cb` — the shorthand every widget uses to reach the tokens.

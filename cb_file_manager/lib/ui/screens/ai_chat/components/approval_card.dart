@@ -13,11 +13,11 @@ class ApprovalCard extends StatelessWidget {
   final VoidCallback onReject;
 
   const ApprovalCard({
-    Key? key,
+    super.key,
     required this.approval,
     required this.onApprove,
     required this.onReject,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +49,9 @@ class ApprovalCard extends StatelessWidget {
         break;
       case ApprovalActionType.generic:
         actionIcon = PhosphorIconsLight.question;
-        accentColor =
-            isDangerous ? theme.colorScheme.error : theme.colorScheme.primary;
+        accentColor = isDangerous
+            ? theme.colorScheme.error
+            : theme.colorScheme.primary;
         break;
     }
 
@@ -118,9 +119,10 @@ class ApprovalCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     side: BorderSide(color: accentColor, width: 1.5),
                   ),
-                  child: const Text('Reject',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    'Reject',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

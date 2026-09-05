@@ -24,12 +24,12 @@ class CreateFileDialog extends StatefulWidget {
   final FolderListBloc? folderListBloc;
 
   const CreateFileDialog({
-    Key? key,
+    super.key,
     required this.directoryPath,
     this.onAfterFileCreated,
     this.inlineRenameController,
     this.folderListBloc,
-  }) : super(key: key);
+  });
 
   /// Opens the dialog as a modal.
   static Future<void> show(
@@ -64,10 +64,7 @@ class CreateFileDialog extends StatefulWidget {
           return dialog;
         }
 
-        return BlocProvider.value(
-          value: resolvedFolderListBloc,
-          child: dialog,
-        );
+        return BlocProvider.value(value: resolvedFolderListBloc, child: dialog);
       },
     );
   }
@@ -233,7 +230,8 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
       AppToast.error(
         context,
         AppLocalizations.of(context)?.errorCreatingFile(
-                'File may already exist or path is not writable') ??
+              'File may already exist or path is not writable',
+            ) ??
             'Error creating file',
       );
       Navigator.of(context).pop();
@@ -254,10 +252,8 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
   }) async {
     return showDialog<String>(
       context: context,
-      builder: (dialogContext) => _CreateFileNameDialog(
-        defaultName: defaultName,
-        extension: extension,
-      ),
+      builder: (dialogContext) =>
+          _CreateFileNameDialog(defaultName: defaultName, extension: extension),
     );
   }
 
@@ -268,8 +264,9 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
     final isNarrow = screen.width < 500;
     final isMobile = Platform.isAndroid || Platform.isIOS;
 
-    final dialogWidth =
-        isNarrow ? (screen.width * 0.92).clamp(300.0, 420.0) : 520.0;
+    final dialogWidth = isNarrow
+        ? (screen.width * 0.92).clamp(300.0, 420.0)
+        : 520.0;
     final dialogHeight = (screen.height * 0.72).clamp(400.0, 680.0);
 
     return Dialog(
@@ -338,8 +335,10 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
           color: isDarkMode ? Colors.white54 : Colors.black45,
         ),
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
@@ -380,7 +379,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
       {'key': 'spreadsheet', 'label': l10n?.fileTypeExcel ?? 'Spreadsheet'},
       {
         'key': 'presentation',
-        'label': l10n?.fileTypePowerPoint ?? 'Presentation'
+        'label': l10n?.fileTypePowerPoint ?? 'Presentation',
       },
       {'key': 'pdf', 'label': 'PDF'},
       {'key': 'code', 'label': 'Code'},
@@ -396,7 +395,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (context, index) {
           final key = categories[index]['key']!;
           final label = categories[index]['label']!;
@@ -450,7 +449,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
             Text(
               _searchQuery.isNotEmpty
                   ? (AppLocalizations.of(context)?.searchVideos ??
-                      'No results for "$_searchQuery"')
+                        'No results for "$_searchQuery"')
                   : 'No templates available',
               style: TextStyle(
                 color: isDarkMode ? Colors.white54 : Colors.black54,
@@ -464,7 +463,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
     if (isMobile) {
       return ListView.separated(
         itemCount: templates.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           return _TemplateTile(
             template: templates[index],
@@ -566,10 +565,7 @@ class _CreateFileNameDialogState extends State<_CreateFileNameDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.cancel),
         ),
-        TextButton(
-          onPressed: _submit,
-          child: Text(l10n.create),
-        ),
+        TextButton(onPressed: _submit, child: Text(l10n.create)),
       ],
     );
   }
@@ -594,8 +590,9 @@ class _TemplateCard extends StatelessWidget {
     return Tooltip(
       message: 'Creates a${template.extension} file',
       child: Material(
-        color:
-            isDarkMode ? Colors.white.withAlpha(13) : Colors.black.withAlpha(5),
+        color: isDarkMode
+            ? Colors.white.withAlpha(13)
+            : Colors.black.withAlpha(5),
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onTap,
@@ -625,8 +622,10 @@ class _TemplateCard extends StatelessWidget {
                 if (template.hasBrandBadge) ...[
                   const SizedBox(height: 3),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: _brandColor(template.brand, isDarkMode),
                       borderRadius: BorderRadius.circular(4),

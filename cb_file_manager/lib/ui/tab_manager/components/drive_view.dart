@@ -42,7 +42,7 @@ class DriveView extends StatefulWidget {
   final bool isRefreshing;
 
   const DriveView({
-    Key? key,
+    super.key,
     required this.tabId,
     required this.onPathChanged,
     required this.folderListBloc,
@@ -53,7 +53,7 @@ class DriveView extends StatefulWidget {
     this.gridZoomLevel = 4,
     this.onZoomChanged,
     this.isRefreshing = false,
-  }) : super(key: key);
+  });
 
   @override
   State<DriveView> createState() => _DriveViewState();
@@ -225,10 +225,7 @@ class _DriveViewState extends State<DriveView> {
       padding: const EdgeInsets.all(16.0),
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: true,
-      itemCount: sections.fold<int>(
-        0,
-        (sum, s) => sum + 1 + s.drives.length,
-      ),
+      itemCount: sections.fold<int>(0, (sum, s) => sum + 1 + s.drives.length),
       itemBuilder: (context, index) {
         var cursor = 0;
         for (final section in sections) {
@@ -237,9 +234,9 @@ class _DriveViewState extends State<DriveView> {
               padding: EdgeInsets.only(top: cursor == 0 ? 0 : 12, bottom: 8),
               child: Text(
                 _groupTitle(context, section.group),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
             );
           }
@@ -277,9 +274,10 @@ class _DriveViewState extends State<DriveView> {
   }
 
   static int _gridCrossAxisCount(double availableWidth, double itemWidth) {
-    final raw = ((availableWidth + DriveView._gridSpacing) /
-            (itemWidth + DriveView._gridSpacing))
-        .floor();
+    final raw =
+        ((availableWidth + DriveView._gridSpacing) /
+                (itemWidth + DriveView._gridSpacing))
+            .floor();
     return math.max(1, raw);
   }
 
@@ -298,8 +296,10 @@ class _DriveViewState extends State<DriveView> {
             .clamp(UserPreferences.minGridZoomLevel, maxZoom)
             .toInt();
         final itemWidth = _gridItemWidthForZoom(effectiveZoom);
-        final availableWidth =
-            math.max(0.0, constraints.maxWidth - (DriveView._gridSpacing * 2));
+        final availableWidth = math.max(
+          0.0,
+          constraints.maxWidth - (DriveView._gridSpacing * 2),
+        );
         final crossAxisCount = _gridCrossAxisCount(availableWidth, itemWidth);
         final itemHeight = itemWidth / DriveView._gridAspectRatio;
 
@@ -397,11 +397,13 @@ class _DriveViewState extends State<DriveView> {
         ? Colors.red
         : (space.usageRatio > 0.7 ? Colors.orange : theme.colorScheme.primary);
 
-    final Color progressBackgroundColor =
-        isDarkMode ? Colors.grey[800]! : Colors.grey[200]!;
+    final Color progressBackgroundColor = isDarkMode
+        ? Colors.grey[800]!
+        : Colors.grey[200]!;
     final Color headerTextColor = isDarkMode ? Colors.white : Colors.black87;
-    final Color subtitleColor =
-        isDarkMode ? Colors.grey[400]! : Colors.grey[600]!;
+    final Color subtitleColor = isDarkMode
+        ? Colors.grey[400]!
+        : Colors.grey[600]!;
     final cardColor = theme.colorScheme.surface.withValues(
       alpha: isDarkMode ? 0.58 : 0.64,
     );
@@ -420,10 +422,12 @@ class _DriveViewState extends State<DriveView> {
         },
         child: InkWell(
           borderRadius: BorderRadius.circular(12.0),
-          onTap:
-              _isDesktopPlatform ? null : () => _openDrive(context, drive.path),
-          onDoubleTap:
-              _isDesktopPlatform ? () => _openDrive(context, drive.path) : null,
+          onTap: _isDesktopPlatform
+              ? null
+              : () => _openDrive(context, drive.path),
+          onDoubleTap: _isDesktopPlatform
+              ? () => _openDrive(context, drive.path)
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(
@@ -557,7 +561,8 @@ class _DriveViewState extends State<DriveView> {
       Rect.fromPoints(globalPosition, globalPosition),
       Offset.zero & overlay.size,
     );
-    final canShowShellMenu = Platform.isWindows &&
+    final canShowShellMenu =
+        Platform.isWindows &&
         FileSystemEntity.typeSync(drive.path) != FileSystemEntityType.notFound;
     final menuColor = Theme.of(context).colorScheme.surface.withAlpha(255);
 
@@ -580,8 +585,10 @@ class _DriveViewState extends State<DriveView> {
         ),
         PopupMenuItem(
           value: 'open_new_pane',
-          child:
-              _menuRow(l10n.openInNewPane, PhosphorIconsLight.splitHorizontal),
+          child: _menuRow(
+            l10n.openInNewPane,
+            PhosphorIconsLight.splitHorizontal,
+          ),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -622,14 +629,18 @@ class _DriveViewState extends State<DriveView> {
           ),
         PopupMenuItem(
           value: 'open_cleaner',
-          child:
-              _menuRow(l10n.driveOpenInCleaner, PhosphorIconsLight.magicWand),
+          child: _menuRow(
+            l10n.driveOpenInCleaner,
+            PhosphorIconsLight.magicWand,
+          ),
         ),
         if (Platform.isWindows && !drive.isSystemVolume)
           PopupMenuItem(
             value: 'format',
-            child:
-                _menuRow(l10n.driveFormat, PhosphorIconsLight.floppyDiskBack),
+            child: _menuRow(
+              l10n.driveFormat,
+              PhosphorIconsLight.floppyDiskBack,
+            ),
           ),
         if (Platform.isWindows)
           PopupMenuItem(
@@ -787,8 +798,8 @@ class _DriveViewState extends State<DriveView> {
         break;
       case 'open_cleaner':
         context.read<TabManagerBloc>().add(
-              AddTab(path: kCbAgentCleanerPath, name: l10n.driveOpenInCleaner),
-            );
+          AddTab(path: kCbAgentCleanerPath, name: l10n.driveOpenInCleaner),
+        );
         break;
       case 'format':
         await _confirmFormat(context, drive);
@@ -934,8 +945,9 @@ class _DriveViewState extends State<DriveView> {
   void _showDrivePropertiesDialog(BuildContext context, DriveInfo drive) {
     final l10n = AppLocalizations.of(context)!;
     final space = drive.space;
-    final usagePercent =
-        (space.usageRatio * 100).clamp(0, 100).toStringAsFixed(1);
+    final usagePercent = (space.usageRatio * 100)
+        .clamp(0, 100)
+        .toStringAsFixed(1);
 
     showDialog<void>(
       context: context,
@@ -1000,8 +1012,10 @@ class _DriveViewState extends State<DriveView> {
       children: <Widget>[
         SizedBox(
           width: 100,
-          child:
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
         Expanded(child: Text(value)),
       ],
@@ -1010,17 +1024,19 @@ class _DriveViewState extends State<DriveView> {
 
   void _openDrive(BuildContext context, String drivePath) {
     context.read<TabManagerBloc>().add(UpdateTabPath(widget.tabId, drivePath));
-    context
-        .read<TabManagerBloc>()
-        .add(UpdateTabName(widget.tabId, _tabNameForPath(drivePath)));
+    context.read<TabManagerBloc>().add(
+      UpdateTabName(widget.tabId, _tabNameForPath(drivePath)),
+    );
     widget.onPathChanged(drivePath);
     widget.folderListBloc.add(FolderListLoad(drivePath));
   }
 
   String _tabNameForPath(String drivePath) {
     final normalized = drivePath.replaceAll('\\', '/');
-    final parts =
-        normalized.split('/').where((part) => part.isNotEmpty).toList();
+    final parts = normalized
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return drivePath;
     return parts.last;
   }

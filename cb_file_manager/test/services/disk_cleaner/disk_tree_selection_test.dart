@@ -98,37 +98,39 @@ void main() {
     expect(child.isSelectedForDeletion, isFalse);
   });
 
-  test('Exact target toggle replaces overlapping targets without tree walk',
-      () {
-    final child = DiskTreeNode(
-      name: 'child.tmp',
-      fullPath: r'C:\cache\child.tmp',
-      isFile: true,
-      isSelectedForDeletion: true,
-    );
-    final sibling = DiskTreeNode(
-      name: 'other.tmp',
-      fullPath: r'C:\other.tmp',
-      isFile: true,
-      isSelectedForDeletion: true,
-    );
-    final parent = DiskTreeNode(
-      name: 'cache',
-      fullPath: r'C:\cache',
-      children: [child],
-    );
+  test(
+    'Exact target toggle replaces overlapping targets without tree walk',
+    () {
+      final child = DiskTreeNode(
+        name: 'child.tmp',
+        fullPath: r'C:\cache\child.tmp',
+        isFile: true,
+        isSelectedForDeletion: true,
+      );
+      final sibling = DiskTreeNode(
+        name: 'other.tmp',
+        fullPath: r'C:\other.tmp',
+        isFile: true,
+        isSelectedForDeletion: true,
+      );
+      final parent = DiskTreeNode(
+        name: 'cache',
+        fullPath: r'C:\cache',
+        children: [child],
+      );
 
-    final selected = DiskTreeSelection.setExactTargetChecked(
-      {child, sibling},
-      parent,
-      true,
-    );
+      final selected = DiskTreeSelection.setExactTargetChecked(
+        {child, sibling},
+        parent,
+        true,
+      );
 
-    expect(selected, {parent, sibling});
-    expect(parent.isSelectedForDeletion, isTrue);
-    expect(child.isSelectedForDeletion, isFalse);
-    expect(sibling.isSelectedForDeletion, isTrue);
-  });
+      expect(selected, {parent, sibling});
+      expect(parent.isSelectedForDeletion, isTrue);
+      expect(child.isSelectedForDeletion, isFalse);
+      expect(sibling.isSelectedForDeletion, isTrue);
+    },
+  );
 
   test('Junk aggregate cache refreshes after tree metadata changes', () {
     final child = DiskTreeNode(
@@ -154,36 +156,38 @@ void main() {
     expect(root.junkBytes, 0);
   });
 
-  test('Preview targets contain selected parents without duplicate children',
-      () {
-    final child = DiskTreeNode(
-      name: 'child.tmp',
-      fullPath: r'C:\cache\child.tmp',
-      isFile: true,
-      sizeBytes: 100,
-      fileCount: 1,
-      junkCategoryId: 'dev_cache',
-      isSelectedForDeletion: true,
-    );
-    final cache = DiskTreeNode(
-      name: 'cache',
-      fullPath: r'C:\cache',
-      sizeBytes: 100,
-      fileCount: 1,
-      children: [child],
-      junkCategoryId: 'dev_cache',
-      isSelectedForDeletion: true,
-    );
-    final root = DiskTreeNode(
-      name: r'C:\',
-      fullPath: r'C:\',
-      children: [cache],
-    );
+  test(
+    'Preview targets contain selected parents without duplicate children',
+    () {
+      final child = DiskTreeNode(
+        name: 'child.tmp',
+        fullPath: r'C:\cache\child.tmp',
+        isFile: true,
+        sizeBytes: 100,
+        fileCount: 1,
+        junkCategoryId: 'dev_cache',
+        isSelectedForDeletion: true,
+      );
+      final cache = DiskTreeNode(
+        name: 'cache',
+        fullPath: r'C:\cache',
+        sizeBytes: 100,
+        fileCount: 1,
+        children: [child],
+        junkCategoryId: 'dev_cache',
+        isSelectedForDeletion: true,
+      );
+      final root = DiskTreeNode(
+        name: r'C:\',
+        fullPath: r'C:\',
+        children: [cache],
+      );
 
-    final targets = DiskTreeSelection.collectDeletionTargets(root);
+      final targets = DiskTreeSelection.collectDeletionTargets(root);
 
-    expect(targets, [cache]);
-  });
+      expect(targets, [cache]);
+    },
+  );
 
   test('Preview expands safe ancestors to reveal selected targets', () {
     final selected = DiskTreeNode(

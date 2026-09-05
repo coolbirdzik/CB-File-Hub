@@ -6,11 +6,7 @@ class AddressBarMenu extends StatelessWidget {
   final List<AddressBarMenuItem> items;
   final String? tooltip;
 
-  const AddressBarMenu({
-    Key? key,
-    required this.items,
-    this.tooltip,
-  }) : super(key: key);
+  const AddressBarMenu({super.key, required this.items, this.tooltip});
 
   @override
   Widget build(BuildContext context) {
@@ -39,10 +35,9 @@ class AddressBarMenu extends StatelessWidget {
                 size: 18,
                 color: item.enabled
                     ? Theme.of(context).colorScheme.onSurface
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -51,17 +46,18 @@ class AddressBarMenu extends StatelessWidget {
                   style: TextStyle(
                     color: item.enabled
                         ? Theme.of(context).colorScheme.onSurface
-                        : Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.5),
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ),
               if (item.badge != null)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.primary,
                     borderRadius: BorderRadius.circular(16.0),

@@ -7,16 +7,9 @@ import 'package:cb_file_manager/services/file_template_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 
-enum DesktopNewFileItemKind {
-  template,
-  shellNew,
-}
+enum DesktopNewFileItemKind { template, shellNew }
 
-enum WindowsShellNewCreationMode {
-  nullFile,
-  templateFile,
-  binaryData,
-}
+enum WindowsShellNewCreationMode { nullFile, templateFile, binaryData }
 
 class WindowsShellNewEntry {
   final String id;
@@ -88,7 +81,8 @@ class DesktopNewFileService {
           id: 'template:${template.extension}',
           extension: template.extension,
           icon: template.icon,
-          suggestedBaseName: template.defaultFileName ??
+          suggestedBaseName:
+              template.defaultFileName ??
               template.extension.replaceFirst('.', '').toUpperCase(),
           kind: DesktopNewFileItemKind.template,
           template: template,
@@ -264,8 +258,9 @@ class DesktopNewFileService {
   }
 
   Future<WindowsShellNewEntry?> _loadShellNewEntry(String key) async {
-    final extensionMatch =
-        RegExp(r'^HKEY_CLASSES_ROOT\\(\.[^\\]+)').firstMatch(key);
+    final extensionMatch = RegExp(
+      r'^HKEY_CLASSES_ROOT\\(\.[^\\]+)',
+    ).firstMatch(key);
     final extension = extensionMatch?.group(1)?.toLowerCase();
     if (extension == null || extension.isEmpty) {
       return null;
@@ -328,8 +323,9 @@ class DesktopNewFileService {
         continue;
       }
 
-      final match =
-          RegExp(r'^\s*([^\s]+)\s+REG_[A-Z_]+\s+(.+)$').firstMatch(rawLine);
+      final match = RegExp(
+        r'^\s*([^\s]+)\s+REG_[A-Z_]+\s+(.+)$',
+      ).firstMatch(rawLine);
       if (match == null) {
         continue;
       }
@@ -436,8 +432,9 @@ class DesktopNewFileService {
     String baseName,
     String extension,
   ) async {
-    final normalizedExtension =
-        extension.startsWith('.') ? extension : '.$extension';
+    final normalizedExtension = extension.startsWith('.')
+        ? extension
+        : '.$extension';
     final fileName = '$baseName$normalizedExtension';
     final initialPath = path.join(directoryPath, fileName);
     if (!await File(initialPath).exists()) {
@@ -445,8 +442,10 @@ class DesktopNewFileService {
     }
 
     for (var index = 1; index <= 999; index++) {
-      final candidatePath =
-          path.join(directoryPath, '$baseName ($index)$normalizedExtension');
+      final candidatePath = path.join(
+        directoryPath,
+        '$baseName ($index)$normalizedExtension',
+      );
       if (!await File(candidatePath).exists()) {
         return candidatePath;
       }

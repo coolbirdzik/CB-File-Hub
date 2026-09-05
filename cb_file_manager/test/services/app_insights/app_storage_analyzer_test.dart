@@ -53,10 +53,7 @@ void main() {
         ),
         r'C:\PROGRAM FILES\EXAMPLE',
       );
-      expect(
-        AppStorageAnalyzer.normalizeWindowsPath('c:'),
-        r'C:\',
-      );
+      expect(AppStorageAnalyzer.normalizeWindowsPath('c:'), r'C:\');
     });
 
     test('uses separator boundaries instead of string prefixes', () {
@@ -89,10 +86,7 @@ void main() {
       1000,
       <DiskTreeNode>[
         discordCache,
-        _directory(
-          r'C:\Users\me\AppData\Roaming\discord\Data',
-          900,
-        ),
+        _directory(r'C:\Users\me\AppData\Roaming\discord\Data', 900),
       ],
     );
     final roaming = _directory(
@@ -127,29 +121,14 @@ void main() {
       roaming.sizeBytes + local.sizeBytes,
       <DiskTreeNode>[roaming, local],
     );
-    final user = _directory(
-      r'C:\Users\me',
-      appData.sizeBytes,
-      <DiskTreeNode>[appData],
-    );
-    final users = _directory(
-      r'C:\Users',
-      user.sizeBytes,
-      <DiskTreeNode>[user],
-    );
+    final user = _directory(r'C:\Users\me', appData.sizeBytes, <DiskTreeNode>[
+      appData,
+    ]);
+    final users = _directory(r'C:\Users', user.sizeBytes, <DiskTreeNode>[user]);
 
-    final sharedSuite = _directory(
-      r'C:\Program Files\SharedSuite',
-      600 * _mib,
-    );
-    final partialApp = _directory(
-      r'C:\Program Files\PartialApp',
-      1000,
-    );
-    final iconApp = _directory(
-      r'C:\Portable\IconApp',
-      400,
-    );
+    final sharedSuite = _directory(r'C:\Program Files\SharedSuite', 600 * _mib);
+    final partialApp = _directory(r'C:\Program Files\PartialApp', 1000);
+    final iconApp = _directory(r'C:\Portable\IconApp', 400);
     final programFiles = _directory(
       r'C:\Program Files',
       sharedSuite.sizeBytes + partialApp.sizeBytes,
@@ -304,11 +283,7 @@ void main() {
 
   test('legacy inaccessible paths still make overlapping storage partial', () {
     final appNode = _directory(r'C:\Apps\Legacy', 42);
-    final appsNode = _directory(
-      r'C:\Apps',
-      42,
-      <DiskTreeNode>[appNode],
-    );
+    final appsNode = _directory(r'C:\Apps', 42, <DiskTreeNode>[appNode]);
     final root = _directory(r'C:\', 42, <DiskTreeNode>[appsNode]);
     final result = FullDiskScanResult(
       root: root,
@@ -337,42 +312,44 @@ void main() {
     );
   });
 
-  test('keeps progressive scan measurements visible but marks them partial',
-      () {
-    final appNode = _directory(r'C:\Apps\Growing', 128);
-    final root = _directory(r'C:\', 128, <DiskTreeNode>[appNode]);
-    final result = FullDiskScanResult(
-      root: root,
-      duration: Duration.zero,
-      coverageIssues: const <FullDiskScanCoverageIssue>[
-        FullDiskScanCoverageIssue(
-          path: r'C:\',
-          reason: FullDiskScanCoverageIssueReason.scanInProgress,
-        ),
-      ],
-    );
+  test(
+    'keeps progressive scan measurements visible but marks them partial',
+    () {
+      final appNode = _directory(r'C:\Apps\Growing', 128);
+      final root = _directory(r'C:\', 128, <DiskTreeNode>[appNode]);
+      final result = FullDiskScanResult(
+        root: root,
+        duration: Duration.zero,
+        coverageIssues: const <FullDiskScanCoverageIssue>[
+          FullDiskScanCoverageIssue(
+            path: r'C:\',
+            reason: FullDiskScanCoverageIssueReason.scanInProgress,
+          ),
+        ],
+      );
 
-    final report = const AppStorageAnalyzer().analyze(
-      root: root,
-      scanResult: result,
-      apps: const <InstalledAppInfo>[
-        InstalledAppInfo(
-          id: 'growing',
-          displayName: 'Growing App',
-          source: InstalledAppSource.win32,
-          installLocation: r'C:\Apps\Growing',
-        ),
-      ],
-      environment: const <String, String>{'SYSTEMDRIVE': r'C:'},
-    );
+      final report = const AppStorageAnalyzer().analyze(
+        root: root,
+        scanResult: result,
+        apps: const <InstalledAppInfo>[
+          InstalledAppInfo(
+            id: 'growing',
+            displayName: 'Growing App',
+            source: InstalledAppSource.win32,
+            installLocation: r'C:\Apps\Growing',
+          ),
+        ],
+        environment: const <String, String>{'SYSTEMDRIVE': r'C:'},
+      );
 
-    expect(report.isPartial, isTrue);
-    expect(report.findApp('growing')!.confirmedSizeBytes, 128);
-    expect(
-      report.findApp('growing')!.measurementQuality,
-      MeasurementQuality.partial,
-    );
-  });
+      expect(report.isPartial, isTrue);
+      expect(report.findApp('growing')!.confirmedSizeBytes, 128);
+      expect(
+        report.findApp('growing')!.measurementQuality,
+        MeasurementQuality.partial,
+      );
+    },
+  );
 
   test('an owned rule chooses a unique exact app over a related runtime', () {
     final cache = _directory(
@@ -382,10 +359,7 @@ void main() {
       'browser_cache',
     );
     final root = _directory(r'C:\', 99, <DiskTreeNode>[cache]);
-    final result = FullDiskScanResult(
-      root: root,
-      duration: Duration.zero,
-    );
+    final result = FullDiskScanResult(root: root, duration: Duration.zero);
 
     final report = const AppStorageAnalyzer().analyze(
       root: root,

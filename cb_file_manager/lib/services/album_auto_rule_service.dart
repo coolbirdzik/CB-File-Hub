@@ -7,13 +7,7 @@ import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:path/path.dart' as path;
 import '../utils/app_logger.dart';
 
-enum RuleCondition {
-  contains,
-  startsWith,
-  endsWith,
-  equals,
-  regex,
-}
+enum RuleCondition { contains, startsWith, endsWith, equals, regex }
 
 class AlbumAutoRule {
   String id;
@@ -224,8 +218,9 @@ class AlbumAutoRuleService {
 
         for (final albumId in matchingAlbumIds) {
           try {
-            final isSmart =
-                await SmartAlbumService.instance.isSmartAlbum(albumId);
+            final isSmart = await SmartAlbumService.instance.isSmartAlbum(
+              albumId,
+            );
             if (!isSmart) {
               await albumService.addFileToAlbum(albumId, filePath);
             }
@@ -256,7 +251,7 @@ class AlbumAutoRuleService {
         return {
           'processedFiles': 0,
           'addedFiles': 0,
-          'errors': ['Directory does not exist']
+          'errors': ['Directory does not exist'],
         };
       }
 

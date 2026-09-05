@@ -42,7 +42,9 @@ class BatchTagManager {
 
   /// Add a tag to multiple files
   Future<Map<String, bool>> addTagToFiles(
-      List<String> filePaths, String tag) async {
+    List<String> filePaths,
+    String tag,
+  ) async {
     final Map<String, bool> results = {};
 
     if (tag.trim().isEmpty || filePaths.isEmpty) {
@@ -73,7 +75,9 @@ class BatchTagManager {
 
   /// Remove a tag from multiple files
   Future<Map<String, bool>> removeTagFromFiles(
-      List<String> filePaths, String tag) async {
+    List<String> filePaths,
+    String tag,
+  ) async {
     final Map<String, bool> results = {};
 
     if (tag.trim().isEmpty || filePaths.isEmpty) {
@@ -83,8 +87,10 @@ class BatchTagManager {
     try {
       // Process each file
       for (final filePath in filePaths) {
-        final success =
-            await _databaseManager!.removeTagFromFile(filePath, tag);
+        final success = await _databaseManager!.removeTagFromFile(
+          filePath,
+          tag,
+        );
         results[filePath] = success;
       }
 
@@ -105,7 +111,8 @@ class BatchTagManager {
 
   /// Get tags for multiple files
   Future<Map<String, List<String>>> getTagsForFiles(
-      List<String> filePaths) async {
+    List<String> filePaths,
+  ) async {
     final Map<String, List<String>> results = {};
 
     if (filePaths.isEmpty) {
@@ -136,7 +143,8 @@ class BatchTagManager {
 
   /// Replace tags in multiple files with a set of new tags
   Future<Map<String, bool>> setTagsForFiles(
-      Map<String, List<String>> fileTagsMap) async {
+    Map<String, List<String>> fileTagsMap,
+  ) async {
     final Map<String, bool> results = {};
 
     if (fileTagsMap.isEmpty) {
@@ -174,8 +182,9 @@ class BatchTagManager {
 
     try {
       // Get tags for each file
-      final Map<String, List<String>> allTags =
-          await getTagsForFiles(filePaths);
+      final Map<String, List<String>> allTags = await getTagsForFiles(
+        filePaths,
+      );
 
       if (allTags.isEmpty) {
         return [];
@@ -207,8 +216,11 @@ class BatchTagManager {
   }
 
   /// Add a tag to all files in a directory (recursive)
-  Future<int> tagDirectory(String directoryPath, String tag,
-      {bool recursive = true}) async {
+  Future<int> tagDirectory(
+    String directoryPath,
+    String tag, {
+    bool recursive = true,
+  }) async {
     if (tag.trim().isEmpty) {
       return 0;
     }
@@ -230,13 +242,16 @@ class BatchTagManager {
       // Process files in batches to avoid overwhelming the database
       const int batchSize = 50;
       for (int i = 0; i < entities.length; i += batchSize) {
-        final int end =
-            (i + batchSize < entities.length) ? i + batchSize : entities.length;
+        final int end = (i + batchSize < entities.length)
+            ? i + batchSize
+            : entities.length;
         final batch = entities.sublist(i, end);
 
         // Add tag to batch of files
         final batchResults = await addTagToFiles(
-            batch.map((entity) => entity.path).toList(), tag);
+          batch.map((entity) => entity.path).toList(),
+          tag,
+        );
 
         // Count successes
         count += batchResults.values.where((success) => success).length;
@@ -265,7 +280,9 @@ class BatchTagManager {
 
   /// Copy all tags from one file to multiple files
   Future<Map<String, bool>> copyTagsToMultipleFiles(
-      String sourceFilePath, List<String> targetFilePaths) async {
+    String sourceFilePath,
+    List<String> targetFilePaths,
+  ) async {
     final Map<String, bool> results = {};
 
     if (targetFilePaths.isEmpty) {
@@ -278,8 +295,10 @@ class BatchTagManager {
 
       // Set tags on each target file
       for (final targetPath in targetFilePaths) {
-        final success =
-            await _databaseManager!.setTagsForFile(targetPath, tags);
+        final success = await _databaseManager!.setTagsForFile(
+          targetPath,
+          tags,
+        );
         results[targetPath] = success;
       }
 
@@ -301,7 +320,10 @@ class BatchTagManager {
   /// Apply a tag operation on multiple files
   /// Operation can be 'add', 'remove', or 'set'
   Future<Map<String, bool>> applyTagOperation(
-      List<String> filePaths, List<String> tags, String operation) async {
+    List<String> filePaths,
+    List<String> tags,
+    String operation,
+  ) async {
     final Map<String, bool> results = {};
 
     if (filePaths.isEmpty || tags.isEmpty) {
@@ -387,7 +409,9 @@ class BatchTagManager {
 
   /// Remove a tag from multiple files - static helper method
   static Future<bool> removeTagFromFilesStatic(
-      List<String> filePaths, String tag) async {
+    List<String> filePaths,
+    String tag,
+  ) async {
     bool success = true;
     for (final path in filePaths) {
       if (!await TagManager.removeTag(path, tag)) {

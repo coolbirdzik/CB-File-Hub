@@ -68,8 +68,8 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       final loadedPreviewPaneWidth = await prefs.getPreviewPaneWidth();
       final effectiveViewMode =
           !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
-              ? ViewMode.grid
-              : loadedViewMode;
+          ? ViewMode.grid
+          : loadedViewMode;
 
       if (mounted) {
         final maxZoom = GridZoomConstraints.maxGridSizeForContext(
@@ -150,10 +150,12 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       }
     });
 
-    folderListBloc.add(SetViewMode(
-        viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode));
+    folderListBloc.add(
+      SetViewMode(viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode),
+    );
     saveViewModeSetting(
-        viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode);
+      viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode,
+    );
   }
 
   /// Set view mode directly to a specific mode
@@ -175,8 +177,9 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       context,
       mode: GridSizeMode.referenceWidth,
     );
-    final clamped =
-        zoomLevel.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    final clamped = zoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
     folderListBloc.add(SetGridZoom(clamped));
     saveGridZoomSetting(clamped);
   }

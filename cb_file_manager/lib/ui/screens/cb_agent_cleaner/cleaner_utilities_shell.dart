@@ -26,7 +26,7 @@ class CleanerUtilitiesShell extends StatelessWidget {
   final Widget child;
 
   const CleanerUtilitiesShell({
-    Key? key,
+    super.key,
     required this.title,
     required this.subtitle,
     required this.selectedId,
@@ -34,8 +34,7 @@ class CleanerUtilitiesShell extends StatelessWidget {
     required this.onSelected,
     required this.child,
     this.navigationEnabled = true,
-  })  : assert(destinations.length > 0),
-        super(key: key);
+  }) : assert(destinations.length > 0);
 
   static const double compactBreakpoint = 920;
 
@@ -232,8 +231,9 @@ class _UtilityNavigationTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: foreground,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w600,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -252,8 +252,11 @@ class _UtilityNavigationTile extends StatelessWidget {
                 ),
                 if (selected) ...[
                   const SizedBox(width: 6),
-                  Icon(Icons.chevron_right_rounded,
-                      size: 18, color: foreground),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: foreground,
+                  ),
                 ],
               ],
             ),
@@ -345,8 +348,10 @@ class _CompactUtilityNavigation extends StatelessWidget {
                   )
                   .toList(growable: false),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(9),

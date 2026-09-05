@@ -32,20 +32,20 @@ class AiToolCall {
   });
 
   Map<String, dynamic> toJson() => {
-        'toolName': toolName,
-        'arguments': arguments,
-        'result': result,
-        'success': success,
-        'isRunning': isRunning,
-      };
+    'toolName': toolName,
+    'arguments': arguments,
+    'result': result,
+    'success': success,
+    'isRunning': isRunning,
+  };
 
   factory AiToolCall.fromJson(Map<String, dynamic> json) => AiToolCall(
-        toolName: json['toolName'] as String? ?? '',
-        arguments: json['arguments'] as String? ?? '',
-        result: json['result'] as String?,
-        success: json['success'] as bool? ?? true,
-        isRunning: json['isRunning'] as bool? ?? false,
-      );
+    toolName: json['toolName'] as String? ?? '',
+    arguments: json['arguments'] as String? ?? '',
+    result: json['result'] as String?,
+    success: json['success'] as bool? ?? true,
+    isRunning: json['isRunning'] as bool? ?? false,
+  );
 }
 
 /// A single message in an AI chat conversation.
@@ -53,6 +53,9 @@ class AiMessage extends Equatable {
   final String id;
   final AiMessageRole role;
   final String content;
+
+  /// Model reasoning, displayed separately and excluded from API history.
+  final String? reasoning;
   final DateTime timestamp;
 
   /// Parsed search results attached to this assistant message.
@@ -74,6 +77,7 @@ class AiMessage extends Equatable {
     required this.id,
     required this.role,
     required this.content,
+    this.reasoning,
     required this.timestamp,
     this.searchResults,
     this.isLoading = false,
@@ -84,6 +88,7 @@ class AiMessage extends Equatable {
 
   AiMessage copyWith({
     String? content,
+    String? reasoning,
     List<AiSearchResult>? searchResults,
     bool? isLoading,
     String? error,
@@ -95,6 +100,7 @@ class AiMessage extends Equatable {
       id: id,
       role: role,
       content: content ?? this.content,
+      reasoning: reasoning ?? this.reasoning,
       timestamp: timestamp,
       searchResults: searchResults ?? this.searchResults,
       isLoading: isLoading ?? this.isLoading,
@@ -106,26 +112,28 @@ class AiMessage extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        role,
-        content,
-        timestamp,
-        searchResults,
-        isLoading,
-        error,
-        toolCalls,
-        referencedFiles,
-      ];
+    id,
+    role,
+    content,
+    reasoning,
+    timestamp,
+    searchResults,
+    isLoading,
+    error,
+    toolCalls,
+    referencedFiles,
+  ];
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'role': role.toString().split('.').last,
-        'content': content,
-        'timestamp': timestamp.toIso8601String(),
-        'searchResults': searchResults?.map((r) => r.toJson()).toList(),
-        'toolCalls': toolCalls?.map((c) => c.toJson()).toList(),
-        'referencedFiles': referencedFiles?.map((f) => f.toJson()).toList(),
-      };
+    'id': id,
+    'role': role.toString().split('.').last,
+    'content': content,
+    'reasoning': reasoning,
+    'timestamp': timestamp.toIso8601String(),
+    'searchResults': searchResults?.map((r) => r.toJson()).toList(),
+    'toolCalls': toolCalls?.map((c) => c.toJson()).toList(),
+    'referencedFiles': referencedFiles?.map((f) => f.toJson()).toList(),
+  };
 
   factory AiMessage.fromJson(Map<String, dynamic> json) {
     final roleStr = json['role'] as String? ?? 'user';
@@ -140,7 +148,9 @@ class AiMessage extends Equatable {
       id: json['id'] as String? ?? '',
       role: role,
       content: json['content'] as String? ?? '',
-      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+      reasoning: json['reasoning'] as String?,
+      timestamp:
+          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
           DateTime.now(),
       searchResults: searchResultsJson
           ?.map((r) => AiSearchResult.fromJson(r as Map<String, dynamic>))

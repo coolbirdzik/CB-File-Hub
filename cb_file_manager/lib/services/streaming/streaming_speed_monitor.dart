@@ -22,8 +22,9 @@ class StreamingSpeedMonitor {
   DateTime _lastUpdateTime = DateTime.now();
 
   // Cấu hình
-  static const Duration _updateInterval =
-      Duration(milliseconds: 500); // Cập nhật mỗi 500ms
+  static const Duration _updateInterval = Duration(
+    milliseconds: 500,
+  ); // Cập nhật mỗi 500ms
 
   /// Stream để lắng nghe thông tin tốc độ
   Stream<StreamingSpeedInfo> get speedStream => _speedController.stream;

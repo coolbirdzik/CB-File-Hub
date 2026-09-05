@@ -146,11 +146,7 @@ class SetSortOption extends FolderListEvent {
   final bool persist;
   final String? folderPath;
 
-  const SetSortOption(
-    this.sortOption, {
-    this.persist = true,
-    this.folderPath,
-  });
+  const SetSortOption(this.sortOption, {this.persist = true, this.folderPath});
 
   @override
   List<Object?> get props => [sortOption, persist, folderPath];

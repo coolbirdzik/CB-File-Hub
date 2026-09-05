@@ -53,7 +53,8 @@ class TagThumbnailManager {
       _cache.addAll(all);
       _cacheLoaded = true;
       AppLogger.info(
-          '[TagThumbnailManager] Loaded ${_cache.length} thumbnails');
+        '[TagThumbnailManager] Loaded ${_cache.length} thumbnails',
+      );
     } catch (e) {
       AppLogger.error('[TagThumbnailManager] initialize failed', error: e);
     }

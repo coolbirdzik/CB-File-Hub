@@ -50,7 +50,8 @@ class PermissionStateService {
         return manage;
       } catch (e) {
         debugPrint(
-            'Error checking Android manage external storage permission: $e');
+          'Error checking Android manage external storage permission: $e',
+        );
         return false;
       }
     }
@@ -139,7 +140,8 @@ class PermissionStateService {
         return false;
       } catch (e) {
         debugPrint(
-            'Error requesting Android manage external storage permission: $e');
+          'Error requesting Android manage external storage permission: $e',
+        );
         await openAppSettings();
         return false;
       }

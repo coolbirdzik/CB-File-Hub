@@ -18,7 +18,7 @@ class ModelSelectorButton extends StatefulWidget {
   final ValueChanged<ModelSelectorValue> onSelected;
 
   const ModelSelectorButton({
-    Key? key,
+    super.key,
     required this.catalogs,
     required this.selectedProviderId,
     required this.selectedModelName,
@@ -31,7 +31,7 @@ class ModelSelectorButton extends StatefulWidget {
     this.searchHint = 'Search models...',
     this.noMatchesLabel = 'No models found',
     this.compact = false,
-  }) : super(key: key);
+  });
 
   @override
   State<ModelSelectorButton> createState() => _ModelSelectorButtonState();
@@ -98,8 +98,9 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
         // the screen (minus margins).
         final available = screen.width - margin * 2;
         final desiredWidth = buttonSize.width < 240 ? 240.0 : buttonSize.width;
-        final panelWidth =
-            desiredWidth.clamp(0.0, panelMaxWidth).clamp(0.0, available);
+        final panelWidth = desiredWidth
+            .clamp(0.0, panelMaxWidth)
+            .clamp(0.0, available);
 
         // Horizontal: align to button left, clamp so it never runs off-screen.
         var left = buttonTopLeft.dx;
@@ -142,14 +143,10 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: theme.colorScheme.outlineVariant,
-                    ),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
                   ),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: panelHeight,
-                    ),
+                    constraints: BoxConstraints(maxHeight: panelHeight),
                     child: StatefulBuilder(
                       builder: (context, setOverlayState) {
                         return _buildMenuContent(theme, setOverlayState);
@@ -199,15 +196,11 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.outlineVariant,
-                ),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.outlineVariant,
-                ),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
               ),
             ),
             onChanged: (value) {
@@ -276,7 +269,8 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
       );
 
       for (final model in catalog.models) {
-        final isSelected = catalog.providerId == widget.selectedProviderId &&
+        final isSelected =
+            catalog.providerId == widget.selectedProviderId &&
             model == widget.selectedModelName;
         rows.add(
           InkWell(
@@ -287,10 +281,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
                   SizedBox(
@@ -308,8 +299,9 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
                       model,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -340,13 +332,14 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     if (_query.isEmpty) return widget.catalogs;
     final result = <AiProviderModelCatalog>[];
     for (final catalog in widget.catalogs) {
-      final providerMatches =
-          catalog.providerName.toLowerCase().contains(_query);
+      final providerMatches = catalog.providerName.toLowerCase().contains(
+        _query,
+      );
       final matchingModels = providerMatches
           ? catalog.models
           : catalog.models
-              .where((m) => m.toLowerCase().contains(_query))
-              .toList();
+                .where((m) => m.toLowerCase().contains(_query))
+                .toList();
       if (matchingModels.isEmpty) continue;
       result.add(
         AiProviderModelCatalog(
@@ -372,15 +365,16 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     // sits inside the composer card without reading as a nested box.
     final Color background = widget.compact
         ? (_hovered || _overlay != null
-            ? theme.colorScheme.onSurface.withValues(alpha: 0.06)
-            : Colors.transparent)
+              ? theme.colorScheme.onSurface.withValues(alpha: 0.06)
+              : Colors.transparent)
         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
 
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
-        cursor:
-            _isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        cursor: _isEnabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
@@ -463,12 +457,13 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     final model = widget.selectedModelName?.trim().isNotEmpty == true
         ? widget.selectedModelName!
         : null;
-    final effectiveModel = model ??
+    final effectiveModel =
+        model ??
         (selectedCatalog.defaultModelName.trim().isNotEmpty
             ? selectedCatalog.defaultModelName.trim()
             : (selectedCatalog.models.isNotEmpty
-                ? selectedCatalog.models.first
-                : widget.emptyLabel));
+                  ? selectedCatalog.models.first
+                  : widget.emptyLabel));
     // Compact mode has little room, so the provider prefix is dropped — the
     // tooltip and the dropdown still show which provider it belongs to.
     if (widget.compact) return effectiveModel;
@@ -480,8 +475,5 @@ class ModelSelectorValue {
   final String providerId;
   final String modelName;
 
-  const ModelSelectorValue({
-    required this.providerId,
-    required this.modelName,
-  });
+  const ModelSelectorValue({required this.providerId, required this.modelName});
 }

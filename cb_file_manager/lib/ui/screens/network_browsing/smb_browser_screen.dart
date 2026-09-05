@@ -23,10 +23,7 @@ class SMBBrowserScreen extends StatefulWidget {
   /// The tab ID this screen belongs to
   final String tabId;
 
-  const SMBBrowserScreen({
-    Key? key,
-    required this.tabId,
-  }) : super(key: key);
+  const SMBBrowserScreen({super.key, required this.tabId});
 
   @override
   State<SMBBrowserScreen> createState() => _SMBBrowserScreenState();
@@ -87,12 +84,15 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
 
     // Thử lấy bloc từ context hoặc tạo mới nếu không tìm thấy
     try {
-      _networkBloc =
-          BlocProvider.of<NetworkBrowsingBloc>(context, listen: false);
+      _networkBloc = BlocProvider.of<NetworkBrowsingBloc>(
+        context,
+        listen: false,
+      );
       _isLocalBloc = false;
     } catch (e) {
       debugPrint(
-          'NetworkBrowsingBloc không tìm thấy trong context, tạo mới: $e');
+        'NetworkBrowsingBloc không tìm thấy trong context, tạo mới: $e',
+      );
       _networkBloc = NetworkBrowsingBloc();
       _isLocalBloc = true;
     }
@@ -197,8 +197,10 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  '${AppLocalizations.of(context)!.networkScanFailed}: $e')),
+            content: Text(
+              '${AppLocalizations.of(context)!.networkScanFailed}: $e',
+            ),
+          ),
         );
       }
     } finally {
@@ -245,8 +247,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
       if (mounted) {
         setState(() {
           _smbVersion = AppLocalizations.of(context)!.smbVersionUnknown;
-          _connectionInfo =
-              AppLocalizations.of(context)!.connectionInfoUnavailable;
+          _connectionInfo = AppLocalizations.of(
+            context,
+          )!.connectionInfoUnavailable;
         });
       }
     } finally {
@@ -300,8 +303,10 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         if (!opened) {
           // Phương pháp 2: Mở Internet Settings Control Panel
           try {
-            await Process.run(
-                'rundll32.exe', ['shell32.dll,Control_RunDLL', 'ncpa.cpl']);
+            await Process.run('rundll32.exe', [
+              'shell32.dll,Control_RunDLL',
+              'ncpa.cpl',
+            ]);
             opened = true;
             debugPrint('Successfully opened network connections');
           } catch (e) {
@@ -313,7 +318,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
           // Phương pháp 3: Thử shell execute với explorer
           try {
             await Process.run('explorer.exe', [
-              'shell:::{26EE0668-A00A-44D7-9371-BEB064C98683}\\0\\::{7007ACC7-3202-11D1-AAD2-00805FC1270E}'
+              'shell:::{26EE0668-A00A-44D7-9371-BEB064C98683}\\0\\::{7007ACC7-3202-11D1-AAD2-00805FC1270E}',
             ]);
             opened = true;
             debugPrint('Successfully opened network shell');
@@ -325,8 +330,12 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         if (!opened) {
           // Phương pháp 4: Thử mở với cmd
           try {
-            await Process.run(
-                'cmd.exe', ['/c', 'start', 'control', 'ncpa.cpl']);
+            await Process.run('cmd.exe', [
+              '/c',
+              'start',
+              'control',
+              'ncpa.cpl',
+            ]);
             opened = true;
             debugPrint('Successfully opened ncpa.cpl through cmd');
           } catch (e) {
@@ -336,9 +345,11 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
 
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(opened
-                ? l10n.networkSettingsOpened
-                : l10n.cannotOpenNetworkSettings),
+            content: Text(
+              opened
+                  ? l10n.networkSettingsOpened
+                  : l10n.cannotOpenNetworkSettings,
+            ),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -363,14 +374,16 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         onConnectionRequested: (connectionPath, tabName) {
           if (connectionPath.startsWith('#network/')) {
             debugPrint(
-                'Opening SMB connection in tab with path: $connectionPath');
+              'Opening SMB connection in tab with path: $connectionPath',
+            );
 
             tabBloc.add(UpdateTabPath(widget.tabId, connectionPath));
             tabBloc.add(UpdateTabName(widget.tabId, tabName));
           } else {
             // Handle cases where connectionPath is null (dialog cancelled) or not the expected format
             debugPrint(
-                'SMBBrowserScreen: Received unexpected connection path: $connectionPath');
+              'SMBBrowserScreen: Received unexpected connection path: $connectionPath',
+            );
           }
         },
       ),
@@ -379,8 +392,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
 
   void _openSavedConnection(String nativeServicePath) {
     // nativeServicePath is like smb://host/share
-    final String? tabPath =
-        _registry.getTabPathForNativeServiceBasePath(nativeServicePath);
+    final String? tabPath = _registry.getTabPathForNativeServiceBasePath(
+      nativeServicePath,
+    );
 
     if (tabPath != null) {
       final tabBloc = BlocProvider.of<TabManagerBloc>(context, listen: false);
@@ -421,7 +435,8 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).colorScheme.onPrimary),
+                      Theme.of(context).colorScheme.onPrimary,
+                    ),
                   ),
                 )
               : const Icon(PhosphorIconsLight.arrowsClockwise),
@@ -432,8 +447,10 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
           icon: const Icon(PhosphorIconsLight.plus),
           onPressed: () {
             // Lấy TabManagerBloc từ context trước khi mở dialog
-            final tabBloc =
-                BlocProvider.of<TabManagerBloc>(context, listen: false);
+            final tabBloc = BlocProvider.of<TabManagerBloc>(
+              context,
+              listen: false,
+            );
 
             // Hiển thị dialog kết nối mới
             showDialog<String?>(
@@ -443,7 +460,8 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                 onConnectionRequested: (connectionPath, tabName) {
                   if (connectionPath.startsWith('#network/')) {
                     debugPrint(
-                        'Opening new SMB connection in tab with path: $connectionPath');
+                      'Opening new SMB connection in tab with path: $connectionPath',
+                    );
                     tabBloc.add(UpdateTabPath(widget.tabId, connectionPath));
                     tabBloc.add(UpdateTabName(widget.tabId, tabName));
                   }
@@ -467,16 +485,17 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                   FluentBackground(
                     blurAmount: 8.0,
                     opacity: 0.7,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withValues(alpha: 0.5),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.5),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
                         children: [
-                          Icon(PhosphorIconsLight.warning,
-                              color: Theme.of(context).colorScheme.secondary),
+                          Icon(
+                            PhosphorIconsLight.warning,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -486,7 +505,8 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                                 Text(
                                   l10n.networkDiscoveryDisabled,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 Text(
                                   l10n.networkDiscoveryDescription,
@@ -529,10 +549,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                               .withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(16.0),
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withValues(alpha: 0.2),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outline.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
@@ -553,9 +572,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        ?.copyWith(fontWeight: FontWeight.w500),
                                   ),
                                   if (_connectionInfo != l10n.notConnected)
                                     Text(
@@ -564,9 +581,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                                           .textTheme
                                           .bodySmall
                                           ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
                                           ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -578,14 +595,16 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                               const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             else
                               IconButton(
                                 icon: const Icon(
-                                    PhosphorIconsLight.arrowsClockwise,
-                                    size: 16),
+                                  PhosphorIconsLight.arrowsClockwise,
+                                  size: 16,
+                                ),
                                 onPressed: _updateSmbVersionInfo,
                                 tooltip: l10n.refreshSmbVersionInfo,
                                 padding: EdgeInsets.zero,
@@ -637,14 +656,16 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
     final activeConnections = _registry.activeConnections;
 
     debugPrint(
-        'SMBBrowserScreen: Active connections from registry: ${activeConnections.keys}');
+      'SMBBrowserScreen: Active connections from registry: ${activeConnections.keys}',
+    );
 
     final smbConnections = activeConnections.entries
         .where((entry) => entry.key.startsWith('smb://'))
         .toList();
 
     debugPrint(
-        'SMBBrowserScreen: SMB connections found: ${smbConnections.length}');
+      'SMBBrowserScreen: SMB connections found: ${smbConnections.length}',
+    );
 
     if (smbConnections.isEmpty) {
       return Padding(
@@ -652,15 +673,19 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         child: Container(
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
-              Icon(PhosphorIconsLight.info,
-                  color: theme.colorScheme.onSurfaceVariant, size: 20),
+              Icon(
+                PhosphorIconsLight.info,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -710,8 +735,11 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                 color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(PhosphorIconsLight.desktop,
-                  color: theme.colorScheme.primary, size: 20),
+              child: Icon(
+                PhosphorIconsLight.desktop,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
             ),
             title: Text(
               serverName,
@@ -725,12 +753,16 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                       ? l10n.shareLabel(sharePath)
                       : l10n.rootShare,
                   style: TextStyle(
-                      fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.tertiary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16.0),
@@ -738,7 +770,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                   child: Text(
                     l10n.connected,
                     style: TextStyle(
-                        fontSize: 10, color: theme.colorScheme.tertiary),
+                      fontSize: 10,
+                      color: theme.colorScheme.tertiary,
+                    ),
                   ),
                 ),
               ],
@@ -747,14 +781,18 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: Icon(PhosphorIconsLight.arrowRight,
-                      color: theme.colorScheme.primary),
+                  icon: Icon(
+                    PhosphorIconsLight.arrowRight,
+                    color: theme.colorScheme.primary,
+                  ),
                   onPressed: () => _openSavedConnection(path),
                   tooltip: l10n.openConnection,
                 ),
                 IconButton(
-                  icon: Icon(PhosphorIconsLight.xCircle,
-                      color: theme.colorScheme.error),
+                  icon: Icon(
+                    PhosphorIconsLight.xCircle,
+                    color: theme.colorScheme.error,
+                  ),
                   onPressed: () {
                     _networkBloc.add(NetworkDisconnectRequested(path));
                   },
@@ -790,22 +828,26 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                   Text(
                     l10n.scanningForSmbServers,
                     style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w500),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     l10n.devicesWillAppear,
                     style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant),
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     l10n.scanningMayTakeTime,
                     style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant),
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -823,23 +865,29 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(PhosphorIconsLight.wifiSlash,
-                      size: 48, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    PhosphorIconsLight.wifiSlash,
+                    size: 48,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
                   Text(l10n.noSmbServersFound),
                   const SizedBox(height: 8),
                   Text(
                     l10n.tryScanningAgain,
                     style: TextStyle(
-                        fontSize: 12,
-                        color: theme.colorScheme.onSurfaceVariant),
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: _resetAndScan,
-                    icon: const Icon(PhosphorIconsLight.arrowsClockwise,
-                        size: 16),
+                    icon: const Icon(
+                      PhosphorIconsLight.arrowsClockwise,
+                      size: 16,
+                    ),
                     label: Text(l10n.scanAgain),
                   ),
                 ],
@@ -856,22 +904,29 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(PhosphorIconsLight.magnifyingGlass,
-                    size: 48, color: theme.colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.magnifyingGlass,
+                  size: 48,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(height: 16),
                 Text(l10n.readyToScan),
                 const SizedBox(height: 8),
                 Text(
                   l10n.clickRefreshToScan,
                   style: TextStyle(
-                      fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: _resetAndScan,
-                  icon:
-                      const Icon(PhosphorIconsLight.arrowsClockwise, size: 16),
+                  icon: const Icon(
+                    PhosphorIconsLight.arrowsClockwise,
+                    size: 16,
+                  ),
                   label: Text(l10n.startScan),
                 ),
               ],
@@ -885,8 +940,10 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
       child: Column(
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Row(
               children: [
                 Text(
@@ -909,14 +966,18 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                       Text(
                         l10n.scanning,
                         style: TextStyle(
-                            fontSize: 12, color: theme.colorScheme.primary),
+                          fontSize: 12,
+                          color: theme.colorScheme.primary,
+                        ),
                       ),
                     ],
                   )
                 else if (_hasScanned)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.tertiary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16.0),
@@ -924,7 +985,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                     child: Text(
                       l10n.scanComplete,
                       style: TextStyle(
-                          fontSize: 10, color: theme.colorScheme.tertiary),
+                        fontSize: 10,
+                        color: theme.colorScheme.tertiary,
+                      ),
                     ),
                   ),
               ],
@@ -940,7 +1003,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
 
                 return Card(
                   margin: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 4.0),
+                    horizontal: 16.0,
+                    vertical: 4.0,
+                  ),
                   child: ListTile(
                     leading: Container(
                       padding: const EdgeInsets.all(8),
@@ -948,8 +1013,11 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                         color: theme.colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Icon(PhosphorIconsLight.desktop,
-                          color: theme.colorScheme.primary, size: 20),
+                      child: Icon(
+                        PhosphorIconsLight.desktop,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
                     title: Text(
                       device.name,
@@ -961,8 +1029,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                         Text(
                           device.ipAddress,
                           style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.onSurfaceVariant),
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                         if (device.hasSmbPort || device.hasNetbiosPort)
                           Row(
@@ -970,7 +1039,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                               if (device.hasSmbPort)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.tertiary
                                         .withValues(alpha: 0.1),
@@ -979,8 +1050,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                                   child: Text(
                                     'SMB',
                                     style: TextStyle(
-                                        fontSize: 10,
-                                        color: theme.colorScheme.tertiary),
+                                      fontSize: 10,
+                                      color: theme.colorScheme.tertiary,
+                                    ),
                                   ),
                                 ),
                               if (device.hasSmbPort && device.hasNetbiosPort)
@@ -988,7 +1060,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                               if (device.hasNetbiosPort)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.secondary
                                         .withValues(alpha: 0.1),
@@ -997,8 +1071,9 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                                   child: Text(
                                     'NetBIOS',
                                     style: TextStyle(
-                                        fontSize: 10,
-                                        color: theme.colorScheme.secondary),
+                                      fontSize: 10,
+                                      color: theme.colorScheme.secondary,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -1007,23 +1082,29 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                           Container(
                             margin: const EdgeInsets.only(top: 4),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.1),
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.1,
+                              ),
                               borderRadius: BorderRadius.circular(16.0),
                             ),
                             child: Text(
                               'SMB ${device.smbVersion}',
                               style: TextStyle(
-                                  fontSize: 10,
-                                  color: theme.colorScheme.primary),
+                                fontSize: 10,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                           ),
                       ],
                     ),
-                    trailing: Icon(PhosphorIconsLight.arrowRight,
-                        color: theme.colorScheme.primary),
+                    trailing: Icon(
+                      PhosphorIconsLight.arrowRight,
+                      color: theme.colorScheme.primary,
+                    ),
                     onTap: () =>
                         _connectToSMBServer(device.ipAddress, device.name),
                   ),

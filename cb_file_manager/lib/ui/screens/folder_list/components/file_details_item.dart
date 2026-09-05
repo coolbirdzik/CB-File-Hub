@@ -29,7 +29,7 @@ class FileDetailsItem extends StatefulWidget {
   final ColumnVisibility columnVisibility;
   final FolderListState state;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
   final Future<void> Function(BuildContext, File)? onDeleteFile;
@@ -39,7 +39,7 @@ class FileDetailsItem extends StatefulWidget {
   final bool showFileTags; // Add parameter to control tag display
 
   const FileDetailsItem({
-    Key? key,
+    super.key,
     required this.file,
     required this.onTap,
     required this.isSelected,
@@ -53,7 +53,7 @@ class FileDetailsItem extends StatefulWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
-  }) : super(key: key);
+  });
 
   @override
   State<FileDetailsItem> createState() => _FileDetailsItemState();
@@ -227,7 +227,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                       flex: 3,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0, vertical: 10.0),
+                          horizontal: 12.0,
+                          vertical: 10.0,
+                        ),
                         child: Row(
                           children: [
                             // Use a dedicated widget for file icon with a key to prevent rebuilds
@@ -240,13 +242,13 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                               color: iconColor,
                             ),
                             const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildNameWidget(context),
-                            ),
+                            Expanded(child: _buildNameWidget(context)),
 
                             // Show file tags if available and enabled
                             if (widget.showFileTags &&
-                                (widget.state.fileTags[widget.file.path]
+                                (widget
+                                        .state
+                                        .fileTags[widget.file.path]
                                         ?.isNotEmpty ??
                                     false))
                               Padding(
@@ -254,8 +256,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                                 child: Icon(
                                   PhosphorIconsLight.bookmark,
                                   size: 16,
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
                                 ),
                               ),
                           ],
@@ -269,7 +272,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _getFileTypeLabel(fileExtension),
                             overflow: TextOverflow.ellipsis,
@@ -283,31 +288,40 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
-                          child: Builder(builder: (context) {
-                            String text = 'Loading...';
-                            final svc =
-                                StreamingHelper.instance.currentNetworkService;
-                            if (svc is WebDAVService) {
-                              final remotePath =
-                                  svc.getRemotePathFromLocal(widget.file.path);
-                              if (remotePath != null) {
-                                final meta = svc.getMeta(remotePath);
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
+                          child: Builder(
+                            builder: (context) {
+                              String text = 'Loading...';
+                              final svc = StreamingHelper
+                                  .instance
+                                  .currentNetworkService;
+                              if (svc is WebDAVService) {
+                                final remotePath = svc.getRemotePathFromLocal(
+                                  widget.file.path,
+                                );
+                                if (remotePath != null) {
+                                  final meta = svc.getMeta(remotePath);
+                                  if (meta != null && meta.size >= 0) {
+                                    text = _formatFileSize(meta.size);
+                                  }
+                                }
+                              } else if (svc is FTPService) {
+                                final meta = svc.getMeta(widget.file.path);
                                 if (meta != null && meta.size >= 0) {
                                   text = _formatFileSize(meta.size);
                                 }
                               }
-                            } else if (svc is FTPService) {
-                              final meta = svc.getMeta(widget.file.path);
-                              if (meta != null && meta.size >= 0) {
-                                text = _formatFileSize(meta.size);
+                              if (text == 'Loading...' && _fileStat != null) {
+                                text = _formatFileSize(_fileStat!.size);
                               }
-                            }
-                            if (text == 'Loading...' && _fileStat != null) {
-                              text = _formatFileSize(_fileStat!.size);
-                            }
-                            return Text(text, overflow: TextOverflow.ellipsis);
-                          }),
+                              return Text(
+                                text,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            },
+                          ),
                         ),
                       ),
 
@@ -317,36 +331,47 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
-                          child: Builder(builder: (context) {
-                            String text = 'Loading...';
-                            final svc =
-                                StreamingHelper.instance.currentNetworkService;
-                            if (svc is WebDAVService) {
-                              final remotePath =
-                                  svc.getRemotePathFromLocal(widget.file.path);
-                              if (remotePath != null) {
-                                final meta = svc.getMeta(remotePath);
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
+                          child: Builder(
+                            builder: (context) {
+                              String text = 'Loading...';
+                              final svc = StreamingHelper
+                                  .instance
+                                  .currentNetworkService;
+                              if (svc is WebDAVService) {
+                                final remotePath = svc.getRemotePathFromLocal(
+                                  widget.file.path,
+                                );
+                                if (remotePath != null) {
+                                  final meta = svc.getMeta(remotePath);
+                                  if (meta != null) {
+                                    text = meta.modified
+                                        .toString()
+                                        .split('.')
+                                        .first;
+                                  }
+                                }
+                              } else if (svc is FTPService) {
+                                final meta = svc.getMeta(widget.file.path);
                                 if (meta != null) {
-                                  text =
-                                      meta.modified.toString().split('.').first;
+                                  final dt = meta.modified ?? DateTime.now();
+                                  text = dt.toString().split('.').first;
                                 }
                               }
-                            } else if (svc is FTPService) {
-                              final meta = svc.getMeta(widget.file.path);
-                              if (meta != null) {
-                                final dt = meta.modified ?? DateTime.now();
-                                text = dt.toString().split('.').first;
+                              if (text == 'Loading...' && _fileStat != null) {
+                                text = _fileStat!.modified
+                                    .toString()
+                                    .split('.')
+                                    .first;
                               }
-                            }
-                            if (text == 'Loading...' && _fileStat != null) {
-                              text = _fileStat!.modified
-                                  .toString()
-                                  .split('.')
-                                  .first;
-                            }
-                            return Text(text, overflow: TextOverflow.ellipsis);
-                          }),
+                              return Text(
+                                text,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            },
+                          ),
                         ),
                       ),
 
@@ -356,7 +381,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _fileStat != null
                                 ? _fileStat!.changed.toString().split('.').first
@@ -372,7 +399,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _getAttributes(_fileStat),
                             overflow: TextOverflow.ellipsis,
@@ -386,13 +415,15 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _fileStat != null
                                 ? _fileStat!.accessed
-                                    .toString()
-                                    .split('.')
-                                    .first
+                                      .toString()
+                                      .split('.')
+                                      .first
                                 : 'Loading...',
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -405,7 +436,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             path.extension(widget.file.path).toLowerCase(),
                             overflow: TextOverflow.ellipsis,
@@ -419,7 +452,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 3,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             widget.file.path,
                             overflow: TextOverflow.ellipsis,
@@ -433,7 +468,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             (widget.state.fileTags[widget.file.path] ?? [])
                                 .join(', '),
@@ -448,9 +485,12 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
-                          child:
-                              _AsyncDimensionsCell(filePath: widget.file.path),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
+                          child: _AsyncDimensionsCell(
+                            filePath: widget.file.path,
+                          ),
                         ),
                       ),
 
@@ -460,7 +500,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: _AsyncDurationCell(filePath: widget.file.path),
                         ),
                       ),
@@ -471,7 +513,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: const Text(
                             '',
                             overflow: TextOverflow.ellipsis,
@@ -538,7 +582,8 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
   Widget _buildNameWidget(BuildContext context) {
     // Check if this item is being renamed inline (desktop only)
     final renameController = InlineRenameScope.maybeOf(context);
-    final isBeingRenamed = renameController != null &&
+    final isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.file.path;
 
     final textWidget = Text(
@@ -558,8 +603,9 @@ class _FileDetailsItemState extends State<FileDetailsItem> {
               onCommit: () => renameController.commitRename(context),
               onCancel: () => renameController.cancelRename(),
               textStyle: TextStyle(
-                fontWeight:
-                    _visuallySelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: _visuallySelected
+                    ? FontWeight.bold
+                    : FontWeight.normal,
               ),
               textAlign: TextAlign.start,
               maxLines: 1,
@@ -585,13 +631,13 @@ class _OptimizedFileIcon extends StatefulWidget {
   final Color? color;
 
   const _OptimizedFileIcon({
-    Key? key,
+    super.key,
     required this.file,
     required this.isVideo,
     required this.isImage,
     required this.icon,
     required this.color,
-  }) : super(key: key);
+  });
 
   @override
   State<_OptimizedFileIcon> createState() => _OptimizedFileIconState();

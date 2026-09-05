@@ -10,12 +10,12 @@ class SelectionSummaryTooltip extends StatefulWidget {
   final List<String> selectedFolderPaths;
 
   const SelectionSummaryTooltip({
-    Key? key,
+    super.key,
     required this.selectedFileCount,
     required this.selectedFolderCount,
     required this.selectedFilePaths,
     required this.selectedFolderPaths,
-  }) : super(key: key);
+  });
 
   @override
   State<SelectionSummaryTooltip> createState() =>
@@ -37,7 +37,9 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.selectedFilePaths, widget.selectedFilePaths) ||
         !listEquals(
-            oldWidget.selectedFolderPaths, widget.selectedFolderPaths)) {
+          oldWidget.selectedFolderPaths,
+          widget.selectedFolderPaths,
+        )) {
       _calculateSize();
     }
   }

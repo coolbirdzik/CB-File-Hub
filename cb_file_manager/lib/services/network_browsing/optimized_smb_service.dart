@@ -36,12 +36,12 @@ class OptimizedSMBService implements ISmbService {
 
   final PrefetchControllerConfig _prefetchConfig =
       const PrefetchControllerConfig(
-    bufferSize: 5 * 1024 * 1024, // 5MB buffer
-    prefetchSize: 2 * 1024 * 1024, // 2MB prefetch
-    maxPrefetchChunks: 8,
-    prefetchTimeout: Duration(seconds: 10),
-    enableCircularBuffer: true,
-  );
+        bufferSize: 5 * 1024 * 1024, // 5MB buffer
+        prefetchSize: 2 * 1024 * 1024, // 2MB prefetch
+        maxPrefetchChunks: 8,
+        prefetchTimeout: Duration(seconds: 10),
+        enableCircularBuffer: true,
+      );
 
   @override
   String get serviceName => 'Optimized SMB';
@@ -68,11 +68,14 @@ class OptimizedSMBService implements ISmbService {
 
     try {
       // 1. Get credentials
-      final credentials = NetworkCredentialsService()
-          .findCredentials(serviceType: 'SMB', host: _connectedHost);
+      final credentials = NetworkCredentialsService().findCredentials(
+        serviceType: 'SMB',
+        host: _connectedHost,
+      );
       if (credentials == null) {
         debugPrint(
-            'OptimizedSMBService: No credentials found for $_connectedHost');
+          'OptimizedSMBService: No credentials found for $_connectedHost',
+        );
         return null;
       }
 
@@ -83,20 +86,24 @@ class OptimizedSMBService implements ISmbService {
       final smbPath = _getSmbPathFromTabPath(tabPath);
       if (smbPath.isEmpty || smbPath == '/') {
         debugPrint(
-            'OptimizedSMBService: Could not determine a valid file path from $tabPath');
+          'OptimizedSMBService: Could not determine a valid file path from $tabPath',
+        );
         return null;
       }
 
       // The smbPath from _getSmbPathFromTabPath is like "/share/folder/file.txt"
       // We need to remove the leading slash for the URL
-      final pathComponent =
-          smbPath.startsWith('/') ? smbPath.substring(1) : smbPath;
+      final pathComponent = smbPath.startsWith('/')
+          ? smbPath.substring(1)
+          : smbPath;
 
       // 3. Construct the direct link, ensure each path segment is URL-encoded
       final encodedUser = Uri.encodeComponent(username);
       final encodedPass = Uri.encodeComponent(password);
-      final encodedPath =
-          pathComponent.split('/').map(Uri.encodeComponent).join('/');
+      final encodedPath = pathComponent
+          .split('/')
+          .map(Uri.encodeComponent)
+          .join('/');
       final link =
           'smb://$encodedUser:$encodedPass@$_connectedHost/$encodedPath';
 
@@ -122,8 +129,10 @@ class OptimizedSMBService implements ISmbService {
     }
 
     final pathWithoutPrefix = tabPath.substring('#network/'.length);
-    final parts =
-        pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
+    final parts = pathWithoutPrefix
+        .split('/')
+        .where((p) => p.isNotEmpty)
+        .toList();
 
     if (parts.length < 2) {
       debugPrint('Tab path has too few parts: $tabPath');
@@ -141,8 +150,10 @@ class OptimizedSMBService implements ISmbService {
 
     if (parts.length > 3) {
       final shareName = Uri.decodeComponent(parts[2]);
-      final folders =
-          parts.sublist(3).map((f) => Uri.decodeComponent(f)).toList();
+      final folders = parts
+          .sublist(3)
+          .map((f) => Uri.decodeComponent(f))
+          .toList();
       return '/$shareName/${folders.join('/')}';
     }
 
@@ -248,7 +259,8 @@ class OptimizedSMBService implements ISmbService {
         await _prefetchController!.initialize();
 
         debugPrint(
-            'OptimizedSMBService: Optimizations initialized successfully');
+          'OptimizedSMBService: Optimizations initialized successfully',
+        );
       } else {
         debugPrint('OptimizedSMBService: Failed to initialize chunk reader');
       }
@@ -277,7 +289,8 @@ class OptimizedSMBService implements ISmbService {
   @override
   Future<List<FileSystemEntity>> listDirectory(String tabPath) async {
     debugPrint(
-        'OptimizedSMBService: listDirectory called with tabPath: $tabPath');
+      'OptimizedSMBService: listDirectory called with tabPath: $tabPath',
+    );
 
     if (!isConnected) {
       debugPrint('OptimizedSMBService: Not connected to SMB server');
@@ -286,11 +299,14 @@ class OptimizedSMBService implements ISmbService {
 
     try {
       final pathWithoutPrefix = tabPath.substring('#network/'.length);
-      final parts =
-          pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
+      final parts = pathWithoutPrefix
+          .split('/')
+          .where((p) => p.isNotEmpty)
+          .toList();
 
       debugPrint(
-          'OptimizedSMBService: Path parts: $parts, length: ${parts.length}');
+        'OptimizedSMBService: Path parts: $parts, length: ${parts.length}',
+      );
 
       if (parts.length <= 2) {
         return await _listShares(tabPath);
@@ -301,7 +317,8 @@ class OptimizedSMBService implements ISmbService {
 
       final smbFiles = await _smbClient.listDirectory(smbPath);
       debugPrint(
-          'OptimizedSMBService: Got ${smbFiles.length} files from native client');
+        'OptimizedSMBService: Got ${smbFiles.length} files from native client',
+      );
 
       final entities = <FileSystemEntity>[];
 
@@ -328,20 +345,25 @@ class OptimizedSMBService implements ISmbService {
 
   Future<List<FileSystemEntity>> _listShares(String tabPath) async {
     debugPrint(
-        'OptimizedSMBService: _listShares called with tabPath: $tabPath');
+      'OptimizedSMBService: _listShares called with tabPath: $tabPath',
+    );
 
     try {
       final shares = await _smbClient.listShares();
       debugPrint(
-          'OptimizedSMBService: Got ${shares.length} shares from native client: $shares');
+        'OptimizedSMBService: Got ${shares.length} shares from native client: $shares',
+      );
 
       final entities = <FileSystemEntity>[];
 
       final pathWithoutPrefix = tabPath.substring('#network/'.length);
-      final parts =
-          pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
-      final server =
-          parts.length > 1 ? Uri.decodeComponent(parts[1]) : _connectedHost;
+      final parts = pathWithoutPrefix
+          .split('/')
+          .where((p) => p.isNotEmpty)
+          .toList();
+      final server = parts.length > 1
+          ? Uri.decodeComponent(parts[1])
+          : _connectedHost;
 
       debugPrint('OptimizedSMBService: Server extracted: $server');
 
@@ -349,12 +371,14 @@ class OptimizedSMBService implements ISmbService {
         final shareTabPath =
             '#network/${_smbScheme.toUpperCase()}/${Uri.encodeComponent(server)}/${Uri.encodeComponent(shareName)}/';
         debugPrint(
-            'OptimizedSMBService: Adding share: $shareName -> $shareTabPath');
+          'OptimizedSMBService: Adding share: $shareName -> $shareTabPath',
+        );
         entities.add(Directory(shareTabPath));
       }
 
       debugPrint(
-          'OptimizedSMBService: Returning ${entities.length} share entities');
+        'OptimizedSMBService: Returning ${entities.length} share entities',
+      );
       return entities;
     } catch (e) {
       debugPrint('OptimizedSMBService: Error listing shares: $e');
@@ -483,17 +507,20 @@ class OptimizedSMBService implements ISmbService {
   Stream<List<int>>? openFileStream(String remotePath, {int startOffset = 0}) {
     try {
       debugPrint(
-          'OptimizedSMBService openFileStream: Starting for path: $remotePath');
+        'OptimizedSMBService openFileStream: Starting for path: $remotePath',
+      );
 
       if (!isConnected) {
         debugPrint(
-            'OptimizedSMBService openFileStream: Not connected to SMB server');
+          'OptimizedSMBService openFileStream: Not connected to SMB server',
+        );
         return null;
       }
 
       final smbPath = _getSmbPathFromTabPath(remotePath);
       debugPrint(
-          'OptimizedSMBService openFileStream: Converted SMB path: $smbPath');
+        'OptimizedSMBService openFileStream: Converted SMB path: $smbPath',
+      );
 
       // Create optimized stream with prefetch
       return _createOptimizedStream(smbPath, startOffset);
@@ -506,12 +533,16 @@ class OptimizedSMBService implements ISmbService {
   /// Create optimized stream with prefetch support
   Stream<List<int>> _createOptimizedStream(String smbPath, int startOffset) {
     // Use native SMB client directly for reliable streaming
-    final stream = _smbClient.seekFileStreamOptimized(smbPath, startOffset,
-        chunkSize: 128 * 1024);
+    final stream = _smbClient.seekFileStreamOptimized(
+      smbPath,
+      startOffset,
+      chunkSize: 128 * 1024,
+    );
 
     if (stream != null) {
       debugPrint(
-          'OptimizedSMBService: Using native SMB stream with 128KB chunks');
+        'OptimizedSMBService: Using native SMB stream with 128KB chunks',
+      );
       return _createContinuousStream(stream);
     }
 
@@ -560,7 +591,8 @@ class OptimizedSMBService implements ISmbService {
           // Log progress for debugging
           if (chunkCount % 10 == 0) {
             debugPrint(
-                'OptimizedSMBService: Streamed $chunkCount chunks, ${(totalBytes / 1024 / 1024).toStringAsFixed(2)} MB');
+              'OptimizedSMBService: Streamed $chunkCount chunks, ${(totalBytes / 1024 / 1024).toStringAsFixed(2)} MB',
+            );
           }
 
           controller.add(chunk);
@@ -572,7 +604,8 @@ class OptimizedSMBService implements ISmbService {
       },
       onDone: () {
         debugPrint(
-            'OptimizedSMBService: Stream completed - $chunkCount chunks, ${(totalBytes / 1024 / 1024).toStringAsFixed(2)} MB total');
+          'OptimizedSMBService: Stream completed - $chunkCount chunks, ${(totalBytes / 1024 / 1024).toStringAsFixed(2)} MB total',
+        );
         closeStream();
       },
       cancelOnError: false,
@@ -585,17 +618,20 @@ class OptimizedSMBService implements ISmbService {
   Stream<List<int>>? openFileStreamWithSeek(String remotePath, int offset) {
     try {
       debugPrint(
-          'OptimizedSMBService openFileStreamWithSeek: Starting for path: $remotePath at offset: $offset');
+        'OptimizedSMBService openFileStreamWithSeek: Starting for path: $remotePath at offset: $offset',
+      );
 
       if (!isConnected) {
         debugPrint(
-            'OptimizedSMBService openFileStreamWithSeek: Not connected to SMB server');
+          'OptimizedSMBService openFileStreamWithSeek: Not connected to SMB server',
+        );
         return null;
       }
 
       final smbPath = _getSmbPathFromTabPath(remotePath);
       debugPrint(
-          'OptimizedSMBService openFileStreamWithSeek: Converted SMB path: $smbPath');
+        'OptimizedSMBService openFileStreamWithSeek: Converted SMB path: $smbPath',
+      );
 
       // Create optimized stream with seek support
       return _createOptimizedStream(smbPath, offset);
@@ -627,7 +663,8 @@ class OptimizedSMBService implements ISmbService {
     debugPrint('=== OptimizedSMBService.readFileData START ===');
     debugPrint('OptimizedSMBService: remotePath: $remotePath');
     debugPrint(
-        'OptimizedSMBService: timestamp: ${startTime.toIso8601String()}');
+      'OptimizedSMBService: timestamp: ${startTime.toIso8601String()}',
+    );
     debugPrint('OptimizedSMBService: connection status: $isConnected');
 
     if (!isConnected) {
@@ -653,11 +690,14 @@ class OptimizedSMBService implements ISmbService {
 
           while (offset < fileSize) {
             final remainingSize = fileSize - offset;
-            final currentChunkSize =
-                remainingSize < chunkSize ? remainingSize : chunkSize;
+            final currentChunkSize = remainingSize < chunkSize
+                ? remainingSize
+                : chunkSize;
 
-            final chunk =
-                await _chunkReader!.readChunk(offset, currentChunkSize);
+            final chunk = await _chunkReader!.readChunk(
+              offset,
+              currentChunkSize,
+            );
             if (chunk != null) {
               chunks.add(chunk.data);
               totalSize += chunk.size;
@@ -673,17 +713,23 @@ class OptimizedSMBService implements ISmbService {
 
             for (final chunk in chunks) {
               combinedData.setRange(
-                  currentOffset, currentOffset + chunk.length, chunk);
+                currentOffset,
+                currentOffset + chunk.length,
+                chunk,
+              );
               currentOffset += chunk.length;
             }
 
             final duration = DateTime.now().difference(startTime);
             debugPrint(
-                'OptimizedSMBService: SUCCESS - File data read with optimization');
+              'OptimizedSMBService: SUCCESS - File data read with optimization',
+            );
             debugPrint(
-                'OptimizedSMBService: Data length: ${combinedData.length} bytes');
+              'OptimizedSMBService: Data length: ${combinedData.length} bytes',
+            );
             debugPrint(
-                'OptimizedSMBService: Transfer speed: ${(combinedData.length / 1024 / 1024 / (duration.inMilliseconds / 1000)).toStringAsFixed(2)} MB/s');
+              'OptimizedSMBService: Transfer speed: ${(combinedData.length / 1024 / 1024 / (duration.inMilliseconds / 1000)).toStringAsFixed(2)} MB/s',
+            );
 
             return combinedData;
           }
@@ -698,9 +744,11 @@ class OptimizedSMBService implements ISmbService {
         final duration = DateTime.now().difference(startTime);
         debugPrint('OptimizedSMBService: SUCCESS - File data read (fallback)');
         debugPrint(
-            'OptimizedSMBService: Data length: ${fileData.length} bytes');
+          'OptimizedSMBService: Data length: ${fileData.length} bytes',
+        );
         debugPrint(
-            'OptimizedSMBService: Transfer speed: ${(fileData.length / 1024 / 1024 / (duration.inMilliseconds / 1000)).toStringAsFixed(2)} MB/s');
+          'OptimizedSMBService: Transfer speed: ${(fileData.length / 1024 / 1024 / (duration.inMilliseconds / 1000)).toStringAsFixed(2)} MB/s',
+        );
 
         return Uint8List.fromList(fileData);
       } else {
@@ -717,7 +765,8 @@ class OptimizedSMBService implements ISmbService {
     } finally {
       final totalDuration = DateTime.now().difference(startTime);
       debugPrint(
-          'OptimizedSMBService: Total readFileData time: ${totalDuration.inMilliseconds}ms');
+        'OptimizedSMBService: Total readFileData time: ${totalDuration.inMilliseconds}ms',
+      );
       debugPrint('=== OptimizedSMBService.readFileData END ===');
     }
   }
@@ -763,7 +812,8 @@ class OptimizedSMBService implements ISmbService {
   Future<Uint8List?> getThumbnail(String tabPath, int size) async {
     if (!isConnected) {
       debugPrint(
-          'OptimizedSMBService: Not connected, cannot generate thumbnail');
+        'OptimizedSMBService: Not connected, cannot generate thumbnail',
+      );
       return null;
     }
 
@@ -781,11 +831,13 @@ class OptimizedSMBService implements ISmbService {
 
       if (thumbnailData != null && thumbnailData.isNotEmpty) {
         debugPrint(
-            'OptimizedSMBService: Successfully generated thumbnail (${thumbnailData.length} bytes)');
+          'OptimizedSMBService: Successfully generated thumbnail (${thumbnailData.length} bytes)',
+        );
         return thumbnailData;
       } else {
         debugPrint(
-            'OptimizedSMBService: Thumbnail generation returned null or empty data');
+          'OptimizedSMBService: Thumbnail generation returned null or empty data',
+        );
         return null;
       }
     } catch (e) {
@@ -824,8 +876,10 @@ class OptimizedSMBService implements ISmbService {
 
   /// Open file stream optimized for video streaming
   /// Returns a stream that can be used directly for media playback
-  Stream<List<int>>? openFileStreamForVideo(String tabPath,
-      {int chunkSize = 1024 * 1024}) {
+  Stream<List<int>>? openFileStreamForVideo(
+    String tabPath, {
+    int chunkSize = 1024 * 1024,
+  }) {
     try {
       final smbPath = _getSmbPathFromTabPath(tabPath);
       debugPrint('OptimizedSMBService: Opening video stream for: $smbPath');
@@ -839,18 +893,26 @@ class OptimizedSMBService implements ISmbService {
 
   /// Open file stream with seek support for video streaming
   /// Useful for seeking to specific positions in video files
-  Stream<List<int>>? seekFileStreamForVideo(String tabPath, int offset,
-      {int chunkSize = 1024 * 1024}) {
+  Stream<List<int>>? seekFileStreamForVideo(
+    String tabPath,
+    int offset, {
+    int chunkSize = 1024 * 1024,
+  }) {
     try {
       final smbPath = _getSmbPathFromTabPath(tabPath);
       debugPrint(
-          'OptimizedSMBService: Opening seekable video stream for: $smbPath at offset: $offset');
+        'OptimizedSMBService: Opening seekable video stream for: $smbPath at offset: $offset',
+      );
 
-      return _smbClient.seekFileStreamOptimized(smbPath, offset,
-          chunkSize: chunkSize);
+      return _smbClient.seekFileStreamOptimized(
+        smbPath,
+        offset,
+        chunkSize: chunkSize,
+      );
     } catch (e) {
       debugPrint(
-          'OptimizedSMBService: Error opening seekable video stream: $e');
+        'OptimizedSMBService: Error opening seekable video stream: $e',
+      );
       return null;
     }
   }
@@ -873,8 +935,11 @@ class OptimizedSMBService implements ISmbService {
       results['fileName'] = remotePath.split('/').last;
 
       // Test streaming speed
-      final stream =
-          _smbClient.seekFileStreamOptimized(smbPath, 0, chunkSize: 128 * 1024);
+      final stream = _smbClient.seekFileStreamOptimized(
+        smbPath,
+        0,
+        chunkSize: 128 * 1024,
+      );
       if (stream != null) {
         int totalBytes = 0;
         int chunkCount = 0;

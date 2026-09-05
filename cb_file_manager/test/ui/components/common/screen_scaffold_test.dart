@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('desktop file surface uses a flat Fluent command surface',
-      (tester) async {
+  testWidgets('desktop file surface uses a flat Fluent command surface', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       fluent.FluentApp(
         home: ScreenScaffold(
@@ -30,8 +31,10 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const ValueKey<String>('desktop-file-surface-body')),
-        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('desktop-file-surface-body')),
+      findsOneWidget,
+    );
     expect(find.text('Path'), findsOneWidget);
     expect(find.text('Action'), findsOneWidget);
     if (DesignSystemConfig.enableLegacyMaterialDesktopShell) {

@@ -9,20 +9,18 @@ import 'package:flutter/services.dart';
 import 'window_startup_payload.dart';
 import 'windows_explorer_drag_drop_service.dart';
 
-enum WindowsNativeTabDragResult {
-  moved,
-  detached,
-  canceled,
-}
+enum WindowsNativeTabDragResult { moved, detached, canceled }
 
 class WindowsNativeTabDragDropService {
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/window_utils');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/window_utils',
+  );
 
   static bool _initialized = false;
   static TabManagerBloc? _tabBloc;
-  static final ValueNotifier<bool> isDragHoveringWindow =
-      ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> isDragHoveringWindow = ValueNotifier<bool>(
+    false,
+  );
 
   static void initialize(TabManagerBloc tabBloc) {
     _tabBloc = tabBloc;
@@ -49,8 +47,9 @@ class WindowsNativeTabDragDropService {
 
       try {
         final decoded = jsonDecode(arg);
-        final Map<String, dynamic> payload =
-            decoded is Map ? Map<String, dynamic>.from(decoded) : const {};
+        final Map<String, dynamic> payload = decoded is Map
+            ? Map<String, dynamic>.from(decoded)
+            : const {};
         final dynamic tabsValue = payload['tabs'];
         if (tabsValue is! List) return;
 
@@ -67,12 +66,14 @@ class WindowsNativeTabDragDropService {
 
         for (int i = 0; i < tabs.length; i++) {
           final t = tabs[i];
-          bloc.add(AddTab(
-            path: t.path,
-            name: t.name,
-            switchToTab: i == tabs.length - 1,
-            highlightedFileName: t.highlightedFileName,
-          ));
+          bloc.add(
+            AddTab(
+              path: t.path,
+              name: t.name,
+              switchToTab: i == tabs.length - 1,
+              highlightedFileName: t.highlightedFileName,
+            ),
+          );
         }
       } catch (e, st) {
         AppLogger.warning(
@@ -133,10 +134,7 @@ class WindowsNativeTabDragDropService {
     try {
       await _channel.invokeMethod<bool>(
         'allowForegroundWindow',
-        <String, dynamic>{
-          'any': pid == null,
-          if (pid != null) 'pid': pid,
-        },
+        <String, dynamic>{'any': pid == null, 'pid': ?pid},
       );
     } catch (_) {}
   }
@@ -151,9 +149,7 @@ class WindowsNativeTabDragDropService {
   static Future<bool> startWindowDragIfMouseDown() async {
     if (!Platform.isWindows) return false;
     try {
-      return await _channel.invokeMethod<bool>(
-            'startWindowDragIfMouseDown',
-          ) ??
+      return await _channel.invokeMethod<bool>('startWindowDragIfMouseDown') ??
           false;
     } catch (_) {
       return false;
@@ -194,14 +190,12 @@ class WindowsNativeTabDragDropService {
   }) async {
     if (!Platform.isWindows) return;
     try {
-      await _channel.invokeMethod<bool>(
-        'setWindowsSystemBackdrop',
-        <String, dynamic>{
-          'enabled': enabled,
-          'preferAcrylic': preferAcrylic,
-          'isDarkMode': isDarkMode,
-        },
-      );
+      await _channel
+          .invokeMethod<bool>('setWindowsSystemBackdrop', <String, dynamic>{
+            'enabled': enabled,
+            'preferAcrylic': preferAcrylic,
+            'isDarkMode': isDarkMode,
+          });
     } catch (_) {}
   }
 }

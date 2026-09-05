@@ -74,16 +74,15 @@ class AiAgentState extends Equatable {
     this.toolActivity = const [],
     this.currentToolCalls = const [],
     this.lastApiPayload,
-    List<AiProviderModelCatalog>? providerModelCatalogs,
-    bool? isLoadingProviderModels,
+    this._providerModelCatalogs,
+    this._isLoadingProviderModels,
     this.thinkingPhrases = const ['Thinking...'],
     this.waitingApproval = 'Waiting for your approval...',
     this.runningToolTemplate = 'Running {}...',
     this.pendingApproval,
     this.conversationId,
     this.conversations = const [],
-  })  : _providerModelCatalogs = providerModelCatalogs,
-        _isLoadingProviderModels = isLoadingProviderModels;
+  });
 
   AiAgentState copyWith({
     List<AiMessage>? messages,
@@ -134,13 +133,15 @@ class AiAgentState extends Equatable {
       isProviderConfigured: isProviderConfigured ?? this.isProviderConfigured,
       currentPath: currentPath ?? this.currentPath,
       thinkingText: clearThinking ? null : (thinkingText ?? this.thinkingText),
-      toolActivity:
-          clearToolActivity ? const [] : (toolActivity ?? this.toolActivity),
+      toolActivity: clearToolActivity
+          ? const []
+          : (toolActivity ?? this.toolActivity),
       currentToolCalls: clearCurrentToolCalls
           ? const []
           : (currentToolCalls ?? this.currentToolCalls),
-      lastApiPayload:
-          clearLastApiPayload ? null : (lastApiPayload ?? this.lastApiPayload),
+      lastApiPayload: clearLastApiPayload
+          ? null
+          : (lastApiPayload ?? this.lastApiPayload),
       providerModelCatalogs:
           providerModelCatalogs ?? this.providerModelCatalogs,
       isLoadingProviderModels:
@@ -148,37 +149,39 @@ class AiAgentState extends Equatable {
       thinkingPhrases: thinkingPhrases ?? this.thinkingPhrases,
       waitingApproval: waitingApproval ?? this.waitingApproval,
       runningToolTemplate: runningToolTemplate ?? this.runningToolTemplate,
-      pendingApproval:
-          clearApproval ? null : (pendingApproval ?? this.pendingApproval),
-      conversationId:
-          clearConversationId ? null : (conversationId ?? this.conversationId),
+      pendingApproval: clearApproval
+          ? null
+          : (pendingApproval ?? this.pendingApproval),
+      conversationId: clearConversationId
+          ? null
+          : (conversationId ?? this.conversationId),
       conversations: conversations ?? this.conversations,
     );
   }
 
   @override
   List<Object?> get props => [
-        messages,
-        isLoading,
-        error,
-        results,
-        searchScope,
-        activeProviderId,
-        selectedProviderId,
-        selectedModelName,
-        isProviderConfigured,
-        currentPath,
-        thinkingText,
-        toolActivity,
-        currentToolCalls,
-        lastApiPayload,
-        providerModelCatalogs,
-        isLoadingProviderModels,
-        thinkingPhrases,
-        waitingApproval,
-        runningToolTemplate,
-        pendingApproval,
-        conversationId,
-        conversations,
-      ];
+    messages,
+    isLoading,
+    error,
+    results,
+    searchScope,
+    activeProviderId,
+    selectedProviderId,
+    selectedModelName,
+    isProviderConfigured,
+    currentPath,
+    thinkingText,
+    toolActivity,
+    currentToolCalls,
+    lastApiPayload,
+    providerModelCatalogs,
+    isLoadingProviderModels,
+    thinkingPhrases,
+    waitingApproval,
+    runningToolTemplate,
+    pendingApproval,
+    conversationId,
+    conversations,
+  ];
 }

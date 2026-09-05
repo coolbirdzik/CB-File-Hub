@@ -28,7 +28,7 @@ class WindowsAppUsageMatcher {
       for (final app in apps) app.id: const AppUsageEvidence(),
     };
     final byId = <String, InstalledAppInfo>{
-      for (final app in apps) app.id: app
+      for (final app in apps) app.id: app,
     };
     final executableOwners = _executableOwners(apps);
 
@@ -38,11 +38,7 @@ class WindowsAppUsageMatcher {
       final target = _extractTarget(resolved ?? record.decodedTarget);
       if (target.isEmpty) continue;
 
-      final match = _matchUserAssistTarget(
-        target,
-        apps,
-        executableOwners,
-      );
+      final match = _matchUserAssistTarget(target, apps, executableOwners);
       if (match == null) continue;
       _replaceIfBetter(
         result,
@@ -58,8 +54,9 @@ class WindowsAppUsageMatcher {
 
     for (final record in prefetchRecords) {
       if (record.lastModified.isAfter(now)) continue;
-      final executable =
-          path.windows.basename(record.executableName).toLowerCase();
+      final executable = path.windows
+          .basename(record.executableName)
+          .toLowerCase();
       final owners = executableOwners[executable];
       // Prefetch names are only safe when they identify exactly one app.
       if (owners == null || owners.length != 1) continue;
@@ -88,13 +85,15 @@ class WindowsAppUsageMatcher {
     final normalized = _normalizePath(target);
     final normalizedLower = normalized.toLowerCase();
 
-    final packageMatches = apps.where((app) {
-      final family = app.packageFamilyName?.toLowerCase();
-      return family != null &&
-          (normalizedLower == family ||
-              normalizedLower.startsWith('$family!') ||
-              normalizedLower.contains('$family!'));
-    }).toList(growable: false);
+    final packageMatches = apps
+        .where((app) {
+          final family = app.packageFamilyName?.toLowerCase();
+          return family != null &&
+              (normalizedLower == family ||
+                  normalizedLower.startsWith('$family!') ||
+                  normalizedLower.contains('$family!'));
+        })
+        .toList(growable: false);
     if (packageMatches.length == 1) {
       return _UsageMatch(
         packageMatches.single.id,
@@ -111,17 +110,16 @@ class WindowsAppUsageMatcher {
       }
     }
     if (exactMatches.length == 1) {
-      return _UsageMatch(
-        exactMatches.single,
-        UsageEvidenceConfidence.high,
-      );
+      return _UsageMatch(exactMatches.single, UsageEvidenceConfidence.high);
     }
 
     if (_looksLikeWindowsPath(normalized)) {
-      final containingApps = apps.where((app) {
-        final root = app.installLocation;
-        return root != null && _isWithin(normalized, root);
-      }).toList(growable: false);
+      final containingApps = apps
+          .where((app) {
+            final root = app.installLocation;
+            return root != null && _isWithin(normalized, root);
+          })
+          .toList(growable: false);
       if (containingApps.length == 1) {
         return _UsageMatch(
           containingApps.single.id,
@@ -134,10 +132,7 @@ class WindowsAppUsageMatcher {
     if (!executableName.endsWith('.exe')) return null;
     final basenameOwners = executableOwners[executableName];
     if (basenameOwners == null || basenameOwners.length != 1) return null;
-    return _UsageMatch(
-      basenameOwners.single,
-      UsageEvidenceConfidence.medium,
-    );
+    return _UsageMatch(basenameOwners.single, UsageEvidenceConfidence.medium);
   }
 
   Map<String, Set<String>> _executableOwners(List<InstalledAppInfo> apps) {

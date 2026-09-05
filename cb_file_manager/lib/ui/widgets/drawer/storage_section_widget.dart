@@ -16,12 +16,12 @@ class StorageSectionWidget extends StatefulWidget {
   final ValueChanged<bool>? onExpansionChanged;
 
   const StorageSectionWidget({
-    Key? key,
+    super.key,
     required this.onNavigate,
     required this.onTrashTap,
     this.initialExpanded = false,
     this.onExpansionChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<StorageSectionWidget> createState() => _StorageSectionWidgetState();
@@ -125,9 +125,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
     return BlocBuilder<DrawerCubit, DrawerState>(
       builder: (context, state) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            dividerColor: Colors.transparent,
-          ),
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Material(
@@ -183,8 +181,10 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
                     )
                   else if (state.storageLocations.isEmpty)
                     ListTile(
-                      contentPadding:
-                          const EdgeInsets.only(left: 52, right: 14),
+                      contentPadding: const EdgeInsets.only(
+                        left: 52,
+                        right: 14,
+                      ),
                       title: Text(context.tr.noStorageLocationsFound),
                       trailing: IconButton(
                         icon: const Icon(PhosphorIconsLight.arrowsClockwise),
@@ -258,10 +258,7 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
       subtitle: subtitle != null
           ? Text(

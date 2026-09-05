@@ -755,7 +755,7 @@ class Class {
   Class();
 
   dynamic get ftpConnect => throw Exception(
-        'FTP functionality requires the ftpconnect package. '
-        'Please ensure it is properly installed and configured in pubspec.yaml.',
-      );
+    'FTP functionality requires the ftpconnect package. '
+    'Please ensure it is properly installed and configured in pubspec.yaml.',
+  );
 }

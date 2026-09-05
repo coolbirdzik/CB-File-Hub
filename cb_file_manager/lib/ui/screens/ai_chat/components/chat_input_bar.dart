@@ -8,8 +8,8 @@ import '../../../../config/languages/app_localizations.dart';
 
 /// Callback when sending a message. [text] is the user input, [referencedFiles]
 /// are the paths of files dropped into the chat.
-typedef OnSendMessage = void Function(
-    String text, List<String> referencedFiles);
+typedef OnSendMessage =
+    void Function(String text, List<String> referencedFiles);
 
 /// Input bar for the AI chat interface with send button, suggestion chips,
 /// workspace indicator, and OS-level file drag-and-drop support.
@@ -28,13 +28,13 @@ class ChatInputBar extends StatefulWidget {
   final Widget? modelSelector;
 
   const ChatInputBar({
-    Key? key,
+    super.key,
     required this.onSend,
     this.onStop,
     this.isLoading = false,
     this.workspaceIndicator,
     this.modelSelector,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -103,10 +103,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final Color composerBorder = _isDragging
         ? theme.colorScheme.primary.withValues(alpha: 0.7)
         : _isFocused
-            ? theme.colorScheme.outline.withValues(alpha: 0.55)
-            : (isDark
-                ? Colors.white.withValues(alpha: 0.10)
-                : Colors.black.withValues(alpha: 0.10));
+        ? theme.colorScheme.outline.withValues(alpha: 0.55)
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.black.withValues(alpha: 0.10));
 
     return DropTarget(
       onDragEntered: (_) => setState(() => _isDragging = true),
@@ -152,8 +152,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   curve: Curves.easeOut,
                   decoration: BoxDecoration(
                     color: isDark
-                        ? Colors.white
-                            .withValues(alpha: _isFocused ? 0.08 : 0.05)
+                        ? Colors.white.withValues(
+                            alpha: _isFocused ? 0.08 : 0.05,
+                          )
                         : Color.alphaBlend(
                             Colors.black.withValues(
                               alpha: _isFocused ? 0.035 : 0,
@@ -164,8 +165,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     border: Border.all(color: composerBorder),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black
-                            .withValues(alpha: isDark ? 0.28 : 0.07),
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.28 : 0.07,
+                        ),
                         blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
@@ -187,7 +189,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       if (_isDragging)
                         Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -235,8 +239,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
                             // Left inset matches the model pill's text below
                             // (footer 8 + pill's own 8); right inset matches
                             // the send button's right margin.
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                            contentPadding: const EdgeInsets.fromLTRB(
+                              16,
+                              12,
+                              16,
+                              6,
+                            ),
                             isDense: true,
                           ),
                           style: const TextStyle(fontSize: 14, height: 1.4),
@@ -259,7 +267,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Flexible(
-                              child: widget.modelSelector ??
+                              child:
+                                  widget.modelSelector ??
                                   const SizedBox.shrink(),
                             ),
                             _SendButton(
@@ -319,13 +328,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding:
-                const EdgeInsets.only(left: 7, right: 4, top: 4, bottom: 4),
-            child: Icon(
-              icon,
-              size: 12,
-              color: theme.colorScheme.primary,
+            padding: const EdgeInsets.only(
+              left: 7,
+              right: 4,
+              top: 4,
+              bottom: 4,
             ),
+            child: Icon(icon, size: 12, color: theme.colorScheme.primary),
           ),
           Flexible(
             child: Text(
@@ -347,8 +356,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
               child: Icon(
                 PhosphorIconsLight.x,
                 size: 10,
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
           ),
@@ -500,10 +510,7 @@ class _SendButtonState extends State<_SendButton> {
             width: 34,
             height: 34,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: bg,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
             child: Icon(
               widget.isLoading
                   ? PhosphorIconsFill.square

@@ -7,7 +7,7 @@ import 'package:cb_file_manager/utils/app_logger.dart';
 class DevToolsPanel extends StatefulWidget {
   final VoidCallback onClose;
 
-  const DevToolsPanel({Key? key, required this.onClose}) : super(key: key);
+  const DevToolsPanel({super.key, required this.onClose});
 
   @override
   State<DevToolsPanel> createState() => _DevToolsPanelState();
@@ -22,10 +22,12 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor =
-        isDark ? Colors.grey.shade900 : Colors.grey.shade100;
-    final headerColor =
-        isDark ? Colors.deepPurple.shade800 : Colors.deepPurple.shade400;
+    final backgroundColor = isDark
+        ? Colors.grey.shade900
+        : Colors.grey.shade100;
+    final headerColor = isDark
+        ? Colors.deepPurple.shade800
+        : Colors.deepPurple.shade400;
     final textColor = isDark ? Colors.white : Colors.black87;
     final textSecondaryColor = isDark ? Colors.white70 : Colors.black54;
     final surfaceColor = isDark
@@ -65,8 +67,11 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
                   const Spacer(),
                   GestureDetector(
                     onTap: widget.onClose,
-                    child:
-                        Icon(Icons.close, color: textSecondaryColor, size: 18),
+                    child: Icon(
+                      Icons.close,
+                      color: textSecondaryColor,
+                      size: 18,
+                    ),
                   ),
                 ],
               ),
@@ -92,7 +97,9 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
                         child: Text(
                           _status,
                           style: TextStyle(
-                              color: textSecondaryColor, fontSize: 11),
+                            color: textSecondaryColor,
+                            fontSize: 11,
+                          ),
                         ),
                       ),
                     ],
@@ -116,8 +123,9 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
       isLoading: _isSeeding,
       onTap: () => _seedTags(100),
       onLongPress: () => _showSeedCountDialog(),
-      iconColor:
-          isDark ? Colors.deepPurple.shade300 : Colors.deepPurple.shade600,
+      iconColor: isDark
+          ? Colors.deepPurple.shade300
+          : Colors.deepPurple.shade600,
       textColor: isDark ? Colors.white : Colors.black87,
       textSecondaryColor: isDark ? Colors.white54 : Colors.black54,
       surfaceColor: isDark
@@ -227,7 +235,8 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
       final existingStandaloneTags = await TagManager.getStandaloneTags();
       final startIndex = existingStandaloneTags.length;
       print(
-          '[SEED_DIRECT] after init existingStandaloneTags=${existingStandaloneTags.length}');
+        '[SEED_DIRECT] after init existingStandaloneTags=${existingStandaloneTags.length}',
+      );
 
       // Build all tag names
       final List<String> newTagNames = [];
@@ -239,10 +248,12 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
         newTagNames.add('$category - $adjective $suffix ${seedIndex + 1}');
       }
 
-      final addedCount =
-          await TagManager.addMultipleStandaloneTags(newTagNames);
+      final addedCount = await TagManager.addMultipleStandaloneTags(
+        newTagNames,
+      );
       print(
-          '[SEED_DIRECT] addMultipleStandaloneTags result addedCount=$addedCount lastError=${TagManager.lastStandaloneTagError}');
+        '[SEED_DIRECT] addMultipleStandaloneTags result addedCount=$addedCount lastError=${TagManager.lastStandaloneTagError}',
+      );
       AppLogger.info(
         '[DevTools] Seed tags completed',
         error:
@@ -266,9 +277,9 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
           () => _status = addedCount > 0
               ? '✅ Added $addedCount standalone tags. SQLite: $sqliteStandaloneCount, standalone: $standaloneCount, visible: $verifyCount'
               : '❌ Failed to save dev seed tags. ${TagManager.lastStandaloneTagError ?? "Unknown error"}\n'
-                  '${TagManager.standaloneTagDiagnostics}\n'
-                  '--- RECENT LOGS ---\n'
-                  '${AppLogger.recentLogsTail}',
+                    '${TagManager.standaloneTagDiagnostics}\n'
+                    '--- RECENT LOGS ---\n'
+                    '${AppLogger.recentLogsTail}',
         );
       }
     } catch (e) {
@@ -297,7 +308,8 @@ class _DevToolsPanelState extends State<DevToolsPanel> {
 
         if ((i + 1) % 25 == 0 && mounted) {
           setState(
-              () => _status = 'Clearing ${i + 1}/${seededTags.length} tags...');
+            () => _status = 'Clearing ${i + 1}/${seededTags.length} tags...',
+          );
         }
       }
 
@@ -357,7 +369,9 @@ class _DevToolButton extends StatelessWidget {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: textSecondaryColor),
+                        strokeWidth: 2,
+                        color: textSecondaryColor,
+                      ),
                     )
                   : Icon(icon, size: 20, color: iconColor),
               const SizedBox(width: 10),

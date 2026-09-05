@@ -13,11 +13,7 @@ class ThumbnailOnly extends StatefulWidget {
   final FileSystemEntity file;
   final double iconSize;
 
-  const ThumbnailOnly({
-    Key? key,
-    required this.file,
-    this.iconSize = 48.0,
-  }) : super(key: key);
+  const ThumbnailOnly({super.key, required this.file, this.iconSize = 48.0});
 
   @override
   State<ThumbnailOnly> createState() => _ThumbnailOnlyState();
@@ -44,8 +40,10 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
     final isImage = category == FileCategory.image;
 
     if (!isVideo && !isImage && widget.file is File) {
-      _iconFuture = FileIconHelper.getIconForFile(widget.file as File,
-          size: widget.iconSize);
+      _iconFuture = FileIconHelper.getIconForFile(
+        widget.file as File,
+        size: widget.iconSize,
+      );
     }
   }
 
@@ -59,8 +57,10 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
       final isImage = category == FileCategory.image;
 
       if (!isVideo && !isImage && widget.file is File) {
-        _iconFuture = FileIconHelper.getIconForFile(widget.file as File,
-            size: widget.iconSize);
+        _iconFuture = FileIconHelper.getIconForFile(
+          widget.file as File,
+          size: widget.iconSize,
+        );
       }
     }
   }

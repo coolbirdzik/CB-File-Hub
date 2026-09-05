@@ -12,10 +12,7 @@ class PathSuggestion {
   final String value;
   final PathSuggestionType type;
 
-  const PathSuggestion({
-    required this.value,
-    required this.type,
-  });
+  const PathSuggestion({required this.value, required this.type});
 }
 
 class PathAutocompleteTextField extends StatefulWidget {
@@ -28,7 +25,7 @@ class PathAutocompleteTextField extends StatefulWidget {
   final Future<List<String>> Function()? recentPathsLoader;
 
   const PathAutocompleteTextField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onSubmitted,
     required this.decoration,
@@ -36,7 +33,7 @@ class PathAutocompleteTextField extends StatefulWidget {
     this.maxSuggestions = 12,
     this.submitOnSuggestionTap = false,
     this.recentPathsLoader,
-  }) : super(key: key);
+  });
 
   @override
   State<PathAutocompleteTextField> createState() =>
@@ -74,7 +71,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
   }
 
   Future<void> _loadRecentPaths() async {
-    final loader = widget.recentPathsLoader ??
+    final loader =
+        widget.recentPathsLoader ??
         () => UserPreferences.instance.getRecentPaths(limit: 50);
     try {
       final paths = await loader();
@@ -93,7 +91,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
       unawaited(
-          _loadRecentPaths().then((_) => _updateSuggestions(force: true)));
+        _loadRecentPaths().then((_) => _updateSuggestions(force: true)),
+      );
       _updateSuggestions(force: true);
       return;
     }
@@ -195,8 +194,9 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
         if (next.length >= widget.maxSuggestions) break;
       }
     } else {
-      final fs =
-          await Future<List<String>>(() => _filesystemSuggestions(query));
+      final fs = await Future<List<String>>(
+        () => _filesystemSuggestions(query),
+      );
       if (!mounted || token != _computeToken) return;
 
       for (final v in fs) {
@@ -213,7 +213,8 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
 
     if (!mounted || token != _computeToken) return;
 
-    final changed = force ||
+    final changed =
+        force ||
         next.length != _suggestions.length ||
         !_listsEqual(next, _suggestions);
 

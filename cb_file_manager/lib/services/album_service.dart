@@ -126,8 +126,10 @@ class AlbumService {
         final albumConfig = config ?? AlbumConfig(albumId: albumId);
         albumConfig.albumId = albumId;
         albumConfig.directoriesList = directories;
-        final configId =
-            await database.insert('album_configs', albumConfig.toDatabaseMap());
+        final configId = await database.insert(
+          'album_configs',
+          albumConfig.toDatabaseMap(),
+        );
         albumConfig.id = configId;
 
         await _processor.addAlbumToMonitoring(albumId, directories);
@@ -225,7 +227,8 @@ class AlbumService {
       }
 
       final database = await _getDatabase();
-      final nextOrderIndex = sqflite.Sqflite.firstIntValue(
+      final nextOrderIndex =
+          sqflite.Sqflite.firstIntValue(
             await database.rawQuery(
               'SELECT MAX(order_index) FROM album_files WHERE album_id = ?',
               <Object?>[albumId],
@@ -273,7 +276,8 @@ class AlbumService {
         }
         if (stat == null) continue;
 
-        final nextOrderIndex = sqflite.Sqflite.firstIntValue(
+        final nextOrderIndex =
+            sqflite.Sqflite.firstIntValue(
               await txn.rawQuery(
                 'SELECT MAX(order_index) FROM album_files WHERE album_id = ?',
                 <Object?>[albumId],
@@ -304,8 +308,12 @@ class AlbumService {
 
   /// Checks if a file is already in an album (within an active transaction).
   Future<bool> _isFileInAlbumTxn(
-      DatabaseExecutor txn, int albumId, String filePath) async {
-    final count = sqflite.Sqflite.firstIntValue(
+    DatabaseExecutor txn,
+    int albumId,
+    String filePath,
+  ) async {
+    final count =
+        sqflite.Sqflite.firstIntValue(
           await txn.rawQuery(
             'SELECT COUNT(*) FROM album_files WHERE album_id = ? AND file_path = ?',
             <Object?>[albumId, filePath],
@@ -336,8 +344,10 @@ class AlbumService {
     bool recursive = true,
   }) async {
     try {
-      final imageFiles =
-          await getAllImages(directoryPath, recursive: recursive);
+      final imageFiles = await getAllImages(
+        directoryPath,
+        recursive: recursive,
+      );
       final filePaths = imageFiles.map((file) => file.path).toList();
       final addedCount = await addFilesToAlbum(albumId, filePaths);
 
@@ -469,7 +479,8 @@ class AlbumService {
   Future<bool> isFileInAlbum(int albumId, String filePath) async {
     try {
       final database = await _getDatabase();
-      final count = sqflite.Sqflite.firstIntValue(
+      final count =
+          sqflite.Sqflite.firstIntValue(
             await database.rawQuery(
               '''
               SELECT COUNT(*)
@@ -500,11 +511,13 @@ class AlbumService {
       }
 
       final query = searchQuery.toLowerCase();
-      return allImages.where((file) {
-        final fileName = path.basename(file.path).toLowerCase();
-        final filePath = file.path.toLowerCase();
-        return fileName.contains(query) || filePath.contains(query);
-      }).toList(growable: false);
+      return allImages
+          .where((file) {
+            final fileName = path.basename(file.path).toLowerCase();
+            final filePath = file.path.toLowerCase();
+            return fileName.contains(query) || filePath.contains(query);
+          })
+          .toList(growable: false);
     } catch (error) {
       debugPrint('Error searching image files: $error');
       return <File>[];
@@ -603,18 +616,20 @@ class AlbumService {
         await controller.addStream(stream);
       } else {
         final manualFiles = await getAlbumFiles(albumId);
-        final fileInfos = manualFiles.map((file) {
-          final localFile = File(file.filePath);
-          final stat = localFile.existsSync() ? localFile.statSync() : null;
-          return FileInfo(
-            path: file.filePath,
-            name: path.basename(file.filePath),
-            size: stat?.size ?? 0,
-            modifiedTime: stat?.modified ?? DateTime.now(),
-            isImage: true,
-            isVideo: false,
-          );
-        }).toList(growable: false);
+        final fileInfos = manualFiles
+            .map((file) {
+              final localFile = File(file.filePath);
+              final stat = localFile.existsSync() ? localFile.statSync() : null;
+              return FileInfo(
+                path: file.filePath,
+                name: path.basename(file.filePath),
+                size: stat?.size ?? 0,
+                modifiedTime: stat?.modified ?? DateTime.now(),
+                isImage: true,
+                isVideo: false,
+              );
+            })
+            .toList(growable: false);
 
         controller.add(fileInfos);
       }

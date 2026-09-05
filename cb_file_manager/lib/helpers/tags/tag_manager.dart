@@ -124,8 +124,9 @@ class TagManager {
     if (tagQuery.isEmpty) return false;
     if (_tagsCache.containsKey(entity.path)) {
       final tags = _tagsCache[entity.path]!;
-      return tags
-          .any((tag) => tag.toLowerCase().contains(tagQuery.toLowerCase()));
+      return tags.any(
+        (tag) => tag.toLowerCase().contains(tagQuery.toLowerCase()),
+      );
     }
     return false;
   }
@@ -210,8 +211,10 @@ class TagManager {
       _useDatabase = true;
       _initialized = true;
       _recordStandaloneTagDiagnostic('initialize:success useDatabase=true');
-      AppLogger.info('[TagManager] initialize success',
-          error: 'useDatabase=true');
+      AppLogger.info(
+        '[TagManager] initialize success',
+        error: 'useDatabase=true',
+      );
     } catch (error) {
       _recordStandaloneTagDiagnostic('initialize:fallback error=$error');
       AppLogger.error('[TagManager] initialize fallback', error: error);
@@ -430,7 +433,8 @@ class TagManager {
   ///
   /// Returns a map of file paths to their tags
   static Future<Map<String, List<String>>> getTagsForFiles(
-      List<String> filePaths) async {
+    List<String> filePaths,
+  ) async {
     if (filePaths.isEmpty) return {};
 
     final stopwatch = Stopwatch()..start();
@@ -450,11 +454,13 @@ class TagManager {
     }
 
     AppLogger.perf(
-        '⏱️ [PERF] TagManager.getTagsForFiles: ${result.length} cached, ${uncachedPaths.length} uncached');
+      '⏱️ [PERF] TagManager.getTagsForFiles: ${result.length} cached, ${uncachedPaths.length} uncached',
+    );
 
     if (uncachedPaths.isEmpty) {
       AppLogger.perf(
-          '⏱️ [PERF] TagManager.getTagsForFiles (all cached) took: ${stopwatch.elapsedMilliseconds}ms');
+        '⏱️ [PERF] TagManager.getTagsForFiles (all cached) took: ${stopwatch.elapsedMilliseconds}ms',
+      );
       return result;
     }
 
@@ -491,7 +497,8 @@ class TagManager {
     }
 
     AppLogger.perf(
-        '⏱️ [PERF] TagManager.getTagsForFiles for ${filePaths.length} files took: ${stopwatch.elapsedMilliseconds}ms');
+      '⏱️ [PERF] TagManager.getTagsForFiles for ${filePaths.length} files took: ${stopwatch.elapsedMilliseconds}ms',
+    );
     return result;
   }
 
@@ -505,8 +512,10 @@ class TagManager {
     _recentTags.removeWhere((item) => item['tag'] == tag);
 
     // Add tag to the beginning of the list with current timestamp
-    _recentTags.insert(
-        0, {'tag': tag, 'timestamp': DateTime.now().millisecondsSinceEpoch});
+    _recentTags.insert(0, {
+      'tag': tag,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
 
     // Limit the list size
     if (_recentTags.length > maxRecentTags) {
@@ -551,8 +560,9 @@ class TagManager {
 
       if (jsonString != null) {
         final List<dynamic> decoded = json.decode(jsonString);
-        _recentTags =
-            decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+        _recentTags = decoded
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
       }
     } catch (e) {
       _recentTags = [];
@@ -570,15 +580,17 @@ class TagManager {
     }
 
     // Extract tag names from the list
-    final List<String> recentTagNames =
-        _recentTags.map((item) => item['tag'] as String).toList();
+    final List<String> recentTagNames = _recentTags
+        .map((item) => item['tag'] as String)
+        .toList();
 
     // Filter out tags that no longer exist in the database
     // so that deleted tags don't reappear in the recent list
     final Set<String> validTags = await getAllUniqueTags('');
 
-    final List<String> filteredRecent =
-        recentTagNames.where((tag) => validTags.contains(tag)).toList();
+    final List<String> filteredRecent = recentTagNames
+        .where((tag) => validTags.contains(tag))
+        .toList();
 
     // Take only up to the limit.
     // Note: we intentionally do NOT supplement with popular tags here.
@@ -683,7 +695,9 @@ class TagManager {
 
   /// Remove tags from multiple files using static method
   static Future<bool> removeTagFromFiles(
-      List<String> filePaths, String tag) async {
+    List<String> filePaths,
+    String tag,
+  ) async {
     bool success = true;
     for (final path in filePaths) {
       if (!await TagManager.removeTag(path, tag)) {
@@ -702,25 +716,34 @@ class TagManager {
   /// callers doing bulk updates (e.g. the batch tag dialog) can fire a single
   /// coalesced notification afterwards instead of one event per file — a large
   /// batch would otherwise trigger one full folder-list rebuild per file.
-  static Future<bool> setTags(String filePath, List<String> tags,
-      {bool notify = true}) async {
+  static Future<bool> setTags(
+    String filePath,
+    List<String> tags, {
+    bool notify = true,
+  }) async {
     try {
-      AppLogger.info('[TagManager] setTags START',
-          error: 'filePath=$filePath incomingTags=$tags');
+      AppLogger.info(
+        '[TagManager] setTags START',
+        error: 'filePath=$filePath incomingTags=$tags',
+      );
       debugPrint(
-          '[TagManager] setTags START filePath=$filePath incomingTags=$tags');
+        '[TagManager] setTags START filePath=$filePath incomingTags=$tags',
+      );
       await initialize();
 
       // First validate tags (remove empty ones)
       final validTags = tags.where((tag) => tag.trim().isNotEmpty).toList();
-      AppLogger.debug('[TagManager] setTags normalized',
-          error:
-              'filePath=$filePath validTags=$validTags useDatabase=$_useDatabase');
+      AppLogger.debug(
+        '[TagManager] setTags normalized',
+        error:
+            'filePath=$filePath validTags=$validTags useDatabase=$_useDatabase',
+      );
 
       // Track newly added tags as "recent" so the recent-tags list reflects
       // tags applied through this dialog path (setTags replaces the whole set).
-      final previousTags =
-          (await getTags(filePath)).map((t) => t.trim()).toSet();
+      final previousTags = (await getTags(
+        filePath,
+      )).map((t) => t.trim()).toSet();
       for (final tag in validTags) {
         final trimmed = tag.trim();
         if (trimmed.isNotEmpty && !previousTags.contains(trimmed)) {
@@ -728,16 +751,22 @@ class TagManager {
         }
       }
       debugPrint(
-          '[TagManager] setTags normalized filePath=$filePath validTags=$validTags useDatabase=$_useDatabase');
+        '[TagManager] setTags normalized filePath=$filePath validTags=$validTags useDatabase=$_useDatabase',
+      );
 
       if (_useDatabase && _databaseManager != null) {
         // Use Database to set tags
-        final success =
-            await _databaseManager!.setTagsForFile(filePath, validTags);
-        AppLogger.info('[TagManager] setTags database result',
-            error: 'filePath=$filePath success=$success');
+        final success = await _databaseManager!.setTagsForFile(
+          filePath,
+          validTags,
+        );
+        AppLogger.info(
+          '[TagManager] setTags database result',
+          error: 'filePath=$filePath success=$success',
+        );
         debugPrint(
-            '[TagManager] setTags database result filePath=$filePath success=$success');
+          '[TagManager] setTags database result filePath=$filePath success=$success',
+        );
 
         if (success) {
           // Update cache
@@ -766,10 +795,13 @@ class TagManager {
         }
 
         final success = await _saveGlobalTags(tagsData);
-        AppLogger.info('[TagManager] setTags json result',
-            error: 'filePath=$filePath success=$success');
+        AppLogger.info(
+          '[TagManager] setTags json result',
+          error: 'filePath=$filePath success=$success',
+        );
         debugPrint(
-            '[TagManager] setTags json result filePath=$filePath success=$success');
+          '[TagManager] setTags json result filePath=$filePath success=$success',
+        );
 
         if (success) {
           // Update cache
@@ -786,8 +818,10 @@ class TagManager {
         return success;
       }
     } catch (e) {
-      AppLogger.error('[TagManager] setTags ERROR',
-          error: 'filePath=$filePath error=$e');
+      AppLogger.error(
+        '[TagManager] setTags ERROR',
+        error: 'filePath=$filePath error=$e',
+      );
       debugPrint('[TagManager] setTags ERROR filePath=$filePath error=$e');
       return false;
     }
@@ -838,7 +872,9 @@ class TagManager {
   ///
   /// Returns a list of files with the tag (no longer includes directories)
   static Future<List<FileSystemEntity>> findFilesByTag(
-      String directoryPath, String tag) async {
+    String directoryPath,
+    String tag,
+  ) async {
     final List<FileSystemEntity> results = [];
     final Set<String> addedPaths =
         {}; // Thêm Set để theo dõi file đã được thêm vào
@@ -852,7 +888,8 @@ class TagManager {
     try {
       await initialize();
       debugPrint(
-          'Finding files with tag: "$normalizedTag" in directory: "$directoryPath"');
+        'Finding files with tag: "$normalizedTag" in directory: "$directoryPath"',
+      );
 
       // Normalize directory path
       String normalizedDirPath = directoryPath;
@@ -867,7 +904,8 @@ class TagManager {
         // Use Database to find files by tag
         final filePaths = await _databaseManager!.findFilesByTag(normalizedTag);
         debugPrint(
-            'Found ${filePaths.length} file paths with tag: "$normalizedTag"');
+          'Found ${filePaths.length} file paths with tag: "$normalizedTag"',
+        );
 
         // Only get paths belonging to current directory
         for (final path in filePaths) {
@@ -953,18 +991,22 @@ class TagManager {
               for (final entity in subdirEntities) {
                 if (entity is File && !addedPaths.contains(entity.path)) {
                   final fileTags = await getTags(entity.path);
-                  if (fileTags.any((fileTag) =>
-                      fileTag.toLowerCase() == normalizedTag ||
-                      fileTag.toLowerCase().contains(normalizedTag))) {
+                  if (fileTags.any(
+                    (fileTag) =>
+                        fileTag.toLowerCase() == normalizedTag ||
+                        fileTag.toLowerCase().contains(normalizedTag),
+                  )) {
                     results.add(entity);
-                    addedPaths
-                        .add(entity.path); // Đánh dấu path đã được thêm vào
+                    addedPaths.add(
+                      entity.path,
+                    ); // Đánh dấu path đã được thêm vào
                   }
                 }
               }
             } catch (e) {
               debugPrint(
-                  'Error listing files in subdirectory ${subdir.path}: $e');
+                'Error listing files in subdirectory ${subdir.path}: $e',
+              );
             }
           }
         } catch (e) {
@@ -984,7 +1026,8 @@ class TagManager {
   ///
   /// Returns a list of files with the tag (no longer includes directories)
   static Future<List<FileSystemEntity>> findFilesByTagGlobally(
-      String tag) async {
+    String tag,
+  ) async {
     final List<FileSystemEntity> results = [];
     final Set<String> addedPaths = {}; // Theo dõi file đã được thêm
     final String normalizedTag = tag.toLowerCase().trim();
@@ -1005,7 +1048,8 @@ class TagManager {
         // Use Database to find files by tag - QUAN TRỌNG: Tìm kiếm chính xác dựa trên tag
         final filePaths = await _databaseManager!.findFilesByTag(normalizedTag);
         debugPrint(
-            'Found ${filePaths.length} file paths with tag: "$normalizedTag"');
+          'Found ${filePaths.length} file paths with tag: "$normalizedTag"',
+        );
 
         // Convert paths to FileSystemEntity objects - only include files, not directories
         for (final path in filePaths) {
@@ -1066,7 +1110,8 @@ class TagManager {
       }
 
       debugPrint(
-          'Found ${results.length} files with tag: "$normalizedTag" globally');
+        'Found ${results.length} files with tag: "$normalizedTag" globally',
+      );
       return results;
     } catch (e) {
       debugPrint('Error finding files by tag globally: $e');
@@ -1189,8 +1234,10 @@ class TagManager {
       for (final filePath in tagsData.keys) {
         final tags = List<String>.from(tagsData[filePath]);
         if (tags.isNotEmpty) {
-          final success =
-              await _databaseManager!.setTagsForFile(filePath, tags);
+          final success = await _databaseManager!.setTagsForFile(
+            filePath,
+            tags,
+          );
           if (success) {
             migratedFileCount++;
           }
@@ -1211,8 +1258,9 @@ class TagManager {
 
     try {
       // Find all files with this tag
-      final filePaths =
-          await instance._findFilesByTagInternal(tag.toLowerCase().trim());
+      final filePaths = await instance._findFilesByTagInternal(
+        tag.toLowerCase().trim(),
+      );
 
       // Remove tag from each file
       for (final path in filePaths) {
@@ -1282,22 +1330,25 @@ class TagManager {
     final legacyTags = <String>{};
 
     if (_useDatabase && _databaseManager != null) {
-      final encodedTags =
-          await _databaseManager!.getStringPreference('standalone_tags');
+      final encodedTags = await _databaseManager!.getStringPreference(
+        'standalone_tags',
+      );
       legacyTags.addAll(_decodeStandaloneTagsJson(encodedTags));
     }
 
     final prefs = await SharedPreferences.getInstance();
-    legacyTags
-        .addAll(_decodeStandaloneTagsJson(prefs.getString('standalone_tags')));
+    legacyTags.addAll(
+      _decodeStandaloneTagsJson(prefs.getString('standalone_tags')),
+    );
     return legacyTags;
   }
 
   static Future<bool> _persistStandaloneTags(Set<String> standaloneTags) async {
     try {
       if (_useDatabase && _databaseManager != null) {
-        final savedToDatabase = await _databaseManager!
-            .replaceStandaloneTags(standaloneTags.toList());
+        final savedToDatabase = await _databaseManager!.replaceStandaloneTags(
+          standaloneTags.toList(),
+        );
         if (savedToDatabase) {
           _lastStandaloneTagError = null;
           await _databaseManager!.deletePreference('standalone_tags');
@@ -1305,7 +1356,8 @@ class TagManager {
           await prefs.remove('standalone_tags');
           return true;
         }
-        _lastStandaloneTagError = _databaseManager!.getLastErrorMessage() ??
+        _lastStandaloneTagError =
+            _databaseManager!.getLastErrorMessage() ??
             'replaceStandaloneTags returned false';
         return false;
       }
@@ -1314,8 +1366,9 @@ class TagManager {
       final prefs = await SharedPreferences.getInstance();
       final saved = await prefs.setString('standalone_tags', encodedTags);
       print('[SEED_DIRECT] persist shared_preferences saved=$saved');
-      _lastStandaloneTagError =
-          saved ? null : 'SharedPreferences.setString returned false';
+      _lastStandaloneTagError = saved
+          ? null
+          : 'SharedPreferences.setString returned false';
       _recordStandaloneTagDiagnostic(
         'persist:shared_preferences saved=$saved count=${standaloneTags.length}',
       );
@@ -1479,8 +1532,9 @@ class TagManager {
       try {
         if (_useDatabase && _databaseManager != null) {
           // SQLite path: query database directly, independent of JSON file
-          final filesWithTag = await instance
-              ._findFilesByTagInternal(oldTag.toLowerCase().trim());
+          final filesWithTag = await instance._findFilesByTagInternal(
+            oldTag.toLowerCase().trim(),
+          );
 
           for (final path in filesWithTag) {
             final currentTags = await getTags(path);

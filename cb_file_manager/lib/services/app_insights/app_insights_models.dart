@@ -3,6 +3,7 @@
 /// These types deliberately contain no Flutter or Windows API dependencies so
 /// inventory, attribution, AI formatting, and UI filtering can be tested with
 /// deterministic fixtures.
+library;
 
 enum InstalledAppSource { win32, msix }
 
@@ -105,10 +106,7 @@ class AppUsageEvidence {
 
   bool get isKnown => lastOpenedAt != null;
 
-  bool isStale({
-    required DateTime now,
-    required Duration threshold,
-  }) {
+  bool isStale({required DateTime now, required Duration threshold}) {
     final lastOpened = lastOpenedAt;
     if (lastOpened == null || lastOpened.isAfter(now)) return false;
     return now.difference(lastOpened) >= threshold;
@@ -185,10 +183,7 @@ class AppStorageProfile {
     return MeasurementQuality.unknown;
   }
 
-  bool isStale({
-    required DateTime now,
-    required Duration threshold,
-  }) {
+  bool isStale({required DateTime now, required Duration threshold}) {
     return usage.isStale(now: now, threshold: threshold);
   }
 }
@@ -210,15 +205,11 @@ class AppStorageReport {
     this.isPartial = false,
   });
 
-  int get confirmedSizeBytes => apps.fold<int>(
-        0,
-        (sum, profile) => sum + profile.confirmedSizeBytes,
-      );
+  int get confirmedSizeBytes =>
+      apps.fold<int>(0, (sum, profile) => sum + profile.confirmedSizeBytes);
 
-  int get cleanableBytes => apps.fold<int>(
-        0,
-        (sum, profile) => sum + profile.cleanableBytes,
-      );
+  int get cleanableBytes =>
+      apps.fold<int>(0, (sum, profile) => sum + profile.cleanableBytes);
 
   AppStorageProfile? findApp(String id) {
     for (final profile in apps) {

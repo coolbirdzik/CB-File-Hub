@@ -5,12 +5,13 @@ import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 
-typedef VideoWindowProcessLauncher = Future<void> Function({
-  required String executable,
-  required List<String> arguments,
-  required Map<String, String> environment,
-  required String workingDirectory,
-});
+typedef VideoWindowProcessLauncher =
+    Future<void> Function({
+      required String executable,
+      required List<String> arguments,
+      required Map<String, String> environment,
+      required String workingDirectory,
+    });
 
 typedef VideoWindowReuseRequester = Future<bool> Function(String filePath);
 
@@ -34,8 +35,8 @@ class VideoWindowService {
   /// The player publishes its ephemeral loopback port here. A fixed port is
   /// unsuitable because Windows can reserve arbitrary chunks of port space.
   static File get _portFile => File(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}cb_file_hub_video_window.port',
-      );
+    '${Directory.systemTemp.path}${Platform.pathSeparator}cb_file_hub_video_window.port',
+  );
 
   static ServerSocket? _server;
   static int? _ownedPort;
@@ -70,16 +71,19 @@ class VideoWindowService {
       env.remove(WindowStartupPayload.envWindowPositionYKey);
 
       final lowerExecutable = executable.toLowerCase();
-      final isDartRuntime = lowerExecutable.endsWith(r'\dart.exe') ||
+      final isDartRuntime =
+          lowerExecutable.endsWith(r'\dart.exe') ||
           lowerExecutable.endsWith('/dart');
       final launchArgs = isDartRuntime
-          ? Platform.executableArguments.where((argument) {
-              final lower = argument.toLowerCase();
-              return !(lower.startsWith('--vm-service') ||
-                  lower.startsWith('--observatory-port') ||
-                  lower.startsWith('--dds-port') ||
-                  lower.startsWith('--devtools-server-address'));
-            }).toList(growable: false)
+          ? Platform.executableArguments
+                .where((argument) {
+                  final lower = argument.toLowerCase();
+                  return !(lower.startsWith('--vm-service') ||
+                      lower.startsWith('--observatory-port') ||
+                      lower.startsWith('--dds-port') ||
+                      lower.startsWith('--devtools-server-address'));
+                })
+                .toList(growable: false)
           : const <String>[];
 
       await _processLauncher(
@@ -197,21 +201,29 @@ class VideoWindowService {
             .cast<List<int>>()
             .transform(utf8.decoder)
             .transform(const LineSplitter())
-            .listen((line) {
-          if (line.trim().isEmpty) return;
-          try {
-            final decoded = jsonDecode(line);
-            if (decoded is Map &&
-                decoded['type'] == 'play' &&
-                decoded['path'] is String &&
-                (decoded['path'] as String).trim().isNotEmpty) {
-              onPlay(decoded['path'] as String);
-              socket.write('${jsonEncode(<String, dynamic>{'type': 'ok'})}\n');
-              return;
-            }
-          } catch (_) {}
-          socket.write('${jsonEncode(<String, dynamic>{'type': 'error'})}\n');
-        }, onDone: socket.destroy, onError: (_) => socket.destroy());
+            .listen(
+              (line) {
+                if (line.trim().isEmpty) return;
+                try {
+                  final decoded = jsonDecode(line);
+                  if (decoded is Map &&
+                      decoded['type'] == 'play' &&
+                      decoded['path'] is String &&
+                      (decoded['path'] as String).trim().isNotEmpty) {
+                    onPlay(decoded['path'] as String);
+                    socket.write(
+                      '${jsonEncode(<String, dynamic>{'type': 'ok'})}\n',
+                    );
+                    return;
+                  }
+                } catch (_) {}
+                socket.write(
+                  '${jsonEncode(<String, dynamic>{'type': 'error'})}\n',
+                );
+              },
+              onDone: socket.destroy,
+              onError: (_) => socket.destroy(),
+            );
       });
     } catch (error) {
       AppLogger.warning('Video player window IPC unavailable: $error');

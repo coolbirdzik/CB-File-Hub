@@ -94,10 +94,7 @@ class NetworkServiceRegistry {
       if (type == "FTP") {
         String hostComponent = Uri.encodeComponent(host);
         String tabPath = '#network/$type/$hostComponent/';
-        return ConnectionResult(
-          success: true,
-          connectedPath: tabPath,
-        );
+        return ConnectionResult(success: true, connectedPath: tabPath);
       }
 
       // Legacy format for other services
@@ -164,7 +161,8 @@ class NetworkServiceRegistry {
         }
 
         String actualServiceName = service.serviceName.toUpperCase();
-        bool typeMatches = serviceType == actualServiceName ||
+        bool typeMatches =
+            serviceType == actualServiceName ||
             serviceType == serviceTypeInBasePath;
 
         bool hostMatches = false;
@@ -175,7 +173,8 @@ class NetworkServiceRegistry {
           try {
             final uri = Uri.tryParse(serviceBasePath);
             if (uri != null) {
-              hostMatches = uri.host == hostComponent ||
+              hostMatches =
+                  uri.host == hostComponent ||
                   uri.host.contains(hostComponent) ||
                   hostComponent.contains(uri.host);
             }
@@ -210,7 +209,8 @@ class NetworkServiceRegistry {
   Future<void> disconnect(String tabPath) async {
     // We need to find the original serviceBasePath from the tabPath to remove it
     final service = getServiceForPath(
-        tabPath); // This should now correctly find the service
+      tabPath,
+    ); // This should now correctly find the service
     if (service != null) {
       // Find the key (serviceBasePath) associated with this service instance IF NEEDED.
       // However, service.basePath should give the original key if service instances are unique per connection.

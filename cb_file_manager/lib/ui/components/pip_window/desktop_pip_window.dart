@@ -13,12 +13,12 @@ class WindowCaptionButtons extends StatelessWidget {
   final VoidCallback? onClose;
 
   const WindowCaptionButtons({
-    Key? key,
+    super.key,
     this.theme,
     this.visibleOnDesktopOnly = true,
     this.padding,
     this.onClose,
-  }) : super(key: key);
+  });
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -94,14 +94,13 @@ class _CaptionButton extends StatefulWidget {
   final bool listensMaximize;
 
   const _CaptionButton({
-    Key? key,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
     required this.theme,
     this.isCloseButton = false,
     this.listensMaximize = false,
-  }) : super(key: key);
+  });
 
   @override
   State<_CaptionButton> createState() => _CaptionButtonState();
@@ -147,13 +146,14 @@ class _CaptionButtonState extends State<_CaptionButton> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.theme.brightness == Brightness.dark;
-    final baseIconColor = widget.theme.colorScheme.onSurface
-        .withValues(alpha: isDark ? 0.7 : 0.54);
+    final baseIconColor = widget.theme.colorScheme.onSurface.withValues(
+      alpha: isDark ? 0.7 : 0.54,
+    );
     final hoverBg = widget.isCloseButton
         ? Colors.red.withValues(alpha: 0.9)
         : (isDark
-            ? widget.theme.colorScheme.onSurface.withValues(alpha: 0.10)
-            : widget.theme.colorScheme.onSurface.withValues(alpha: 0.08));
+              ? widget.theme.colorScheme.onSurface.withValues(alpha: 0.10)
+              : widget.theme.colorScheme.onSurface.withValues(alpha: 0.08));
     final hoverIconColor = widget.isCloseButton
         ? Colors.white
         : widget.theme.colorScheme.onSurface;

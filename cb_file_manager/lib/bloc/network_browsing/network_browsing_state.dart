@@ -75,20 +75,20 @@ class NetworkBrowsingState extends Equatable {
 
   /// Initial state of the bloc
   const NetworkBrowsingState.initial()
-      : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = false,
-        errorMessage = null,
-        services = null,
-        connections = const {},
-        lastSuccessfullyConnectedPath = null,
-        currentService = null,
-        currentPath = null,
-        directories = null,
-        files = null,
-        transferProgress = null,
-        transferPath = null,
-        isTransferring = false;
+    : isLoading = false,
+      isLoadingMore = false,
+      isConnecting = false,
+      errorMessage = null,
+      services = null,
+      connections = const {},
+      lastSuccessfullyConnectedPath = null,
+      currentService = null,
+      currentPath = null,
+      directories = null,
+      files = null,
+      transferProgress = null,
+      transferPath = null,
+      isTransferring = false;
 
   /// Loading state
   const NetworkBrowsingState.loading({
@@ -103,10 +103,10 @@ class NetworkBrowsingState extends Equatable {
     this.transferProgress,
     this.transferPath,
     this.isTransferring = false,
-  })  : isLoading = true,
-        isLoadingMore = false,
-        isConnecting = false,
-        connections = connections ?? const {};
+  }) : isLoading = true,
+       isLoadingMore = false,
+       isConnecting = false,
+       connections = connections ?? const {};
 
   /// State when connection is in progress
   const NetworkBrowsingState.connecting({
@@ -121,10 +121,10 @@ class NetworkBrowsingState extends Equatable {
     this.transferProgress,
     this.transferPath,
     this.isTransferring = false,
-  })  : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = true,
-        connections = connections ?? const {};
+  }) : isLoading = false,
+       isLoadingMore = false,
+       isConnecting = true,
+       connections = connections ?? const {};
 
   /// State when services are loaded
   const NetworkBrowsingState.servicesLoaded({
@@ -138,11 +138,11 @@ class NetworkBrowsingState extends Equatable {
     this.transferProgress,
     this.transferPath,
     this.isTransferring = false,
-  })  : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = false,
-        errorMessage = null,
-        connections = connections ?? const {};
+  }) : isLoading = false,
+       isLoadingMore = false,
+       isConnecting = false,
+       errorMessage = null,
+       connections = connections ?? const {};
 
   /// State when connected to a service
   const NetworkBrowsingState.connected({
@@ -155,12 +155,12 @@ class NetworkBrowsingState extends Equatable {
     this.transferProgress,
     this.transferPath,
     this.isTransferring = false,
-  })  : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = false,
-        errorMessage = null,
-        services = null,
-        connections = connections ?? const {};
+  }) : isLoading = false,
+       isLoadingMore = false,
+       isConnecting = false,
+       errorMessage = null,
+       services = null,
+       connections = connections ?? const {};
 
   /// State when disconnected from a service
   const NetworkBrowsingState.disconnected({
@@ -170,15 +170,15 @@ class NetworkBrowsingState extends Equatable {
     this.transferProgress,
     this.transferPath,
     this.isTransferring = false,
-  })  : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = false,
-        errorMessage = null,
-        connections = connections ?? const {},
-        currentService = null,
-        currentPath = null,
-        directories = null,
-        files = null;
+  }) : isLoading = false,
+       isLoadingMore = false,
+       isConnecting = false,
+       errorMessage = null,
+       connections = connections ?? const {},
+       currentService = null,
+       currentPath = null,
+       directories = null,
+       files = null;
 
   /// State when a directory is loaded (supports partial loading)
   const NetworkBrowsingState.directoryLoaded({
@@ -192,11 +192,11 @@ class NetworkBrowsingState extends Equatable {
     this.transferPath,
     this.isTransferring = false,
     this.isLoadingMore = false,
-  })  : isLoading = false,
-        isConnecting = false,
-        errorMessage = null,
-        services = null,
-        connections = connections ?? const {};
+  }) : isLoading = false,
+       isConnecting = false,
+       errorMessage = null,
+       services = null,
+       connections = connections ?? const {};
 
   /// State when an error occurs
   const NetworkBrowsingState.error({
@@ -211,10 +211,10 @@ class NetworkBrowsingState extends Equatable {
     this.transferProgress,
     this.transferPath,
     this.isTransferring = false,
-  })  : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = false,
-        connections = connections ?? const {};
+  }) : isLoading = false,
+       isLoadingMore = false,
+       isConnecting = false,
+       connections = connections ?? const {};
 
   /// State when a file transfer is in progress
   const NetworkBrowsingState.transferring({
@@ -227,12 +227,12 @@ class NetworkBrowsingState extends Equatable {
     this.currentPath,
     this.directories,
     this.files,
-  })  : isLoading = false,
-        isLoadingMore = false,
-        isConnecting = false,
-        errorMessage = null,
-        connections = connections ?? const {},
-        isTransferring = true;
+  }) : isLoading = false,
+       isLoadingMore = false,
+       isConnecting = false,
+       errorMessage = null,
+       connections = connections ?? const {},
+       isTransferring = true;
 
   /// Helper method to create a copy of the current state with some values changed.
   /// This is often preferred over many named constructors for state updates.
@@ -261,8 +261,9 @@ class NetworkBrowsingState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       isConnecting: isConnecting ?? this.isConnecting,
-      errorMessage:
-          clearErrorMessage ? null : errorMessage ?? this.errorMessage,
+      errorMessage: clearErrorMessage
+          ? null
+          : errorMessage ?? this.errorMessage,
       services: clearServices ? null : services ?? this.services,
       connections: connections ?? this.connections,
       lastSuccessfullyConnectedPath: clearLastSuccessfullyConnectedPath
@@ -280,21 +281,21 @@ class NetworkBrowsingState extends Equatable {
 
   @override
   List<Object?> get props => [
-        isLoading,
-        isLoadingMore,
-        isConnecting,
-        errorMessage,
-        services,
-        connections,
-        lastSuccessfullyConnectedPath,
-        currentService,
-        currentPath,
-        directories,
-        files,
-        transferProgress,
-        transferPath,
-        isTransferring,
-      ];
+    isLoading,
+    isLoadingMore,
+    isConnecting,
+    errorMessage,
+    services,
+    connections,
+    lastSuccessfullyConnectedPath,
+    currentService,
+    currentPath,
+    directories,
+    files,
+    transferProgress,
+    transferPath,
+    isTransferring,
+  ];
 
   @override
   String toString() {

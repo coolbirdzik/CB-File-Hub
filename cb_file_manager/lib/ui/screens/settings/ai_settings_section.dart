@@ -19,7 +19,8 @@ class AiSettingsSection extends StatefulWidget {
     required String title,
     required IconData icon,
     required List<Widget> children,
-  }) buildSectionCard;
+  })
+  buildSectionCard;
 
   /// Compact setting tile builder from the parent settings screen.
   final Widget Function({
@@ -28,13 +29,14 @@ class AiSettingsSection extends StatefulWidget {
     required IconData icon,
     Widget? trailing,
     VoidCallback? onTap,
-  }) buildCompactSettingTile;
+  })
+  buildCompactSettingTile;
 
   const AiSettingsSection({
-    Key? key,
+    super.key,
     required this.buildSectionCard,
     required this.buildCompactSettingTile,
-  }) : super(key: key);
+  });
 
   @override
   State<AiSettingsSection> createState() => _AiSettingsSectionState();
@@ -232,11 +234,16 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(PhosphorIconsLight.trash,
-                        size: 16, color: theme.colorScheme.error),
+                    Icon(
+                      PhosphorIconsLight.trash,
+                      size: 16,
+                      color: theme.colorScheme.error,
+                    ),
                     const SizedBox(width: 8),
-                    Text(l.delete,
-                        style: TextStyle(color: theme.colorScheme.error)),
+                    Text(
+                      l.delete,
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
                   ],
                 ),
               ),
@@ -280,8 +287,9 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(ok ? l.connectionSuccess : l.aiConnectionFailed),
-          backgroundColor:
-              ok ? Colors.green : Theme.of(context).colorScheme.error,
+          backgroundColor: ok
+              ? Colors.green
+              : Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -289,7 +297,9 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   }
 
   Future<void> _confirmDelete(
-      BuildContext context, AiProviderConfig provider) async {
+    BuildContext context,
+    AiProviderConfig provider,
+  ) async {
     final l = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -303,8 +313,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.delete,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(
+              l.delete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -346,10 +358,7 @@ class _ProviderFormDialog extends StatefulWidget {
   final AiProviderConfig? existing;
   final AiProviderService providerService;
 
-  const _ProviderFormDialog({
-    this.existing,
-    required this.providerService,
-  });
+  const _ProviderFormDialog({this.existing, required this.providerService});
 
   @override
   State<_ProviderFormDialog> createState() => _ProviderFormDialogState();
@@ -477,8 +486,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       text: e?.endpoint ?? AiProviderConfig.defaultEndpoint(_apiType),
     );
     _modelController = TextEditingController(text: e?.modelName ?? '');
-    _systemPromptController =
-        TextEditingController(text: e?.systemPrompt ?? '');
+    _systemPromptController = TextEditingController(
+      text: e?.systemPrompt ?? '',
+    );
     if (e != null) {
       _apiType = e.apiType;
       _authMode = e.authMode;
@@ -562,21 +572,29 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                 const SizedBox(height: 16),
 
                 // API Type
-                Text(l.apiType,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
+                Text(
+                  l.apiType,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 SegmentedButton<AiApiType>(
                   segments: [
                     ButtonSegment(
                       value: AiApiType.openaiCompatible,
-                      label: Text(l.openAiCompatible,
-                          style: const TextStyle(fontSize: 12)),
+                      label: Text(
+                        l.openAiCompatible,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ),
                     ButtonSegment(
                       value: AiApiType.anthropic,
-                      label: Text(l.anthropic,
-                          style: const TextStyle(fontSize: 12)),
+                      label: Text(
+                        l.anthropic,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                   selected: {_apiType},
@@ -627,8 +645,8 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                         if (_usesCodexOauth) {
                           _endpointController.text =
                               AiProviderConfig.defaultEndpoint(
-                            AiApiType.openaiCompatible,
-                          );
+                                AiApiType.openaiCompatible,
+                              );
                         }
                       });
                     },
@@ -642,8 +660,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -659,8 +678,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                               l.codexCredentialUnavailable,
                           style: TextStyle(
                             fontSize: 12,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -707,9 +727,7 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                 // Endpoint URL
                 TextFormField(
                   controller: _endpointController,
-                  decoration: InputDecoration(
-                    labelText: l.endpointUrl,
-                  ),
+                  decoration: InputDecoration(labelText: l.endpointUrl),
                   enabled: !_usesCodexOauth,
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
@@ -738,8 +756,10 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                           // validation pass as the text fields around it now
                           // that it no longer carries its own.
                           : FormField<String>(
-                              initialValue: _availableModels
-                                      .contains(_modelController.text)
+                              initialValue:
+                                  _availableModels.contains(
+                                    _modelController.text,
+                                  )
                                   ? _modelController.text
                                   : null,
                               validator: (v) =>
@@ -774,15 +794,17 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                               ),
                             )
                           : IconButton(
                               icon: const Icon(
-                                  PhosphorIconsLight.arrowsClockwise,
-                                  size: 20),
+                                PhosphorIconsLight.arrowsClockwise,
+                                size: 20,
+                              ),
                               tooltip: l.fetchModels,
                               onPressed: _fetchAvailableModels,
                             ),
@@ -814,9 +836,13 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                         size: 16,
                       ),
                       const SizedBox(width: 8),
-                      Text(l.advancedSettings,
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w500)),
+                      Text(
+                        l.advancedSettings,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -827,15 +853,19 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                   Row(
                     children: [
                       Text(
-                          '${l.temperature}: ${_temperature.toStringAsFixed(1)}',
-                          style: const TextStyle(fontSize: 13)),
+                        '${l.temperature}: ${_temperature.toStringAsFixed(1)}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
                       Expanded(
-                        child: Slider(
-                          value: _temperature,
-                          min: 0.0,
-                          max: 2.0,
-                          divisions: 20,
-                          onChanged: (v) => setState(() => _temperature = v),
+                        child: Semantics(
+                          container: true,
+                          child: Slider(
+                            value: _temperature,
+                            min: 0.0,
+                            max: 2.0,
+                            divisions: 20,
+                            onChanged: (v) => setState(() => _temperature = v),
+                          ),
                         ),
                       ),
                     ],
@@ -898,7 +928,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : Text(l.save),
         ),
@@ -946,8 +978,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
       if (mounted) {
         setState(() {
           _isFetchingModels = false;
-          _fetchModelsError =
-              AppLocalizations.of(context)!.fetchModelsError('$e');
+          _fetchModelsError = AppLocalizations.of(
+            context,
+          )!.fetchModelsError('$e');
         });
       }
     }
@@ -1030,11 +1063,13 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
 
   Future<void> _launchCodexLogin() async {
     try {
-      await Process.start(
-        'cmd',
-        ['/c', 'start', '', 'codex', 'login'],
-        runInShell: true,
-      );
+      await Process.start('cmd', [
+        '/c',
+        'start',
+        '',
+        'codex',
+        'login',
+      ], runInShell: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1061,8 +1096,9 @@ class _ProviderFormDialogState extends State<_ProviderFormDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok ? l.connectionSuccess : l.codexCredentialMissing),
-        backgroundColor:
-            ok ? Colors.green : Theme.of(context).colorScheme.error,
+        backgroundColor: ok
+            ? Colors.green
+            : Theme.of(context).colorScheme.error,
         behavior: SnackBarBehavior.floating,
       ),
     );

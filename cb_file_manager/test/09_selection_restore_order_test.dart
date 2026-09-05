@@ -5,48 +5,57 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
-      '09.01 SelectItemsInRect (shift) keeps lastSelectedPath by insertion order',
-      () async {
-    final bloc = SelectionBloc();
+    '09.01 SelectItemsInRect (shift) keeps lastSelectedPath by insertion order',
+    () async {
+      final bloc = SelectionBloc();
 
-    final filePaths = LinkedHashSet<String>.of({
-      '/a.mp4',
-      '/b.mp4',
-      '/c.mp4',
-    });
+      final filePaths = LinkedHashSet<String>.of({
+        '/a.mp4',
+        '/b.mp4',
+        '/c.mp4',
+      });
 
-    bloc.add(SelectItemsInRect(
-      folderPaths: const <String>{},
-      filePaths: filePaths,
-      isShiftPressed: true,
-      isCtrlPressed: false,
-    ));
+      bloc.add(
+        SelectItemsInRect(
+          folderPaths: const <String>{},
+          filePaths: filePaths,
+          isShiftPressed: true,
+          isCtrlPressed: false,
+        ),
+      );
 
-    final next = await bloc.stream.first;
-    expect(next.selectedFilePaths,
-        containsAll(<String>['/a.mp4', '/b.mp4', '/c.mp4']));
-    expect(next.lastSelectedPath, equals('/c.mp4'));
+      final next = await bloc.stream.first;
+      expect(
+        next.selectedFilePaths,
+        containsAll(<String>['/a.mp4', '/b.mp4', '/c.mp4']),
+      );
+      expect(next.lastSelectedPath, equals('/c.mp4'));
 
-    await bloc.close();
-  });
+      await bloc.close();
+    },
+  );
 
-  test('09.02 SelectItemsInRect (shift) can use an explicit lastSelectedPath',
-      () async {
-    final bloc = SelectionBloc();
+  test(
+    '09.02 SelectItemsInRect (shift) can use an explicit lastSelectedPath',
+    () async {
+      final bloc = SelectionBloc();
 
-    bloc.add(const SelectItemsInRect(
-      folderPaths: <String>{'/folder'},
-      filePaths: <String>{'/a.mp4', '/b.mp4'},
-      isShiftPressed: true,
-      isCtrlPressed: false,
-      lastSelectedPath: '/folder',
-    ));
+      bloc.add(
+        const SelectItemsInRect(
+          folderPaths: <String>{'/folder'},
+          filePaths: <String>{'/a.mp4', '/b.mp4'},
+          isShiftPressed: true,
+          isCtrlPressed: false,
+          lastSelectedPath: '/folder',
+        ),
+      );
 
-    final next = await bloc.stream.first;
-    expect(next.selectedFilePaths, containsAll(<String>['/a.mp4', '/b.mp4']));
-    expect(next.selectedFolderPaths, contains('/folder'));
-    expect(next.lastSelectedPath, equals('/folder'));
+      final next = await bloc.stream.first;
+      expect(next.selectedFilePaths, containsAll(<String>['/a.mp4', '/b.mp4']));
+      expect(next.selectedFolderPaths, contains('/folder'));
+      expect(next.lastSelectedPath, equals('/folder'));
 
-    await bloc.close();
-  });
+      await bloc.close();
+    },
+  );
 }

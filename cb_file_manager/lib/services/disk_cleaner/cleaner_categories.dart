@@ -53,52 +53,68 @@ class CleanerCategories {
         // Edge
         CleanerPathRule(
           source: PathSource.env(
-              'LOCALAPPDATA', r'Microsoft\Edge\User Data\Default\Cache'),
+            'LOCALAPPDATA',
+            r'Microsoft\Edge\User Data\Default\Cache',
+          ),
           appOwnerHints: <String>['Microsoft Edge', 'msedge.exe'],
           storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
           source: PathSource.env(
-              'LOCALAPPDATA', r'Microsoft\Edge\User Data\Default\Code Cache'),
+            'LOCALAPPDATA',
+            r'Microsoft\Edge\User Data\Default\Code Cache',
+          ),
           appOwnerHints: <String>['Microsoft Edge', 'msedge.exe'],
           storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
           source: PathSource.env(
-              'LOCALAPPDATA', r'Microsoft\Edge\User Data\Default\GPUCache'),
+            'LOCALAPPDATA',
+            r'Microsoft\Edge\User Data\Default\GPUCache',
+          ),
           appOwnerHints: <String>['Microsoft Edge', 'msedge.exe'],
           storageKind: AppStorageKind.cache,
         ),
         // Chrome
         CleanerPathRule(
           source: PathSource.env(
-              'LOCALAPPDATA', r'Google\Chrome\User Data\Default\Cache'),
+            'LOCALAPPDATA',
+            r'Google\Chrome\User Data\Default\Cache',
+          ),
           appOwnerHints: <String>['Google Chrome', 'chrome.exe'],
           storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
           source: PathSource.env(
-              'LOCALAPPDATA', r'Google\Chrome\User Data\Default\Code Cache'),
+            'LOCALAPPDATA',
+            r'Google\Chrome\User Data\Default\Code Cache',
+          ),
           appOwnerHints: <String>['Google Chrome', 'chrome.exe'],
           storageKind: AppStorageKind.cache,
         ),
         CleanerPathRule(
           source: PathSource.env(
-              'LOCALAPPDATA', r'Google\Chrome\User Data\Default\GPUCache'),
+            'LOCALAPPDATA',
+            r'Google\Chrome\User Data\Default\GPUCache',
+          ),
           appOwnerHints: <String>['Google Chrome', 'chrome.exe'],
           storageKind: AppStorageKind.cache,
         ),
         // Brave
         CleanerPathRule(
-          source: PathSource.env('LOCALAPPDATA',
-              r'BraveSoftware\Brave-Browser\User Data\Default\Cache'),
+          source: PathSource.env(
+            'LOCALAPPDATA',
+            r'BraveSoftware\Brave-Browser\User Data\Default\Cache',
+          ),
           appOwnerHints: <String>['Brave', 'Brave Browser', 'brave.exe'],
           storageKind: AppStorageKind.cache,
         ),
         // Opera
         CleanerPathRule(
-          source:
-              PathSource.env('APPDATA', r'Opera Software\Opera Stable\Cache'),
+          source: PathSource.env(
+            'APPDATA',
+            r'Opera Software\Opera Stable\Cache',
+          ),
           appOwnerHints: <String>['Opera', 'opera.exe'],
           storageKind: AppStorageKind.cache,
         ),
@@ -120,9 +136,7 @@ class CleanerCategories {
       description: 'Empty the Recycle Bin on every fixed drive.',
       safety: CleanerSafety.safe,
       defaultEnabled: true,
-      rules: [
-        CleanerPathRule(source: PathSource.recycleBin()),
-      ],
+      rules: [CleanerPathRule(source: PathSource.recycleBin())],
     ),
 
     // -----------------------------------------------------------------------
@@ -179,7 +193,9 @@ class CleanerCategories {
         // Teams (new + classic)
         CleanerPathRule(
           source: PathSource.env(
-              'APPDATA', r'Microsoft\Teams\Service Worker\CacheStorage'),
+            'APPDATA',
+            r'Microsoft\Teams\Service Worker\CacheStorage',
+          ),
           appOwnerHints: <String>[
             'Microsoft Teams',
             'ms-teams.exe',
@@ -285,8 +301,9 @@ class CleanerCategories {
       requiresAdmin: true,
       rules: [
         CleanerPathRule(
-          source:
-              PathSource.absolute(r'C:\Windows\SoftwareDistribution\Download'),
+          source: PathSource.absolute(
+            r'C:\Windows\SoftwareDistribution\Download',
+          ),
         ),
       ],
     ),
@@ -325,7 +342,8 @@ class CleanerCategories {
       rules: [
         CleanerPathRule(
           source: PathSource.absolute(
-              r'C:\Windows\SoftwareDistribution\DeliveryOptimization'),
+            r'C:\Windows\SoftwareDistribution\DeliveryOptimization',
+          ),
         ),
       ],
     ),
@@ -348,13 +366,17 @@ class CleanerCategories {
         CleanerPathRule(source: PathSource.env('LOCALAPPDATA', r'Yarn\Cache')),
         CleanerPathRule(source: PathSource.env('LOCALAPPDATA', r'pip\Cache')),
         CleanerPathRule(
-            source: PathSource.env('USERPROFILE', r'.gradle\caches')),
+          source: PathSource.env('USERPROFILE', r'.gradle\caches'),
+        ),
         CleanerPathRule(
-            source: PathSource.env('USERPROFILE', r'.m2\repository')),
+          source: PathSource.env('USERPROFILE', r'.m2\repository'),
+        ),
         CleanerPathRule(
-            source: PathSource.env('USERPROFILE', r'.cargo\registry\cache')),
+          source: PathSource.env('USERPROFILE', r'.cargo\registry\cache'),
+        ),
         CleanerPathRule(
-            source: PathSource.env('USERPROFILE', r'.nuget\packages')),
+          source: PathSource.env('USERPROFILE', r'.nuget\packages'),
+        ),
       ],
     ),
   ];

@@ -48,15 +48,13 @@ class AppStorageAnalyzer {
       final byPath = candidatesByApp[appId];
       if (byPath == null) return;
       final existing = byPath[candidate.path];
-      byPath[candidate.path] =
-          existing == null ? candidate : existing.merge(candidate);
+      byPath[candidate.path] = existing == null
+          ? candidate
+          : existing.merge(candidate);
     }
 
     for (final app in apps) {
-      final installLocation = _expandAndNormalize(
-        app.installLocation,
-        env,
-      );
+      final installLocation = _expandAndNormalize(app.installLocation, env);
       if (installLocation != null) {
         addCandidate(
           app.id,
@@ -89,10 +87,7 @@ class AppStorageAnalyzer {
         );
       }
 
-      final possibleIconRoot = _displayIconDirectory(
-        app.displayIconPath,
-        env,
-      );
+      final possibleIconRoot = _displayIconDirectory(app.displayIconPath, env);
       if (possibleIconRoot != null) {
         addCandidate(
           app.id,
@@ -191,22 +186,28 @@ class AppStorageAnalyzer {
     for (final app in apps) {
       final appCandidates = candidatesByApp[app.id]!.values;
       final confirmedForApp = appCandidates
-          .where((candidate) =>
-              candidate.confidence == AttributionConfidence.confirmed &&
-              !sharedExactPaths.contains(candidate.path))
+          .where(
+            (candidate) =>
+                candidate.confidence == AttributionConfidence.confirmed &&
+                !sharedExactPaths.contains(candidate.path),
+          )
           .toList(growable: false);
 
-      final possibleForApp = appCandidates.where((candidate) {
-        if (candidate.confidence != AttributionConfidence.likely) return false;
-        // A possible root already covered by any exact root is not useful and
-        // would double-count bytes in the detail panel.
-        return !acceptedConfirmed.any(
-              (root) => isSameOrDescendant(candidate.path, root.path),
-            ) &&
-            !sharedRoots.any(
-              (root) => isSameOrDescendant(candidate.path, root.path),
-            );
-      }).toList(growable: false);
+      final possibleForApp = appCandidates
+          .where((candidate) {
+            if (candidate.confidence != AttributionConfidence.likely) {
+              return false;
+            }
+            // A possible root already covered by any exact root is not useful and
+            // would double-count bytes in the detail panel.
+            return !acceptedConfirmed.any(
+                  (root) => isSameOrDescendant(candidate.path, root.path),
+                ) &&
+                !sharedRoots.any(
+                  (root) => isSameOrDescendant(candidate.path, root.path),
+                );
+          })
+          .toList(growable: false);
 
       final entries = <AppStorageEntry>[];
       for (final candidate in <_StorageCandidate>[
@@ -224,8 +225,9 @@ class AppStorageAnalyzer {
       }
 
       entries.sort((a, b) {
-        final confidence = a.attributionConfidence.index
-            .compareTo(b.attributionConfidence.index);
+        final confidence = a.attributionConfidence.index.compareTo(
+          b.attributionConfidence.index,
+        );
         if (confidence != 0) return confidence;
         return b.sizeBytes.compareTo(a.sizeBytes);
       });
@@ -265,20 +267,22 @@ class AppStorageAnalyzer {
         continue;
       }
 
-      profiles.add(AppStorageProfile(
-        app: app,
-        usage: usageByAppId[app.id] ?? const AppUsageEvidence(),
-        entries: entries,
-        warnings: warnings.toList(growable: false),
-      ));
+      profiles.add(
+        AppStorageProfile(
+          app: app,
+          usage: usageByAppId[app.id] ?? const AppUsageEvidence(),
+          entries: entries,
+          warnings: warnings.toList(growable: false),
+        ),
+      );
     }
 
     profiles.sort((a, b) {
       final size = b.bestKnownSizeBytes.compareTo(a.bestKnownSizeBytes);
       if (size != 0) return size;
-      return a.app.displayName
-          .toLowerCase()
-          .compareTo(b.app.displayName.toLowerCase());
+      return a.app.displayName.toLowerCase().compareTo(
+        b.app.displayName.toLowerCase(),
+      );
     });
 
     final sharedOrUnattributed = _buildSharedOrUnattributed(
@@ -341,13 +345,20 @@ class AppStorageAnalyzer {
     Map<String, String>? environment,
   }) {
     final env = _normalizedEnvironment(environment ?? Platform.environment);
-    final entries = profile.entries
-        .where((entry) =>
-            entry.isConfirmed && entry.isCleanable && entry.categoryId != null)
-        .toList(growable: false)
-      ..sort((a, b) => normalizeWindowsPath(a.path)
-          .length
-          .compareTo(normalizeWindowsPath(b.path).length));
+    final entries =
+        profile.entries
+            .where(
+              (entry) =>
+                  entry.isConfirmed &&
+                  entry.isCleanable &&
+                  entry.categoryId != null,
+            )
+            .toList(growable: false)
+          ..sort(
+            (a, b) => normalizeWindowsPath(
+              a.path,
+            ).length.compareTo(normalizeWindowsPath(b.path).length),
+          );
 
     final selectedPaths = <String>[];
     final items = <JunkItem>[];
@@ -373,13 +384,15 @@ class AppStorageAnalyzer {
       if (exactRule == null) continue;
 
       selectedPaths.add(normalizedPath);
-      items.add(JunkItem(
-        path: entry.path,
-        sizeBytes: entry.sizeBytes,
-        categoryId: entry.categoryId!,
-        isContainerOnly: exactRule.emptyOnly,
-        isUserSelected: false,
-      ));
+      items.add(
+        JunkItem(
+          path: entry.path,
+          sizeBytes: entry.sizeBytes,
+          categoryId: entry.categoryId!,
+          isContainerOnly: exactRule.emptyOnly,
+          isUserSelected: false,
+        ),
+      );
     }
     return items;
   }
@@ -425,8 +438,9 @@ class AppStorageAnalyzer {
     final normalizedPath = normalizeWindowsPath(path);
     final normalizedRoot = normalizeWindowsPath(root);
     if (normalizedPath == normalizedRoot) return true;
-    final prefix =
-        normalizedRoot.endsWith(r'\') ? normalizedRoot : '$normalizedRoot\\';
+    final prefix = normalizedRoot.endsWith(r'\')
+        ? normalizedRoot
+        : '$normalizedRoot\\';
     return normalizedPath.startsWith(prefix);
   }
 
@@ -494,17 +508,15 @@ class AppStorageAnalyzer {
       );
     }
 
-    final exclusions = <_ResolvedRoot>[
-      ...confirmedRoots,
-      ...sharedRoots,
-    ];
+    final exclusions = <_ResolvedRoot>[...confirmedRoots, ...sharedRoots];
     final size = candidate.confidence == AttributionConfidence.confirmed
         ? _exclusiveSize(node, candidate.path, exclusions)
         : node.sizeBytes;
     final quality = overlappingIssues.isEmpty
         ? MeasurementQuality.measured
         : MeasurementQuality.partial;
-    final categoryMatches = candidate.categoryId != null &&
+    final categoryMatches =
+        candidate.categoryId != null &&
         node.isJunk &&
         node.junkCategoryId == candidate.categoryId;
     final isCleanable = candidate.cleanableByRule && categoryMatches;
@@ -553,8 +565,9 @@ class AppStorageAnalyzer {
         path: node.fullPath,
         kind: AppStorageKind.shared,
         sizeBytes: size,
-        measurementQuality:
-            partial ? MeasurementQuality.partial : MeasurementQuality.measured,
+        measurementQuality: partial
+            ? MeasurementQuality.partial
+            : MeasurementQuality.measured,
         attributionConfidence: AttributionConfidence.shared,
         warnings: <String>[
           'Multiple installed apps claim this exact storage root.',
@@ -584,10 +597,7 @@ class AppStorageAnalyzer {
         final remaining = _remainingAfterRoots(
           child,
           childPath,
-          <_ResolvedRoot>[
-            ...acceptedConfirmed,
-            ...includedSharedRoots,
-          ],
+          <_ResolvedRoot>[...acceptedConfirmed, ...includedSharedRoots],
         );
         if (remaining < minimumBytes) continue;
         final partial = coverageIssues.any(
@@ -624,12 +634,15 @@ class AppStorageAnalyzer {
   ) {
     final descendants = roots
         .where(
-            (root) => root.path != path && isSameOrDescendant(root.path, path))
+          (root) => root.path != path && isSameOrDescendant(root.path, path),
+        )
         .toList(growable: false);
     final topLevel = descendants.where((candidate) {
-      return !descendants.any((other) =>
-          other.path != candidate.path &&
-          isSameOrDescendant(candidate.path, other.path));
+      return !descendants.any(
+        (other) =>
+            other.path != candidate.path &&
+            isSameOrDescendant(candidate.path, other.path),
+      );
     });
     final excluded = topLevel.fold<int>(
       0,
@@ -648,9 +661,11 @@ class AppStorageAnalyzer {
         .where((root) => isSameOrDescendant(root.path, path))
         .toList(growable: false);
     final topLevel = covered.where((candidate) {
-      return !covered.any((other) =>
-          other.path != candidate.path &&
-          isSameOrDescendant(candidate.path, other.path));
+      return !covered.any(
+        (other) =>
+            other.path != candidate.path &&
+            isSameOrDescendant(candidate.path, other.path),
+      );
     });
     final excluded = topLevel.fold<int>(
       0,
@@ -688,10 +703,7 @@ class AppStorageAnalyzer {
     };
   }
 
-  static String? _expandAndNormalize(
-    String? rawPath,
-    Map<String, String> env,
-  ) {
+  static String? _expandAndNormalize(String? rawPath, Map<String, String> env) {
     if (rawPath == null || rawPath.trim().isEmpty) return null;
     final expanded = rawPath.replaceAllMapped(
       RegExp(r'%([^%]+)%'),
@@ -702,10 +714,7 @@ class AppStorageAnalyzer {
     return normalized;
   }
 
-  static String? _resolveSource(
-    PathSource source,
-    Map<String, String> env,
-  ) {
+  static String? _resolveSource(PathSource source, Map<String, String> env) {
     switch (source.kind) {
       case PathSourceKind.recycleBin:
         return null;
@@ -823,13 +832,13 @@ class _StorageCandidate {
     final confirmed = confidence == AttributionConfidence.confirmed
         ? this
         : other.confidence == AttributionConfidence.confirmed
-            ? other
-            : this;
+        ? other
+        : this;
     final cleaner = cleanableByRule
         ? this
         : other.cleanableByRule
-            ? other
-            : confirmed;
+        ? other
+        : confirmed;
     return _StorageCandidate(
       appId: appId,
       path: path,
@@ -837,10 +846,13 @@ class _StorageCandidate {
       confidence: confirmed.confidence,
       categoryId: cleaner.categoryId ?? confirmed.categoryId,
       cleanableByRule: cleanableByRule || other.cleanableByRule,
-      containerOnly:
-          cleaner.cleanableByRule ? cleaner.containerOnly : containerOnly,
-      warnings:
-          <String>{...warnings, ...other.warnings}.toList(growable: false),
+      containerOnly: cleaner.cleanableByRule
+          ? cleaner.containerOnly
+          : containerOnly,
+      warnings: <String>{
+        ...warnings,
+        ...other.warnings,
+      }.toList(growable: false),
     );
   }
 }

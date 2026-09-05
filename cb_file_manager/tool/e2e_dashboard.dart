@@ -51,16 +51,16 @@ class Shot {
   Shot({required this.filename, required this.step, required this.ts});
 
   Map<String, dynamic> toJson() => {
-        'filename': filename,
-        'step': step,
-        'ts': ts.toIso8601String(),
-      };
+    'filename': filename,
+    'step': step,
+    'ts': ts.toIso8601String(),
+  };
 
   static Shot fromJson(Map<String, dynamic> j) => Shot(
-        filename: j['filename'] as String,
-        step: j['step'] as String? ?? '',
-        ts: DateTime.tryParse(j['ts'] as String? ?? '') ?? DateTime.now(),
-      );
+    filename: j['filename'] as String,
+    step: j['step'] as String? ?? '',
+    ts: DateTime.tryParse(j['ts'] as String? ?? '') ?? DateTime.now(),
+  );
 }
 
 class TestResult {
@@ -85,13 +85,13 @@ class TestResult {
   bool get isBlocked => status == 'blocked';
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'status': status,
-        if (error != null) 'error': error,
-        if (stackTrace != null) 'stackTrace': stackTrace,
-        'shots': shots.map((s) => s.toJson()).toList(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'name': name,
+    'status': status,
+    if (error != null) 'error': error,
+    if (stackTrace != null) 'stackTrace': stackTrace,
+    'shots': shots.map((s) => s.toJson()).toList(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   static TestResult fromJson(Map<String, dynamic> j) {
     // Back-compat with old `screenshots: [filename, ...]` format.
@@ -314,13 +314,15 @@ TestReport parseJsonLog(
       status = 'passed';
     }
 
-    results.add(TestResult(
-      name: name,
-      status: status,
-      error: errMessage,
-      stackTrace: errTrace,
-      shots: shots,
-    ));
+    results.add(
+      TestResult(
+        name: name,
+        status: status,
+        error: errMessage,
+        stackTrace: errTrace,
+        shots: shots,
+      ),
+    );
   }
 
   return TestReport(
@@ -393,10 +395,7 @@ _ErrorInfo? _extractFailureFromPrints(List<String> rawMessages) {
   final message = _extractFailureSummary(traceLines);
   if (message == null || message.trim().isEmpty) return null;
 
-  return _ErrorInfo(
-    message: message,
-    trace: traceLines.join('\n').trimRight(),
-  );
+  return _ErrorInfo(message: message, trace: traceLines.join('\n').trimRight());
 }
 
 String _cleanLogLine(String line) {
@@ -462,7 +461,8 @@ String _renderTrace(String trace) {
   for (final line in lines) {
     final escaped = _escapeHtml(line);
     final lower = line.toLowerCase();
-    final isFlutter = lower.contains('package:flutter') ||
+    final isFlutter =
+        lower.contains('package:flutter') ||
         lower.contains('/flutter/') ||
         lower.contains(r'\flutter\') ||
         lower.startsWith('dart:') ||
@@ -530,9 +530,11 @@ String? _firstUserFrame(String text) {
     RegExp(r'(integration_test/[^\s:"]+\.dart)'),
     RegExp(r'(package:cb_file_manager/[^\s:"]+\.dart)'),
     RegExp(
-        r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?integration_test[/\\][^\s:"]*?\.dart)'),
+      r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?integration_test[/\\][^\s:"]*?\.dart)',
+    ),
     RegExp(
-        r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?cb_file_manager[/\\][^\s:"]*?\.dart)'),
+      r'(?:file:///)?([A-Za-z]:[/\\][^\s:"]*?cb_file_manager[/\\][^\s:"]*?\.dart)',
+    ),
   ];
   for (final p in pathOnlyPatterns) {
     for (final m in p.allMatches(text)) {
@@ -565,11 +567,15 @@ Future<Map<String, List<Shot>>> _loadManifestShots(String buildDir) async {
       final filename = raw['filename'] as String?;
       final tsStr = raw['ts'] as String?;
       if (tn == null || filename == null) continue;
-      out.putIfAbsent(tn, () => []).add(Shot(
-            filename: filename,
-            step: step,
-            ts: DateTime.tryParse(tsStr ?? '') ?? DateTime.now(),
-          ));
+      out
+          .putIfAbsent(tn, () => [])
+          .add(
+            Shot(
+              filename: filename,
+              step: step,
+              ts: DateTime.tryParse(tsStr ?? '') ?? DateTime.now(),
+            ),
+          );
     }
     // Sort each test's shots by capture timestamp.
     for (final list in out.values) {
@@ -637,11 +643,13 @@ List<Shot> _shotsForTest(
   // Use the longest matching slug for stripping the human-readable step label.
   final bestSlug = slugs.reduce((a, b) => a.length >= b.length ? a : b);
   return candidates
-      .map((f) => Shot(
-            filename: f,
-            step: _stepFromFilename(f, bestSlug),
-            ts: DateTime.now(),
-          ))
+      .map(
+        (f) => Shot(
+          filename: f,
+          step: _stepFromFilename(f, bestSlug),
+          ts: DateTime.now(),
+        ),
+      )
       .toList();
 }
 
@@ -699,7 +707,9 @@ Future<Map<String, TestResult>> _loadPersistedState(String dashboardDir) async {
 }
 
 Future<void> _savePersistedState(
-    String dashboardDir, Map<String, TestResult> tests) async {
+  String dashboardDir,
+  Map<String, TestResult> tests,
+) async {
   final stateFile = File('$dashboardDir/$_kStateFile');
   await stateFile.parent.create(recursive: true);
   final body = {
@@ -770,22 +780,27 @@ String generateHtml(TestReport report) {
     suiteBanner.writeln('<div class="suite-error-title">');
     suiteBanner.writeln('<span class="suite-error-icon">!</span>');
     suiteBanner.writeln(
-        'Suite failed to load — every blocked test below shares this root cause');
+      'Suite failed to load — every blocked test below shares this root cause',
+    );
     suiteBanner.writeln('</div>');
     if (suiteFrame != null) {
-      suiteBanner.writeln('<div class="reason-where">'
-          '<span class="reason-where-label">at</span> '
-          '<code>${_escapeHtml(suiteFrame)}</code>'
-          '</div>');
+      suiteBanner.writeln(
+        '<div class="reason-where">'
+        '<span class="reason-where-label">at</span> '
+        '<code>${_escapeHtml(suiteFrame)}</code>'
+        '</div>',
+      );
     }
     suiteBanner.writeln(
-        '<div class="suite-error-msg">${_escapeHtml(report.suiteError!)}</div>');
+      '<div class="suite-error-msg">${_escapeHtml(report.suiteError!)}</div>',
+    );
     if (report.suiteStackTrace != null &&
         report.suiteStackTrace!.trim().isNotEmpty &&
         report.suiteStackTrace != report.suiteError) {
       suiteBanner.writeln('<div class="reason-trace-label">Stack trace</div>');
       suiteBanner.writeln(
-          '<pre class="reason-trace-pre">${_renderTrace(report.suiteStackTrace!)}</pre>');
+        '<pre class="reason-trace-pre">${_renderTrace(report.suiteStackTrace!)}</pre>',
+      );
     }
     suiteBanner.writeln('</div>');
   }
@@ -815,16 +830,19 @@ String generateHtml(TestReport report) {
 
     final statusClass = allPassed ? 'all-pass' : 'has-fail';
     final statsText = '$suitePassed/$suiteTotal';
-    final rateText =
-        suiteTotal > 0 ? '${(suitePassed / suiteTotal * 100).round()}%' : '-';
+    final rateText = suiteTotal > 0
+        ? '${(suitePassed / suiteTotal * 100).round()}%'
+        : '-';
 
     suiteSections.writeln('<details class="suite-group" open>');
     suiteSections.writeln('<summary class="suite-header $statusClass">');
     suiteSections.writeln('<span class="suite-chevron">▶</span>');
-    suiteSections
-        .writeln('<span class="suite-name">${_escapeHtml(suiteName)}</span>');
     suiteSections.writeln(
-        '<span class="suite-stats">$statsText &middot; $rateText</span>');
+      '<span class="suite-name">${_escapeHtml(suiteName)}</span>',
+    );
+    suiteSections.writeln(
+      '<span class="suite-stats">$statsText &middot; $rateText</span>',
+    );
     suiteSections.writeln('</summary>');
     suiteSections.writeln('<div class="suite-tests">');
 
@@ -856,14 +874,18 @@ String generateHtml(TestReport report) {
             'step': shot.step,
             'src': 'screenshots/${shot.filename}',
           });
-          galleryBuf.writeln('<figure class="thumb" '
-              'onclick="lbOpen($globalIdx)" '
-              'title="${_escapeHtml(shot.step)}">');
-          galleryBuf
-              .writeln('<img src="screenshots/${_escapeHtml(shot.filename)}" '
-                  'alt="${_escapeHtml(shot.step)}" loading="lazy">');
           galleryBuf.writeln(
-              '<figcaption>${_escapeHtml(shot.step.isEmpty ? 'screenshot' : shot.step)}</figcaption>');
+            '<figure class="thumb" '
+            'onclick="lbOpen($globalIdx)" '
+            'title="${_escapeHtml(shot.step)}">',
+          );
+          galleryBuf.writeln(
+            '<img src="screenshots/${_escapeHtml(shot.filename)}" '
+            'alt="${_escapeHtml(shot.step)}" loading="lazy">',
+          );
+          galleryBuf.writeln(
+            '<figcaption>${_escapeHtml(shot.step.isEmpty ? 'screenshot' : shot.step)}</figcaption>',
+          );
           galleryBuf.writeln('</figure>');
         }
         galleryBuf.writeln('</div>');
@@ -887,20 +909,25 @@ String generateHtml(TestReport report) {
         reasonBuf.writeln('<div class="$cls">');
         reasonBuf.writeln('<div class="reason-label">$label</div>');
         if (userFrame != null) {
-          reasonBuf.writeln('<div class="reason-where">'
-              '<span class="reason-where-label">at</span> '
-              '<code>${_escapeHtml(userFrame)}</code>'
-              '</div>');
+          reasonBuf.writeln(
+            '<div class="reason-where">'
+            '<span class="reason-where-label">at</span> '
+            '<code>${_escapeHtml(userFrame)}</code>'
+            '</div>',
+          );
         }
-        reasonBuf
-            .writeln('<div class="reason-text">${_escapeHtml(t.error!)}</div>');
+        reasonBuf.writeln(
+          '<div class="reason-text">${_escapeHtml(t.error!)}</div>',
+        );
         if (t.stackTrace != null &&
             t.stackTrace!.trim().isNotEmpty &&
             t.stackTrace != t.error) {
-          reasonBuf
-              .writeln('<div class="reason-trace-label">Stack trace</div>');
           reasonBuf.writeln(
-              '<pre class="reason-trace-pre">${_renderTrace(t.stackTrace!)}</pre>');
+            '<div class="reason-trace-label">Stack trace</div>',
+          );
+          reasonBuf.writeln(
+            '<pre class="reason-trace-pre">${_renderTrace(t.stackTrace!)}</pre>',
+          );
         }
         reasonBuf.writeln('</div>');
       }
@@ -938,8 +965,10 @@ String generateHtml(TestReport report) {
     suiteSections.writeln('</details>'); // .suite-group
   }
 
-  final timestamp =
-      report.generatedAt.toLocal().toString().replaceAll('.000', '');
+  final timestamp = report.generatedAt.toLocal().toString().replaceAll(
+    '.000',
+    '',
+  );
   final shotsJson = jsonEncode(allShots);
 
   return '''<!DOCTYPE html>
@@ -1561,7 +1590,10 @@ String _inferSuite(String name) {
 // ---------------------------------------------------------------------------
 
 Future<void> copyScreenshots(
-    List<String> screenshots, String buildDir, String dashboardDir) async {
+  List<String> screenshots,
+  String buildDir,
+  String dashboardDir,
+) async {
   final ssDir = Directory('$dashboardDir/screenshots');
   if (!await ssDir.exists()) {
     await ssDir.create(recursive: true);
@@ -1569,10 +1601,7 @@ Future<void> copyScreenshots(
 
   // Possible source roots, in priority order. E2ETester writes to
   // build/e2e_report/screenshots; older tooling drops files in build/.
-  final sourceRoots = <String>[
-    '$buildDir/e2e_report/screenshots',
-    buildDir,
-  ];
+  final sourceRoots = <String>['$buildDir/e2e_report/screenshots', buildDir];
 
   for (final ss in screenshots) {
     for (final root in sourceRoots) {
@@ -1648,8 +1677,10 @@ Future<void> main(List<String> args) async {
   await _savePersistedState(dashboardDir, merged);
 
   if (freshReport.tests.length < merged.length) {
-    print('[Dashboard] Merged ${freshReport.tests.length} fresh result(s) '
-        'with ${persisted.length} persisted — total ${merged.length}.');
+    print(
+      '[Dashboard] Merged ${freshReport.tests.length} fresh result(s) '
+      'with ${persisted.length} persisted — total ${merged.length}.',
+    );
   }
 
   // Collect all screenshots referenced by any test
@@ -1676,10 +1707,13 @@ Future<void> main(List<String> args) async {
   print('[Dashboard] Open in browser:');
   print('  file://${Directory.current.path}/$htmlPath');
   print('');
-  final blockedSummary =
-      report.blocked > 0 ? ', ${report.blocked} blocked' : '';
-  print('  Summary: ${report.passed} passed, ${report.failed} failed'
-      '$blockedSummary, ${report.total} total');
+  final blockedSummary = report.blocked > 0
+      ? ', ${report.blocked} blocked'
+      : '';
+  print(
+    '  Summary: ${report.passed} passed, ${report.failed} failed'
+    '$blockedSummary, ${report.total} total',
+  );
   print('  Pass rate: ${report.passRate.toStringAsFixed(1)}%');
   if (report.suiteError != null && report.suiteError!.isNotEmpty) {
     print('');

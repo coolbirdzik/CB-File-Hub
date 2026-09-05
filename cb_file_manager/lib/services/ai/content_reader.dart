@@ -15,8 +15,11 @@ class FileContent {
     required this.isTruncated,
   });
 
-  static const empty =
-      FileContent(text: '', totalLength: 0, isTruncated: false);
+  static const empty = FileContent(
+    text: '',
+    totalLength: 0,
+    isTruncated: false,
+  );
 }
 
 /// Reads text file content with size limits, encoding fallback, and LRU caching.
@@ -155,11 +158,7 @@ class ContentReader {
 
       final stat = await file.stat();
       if (stat.size > previewMaxFileSize) {
-        return FileContent(
-          text: '',
-          totalLength: stat.size,
-          isTruncated: true,
-        );
+        return FileContent(text: '', totalLength: stat.size, isTruncated: true);
       }
 
       final content = await _readWithEncodingFallbackStatic(file);
@@ -197,11 +196,7 @@ class ContentReader {
 
       final stat = await file.stat();
       if (stat.size > _maxFileSize) {
-        return FileContent(
-          text: '',
-          totalLength: stat.size,
-          isTruncated: true,
-        );
+        return FileContent(text: '', totalLength: stat.size, isTruncated: true);
       }
 
       final content = await _readWithEncodingFallback(file);

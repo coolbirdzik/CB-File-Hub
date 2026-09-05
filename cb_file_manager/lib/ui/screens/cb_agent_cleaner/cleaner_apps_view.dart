@@ -11,13 +11,10 @@ import '../../../helpers/files/windows_app_icon.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../utils/format_utils.dart';
 
-typedef AppStorageEntryAction = FutureOr<void> Function(
-  AppStorageEntry entry,
-);
+typedef AppStorageEntryAction = FutureOr<void> Function(AppStorageEntry entry);
 typedef InstalledAppAction = FutureOr<void> Function(InstalledAppInfo app);
-typedef AppStorageProfileAction = FutureOr<void> Function(
-  AppStorageProfile profile,
-);
+typedef AppStorageProfileAction =
+    FutureOr<void> Function(AppStorageProfile profile);
 
 class CleanerAppsView extends StatefulWidget {
   final CleanerAppInsightsCubit cubit;
@@ -27,13 +24,13 @@ class CleanerAppsView extends StatefulWidget {
   final AppStorageProfileAction? onAskAgent;
 
   const CleanerAppsView({
-    Key? key,
+    super.key,
     required this.cubit,
     this.onOpenFolder,
     this.onManageApp,
     this.onReviewCleanable,
     this.onAskAgent,
-  }) : super(key: key);
+  });
 
   @override
   State<CleanerAppsView> createState() => _CleanerAppsViewState();
@@ -209,7 +206,8 @@ class _CleanerAppsViewState extends State<CleanerAppsView> {
             onReviewCleanable: widget.onReviewCleanable,
             onAskAgent: widget.onAskAgent,
             evaluatedAt: state.evaluatedAt,
-            isAttention: state.selectedProfile != null &&
+            isAttention:
+                state.selectedProfile != null &&
                 appNeedsAttention(
                   state.selectedProfile!,
                   evaluatedAt: state.evaluatedAt,
@@ -304,11 +302,7 @@ class _CenteredStatus extends StatelessWidget {
   final Widget icon;
   final String message;
 
-  const _CenteredStatus({
-    Key? key,
-    required this.icon,
-    required this.message,
-  }) : super(key: key);
+  const _CenteredStatus({super.key, required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -443,14 +437,14 @@ class _SummaryCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _SummaryCard({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.value,
     this.accentColor,
     this.selected = false,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -521,8 +515,9 @@ class _FiltersToolbar extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final searchWidth =
-            constraints.maxWidth < 560 ? constraints.maxWidth : 280.0;
+        final searchWidth = constraints.maxWidth < 560
+            ? constraints.maxWidth
+            : 280.0;
         return Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -550,10 +545,7 @@ class _FiltersToolbar extends StatelessWidget {
                   ),
                 ),
               ),
-            _ViewOptionsMenu(
-              cubit: cubit,
-              state: state,
-            ),
+            _ViewOptionsMenu(cubit: cubit, state: state),
           ],
         );
       },
@@ -586,9 +578,7 @@ class _SearchField extends StatelessWidget {
     );
     final focusedBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(999),
-      borderSide: BorderSide(
-        color: colors.outline.withValues(alpha: 0.55),
-      ),
+      borderSide: BorderSide(color: colors.outline.withValues(alpha: 0.55)),
     );
 
     return SizedBox(
@@ -635,8 +625,9 @@ class _SearchField extends StatelessWidget {
                         minWidth: 32,
                         minHeight: 32,
                       ),
-                      tooltip:
-                          MaterialLocalizations.of(context).deleteButtonTooltip,
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).deleteButtonTooltip,
                       onPressed: () {
                         controller.clear();
                         onChanged('');
@@ -704,16 +695,19 @@ class _ViewOptionsMenu extends StatelessWidget {
           height: 32,
           child: Text(l10n.cleanerAppsLargeThresholdLabel),
         ),
-        for (var index = 0;
-            index < cleanerAppLargeThresholdPresets.length;
-            index++)
+        for (
+          var index = 0;
+          index < cleanerAppLargeThresholdPresets.length;
+          index++
+        )
           CheckedPopupMenuItem<_ViewOption>(
             value: <_ViewOption>[
               _ViewOption.large500Mb,
               _ViewOption.large1Gb,
               _ViewOption.large5Gb,
             ][index],
-            checked: state.largeThresholdBytes ==
+            checked:
+                state.largeThresholdBytes ==
                 cleanerAppLargeThresholdPresets[index],
             child: Text(
               FormatUtils.formatFileSize(
@@ -910,11 +904,7 @@ class _AppRow extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final app = profile.app;
-    final usageLabel = _compactUsageLabel(
-      l10n,
-      profile.usage,
-      evaluatedAt,
-    );
+    final usageLabel = _compactUsageLabel(l10n, profile.usage, evaluatedAt);
     final sizeLabel = _profileSizeLabel(l10n, profile);
     final attentionColor = Colors.orange.shade800;
 
@@ -925,15 +915,15 @@ class _AppRow extends StatelessWidget {
         color: isAttention
             ? attentionColor.withValues(alpha: isSelected ? 0.12 : 0.055)
             : isSelected
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.52)
-                : theme.colorScheme.surface,
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.52)
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
           color: isAttention
               ? attentionColor.withValues(alpha: 0.65)
               : isSelected
-                  ? theme.colorScheme.primary
-                  : theme.dividerColor,
+              ? theme.colorScheme.primary
+              : theme.dividerColor,
           width: isAttention ? 1.4 : 1,
         ),
       ),
@@ -1090,9 +1080,9 @@ class _AppDetailsPanel extends StatelessWidget {
           const SizedBox(height: 18),
           Text(
             l10n.cleanerAppsStorageBreakdown,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           if (current.entries.isEmpty)
@@ -1214,11 +1204,7 @@ class _DetailsMetrics extends StatelessWidget {
           Expanded(
             child: _CompactMetric(
               label: l10n.cleanerAppsFilterStale,
-              value: _compactUsageLabel(
-                l10n,
-                profile.usage,
-                evaluatedAt,
-              ),
+              value: _compactUsageLabel(l10n, profile.usage, evaluatedAt),
               valueColor: isAttention ? attentionColor : null,
             ),
           ),
@@ -1304,9 +1290,7 @@ class _DetailsActions extends StatelessWidget {
         if (profile.app.canManage && onManageApp != null)
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(shape: buttonShape),
-            key: ValueKey<String>(
-              'cleaner-app-manage-${profile.app.id}',
-            ),
+            key: ValueKey<String>('cleaner-app-manage-${profile.app.id}'),
             onPressed: () => onManageApp!(profile.app),
             icon: const Icon(Icons.settings_outlined, size: 17),
             label: Text(l10n.cleanerAppsManageInWindows),
@@ -1314,9 +1298,7 @@ class _DetailsActions extends StatelessWidget {
         if (profile.cleanableBytes > 0 && onReviewCleanable != null)
           FilledButton.tonalIcon(
             style: FilledButton.styleFrom(shape: buttonShape),
-            key: ValueKey<String>(
-              'cleaner-app-review-${profile.app.id}',
-            ),
+            key: ValueKey<String>('cleaner-app-review-${profile.app.id}'),
             onPressed: () => onReviewCleanable!(profile),
             icon: const Icon(Icons.fact_check_outlined, size: 17),
             label: Text(l10n.cleanerAppsReviewCleanable),
@@ -1324,9 +1306,7 @@ class _DetailsActions extends StatelessWidget {
         if (onAskAgent != null)
           FilledButton.tonalIcon(
             style: FilledButton.styleFrom(shape: buttonShape),
-            key: ValueKey<String>(
-              'cleaner-app-ask-agent-${profile.app.id}',
-            ),
+            key: ValueKey<String>('cleaner-app-ask-agent-${profile.app.id}'),
             onPressed: () => onAskAgent!(profile),
             icon: const Icon(Icons.auto_awesome_outlined, size: 17),
             label: Text(l10n.cleanerAppsAskAgent),
@@ -1341,10 +1321,10 @@ class _StorageEntryTile extends StatelessWidget {
   final AppStorageEntryAction? onOpenFolder;
 
   const _StorageEntryTile({
-    Key? key,
+    super.key,
     required this.entry,
     required this.onOpenFolder,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1353,10 +1333,8 @@ class _StorageEntryTile extends StatelessWidget {
     final size = entry.sizeBytes > 0
         ? FormatUtils.formatFileSize(entry.sizeBytes)
         : l10n.cleanerAppsUnknown;
-    final technicalDetails = '${_measurementLabel(
-      l10n,
-      entry.measurementQuality,
-    )} • ${_attributionLabel(l10n, entry.attributionConfidence)}';
+    final technicalDetails =
+        '${_measurementLabel(l10n, entry.measurementQuality)} • ${_attributionLabel(l10n, entry.attributionConfidence)}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -1418,9 +1396,7 @@ class _StorageEntryTile extends StatelessWidget {
               style: IconButton.styleFrom(
                 shape: ChipTheme.of(context).shape ?? const StadiumBorder(),
               ),
-              key: ValueKey<String>(
-                'cleaner-app-open-folder-${entry.path}',
-              ),
+              key: ValueKey<String>('cleaner-app-open-folder-${entry.path}'),
               tooltip: l10n.cleanerAppsOpenFolder,
               onPressed: () => onOpenFolder!(entry),
               icon: const Icon(Icons.folder_open_outlined, size: 18),
@@ -1610,10 +1586,7 @@ String _sortLabel(AppLocalizations l10n, CleanerAppSort sort) {
   }
 }
 
-String _measurementLabel(
-  AppLocalizations l10n,
-  MeasurementQuality quality,
-) {
+String _measurementLabel(AppLocalizations l10n, MeasurementQuality quality) {
   switch (quality) {
     case MeasurementQuality.measured:
       return l10n.cleanerAppsMeasurementMeasured;
@@ -1683,10 +1656,7 @@ IconData _storageKindIcon(AppStorageKind kind) {
   }
 }
 
-String _profileSizeLabel(
-  AppLocalizations l10n,
-  AppStorageProfile profile,
-) {
+String _profileSizeLabel(AppLocalizations l10n, AppStorageProfile profile) {
   final bytes = profile.bestKnownSizeBytes;
   if (bytes <= 0 &&
       (profile.measurementQuality == MeasurementQuality.partial ||
@@ -1705,7 +1675,5 @@ String _compactUsageLabel(
   if (date == null || date.isAfter(evaluatedAt)) {
     return l10n.cleanerAppsUsageUnknownCompact;
   }
-  return l10n.cleanerAppsNotOpenedForDays(
-    evaluatedAt.difference(date).inDays,
-  );
+  return l10n.cleanerAppsNotOpenedForDays(evaluatedAt.difference(date).inDays);
 }

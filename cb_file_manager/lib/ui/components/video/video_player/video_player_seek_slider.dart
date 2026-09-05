@@ -11,14 +11,14 @@ class VideoPlayerSeekSlider extends StatelessWidget {
   final VoidCallback? onChangeEnd;
 
   const VideoPlayerSeekSlider({
-    Key? key,
+    super.key,
     required this.value,
     required this.min,
     required this.max,
     this.onChangeStart,
     this.onChanged,
     this.onChangeEnd,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

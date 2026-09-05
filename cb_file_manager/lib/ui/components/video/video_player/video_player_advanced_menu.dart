@@ -59,7 +59,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
   final Duration? sleepDuration;
 
   const VideoPlayerAdvancedMenu({
-    Key? key,
+    super.key,
     this.onScreenshot,
     this.onAudioTracks,
     this.onSubtitles,
@@ -72,7 +72,7 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
     this.playbackSpeed = 1.0,
     this.isPictureInPicture = false,
     this.sleepDuration,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -83,8 +83,11 @@ class VideoPlayerAdvancedMenu extends StatelessWidget {
     return Semantics(
       container: true,
       child: PopupMenuButton<String>(
-        icon: const Icon(PhosphorIconsLight.dotsThreeVertical,
-            color: Colors.white, size: 24),
+        icon: const Icon(
+          PhosphorIconsLight.dotsThreeVertical,
+          color: Colors.white,
+          size: 24,
+        ),
         color: Colors.black.withValues(alpha: 0.9),
         tooltip: 'Advanced Controls',
         onSelected: (String value) {

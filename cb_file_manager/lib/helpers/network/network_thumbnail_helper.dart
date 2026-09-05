@@ -36,7 +36,7 @@ class _QueuedThumbnailRequest {
   final Completer<String?> completer;
 
   _QueuedThumbnailRequest(this.path, this.key, this.size, this.isSmb)
-      : completer = Completer<String?>();
+    : completer = Completer<String?>();
 }
 
 class NetworkThumbnailHelper {
@@ -161,8 +161,9 @@ class NetworkThumbnailHelper {
 
     // Cancel debounce timers for all sizes of this path.
     final prefix = '$path:';
-    final debounceKeys =
-        _debounceTimers.keys.where((k) => k.startsWith(prefix)).toList();
+    final debounceKeys = _debounceTimers.keys
+        .where((k) => k.startsWith(prefix))
+        .toList();
     for (final key in debounceKeys) {
       _debounceTimers[key]?.cancel();
       _debounceTimers.remove(key);
@@ -460,8 +461,9 @@ class NetworkThumbnailHelper {
     final sanitizedPath = sanitizePath(networkFilePath);
 
     // Create a safe filename from the network path
-    final fileName =
-        p.basename(sanitizedPath).replaceAll(RegExp(r'[<>:"/\\|?*%]'), '_');
+    final fileName = p
+        .basename(sanitizedPath)
+        .replaceAll(RegExp(r'[<>:"/\\|?*%]'), '_');
 
     // Create a unique identifier for the path to avoid collisions
     final pathHash = sanitizedPath.hashCode.abs().toString();
@@ -508,12 +510,12 @@ class NetworkThumbnailHelper {
       final backoffMinutes = retryCount <= 1
           ? 2
           : retryCount == 2
-              ? 5
-              : retryCount == 3
-                  ? 10
-                  : retryCount == 4
-                      ? 20
-                      : 30;
+          ? 5
+          : retryCount == 3
+          ? 10
+          : retryCount == 4
+          ? 20
+          : 30;
       final backoffDelay = Duration(minutes: backoffMinutes);
 
       if (durationSinceLast < backoffDelay) {
@@ -648,8 +650,8 @@ class NetworkThumbnailHelper {
 
       // Không bỏ qua yêu cầu – chỉ cần xếp vào hàng đợi, hệ thống sẽ xử lý dần
       final isSmbFile = networkFilePath.toLowerCase().startsWith(
-            '#network/smb/'.toLowerCase(),
-          );
+        '#network/smb/'.toLowerCase(),
+      );
       final request = _QueuedThumbnailRequest(
         networkFilePath,
         requestKey,
@@ -678,16 +680,16 @@ class NetworkThumbnailHelper {
     try {
       // For SMB files (case-insensitive check for convenience)
       if (networkFilePath.toLowerCase().startsWith(
-            '#network/smb/'.toLowerCase(),
-          )) {
+        '#network/smb/'.toLowerCase(),
+      )) {
         // Store the future to prevent duplicate requests
         final timeout = (Platform.isAndroid || Platform.isIOS)
             ? const Duration(seconds: 6)
             : const Duration(seconds: 3);
-        final future = _generateSMBThumbnail(networkFilePath, size).timeout(
-          timeout,
-          onTimeout: () => null,
-        ); // Shorter timeout
+        final future = _generateSMBThumbnail(
+          networkFilePath,
+          size,
+        ).timeout(timeout, onTimeout: () => null); // Shorter timeout
         _pendingRequests[requestKey] = future;
 
         // Clean up pending request when done
@@ -757,10 +759,10 @@ class NetworkThumbnailHelper {
           try {
             final thumbnailData =
                 await SmbNativeThumbnailHelper.generateThumbnailDirect(
-              filePath: unc,
-              thumbnailSize: size,
-              useFastMode: false, // Use high quality mode
-            ).timeout(const Duration(seconds: 2), onTimeout: () => null);
+                  filePath: unc,
+                  thumbnailSize: size,
+                  useFastMode: false, // Use high quality mode
+                ).timeout(const Duration(seconds: 2), onTimeout: () => null);
 
             if (thumbnailData != null && thumbnailData.isNotEmpty) {
               return await _saveThumbnailToFile(
@@ -867,10 +869,7 @@ class NetworkThumbnailHelper {
     final data = bytes.takeBytes();
     if (data.isEmpty) return null;
 
-    return compute(_generateImageThumbnailBytes, {
-      'bytes': data,
-      'size': size,
-    });
+    return compute(_generateImageThumbnailBytes, {'bytes': data, 'size': size});
   }
 
   /// Generate thumbnails using Windows native APIs (much faster)
@@ -913,20 +912,23 @@ class NetworkThumbnailHelper {
       // Validate image data before decoding
       if (bytes.isEmpty) {
         debugPrint(
-            'NetworkThumbnail (Isolate): Empty image data for $sourcePath');
+          'NetworkThumbnail (Isolate): Empty image data for $sourcePath',
+        );
         return null;
       }
 
       if (bytes.length < 100) {
         debugPrint(
-            'NetworkThumbnail (Isolate): Image data too small (${bytes.length} bytes) for $sourcePath');
+          'NetworkThumbnail (Isolate): Image data too small (${bytes.length} bytes) for $sourcePath',
+        );
         return null;
       }
 
       final img.Image? decoded = img.decodeImage(bytes);
       if (decoded == null) {
         debugPrint(
-            'NetworkThumbnail (Isolate): Failed to decode image data (${bytes.length} bytes) for $sourcePath - invalid image data');
+          'NetworkThumbnail (Isolate): Failed to decode image data (${bytes.length} bytes) for $sourcePath - invalid image data',
+        );
         return null;
       }
 
@@ -1218,15 +1220,17 @@ class NetworkThumbnailHelper {
       });
     });
 
-    future.then((result) {
-      if (!request.completer.isCompleted) {
-        request.completer.complete(result);
-      }
-    }).catchError((error) {
-      if (!request.completer.isCompleted) {
-        request.completer.completeError(error);
-      }
-    });
+    future
+        .then((result) {
+          if (!request.completer.isCompleted) {
+            request.completer.complete(result);
+          }
+        })
+        .catchError((error) {
+          if (!request.completer.isCompleted) {
+            request.completer.completeError(error);
+          }
+        });
   }
 
   // Basic resource cleanup: trims caches and triggers periodic cleanup

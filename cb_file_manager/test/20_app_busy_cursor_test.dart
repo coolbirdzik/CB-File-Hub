@@ -18,9 +18,7 @@ void main() {
 
   Future<void> pumpOverlay(WidgetTester tester) {
     return tester.pumpWidget(
-      const MaterialApp(
-        home: AppBusyCursorOverlay(child: SizedBox.expand()),
-      ),
+      const MaterialApp(home: AppBusyCursorOverlay(child: SizedBox.expand())),
     );
   }
 
@@ -43,8 +41,9 @@ void main() {
     expect(busyRegion(tester), isNull);
   });
 
-  testWidgets('scope keeps the cursor until the work completes',
-      (tester) async {
+  testWidgets('scope keeps the cursor until the work completes', (
+    tester,
+  ) async {
     await pumpOverlay(tester);
 
     final completer = Completer<void>();
@@ -81,47 +80,47 @@ void main() {
   });
 
   testWidgets(
-      'busy cursor overrides the item cursor under a stationary pointer',
-      (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: AppBusyCursorOverlay(
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: SizedBox.expand(key: ValueKey('row')),
+    'busy cursor overrides the item cursor under a stationary pointer',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: AppBusyCursorOverlay(
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: SizedBox.expand(key: ValueKey('row')),
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await gesture.addPointer(
-      location: tester.getCenter(find.byKey(const ValueKey('row'))),
-    );
-    addTearDown(() => gesture.removePointer());
-    await tester.pump();
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(
+        location: tester.getCenter(find.byKey(const ValueKey('row'))),
+      );
+      addTearDown(() => gesture.removePointer());
+      await tester.pump();
 
-    MouseCursor? activeCursor() =>
-        RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1);
+      MouseCursor? activeCursor() =>
+          RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1);
 
-    expect(activeCursor(), SystemMouseCursors.click);
+      expect(activeCursor(), SystemMouseCursors.click);
 
-    // No pointer movement: the cursor must still flip on the next frame.
-    AppBusyCursor.pulse(const Duration(milliseconds: 300));
-    await tester.pump();
-    expect(activeCursor(), SystemMouseCursors.progress);
+      // No pointer movement: the cursor must still flip on the next frame.
+      AppBusyCursor.pulse(const Duration(milliseconds: 300));
+      await tester.pump();
+      expect(activeCursor(), SystemMouseCursors.progress);
 
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(activeCursor(), SystemMouseCursors.click);
-  });
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(activeCursor(), SystemMouseCursors.click);
+    },
+  );
 
-  testWidgets('toggling the busy cursor never remounts the app subtree',
-      (tester) async {
+  testWidgets('toggling the busy cursor never remounts the app subtree', (
+    tester,
+  ) async {
     _MountProbeState.mounts = 0;
     await tester.pumpWidget(
-      const MaterialApp(
-        home: AppBusyCursorOverlay(child: _MountProbe()),
-      ),
+      const MaterialApp(home: AppBusyCursorOverlay(child: _MountProbe())),
     );
     expect(_MountProbeState.mounts, 1);
 
@@ -135,13 +134,19 @@ void main() {
     expect(_MountProbeState.mounts, 1);
   });
 
-  testWidgets('overlay contributes no semantics nodes in either state',
-      (tester) async {
+  testWidgets('overlay contributes no semantics nodes in either state', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
 
     int countNodes() {
       final root = tester
-          .binding.renderViews.first.owner?.semanticsOwner?.rootSemanticsNode;
+          .binding
+          .renderViews
+          .first
+          .owner
+          ?.semanticsOwner
+          ?.rootSemanticsNode;
       if (root == null) return 0;
       var total = 0;
       void walk(SemanticsNode node) {
@@ -185,7 +190,7 @@ void main() {
 
 /// Counts how often it is mounted, so a reparented overlay is caught.
 class _MountProbe extends StatefulWidget {
-  const _MountProbe({Key? key}) : super(key: key);
+  const _MountProbe();
 
   @override
   State<_MountProbe> createState() => _MountProbeState();

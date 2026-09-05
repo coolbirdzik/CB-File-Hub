@@ -75,7 +75,8 @@ class VideoLibraryCacheService {
       return validPaths;
     } catch (e) {
       debugPrint(
-          'VideoLibraryCache: failed to load cache for library $libraryId: $e');
+        'VideoLibraryCache: failed to load cache for library $libraryId: $e',
+      );
       return null;
     }
   }
@@ -92,7 +93,8 @@ class VideoLibraryCacheService {
       await file.writeAsString(jsonEncode(data));
     } catch (e) {
       debugPrint(
-          'VideoLibraryCache: failed to save cache for library $libraryId: $e');
+        'VideoLibraryCache: failed to save cache for library $libraryId: $e',
+      );
     }
   }
 
@@ -107,7 +109,8 @@ class VideoLibraryCacheService {
       }
     } catch (e) {
       debugPrint(
-          'VideoLibraryCache: failed to invalidate library $libraryId: $e');
+        'VideoLibraryCache: failed to invalidate library $libraryId: $e',
+      );
     }
   }
 

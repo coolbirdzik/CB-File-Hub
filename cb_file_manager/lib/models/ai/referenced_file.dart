@@ -51,26 +51,32 @@ class ReferencedFile extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
-        'path': path,
-        'fileName': fileName,
-        'isTextFile': isTextFile,
-        'content': content,
-        'contentLoaded': contentLoaded,
-        'error': error,
-      };
+    'path': path,
+    'fileName': fileName,
+    'isTextFile': isTextFile,
+    'content': content,
+    'contentLoaded': contentLoaded,
+    'error': error,
+  };
 
   factory ReferencedFile.fromJson(Map<String, dynamic> json) => ReferencedFile(
-        path: json['path'] as String? ?? '',
-        fileName: json['fileName'] as String? ?? '',
-        isTextFile: json['isTextFile'] as bool? ?? false,
-        content: json['content'] as String?,
-        contentLoaded: json['contentLoaded'] as bool? ?? false,
-        error: json['error'] as String?,
-      );
+    path: json['path'] as String? ?? '',
+    fileName: json['fileName'] as String? ?? '',
+    isTextFile: json['isTextFile'] as bool? ?? false,
+    content: json['content'] as String?,
+    contentLoaded: json['contentLoaded'] as bool? ?? false,
+    error: json['error'] as String?,
+  );
 
   @override
-  List<Object?> get props =>
-      [path, fileName, isTextFile, content, contentLoaded, error];
+  List<Object?> get props => [
+    path,
+    fileName,
+    isTextFile,
+    content,
+    contentLoaded,
+    error,
+  ];
 
   /// Returns true if the file extension matches a known text file type.
   static bool isTextExtension(String ext) {

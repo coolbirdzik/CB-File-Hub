@@ -97,9 +97,7 @@ class RouteUtils {
       } catch (homeError) {
         debugPrint('Failed to go home: $homeError');
         // If even going home fails, restart the app
-        runApp(CBFileApp(
-          windowAcrylicService: WindowAcrylicService(),
-        ));
+        runApp(CBFileApp(windowAcrylicService: WindowAcrylicService()));
       }
     }
   }

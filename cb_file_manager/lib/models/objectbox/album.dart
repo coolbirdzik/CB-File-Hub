@@ -17,8 +17,8 @@ class Album {
     DateTime? modifiedAt,
     this.colorTheme,
     this.isSystemAlbum = false,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        modifiedAt = modifiedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       modifiedAt = modifiedAt ?? DateTime.now();
 
   factory Album.fromDatabaseMap(Map<String, Object?> map) {
     return Album(

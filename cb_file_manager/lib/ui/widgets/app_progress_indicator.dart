@@ -13,21 +13,22 @@ class AppProgressIndicator extends StatelessWidget {
   final double? value; // Add this to support determinate progress
 
   const AppProgressIndicator({
-    Key? key,
+    super.key,
     this.height = 3.0,
     this.backgroundColor,
     this.valueColor,
     this.borderRadius,
     this.showGlow = true,
     this.value,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final effectiveBackgroundColor = backgroundColor ??
+    final effectiveBackgroundColor =
+        backgroundColor ??
         colorScheme.surfaceContainerHighest.withValues(alpha: 0.3);
     final effectiveValueColor = valueColor ?? colorScheme.primary;
     final effectiveBorderRadius =
@@ -67,47 +68,34 @@ class AppProgressIndicator extends StatelessWidget {
 /// Thin version for subtle loading states
 class AppProgressIndicatorThin extends AppProgressIndicator {
   const AppProgressIndicatorThin({
-    Key? key,
-    Color? backgroundColor,
-    Color? valueColor,
-    bool showGlow = false,
-  }) : super(
-            key: key,
-            height: 2.0,
-            backgroundColor: backgroundColor,
-            valueColor: valueColor,
-            showGlow: showGlow);
+    super.key,
+    super.backgroundColor,
+    super.valueColor,
+    super.showGlow = false,
+  }) : super(height: 2.0);
 }
 
 /// Thick version for prominent loading states
 class AppProgressIndicatorThick extends AppProgressIndicator {
   const AppProgressIndicatorThick({
-    Key? key,
-    Color? backgroundColor,
-    Color? valueColor,
-    bool showGlow = true,
-  }) : super(
-            key: key,
-            height: 4.0,
-            backgroundColor: backgroundColor,
-            valueColor: valueColor,
-            showGlow: showGlow);
+    super.key,
+    super.backgroundColor,
+    super.valueColor,
+    super.showGlow,
+  }) : super(height: 4.0);
 }
 
 /// Rounded version with more pronounced curves
 class AppProgressIndicatorRounded extends AppProgressIndicator {
   const AppProgressIndicatorRounded({
-    Key? key,
-    Color? backgroundColor,
-    Color? valueColor,
-    bool showGlow = true,
+    super.key,
+    super.backgroundColor,
+    super.valueColor,
+    super.showGlow,
   }) : super(
-            key: key,
-            height: 6.0,
-            borderRadius: const BorderRadius.all(Radius.circular(3.0)),
-            backgroundColor: backgroundColor,
-            valueColor: valueColor,
-            showGlow: showGlow);
+         height: 6.0,
+         borderRadius: const BorderRadius.all(Radius.circular(3.0)),
+       );
 }
 
 /// Clean and simple progress bar with subtle animations
@@ -120,14 +108,14 @@ class AppProgressIndicatorBeautiful extends StatefulWidget {
   final bool animated;
 
   const AppProgressIndicatorBeautiful({
-    Key? key,
+    super.key,
     this.height = 4.0,
     this.backgroundColor,
     this.valueColor,
     this.showGlow = false,
     this.value,
     this.animated = true,
-  }) : super(key: key);
+  });
 
   @override
   State<AppProgressIndicatorBeautiful> createState() =>
@@ -135,7 +123,8 @@ class AppProgressIndicatorBeautiful extends StatefulWidget {
 }
 
 class _AppProgressIndicatorBeautifulState
-    extends State<AppProgressIndicatorBeautiful> with TickerProviderStateMixin {
+    extends State<AppProgressIndicatorBeautiful>
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -148,13 +137,9 @@ class _AppProgressIndicatorBeautifulState
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.6,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
 
     if (widget.animated) {
       _animationController.repeat(reverse: true);
@@ -172,14 +157,16 @@ class _AppProgressIndicatorBeautifulState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final effectiveBackgroundColor = widget.backgroundColor ??
+    final effectiveBackgroundColor =
+        widget.backgroundColor ??
         colorScheme.surfaceContainerHighest.withValues(alpha: 0.15);
 
     final effectiveValueColor = widget.valueColor ?? colorScheme.primary;
 
     return AnimatedBuilder(
-      animation:
-          widget.animated ? _fadeAnimation : const AlwaysStoppedAnimation(1.0),
+      animation: widget.animated
+          ? _fadeAnimation
+          : const AlwaysStoppedAnimation(1.0),
       builder: (context, child) {
         return Container(
           height: widget.height,
@@ -215,11 +202,7 @@ class AppWaveLoader extends StatefulWidget {
   final double size;
   final Color? color;
 
-  const AppWaveLoader({
-    Key? key,
-    this.size = 24,
-    this.color,
-  }) : super(key: key);
+  const AppWaveLoader({super.key, this.size = 24, this.color});
 
   @override
   State<AppWaveLoader> createState() => _AppWaveLoaderState();

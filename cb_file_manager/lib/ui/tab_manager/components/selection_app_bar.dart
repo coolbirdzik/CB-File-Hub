@@ -17,7 +17,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isNetworkPath;
 
   const SelectionAppBar({
-    Key? key,
+    super.key,
     required this.selectedCount,
     required this.selectedFileCount,
     required this.selectedFolderCount,
@@ -28,7 +28,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.showManageAllTagsDialog,
     required this.showDeleteConfirmationDialog,
     this.isNetworkPath = false,
-  }) : super(key: key);
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -44,7 +44,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     // Warn if our count doesn't match what was passed in
     if (selectedCount != actualCount) {
       debugPrint(
-          "⚠️ SelectionAppBar - Count mismatch: passed=$selectedCount, actual=$actualCount (files=$fileCount, folders=$folderCount)");
+        "⚠️ SelectionAppBar - Count mismatch: passed=$selectedCount, actual=$actualCount (files=$fileCount, folders=$folderCount)",
+      );
     }
 
     return AppBar(

@@ -12,7 +12,7 @@ class SoftCheckbox extends StatelessWidget {
   final bool compact;
 
   const SoftCheckbox({
-    Key? key,
+    super.key,
     this.value,
     this.onChanged,
     this.tristate = false,
@@ -20,7 +20,7 @@ class SoftCheckbox extends StatelessWidget {
     this.activeColor,
     this.checkColor,
     this.compact = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -37,10 +37,7 @@ class SoftCheckbox extends StatelessWidget {
           shape: BoxShape.rectangle,
           borderRadius: BorderRadius.circular(effectiveSize / 3),
           color: _getBackgroundColor(theme),
-          border: Border.all(
-            color: _getBorderColor(theme),
-            width: 2,
-          ),
+          border: Border.all(color: _getBorderColor(theme), width: 2),
         ),
         child: _buildCheckMark(theme, effectiveSize),
       ),
@@ -114,11 +111,11 @@ class SoftCheckboxInline extends StatelessWidget {
   final double size;
 
   const SoftCheckboxInline({
-    Key? key,
+    super.key,
     required this.value,
     this.onChanged,
     this.size = 20,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,8 +132,9 @@ class SoftCheckboxInline extends StatelessWidget {
           borderRadius: BorderRadius.circular(size / 3.5),
           color: value ? theme.colorScheme.primary : Colors.transparent,
           border: Border.all(
-            color:
-                value ? theme.colorScheme.primary : theme.colorScheme.outline,
+            color: value
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline,
             width: 1.5,
           ),
         ),

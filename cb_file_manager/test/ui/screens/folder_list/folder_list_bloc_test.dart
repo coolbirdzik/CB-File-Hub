@@ -24,8 +24,9 @@ void main() {
     StreamSubscription? subscription;
 
     try {
-      await File('${root.path}${Platform.pathSeparator}visible.txt')
-          .writeAsString('visible');
+      await File(
+        '${root.path}${Platform.pathSeparator}visible.txt',
+      ).writeAsString('visible');
       DirectoryListingCacheService.instance.clearAll();
 
       subscription = bloc.stream.listen((state) {
@@ -39,11 +40,13 @@ void main() {
       });
 
       bloc.add(FolderListLoad(root.path));
-      await bloc.stream.firstWhere((state) =>
-          repeated &&
-          state.currentPath.path == root.path &&
-          !state.isLoading &&
-          state.files.isNotEmpty);
+      await bloc.stream.firstWhere(
+        (state) =>
+            repeated &&
+            state.currentPath.path == root.path &&
+            !state.isLoading &&
+            state.files.isNotEmpty,
+      );
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       expect(repeated, isTrue);

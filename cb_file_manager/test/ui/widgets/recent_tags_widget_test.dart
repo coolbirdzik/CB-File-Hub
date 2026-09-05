@@ -5,8 +5,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('recent tags block renders and selects a recent tag',
-      (tester) async {
+  testWidgets('recent tags block renders and selects a recent tag', (
+    tester,
+  ) async {
     String? selectedTag;
 
     await tester.pumpWidget(

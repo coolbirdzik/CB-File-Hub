@@ -215,7 +215,7 @@ Run `just` recipes from the repository root. Run direct `flutter` and `dart` com
 
 ### Prerequisites
 
-- Flutter SDK 3.41.5 stable
+- Flutter SDK 3.47.2 stable
 - Dart SDK bundled with that Flutter SDK
 - `just`
 - Git Bash on Windows, used by the repository `justfile`

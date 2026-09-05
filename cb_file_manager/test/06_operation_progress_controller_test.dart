@@ -17,9 +17,13 @@ void main() {
     );
 
     expect(
-        controller.runningEntries.map((entry) => entry.id), contains(copyId));
+      controller.runningEntries.map((entry) => entry.id),
+      contains(copyId),
+    );
     expect(
-        controller.runningEntries.map((entry) => entry.id), contains(deleteId));
+      controller.runningEntries.map((entry) => entry.id),
+      contains(deleteId),
+    );
     expect(controller.runningEntries, hasLength(2));
   });
 
@@ -59,25 +63,28 @@ void main() {
   });
 
   test(
-      '06.04 dismiss removes a single entry and dismissFinished clears history',
-      () {
-    final controller = OperationProgressController();
+    '06.04 dismiss removes a single entry and dismissFinished clears history',
+    () {
+      final controller = OperationProgressController();
 
-    final running = controller.begin(title: 'Running', total: 1);
-    final finished = controller.begin(title: 'Finished', total: 1);
-    controller.succeed(finished);
+      final running = controller.begin(title: 'Running', total: 1);
+      final finished = controller.begin(title: 'Finished', total: 1);
+      controller.succeed(finished);
 
-    controller.dismiss(finished);
+      controller.dismiss(finished);
 
-    expect(controller.entries.map((entry) => entry.id), contains(running));
-    expect(
-        controller.entries.map((entry) => entry.id), isNot(contains(finished)));
+      expect(controller.entries.map((entry) => entry.id), contains(running));
+      expect(
+        controller.entries.map((entry) => entry.id),
+        isNot(contains(finished)),
+      );
 
-    controller.succeed(running);
-    controller.dismissFinished();
+      controller.succeed(running);
+      controller.dismissFinished();
 
-    expect(controller.entries, isEmpty);
-  });
+      expect(controller.entries, isEmpty);
+    },
+  );
 
   test('06.05 indeterminate tasks make aggregate indeterminate', () {
     final controller = OperationProgressController();
@@ -92,23 +99,24 @@ void main() {
   });
 
   test(
-      '06.06 markAllSeen clears notification badge count without removing entries',
-      () {
-    final controller = OperationProgressController();
+    '06.06 markAllSeen clears notification badge count without removing entries',
+    () {
+      final controller = OperationProgressController();
 
-    final first = controller.begin(title: 'First', total: 1);
-    final second = controller.begin(title: 'Second', total: 1);
+      final first = controller.begin(title: 'First', total: 1);
+      final second = controller.begin(title: 'Second', total: 1);
 
-    expect(controller.unseenCount, 2);
+      expect(controller.unseenCount, 2);
 
-    controller.markAllSeen();
+      controller.markAllSeen();
 
-    expect(controller.unseenCount, 0);
-    expect(controller.entries.map((entry) => entry.id), contains(first));
-    expect(controller.entries.map((entry) => entry.id), contains(second));
+      expect(controller.unseenCount, 0);
+      expect(controller.entries.map((entry) => entry.id), contains(first));
+      expect(controller.entries.map((entry) => entry.id), contains(second));
 
-    controller.begin(title: 'Third', total: 1);
+      controller.begin(title: 'Third', total: 1);
 
-    expect(controller.unseenCount, 1);
-  });
+      expect(controller.unseenCount, 1);
+    },
+  );
 }

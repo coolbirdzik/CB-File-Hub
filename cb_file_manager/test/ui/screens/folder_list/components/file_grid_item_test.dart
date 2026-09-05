@@ -22,11 +22,8 @@ void main() {
                 isSelected: false,
                 isDesktopMode: true,
                 showFileTags: false,
-                toggleFileSelection: (
-                  path, {
-                  shiftSelect = false,
-                  ctrlSelect = false,
-                }) {},
+                toggleFileSelection:
+                    (path, {shiftSelect = false, ctrlSelect = false}) {},
                 toggleSelectionMode: () {},
                 onFileTap: (openedFile, isVideo) {
                   openedFiles.add(openedFile);

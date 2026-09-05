@@ -129,15 +129,9 @@ class ThumbnailBackgroundIsolate {
           break;
       }
 
-      mainSendPort.send({
-        'requestId': requestId,
-        'result': result,
-      });
+      mainSendPort.send({'requestId': requestId, 'result': result});
     } catch (e) {
-      mainSendPort.send({
-        'requestId': requestId,
-        'error': e.toString(),
-      });
+      mainSendPort.send({'requestId': requestId, 'error': e.toString()});
     }
   }
 

@@ -110,13 +110,18 @@ class SharedActionBar {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                 child: Row(
                   children: [
-                    Icon(PhosphorIconsLight.squaresFour,
-                        size: 22, color: colorScheme.primary),
+                    Icon(
+                      PhosphorIconsLight.squaresFour,
+                      size: 22,
+                      color: colorScheme.primary,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       l10n.adjustGridSizeTitle,
                       style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -141,8 +146,11 @@ class SharedActionBar {
                     ),
                   ),
                   trailing: i == currentGridSize
-                      ? Icon(PhosphorIconsLight.check,
-                          color: colorScheme.primary, size: 20)
+                      ? Icon(
+                          PhosphorIconsLight.check,
+                          color: colorScheme.primary,
+                          size: 20,
+                        )
                       : null,
                   onTap: () {
                     onApply(i);
@@ -179,8 +187,9 @@ class SharedActionBar {
           Text(
             l10n.gridSizeLabel(size),
             style: TextStyle(
-              fontWeight:
-                  size == currentSize ? FontWeight.bold : FontWeight.normal,
+              fontWeight: size == currentSize
+                  ? FontWeight.bold
+                  : FontWeight.normal,
               color: size == currentSize
                   ? Theme.of(context).colorScheme.primary
                   : null,
@@ -188,8 +197,11 @@ class SharedActionBar {
           ),
           const Spacer(),
           if (size == currentSize)
-            Icon(PhosphorIconsLight.check,
-                color: Theme.of(context).colorScheme.primary, size: 20),
+            Icon(
+              PhosphorIconsLight.check,
+              color: Theme.of(context).colorScheme.primary,
+              size: 20,
+            ),
         ],
       ),
     );
@@ -502,9 +514,7 @@ class SharedActionBar {
                             : null,
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(l10n.allowFileExtensionRename),
-                      ),
+                      Expanded(child: Text(l10n.allowFileExtensionRename)),
                       if (allowFileExtensionRename)
                         Icon(
                           PhosphorIconsLight.check,
@@ -535,8 +545,9 @@ class SharedActionBar {
                 }
                 break;
               case 'toggle_file_extension_rename':
-                onAllowFileExtensionRenameChanged
-                    ?.call(!allowFileExtensionRename);
+                onAllowFileExtensionRenameChanged?.call(
+                  !allowFileExtensionRename,
+                );
                 break;
               default:
                 onAdditionalMoreOptionSelected?.call(value);
@@ -602,63 +613,109 @@ class SharedActionBar {
         initialValue: currentSortOption,
         onSelected: onSortOptionSelected,
         itemBuilder: (context) => [
-          buildSortMenuItem(context, SortOption.nameAsc, l10n.sortNameAsc,
-              PhosphorIconsLight.fileText, currentSortOption),
-          buildSortMenuItem(context, SortOption.nameDesc, l10n.sortNameDesc,
-              PhosphorIconsLight.fileText, currentSortOption),
+          buildSortMenuItem(
+            context,
+            SortOption.nameAsc,
+            l10n.sortNameAsc,
+            PhosphorIconsLight.fileText,
+            currentSortOption,
+          ),
+          buildSortMenuItem(
+            context,
+            SortOption.nameDesc,
+            l10n.sortNameDesc,
+            PhosphorIconsLight.fileText,
+            currentSortOption,
+          ),
           const PopupMenuDivider(),
           buildSortMenuItem(
-              context,
-              SortOption.dateAsc,
-              l10n.sortDateModifiedOldest,
-              PhosphorIconsLight.calendar,
-              currentSortOption),
+            context,
+            SortOption.dateAsc,
+            l10n.sortDateModifiedOldest,
+            PhosphorIconsLight.calendar,
+            currentSortOption,
+          ),
           buildSortMenuItem(
-              context,
-              SortOption.dateDesc,
-              l10n.sortDateModifiedNewest,
-              PhosphorIconsLight.calendar,
-              currentSortOption),
+            context,
+            SortOption.dateDesc,
+            l10n.sortDateModifiedNewest,
+            PhosphorIconsLight.calendar,
+            currentSortOption,
+          ),
           const PopupMenuDivider(),
           buildSortMenuItem(
-              context,
-              SortOption.dateCreatedAsc,
-              l10n.sortDateCreatedOldest,
-              PhosphorIconsLight.clock,
-              currentSortOption),
+            context,
+            SortOption.dateCreatedAsc,
+            l10n.sortDateCreatedOldest,
+            PhosphorIconsLight.clock,
+            currentSortOption,
+          ),
           buildSortMenuItem(
-              context,
-              SortOption.dateCreatedDesc,
-              l10n.sortDateCreatedNewest,
-              PhosphorIconsLight.clock,
-              currentSortOption),
-          buildSortMenuItem(context, SortOption.sizeAsc, l10n.sortSizeSmallest,
-              PhosphorIconsLight.chartBar, currentSortOption),
-          buildSortMenuItem(context, SortOption.sizeDesc, l10n.sortSizeLargest,
-              PhosphorIconsLight.chartBar, currentSortOption),
-          const PopupMenuDivider(),
-          buildSortMenuItem(context, SortOption.typeAsc, l10n.sortTypeAsc,
-              PhosphorIconsLight.file, currentSortOption),
-          buildSortMenuItem(context, SortOption.typeDesc, l10n.sortTypeDesc,
-              PhosphorIconsLight.file, currentSortOption),
-          const PopupMenuDivider(),
-          buildSortMenuItem(context, SortOption.extensionAsc,
-              l10n.sortExtensionAsc, PhosphorIconsLight.at, currentSortOption),
-          buildSortMenuItem(context, SortOption.extensionDesc,
-              l10n.sortExtensionDesc, PhosphorIconsLight.at, currentSortOption),
+            context,
+            SortOption.dateCreatedDesc,
+            l10n.sortDateCreatedNewest,
+            PhosphorIconsLight.clock,
+            currentSortOption,
+          ),
+          buildSortMenuItem(
+            context,
+            SortOption.sizeAsc,
+            l10n.sortSizeSmallest,
+            PhosphorIconsLight.chartBar,
+            currentSortOption,
+          ),
+          buildSortMenuItem(
+            context,
+            SortOption.sizeDesc,
+            l10n.sortSizeLargest,
+            PhosphorIconsLight.chartBar,
+            currentSortOption,
+          ),
           const PopupMenuDivider(),
           buildSortMenuItem(
-              context,
-              SortOption.attributesAsc,
-              l10n.sortAttributesAsc,
-              PhosphorIconsLight.info,
-              currentSortOption),
+            context,
+            SortOption.typeAsc,
+            l10n.sortTypeAsc,
+            PhosphorIconsLight.file,
+            currentSortOption,
+          ),
           buildSortMenuItem(
-              context,
-              SortOption.attributesDesc,
-              l10n.sortAttributesDesc,
-              PhosphorIconsLight.info,
-              currentSortOption),
+            context,
+            SortOption.typeDesc,
+            l10n.sortTypeDesc,
+            PhosphorIconsLight.file,
+            currentSortOption,
+          ),
+          const PopupMenuDivider(),
+          buildSortMenuItem(
+            context,
+            SortOption.extensionAsc,
+            l10n.sortExtensionAsc,
+            PhosphorIconsLight.at,
+            currentSortOption,
+          ),
+          buildSortMenuItem(
+            context,
+            SortOption.extensionDesc,
+            l10n.sortExtensionDesc,
+            PhosphorIconsLight.at,
+            currentSortOption,
+          ),
+          const PopupMenuDivider(),
+          buildSortMenuItem(
+            context,
+            SortOption.attributesAsc,
+            l10n.sortAttributesAsc,
+            PhosphorIconsLight.info,
+            currentSortOption,
+          ),
+          buildSortMenuItem(
+            context,
+            SortOption.attributesDesc,
+            l10n.sortAttributesDesc,
+            PhosphorIconsLight.info,
+            currentSortOption,
+          ),
         ],
       ),
     );
@@ -774,8 +831,11 @@ class SharedActionBar {
                 ),
                 const Spacer(),
                 if (viewMode == ViewMode.list)
-                  Icon(PhosphorIconsLight.check,
-                      color: Theme.of(context).colorScheme.primary, size: 20),
+                  Icon(
+                    PhosphorIconsLight.check,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -804,8 +864,11 @@ class SharedActionBar {
                 ),
                 const Spacer(),
                 if (viewMode == ViewMode.tiles)
-                  Icon(PhosphorIconsLight.check,
-                      color: Theme.of(context).colorScheme.primary, size: 20),
+                  Icon(
+                    PhosphorIconsLight.check,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -834,8 +897,11 @@ class SharedActionBar {
                 ),
                 const Spacer(),
                 if (viewMode == ViewMode.grid)
-                  Icon(PhosphorIconsLight.check,
-                      color: Theme.of(context).colorScheme.primary, size: 20),
+                  Icon(
+                    PhosphorIconsLight.check,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -864,8 +930,11 @@ class SharedActionBar {
                 ),
                 const Spacer(),
                 if (viewMode == ViewMode.details)
-                  Icon(PhosphorIconsLight.check,
-                      color: Theme.of(context).colorScheme.primary, size: 20),
+                  Icon(
+                    PhosphorIconsLight.check,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -895,8 +964,11 @@ class SharedActionBar {
                   ),
                   const Spacer(),
                   if (viewMode == ViewMode.columns)
-                    Icon(PhosphorIconsLight.check,
-                        color: Theme.of(context).colorScheme.primary, size: 20),
+                    Icon(
+                      PhosphorIconsLight.check,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
                 ],
               ),
             ),
@@ -925,8 +997,11 @@ class SharedActionBar {
                 ),
                 const Spacer(),
                 if (viewMode == ViewMode.tree)
-                  Icon(PhosphorIconsLight.check,
-                      color: Theme.of(context).colorScheme.primary, size: 20),
+                  Icon(
+                    PhosphorIconsLight.check,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -953,16 +1028,18 @@ class SharedActionBar {
     );
 
     // Add more options menu
-    actions.add(buildMoreOptionsMenu(
-      onSelectionModeToggled: onSelectionModeToggled,
-      onManageTagsPressed: onManageTagsPressed,
-      allowFileExtensionRename: allowFileExtensionRename,
-      onAllowFileExtensionRenameChanged: onAllowFileExtensionRenameChanged,
-      onGallerySelected: onGallerySelected,
-      currentPath: currentPath,
-      additionalMoreOptions: additionalMoreOptions,
-      onAdditionalMoreOptionSelected: onAdditionalMoreOptionSelected,
-    ));
+    actions.add(
+      buildMoreOptionsMenu(
+        onSelectionModeToggled: onSelectionModeToggled,
+        onManageTagsPressed: onManageTagsPressed,
+        allowFileExtensionRename: allowFileExtensionRename,
+        onAllowFileExtensionRenameChanged: onAllowFileExtensionRenameChanged,
+        onGallerySelected: onGallerySelected,
+        currentPath: currentPath,
+        additionalMoreOptions: additionalMoreOptions,
+        onAdditionalMoreOptionSelected: onAdditionalMoreOptionSelected,
+      ),
+    );
 
     return actions;
   }
@@ -974,12 +1051,12 @@ class SharedActionBar {
 /// Exposed publicly so other screens (e.g. album detail) can reuse the same UI.
 class GridSizeSliderMenu extends StatefulWidget {
   const GridSizeSliderMenu({
-    Key? key,
+    super.key,
     required this.currentValue,
     required this.minValue,
     required this.maxValue,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   final int currentValue;
   final int minValue;
@@ -1005,16 +1082,18 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
   @override
   void initState() {
     super.initState();
-    _zoomValue =
-        widget.currentValue.clamp(widget.minValue, widget.maxValue).toInt();
+    _zoomValue = widget.currentValue
+        .clamp(widget.minValue, widget.maxValue)
+        .toInt();
   }
 
   @override
   void didUpdateWidget(GridSizeSliderMenu oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.currentValue != oldWidget.currentValue) {
-      _zoomValue =
-          widget.currentValue.clamp(widget.minValue, widget.maxValue).toInt();
+      _zoomValue = widget.currentValue
+          .clamp(widget.minValue, widget.maxValue)
+          .toInt();
     }
   }
 
@@ -1036,8 +1115,11 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
             // Header: icon + current display value (bigger number = bigger items)
             Row(
               children: [
-                Icon(PhosphorIconsLight.squaresFour,
-                    size: 18, color: colorScheme.primary),
+                Icon(
+                  PhosphorIconsLight.squaresFour,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   l10n.adjustGridSizeTitle,
@@ -1049,8 +1131,10 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
                 ),
                 const Spacer(),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
@@ -1070,36 +1154,46 @@ class _GridSizeSliderMenuState extends State<GridSizeSliderMenu> {
             // Slider: left = smallest items (many columns), right = largest items (few columns).
             Row(
               children: [
-                Icon(PhosphorIconsLight.minus,
-                    size: 14, color: colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.minus,
+                  size: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 3,
-                      thumbShape:
-                          const RoundSliderThumbShape(enabledThumbRadius: 7),
-                      overlayShape:
-                          const RoundSliderOverlayShape(overlayRadius: 14),
-                    ),
-                    child: Slider(
-                      // Slider operates in display-space (higher = bigger items).
-                      value: displayVal.toDouble(),
-                      min: widget.minValue.toDouble(),
-                      max: widget.maxValue.toDouble(),
-                      divisions: divisions,
-                      onChanged: (v) {
-                        final newDisplay = v.round();
-                        if (newDisplay != displayVal) {
-                          final newZoom = _displayToZoom(newDisplay);
-                          setState(() => _zoomValue = newZoom);
-                          widget.onChanged(newZoom);
-                        }
-                      },
+                  child: Semantics(
+                    container: true,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 7,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 14,
+                        ),
+                      ),
+                      child: Slider(
+                        value: displayVal.toDouble(),
+                        min: widget.minValue.toDouble(),
+                        max: widget.maxValue.toDouble(),
+                        divisions: divisions,
+                        onChanged: (v) {
+                          final newDisplay = v.round();
+                          if (newDisplay != displayVal) {
+                            final newZoom = _displayToZoom(newDisplay);
+                            setState(() => _zoomValue = newZoom);
+                            widget.onChanged(newZoom);
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ),
-                Icon(PhosphorIconsLight.plus,
-                    size: 14, color: colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.plus,
+                  size: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ],
             ),
           ],

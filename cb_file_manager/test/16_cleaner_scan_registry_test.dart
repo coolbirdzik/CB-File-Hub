@@ -5,11 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   ScanReport report() => ScanReport(
-        drivesScanned: const ['C:\\'],
-        itemsByCategory: const {},
-        warnings: const [],
-        scannedAt: DateTime(2026),
-      );
+    drivesScanned: const ['C:\\'],
+    itemsByCategory: const {},
+    warnings: const [],
+    scannedAt: DateTime(2026),
+  );
 
   group('CleanerScanRegistry', () {
     test('recognizes model-generated scan ID placeholders', () {
@@ -29,20 +29,11 @@ void main() {
       registry.store('sc_tab_a_latest', report(), ownerTabId: 'tab-a');
 
       expect(
-        registry.resolveId(
-          'SCANNED_ID_PLACEHOLDER',
-          ownerTabId: 'tab-a',
-        ),
+        registry.resolveId('SCANNED_ID_PLACEHOLDER', ownerTabId: 'tab-a'),
         'sc_tab_a_latest',
       );
-      expect(
-        registry.resolveId('sc_tab_b', ownerTabId: 'tab-a'),
-        isNull,
-      );
-      expect(
-        registry.resolveId('sc_expired', ownerTabId: 'tab-a'),
-        isNull,
-      );
+      expect(registry.resolveId('sc_tab_b', ownerTabId: 'tab-a'), isNull);
+      expect(registry.resolveId('sc_expired', ownerTabId: 'tab-a'), isNull);
     });
 
     test('evicts the oldest scan when capacity is reached', () {
@@ -60,12 +51,14 @@ void main() {
   test('cleaner call expands the generic cache category alias', () {
     final executor = ToolExecutor(ownerTabId: 'tab-a');
 
-    final normalized = executor.normalizeCall(const ToolCall(
-      name: 'clean_disk_junk',
-      arguments: {
-        'categories': ['dev_cache', 'cache'],
-      },
-    ));
+    final normalized = executor.normalizeCall(
+      const ToolCall(
+        name: 'clean_disk_junk',
+        arguments: {
+          'categories': ['dev_cache', 'cache'],
+        },
+      ),
+    );
 
     expect(normalized.arguments['categories'], [
       'dev_cache',

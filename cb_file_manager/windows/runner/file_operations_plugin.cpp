@@ -30,6 +30,29 @@ namespace file_operations_plugin
 
     namespace
     {
+        // Declare before every COM interface so reverse destruction releases
+        // those interfaces before the worker's apartment is uninitialized.
+        // S_FALSE also increments COM's per-thread initialization count.
+        class ScopedComApartment
+        {
+        public:
+            explicit ScopedComApartment(DWORD flags)
+                : result_(CoInitializeEx(nullptr, flags)) {}
+
+            ~ScopedComApartment()
+            {
+                if (SUCCEEDED(result_)) CoUninitialize();
+            }
+
+            ScopedComApartment(const ScopedComApartment &) = delete;
+            ScopedComApartment &operator=(const ScopedComApartment &) = delete;
+
+            HRESULT result() const { return result_; }
+
+        private:
+            HRESULT result_;
+        };
+
         constexpr UINT kOperationCompleteMessage = WM_APP + 0x4F1;
 
         // Tracks method-channel results whose native work runs on a detached
@@ -167,10 +190,14 @@ namespace file_operations_plugin
             // pump causes deadlocks when the shell attempts to marshal calls.
             // Using COINIT_MULTITHREADED avoids the need for a message pump
             // and prevents the PerformOperations() deadlock on modern Windows.
-            HRESULT init_hr = CoInitializeEx(nullptr,
-                                             COINIT_MULTITHREADED |
-                                                 COINIT_DISABLE_OLE1DDE);
-            const bool inited_here = SUCCEEDED(init_hr) && init_hr != S_FALSE;
+            ScopedComApartment apartment(
+                COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
+            if (FAILED(apartment.result()))
+            {
+                LogOperationMessage(L"COM initialization failed | hr=" +
+                                    std::to_wstring(apartment.result()));
+                return false;
+            }
 
             bool result_ok = false;
             do
@@ -281,10 +308,6 @@ namespace file_operations_plugin
                     std::to_wstring(result_ok ? 1 : 0));
             } while (false);
 
-            if (inited_here)
-            {
-                CoUninitialize();
-            }
             LogOperationMessage(
                 L"PerformDeleteOperation end | ok=" +
                 std::to_wstring(result_ok ? 1 : 0));
@@ -299,9 +322,9 @@ namespace file_operations_plugin
             bool is_move)
         {
 
-            HRESULT init_hr = CoInitializeEx(
-                nullptr, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
-            const bool inited_here = SUCCEEDED(init_hr) && init_hr != S_FALSE;
+            ScopedComApartment apartment(
+                COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
+            if (FAILED(apartment.result())) return false;
 
             Microsoft::WRL::ComPtr<IFileOperation> pfo;
             HRESULT hr = CoCreateInstance(
@@ -380,12 +403,7 @@ namespace file_operations_plugin
             BOOL aborted = FALSE;
             pfo->GetAnyOperationsAborted(&aborted);
 
-            const bool success = !aborted;
-            if (inited_here)
-            {
-                CoUninitialize();
-            }
-            return success;
+            return !aborted;
         }
 
         class FileOperationsPlugin : public flutter::Plugin
@@ -844,9 +862,15 @@ namespace file_operations_plugin
                         std::move(result));
 
                 std::thread([plugin_result_ptr, requested_offset, requested_limit]() {
-                    HRESULT init_hr = CoInitializeEx(
-                        nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-                    bool com_initialized = SUCCEEDED(init_hr);
+                    ScopedComApartment apartment(
+                        COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+                    if (FAILED(apartment.result()))
+                    {
+                        plugin_result_ptr->Error(
+                            "RECYCLE_BIN_ENUM_FAILED",
+                            "Failed to initialize COM for Recycle Bin enumeration");
+                        return;
+                    }
 
                     flutter::EncodableList items;
 
@@ -856,10 +880,6 @@ namespace file_operations_plugin
                         IID_PPV_ARGS(&shell_dispatch));
                     if (FAILED(hr) || !shell_dispatch)
                     {
-                        if (com_initialized)
-                        {
-                            CoUninitialize();
-                        }
                         plugin_result_ptr->Error(
                             "RECYCLE_BIN_ENUM_FAILED",
                             "Failed to create Shell.Application COM instance");
@@ -878,10 +898,6 @@ namespace file_operations_plugin
 
                     if (FAILED(hr) || !recycle_folder)
                     {
-                        if (com_initialized)
-                        {
-                            CoUninitialize();
-                        }
                         plugin_result_ptr->Error(
                             "RECYCLE_BIN_ENUM_FAILED",
                             "Failed to open Recycle Bin namespace");
@@ -1046,10 +1062,6 @@ namespace file_operations_plugin
                         }
                     }
 
-                    if (com_initialized)
-                    {
-                        CoUninitialize();
-                    }
                     flutter::EncodableMap response;
                     response[flutter::EncodableValue("items")] =
                         flutter::EncodableValue(items);

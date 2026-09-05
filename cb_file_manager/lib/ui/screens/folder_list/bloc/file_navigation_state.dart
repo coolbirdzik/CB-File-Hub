@@ -46,10 +46,8 @@ class FileNavigationState extends Equatable {
     this.searchRecursive = false,
   });
 
-  factory FileNavigationState.initial(String path) => FileNavigationState(
-        currentPath: Directory(path),
-        isLoading: true,
-      );
+  factory FileNavigationState.initial(String path) =>
+      FileNavigationState(currentPath: Directory(path), isLoading: true);
 
   bool get isSearchActive => currentSearchQuery != null;
 
@@ -108,23 +106,23 @@ class FileNavigationState extends Equatable {
 
   @override
   List<Object?> get props => [
-        isLoading,
-        isRefreshing,
-        error,
-        currentPath.path,
-        folders,
-        files,
-        searchResults,
-        hasMoreSearchResults,
-        isLoadingMoreSearchResults,
-        searchResultsTotal,
-        filteredFiles,
-        currentFilter,
-        currentSearchQuery,
-        viewMode,
-        sortOption,
-        gridZoomLevel,
-        isSearchByName,
-        searchRecursive,
-      ];
+    isLoading,
+    isRefreshing,
+    error,
+    currentPath.path,
+    folders,
+    files,
+    searchResults,
+    hasMoreSearchResults,
+    isLoadingMoreSearchResults,
+    searchResultsTotal,
+    filteredFiles,
+    currentFilter,
+    currentSearchQuery,
+    viewMode,
+    sortOption,
+    gridZoomLevel,
+    isSearchByName,
+    searchRecursive,
+  ];
 }

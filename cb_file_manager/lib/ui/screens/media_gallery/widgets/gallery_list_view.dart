@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+
 // For formatFileSize
 
 class GalleryListView extends StatelessWidget {
@@ -15,14 +16,14 @@ class GalleryListView extends StatelessWidget {
   final Function(File, bool) onSelectionChanged;
 
   const GalleryListView({
-    Key? key,
+    super.key,
     required this.imageFiles,
     required this.selectedFilePaths,
     required this.isSelectionMode,
     required this.onTap,
     required this.onLongPress,
     required this.onSelectionChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

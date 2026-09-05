@@ -14,12 +14,12 @@ class WindowCaptionButtons extends StatelessWidget {
   final VoidCallback? onClose;
 
   const WindowCaptionButtons({
-    Key? key,
+    super.key,
     this.theme,
     this.visibleOnDesktopOnly = true,
     this.padding,
     this.onClose,
-  }) : super(key: key);
+  });
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -95,14 +95,13 @@ class _CaptionButton extends StatefulWidget {
   final bool listensMaximize;
 
   const _CaptionButton({
-    Key? key,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
     required this.theme,
     this.isCloseButton = false,
     this.listensMaximize = false,
-  }) : super(key: key);
+  });
 
   @override
   State<_CaptionButton> createState() => _CaptionButtonState();
@@ -156,10 +155,11 @@ class _CaptionButtonState extends State<_CaptionButton> {
     final hoverBg = widget.isCloseButton
         ? widget.theme.colorScheme.error
         : (isDark
-            ? accentColor.withValues(alpha: 0.16)
-            : accentColor.withValues(alpha: 0.14));
-    final hoverIconColor =
-        widget.isCloseButton ? widget.theme.colorScheme.onError : accentColor;
+              ? accentColor.withValues(alpha: 0.16)
+              : accentColor.withValues(alpha: 0.14));
+    final hoverIconColor = widget.isCloseButton
+        ? widget.theme.colorScheme.onError
+        : accentColor;
 
     return CbTooltip(
       message: _dynamicTooltip ?? widget.tooltip,

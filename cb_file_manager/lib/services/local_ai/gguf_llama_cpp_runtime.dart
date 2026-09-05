@@ -4,6 +4,7 @@ import 'dart:io';
 
 import '../../models/local_ai/local_ai_advisor_model.dart';
 import 'windows_process_reaper.dart';
+import 'llama_cpp_chat_client.dart';
 
 /// Local chat runtime backed by the bundled `llama-server.exe` process.
 ///
@@ -17,7 +18,8 @@ import 'windows_process_reaper.dart';
 /// The server process is started once for a given (model, context size) pair
 /// and reused across requests. It is only restarted when the selected model or
 /// the configured context window changes.
-class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
+class GgufLlamaCppLocalAiChatRuntime
+    implements LocalAiChatRuntime, LocalAiConversationRuntime {
   /// GPU layers to offload. 99 offloads all layers to the GPU (via the bundled
   /// Vulkan backend); the server falls back to CPU for layers the GPU cannot
   /// fit. Set to 0 to force CPU-only inference.
@@ -79,28 +81,35 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
     int maxTokens = 4096,
   }) {
     if (!model.localPath.toLowerCase().endsWith('.gguf')) {
-      return Stream.error(UnsupportedError(
-        'GgufLlamaCppLocalAiChatRuntime only supports .gguf artifacts. '
-        'Got: ${model.localPath}',
-      ));
+      return Stream.error(
+        UnsupportedError(
+          'GgufLlamaCppLocalAiChatRuntime only supports .gguf artifacts. '
+          'Got: ${model.localPath}',
+        ),
+      );
     }
 
-    return _sendMessageStreamInternal(
-      modelPath: model.localPath,
-      message: message,
+    return sendConversationStream(
+      model: model,
+      messages: [
+        {'role': 'user', 'content': message},
+      ],
       systemPrompt: systemPrompt,
       maxTokens: maxTokens,
     );
   }
 
-  Stream<String> _sendMessageStreamInternal({
-    required String modelPath,
-    required String message,
+  @override
+  Stream<String> sendConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
     String? systemPrompt,
-    required int maxTokens,
+    int maxTokens = 4096,
   }) async* {
+    final modelPath = model.localPath;
     // Restart the server if the model or context window changed.
-    final needsRestart = _serverProcess != null &&
+    final needsRestart =
+        _serverProcess != null &&
         (_loadedModelPath != modelPath || _loadedContextSize != maxTokens);
     if (needsRestart) {
       await _stopServer();
@@ -115,10 +124,21 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
       throw StateError('Local AI server is not ready after startup.');
     }
 
-    yield* _streamCompletion(
-      port: port,
-      prompt: _buildChatMLPrompt(message, systemPrompt: systemPrompt),
-      maxTokens: maxTokens,
+    final nPredict = maxResponseTokens < 0
+        ? maxTokens
+        : (maxResponseTokens < maxTokens ? maxResponseTokens : maxTokens);
+    yield* LlamaCppChatClient(_httpClient).stream(
+      baseUri: Uri.parse('http://127.0.0.1:$port'),
+      messages: [
+        {
+          'role': 'system',
+          'content': systemPrompt?.trim().isNotEmpty == true
+              ? systemPrompt!.trim()
+              : 'You are a helpful assistant.',
+        },
+        ...messages,
+      ],
+      maxResponseTokens: nPredict,
     );
   }
 
@@ -152,23 +172,19 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
     yield '${_statusPrefix}Starting local AI server...';
 
     final port = await _findFreePort();
-    final process = await Process.start(
-      serverPath,
-      <String>[
-        '-m',
-        modelPath,
-        '--host',
-        '127.0.0.1',
-        '--port',
-        '$port',
-        '-c',
-        '$maxTokens',
-        '-ngl',
-        '$nGpuLayers',
-        '--no-ui',
-      ],
-      workingDirectory: serverDir,
-    );
+    final process = await Process.start(serverPath, <String>[
+      '-m',
+      modelPath,
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '$port',
+      '-c',
+      '$maxTokens',
+      '-ngl',
+      '$nGpuLayers',
+      '--no-ui',
+    ], workingDirectory: serverDir);
     _serverProcess = process;
     _serverPort = port;
 
@@ -184,14 +200,16 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
     process.stderr.drain<void>();
 
     // Surface early process death (e.g. bad model, port in use).
-    unawaited(process.exitCode.then((code) {
-      if (identical(_serverProcess, process)) {
-        _serverProcess = null;
-        _serverPort = null;
-        _loadedModelPath = null;
-        _loadedContextSize = null;
-      }
-    }));
+    unawaited(
+      process.exitCode.then((code) {
+        if (identical(_serverProcess, process)) {
+          _serverProcess = null;
+          _serverPort = null;
+          _loadedModelPath = null;
+          _loadedContextSize = null;
+        }
+      }),
+    );
 
     yield '${_statusPrefix}Loading model (this may take 10-30 seconds)...';
 
@@ -223,8 +241,8 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
             .getUrl(Uri.parse('http://127.0.0.1:$port/health'))
             .timeout(const Duration(seconds: 3));
         final response = await request.close().timeout(
-              const Duration(seconds: 3),
-            );
+          const Duration(seconds: 3),
+        );
         final body = await response.transform(utf8.decoder).join();
         if (response.statusCode == 200 && body.contains('"status"')) {
           if (body.contains('"ok"')) return true;
@@ -235,65 +253,6 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
     return false;
-  }
-
-  /// Streams a completion from the server's /completion SSE endpoint, yielding
-  /// each token piece as it arrives.
-  Stream<String> _streamCompletion({
-    required int port,
-    required String prompt,
-    required int maxTokens,
-  }) async* {
-    // Response-length cap (n_predict), never larger than the context window.
-    // -1 means "generate until EOS", bounded only by the context window.
-    final nPredict = maxResponseTokens < 0
-        ? maxTokens
-        : (maxResponseTokens < maxTokens ? maxResponseTokens : maxTokens);
-    final request = await _httpClient.postUrl(
-      Uri.parse('http://127.0.0.1:$port/completion'),
-    );
-    request.headers.contentType = ContentType.json;
-    request.add(utf8.encode(jsonEncode(<String, Object?>{
-      'prompt': prompt,
-      'n_predict': nPredict,
-      'stream': true,
-      'cache_prompt': true,
-      'temperature': 0.3,
-      'top_k': 64,
-      'top_p': 0.95,
-    })));
-
-    final response = await request.close();
-    if (response.statusCode != 200) {
-      final body = await response.transform(utf8.decoder).join();
-      throw StateError(
-        'Local AI server returned HTTP ${response.statusCode}: $body',
-      );
-    }
-
-    // Server-Sent Events: lines like `data: {json}` separated by blank lines.
-    final lines =
-        response.transform(utf8.decoder).transform(const LineSplitter());
-
-    await for (final line in lines) {
-      if (line.isEmpty) continue;
-      if (!line.startsWith('data:')) continue;
-      final payload = line.substring(5).trim();
-      if (payload.isEmpty) continue;
-
-      Map<String, Object?> json;
-      try {
-        json = jsonDecode(payload) as Map<String, Object?>;
-      } catch (_) {
-        continue;
-      }
-
-      final content = json['content'] as String?;
-      if (content != null && content.isNotEmpty) {
-        yield content;
-      }
-      if (json['stop'] == true) break;
-    }
   }
 
   Future<int> _findFreePort() async {
@@ -329,18 +288,3 @@ class GgufLlamaCppLocalAiChatRuntime implements LocalAiChatRuntime {
 /// Prefix used to mark status/progress messages so the bloc can route them to
 /// the "thinking" indicator instead of the chat content.
 const String _statusPrefix = '[STATUS]';
-
-// ---------------------------------------------------------------------------
-// ChatML prompt builder
-// ---------------------------------------------------------------------------
-
-String _buildChatMLPrompt(String message, {String? systemPrompt}) {
-  final system = (systemPrompt == null || systemPrompt.trim().isEmpty)
-      ? 'You are a helpful assistant.'
-      : systemPrompt.trim();
-  return '<|im_start|>system\n'
-      '$system<|im_end|>\n'
-      '<|im_start|>user\n'
-      '$message<|im_end|>\n'
-      '<|im_start|>assistant\n';
-}

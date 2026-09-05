@@ -54,8 +54,9 @@ class LazyPathSizeCalculator {
 
     var totalSize = 0;
     try {
-      await for (final entity
-          in Directory(folderPath).list(followLinks: false)) {
+      await for (final entity in Directory(
+        folderPath,
+      ).list(followLinks: false)) {
         if (isCancelled?.call() ?? false) return totalSize;
         if (entity is File) {
           try {

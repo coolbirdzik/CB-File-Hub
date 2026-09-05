@@ -8,9 +8,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-final _expandedFailure = RegExp(
-  r'^\d+:\d+\s+\+\d+\s+-\d+:\s+(.+)\s+\[E\]\s*$',
-);
+final _expandedFailure = RegExp(r'^\d+:\d+\s+\+\d+\s+-\d+:\s+(.+)\s+\[E\]\s*$');
 
 Future<void> main(List<String> args) async {
   final paths = args.where((a) => !a.startsWith('-')).toList();
@@ -29,9 +27,11 @@ Future<void> main(List<String> args) async {
   failed.addAll(_failuresFromExpanded(allLines));
   failed.addAll(jsonSummary.failedNames);
 
-  _printBox(failed.toList()..sort(),
-      logPath: paths.isEmpty ? null : paths.first,
-      diagnosticsByTest: jsonSummary.diagnosticsByTest);
+  _printBox(
+    failed.toList()..sort(),
+    logPath: paths.isEmpty ? null : paths.first,
+    diagnosticsByTest: jsonSummary.diagnosticsByTest,
+  );
 }
 
 Set<String> _failuresFromExpanded(List<String> allLines) {

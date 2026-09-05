@@ -8,16 +8,14 @@ class BrowserLikeDisplayState {
     String? currentFilter,
     String? currentSearchTagOverride,
   }) {
-    final hasSearch = state.currentSearchQuery != null ||
+    final hasSearch =
+        state.currentSearchQuery != null ||
         state.currentSearchTag != null ||
         currentSearchTagOverride != null;
     if (hasSearch && state.searchResults.isNotEmpty) {
       final folders = state.searchResults.whereType<Directory>().toList();
       final files = state.searchResults.whereType<File>().toList();
-      return state.copyWith(
-        folders: folders,
-        files: files,
-      );
+      return state.copyWith(folders: folders, files: files);
     }
 
     final hasFilter = currentFilter != null && currentFilter.isNotEmpty;

@@ -79,10 +79,12 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
   final colorScheme = baseTheme.colorScheme;
   const Color lightSurfaceBase = fluentLightBackground3;
   const Color lightContainerBase = fluentLightBackground2;
-  final Color effectiveSurfaceBase =
-      isLightMode ? lightSurfaceBase : colorScheme.surface;
-  final Color effectiveContainerBase =
-      isLightMode ? lightContainerBase : colorScheme.surfaceContainer;
+  final Color effectiveSurfaceBase = isLightMode
+      ? lightSurfaceBase
+      : colorScheme.surface;
+  final Color effectiveContainerBase = isLightMode
+      ? lightContainerBase
+      : colorScheme.surfaceContainer;
 
   final bridgedColorScheme = colorScheme.copyWith(
     surface: effectiveSurfaceBase.withValues(alpha: surfaceOpacity),
@@ -118,16 +120,13 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
 
   return baseTheme.copyWith(
     colorScheme: bridgedColorScheme,
-    scaffoldBackgroundColor:
-        baseTheme.scaffoldBackgroundColor.withValues(alpha: scaffoldOpacity),
+    scaffoldBackgroundColor: baseTheme.scaffoldBackgroundColor.withValues(
+      alpha: scaffoldOpacity,
+    ),
     canvasColor: menuColor,
     cardColor: cardColor,
-    cardTheme: baseTheme.cardTheme.copyWith(
-      color: cardColor,
-    ),
-    dialogTheme: baseTheme.dialogTheme.copyWith(
-      backgroundColor: dialogColor,
-    ),
+    cardTheme: baseTheme.cardTheme.copyWith(color: cardColor),
+    dialogTheme: baseTheme.dialogTheme.copyWith(backgroundColor: dialogColor),
     popupMenuTheme: baseTheme.popupMenuTheme.copyWith(
       color: menuColor,
       elevation: 4,
@@ -144,20 +143,21 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
       ),
     ),
     dropdownMenuTheme: baseTheme.dropdownMenuTheme.copyWith(
-      menuStyle:
-          (baseTheme.dropdownMenuTheme.menuStyle ?? const MenuStyle()).copyWith(
-        backgroundColor: WidgetStatePropertyAll(menuColor),
-        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-      ),
+      menuStyle: (baseTheme.dropdownMenuTheme.menuStyle ?? const MenuStyle())
+          .copyWith(
+            backgroundColor: WidgetStatePropertyAll(menuColor),
+            surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          ),
     ),
     bottomSheetTheme: baseTheme.bottomSheetTheme.copyWith(
       backgroundColor: dialogColor,
       modalBackgroundColor: dialogColor,
     ),
     appBarTheme: baseTheme.appBarTheme.copyWith(
-      backgroundColor: (baseTheme.appBarTheme.backgroundColor ??
-              baseTheme.scaffoldBackgroundColor)
-          .withValues(alpha: appBarOpacity),
+      backgroundColor:
+          (baseTheme.appBarTheme.backgroundColor ??
+                  baseTheme.scaffoldBackgroundColor)
+              .withValues(alpha: appBarOpacity),
       surfaceTintColor: Colors.transparent,
     ),
   );

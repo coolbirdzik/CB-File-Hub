@@ -82,7 +82,7 @@ class CbInlineRenameField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
 
   const CbInlineRenameField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.focusNode,
     required this.onCommit,
@@ -99,7 +99,7 @@ class CbInlineRenameField extends StatefulWidget {
     this.hasError = false,
     this.restrictToFilesystemSafeCharacters = true,
     this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<CbInlineRenameField> createState() => _CbInlineRenameFieldState();
@@ -284,12 +284,12 @@ class CbInlineRenameOverlay extends StatefulWidget {
   final double minWidth;
 
   const CbInlineRenameOverlay({
-    Key? key,
+    super.key,
     required this.active,
     required this.label,
     required this.editorBuilder,
     this.minWidth = 160,
-  }) : super(key: key);
+  });
 
   @override
   State<CbInlineRenameOverlay> createState() => _CbInlineRenameOverlayState();
@@ -420,7 +420,7 @@ class CbInlineRenamePanel extends StatefulWidget {
   final String? Function(String value)? validator;
 
   const CbInlineRenamePanel({
-    Key? key,
+    super.key,
     required this.title,
     required this.initialValue,
     required this.confirmLabel,
@@ -433,7 +433,7 @@ class CbInlineRenamePanel extends StatefulWidget {
     this.maxLength,
     this.width = 360,
     this.validator,
-  }) : super(key: key);
+  });
 
   @override
   State<CbInlineRenamePanel> createState() => _CbInlineRenamePanelState();
@@ -523,8 +523,9 @@ class _CbInlineRenamePanelState extends State<CbInlineRenamePanel> {
                     height: CbSizes.controlXs,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: (widget.iconColor ?? c.accent.base)
-                          .withValues(alpha: 0.14),
+                      color: (widget.iconColor ?? c.accent.base).withValues(
+                        alpha: 0.14,
+                      ),
                       borderRadius: CbRadii.smAll,
                     ),
                     child: Icon(
@@ -585,8 +586,9 @@ class _CbInlineRenamePanelState extends State<CbInlineRenamePanel> {
                   Expanded(
                     child: Text(
                       _error!,
-                      style:
-                          CbTypography.caption.copyWith(color: c.status.danger),
+                      style: CbTypography.caption.copyWith(
+                        color: c.status.danger,
+                      ),
                     ),
                   ),
                 ],
@@ -599,8 +601,9 @@ class _CbInlineRenamePanelState extends State<CbInlineRenamePanel> {
                   Expanded(
                     child: Text(
                       widget.hintText!,
-                      style:
-                          CbTypography.caption.copyWith(color: c.textTertiary),
+                      style: CbTypography.caption.copyWith(
+                        color: c.textTertiary,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -648,8 +651,10 @@ class _CbAnchorLayout extends SingleChildLayoutDelegate {
   @override
   Offset getPositionForChild(Size size, Size childSize) {
     final double maxX = math.max(margin, size.width - childSize.width - margin);
-    final double maxY =
-        math.max(margin, size.height - childSize.height - margin);
+    final double maxY = math.max(
+      margin,
+      size.height - childSize.height - margin,
+    );
 
     // Callers hand us whatever context they have, and that is sometimes the
     // whole list rather than the row. Anchoring to a rect that large would
@@ -725,8 +730,8 @@ Future<String?> showCbInlineRename({
     // window for it would overstate what is happening.
     barrierColor: c.scrim.withValues(alpha: 0.18),
     transitionDuration: CbDurations.fast,
-    pageBuilder: (_, __, ___) => const SizedBox.shrink(),
-    transitionBuilder: (dialogContext, animation, _, __) {
+    pageBuilder: (_, _, _) => const SizedBox.shrink(),
+    transitionBuilder: (dialogContext, animation, _, _) {
       final Animation<double> curved = CurvedAnimation(
         parent: animation,
         curve: CbCurves.standard,
@@ -738,10 +743,7 @@ Future<String?> showCbInlineRename({
         child: ScaleTransition(
           scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
           alignment: anchorRect == null ? Alignment.center : Alignment.topLeft,
-          child: Material(
-            type: MaterialType.transparency,
-            child: panel,
-          ),
+          child: Material(type: MaterialType.transparency, child: panel),
         ),
       );
 

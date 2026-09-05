@@ -27,11 +27,7 @@ class AppToast {
     p.success(message, duration: duration);
   }
 
-  static void info(
-    BuildContext context,
-    String message, {
-    Duration? duration,
-  }) {
+  static void info(BuildContext context, String message, {Duration? duration}) {
     capture(context).info(message, duration: duration);
   }
 
@@ -82,10 +78,7 @@ class AppToastPresenter {
     this.toastTheme,
   });
 
-  void success(
-    String message, {
-    Duration? duration,
-  }) {
+  void success(String message, {Duration? duration}) {
     show(
       message,
       icon: PhosphorIconsLight.checkCircle,
@@ -94,10 +87,7 @@ class AppToastPresenter {
     );
   }
 
-  void info(
-    String message, {
-    Duration? duration,
-  }) {
+  void info(String message, {Duration? duration}) {
     show(
       message,
       icon: PhosphorIconsLight.info,
@@ -106,10 +96,7 @@ class AppToastPresenter {
     );
   }
 
-  void warning(
-    String message, {
-    Duration? duration,
-  }) {
+  void warning(String message, {Duration? duration}) {
     show(
       message,
       icon: PhosphorIconsLight.warningCircle,
@@ -118,10 +105,7 @@ class AppToastPresenter {
     );
   }
 
-  void error(
-    String message, {
-    Duration? duration,
-  }) {
+  void error(String message, {Duration? duration}) {
     show(
       message,
       icon: PhosphorIconsLight.xCircle,
@@ -166,8 +150,9 @@ class AppToastPresenter {
 
     overlay!.insert(entry);
     timer = Timer(
-        duration ?? t?.durationInfo ?? const Duration(milliseconds: 2200),
-        dismiss);
+      duration ?? t?.durationInfo ?? const Duration(milliseconds: 2200),
+      dismiss,
+    );
   }
 }
 
@@ -258,14 +243,16 @@ class _AppToastOverlay extends StatelessWidget {
                   color: colorScheme.surface.withValues(alpha: _surfaceOpacity),
                   borderRadius: BorderRadius.circular(_containerRadius),
                   border: Border.all(
-                    color:
-                        colorScheme.outline.withValues(alpha: _borderOpacity),
+                    color: colorScheme.outline.withValues(
+                      alpha: _borderOpacity,
+                    ),
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(
-                        alpha:
-                            isDark ? _shadowOpacityDark : _shadowOpacityLight,
+                        alpha: isDark
+                            ? _shadowOpacityDark
+                            : _shadowOpacityLight,
                       ),
                       blurRadius: 24,
                       offset: const Offset(0, 10),
@@ -288,8 +275,11 @@ class _AppToastOverlay extends StatelessWidget {
                             ),
                             borderRadius: BorderRadius.circular(_iconBoxRadius),
                           ),
-                          child:
-                              Icon(icon, color: accentColor, size: _iconSize),
+                          child: Icon(
+                            icon,
+                            color: accentColor,
+                            size: _iconSize,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Flexible(
@@ -297,9 +287,7 @@ class _AppToastOverlay extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Text(
                               message,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
+                              style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: colorScheme.onSurface,
                                     fontWeight: FontWeight.w600,

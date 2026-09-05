@@ -5,6 +5,8 @@
 ///   final root = await AppPathHelper.getRootDir();
 ///   final videoDir = await AppPathHelper.getVideoCacheDir();
 ///
+library;
+
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -33,7 +35,7 @@ class AppPathHelper {
     return await getTemporaryDirectory();
   }
 
-  /// Get/create the root directory: <base>/cb_file_hub
+  /// Get/create the root directory: `<base>/cb_file_hub`
   static Future<Directory> getRootDir() async {
     if (_rootDirectory != null) return _rootDirectory!;
 
@@ -55,7 +57,7 @@ class AppPathHelper {
   /// Synchronously return root directory path if already initialized, else null.
   static String? get rootPath => _rootPath;
 
-  /// Get/create the persistent root directory: <appDocuments>/cb_file_hub.
+  /// Get/create the persistent root directory: `<appDocuments>/cb_file_hub`.
   ///
   /// Unlike [getRootDir] (which lives under the OS temp/cache directory and may
   /// be wiped by the OS or a cleaner), this lives under the application

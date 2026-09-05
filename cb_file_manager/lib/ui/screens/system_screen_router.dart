@@ -51,7 +51,10 @@ class SystemScreenRouter {
   /// Routes a special path to the appropriate screen
   /// Returns null if the path is not a system path
   static Widget? routeSystemPath(
-      BuildContext context, String path, String tabId) {
+    BuildContext context,
+    String path,
+    String tabId,
+  ) {
     // Check if this is a system path by looking for the # prefix
     if (path.startsWith('#')) {
       // Handle different types of system paths
@@ -71,7 +74,10 @@ class SystemScreenRouter {
   /// Handles system paths that start with #
   /// Handles system paths that start with #
   static Widget? _handleSystemPaths(
-      BuildContext context, String path, String tabId) {
+    BuildContext context,
+    String path,
+    String tabId,
+  ) {
     // Create a cache key from the tab ID and path
     final String cacheKey = '$tabId:$path';
 
@@ -107,8 +113,10 @@ class SystemScreenRouter {
       case '#cb-agent-cleaner':
         if (!Platform.isWindows) {
           return _buildErrorWidget(
-              context, AppLocalizations.of(context)!.diskCleanerNotAvailable,
-              cacheKey: cacheKey);
+            context,
+            AppLocalizations.of(context)!.diskCleanerNotAvailable,
+            cacheKey: cacheKey,
+          );
         }
         return const CbAgentCleanerScreen();
     }
@@ -135,8 +143,11 @@ class SystemScreenRouter {
     }
 
     // Fallback for unknown system paths
-    return _buildErrorWidget(context, '${context.tr.unknownSystemPath}: $path',
-        cacheKey: cacheKey);
+    return _buildErrorWidget(
+      context,
+      '${context.tr.unknownSystemPath}: $path',
+      cacheKey: cacheKey,
+    );
   }
 
   static Widget _handleAlbumRoute(String path) {
@@ -160,7 +171,11 @@ class SystemScreenRouter {
   }
 
   static Widget _handleImageRoute(
-      BuildContext context, String path, String tabId, String cacheKey) {
+    BuildContext context,
+    String path,
+    String tabId,
+    String cacheKey,
+  ) {
     String filePath = '';
     final int qIndexImage = path.indexOf('?');
     if (qIndexImage != -1 && qIndexImage < path.length - 1) {
@@ -175,8 +190,11 @@ class SystemScreenRouter {
       }
     }
     if (filePath.isEmpty) {
-      return _buildErrorWidget(context, 'Invalid image path',
-          cacheKey: cacheKey);
+      return _buildErrorWidget(
+        context,
+        'Invalid image path',
+        cacheKey: cacheKey,
+      );
     }
     // Update tab name to image file name
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
@@ -192,8 +210,9 @@ class SystemScreenRouter {
       try {
         final params = Uri.splitQueryString(query);
         if (params.containsKey('workspace')) {
-          workspacePath =
-              UriUtils.safeDecodeComponent(params['workspace'] ?? '');
+          workspacePath = UriUtils.safeDecodeComponent(
+            params['workspace'] ?? '',
+          );
         }
       } catch (_) {
         workspacePath = '';
@@ -249,10 +268,15 @@ class SystemScreenRouter {
   }
 
   static Widget _handleSearchRoute(
-      BuildContext context, String path, String tabId, String cacheKey) {
+    BuildContext context,
+    String path,
+    String tabId,
+    String cacheKey,
+  ) {
     _cachedWidgets.remove(cacheKey);
 
-    final String tag = UriUtils.extractTagFromSearchPath(path) ??
+    final String tag =
+        UriUtils.extractTagFromSearchPath(path) ??
         path.substring('#search?tag='.length);
 
     final widget = TabbedFolderListScreen(
@@ -270,7 +294,10 @@ class SystemScreenRouter {
 
   /// Handles network paths (smb://, ftp://, etc.)
   static Widget _handleNetworkPath(
-      BuildContext context, String path, String tabId) {
+    BuildContext context,
+    String path,
+    String tabId,
+  ) {
     // Create a cache key from the tab ID and path
     final String cacheKey = '$tabId:$path';
     try {
@@ -327,8 +354,9 @@ class SystemScreenRouter {
                     onPressed: () {
                       // Open FTP browser screen in this tab
                       tabBloc.add(UpdateTabPath(tabId, '#ftp'));
-                      tabBloc
-                          .add(UpdateTabName(tabId, context.tr.ftpConnections));
+                      tabBloc.add(
+                        UpdateTabName(tabId, context.tr.ftpConnections),
+                      );
                     },
                     child: Text(context.tr.goToFtpConnections),
                   ),
@@ -363,8 +391,10 @@ class SystemScreenRouter {
       _loggedKeys.add(cacheKey);
       // Fallback for navigation errors
       return _buildErrorWidget(
-          context, '${context.tr.cannotOpenNetworkPath}: $path',
-          cacheKey: cacheKey);
+        context,
+        '${context.tr.cannotOpenNetworkPath}: $path',
+        cacheKey: cacheKey,
+      );
     }
   }
 
@@ -383,8 +413,11 @@ class SystemScreenRouter {
   }
 
   /// Builds an error widget for unknown paths
-  static Widget _buildErrorWidget(BuildContext context, String message,
-      {String? cacheKey}) {
+  static Widget _buildErrorWidget(
+    BuildContext context,
+    String message, {
+    String? cacheKey,
+  }) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

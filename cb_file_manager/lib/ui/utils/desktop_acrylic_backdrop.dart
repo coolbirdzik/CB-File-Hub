@@ -18,10 +18,10 @@ class DesktopAcrylicBackdrop extends StatelessWidget {
   final Brightness brightness;
 
   const DesktopAcrylicBackdrop({
-    Key? key,
+    super.key,
     required this.child,
     required this.brightness,
-  }) : super(key: key);
+  });
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -49,7 +49,7 @@ class DesktopAcrylicBackdrop extends StatelessWidget {
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
         ),
         // Frosted glass blur overlay
         ClipRect(
@@ -61,15 +61,21 @@ class DesktopAcrylicBackdrop extends StatelessWidget {
             child: Container(
               color: brightness == Brightness.light
                   ? Colors.white.withValues(
-                      alpha: (0.82 +
-                              0.14 *
-                                  (1.0 - themeProvider.desktopAcrylicStrength))
-                          .clamp(0.0, 1.0))
+                      alpha:
+                          (0.82 +
+                                  0.14 *
+                                      (1.0 -
+                                          themeProvider.desktopAcrylicStrength))
+                              .clamp(0.0, 1.0),
+                    )
                   : Colors.black.withValues(
-                      alpha: (0.78 +
-                              0.16 *
-                                  (1.0 - themeProvider.desktopAcrylicStrength))
-                          .clamp(0.0, 1.0)),
+                      alpha:
+                          (0.78 +
+                                  0.16 *
+                                      (1.0 -
+                                          themeProvider.desktopAcrylicStrength))
+                              .clamp(0.0, 1.0),
+                    ),
             ),
           ),
         ),

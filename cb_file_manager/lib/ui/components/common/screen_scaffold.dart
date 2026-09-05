@@ -27,7 +27,7 @@ class ScreenScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
 
   const ScreenScaffold({
-    Key? key,
+    super.key,
     required this.selectionState,
     required this.body,
     required this.isNetworkPath,
@@ -43,7 +43,7 @@ class ScreenScaffold extends StatelessWidget {
     required this.pathNavigationBar,
     required this.actions,
     this.floatingActionButton,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +57,8 @@ class ScreenScaffold extends StatelessWidget {
     // Scaffold/AppBar pair. Keeping this branch here lets mobile retain its
     // existing Scaffold semantics while the Windows file browser gets one
     // consistent toolbar, separator, and content surface.
-    final useFluentDesktopShell = isDesktop &&
+    final useFluentDesktopShell =
+        isDesktop &&
         DesignSystemConfig.enableFluentDesktopShell &&
         !DesignSystemConfig.enableLegacyMaterialDesktopShell;
 
@@ -78,9 +79,7 @@ class ScreenScaffold extends StatelessWidget {
                     blurSigma: surfaces.chromeBlur,
                     borderRadius: FluentSurfaceTokens.toolbarRadius,
                     border: Border(
-                      bottom: BorderSide(
-                        color: surfaces.chromeStroke,
-                      ),
+                      bottom: BorderSide(color: surfaces.chromeStroke),
                     ),
                     child: SizedBox(
                       height: FluentSurfaceTokens.toolbarHeight,
@@ -89,8 +88,9 @@ class ScreenScaffold extends StatelessWidget {
                         child: Row(
                           children: [
                             Expanded(
-                              child:
-                                  showSearchBar ? searchBar : pathNavigationBar,
+                              child: showSearchBar
+                                  ? searchBar
+                                  : pathNavigationBar,
                             ),
                             if (actions.isNotEmpty) ...[
                               const SizedBox(width: 8),
@@ -105,11 +105,7 @@ class ScreenScaffold extends StatelessWidget {
               ],
             ),
             if (fab != null)
-              PositionedDirectional(
-                end: 22,
-                bottom: 22,
-                child: fab,
-              ),
+              PositionedDirectional(end: 22, bottom: 22, child: fab),
           ],
         ),
       );

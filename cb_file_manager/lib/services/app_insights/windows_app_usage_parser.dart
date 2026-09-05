@@ -40,10 +40,7 @@ class WindowsAppUsageParser {
   DateTime? parseModernUserAssistLastOpened(Uint8List data) {
     if (data.length < _modernUserAssistRecordLength) return null;
     final byteData = ByteData.sublistView(data);
-    final low = byteData.getUint32(
-      _lastExecutionFileTimeOffset,
-      Endian.little,
-    );
+    final low = byteData.getUint32(_lastExecutionFileTimeOffset, Endian.little);
     final high = byteData.getUint32(
       _lastExecutionFileTimeOffset + 4,
       Endian.little,
@@ -55,10 +52,7 @@ class WindowsAppUsageParser {
         (fileTimeTicks ~/ 10) - _windowsToUnixEpochMicroseconds;
     if (unixMicroseconds <= 0) return null;
     try {
-      return DateTime.fromMicrosecondsSinceEpoch(
-        unixMicroseconds,
-        isUtc: true,
-      );
+      return DateTime.fromMicrosecondsSinceEpoch(unixMicroseconds, isUtc: true);
     } on ArgumentError {
       return null;
     }

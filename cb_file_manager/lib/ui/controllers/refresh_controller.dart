@@ -73,7 +73,8 @@ class RefreshController {
         SystemScreenRouter.refreshSystemPath(currentPath, tabId);
         // Reload tag management data (will be handled by the component)
       } else if (currentPath.startsWith('#search?tag=')) {
-        final tag = UriUtils.extractTagFromSearchPath(currentPath) ??
+        final tag =
+            UriUtils.extractTagFromSearchPath(currentPath) ??
             currentPath.substring('#search?tag='.length);
         TagManager.clearCache();
         // Clear the system screen router cache for this path
@@ -88,7 +89,8 @@ class RefreshController {
 
         // If this screen still uses FolderList, trigger bloc refresh to regenerate thumbnails
         folderListBloc.add(
-            FolderListRefresh(currentPath, forceRegenerateThumbnails: true));
+          FolderListRefresh(currentPath, forceRegenerateThumbnails: true),
+        );
       }
     } else {
       // For regular paths, finish the visible refresh state as soon as the
@@ -179,7 +181,8 @@ class RefreshController {
               completer.complete();
             });
           } else if (currentPath.startsWith('#search?tag=')) {
-            final tag = UriUtils.extractTagFromSearchPath(currentPath) ??
+            final tag =
+                UriUtils.extractTagFromSearchPath(currentPath) ??
                 currentPath.substring('#search?tag='.length);
             TagManager.clearCache();
             // Clear the system screen router cache for this path
@@ -194,17 +197,20 @@ class RefreshController {
             tabManagerBloc.add(UpdateTabPath(tabId, currentPath));
 
             // If this screen still uses FolderList, trigger bloc refresh to regenerate thumbnails
-            folderListBloc.add(FolderListRefresh(currentPath,
-                forceRegenerateThumbnails: true));
+            folderListBloc.add(
+              FolderListRefresh(currentPath, forceRegenerateThumbnails: true),
+            );
           } else if (ArchivePathUtils.isArchiveBrowsePath(currentPath)) {
-            folderListBloc.add(FolderListRefresh(currentPath,
-                forceRegenerateThumbnails: true));
+            folderListBloc.add(
+              FolderListRefresh(currentPath, forceRegenerateThumbnails: true),
+            );
           }
         } else {
           // Use FolderListRefresh instead of FolderListLoad to force thumbnail regeneration
           VideoThumbnailHelper.trimCache();
           folderListBloc.add(
-              FolderListRefresh(currentPath, forceRegenerateThumbnails: true));
+            FolderListRefresh(currentPath, forceRegenerateThumbnails: true),
+          );
         }
 
         // Wait for the loading to complete before returning

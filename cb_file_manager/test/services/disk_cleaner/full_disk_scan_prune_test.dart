@@ -8,22 +8,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 DiskTreeNode _file(String name, int bytes) => DiskTreeNode(
-      name: name,
-      fullPath: 'C:\\$name',
-      isFile: true,
-      sizeBytes: bytes,
-      fileCount: 1,
-    );
+  name: name,
+  fullPath: 'C:\\$name',
+  isFile: true,
+  sizeBytes: bytes,
+  fileCount: 1,
+);
 
 void main() {
   test('full-scan watcher path matching ignores case and separators', () {
-    expect(
-      fullScanPathsWithinRoot(r'C:\', r'c:\Temp\cache.bin'),
-      isTrue,
-    );
+    expect(fullScanPathsWithinRoot(r'C:\', r'c:\Temp\cache.bin'), isTrue);
     expect(
       fullScanPathsWithinRoot(
-          r'C:\Users\Cleaner', r'c:/users/cleaner/Temp/cache.bin'),
+        r'C:\Users\Cleaner',
+        r'c:/users/cleaner/Temp/cache.bin',
+      ),
       isTrue,
     );
     expect(
@@ -78,9 +77,7 @@ void main() {
       final root = DiskTreeNode(
         name: r'C:\',
         fullPath: r'C:\',
-        children: [
-          for (var i = 0; i < 10; i++) _file('f$i', (10 - i) * 1000),
-        ],
+        children: [for (var i = 0; i < 10; i++) _file('f$i', (10 - i) * 1000)],
       );
 
       pruneTreeForDisplay(root, minEntryBytes: 0, maxChildren: 3);
@@ -116,10 +113,14 @@ void main() {
 
       pruneTreeForDisplay(root, minEntryBytes: 1000, maxChildren: 100);
 
-      final totalBytes = documents.children
-          .fold<int>(0, (sum, child) => sum + child.sizeBytes);
-      final totalFiles = documents.children
-          .fold<int>(0, (sum, child) => sum + child.fileCount);
+      final totalBytes = documents.children.fold<int>(
+        0,
+        (sum, child) => sum + child.sizeBytes,
+      );
+      final totalFiles = documents.children.fold<int>(
+        0,
+        (sum, child) => sum + child.fileCount,
+      );
       expect(totalBytes, 3300);
       expect(totalFiles, 3);
     });
@@ -143,8 +144,9 @@ void main() {
       // Folder rows stay visible even when their total is small. Their own
       // small file leaves may still be represented by a roll-up row.
       expect(root.children.length, 2);
-      final tinyRow =
-          root.children.singleWhere((child) => child.name == 'Tiny');
+      final tinyRow = root.children.singleWhere(
+        (child) => child.name == 'Tiny',
+      );
       expect(tinyRow.isAggregate, isFalse);
       expect(tinyRow.children.single.isAggregate, isTrue);
       expect(tinyRow.children.single.sizeBytes, 400);
@@ -234,11 +236,7 @@ void main() {
             fullPath: r'C:\large',
             sizeBytes: 3000,
             fileCount: 3,
-            children: [
-              _file('a', 1000),
-              _file('b', 1000),
-              _file('c', 1000),
-            ],
+            children: [_file('a', 1000), _file('b', 1000), _file('c', 1000)],
           ),
           DiskTreeNode(
             name: 'other',
@@ -310,16 +308,22 @@ void main() {
       expect(
         identical(
           dir.children,
-          DiskTreeNode(name: 'other', fullPath: r'C:\other', isFile: true)
-              .children,
+          DiskTreeNode(
+            name: 'other',
+            fullPath: r'C:\other',
+            isFile: true,
+          ).children,
         ),
         isTrue,
       );
     });
 
     test('sortBySize is safe on childless nodes', () {
-      final leaf =
-          DiskTreeNode(name: 'leaf', fullPath: r'C:\leaf', isFile: true);
+      final leaf = DiskTreeNode(
+        name: 'leaf',
+        fullPath: r'C:\leaf',
+        isFile: true,
+      );
       expect(leaf.sortBySize, returnsNormally);
     });
   });
@@ -337,10 +341,7 @@ void main() {
         lastModified: oldActivity,
       );
 
-      expect(
-        qualifiesAsOldLargeDiskInsight(insight, now: now),
-        isTrue,
-      );
+      expect(qualifiesAsOldLargeDiskInsight(insight, now: now), isTrue);
       expect(
         qualifiesAsOldLargeDiskInsight(
           FullDiskScanInsight(
@@ -401,55 +402,53 @@ void main() {
       );
     });
 
-    test('retains independent 50-item folder and file caps within 100 total',
-        () {
-      final folders = <FullDiskScanInsight>[];
-      final files = <FullDiskScanInsight>[];
-      final oldActivity = DateTime(2025, 1, 1);
+    test(
+      'retains independent 50-item folder and file caps within 100 total',
+      () {
+        final folders = <FullDiskScanInsight>[];
+        final files = <FullDiskScanInsight>[];
+        final oldActivity = DateTime(2025, 1, 1);
 
-      for (var index = 0; index < 60; index++) {
-        retainOldLargeDiskInsight(
-          folders,
-          FullDiskScanInsight(
-            name: 'folder-$index',
-            path: 'C:\\folder-$index',
-            isFile: false,
-            sizeBytes: defaultOldLargeDirectoryBytes + index,
-            lastModified: oldActivity,
-          ),
-          now: now,
-        );
-        retainOldLargeDiskInsight(
-          files,
-          FullDiskScanInsight(
-            name: 'file-$index',
-            path: 'C:\\file-$index.bin',
-            isFile: true,
-            sizeBytes: defaultOldLargeFileBytes + index,
-            lastModified: oldActivity,
-          ),
-          now: now,
-        );
-      }
+        for (var index = 0; index < 60; index++) {
+          retainOldLargeDiskInsight(
+            folders,
+            FullDiskScanInsight(
+              name: 'folder-$index',
+              path: 'C:\\folder-$index',
+              isFile: false,
+              sizeBytes: defaultOldLargeDirectoryBytes + index,
+              lastModified: oldActivity,
+            ),
+            now: now,
+          );
+          retainOldLargeDiskInsight(
+            files,
+            FullDiskScanInsight(
+              name: 'file-$index',
+              path: 'C:\\file-$index.bin',
+              isFile: true,
+              sizeBytes: defaultOldLargeFileBytes + index,
+              lastModified: oldActivity,
+            ),
+            now: now,
+          );
+        }
 
-      expect(folders, hasLength(defaultOldLargeItemsPerType));
-      expect(files, hasLength(defaultOldLargeItemsPerType));
-      final combined = buildBoundedOldLargeDiskEvidence(
-        folders: folders,
-        files: files,
-      );
-      expect(combined, hasLength(100));
-      expect(combined.length, lessThanOrEqualTo(defaultMaxOldLargeItems));
-      expect(folders.first.name, 'folder-59');
-      expect(files.first.name, 'file-59');
-    });
+        expect(folders, hasLength(defaultOldLargeItemsPerType));
+        expect(files, hasLength(defaultOldLargeItemsPerType));
+        final combined = buildBoundedOldLargeDiskEvidence(
+          folders: folders,
+          files: files,
+        );
+        expect(combined, hasLength(100));
+        expect(combined.length, lessThanOrEqualTo(defaultMaxOldLargeItems));
+        expect(folders.first.name, 'folder-59');
+        expect(files.first.name, 'file-59');
+      },
+    );
 
     test('retains the lexical winner at an equal-size cutoff', () {
-      final paths = <String>[
-        r'C:\zeta.bin',
-        r'C:\middle.bin',
-        r'C:\alpha.bin',
-      ];
+      final paths = <String>[r'C:\zeta.bin', r'C:\middle.bin', r'C:\alpha.bin'];
 
       List<String> retainedInOrder(Iterable<String> enumeration) {
         final retained = <FullDiskScanInsight>[];
@@ -497,17 +496,15 @@ void main() {
         isTrue,
       );
       expect(
-        isOldLargeInsightInvalidatedByDirtyDirectories(
-          fileInsight,
-          <String>[r'C:\Data\Archive\new-folder'],
-        ),
+        isOldLargeInsightInvalidatedByDirtyDirectories(fileInsight, <String>[
+          r'C:\Data\Archive\new-folder',
+        ]),
         isFalse,
       );
       expect(
-        isOldLargeInsightInvalidatedByDirtyDirectories(
-          fileInsight,
-          <String>[r'C:\Data'],
-        ),
+        isOldLargeInsightInvalidatedByDirtyDirectories(fileInsight, <String>[
+          r'C:\Data',
+        ]),
         isTrue,
       );
     });
@@ -536,129 +533,148 @@ void main() {
           reason: 'Directory evidence should be invalidated by $dirtyRoot',
         );
         expect(
-          isOldLargeInsightInvalidatedByDirtyDirectories(
-            fileInsight,
-            <String>[dirtyRoot],
-          ),
+          isOldLargeInsightInvalidatedByDirtyDirectories(fileInsight, <String>[
+            dirtyRoot,
+          ]),
           isTrue,
           reason: 'File evidence should be invalidated by $dirtyRoot',
         );
       }
     });
 
-    test('directory invalidation respects ancestors and sibling boundaries',
-        () {
-      const directoryInsight = FullDiskScanInsight(
-        name: 'archive',
-        path: r'C:\Data\Archive',
-        isFile: false,
-        sizeBytes: defaultOldLargeDirectoryBytes,
-      );
+    test(
+      'directory invalidation respects ancestors and sibling boundaries',
+      () {
+        const directoryInsight = FullDiskScanInsight(
+          name: 'archive',
+          path: r'C:\Data\Archive',
+          isFile: false,
+          sizeBytes: defaultOldLargeDirectoryBytes,
+        );
 
-      expect(
-        isOldLargeInsightInvalidatedByDirtyDirectories(
-          directoryInsight,
-          <String>[r'C:\Data'],
-        ),
-        isTrue,
-      );
-      expect(
-        isOldLargeInsightInvalidatedByDirtyDirectories(
-          directoryInsight,
-          <String>[r'C:\Data\Archive2'],
-        ),
-        isFalse,
-      );
-    });
+        expect(
+          isOldLargeInsightInvalidatedByDirtyDirectories(
+            directoryInsight,
+            <String>[r'C:\Data'],
+          ),
+          isTrue,
+        );
+        expect(
+          isOldLargeInsightInvalidatedByDirtyDirectories(
+            directoryInsight,
+            <String>[r'C:\Data\Archive2'],
+          ),
+          isFalse,
+        );
+      },
+    );
   });
 
-  test('full scan keeps small directories while compacting file leaves',
-      () async {
-    if (!Platform.isWindows) return;
+  test(
+    'full scan keeps small directories while compacting file leaves',
+    () async {
+      if (!Platform.isWindows) return;
 
-    final tempRoot = await Directory.systemTemp.createTemp('cb-full-scan-');
-    try {
-      final folder =
-          await Directory(p.join(tempRoot.path, 'small-folder')).create();
-      await File(p.join(folder.path, 'small.txt')).writeAsString('small');
+      final tempRoot = await Directory.systemTemp.createTemp('cb-full-scan-');
+      try {
+        final folder = await Directory(
+          p.join(tempRoot.path, 'small-folder'),
+        ).create();
+        await File(p.join(folder.path, 'small.txt')).writeAsString('small');
 
-      final handle = await spawnFullDiskScan(
-        drivePath: tempRoot.path,
-        minDisplayEntryBytes: 1024 * 1024,
-        maxChildrenPerDirectory: 1,
+        final handle = await spawnFullDiskScan(
+          drivePath: tempRoot.path,
+          minDisplayEntryBytes: 1024 * 1024,
+          maxChildrenPerDirectory: 1,
+        );
+        final result = await handle.future;
+
+        final folderNode = result.root.children.singleWhere(
+          (child) => child.name == 'small-folder',
+        );
+        expect(folderNode.isAggregate, isFalse);
+        expect(folderNode.children.single.isAggregate, isTrue);
+        expect(folderNode.children.single.fileCount, 1);
+      } finally {
+        await tempRoot.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'full scan reconstructs the complete nested tree across final batches',
+    () async {
+      if (!Platform.isWindows) return;
+
+      final tempRoot = await Directory.systemTemp.createTemp(
+        'cb-batched-scan-',
       );
-      final result = await handle.future;
+      try {
+        final nested = await Directory(
+          p.join(tempRoot.path, 'nested'),
+        ).create(recursive: true);
+        final deep = await Directory(
+          p.join(nested.path, 'deep'),
+        ).create(recursive: true);
+        await File(p.join(nested.path, 'child.txt')).writeAsString('child');
+        await File(p.join(deep.path, 'junk.bin')).writeAsString('junk');
+        await File(p.join(deep.path, 'kept.txt')).writeAsString('ok');
 
-      final folderNode = result.root.children
-          .singleWhere((child) => child.name == 'small-folder');
-      expect(folderNode.isAggregate, isFalse);
-      expect(folderNode.children.single.isAggregate, isTrue);
-      expect(folderNode.children.single.fileCount, 1);
-    } finally {
-      await tempRoot.delete(recursive: true);
-    }
-  });
+        final handle = await spawnFullDiskScan(
+          drivePath: tempRoot.path,
+          minDisplayEntryBytes: 0,
+          maxChildrenPerDirectory: 10,
+          finalTreeBatchSize: 1,
+          junkRules: <FullDiskJunkRule>[
+            FullDiskJunkRule(basePath: deep.path, categoryId: 'deep-junk'),
+          ],
+        );
+        final result = await handle.future;
 
-  test('full scan reconstructs the complete nested tree across final batches',
-      () async {
-    if (!Platform.isWindows) return;
+        expect(result.nodeCount, 6);
+        expect(countNodes(result.root), result.nodeCount);
+        final nestedNode = result.root.children.single;
+        expect(nestedNode.name, 'nested');
+        expect(
+          nestedNode.children.map((child) => child.name).toList(),
+          <String>['deep', 'child.txt'],
+        );
 
-    final tempRoot = await Directory.systemTemp.createTemp('cb-batched-scan-');
-    try {
-      final nested = await Directory(p.join(tempRoot.path, 'nested'))
-          .create(recursive: true);
-      final deep =
-          await Directory(p.join(nested.path, 'deep')).create(recursive: true);
-      await File(p.join(nested.path, 'child.txt')).writeAsString('child');
-      await File(p.join(deep.path, 'junk.bin')).writeAsString('junk');
-      await File(p.join(deep.path, 'kept.txt')).writeAsString('ok');
-
-      final handle = await spawnFullDiskScan(
-        drivePath: tempRoot.path,
-        minDisplayEntryBytes: 0,
-        maxChildrenPerDirectory: 10,
-        finalTreeBatchSize: 1,
-        junkRules: <FullDiskJunkRule>[
-          FullDiskJunkRule(basePath: deep.path, categoryId: 'deep-junk'),
-        ],
-      );
-      final result = await handle.future;
-
-      expect(result.nodeCount, 6);
-      expect(countNodes(result.root), result.nodeCount);
-      final nestedNode = result.root.children.single;
-      expect(nestedNode.name, 'nested');
-      expect(nestedNode.children.map((child) => child.name).toList(),
-          <String>['deep', 'child.txt']);
-
-      final deepNode =
-          nestedNode.children.singleWhere((child) => child.name == 'deep');
-      expect(deepNode.children.map((child) => child.name).toList(),
-          <String>['junk.bin', 'kept.txt']);
-      expect(deepNode.junkCategoryId, 'deep-junk');
-      expect(deepNode.hasJunkChildren, isTrue);
-      expect(deepNode.junkBytes, 6);
-      expect(result.root.junkBytes, 6);
-      expect(result.cleanableCount, 3);
-    } finally {
-      await tempRoot.delete(recursive: true);
-    }
-  });
+        final deepNode = nestedNode.children.singleWhere(
+          (child) => child.name == 'deep',
+        );
+        expect(deepNode.children.map((child) => child.name).toList(), <String>[
+          'junk.bin',
+          'kept.txt',
+        ]);
+        expect(deepNode.junkCategoryId, 'deep-junk');
+        expect(deepNode.hasJunkChildren, isTrue);
+        expect(deepNode.junkBytes, 6);
+        expect(result.root.junkBytes, 6);
+        expect(result.cleanableCount, 3);
+      } finally {
+        await tempRoot.delete(recursive: true);
+      }
+    },
+  );
 
   test('full scan preserves whole-directory and glob junk matching', () async {
     if (!Platform.isWindows) return;
 
     final tempRoot = await Directory.systemTemp.createTemp('cb-rule-scan-');
     try {
-      final wholeDirectory =
-          await Directory(p.join(tempRoot.path, 'whole')).create();
-      final globDirectory =
-          await Directory(p.join(tempRoot.path, 'glob', 'nested'))
-              .create(recursive: true);
-      await File(p.join(wholeDirectory.path, 'inside.bin'))
-          .writeAsString('whole');
-      await File(p.join(globDirectory.path, 'matched.tmp'))
-          .writeAsString('matched');
+      final wholeDirectory = await Directory(
+        p.join(tempRoot.path, 'whole'),
+      ).create();
+      final globDirectory = await Directory(
+        p.join(tempRoot.path, 'glob', 'nested'),
+      ).create(recursive: true);
+      await File(
+        p.join(wholeDirectory.path, 'inside.bin'),
+      ).writeAsString('whole');
+      await File(
+        p.join(globDirectory.path, 'matched.tmp'),
+      ).writeAsString('matched');
       await File(p.join(globDirectory.path, 'kept.txt')).writeAsString('kept');
 
       final handle = await spawnFullDiskScan(
@@ -666,10 +682,7 @@ void main() {
         minDisplayEntryBytes: 0,
         maxChildrenPerDirectory: 10,
         junkRules: <FullDiskJunkRule>[
-          FullDiskJunkRule(
-            basePath: wholeDirectory.path,
-            categoryId: 'whole',
-          ),
+          FullDiskJunkRule(basePath: wholeDirectory.path, categoryId: 'whole'),
           FullDiskJunkRule(
             basePath: p.join(tempRoot.path, 'glob'),
             categoryId: 'glob',
@@ -679,12 +692,15 @@ void main() {
       );
       final result = await handle.future;
 
-      final wholeNode =
-          result.root.children.singleWhere((child) => child.name == 'whole');
-      final globNode =
-          result.root.children.singleWhere((child) => child.name == 'glob');
-      final nestedNode =
-          globNode.children.singleWhere((child) => child.name == 'nested');
+      final wholeNode = result.root.children.singleWhere(
+        (child) => child.name == 'whole',
+      );
+      final globNode = result.root.children.singleWhere(
+        (child) => child.name == 'glob',
+      );
+      final nestedNode = globNode.children.singleWhere(
+        (child) => child.name == 'nested',
+      );
       expect(wholeNode.junkCategoryId, 'whole');
       expect(
         nestedNode.children
@@ -737,8 +753,10 @@ void main() {
       );
       expect(second.changedDirectoryCount, greaterThanOrEqualTo(1));
       expect(second.root.fileCount, 2);
-      expect(second.root.children.any((child) => child.name == 'after.txt'),
-          isTrue);
+      expect(
+        second.root.children.any((child) => child.name == 'after.txt'),
+        isTrue,
+      );
     } finally {
       await tempRoot.delete(recursive: true);
     }
@@ -800,25 +818,29 @@ void main() {
     }
   });
 
-  test('subtree scans are not retained as long-lived incremental caches',
-      () async {
-    if (!Platform.isWindows) return;
+  test(
+    'subtree scans are not retained as long-lived incremental caches',
+    () async {
+      if (!Platform.isWindows) return;
 
-    final tempRoot = await Directory.systemTemp.createTemp('cb-subtree-scan-');
-    try {
-      await File(p.join(tempRoot.path, 'file.txt')).writeAsString('file');
-      final service = DiskCleanerService.instance;
-      final handle = await service.scanFullDisk(
-        drivePath: tempRoot.path,
-        minDisplayEntryBytes: 0,
-        maxChildrenPerDirectory: 10,
+      final tempRoot = await Directory.systemTemp.createTemp(
+        'cb-subtree-scan-',
       );
-      await handle.future;
+      try {
+        await File(p.join(tempRoot.path, 'file.txt')).writeAsString('file');
+        final service = DiskCleanerService.instance;
+        final handle = await service.scanFullDisk(
+          drivePath: tempRoot.path,
+          minDisplayEntryBytes: 0,
+          maxChildrenPerDirectory: 10,
+        );
+        await handle.future;
 
-      expect(service.canUseIncrementalScan(tempRoot.path), isFalse);
-      expect(service.cachedFullScanRoot(tempRoot.path), isNull);
-    } finally {
-      await tempRoot.delete(recursive: true);
-    }
-  });
+        expect(service.canUseIncrementalScan(tempRoot.path), isFalse);
+        expect(service.cachedFullScanRoot(tempRoot.path), isNull);
+      } finally {
+        await tempRoot.delete(recursive: true);
+      }
+    },
+  );
 }

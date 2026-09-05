@@ -37,8 +37,11 @@ class FileNavigationRefresh extends FileNavigationEvent {
   /// processing so a specialized child bloc can handle it.
   final bool isVirtualPath;
 
-  const FileNavigationRefresh(this.path,
-      {this.forceRegenerateThumbnails = false, this.isVirtualPath = false});
+  const FileNavigationRefresh(
+    this.path, {
+    this.forceRegenerateThumbnails = false,
+    this.isVirtualPath = false,
+  });
 
   @override
   List<Object> get props => [path, forceRegenerateThumbnails, isVirtualPath];

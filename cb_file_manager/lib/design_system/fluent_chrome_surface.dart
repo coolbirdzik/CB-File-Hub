@@ -16,14 +16,14 @@ class FluentChromeSurface extends StatelessWidget {
   final Widget child;
 
   const FluentChromeSurface({
-    Key? key,
+    super.key,
     required this.tint,
     required this.tintAlpha,
     required this.blurSigma,
     required this.borderRadius,
     this.border,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +35,7 @@ class FluentChromeSurface extends StatelessWidget {
     final backdrop = blurSigma > 0
         ? Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: blurSigma,
-                sigmaY: blurSigma,
-              ),
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
               child: const SizedBox.expand(),
             ),
           )
@@ -55,9 +52,7 @@ class FluentChromeSurface extends StatelessWidget {
           if (border != null)
             Positioned.fill(
               child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(border: border),
-                ),
+                child: DecoratedBox(decoration: BoxDecoration(border: border)),
               ),
             ),
         ],

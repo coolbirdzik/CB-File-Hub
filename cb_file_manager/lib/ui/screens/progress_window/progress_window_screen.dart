@@ -18,12 +18,12 @@ class ProgressWindowScreen extends StatefulWidget {
   final bool initialIndeterminate;
 
   const ProgressWindowScreen({
-    Key? key,
+    super.key,
     required this.ipcPort,
     required this.initialTitle,
     required this.initialTotal,
     required this.initialIndeterminate,
-  }) : super(key: key);
+  });
 
   @override
   State<ProgressWindowScreen> createState() => _ProgressWindowScreenState();
@@ -221,8 +221,9 @@ class _ProgressWindowScreenState extends State<ProgressWindowScreen>
         : (_status == _ProgressStatus.success ? 'Done' : 'Error');
 
     final bgColor = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5);
-    final titleBarColor =
-        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE8E8E8);
+    final titleBarColor = isDark
+        ? const Color(0xFF2A2A2A)
+        : const Color(0xFFE8E8E8);
 
     return Material(
       color: bgColor,

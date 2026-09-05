@@ -11,10 +11,10 @@ class TagSearchDialog extends StatefulWidget {
   final Function(List<FileSystemEntity>, String) onSearchComplete;
 
   const TagSearchDialog({
-    Key? key,
+    super.key,
     required this.currentPath,
     required this.onSearchComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<TagSearchDialog> createState() => _TagSearchDialogState();
@@ -62,8 +62,9 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
     try {
       List<FileSystemEntity> results;
       if (_isGlobalSearch) {
-        results =
-            await TagManager.findFilesByTagGlobally(_tagController.text.trim());
+        results = await TagManager.findFilesByTagGlobally(
+          _tagController.text.trim(),
+        );
       } else {
         results = await TagManager.findFilesByTag(
           widget.currentPath,
@@ -100,9 +101,11 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
               if (textEditingValue.text.isEmpty) {
                 return _availableTags;
               }
-              return _availableTags.where((tag) => tag
-                  .toLowerCase()
-                  .contains(textEditingValue.text.toLowerCase()));
+              return _availableTags.where(
+                (tag) => tag.toLowerCase().contains(
+                  textEditingValue.text.toLowerCase(),
+                ),
+              );
             },
             onSelected: (String selection) {
               _tagController.text = selection;
@@ -111,18 +114,18 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
             },
             fieldViewBuilder:
                 (context, controller, focusNode, onFieldSubmitted) {
-              _tagController.text = controller.text;
-              return TextField(
-                controller: controller,
-                focusNode: focusNode,
-                decoration: const InputDecoration(
-                  labelText: 'Nhập tag để tìm kiếm',
-                  hintText: 'Ví dụ: important, work, personal',
-                  border: OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _performSearch(),
-              );
-            },
+                  _tagController.text = controller.text;
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(
+                      labelText: 'Nhập tag để tìm kiếm',
+                      hintText: 'Ví dụ: important, work, personal',
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _performSearch(),
+                  );
+                },
           ),
           const SizedBox(height: 16),
           SwitchListTile(
@@ -141,16 +144,18 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
               spacing: 8.0,
               runSpacing: 4.0,
               children: _availableTags
-                  .map((tag) => ActionChip(
-                        label: Text(tag),
-                        onPressed: () {
-                          setState(() {
-                            _tagController.text = tag;
-                          });
-                          // Tự động thực hiện tìm kiếm khi người dùng chọn một tag
-                          _performSearch();
-                        },
-                      ))
+                  .map(
+                    (tag) => ActionChip(
+                      label: Text(tag),
+                      onPressed: () {
+                        setState(() {
+                          _tagController.text = tag;
+                        });
+                        // Tự động thực hiện tìm kiếm khi người dùng chọn một tag
+                        _performSearch();
+                      },
+                    ),
+                  )
                   .toList(),
             )
           else

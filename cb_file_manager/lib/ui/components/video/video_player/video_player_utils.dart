@@ -56,19 +56,12 @@ class VideoPlayerUtils {
           width: labelWidth,
           child: Text(
             label,
-            style: TextStyle(
-              color: c.withValues(alpha: 0.8),
-              fontSize: 10,
-            ),
+            style: TextStyle(color: c.withValues(alpha: 0.8), fontSize: 10),
           ),
         ),
         Text(
           value,
-          style: TextStyle(
-            color: c,
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w500),
         ),
       ],
     );

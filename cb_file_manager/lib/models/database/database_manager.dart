@@ -76,7 +76,8 @@ class DatabaseManager implements IDatabaseProvider {
               await Future.delayed(Duration(milliseconds: 500 * retryCount));
             } else {
               throw Exception(
-                  'Failed to initialize database after $maxRetries attempts: $e');
+                'Failed to initialize database after $maxRetries attempts: $e',
+              );
             }
           }
         }
@@ -143,14 +144,17 @@ class DatabaseManager implements IDatabaseProvider {
   /// Much more efficient than calling [getTagsForFile] in a loop when
   /// initialising a large grid of items.
   Future<Map<String, List<String>>> getTagsForFiles(
-      List<String> filePaths) async {
+    List<String> filePaths,
+  ) async {
     if (filePaths.isEmpty) return {};
     await _ensureInitialized();
     final result = <String, List<String>>{};
     // Run individual queries concurrently — still a single provider-call batch.
-    await Future.wait(filePaths.map((path) async {
-      result[path] = await _provider.getTagsForFile(path);
-    }));
+    await Future.wait(
+      filePaths.map((path) async {
+        result[path] = await _provider.getTagsForFile(path);
+      }),
+    );
     return result;
   }
 
@@ -173,8 +177,9 @@ class DatabaseManager implements IDatabaseProvider {
 
     try {
       // Sử dụng provider hiện tại để tìm kiếm tag
-      final List<String> results =
-          await _provider.findFilesByTag(normalizedTag);
+      final List<String> results = await _provider.findFilesByTag(
+        normalizedTag,
+      );
 
       return results;
     } catch (e) {
@@ -207,8 +212,10 @@ class DatabaseManager implements IDatabaseProvider {
 
   /// Get a string preference
   @override
-  Future<String?> getStringPreference(String key,
-      {String? defaultValue}) async {
+  Future<String?> getStringPreference(
+    String key, {
+    String? defaultValue,
+  }) async {
     await _ensureInitialized();
     return _provider.getStringPreference(key, defaultValue: defaultValue);
   }
@@ -236,8 +243,10 @@ class DatabaseManager implements IDatabaseProvider {
 
   /// Get a double preference
   @override
-  Future<double?> getDoublePreference(String key,
-      {double? defaultValue}) async {
+  Future<double?> getDoublePreference(
+    String key, {
+    double? defaultValue,
+  }) async {
     await _ensureInitialized();
     return _provider.getDoublePreference(key, defaultValue: defaultValue);
   }
@@ -379,7 +388,7 @@ class DatabaseManager implements IDatabaseProvider {
       final Map<String, dynamic> exportData = {
         'tags': tagsData,
         'exportDate': DateTime.now().toIso8601String(),
-        'version': '1.0'
+        'version': '1.0',
       };
 
       // Convert to JSON
@@ -395,8 +404,10 @@ class DatabaseManager implements IDatabaseProvider {
         // Generate a path in the application documents directory
         final directory = await getApplicationDocumentsDirectory();
         final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-        filePath =
-            path.join(directory.path, 'cb_file_hub_db_export_$timestamp.json');
+        filePath = path.join(
+          directory.path,
+          'cb_file_hub_db_export_$timestamp.json',
+        );
       }
 
       final file = File(filePath);
@@ -412,20 +423,24 @@ class DatabaseManager implements IDatabaseProvider {
   }
 
   /// Import database data from a JSON file
-  Future<bool> importDatabase(String filePath,
-      {bool skipFileExistenceCheck = false}) async {
+  Future<bool> importDatabase(
+    String filePath, {
+    bool skipFileExistenceCheck = false,
+  }) async {
     try {
       debugPrint('ImportDatabase: Starting import from $filePath');
 
       // Ensure database is initialized first
       if (!_isInitialized) {
         debugPrint(
-            'ImportDatabase: Database not initialized, initializing now...');
+          'ImportDatabase: Database not initialized, initializing now...',
+        );
         await initialize();
       }
 
       debugPrint(
-          'ImportDatabase: Database is initialized, isInitialized=$_isInitialized');
+        'ImportDatabase: Database is initialized, isInitialized=$_isInitialized',
+      );
 
       // Read from file
       final exportFile = File(filePath);
@@ -436,12 +451,14 @@ class DatabaseManager implements IDatabaseProvider {
 
       final jsonString = await exportFile.readAsString();
       debugPrint(
-          'ImportDatabase: Read ${jsonString.length} characters from file');
+        'ImportDatabase: Read ${jsonString.length} characters from file',
+      );
 
       // Parse JSON
       final Map<String, dynamic> importData = jsonDecode(jsonString);
       debugPrint(
-          'ImportDatabase: Parsed JSON, keys: ${importData.keys.toList()}');
+        'ImportDatabase: Parsed JSON, keys: ${importData.keys.toList()}',
+      );
 
       int importedTagCount = 0;
       int skippedFileCount = 0;
@@ -456,7 +473,8 @@ class DatabaseManager implements IDatabaseProvider {
         for (final tag in tagsData.keys) {
           final List<dynamic> files = tagsData[tag];
           debugPrint(
-              'ImportDatabase: Processing tag "$tag" with ${files.length} files');
+            'ImportDatabase: Processing tag "$tag" with ${files.length} files',
+          );
 
           // Add the tag to each file
           for (final filePathEntry in files) {
@@ -484,12 +502,14 @@ class DatabaseManager implements IDatabaseProvider {
                   } else {
                     skippedFileCount++;
                     debugPrint(
-                        'ImportDatabase: Skipping file (not exists): $filePathEntry');
+                      'ImportDatabase: Skipping file (not exists): $filePathEntry',
+                    );
                   }
                 }
               } catch (e) {
                 debugPrint(
-                    'ImportDatabase: Error adding tag "$tag" to file "$filePathEntry": $e');
+                  'ImportDatabase: Error adding tag "$tag" to file "$filePathEntry": $e',
+                );
                 failedCount++;
               }
             }
@@ -497,12 +517,14 @@ class DatabaseManager implements IDatabaseProvider {
         }
 
         debugPrint(
-            'ImportDatabase: Summary - imported: $importedTagCount, skipped: $skippedFileCount, failed: $failedCount');
+          'ImportDatabase: Summary - imported: $importedTagCount, skipped: $skippedFileCount, failed: $failedCount',
+        );
       } else {
         debugPrint('ImportDatabase: No "tags" key found in import file');
         // Try to import as the old format where key is file path and value is list of tags
         debugPrint(
-            'ImportDatabase: Checking for old format (file path -> tags list)...');
+          'ImportDatabase: Checking for old format (file path -> tags list)...',
+        );
 
         for (final key in importData.keys) {
           if (key == 'tags' || key == 'exportDate' || key == 'version') {
@@ -514,7 +536,8 @@ class DatabaseManager implements IDatabaseProvider {
             final filePath = key;
             final tags = value.cast<String>();
             debugPrint(
-                'ImportDatabase: Old format - file: $filePath, tags: $tags');
+              'ImportDatabase: Old format - file: $filePath, tags: $tags',
+            );
 
             for (final tag in tags) {
               try {
@@ -524,23 +547,27 @@ class DatabaseManager implements IDatabaseProvider {
                 }
               } catch (e) {
                 debugPrint(
-                    'ImportDatabase: Error adding tag "$tag" to file "$filePath": $e');
+                  'ImportDatabase: Error adding tag "$tag" to file "$filePath": $e',
+                );
               }
             }
           }
         }
 
         debugPrint(
-            'ImportDatabase: Old format import complete, imported: $importedTagCount');
+          'ImportDatabase: Old format import complete, imported: $importedTagCount',
+        );
       }
 
       // Note: TagManager cache clearing should be handled by the caller after successful import
       // to ensure UI properly refreshes with new data
       if (importedTagCount > 0) {
         debugPrint(
-            'ImportDatabase: Import completed successfully with $importedTagCount tags');
+          'ImportDatabase: Import completed successfully with $importedTagCount tags',
+        );
         debugPrint(
-            'ImportDatabase: Caller should clear TagManager cache to refresh UI');
+          'ImportDatabase: Caller should clear TagManager cache to refresh UI',
+        );
       }
 
       return importedTagCount > 0;
@@ -563,7 +590,9 @@ class DatabaseManager implements IDatabaseProvider {
 
   @override
   Future<bool> setTagThumbnail(
-      String normalizedTag, String thumbnailPath) async {
+    String normalizedTag,
+    String thumbnailPath,
+  ) async {
     await _ensureInitialized();
     return _provider.setTagThumbnail(normalizedTag, thumbnailPath);
   }
@@ -592,17 +621,23 @@ class DatabaseManager implements IDatabaseProvider {
 
   @override
   Future<bool> setTagHierarchy(
-      String parentNormalizedTag, String childNormalizedTag) async {
+    String parentNormalizedTag,
+    String childNormalizedTag,
+  ) async {
     await _ensureInitialized();
     return _provider.setTagHierarchy(parentNormalizedTag, childNormalizedTag);
   }
 
   @override
   Future<bool> removeTagHierarchy(
-      String parentNormalizedTag, String childNormalizedTag) async {
+    String parentNormalizedTag,
+    String childNormalizedTag,
+  ) async {
     await _ensureInitialized();
     return _provider.removeTagHierarchy(
-        parentNormalizedTag, childNormalizedTag);
+      parentNormalizedTag,
+      childNormalizedTag,
+    );
   }
 
   @override
@@ -671,8 +706,10 @@ class DatabaseManager implements IDatabaseProvider {
       } else {
         final directory = await getApplicationDocumentsDirectory();
         final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-        destPath =
-            path.join(directory.path, 'cb_file_hub_backup_$timestamp.db');
+        destPath = path.join(
+          directory.path,
+          'cb_file_hub_backup_$timestamp.db',
+        );
       }
 
       // Copy the live DB file to destination

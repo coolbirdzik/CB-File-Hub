@@ -33,7 +33,8 @@ class TagManagementSectionController {
 
   void _attach(_TagManagementSectionState state) {
     AppLogger.info(
-        '[ManageTags][Controller] Attached to ${state.widget.filePath}');
+      '[ManageTags][Controller] Attached to ${state.widget.filePath}',
+    );
     _state = state;
   }
 
@@ -75,7 +76,7 @@ class TagManagementSection extends StatefulWidget {
   final void Function(TagManagementSection section)? onSectionReady;
 
   const TagManagementSection({
-    Key? key,
+    super.key,
     required this.filePath,
     this.onTagsUpdated,
     this.showRecentTags = true,
@@ -85,7 +86,7 @@ class TagManagementSection extends StatefulWidget {
     this.onPendingChangesChanged,
     this.controller,
     this.onSectionReady,
-  }) : super(key: key);
+  });
 
   @override
   State<TagManagementSection> createState() => _TagManagementSectionState();
@@ -147,8 +148,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   /// Compute pending changes count and update flags
   void _updatePendingChanges() {
     final added = _selectedTags.where((t) => !_originalTags.contains(t)).length;
-    final removed =
-        _originalTags.where((t) => !_selectedTags.contains(t)).length;
+    final removed = _originalTags
+        .where((t) => !_selectedTags.contains(t))
+        .length;
     _hasPendingChanges = added > 0 || removed > 0;
     _pendingChangesCount = added + removed;
     widget.onPendingChangesChanged?.call();
@@ -249,11 +251,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
       return false;
     }
 
-    _addSelectedTag(
-      draftTag,
-      clearSuggestions: true,
-      clearDraft: true,
-    );
+    _addSelectedTag(draftTag, clearSuggestions: true, clearDraft: true);
     return true;
   }
 
@@ -261,7 +259,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     // Use initialTags if provided, otherwise fetch from TagManager
     List<String> currentTags = [];
     AppLogger.debug(
-        '[ManageTags][Section] Loading tags for ${widget.filePath}');
+      '[ManageTags][Section] Loading tags for ${widget.filePath}',
+    );
 
     if (widget.initialTags != null) {
       currentTags = List.from(widget.initialTags!);
@@ -270,7 +269,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         currentTags = await TagManager.getTags(widget.filePath);
       } catch (e) {
         AppLogger.warning(
-            '[ManageTags][Section] Loading tags failed for ${widget.filePath}: $e');
+          '[ManageTags][Section] Loading tags failed for ${widget.filePath}: $e',
+        );
         currentTags = [];
       }
     }
@@ -283,14 +283,16 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         _pendingChangesCount = 0;
       });
       AppLogger.info(
-          '[ManageTags][Section] Loaded ${_selectedTags.length} tags for ${widget.filePath}');
+        '[ManageTags][Section] Loaded ${_selectedTags.length} tags for ${widget.filePath}',
+      );
     }
   }
 
   // Save all changes to file
   Future<void> saveChanges() async {
     AppLogger.info(
-        '[ManageTags][Section] saveChanges START ${widget.filePath} pending=$_pendingChangesCount');
+      '[ManageTags][Section] saveChanges START ${widget.filePath} pending=$_pendingChangesCount',
+    );
     if (!mounted) {
       return;
     }
@@ -300,7 +302,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
 
       if (!_hasPendingChanges) {
         AppLogger.warning(
-            '[ManageTags][Section] saveChanges skipped because no pending changes for ${widget.filePath}');
+          '[ManageTags][Section] saveChanges skipped because no pending changes for ${widget.filePath}',
+        );
         return;
       }
 
@@ -328,7 +331,8 @@ class _TagManagementSectionState extends State<TagManagementSection> {
 
       await _refreshTags();
       AppLogger.info(
-          '[ManageTags][Section] saveChanges DONE ${widget.filePath}');
+        '[ManageTags][Section] saveChanges DONE ${widget.filePath}',
+      );
     } catch (e) {
       AppLogger.error(
         '[ManageTags][Section] saveChanges ERROR ${widget.filePath}',
@@ -372,8 +376,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     final suggestions = await TagManager.instance.searchTags(text);
     if (mounted) {
       setState(() {
-        _tagSuggestions =
-            suggestions.where((tag) => !_selectedTags.contains(tag)).toList();
+        _tagSuggestions = suggestions
+            .where((tag) => !_selectedTags.contains(tag))
+            .toList();
       });
     }
   }
@@ -392,17 +397,11 @@ class _TagManagementSectionState extends State<TagManagementSection> {
           decoration: InputDecoration(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: Colors.transparent,
-                width: 0,
-              ),
+              borderSide: const BorderSide(color: Colors.transparent, width: 0),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: Colors.transparent,
-                width: 0,
-              ),
+              borderSide: const BorderSide(color: Colors.transparent, width: 0),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16.0),
@@ -412,13 +411,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
               ),
             ),
             labelText: AppLocalizations.of(context)!.tagName,
-            labelStyle: const TextStyle(
-              fontSize: 18,
-            ),
+            labelStyle: const TextStyle(fontSize: 18),
             hintText: AppLocalizations.of(context)!.enterTagName,
-            hintStyle: const TextStyle(
-              fontSize: 18,
-            ),
+            hintStyle: const TextStyle(fontSize: 18),
             prefixIcon: const Icon(PhosphorIconsLight.tag, size: 24),
             filled: true,
             fillColor: WidgetStateColor.resolveWith((states) {
@@ -489,13 +484,17 @@ class _TagManagementSectionState extends State<TagManagementSection> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(PhosphorIconsLight.magnifyingGlass,
-                    size: 18, color: Colors.white),
+                const Icon(
+                  PhosphorIconsLight.magnifyingGlass,
+                  size: 18,
+                  color: Colors.white,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   AppLocalizations.of(context)!.tagSuggestions,
@@ -512,8 +511,11 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                       _tagSuggestions = [];
                     });
                   },
-                  child: const Icon(PhosphorIconsLight.x,
-                      size: 20, color: Colors.white),
+                  child: const Icon(
+                    PhosphorIconsLight.x,
+                    size: 20,
+                    color: Colors.white,
+                  ),
                 ),
               ],
             ),
@@ -522,8 +524,9 @@ class _TagManagementSectionState extends State<TagManagementSection> {
             child: ListView.builder(
               shrinkWrap: true,
               physics: const ClampingScrollPhysics(),
-              itemCount:
-                  _tagSuggestions.length > 6 ? 6 : _tagSuggestions.length,
+              itemCount: _tagSuggestions.length > 6
+                  ? 6
+                  : _tagSuggestions.length,
               itemBuilder: (context, index) {
                 final suggestion = _tagSuggestions[index];
                 return InkWell(
@@ -604,10 +607,10 @@ class PopularTagsWidget extends StatelessWidget {
   final int limit;
 
   const PopularTagsWidget({
-    Key? key,
+    super.key,
     required this.onTagSelected,
     this.limit = 20,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -662,11 +665,11 @@ class RecentTagsWidget extends StatelessWidget {
   final Future<List<String>> Function(int limit)? loadRecentTags;
 
   const RecentTagsWidget({
-    Key? key,
+    super.key,
     required this.onTagSelected,
     this.limit = 20,
     this.loadRecentTags,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -703,10 +706,7 @@ class RecentTagsWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            AnimatedTagList(
-              tags: recentTags,
-              onTagSelected: onTagSelected,
-            ),
+            AnimatedTagList(tags: recentTags, onTagSelected: onTagSelected),
           ],
         );
       },
@@ -721,11 +721,11 @@ class AnimatedTagList extends StatelessWidget {
   final Function(String) onTagSelected;
 
   const AnimatedTagList({
-    Key? key,
+    super.key,
     required this.tags,
     required this.onTagSelected,
     this.counts,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -753,11 +753,11 @@ class AnimatedTagChip extends StatefulWidget {
   final VoidCallback onTap;
 
   const AnimatedTagChip({
-    Key? key,
+    super.key,
     required this.tag,
     required this.onTap,
     required this.displayText,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedTagChip> createState() => _AnimatedTagChipState();
@@ -783,13 +783,15 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    _elevationAnimation = Tween<double>(begin: 0, end: 2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _elevationAnimation = Tween<double>(
+      begin: 0,
+      end: 2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -801,34 +803,25 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    // Get tag color from TagColorManager
+    // getTagColor never returns null — an unassigned tag still gets a colour
+    // derived from its hash — so the tag colour always drives the chip.
     final tagColor = _colorManager.getTagColor(widget.tag);
 
-    // If tag has a custom color, use it; otherwise use theme colors
-    // ignore: unnecessary_null_comparison
-    final bool hasCustomColor = tagColor != null;
-
     // Dynamic colors based on hover state and tag color
-    final Color backgroundColor = hasCustomColor
-        ? (tagColor.withValues(alpha: _isHovered ? 0.3 : 0.2))
-        : (_isHovered
-            ? (isDark
-                ? Colors.blue.withValues(alpha: 0.3)
-                : theme.colorScheme.primary.withValues(alpha: 0.15))
-            : (isDark ? Colors.grey[700]! : Colors.grey[200]!));
-    final Color effectiveBackground =
-        Color.alphaBlend(backgroundColor, theme.colorScheme.surface);
+    final Color backgroundColor = tagColor.withValues(
+      alpha: _isHovered ? 0.3 : 0.2,
+    );
+    final Color effectiveBackground = Color.alphaBlend(
+      backgroundColor,
+      theme.colorScheme.surface,
+    );
     final Color foregroundColor = _bestForegroundColor(effectiveBackground);
     final Color textColor = foregroundColor;
     final Color iconColor = foregroundColor.withValues(alpha: 0.92);
 
-    final Color borderColor = hasCustomColor
-        ? (tagColor.withValues(alpha: _isHovered ? 0.8 : 0.3))
-        : (_isHovered
-            ? theme.colorScheme.primary.withValues(alpha: 0.5)
-            : Colors.transparent);
+    final Color borderColor = tagColor.withValues(
+      alpha: _isHovered ? 0.8 : 0.3,
+    );
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -858,13 +851,12 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
                   decoration: BoxDecoration(
                     color: backgroundColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: borderColor,
-                      width: 1,
-                    ),
+                    border: Border.all(color: borderColor, width: 1),
                   ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -936,11 +928,8 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
           width: 20,
           height: 20,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Icon(
-            PhosphorIconsLight.tag,
-            size: 14,
-            color: iconColor,
-          ),
+          errorBuilder: (_, _, _) =>
+              Icon(PhosphorIconsLight.tag, size: 14, color: iconColor),
         ),
       );
     }

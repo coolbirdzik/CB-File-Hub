@@ -12,10 +12,7 @@ import 'dart:io';
 class HomeScreen extends StatefulWidget {
   final String tabId;
 
-  const HomeScreen({
-    Key? key,
-    required this.tabId,
-  }) : super(key: key);
+  const HomeScreen({super.key, required this.tabId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -42,11 +39,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -81,29 +77,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ).withValues(alpha: desktopLightAlpha),
           ]
         : const <Color>[];
-    final darkBackgroundColor =
-        isDesktopPlatform ? cs.surface.withValues(alpha: 0.30) : cs.surface;
+    final darkBackgroundColor = isDesktopPlatform
+        ? cs.surface.withValues(alpha: 0.30)
+        : cs.surface;
 
     return Scaffold(
       backgroundColor: isDesktopPlatform
           ? Colors.transparent
           : (isLightMode
-              ? cs.surfaceContainerLowest
-              : theme.scaffoldBackgroundColor),
+                ? cs.surfaceContainerLowest
+                : theme.scaffoldBackgroundColor),
       body: Container(
         decoration: isDesktopPlatform
             ? const BoxDecoration(color: desktopUnifiedBackgroundColor)
             : (isLightMode
-                ? BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: backgroundGradientColors,
-                    ),
-                  )
-                : BoxDecoration(
-                    color: darkBackgroundColor,
-                  )),
+                  ? BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: backgroundGradientColors,
+                      ),
+                    )
+                  : BoxDecoration(color: darkBackgroundColor)),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
@@ -181,11 +176,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           Row(
             children: [
-              Icon(
-                PhosphorIconsLight.house,
-                color: cs.primary,
-                size: 32,
-              ),
+              Icon(PhosphorIconsLight.house, color: cs.primary, size: 32),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
@@ -225,11 +216,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             child: Row(
               children: [
-                Icon(
-                  PhosphorIconsLight.lightbulb,
-                  color: cs.primary,
-                  size: 20,
-                ),
+                Icon(PhosphorIconsLight.lightbulb, color: cs.primary, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -335,7 +322,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   PhosphorIconsLight.plusCircle,
                   [
                     theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7)
+                    theme.colorScheme.primary.withValues(alpha: 0.7),
                   ],
                   () => _openNewTab(),
                 ),
@@ -346,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   PhosphorIconsLight.folder,
                   [
                     theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7)
+                    theme.colorScheme.primary.withValues(alpha: 0.7),
                   ],
                   () => _navigateToPath(''),
                 ),
@@ -357,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   PhosphorIconsLight.image,
                   [
                     theme.colorScheme.tertiary,
-                    theme.colorScheme.tertiary.withValues(alpha: 0.7)
+                    theme.colorScheme.tertiary.withValues(alpha: 0.7),
                   ],
                   () => _openImageGallery(),
                 ),
@@ -368,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   PhosphorIconsLight.videoCamera,
                   [
                     theme.colorScheme.secondary,
-                    theme.colorScheme.secondary.withValues(alpha: 0.7)
+                    theme.colorScheme.secondary.withValues(alpha: 0.7),
                   ],
                   () => _openVideoGallery(),
                 ),
@@ -379,7 +366,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   PhosphorIconsLight.tag,
                   [
                     theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7)
+                    theme.colorScheme.primary.withValues(alpha: 0.7),
                   ],
                   () => _openTagsTab(),
                 ),
@@ -430,11 +417,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    icon,
-                    size: iconSize + 4,
-                    color: gradientColors[0],
-                  ),
+                  Icon(icon, size: iconSize + 4, color: gradientColors[0]),
                   SizedBox(height: spacing),
                   Flexible(
                     child: Text(
@@ -453,8 +436,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: Text(
                       description,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
                         fontSize: isMobile ? 11 : null,
                       ),
                       textAlign: TextAlign.center,
@@ -498,8 +482,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: Text(
                       "No pinned items yet",
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                   ),
@@ -522,13 +507,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               _buildPinnedHeader(theme, localizations, cs),
               const SizedBox(height: 24),
-              ...state.pinnedPaths.map((path) => _buildPinnedItem(
-                    theme,
-                    path,
-                    _iconForPinnedPath(path),
-                    _getPinnedDisplayName(path),
-                    () => _navigateToPath(path),
-                  )),
+              ...state.pinnedPaths.map(
+                (path) => _buildPinnedItem(
+                  theme,
+                  path,
+                  _iconForPinnedPath(path),
+                  _getPinnedDisplayName(path),
+                  () => _navigateToPath(path),
+                ),
+              ),
             ],
           ),
         );
@@ -537,14 +524,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildPinnedHeader(
-      ThemeData theme, AppLocalizations localizations, ColorScheme cs) {
+    ThemeData theme,
+    AppLocalizations localizations,
+    ColorScheme cs,
+  ) {
     return Row(
       children: [
-        Icon(
-          PhosphorIconsLight.pushPin,
-          color: cs.primary,
-          size: 24,
-        ),
+        Icon(PhosphorIconsLight.pushPin, color: cs.primary, size: 24),
         const SizedBox(width: 16),
         Text(
           localizations.pinnedSection,
@@ -571,8 +557,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isLightMode
-            ? theme.colorScheme.surface
-                .withValues(alpha: isDesktopPlatform ? 0.46 : 1.0)
+            ? theme.colorScheme.surface.withValues(
+                alpha: isDesktopPlatform ? 0.46 : 1.0,
+              )
             : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
@@ -591,11 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    icon,
-                    color: theme.colorScheme.primary,
-                    size: 20,
-                  ),
+                  child: Icon(icon, color: theme.colorScheme.primary, size: 20),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -613,8 +596,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Text(
                         path,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.7,
+                          ),
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -675,10 +659,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       tabManager.add(UpdateTabName(activeTab.id, 'Gallery Hub'));
     } else {
       // Fallback: create new tab if no active tab exists
-      tabManager.add(AddTab(
-        path: '#gallery',
-        name: 'Gallery Hub',
-      ));
+      tabManager.add(AddTab(path: '#gallery', name: 'Gallery Hub'));
     }
   }
 
@@ -689,10 +670,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       TabNavigator.updateTabPath(context, activeTab.id, '#video');
       tabManager.add(UpdateTabName(activeTab.id, 'Video Hub'));
     } else {
-      tabManager.add(AddTab(
-        path: '#video',
-        name: 'Video Hub',
-      ));
+      tabManager.add(AddTab(path: '#video', name: 'Video Hub'));
     }
   }
 
@@ -721,11 +699,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       tabBloc.add(UpdateTabName(activeTab.id, tabName));
     } else {
       // Create new tab if no active tab exists
-      tabBloc.add(AddTab(
-        path: targetPath,
-        name: tabName,
-        switchToTab: true,
-      ));
+      tabBloc.add(AddTab(path: targetPath, name: tabName, switchToTab: true));
     }
   }
 
@@ -739,13 +713,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       tabBloc.add(UpdateTabName(activeTab.id, 'Tags'));
     } else {
       // Fallback: create new tab if no active tab exists
-      tabBloc.add(
-        AddTab(
-          path: '#tags',
-          name: 'Tags',
-          switchToTab: true,
-        ),
-      );
+      tabBloc.add(AddTab(path: '#tags', name: 'Tags', switchToTab: true));
     }
   }
 }

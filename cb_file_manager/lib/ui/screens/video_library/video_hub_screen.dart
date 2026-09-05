@@ -18,7 +18,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 class VideoHubScreen extends StatefulWidget {
   final String tabId;
 
-  const VideoHubScreen({Key? key, required this.tabId}) : super(key: key);
+  const VideoHubScreen({super.key, required this.tabId});
 
   @override
   State<VideoHubScreen> createState() => _VideoHubScreenState();
@@ -26,8 +26,9 @@ class VideoHubScreen extends StatefulWidget {
 
 class _VideoHubScreenState extends State<VideoHubScreen> {
   final VideoLibraryService _service = VideoLibraryService();
-  final TextEditingController _addressController =
-      TextEditingController(text: '#video');
+  final TextEditingController _addressController = TextEditingController(
+    text: '#video',
+  );
   List<VideoLibrary> _libraries = [];
   Map<int, int> _videoCounts = {};
   bool _isLoading = true;
@@ -92,10 +93,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     final refreshedCounts = await _service.refreshAllLibraryVideoCounts(
       staleLibraries,
     );
-    final freshCounts = <int, int>{
-      ...cachedCounts,
-      ...refreshedCounts,
-    };
+    final freshCounts = <int, int>{...cachedCounts, ...refreshedCounts};
 
     if (mounted) {
       setState(() {
@@ -124,8 +122,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(localizations.deleteVideoLibrary),
-        content:
-            Text(localizations.deleteVideoLibraryConfirmation(library.name)),
+        content: Text(
+          localizations.deleteVideoLibraryConfirmation(library.name),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -147,7 +146,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
 
       if (success && mounted) {
         VideoLibraryHelpers.showSuccessMessage(
-            context, localizations.libraryDeletedSuccessfully);
+          context,
+          localizations.libraryDeletedSuccessfully,
+        );
         _refreshData();
       }
     }
@@ -175,8 +176,12 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     if (activeTab != null) {
       final path = '#video-library-settings/${library.id}';
       TabNavigator.updateTabPath(context, activeTab.id, path);
-      tabManager.add(UpdateTabName(activeTab.id,
-          '${library.name} — ${localizations.videoLibrarySettings}'));
+      tabManager.add(
+        UpdateTabName(
+          activeTab.id,
+          '${library.name} — ${localizations.videoLibrarySettings}',
+        ),
+      );
     }
   }
 
@@ -192,14 +197,17 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     final double desktopLightAlpha = isDesktopPlatform ? 0.42 : 1.0;
     final backgroundGradientColors = isLightMode
         ? <Color>[
-            theme.colorScheme.surfaceContainerLowest
-                .withValues(alpha: desktopLightAlpha),
-            theme.colorScheme.surfaceContainerLow
-                .withValues(alpha: desktopLightAlpha),
+            theme.colorScheme.surfaceContainerLowest.withValues(
+              alpha: desktopLightAlpha,
+            ),
+            theme.colorScheme.surfaceContainerLow.withValues(
+              alpha: desktopLightAlpha,
+            ),
             Color.alphaBlend(
               theme.colorScheme.primary.withValues(alpha: 0.02),
-              theme.colorScheme.surfaceContainer
-                  .withValues(alpha: desktopLightAlpha),
+              theme.colorScheme.surfaceContainer.withValues(
+                alpha: desktopLightAlpha,
+              ),
             ).withValues(alpha: desktopLightAlpha),
           ]
         : <Color>[];
@@ -211,8 +219,8 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
       backgroundColor: isDesktopPlatform
           ? Colors.transparent
           : (isLightMode
-              ? theme.colorScheme.surfaceContainerLowest
-              : theme.scaffoldBackgroundColor),
+                ? theme.colorScheme.surfaceContainerLowest
+                : theme.scaffoldBackgroundColor),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: isDesktopPlatform ? Colors.transparent : null,
@@ -236,16 +244,14 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
         decoration: isDesktopPlatform
             ? const BoxDecoration(color: Colors.transparent)
             : (isLightMode
-                ? BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: backgroundGradientColors,
-                    ),
-                  )
-                : BoxDecoration(
-                    color: darkBackgroundColor,
-                  )),
+                  ? BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: backgroundGradientColors,
+                      ),
+                    )
+                  : BoxDecoration(color: darkBackgroundColor)),
         child: RefreshIndicator(
           onRefresh: _refreshData,
           child: CustomScrollView(
@@ -253,7 +259,11 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
               // Welcome Section
               SliverToBoxAdapter(
                 child: _buildWelcomeSection(
-                    theme, localizations, isLightMode, isDesktopPlatform),
+                  theme,
+                  localizations,
+                  isLightMode,
+                  isDesktopPlatform,
+                ),
               ),
 
               // Libraries Grid
@@ -263,43 +273,44 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                     ? SliverGrid(
                         gridDelegate:
                             const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 300,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 1.2,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => _VideoLibrarySkeletonCard(
-                            index: index,
-                          ),
-                          childCount: 6,
-                        ),
-                      )
-                    : _libraries.isEmpty
-                        ? SliverFillRemaining(
-                            child: _buildEmptyState(theme, localizations,
-                                isLightMode, isDesktopPlatform),
-                          )
-                        : SliverGrid(
-                            gridDelegate:
-                                const SliverGridDelegateWithMaxCrossAxisExtent(
                               maxCrossAxisExtent: 300,
                               mainAxisSpacing: 16,
                               crossAxisSpacing: 16,
                               childAspectRatio: 1.2,
                             ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                return _buildLibraryCard(
-                                    theme,
-                                    localizations,
-                                    _libraries[index],
-                                    isLightMode,
-                                    isDesktopPlatform);
-                              },
-                              childCount: _libraries.length,
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) =>
+                              _VideoLibrarySkeletonCard(index: index),
+                          childCount: 6,
+                        ),
+                      )
+                    : _libraries.isEmpty
+                    ? SliverFillRemaining(
+                        child: _buildEmptyState(
+                          theme,
+                          localizations,
+                          isLightMode,
+                          isDesktopPlatform,
+                        ),
+                      )
+                    : SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 300,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 1.2,
                             ),
-                          ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          return _buildLibraryCard(
+                            theme,
+                            localizations,
+                            _libraries[index],
+                            isLightMode,
+                            isDesktopPlatform,
+                          );
+                        }, childCount: _libraries.length),
+                      ),
               ),
             ],
           ),
@@ -313,8 +324,12 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 
-  Widget _buildWelcomeSection(ThemeData theme, AppLocalizations localizations,
-      bool isLightMode, bool isDesktopPlatform) {
+  Widget _buildWelcomeSection(
+    ThemeData theme,
+    AppLocalizations localizations,
+    bool isLightMode,
+    bool isDesktopPlatform,
+  ) {
     final cs = theme.colorScheme;
     final welcomeGradientColors = isLightMode
         ? <Color>[
@@ -373,8 +388,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                     Text(
                       localizations.videoHubWelcome,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer
-                            .withValues(alpha: 0.7),
+                        color: theme.colorScheme.onPrimaryContainer.withValues(
+                          alpha: 0.7,
+                        ),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -389,8 +405,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color:
-                              theme.colorScheme.surface.withValues(alpha: 0.7),
+                          color: theme.colorScheme.surface.withValues(
+                            alpha: 0.7,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -415,8 +432,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color:
-                              theme.colorScheme.surface.withValues(alpha: 0.7),
+                          color: theme.colorScheme.surface.withValues(
+                            alpha: 0.7,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -431,8 +449,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
                             Text(
                               localizations.videos,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.7),
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.7,
+                                ),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -479,8 +498,12 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme, AppLocalizations localizations,
-      bool isLightMode, bool isDesktopPlatform) {
+  Widget _buildEmptyState(
+    ThemeData theme,
+    AppLocalizations localizations,
+    bool isLightMode,
+    bool isDesktopPlatform,
+  ) {
     final cs = theme.colorScheme;
     final emptyStateGradientColors = isLightMode
         ? <Color>[
@@ -522,10 +545,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Text(
-            localizations.noVideoSources,
-            style: theme.textTheme.titleLarge,
-          ),
+          Text(localizations.noVideoSources, style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             localizations.createVideoLibrary,
@@ -631,8 +651,8 @@ class _LibraryCardContent extends StatelessWidget {
                     Text(
                       library.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -653,10 +673,9 @@ class _LibraryCardContent extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest
-                      .withValues(alpha: 0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(16),
                     bottomRight: Radius.circular(16),
@@ -676,10 +695,8 @@ class _LibraryCardContent extends StatelessWidget {
                       Text(
                         '$videoCount ${localizations.videos.toLowerCase()}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                   ],
                 ),
@@ -721,11 +738,7 @@ class _LibraryMenuButton extends StatelessWidget {
             onDelete();
           }
         },
-        icon: const Icon(
-          Icons.more_vert,
-          size: 18,
-          color: Colors.white,
-        ),
+        icon: const Icon(Icons.more_vert, size: 18, color: Colors.white),
         itemBuilder: (ctx) => [
           PopupMenuItem(
             value: 'settings',
@@ -741,8 +754,10 @@ class _LibraryMenuButton extends StatelessWidget {
             value: 'delete',
             child: Row(
               children: [
-                Icon(PhosphorIconsLight.trash,
-                    color: Theme.of(ctx).colorScheme.error),
+                Icon(
+                  PhosphorIconsLight.trash,
+                  color: Theme.of(ctx).colorScheme.error,
+                ),
                 const SizedBox(width: 8),
                 Text(deleteLabel),
               ],
@@ -782,8 +797,9 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.2,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -804,8 +820,9 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
                     width: 24,
                     height: 24,
                     borderRadius: BorderRadius.circular(12),
-                    delay:
-                        Duration(milliseconds: (index * 80 + 40).clamp(0, 520)),
+                    delay: Duration(
+                      milliseconds: (index * 80 + 40).clamp(0, 520),
+                    ),
                   ),
                 ],
               ),
@@ -824,7 +841,8 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
                       height: 20,
                       borderRadius: BorderRadius.circular(6),
                       delay: Duration(
-                          milliseconds: (index * 80 + 80).clamp(0, 560)),
+                        milliseconds: (index * 80 + 80).clamp(0, 560),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     ShimmerBox(
@@ -832,7 +850,8 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
                       height: 14,
                       borderRadius: BorderRadius.circular(4),
                       delay: Duration(
-                          milliseconds: (index * 80 + 120).clamp(0, 600)),
+                        milliseconds: (index * 80 + 120).clamp(0, 600),
+                      ),
                     ),
                   ],
                 ),
@@ -843,8 +862,9 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.15),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.15,
+                ),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(16),
                   bottomRight: Radius.circular(16),
@@ -857,7 +877,8 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
                     height: 16,
                     borderRadius: BorderRadius.circular(4),
                     delay: Duration(
-                        milliseconds: (index * 80 + 160).clamp(0, 640)),
+                      milliseconds: (index * 80 + 160).clamp(0, 640),
+                    ),
                   ),
                   const SizedBox(width: 4),
                   ShimmerBox(
@@ -865,7 +886,8 @@ class _VideoLibrarySkeletonCard extends StatelessWidget {
                     height: 14,
                     borderRadius: BorderRadius.circular(4),
                     delay: Duration(
-                        milliseconds: (index * 80 + 200).clamp(0, 680)),
+                      milliseconds: (index * 80 + 200).clamp(0, 680),
+                    ),
                   ),
                 ],
               ),

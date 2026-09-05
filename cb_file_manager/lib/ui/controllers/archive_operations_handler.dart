@@ -35,8 +35,9 @@ class ArchiveOperationsHandler {
     FolderListBloc? folderListBloc,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    final dest = destinationDir ??
-        await FilePicker.platform.getDirectoryPath(
+    final dest =
+        destinationDir ??
+        await FilePicker.getDirectoryPath(
           dialogTitle: l10n.archiveExtractToTitle,
         );
     if (dest == null || dest.isEmpty) return;

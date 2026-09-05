@@ -74,8 +74,9 @@ class NetworkCredentialsService {
       password: password,
       port: port,
       domain: domain,
-      additionalOptions:
-          additionalOptions != null ? jsonEncode(additionalOptions) : null,
+      additionalOptions: additionalOptions != null
+          ? jsonEncode(additionalOptions)
+          : null,
       lastConnected: DateTime.now(),
     );
 
@@ -180,7 +181,8 @@ class NetworkCredentialsService {
   void _checkInitialized() {
     if (!_isInitialized) {
       throw StateError(
-          'NetworkCredentialsService has not been initialized yet');
+        'NetworkCredentialsService has not been initialized yet',
+      );
     }
   }
 }

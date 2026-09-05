@@ -40,7 +40,7 @@ void main() {
   test('17.02 chat input exposes a stop callback while loading', () {
     var stopCount = 0;
     final input = ChatInputBar(
-      onSend: (_, __) {},
+      onSend: (_, _) {},
       onStop: () => stopCount++,
       isLoading: true,
     );
@@ -54,10 +54,7 @@ void main() {
   test('17.03 approved tool remains visible while it is running', () async {
     final provider = _ToolApprovalProviderService();
     final executor = _BlockingToolExecutor();
-    final bloc = AiAgentBloc(
-      providerService: provider,
-      toolExecutor: executor,
-    );
+    final bloc = AiAgentBloc(providerService: provider, toolExecutor: executor);
 
     bloc.add(const SendMessage('Clean junk files'));
     await _waitUntil(() => bloc.state.pendingApproval != null);
@@ -98,7 +95,7 @@ class _ControllableProviderService extends AiProviderService {
       firstRequestStarted.complete();
       return _firstRequestResult.future;
     }
-    return Future.value(_result('tool-free response'));
+    return Future.value(_result('second response'));
   }
 
   @override
@@ -119,9 +116,9 @@ class _ControllableProviderService extends AiProviderService {
   }
 
   AiChatResult _result(String content) => AiChatResult(
-        response: AiChatResponse(content: content),
-        providerId: 'test',
-      );
+    response: AiChatResponse(content: content),
+    providerId: 'test',
+  );
 }
 
 class _ToolApprovalProviderService extends AiProviderService {
@@ -137,8 +134,8 @@ class _ToolApprovalProviderService extends AiProviderService {
     _chatCalls++;
     final content = _chatCalls == 1
         ? '<tool_call>{"name":"clean_disk_junk","arguments":'
-            '{"scan_id":"scan-test","categories":["dev_cache"],'
-            '"permanent":false}}</tool_call>'
+              '{"scan_id":"scan-test","categories":["dev_cache"],'
+              '"permanent":false}}</tool_call>'
         : 'Cleaning finished.';
     return AiChatResult(
       response: AiChatResponse(content: content),
@@ -171,10 +168,9 @@ class _BlockingToolExecutor extends ToolExecutor {
   }
 
   void complete() {
-    _result.complete(const ToolResult(
-      toolName: 'clean_disk_junk',
-      output: 'Cleaned.',
-    ));
+    _result.complete(
+      const ToolResult(toolName: 'clean_disk_junk', output: 'Cleaned.'),
+    );
   }
 }
 

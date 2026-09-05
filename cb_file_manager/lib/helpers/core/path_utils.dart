@@ -1,5 +1,5 @@
 /// Common path utilities used across helpers
-library path_utils;
+library;
 
 /// Replace characters that are not allowed in file names with '_'.
 String sanitizePath(String path) {

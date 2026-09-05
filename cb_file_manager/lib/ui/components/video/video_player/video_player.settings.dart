@@ -183,9 +183,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: StatefulBuilder(
           builder: (context, setDialogState) {
-            final acrylicBg = (Theme.of(context).dialogTheme.backgroundColor ??
-                    Theme.of(context).colorScheme.surface)
-                .withValues(alpha: 0.82);
+            final acrylicBg =
+                (Theme.of(context).dialogTheme.backgroundColor ??
+                        Theme.of(context).colorScheme.surface)
+                    .withValues(alpha: 0.82);
             return AlertDialog(
               backgroundColor: acrylicBg,
               title: const Text('Video Settings'),
@@ -195,8 +196,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Codec Selection
-                    const Text('Codec:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Codec:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     CbSelect<String>(
                       value: _selectedCodec,
                       expand: true,
@@ -216,21 +219,29 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Video Scale Mode
-                    const Text('Video Scale Mode:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Video Scale Mode:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     CbSelect<String>(
                       value: _videoScaleMode,
                       expand: true,
                       items: const [
                         CbSelectItem(
-                            value: 'cover', label: 'Cover (Fill & Crop)'),
+                          value: 'cover',
+                          label: 'Cover (Fill & Crop)',
+                        ),
                         CbSelectItem(
-                            value: 'contain', label: 'Contain (Fit All)'),
+                          value: 'contain',
+                          label: 'Contain (Fit All)',
+                        ),
                         CbSelectItem(value: 'fill', label: 'Fill (Stretch)'),
                         CbSelectItem(value: 'fitWidth', label: 'Fit Width'),
                         CbSelectItem(value: 'fitHeight', label: 'Fit Height'),
                         CbSelectItem(
-                            value: 'none', label: 'None (Original Size)'),
+                          value: 'none',
+                          label: 'None (Original Size)',
+                        ),
                         CbSelectItem(value: 'scaleDown', label: 'Scale Down'),
                       ],
                       onChanged: (value) {
@@ -266,8 +277,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
 
                     // Video Decoder
-                    const Text('Video Decoder:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Video Decoder:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     CbSelect<String>(
                       value: _videoDecoder,
                       expand: true,
@@ -307,8 +320,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Audio Decoder
-                    const Text('Audio Decoder:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Audio Decoder:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     CbSelect<String>(
                       value: _audioDecoder,
                       expand: true,
@@ -354,8 +369,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     ),
 
                     // Subtitle Encoding
-                    const Text('Subtitle Encoding:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Subtitle Encoding:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     CbSelect<String>(
                       value: _subtitleEncoding,
                       expand: true,
@@ -364,7 +381,9 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                         CbSelectItem(value: 'utf-16', label: 'UTF-16'),
                         CbSelectItem(value: 'iso-8859-1', label: 'ISO-8859-1'),
                         CbSelectItem(
-                            value: 'windows-1252', label: 'Windows-1252'),
+                          value: 'windows-1252',
+                          label: 'Windows-1252',
+                        ),
                       ],
                       onChanged: (value) {
                         setDialogState(() => _subtitleEncoding = value);
@@ -375,8 +394,10 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
                     const SizedBox(height: 16),
 
                     // Video Output Format
-                    const Text('Video Output Format:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Video Output Format:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     CbSelect<String>(
                       value: _videoOutputFormat,
                       expand: true,
@@ -464,14 +485,18 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       await prefs.init();
       await prefs.setVideoPlayerString('video_codec', _selectedCodec);
       await prefs.setVideoPlayerBool(
-          'hardware_acceleration', _hardwareAcceleration);
+        'hardware_acceleration',
+        _hardwareAcceleration,
+      );
       await prefs.setVideoPlayerString('video_decoder', _videoDecoder);
       await prefs.setVideoPlayerString('audio_decoder', _audioDecoder);
       await prefs.setVideoPlayerInt('buffer_size', _bufferSize);
       await prefs.setVideoPlayerInt('network_timeout', _networkTimeout);
       await prefs.setVideoPlayerString('subtitle_encoding', _subtitleEncoding);
       await prefs.setVideoPlayerString(
-          'video_output_format', _videoOutputFormat);
+        'video_output_format',
+        _videoOutputFormat,
+      );
       await prefs.setVideoPlayerString('video_scale_mode', _videoScaleMode);
       await prefs.setVideoSeekSpeed(_videoSeekSpeed);
       debugPrint('Video player settings saved successfully');
@@ -491,51 +516,73 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       // connection to device"). Force it OFF once on Windows so existing
       // users get the safe default. The user can still re-enable it manually.
       if (!kIsWeb && Platform.isWindows) {
-        final migrated = await prefs.getVideoPlayerBool(
-                'hw_accel_windows_migrated',
-                defaultValue: false) ??
+        final migrated =
+            await prefs.getVideoPlayerBool(
+              'hw_accel_windows_migrated',
+              defaultValue: false,
+            ) ??
             false;
         if (!migrated) {
           await prefs.setVideoPlayerBool('hardware_acceleration', false);
           await prefs.setVideoPlayerString('video_decoder', 'software');
           await prefs.setVideoPlayerBool('hw_accel_windows_migrated', true);
           debugPrint(
-              'VideoPlayer: applied one-time Windows HW-accel safety migration');
+            'VideoPlayer: applied one-time Windows HW-accel safety migration',
+          );
         }
       }
 
-      _selectedCodec = await prefs.getVideoPlayerString('video_codec',
-              defaultValue: 'auto') ??
+      _selectedCodec =
+          await prefs.getVideoPlayerString(
+            'video_codec',
+            defaultValue: 'auto',
+          ) ??
           'auto';
       // Default hardware acceleration OFF on Windows: media_kit's D3D11/ANGLE
       // rendering path can fail to create a device (E_OUTOFMEMORY) on some
       // GPUs/drivers and crash the engine ("Lost connection to device").
       // Software decoding avoids that. Mirrors the desktop PiP windows.
       final hwAccelDefault = kIsWeb ? true : !Platform.isWindows;
-      _hardwareAcceleration = await prefs.getVideoPlayerBool(
-              'hardware_acceleration',
-              defaultValue: hwAccelDefault) ??
+      _hardwareAcceleration =
+          await prefs.getVideoPlayerBool(
+            'hardware_acceleration',
+            defaultValue: hwAccelDefault,
+          ) ??
           hwAccelDefault;
-      _videoDecoder = await prefs.getVideoPlayerString('video_decoder',
-              defaultValue: 'auto') ??
+      _videoDecoder =
+          await prefs.getVideoPlayerString(
+            'video_decoder',
+            defaultValue: 'auto',
+          ) ??
           'auto';
-      _audioDecoder = await prefs.getVideoPlayerString('audio_decoder',
-              defaultValue: 'auto') ??
+      _audioDecoder =
+          await prefs.getVideoPlayerString(
+            'audio_decoder',
+            defaultValue: 'auto',
+          ) ??
           'auto';
       _bufferSize =
           await prefs.getVideoPlayerInt('buffer_size', defaultValue: 10) ?? 10;
       _networkTimeout =
           await prefs.getVideoPlayerInt('network_timeout', defaultValue: 30) ??
-              30;
-      _subtitleEncoding = await prefs.getVideoPlayerString('subtitle_encoding',
-              defaultValue: 'utf-8') ??
+          30;
+      _subtitleEncoding =
+          await prefs.getVideoPlayerString(
+            'subtitle_encoding',
+            defaultValue: 'utf-8',
+          ) ??
           'utf-8';
-      _videoOutputFormat = await prefs.getVideoPlayerString(
-              'video_output_format',
-              defaultValue: 'auto') ??
+      _videoOutputFormat =
+          await prefs.getVideoPlayerString(
+            'video_output_format',
+            defaultValue: 'auto',
+          ) ??
           'auto';
-      _videoScaleMode = await prefs.getVideoPlayerString('video_scale_mode',
-              defaultValue: 'contain') ??
+      _videoScaleMode =
+          await prefs.getVideoPlayerString(
+            'video_scale_mode',
+            defaultValue: 'contain',
+          ) ??
           'contain';
       _videoSeekSpeed = await prefs.getVideoSeekSpeed();
 

@@ -74,9 +74,11 @@ class StreamingServiceManager {
       }
 
       // Check if we have any native streaming helpers
-      return _helpers.any((helper) =>
-          (helper).name.toLowerCase().contains('native') &&
-          (helper).priority >= 1000);
+      return _helpers.any(
+        (helper) =>
+            (helper).name.toLowerCase().contains('native') &&
+            (helper).priority >= 1000,
+      );
     } catch (e) {
       AppLogger.error('Error checking native streaming availability', error: e);
       return false;

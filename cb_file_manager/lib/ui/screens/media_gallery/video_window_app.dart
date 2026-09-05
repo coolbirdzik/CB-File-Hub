@@ -22,7 +22,7 @@ import 'video_player_full_screen.dart';
 class VideoWindowApp extends StatefulWidget {
   final String initialPath;
 
-  const VideoWindowApp({Key? key, required this.initialPath}) : super(key: key);
+  const VideoWindowApp({super.key, required this.initialPath});
 
   @override
   State<VideoWindowApp> createState() => _VideoWindowAppState();
@@ -137,10 +137,7 @@ class _VideoWindowAppState extends State<VideoWindowApp> {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: const [
-              Locale('vi', ''),
-              Locale('en', ''),
-            ],
+            supportedLocales: const [Locale('vi', ''), Locale('en', '')],
             // Keep the same route/window; VideoPlayerFullScreen updates the
             // source from didUpdateWidget when this path changes.
             home: VideoPlayerFullScreen(

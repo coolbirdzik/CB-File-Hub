@@ -10,11 +10,11 @@ class SearchScopeSelector extends StatelessWidget {
   final String currentPath;
 
   const SearchScopeSelector({
-    Key? key,
+    super.key,
     required this.selectedScope,
     required this.onScopeChanged,
     this.currentPath = '',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

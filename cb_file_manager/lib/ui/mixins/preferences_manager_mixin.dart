@@ -68,32 +68,34 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       final globalViewMode = await prefs.getViewMode();
       final loadedViewMode =
           await folderSortManager.getFolderViewMode(folderPreferencePath) ??
-              globalViewMode;
+          globalViewMode;
       final globalSortOption = await prefs.getSortOption();
       final sortOption =
           await folderSortManager.getFolderSortOption(folderPreferencePath) ??
-              globalSortOption;
-      final loadedGridZoomLevel = await folderSortManager
-              .getFolderGridZoomLevel(folderPreferencePath) ??
+          globalSortOption;
+      final loadedGridZoomLevel =
+          await folderSortManager.getFolderGridZoomLevel(
+            folderPreferencePath,
+          ) ??
           await prefs.getGridZoomLevel();
       final loadedColumnVisibility =
           await folderSortManager.getFolderColumnVisibility(
-                folderPreferencePath,
-              ) ??
-              await prefs.getColumnVisibility();
+            folderPreferencePath,
+          ) ??
+          await prefs.getColumnVisibility();
       final loadedShowFileTags =
           await folderSortManager.getFolderShowFileTags(folderPreferencePath) ??
-              await prefs.getShowFileTags();
+          await prefs.getShowFileTags();
       final loadedPreviewPaneVisible =
           await folderSortManager.getFolderPreviewPaneVisible(
-                folderPreferencePath,
-              ) ??
-              await prefs.getPreviewPaneVisible();
+            folderPreferencePath,
+          ) ??
+          await prefs.getPreviewPaneVisible();
       final loadedPreviewPaneWidth =
           await folderSortManager.getFolderPreviewPaneWidth(
-                folderPreferencePath,
-              ) ??
-              await prefs.getPreviewPaneWidth();
+            folderPreferencePath,
+          ) ??
+          await prefs.getPreviewPaneWidth();
       final effectiveViewMode = ViewModeUtils.normalize(
         !isDesktopPlatform && loadedViewMode == ViewMode.gridPreview
             ? ViewMode.grid
@@ -118,10 +120,7 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
         });
 
         folderListBloc.add(SetViewMode(effectiveViewMode));
-        folderListBloc.add(SetSortOption(
-          sortOption,
-          persist: false,
-        ));
+        folderListBloc.add(SetSortOption(sortOption, persist: false));
         folderListBloc.add(SetGridZoom(resolvedGridZoom));
       }
     } catch (e) {
@@ -213,8 +212,9 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
       context,
       mode: GridSizeMode.referenceWidth,
     );
-    final clamped =
-        zoomLevel.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    final clamped = zoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
     folderListBloc.add(SetGridZoom(clamped));
     saveGridZoomSetting(clamped);
   }
@@ -250,12 +250,7 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
           ViewMode.list,
           ViewMode.tiles,
         }
-      : const {
-          ViewMode.tree,
-          ViewMode.details,
-          ViewMode.list,
-          ViewMode.tiles,
-        };
+      : const {ViewMode.tree, ViewMode.details, ViewMode.list, ViewMode.tiles};
 
   /// Handle a unified "view scale" delta from Ctrl+scroll.
   ///
@@ -356,10 +351,7 @@ mixin PreferencesManagerMixin<T extends StatefulWidget> on State<T> {
   Future<void> saveShowFileTagsSetting(bool visible) async {
     try {
       await UserPreferences.instance.init();
-      await FolderSortManager().saveFolderShowFileTags(
-        preferencePath,
-        visible,
-      );
+      await FolderSortManager().saveFolderShowFileTags(preferencePath, visible);
       if (!mounted) return;
       setState(() {
         showFileTags = visible;

@@ -9,8 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {
-  testWidgets('11.01 Shift+arrow extends selection from the original anchor',
-      (tester) async {
+  testWidgets('11.01 Shift+arrow extends selection from the original anchor', (
+    tester,
+  ) async {
     final controller = TabbedFolderKeyboardController();
     addTearDown(controller.dispose);
 
@@ -41,21 +42,22 @@ void main() {
         onBackInTabHistory: () {},
         focusFolderPath: (_) => fail('Shift+arrow should select a range'),
         focusFilePath: (_) => fail('Shift+arrow should select a range'),
-        selectRange: ({
-          required Set<String> folderPaths,
-          required Set<String> filePaths,
-          required String lastSelectedPath,
-          required bool ctrlSelect,
-        }) {
-          selectedRanges.add(filePaths);
-          selectionState = SelectionState(
-            selectedFilePaths: filePaths,
-            selectedFolderPaths: folderPaths,
-            lastSelectedPath: lastSelectedPath,
-            isSelectionMode: filePaths.isNotEmpty || folderPaths.isNotEmpty,
-          );
-          capturedLastSelectedPath = lastSelectedPath;
-        },
+        selectRange:
+            ({
+              required Set<String> folderPaths,
+              required Set<String> filePaths,
+              required String lastSelectedPath,
+              required bool ctrlSelect,
+            }) {
+              selectedRanges.add(filePaths);
+              selectionState = SelectionState(
+                selectedFilePaths: filePaths,
+                selectedFolderPaths: folderPaths,
+                lastSelectedPath: lastSelectedPath,
+                isSelectionMode: filePaths.isNotEmpty || folderPaths.isNotEmpty,
+              );
+              capturedLastSelectedPath = lastSelectedPath;
+            },
         activateEntity: (_) {},
         onDelete: (_) {},
         event: const KeyDownEvent(
@@ -80,8 +82,9 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
   });
 
-  testWidgets('11.02 Immediate selection settles after bloc state catches up',
-      (tester) async {
+  testWidgets('11.02 Immediate selection settles after bloc state catches up', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SizedBox());
     final controller = TabbedFolderKeyboardController();
     addTearDown(controller.dispose);
@@ -99,11 +102,13 @@ void main() {
     expect(oldSelection.value, isFalse);
     expect(newSelection.value, isTrue);
 
-    controller.syncFromSelection(const SelectionState(
-      selectedFilePaths: <String>{newPath},
-      lastSelectedPath: newPath,
-      isSelectionMode: true,
-    ));
+    controller.syncFromSelection(
+      const SelectionState(
+        selectedFilePaths: <String>{newPath},
+        lastSelectedPath: newPath,
+        isSelectionMode: true,
+      ),
+    );
 
     // Keep the existing row style for this frame, then hand control back to
     // SelectionBloc without any second overlay or visible transition.
@@ -114,8 +119,9 @@ void main() {
     expect(newSelection.value, isNull);
   });
 
-  testWidgets('11.03 Interaction without long press reacts on pointer down',
-      (tester) async {
+  testWidgets('11.03 Interaction without long press reacts on pointer down', (
+    tester,
+  ) async {
     var tapCount = 0;
     await tester.pumpWidget(
       Directionality(

@@ -28,10 +28,7 @@ class DiskTreeSelection {
   /// Checking makes the selection exactly the scanner-approved junk nodes,
   /// clearing any stale or manual safe-node selections. Unchecking clears the
   /// entire tree because the corresponding UI action is "Uncheck all".
-  static Set<String> setAllCleanableChecked(
-    DiskTreeNode? root,
-    bool checked,
-  ) {
+  static Set<String> setAllCleanableChecked(DiskTreeNode? root, bool checked) {
     if (root == null) return <String>{};
     final selectedPaths = <String>{};
 

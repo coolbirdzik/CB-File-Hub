@@ -12,12 +12,12 @@ class VideoLibraryCover extends StatelessWidget {
   final String? placeholderLabel;
 
   const VideoLibraryCover({
-    Key? key,
+    super.key,
     required this.coverImagePath,
     required this.placeholderIcon,
     required this.accentColor,
     this.placeholderLabel,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +26,7 @@ class VideoLibraryCover extends StatelessWidget {
       return Image.file(
         File(coverPath),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPlaceholder(context),
+        errorBuilder: (_, _, _) => _buildPlaceholder(context),
       );
     }
     return _buildPlaceholder(context);

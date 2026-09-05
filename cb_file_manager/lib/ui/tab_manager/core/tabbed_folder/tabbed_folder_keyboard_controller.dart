@@ -9,8 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class TabbedFolderKeyboardController {
-  final FocusNode focusNode =
-      FocusNode(debugLabel: 'tabbed-folder-list-keyboard');
+  final FocusNode focusNode = FocusNode(
+    debugLabel: 'tabbed-folder-list-keyboard',
+  );
 
   /// Scroll controller attached to the active list/grid view.
   /// The screen creates this and passes it to [FileListViewBuilder].
@@ -48,9 +49,7 @@ class TabbedFolderKeyboardController {
     }
     return _immediateSelectionNotifiers.putIfAbsent(
       path,
-      () => ValueNotifier<bool?>(
-        immediatePaths?.contains(path),
-      ),
+      () => ValueNotifier<bool?>(immediatePaths?.contains(path)),
     );
   }
 
@@ -149,11 +148,13 @@ class TabbedFolderKeyboardController {
     });
   }
 
-  void _ensurePathVisible(String path,
-      {required bool forward,
-      int? index,
-      int? crossAxisCount,
-      double? itemHeight}) {
+  void _ensurePathVisible(
+    String path, {
+    required bool forward,
+    int? index,
+    int? crossAxisCount,
+    double? itemHeight,
+  }) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final key = _itemKeys[path];
       final context = key?.currentContext;
@@ -173,11 +174,16 @@ class TabbedFolderKeyboardController {
           final double viewEnd = viewStart + pos.viewportDimension;
 
           if (itemEnd > viewEnd) {
-            scrollController.jumpTo((itemEnd - pos.viewportDimension)
-                .clamp(pos.minScrollExtent, pos.maxScrollExtent));
+            scrollController.jumpTo(
+              (itemEnd - pos.viewportDimension).clamp(
+                pos.minScrollExtent,
+                pos.maxScrollExtent,
+              ),
+            );
           } else if (itemStart < viewStart) {
             scrollController.jumpTo(
-                itemStart.clamp(pos.minScrollExtent, pos.maxScrollExtent));
+              itemStart.clamp(pos.minScrollExtent, pos.maxScrollExtent),
+            );
           }
         }
         return;
@@ -240,7 +246,8 @@ class TabbedFolderKeyboardController {
       required Set<String> filePaths,
       required String lastSelectedPath,
       required bool ctrlSelect,
-    }) selectRange,
+    })
+    selectRange,
     required void Function(FileSystemEntity entity) activateEntity,
 
     /// Shift+Enter: open the focused entity in a brand new window.
@@ -258,7 +265,7 @@ class TabbedFolderKeyboardController {
     /// (1 for list/details), [itemMainAxisExtent] is the item height (list/details)
     /// or cell height (grid).
     void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
-        onScrollToIndex,
+    onScrollToIndex,
     KeyEvent? event,
   }) {
     if (!isDesktop || event == null) return KeyEventResult.ignored;
@@ -268,11 +275,14 @@ class TabbedFolderKeyboardController {
 
     final LogicalKeyboardKey key = event.logicalKey;
     final bool isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
-    final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed ||
-        HardwareKeyboard.instance.logicalKeysPressed
-            .contains(LogicalKeyboardKey.shiftLeft) ||
-        HardwareKeyboard.instance.logicalKeysPressed
-            .contains(LogicalKeyboardKey.shiftRight);
+    final bool isShiftPressed =
+        HardwareKeyboard.instance.isShiftPressed ||
+        HardwareKeyboard.instance.logicalKeysPressed.contains(
+          LogicalKeyboardKey.shiftLeft,
+        ) ||
+        HardwareKeyboard.instance.logicalKeysPressed.contains(
+          LogicalKeyboardKey.shiftRight,
+        );
 
     // Delete key - move to trash or permanent delete
     if (key == LogicalKeyboardKey.delete) {
@@ -324,7 +334,8 @@ class TabbedFolderKeyboardController {
             (isCtrlPressed && key == LogicalKeyboardKey.keyR)) &&
         onRefresh != null) {
       debugPrint(
-          '${key == LogicalKeyboardKey.f5 ? "F5" : "Ctrl+R"} pressed - Refresh');
+        '${key == LogicalKeyboardKey.f5 ? "F5" : "Ctrl+R"} pressed - Refresh',
+      );
       onRefresh();
       return KeyEventResult.handled;
     }
@@ -340,25 +351,29 @@ class TabbedFolderKeyboardController {
       return KeyEventResult.handled;
     }
 
-    final List<FileSystemEntity> items =
-        _getNavigableItems(folderListState, currentFilter);
+    final List<FileSystemEntity> items = _getNavigableItems(
+      folderListState,
+      currentFilter,
+    );
     if (items.isEmpty) return KeyEventResult.ignored;
 
     final bool isGridLayout =
         ViewModeUtils.isGridLike(folderListState.viewMode) ||
-            folderListState.viewMode == ViewMode.tiles;
+        folderListState.viewMode == ViewMode.tiles;
     final int crossAxisCount = isGridLayout
         ? (gridCrossAxisCount ?? folderListState.gridZoomLevel).clamp(1, 999)
         : 1;
 
     int currentIndex = -1;
     if (focusedPath != null) {
-      currentIndex =
-          items.indexWhere((FileSystemEntity item) => item.path == focusedPath);
+      currentIndex = items.indexWhere(
+        (FileSystemEntity item) => item.path == focusedPath,
+      );
     }
     if (currentIndex == -1 && selectionState.lastSelectedPath != null) {
-      currentIndex = items.indexWhere((FileSystemEntity item) =>
-          item.path == selectionState.lastSelectedPath);
+      currentIndex = items.indexWhere(
+        (FileSystemEntity item) => item.path == selectionState.lastSelectedPath,
+      );
     }
     if (currentIndex == -1) {
       currentIndex = 0;
@@ -440,7 +455,9 @@ class TabbedFolderKeyboardController {
   }
 
   List<FileSystemEntity> _getNavigableItems(
-      FolderListState state, String? currentFilter) {
+    FolderListState state,
+    String? currentFilter,
+  ) {
     if (state.currentSearchTag != null || state.currentSearchQuery != null) {
       return List<FileSystemEntity>.from(state.searchResults);
     }
@@ -461,7 +478,7 @@ class TabbedFolderKeyboardController {
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
     void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
-        onScrollToIndex,
+    onScrollToIndex,
     int crossAxisCount = 1,
   }) {
     if (index < 0 || index >= items.length) return;
@@ -498,27 +515,31 @@ class TabbedFolderKeyboardController {
       required Set<String> filePaths,
       required String lastSelectedPath,
       required bool ctrlSelect,
-    }) selectRange,
+    })
+    selectRange,
     required bool ctrlSelect,
     required int crossAxisCount,
   }) {
     if (targetIndex < 0 || targetIndex >= items.length) return;
 
-    final String anchorPath = _keyboardRangeAnchorPath ??
+    final String anchorPath =
+        _keyboardRangeAnchorPath ??
         focusedPath ??
         selectionState.lastSelectedPath ??
         items[currentIndex].path;
     _keyboardRangeAnchorPath = anchorPath;
 
-    int anchorIndex =
-        items.indexWhere((FileSystemEntity item) => item.path == anchorPath);
+    int anchorIndex = items.indexWhere(
+      (FileSystemEntity item) => item.path == anchorPath,
+    );
     if (anchorIndex == -1) {
       anchorIndex = currentIndex;
       _keyboardRangeAnchorPath = items[currentIndex].path;
     }
 
-    final int startIndex =
-        anchorIndex < targetIndex ? anchorIndex : targetIndex;
+    final int startIndex = anchorIndex < targetIndex
+        ? anchorIndex
+        : targetIndex;
     final int endIndex = anchorIndex < targetIndex ? targetIndex : anchorIndex;
     final Set<String> folderPaths = <String>{};
     final Set<String> filePaths = <String>{};
@@ -557,7 +578,7 @@ class TabbedFolderKeyboardController {
     required void Function(String folderPath) focusFolderPath,
     required void Function(String filePath) focusFilePath,
     void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
-        onScrollToIndex,
+    onScrollToIndex,
   }) {
     final now = DateTime.now();
     final bool isTimeout = now.difference(_lastTypeTime) > _typeAheadTimeout;

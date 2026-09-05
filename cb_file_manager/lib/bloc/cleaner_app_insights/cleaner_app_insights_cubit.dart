@@ -10,12 +10,10 @@ class CleanerAppInsightsCubit extends Cubit<CleanerAppInsightsState> {
   int _loadGeneration = 0;
 
   CleanerAppInsightsCubit({DateTime Function()? nowProvider})
-      : _nowProvider = nowProvider ?? DateTime.now,
-        super(
-          CleanerAppInsightsState(
-            evaluatedAt: (nowProvider ?? DateTime.now)(),
-          ),
-        );
+    : _nowProvider = nowProvider ?? DateTime.now,
+      super(
+        CleanerAppInsightsState(evaluatedAt: (nowProvider ?? DateTime.now)()),
+      );
 
   Future<void> load(CleanerAppInsightsLoader loader) async {
     final generation = ++_loadGeneration;
@@ -96,16 +94,12 @@ class CleanerAppInsightsCubit extends Cubit<CleanerAppInsightsState> {
 
   void setLargeThresholdBytes(int bytes) {
     if (bytes <= 0) return;
-    _emitWithVisibleSelection(
-      state.copyWith(largeThresholdBytes: bytes),
-    );
+    _emitWithVisibleSelection(state.copyWith(largeThresholdBytes: bytes));
   }
 
   void setStaleThresholdDays(int days) {
     if (days <= 0) return;
-    _emitWithVisibleSelection(
-      state.copyWith(staleThresholdDays: days),
-    );
+    _emitWithVisibleSelection(state.copyWith(staleThresholdDays: days));
   }
 
   void selectApp(String? appId) {
@@ -132,7 +126,8 @@ class CleanerAppInsightsCubit extends Cubit<CleanerAppInsightsState> {
   void _emitWithVisibleSelection(CleanerAppInsightsState next) {
     final visible = next.visibleApps;
     final selectedId = next.selectedAppId;
-    final selectedIsVisible = selectedId != null &&
+    final selectedIsVisible =
+        selectedId != null &&
         visible.any((profile) => profile.app.id == selectedId);
     final nextSelectedId = selectedIsVisible
         ? selectedId

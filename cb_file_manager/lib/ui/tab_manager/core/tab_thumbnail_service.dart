@@ -21,8 +21,9 @@ class TabThumbnailService {
       final ui.Image image = await boundary.toImage(pixelRatio: 0.5);
 
       // Convert to byte data
-      final ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
 
       if (byteData == null) {
         debugPrint('TabThumbnailService: Failed to convert image to bytes');
@@ -32,7 +33,8 @@ class TabThumbnailService {
       final Uint8List pngBytes = byteData.buffer.asUint8List();
 
       debugPrint(
-          'TabThumbnailService: Captured thumbnail (${pngBytes.length} bytes)');
+        'TabThumbnailService: Captured thumbnail (${pngBytes.length} bytes)',
+      );
       return pngBytes;
     } catch (e) {
       debugPrint('TabThumbnailService: Error capturing thumbnail: $e');

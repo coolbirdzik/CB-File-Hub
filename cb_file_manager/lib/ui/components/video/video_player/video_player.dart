@@ -93,7 +93,7 @@ class VideoPlayer extends StatefulWidget {
   final VoidCallback? onToggleStreamingSpeed;
 
   const VideoPlayer._({
-    Key? key,
+    super.key,
     this.file,
     this.streamingUrl,
     this.smbMrl,
@@ -119,14 +119,13 @@ class VideoPlayer extends StatefulWidget {
     this.hasPreviousVideo = false,
     this.showStreamingSpeed = false,
     this.onToggleStreamingSpeed,
-  })  : assert(
-          file != null ||
-              streamingUrl != null ||
-              smbMrl != null ||
-              fileStream != null,
-          'At least one media source must be provided',
-        ),
-        super(key: key);
+  }) : assert(
+         file != null ||
+             streamingUrl != null ||
+             smbMrl != null ||
+             fileStream != null,
+         'At least one media source must be provided',
+       );
 
   /// Constructor for local file playback
   VideoPlayer.file({
@@ -151,30 +150,31 @@ class VideoPlayer extends StatefulWidget {
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
   }) : this._(
-          key: key,
-          file: file,
-          fileName: pathlib.basename(file.path),
-          fileType: FileTypeRegistry.getCategory(
-              VideoPlayerUtils.extensionFromPath(file.path)),
-          autoPlay: autoPlay,
-          looping: looping,
-          showControls: showControls,
-          allowFullScreen: allowFullScreen,
-          allowMuting: allowMuting,
-          allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
-          onVideoInitialized: onVideoInitialized,
-          onError: onError,
-          onNextVideo: onNextVideo,
-          onPreviousVideo: onPreviousVideo,
-          onControlVisibilityChanged: onControlVisibilityChanged,
-          onFullScreenChanged: onFullScreenChanged,
-          onInitialized: onInitialized,
-          onOpenFolder: onOpenFolder,
-          hasNextVideo: hasNextVideo,
-          hasPreviousVideo: hasPreviousVideo,
-          showStreamingSpeed: showStreamingSpeed,
-          onToggleStreamingSpeed: onToggleStreamingSpeed,
-        );
+         key: key,
+         file: file,
+         fileName: pathlib.basename(file.path),
+         fileType: FileTypeRegistry.getCategory(
+           VideoPlayerUtils.extensionFromPath(file.path),
+         ),
+         autoPlay: autoPlay,
+         looping: looping,
+         showControls: showControls,
+         allowFullScreen: allowFullScreen,
+         allowMuting: allowMuting,
+         allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
+         onVideoInitialized: onVideoInitialized,
+         onError: onError,
+         onNextVideo: onNextVideo,
+         onPreviousVideo: onPreviousVideo,
+         onControlVisibilityChanged: onControlVisibilityChanged,
+         onFullScreenChanged: onFullScreenChanged,
+         onInitialized: onInitialized,
+         onOpenFolder: onOpenFolder,
+         hasNextVideo: hasNextVideo,
+         hasPreviousVideo: hasPreviousVideo,
+         showStreamingSpeed: showStreamingSpeed,
+         onToggleStreamingSpeed: onToggleStreamingSpeed,
+       );
 
   /// Constructor for streaming URL playback
   VideoPlayer.url({
@@ -197,27 +197,29 @@ class VideoPlayer extends StatefulWidget {
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
   }) : this._(
-          key: key,
-          streamingUrl: streamingUrl,
-          fileName: fileName,
-          fileType: fileType ??
-              FileTypeRegistry.getCategory(
-                  VideoPlayerUtils.extensionFromPath(fileName)),
-          autoPlay: autoPlay,
-          looping: looping,
-          showControls: showControls,
-          allowFullScreen: allowFullScreen,
-          allowMuting: allowMuting,
-          allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
-          onVideoInitialized: onVideoInitialized,
-          onError: onError,
-          onClose: onClose,
-          onControlVisibilityChanged: onControlVisibilityChanged,
-          onFullScreenChanged: onFullScreenChanged,
-          onInitialized: onInitialized,
-          showStreamingSpeed: showStreamingSpeed,
-          onToggleStreamingSpeed: onToggleStreamingSpeed,
-        );
+         key: key,
+         streamingUrl: streamingUrl,
+         fileName: fileName,
+         fileType:
+             fileType ??
+             FileTypeRegistry.getCategory(
+               VideoPlayerUtils.extensionFromPath(fileName),
+             ),
+         autoPlay: autoPlay,
+         looping: looping,
+         showControls: showControls,
+         allowFullScreen: allowFullScreen,
+         allowMuting: allowMuting,
+         allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
+         onVideoInitialized: onVideoInitialized,
+         onError: onError,
+         onClose: onClose,
+         onControlVisibilityChanged: onControlVisibilityChanged,
+         onFullScreenChanged: onFullScreenChanged,
+         onInitialized: onInitialized,
+         showStreamingSpeed: showStreamingSpeed,
+         onToggleStreamingSpeed: onToggleStreamingSpeed,
+       );
 
   /// Constructor for SMB MRL playback
   VideoPlayer.smb({
@@ -240,27 +242,29 @@ class VideoPlayer extends StatefulWidget {
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
   }) : this._(
-          key: key,
-          smbMrl: smbMrl,
-          fileName: fileName,
-          fileType: fileType ??
-              FileTypeRegistry.getCategory(
-                  VideoPlayerUtils.extensionFromPath(fileName)),
-          autoPlay: autoPlay,
-          looping: looping,
-          showControls: showControls,
-          allowFullScreen: allowFullScreen,
-          allowMuting: allowMuting,
-          allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
-          onVideoInitialized: onVideoInitialized,
-          onError: onError,
-          onClose: onClose,
-          onControlVisibilityChanged: onControlVisibilityChanged,
-          onFullScreenChanged: onFullScreenChanged,
-          onInitialized: onInitialized,
-          showStreamingSpeed: showStreamingSpeed,
-          onToggleStreamingSpeed: onToggleStreamingSpeed,
-        );
+         key: key,
+         smbMrl: smbMrl,
+         fileName: fileName,
+         fileType:
+             fileType ??
+             FileTypeRegistry.getCategory(
+               VideoPlayerUtils.extensionFromPath(fileName),
+             ),
+         autoPlay: autoPlay,
+         looping: looping,
+         showControls: showControls,
+         allowFullScreen: allowFullScreen,
+         allowMuting: allowMuting,
+         allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
+         onVideoInitialized: onVideoInitialized,
+         onError: onError,
+         onClose: onClose,
+         onControlVisibilityChanged: onControlVisibilityChanged,
+         onFullScreenChanged: onFullScreenChanged,
+         onInitialized: onInitialized,
+         showStreamingSpeed: showStreamingSpeed,
+         onToggleStreamingSpeed: onToggleStreamingSpeed,
+       );
 
   /// Constructor for file stream playback
   VideoPlayer.stream({
@@ -283,27 +287,29 @@ class VideoPlayer extends StatefulWidget {
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
   }) : this._(
-          key: key,
-          fileStream: fileStream,
-          fileName: fileName,
-          fileType: fileType ??
-              FileTypeRegistry.getCategory(
-                  VideoPlayerUtils.extensionFromPath(fileName)),
-          autoPlay: autoPlay,
-          looping: looping,
-          showControls: showControls,
-          allowFullScreen: allowFullScreen,
-          allowMuting: allowMuting,
-          allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
-          onVideoInitialized: onVideoInitialized,
-          onError: onError,
-          onClose: onClose,
-          onControlVisibilityChanged: onControlVisibilityChanged,
-          onFullScreenChanged: onFullScreenChanged,
-          onInitialized: onInitialized,
-          showStreamingSpeed: showStreamingSpeed,
-          onToggleStreamingSpeed: onToggleStreamingSpeed,
-        );
+         key: key,
+         fileStream: fileStream,
+         fileName: fileName,
+         fileType:
+             fileType ??
+             FileTypeRegistry.getCategory(
+               VideoPlayerUtils.extensionFromPath(fileName),
+             ),
+         autoPlay: autoPlay,
+         looping: looping,
+         showControls: showControls,
+         allowFullScreen: allowFullScreen,
+         allowMuting: allowMuting,
+         allowPlaybackSpeedChanging: allowPlaybackSpeedChanging,
+         onVideoInitialized: onVideoInitialized,
+         onError: onError,
+         onClose: onClose,
+         onControlVisibilityChanged: onControlVisibilityChanged,
+         onFullScreenChanged: onFullScreenChanged,
+         onInitialized: onInitialized,
+         showStreamingSpeed: showStreamingSpeed,
+         onToggleStreamingSpeed: onToggleStreamingSpeed,
+       );
 
   @override
   State<VideoPlayer> createState() => _VideoPlayerState();
@@ -324,8 +330,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   VlcPlayerController? _vlcController;
   @override
-  exo.VideoPlayerController?
-      _exoController; // ExoPlayer for Android PiP fallback
+  exo.VideoPlayerController? _exoController; // ExoPlayer for Android PiP fallback
   // Fallback timer if VLC fails to start on Android
   Timer? _vlcStartupFallback;
   Timer? _vlcAutoPlayTimer;
@@ -430,8 +435,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   String _videoOutputFormat = 'auto'; // auto, yuv420p, rgb24
   @override
-  String _videoScaleMode =
-      'contain'; // cover, contain, fill, fitWidth, fitHeight, none, scaleDown
+  String _videoScaleMode = 'contain'; // cover, contain, fill, fitWidth, fitHeight, none, scaleDown
 
   // Timers
   Timer? _initializationTimeout;
@@ -470,7 +474,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   bool _isRestoringVolume = false;
   Map<String, dynamic>?
-      _vlcPendingRestore; // {pos: Duration, vol: double0..1or0..100, playing: bool}
+  _vlcPendingRestore; // {pos: Duration, vol: double0..1or0..100, playing: bool}
   bool _vlcPendingRestoreApplied = false;
 
   Map<String, dynamic>? _videoMetadata;
@@ -493,16 +497,20 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Ensure system UI is visible when video player starts (not fullscreen)
     if (Platform.isAndroid || Platform.isIOS) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+      );
       // Explicitly set light status bar icons to ensure visibility on dark backgrounds
       SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
       // Guard against plugins or platform views hiding system UI unexpectedly
       SystemChrome.setSystemUIChangeCallback((visible) async {
         if (!mounted) return;
         if (!_isFullScreen && visible == false) {
-          await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-              overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+          await SystemChrome.setEnabledSystemUIMode(
+            SystemUiMode.manual,
+            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+          );
           SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
         }
       });
@@ -542,29 +550,33 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           'volume': volume,
           'playing': playing,
         },
-        onClose: (
-            {required int positionMs,
-            required double volume,
-            required bool playing}) async {
-          try {
-            if (_player != null) {
-              await _player!.seek(Duration(milliseconds: positionMs));
-              await _player!.setVolume(volume.clamp(0.0, 100.0));
-              if (playing) {
-                await _player!.play();
+        onClose:
+            ({
+              required int positionMs,
+              required double volume,
+              required bool playing,
+            }) async {
+              try {
+                if (_player != null) {
+                  await _player!.seek(Duration(milliseconds: positionMs));
+                  await _player!.setVolume(volume.clamp(0.0, 100.0));
+                  if (playing) {
+                    await _player!.play();
+                  }
+                } else if (_vlcController != null) {
+                  await _vlcController!.seekTo(
+                    Duration(milliseconds: positionMs),
+                  );
+                  await _vlcController!.setVolume(volume.toInt());
+                  if (playing) {
+                    await _vlcController!.play();
+                  }
+                }
+              } catch (_) {}
+              if (mounted) {
+                setState(() => _isPictureInPicture = false);
               }
-            } else if (_vlcController != null) {
-              await _vlcController!.seekTo(Duration(milliseconds: positionMs));
-              await _vlcController!.setVolume(volume.toInt());
-              if (playing) {
-                await _vlcController!.play();
-              }
-            }
-          } catch (_) {}
-          if (mounted) {
-            setState(() => _isPictureInPicture = false);
-          }
-        },
+            },
       );
 
       if (mounted) {
@@ -766,7 +778,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       });
 
       debugPrint(
-          'Loaded volume preferences - volume: ${_savedVolume.toStringAsFixed(1)}, muted: $_isMuted');
+        'Loaded volume preferences - volume: ${_savedVolume.toStringAsFixed(1)}, muted: $_isMuted',
+      );
 
       // Avoid early player volume stream events overriding restored volume during initialization.
       _isRestoringVolume = true;
@@ -957,7 +970,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     if (_hwDecodeFallbackAttempted) return;
     _hwDecodeFallbackAttempted = true;
     debugPrint(
-        'VideoPlayer: persisting software decoding preference after HW failure');
+      'VideoPlayer: persisting software decoding preference after HW failure',
+    );
     () async {
       try {
         final prefs = UserPreferences.instance;
@@ -1025,7 +1039,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         await _openWithTempFileFallback(uncPath);
       } catch (e) {
         debugPrint(
-            'VideoPlayer: Open failed: $e, trying temp file fallback...');
+          'VideoPlayer: Open failed: $e, trying temp file fallback...',
+        );
         await _openWithTempFileFallback(uncPath);
       }
     } else {
@@ -1034,9 +1049,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       final media = Media(
         widget.smbMrl!,
-        httpHeaders: {
-          'User-Agent': 'VLC/3.0.0 LibVLC/3.0.0',
-        },
+        httpHeaders: {'User-Agent': 'VLC/3.0.0 LibVLC/3.0.0'},
         extras: {
           'load-unsafe-playlists': '',
           'network-caching': '3000',
@@ -1182,8 +1195,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       // Fallback to copying to temp file
       try {
-        final tempPath = await helper.uncPathToTempFile(uncPath,
-            highPriority: true, maxBytes: 32 * 1024 * 1024);
+        final tempPath = await helper.uncPathToTempFile(
+          uncPath,
+          highPriority: true,
+          maxBytes: 32 * 1024 * 1024,
+        );
         if (tempPath != null) {
           await _player!.open(Media(tempPath));
           if (widget.autoPlay) {
@@ -1214,7 +1230,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }) async {
     final tempDir = Directory.systemTemp;
     _tempFile = File(
-        '${tempDir.path}/temp_media_${DateTime.now().millisecondsSinceEpoch}');
+      '${tempDir.path}/temp_media_${DateTime.now().millisecondsSinceEpoch}',
+    );
 
     try {
       _tempRaf = await _tempFile!.open(mode: FileMode.write);
@@ -1249,89 +1266,97 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       }
     });
 
-    _bufferSub = source.listen((chunk) async {
-      if (chunk.isEmpty) return;
-      _firstDataTime ??= DateTime.now();
+    _bufferSub = source.listen(
+      (chunk) async {
+        if (chunk.isEmpty) return;
+        _firstDataTime ??= DateTime.now();
 
-      try {
-        await _tempRaf!.writeFrom(chunk);
-        _bytesWritten += chunk.length;
-        bytesSinceFlush += chunk.length;
+        try {
+          await _tempRaf!.writeFrom(chunk);
+          _bytesWritten += chunk.length;
+          bytesSinceFlush += chunk.length;
 
+          if (mounted) {
+            setState(() {
+              _totalBytesBuffered = _bytesWritten;
+              _chunkCountBuffered += 1;
+            });
+          }
+          _streamController?.add(chunk);
+
+          if (bytesSinceFlush >= flushEveryBytes) {
+            await _tempRaf!.flush();
+            bytesSinceFlush = 0;
+          }
+
+          if (!_playerOpenedFromTemp && _bytesWritten >= initialBufferBytes) {
+            _playerOpenedFromTemp = true;
+            try {
+              await _tempRaf!.flush();
+            } catch (_) {}
+            debugPrint(
+              'VideoPlayer: Opening from temp with ${_formatBytes(_bytesWritten)} buffered',
+            );
+            try {
+              await _player!.open(Media(_tempFile!.path));
+              if (widget.autoPlay) {
+                await _player!.play();
+              }
+            } catch (e) {
+              debugPrint('VideoPlayer: Open error: $e');
+              if (mounted) {
+                setState(() {
+                  _errorMessage = 'Error opening playback: $e';
+                  _hasError = true;
+                });
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('VideoPlayer: Write error: $e');
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Error writing temp data: $e';
+              _hasError = true;
+            });
+          }
+        }
+      },
+      onError: (e) async {
+        debugPrint('VideoPlayer: Buffer error: $e');
+        try {
+          await _tempRaf?.flush();
+          await _tempRaf?.close();
+        } catch (_) {}
         if (mounted) {
           setState(() {
-            _totalBytesBuffered = _bytesWritten;
-            _chunkCountBuffered += 1;
+            _errorMessage = 'Stream data error: $e';
+            _hasError = true;
           });
         }
-        _streamController?.add(chunk);
-
-        if (bytesSinceFlush >= flushEveryBytes) {
-          await _tempRaf!.flush();
-          bytesSinceFlush = 0;
-        }
-
-        if (!_playerOpenedFromTemp && _bytesWritten >= initialBufferBytes) {
-          _playerOpenedFromTemp = true;
-          try {
-            await _tempRaf!.flush();
-          } catch (_) {}
-          debugPrint(
-              'VideoPlayer: Opening from temp with ${_formatBytes(_bytesWritten)} buffered');
+      },
+      onDone: () async {
+        debugPrint(
+          'VideoPlayer: Buffer done at ${_formatBytes(_bytesWritten)}',
+        );
+        try {
+          await _tempRaf?.flush();
+          await _tempRaf?.close();
+        } catch (_) {}
+        _tempRaf = null;
+        if (!_playerOpenedFromTemp && _tempFile != null) {
           try {
             await _player!.open(Media(_tempFile!.path));
             if (widget.autoPlay) {
               await _player!.play();
             }
           } catch (e) {
-            debugPrint('VideoPlayer: Open error: $e');
-            if (mounted) {
-              setState(() {
-                _errorMessage = 'Error opening playback: $e';
-                _hasError = true;
-              });
-            }
+            debugPrint('VideoPlayer: Open on done error: $e');
           }
         }
-      } catch (e) {
-        debugPrint('VideoPlayer: Write error: $e');
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'Error writing temp data: $e';
-            _hasError = true;
-          });
-        }
-      }
-    }, onError: (e) async {
-      debugPrint('VideoPlayer: Buffer error: $e');
-      try {
-        await _tempRaf?.flush();
-        await _tempRaf?.close();
-      } catch (_) {}
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Stream data error: $e';
-          _hasError = true;
-        });
-      }
-    }, onDone: () async {
-      debugPrint('VideoPlayer: Buffer done at ${_formatBytes(_bytesWritten)}');
-      try {
-        await _tempRaf?.flush();
-        await _tempRaf?.close();
-      } catch (_) {}
-      _tempRaf = null;
-      if (!_playerOpenedFromTemp && _tempFile != null) {
-        try {
-          await _player!.open(Media(_tempFile!.path));
-          if (widget.autoPlay) {
-            await _player!.play();
-          }
-        } catch (e) {
-          debugPrint('VideoPlayer: Open on done error: $e');
-        }
-      }
-    }, cancelOnError: true);
+      },
+      cancelOnError: true,
+    );
   }
 
   String _formatBytes(int bytes) {
@@ -1347,8 +1372,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   @override
   Widget build(BuildContext context) {
     // Determine the appropriate player widget (it already shows its own loading when needed)
-    final Widget playerWidget =
-        widget.file != null ? _buildLocalFilePlayer() : _buildStreamingPlayer();
+    final Widget playerWidget = widget.file != null
+        ? _buildLocalFilePlayer()
+        : _buildStreamingPlayer();
     return playerWidget;
   }
 
@@ -1361,34 +1387,33 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     return _isLoading
         ? const Center(child: CircularProgressIndicator(color: Colors.white))
         : _hasError
-            ? _buildErrorWidget(_errorMessage)
-            : Focus(
-                autofocus: true,
-                onKeyEvent: (node, event) => _handleKeyEvent(event),
-                child: MouseRegion(
-                  onHover: (_) {
-                    _showControlsWithTimer();
-                  },
-                  child: GestureDetector(
-                    onTap: () {
-                      _showControlsWithTimer();
-                    },
-                    child: Stack(
-                      children: [
-                        GestureDetector(
-                          onDoubleTap:
-                              widget.allowFullScreen ? _toggleFullScreen : null,
-                          child: _buildPrimaryVideoSurface(),
-                        ),
-                        if (!_isAndroidPip &&
-                            widget.showControls &&
-                            _showControls)
-                          _buildCustomControls(),
-                      ],
+        ? _buildErrorWidget(_errorMessage)
+        : Focus(
+            autofocus: true,
+            onKeyEvent: (node, event) => _handleKeyEvent(event),
+            child: MouseRegion(
+              onHover: (_) {
+                _showControlsWithTimer();
+              },
+              child: GestureDetector(
+                onTap: () {
+                  _showControlsWithTimer();
+                },
+                child: Stack(
+                  children: [
+                    GestureDetector(
+                      onDoubleTap: widget.allowFullScreen
+                          ? _toggleFullScreen
+                          : null,
+                      child: _buildPrimaryVideoSurface(),
                     ),
-                  ),
+                    if (!_isAndroidPip && widget.showControls && _showControls)
+                      _buildCustomControls(),
+                  ],
                 ),
-              );
+              ),
+            ),
+          );
   }
 
   // Tránh clip tròn trên desktop để giảm jank; cô lập bề mặt video bằng RepaintBoundary
@@ -1401,8 +1426,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       return RepaintBoundary(child: surface);
     }
     return ClipRRect(
-      borderRadius:
-          _isFullScreen ? BorderRadius.zero : BorderRadius.circular(16.0),
+      borderRadius: _isFullScreen
+          ? BorderRadius.zero
+          : BorderRadius.circular(16.0),
       child: RepaintBoundary(child: surface),
     );
   }
@@ -1449,9 +1475,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       onDoubleTap: _toggleFullScreen,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: _buildVideoWidget(),
-          ),
+          Positioned.fill(child: _buildVideoWidget()),
           if (widget.showControls && _showControls) _buildCustomControls(),
           if (_showSpeedIndicator && _currentStream != null)
             _buildSpeedIndicatorOverlay(),
@@ -1482,10 +1506,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         ),
       );
     } else if (_vlcController != null) {
-      return RepaintBoundary(
-        key: _screenshotKey,
-        child: _buildVlcSurface(),
-      );
+      return RepaintBoundary(key: _screenshotKey, child: _buildVlcSurface());
     } else {
       // Show loading widget when VLC controller is not ready
       return _buildLoadingWidget();
@@ -1500,12 +1521,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _vlcController?.addOnInitListener(() {
       _kickVlcPlayback(reason: 'init');
     });
-    _vlcAutoPlayTimer = Timer(
-      const Duration(milliseconds: 800),
-      () {
-        _kickVlcPlayback(reason: 'timer');
-      },
-    );
+    _vlcAutoPlayTimer = Timer(const Duration(milliseconds: 800), () {
+      _kickVlcPlayback(reason: 'timer');
+    });
   }
 
   void _scheduleVlcRenderFallback() {
@@ -1625,12 +1643,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           hwAcc: HwAcc.full,
           autoPlay: widget.autoPlay,
           options: VlcPlayerOptions(
-            advanced: VlcAdvancedOptions([
-              '--network-caching=1000',
-            ]),
-            video: VlcVideoOptions([
-              '--android-display-chroma=RV32',
-            ]),
+            advanced: VlcAdvancedOptions(['--network-caching=1000']),
+            video: VlcVideoOptions(['--android-display-chroma=RV32']),
           ),
         );
       } else if (widget.file != null) {
@@ -1640,9 +1654,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           hwAcc: HwAcc.full,
           autoPlay: widget.autoPlay,
           options: VlcPlayerOptions(
-            video: VlcVideoOptions([
-              '--android-display-chroma=RV32',
-            ]),
+            video: VlcVideoOptions(['--android-display-chroma=RV32']),
           ),
         );
       }
@@ -1659,7 +1671,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         _vlcStartupFallback?.cancel();
         _vlcStartupFallback = Timer(const Duration(seconds: 3), () async {
           if (!mounted) return;
-          final notReady = _vlcController == null ||
+          final notReady =
+              _vlcController == null ||
               !_vlcController!.value.isInitialized ||
               _vlcController!.value.size.width == 0;
           if (notReady) {
@@ -1693,7 +1706,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             }
           }
         }
-        final hasMediaInfo = v.duration > Duration.zero ||
+        final hasMediaInfo =
+            v.duration > Duration.zero ||
             (v.size.width > 0 && v.size.height > 0);
         if (_isLoading && (v.isInitialized || v.isPlaying || hasMediaInfo)) {
           if (mounted) {
@@ -1808,10 +1822,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 _showControlsWithTimer();
               },
               onDoubleTap: _toggleFullScreen,
-              child: Container(
-                color: Colors.black,
-                child: _buildVlcSurface(),
-              ),
+              child: Container(color: Colors.black, child: _buildVlcSurface()),
             ),
           ),
         ),
@@ -1834,12 +1845,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         controller = exo.VideoPlayerController.file(widget.file!);
       } else if (widget.streamingUrl != null) {
         controller = exo.VideoPlayerController.networkUrl(
-            Uri.parse(widget.streamingUrl!));
+          Uri.parse(widget.streamingUrl!),
+        );
       } else if (widget.smbMrl != null) {
         // Use local HTTP proxy for SMB to ensure Exo compatibility
         try {
-          final proxied =
-              await SmbHttpProxyServer.instance.urlFor(widget.smbMrl!);
+          final proxied = await SmbHttpProxyServer.instance.urlFor(
+            widget.smbMrl!,
+          );
           controller = exo.VideoPlayerController.networkUrl(proxied);
         } catch (e) {
           debugPrint('Exo fallback: proxy failed: $e');
@@ -1880,9 +1893,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   /// Single unified loading: same minimal spinner for init and for VlcPlayer placeholder.
   /// Avoids "big" VideoPlayerLoadingWidget + a second different loading in SMB/VLC mode.
   Widget _buildLoadingWidget() {
-    return const Center(
-      child: CircularProgressIndicator(color: Colors.white),
-    );
+    return const Center(child: CircularProgressIndicator(color: Colors.white));
   }
 
   Widget _buildVlcPlaceholder() {
@@ -1959,16 +1970,18 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Icon(PhosphorIconsLight.musicNote,
-                    size: 80, color: Colors.white),
+                child: const Icon(
+                  PhosphorIconsLight.musicNote,
+                  size: 80,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 32),
               Text(
                 widget.fileName,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(color: Colors.white),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -1997,8 +2010,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           children: [
             IconButton(
               onPressed: () => _player!.previous(),
-              icon: const Icon(PhosphorIconsLight.skipBack,
-                  color: Colors.white, size: 32),
+              icon: const Icon(
+                PhosphorIconsLight.skipBack,
+                color: Colors.white,
+                size: 32,
+              ),
             ),
             const SizedBox(width: 16),
             IconButton(
@@ -2014,8 +2030,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             const SizedBox(width: 16),
             IconButton(
               onPressed: () => _player!.next(),
-              icon: const Icon(PhosphorIconsLight.skipForward,
-                  color: Colors.white, size: 32),
+              icon: const Icon(
+                PhosphorIconsLight.skipForward,
+                color: Colors.white,
+                size: 32,
+              ),
             ),
           ],
         );
@@ -2029,15 +2048,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       right: 16,
       child: Column(
         children: [
-          StreamSpeedIndicator(
-            stream: _currentStream,
-            label: 'Stream Speed',
-          ),
+          StreamSpeedIndicator(stream: _currentStream, label: 'Stream Speed'),
           const SizedBox(height: 12),
-          BufferInfoWidget(
-            stream: _currentStream,
-            label: 'Buffer Info',
-          ),
+          BufferInfoWidget(stream: _currentStream, label: 'Buffer Info'),
           const SizedBox(height: 12),
           Container(
             width: 200,
@@ -2240,8 +2253,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           await Future<void>.delayed(const Duration(milliseconds: 60));
 
           if (_desktopWasResizableBeforeFullScreen != null) {
-            await windowManager
-                .setResizable(_desktopWasResizableBeforeFullScreen!);
+            await windowManager.setResizable(
+              _desktopWasResizableBeforeFullScreen!,
+            );
           } else {
             await windowManager.setResizable(true);
           }
@@ -2256,10 +2270,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           _desktopWasResizableBeforeFullScreen = null;
           _desktopBoundsBeforeFullScreen = null;
         } else {
-          _desktopWasMaximizedBeforeFullScreen =
-              await windowManager.isMaximized();
-          _desktopWasResizableBeforeFullScreen =
-              await windowManager.isResizable();
+          _desktopWasMaximizedBeforeFullScreen = await windowManager
+              .isMaximized();
+          _desktopWasResizableBeforeFullScreen = await windowManager
+              .isResizable();
           _desktopBoundsBeforeFullScreen = await windowManager.getBounds();
 
           await windowManager.setFullScreen(true);
@@ -2296,8 +2310,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       } else {
         SystemChrome.setPreferredOrientations(DeviceOrientation.values);
         // Restore both status bar and nav bar
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
         // Restore light status bar icons after exiting fullscreen
         SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
       }
@@ -2342,11 +2358,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     if (_useVlcControls) {
       final v = _vlcController!.value;
-      final maxMs = (v.duration - safetyBuffer)
-          .inMilliseconds
-          .clamp(0, v.duration.inMilliseconds);
-      final targetMs =
-          (v.position.inMilliseconds + (seconds * 1000)).clamp(0, maxMs);
+      final maxMs = (v.duration - safetyBuffer).inMilliseconds.clamp(
+        0,
+        v.duration.inMilliseconds,
+      );
+      final targetMs = (v.position.inMilliseconds + (seconds * 1000)).clamp(
+        0,
+        maxMs,
+      );
       await _vlcController!.seekTo(Duration(milliseconds: targetMs));
     } else if (_useExoControls) {
       final pos = _exoController!.value.position;
@@ -2377,17 +2396,20 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       final v = _vlcController!.value;
       final targetMs = (v.position.inMilliseconds - (seconds * 1000));
       await _vlcController!.seekTo(
-          Duration(milliseconds: targetMs.clamp(0, v.duration.inMilliseconds)));
+        Duration(milliseconds: targetMs.clamp(0, v.duration.inMilliseconds)),
+      );
     } else if (_useExoControls) {
       final pos = _exoController!.value.position;
       final target = pos - Duration(seconds: seconds);
-      await _exoController!
-          .seekTo(target < Duration.zero ? Duration.zero : target);
+      await _exoController!.seekTo(
+        target < Duration.zero ? Duration.zero : target,
+      );
     } else if (_player != null) {
       final currentPosition = _player!.state.position;
       final newPosition = currentPosition - Duration(seconds: seconds);
-      final seekPosition =
-          newPosition < Duration.zero ? Duration.zero : newPosition;
+      final seekPosition = newPosition < Duration.zero
+          ? Duration.zero
+          : newPosition;
       await _player!.seek(seekPosition);
     }
 
@@ -2427,13 +2449,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       final currentPos = _useVlcControls
           ? _vlcController!.value.position
           : _useExoControls
-              ? _exoController!.value.position
-              : _player?.state.position ?? Duration.zero;
+          ? _exoController!.value.position
+          : _player?.state.position ?? Duration.zero;
       final totalDuration = _useVlcControls
           ? _vlcController!.value.duration
           : _useExoControls
-              ? _exoController!.value.duration
-              : _player?.state.duration ?? Duration.zero;
+          ? _exoController!.value.duration
+          : _player?.state.duration ?? Duration.zero;
 
       if (_fastSeekingForward &&
           currentPos >= totalDuration - const Duration(seconds: 1)) {
@@ -2448,13 +2470,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _fastSeekTicks++;
 
       // Scale tick by speed: slow=0 → climbs 2.5× slower, fast=2 → climbs 2.5× faster
-      final double tickMultiplier =
-          _videoSeekSpeed == 0 ? 0.4 : (_videoSeekSpeed == 2 ? 2.5 : 1.0);
+      final double tickMultiplier = _videoSeekSpeed == 0
+          ? 0.4
+          : (_videoSeekSpeed == 2 ? 2.5 : 1.0);
       final int scaledTick = (tickMultiplier > 1.0
           ? (_fastSeekTicks * tickMultiplier).round()
           : (tickMultiplier < 1.0
-              ? (_fastSeekTicks * tickMultiplier).ceil()
-              : _fastSeekTicks));
+                ? (_fastSeekTicks * tickMultiplier).ceil()
+                : _fastSeekTicks));
 
       if (withCtrl) {
         // Ctrl+Arrow: aggressive VLC-style (10 ticks = 1s real time)
@@ -2529,8 +2552,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     final current = _useVlcControls
         ? _vlcController!.value.volume.toDouble()
         : _useExoControls
-            ? (_exoController!.value.volume * 100.0)
-            : (_player?.state.volume ?? _savedVolume);
+        ? (_exoController!.value.volume * 100.0)
+        : (_player?.state.volume ?? _savedVolume);
     await _setVolumeFromUser((current + 5).clamp(0.0, 100.0));
   }
 
@@ -2538,8 +2561,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     final current = _useVlcControls
         ? _vlcController!.value.volume.toDouble()
         : _useExoControls
-            ? (_exoController!.value.volume * 100.0)
-            : (_player?.state.volume ?? _savedVolume);
+        ? (_exoController!.value.volume * 100.0)
+        : (_player?.state.volume ?? _savedVolume);
     await _setVolumeFromUser((current - 5).clamp(0.0, 100.0));
   }
 
@@ -2586,10 +2609,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         ),
 
         // Center play/pause
-        if (_showControls)
-          Center(
-            child: _buildPlayPauseButton(),
-          ),
+        if (_showControls) Center(child: _buildPlayPauseButton()),
 
         // Bottom controls
         Positioned(
@@ -2621,32 +2641,38 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                               return Text(
                                 VideoPlayerUtils.formatDuration(v.position),
                                 style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               );
                             },
                           )
                         : _useExoControls
-                            ? ValueListenableBuilder<exo.VideoPlayerValue>(
-                                valueListenable: _exoController!,
-                                builder: (context, v, _) {
-                                  return Text(
-                                    VideoPlayerUtils.formatDuration(v.position),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  );
-                                },
-                              )
-                            : StreamBuilder<Duration>(
-                                stream: _player!.stream.position,
-                                builder: (context, snap) {
-                                  final pos = snap.data ?? Duration.zero;
-                                  return Text(
-                                    VideoPlayerUtils.formatDuration(pos),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  );
-                                },
-                              ),
+                        ? ValueListenableBuilder<exo.VideoPlayerValue>(
+                            valueListenable: _exoController!,
+                            builder: (context, v, _) {
+                              return Text(
+                                VideoPlayerUtils.formatDuration(v.position),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          )
+                        : StreamBuilder<Duration>(
+                            stream: _player!.stream.position,
+                            builder: (context, snap) {
+                              final pos = snap.data ?? Duration.zero;
+                              return Text(
+                                VideoPlayerUtils.formatDuration(pos),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          ),
 
                     const SizedBox(width: 8),
 
@@ -2666,27 +2692,34 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                               return Text(
                                 dur,
                                 style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               );
                             },
                           )
                         : _useExoControls
-                            ? ValueListenableBuilder<exo.VideoPlayerValue>(
-                                valueListenable: _exoController!,
-                                builder: (context, v, _) {
-                                  return Text(
-                                    VideoPlayerUtils.formatDuration(v.duration),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  );
-                                },
-                              )
-                            : Text(
-                                VideoPlayerUtils.formatDuration(
-                                    _player!.state.duration),
+                        ? ValueListenableBuilder<exo.VideoPlayerValue>(
+                            valueListenable: _exoController!,
+                            builder: (context, v, _) {
+                              return Text(
+                                VideoPlayerUtils.formatDuration(v.duration),
                                 style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
-                              ),
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          )
+                        : Text(
+                            VideoPlayerUtils.formatDuration(
+                              _player!.state.duration,
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -2754,11 +2787,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             value: value,
             min: 0,
             max: maxMs.toDouble(),
-            onChangeStart:
-                hasDuration ? () => setState(() => _isSeeking = true) : null,
+            onChangeStart: hasDuration
+                ? () => setState(() => _isSeeking = true)
+                : null,
             onChanged: hasDuration
                 ? (vv) =>
-                    _vlcController?.seekTo(Duration(milliseconds: vv.toInt()))
+                      _vlcController?.seekTo(Duration(milliseconds: vv.toInt()))
                 : null,
             onChangeEnd: hasDuration ? onSeekEnd : null,
           );
@@ -2768,8 +2802,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       return ValueListenableBuilder<exo.VideoPlayerValue>(
         valueListenable: _exoController!,
         builder: (context, v, _) {
-          final maxMs =
-              v.duration.inMilliseconds <= 0 ? 1 : v.duration.inMilliseconds;
+          final maxMs = v.duration.inMilliseconds <= 0
+              ? 1
+              : v.duration.inMilliseconds;
           final value = v.position.inMilliseconds.clamp(0, maxMs).toDouble();
           return VideoPlayerSeekSlider(
             value: value,
@@ -2788,8 +2823,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         builder: (context, snapshot) {
           final position = snapshot.data ?? Duration.zero;
           final duration = _player!.state.duration;
-          final maxMs =
-              duration.inMilliseconds <= 0 ? 1 : duration.inMilliseconds;
+          final maxMs = duration.inMilliseconds <= 0
+              ? 1
+              : duration.inMilliseconds;
           final value = position.inMilliseconds.clamp(0, maxMs).toDouble();
           return VideoPlayerSeekSlider(
             value: value,
@@ -2816,8 +2852,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             icon: isMuted
                 ? PhosphorIconsLight.speakerSlash
                 : (vol < 50
-                    ? PhosphorIconsLight.speakerLow
-                    : PhosphorIconsLight.speakerHigh),
+                      ? PhosphorIconsLight.speakerLow
+                      : PhosphorIconsLight.speakerHigh),
             onPressed: _toggleMute,
             enabled: true,
             tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -2834,8 +2870,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             icon: isMuted
                 ? PhosphorIconsLight.speakerSlash
                 : (vol < 0.5
-                    ? PhosphorIconsLight.speakerLow
-                    : PhosphorIconsLight.speakerHigh),
+                      ? PhosphorIconsLight.speakerLow
+                      : PhosphorIconsLight.speakerHigh),
             onPressed: _toggleMute,
             enabled: true,
             tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -2853,8 +2889,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             icon: isMuted
                 ? PhosphorIconsLight.speakerSlash
                 : volume < 50
-                    ? PhosphorIconsLight.speakerLow
-                    : PhosphorIconsLight.speakerHigh,
+                ? PhosphorIconsLight.speakerLow
+                : PhosphorIconsLight.speakerHigh,
             onPressed: _toggleMute,
             enabled: true,
             tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -2913,113 +2949,128 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                               final maxMs = hasDuration
                                   ? durMs
                                   : (v.position.inMilliseconds > 0
-                                      ? v.position.inMilliseconds + 1000
-                                      : 1);
+                                        ? v.position.inMilliseconds + 1000
+                                        : 1);
                               final value = v.position.inMilliseconds
                                   .clamp(0, maxMs)
                                   .toDouble();
-                              return Slider(
-                                value: value,
-                                min: 0,
-                                max: maxMs.toDouble(),
-                                activeColor: Colors.white,
-                                inactiveColor: Colors.white24,
-                                onChangeStart: hasDuration
-                                    ? (_) => _isSeeking = true
-                                    : null,
-                                onChanged: hasDuration
-                                    ? (vv) async {
-                                        await _vlcController?.seekTo(
-                                            Duration(milliseconds: vv.toInt()));
-                                      }
-                                    : null,
-                                onChangeEnd: hasDuration
-                                    ? (_) {
-                                        _seekingTimer?.cancel();
-                                        _seekingTimer = Timer(
+                              return Semantics(
+                                container: true,
+                                child: Slider(
+                                  value: value,
+                                  min: 0,
+                                  max: maxMs.toDouble(),
+                                  activeColor: Colors.white,
+                                  inactiveColor: Colors.white24,
+                                  onChangeStart: hasDuration
+                                      ? (_) => _isSeeking = true
+                                      : null,
+                                  onChanged: hasDuration
+                                      ? (vv) async {
+                                          await _vlcController?.seekTo(
+                                            Duration(milliseconds: vv.toInt()),
+                                          );
+                                        }
+                                      : null,
+                                  onChangeEnd: hasDuration
+                                      ? (_) {
+                                          _seekingTimer?.cancel();
+                                          _seekingTimer = Timer(
                                             const Duration(milliseconds: 200),
                                             () {
-                                          if (mounted) _isSeeking = false;
-                                        });
-                                      }
-                                    : null,
+                                              if (mounted) _isSeeking = false;
+                                            },
+                                          );
+                                        }
+                                      : null,
+                                ),
                               );
                             },
                           )
                         : _useExoControls
-                            ? ValueListenableBuilder<exo.VideoPlayerValue>(
-                                valueListenable: _exoController!,
-                                builder: (context, v, _) {
-                                  final maxMs = v.duration.inMilliseconds <= 0
-                                      ? 1
-                                      : v.duration.inMilliseconds;
-                                  final value = v.position.inMilliseconds
-                                      .clamp(0, maxMs)
-                                      .toDouble();
-                                  return Slider(
+                        ? ValueListenableBuilder<exo.VideoPlayerValue>(
+                            valueListenable: _exoController!,
+                            builder: (context, v, _) {
+                              final maxMs = v.duration.inMilliseconds <= 0
+                                  ? 1
+                                  : v.duration.inMilliseconds;
+                              final value = v.position.inMilliseconds
+                                  .clamp(0, maxMs)
+                                  .toDouble();
+                              return Semantics(
+                                container: true,
+                                child: Slider(
+                                  value: value,
+                                  min: 0,
+                                  max: maxMs.toDouble(),
+                                  activeColor: Colors.white,
+                                  inactiveColor: Colors.white24,
+                                  onChangeStart: (_) => _isSeeking = true,
+                                  onChanged: (vv) async {
+                                    await _exoController!.seekTo(
+                                      Duration(milliseconds: vv.toInt()),
+                                    );
+                                  },
+                                  onChangeEnd: (_) {
+                                    _seekingTimer?.cancel();
+                                    _seekingTimer = Timer(
+                                      const Duration(milliseconds: 200),
+                                      () {
+                                        if (mounted) _isSeeking = false;
+                                      },
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          )
+                        : StreamBuilder<Duration>(
+                            stream: _player!.stream.position,
+                            builder: (context, snapshot) {
+                              final position = snapshot.data ?? Duration.zero;
+                              final duration = _player!.state.duration;
+                              final maxMs = duration.inMilliseconds <= 0
+                                  ? 1
+                                  : duration.inMilliseconds;
+                              final value = position.inMilliseconds
+                                  .clamp(0, maxMs)
+                                  .toDouble();
+                              return Semantics(
+                                container: true,
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 2.5,
+                                    thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 7,
+                                    ),
+                                  ),
+                                  child: Slider(
                                     value: value,
                                     min: 0,
                                     max: maxMs.toDouble(),
                                     activeColor: Colors.white,
                                     inactiveColor: Colors.white24,
                                     onChangeStart: (_) => _isSeeking = true,
-                                    onChanged: (vv) async {
-                                      await _exoController!.seekTo(
-                                          Duration(milliseconds: vv.toInt()));
+                                    onChanged: (v) async {
+                                      final target = Duration(
+                                        milliseconds: v.toInt(),
+                                      );
+                                      await _player!.seek(target);
                                     },
                                     onChangeEnd: (_) {
                                       _seekingTimer?.cancel();
                                       _seekingTimer = Timer(
-                                          const Duration(milliseconds: 200),
-                                          () {
-                                        if (mounted) _isSeeking = false;
-                                      });
-                                    },
-                                  );
-                                },
-                              )
-                            : StreamBuilder<Duration>(
-                                stream: _player!.stream.position,
-                                builder: (context, snapshot) {
-                                  final position =
-                                      snapshot.data ?? Duration.zero;
-                                  final duration = _player!.state.duration;
-                                  final maxMs = duration.inMilliseconds <= 0
-                                      ? 1
-                                      : duration.inMilliseconds;
-                                  final value = position.inMilliseconds
-                                      .clamp(0, maxMs)
-                                      .toDouble();
-                                  return SliderTheme(
-                                    data: SliderTheme.of(context).copyWith(
-                                      trackHeight: 2.5,
-                                      thumbShape: const RoundSliderThumbShape(
-                                          enabledThumbRadius: 7),
-                                    ),
-                                    child: Slider(
-                                      value: value,
-                                      min: 0,
-                                      max: maxMs.toDouble(),
-                                      activeColor: Colors.white,
-                                      inactiveColor: Colors.white24,
-                                      onChangeStart: (_) => _isSeeking = true,
-                                      onChanged: (v) async {
-                                        final target =
-                                            Duration(milliseconds: v.toInt());
-                                        await _player!.seek(target);
-                                      },
-                                      onChangeEnd: (_) {
-                                        _seekingTimer?.cancel();
-                                        _seekingTimer = Timer(
-                                            const Duration(milliseconds: 200),
-                                            () {
+                                        const Duration(milliseconds: 200),
+                                        () {
                                           if (mounted) _isSeeking = false;
-                                        });
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 );
 
@@ -3054,7 +3105,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                           return Text(
                             VideoPlayerUtils.formatDuration(v.position),
                             style: const TextStyle(
-                                color: Colors.white70, fontSize: 12),
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           );
                         },
                       )
@@ -3065,7 +3118,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                           return Text(
                             VideoPlayerUtils.formatDuration(v.position),
                             style: const TextStyle(
-                                color: Colors.white70, fontSize: 12),
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           );
                         },
                       )
@@ -3077,7 +3132,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                           return Text(
                             VideoPlayerUtils.formatDuration(p),
                             style: const TextStyle(
-                                color: Colors.white70, fontSize: 12),
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           );
                         },
                       ),
@@ -3097,27 +3154,34 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                               return Text(
                                 dur,
                                 style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               );
                             },
                           )
                         : _useExoControls
-                            ? ValueListenableBuilder<exo.VideoPlayerValue>(
-                                valueListenable: _exoController!,
-                                builder: (context, v, _) {
-                                  return Text(
-                                    VideoPlayerUtils.formatDuration(v.duration),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  );
-                                },
-                              )
-                            : Text(
-                                VideoPlayerUtils.formatDuration(
-                                    _player!.state.duration),
+                        ? ValueListenableBuilder<exo.VideoPlayerValue>(
+                            valueListenable: _exoController!,
+                            builder: (context, v, _) {
+                              return Text(
+                                VideoPlayerUtils.formatDuration(v.duration),
                                 style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
-                              ),
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              );
+                            },
+                          )
+                        : Text(
+                            VideoPlayerUtils.formatDuration(
+                              _player!.state.duration,
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
 
                     const SizedBox(width: 8),
                     if (showSecondaryActions && widget.allowMuting)
@@ -3126,7 +3190,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                       const SizedBox(width: 4),
                       _buildAdvancedControlsMenu(),
                     ],
-                    if (fullScreenButton != null) fullScreenButton,
+                    ?fullScreenButton,
                   ],
                 );
               },
@@ -3175,8 +3239,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         builder: (context, snapshot) {
           final isPlaying = snapshot.data ?? _player!.state.playing;
           return VideoPlayerControlButton(
-            icon:
-                isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
+            icon: isPlaying
+                ? PhosphorIconsLight.pause
+                : PhosphorIconsLight.play,
             onPressed: _togglePlayPause,
             size: 40,
             padding: 10,
@@ -3210,8 +3275,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 icon: isMuted
                     ? PhosphorIconsLight.speakerSlash
                     : (vol < 50
-                        ? PhosphorIconsLight.speakerLow
-                        : PhosphorIconsLight.speakerHigh),
+                          ? PhosphorIconsLight.speakerLow
+                          : PhosphorIconsLight.speakerHigh),
                 onPressed: _toggleMute,
                 enabled: true,
                 tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -3228,8 +3293,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 icon: isMuted
                     ? PhosphorIconsLight.speakerSlash
                     : (vol < 0.5
-                        ? PhosphorIconsLight.speakerLow
-                        : PhosphorIconsLight.speakerHigh),
+                          ? PhosphorIconsLight.speakerLow
+                          : PhosphorIconsLight.speakerHigh),
                 onPressed: _toggleMute,
                 enabled: true,
                 tooltip: isMuted ? 'Unmute' : 'Mute',
@@ -3237,20 +3302,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             },
           )
         else if (_player != null)
-          Builder(builder: (context) {
-            final volume = _isMuted ? 0.0 : _savedVolume;
-            final isMuted = volume <= 0.1;
-            return VideoPlayerControlButton(
-              icon: isMuted
-                  ? PhosphorIconsLight.speakerSlash
-                  : volume < 50
-                      ? PhosphorIconsLight.speakerLow
-                      : PhosphorIconsLight.speakerHigh,
-              onPressed: _toggleMute,
-              enabled: true,
-              tooltip: isMuted ? 'Unmute' : 'Mute',
-            );
-          })
+          Builder(
+            builder: (context) {
+              final volume = _isMuted ? 0.0 : _savedVolume;
+              final isMuted = volume <= 0.1;
+              return VideoPlayerControlButton(
+                icon: isMuted
+                    ? PhosphorIconsLight.speakerSlash
+                    : volume < 50
+                    ? PhosphorIconsLight.speakerLow
+                    : PhosphorIconsLight.speakerHigh,
+                onPressed: _toggleMute,
+                enabled: true,
+                tooltip: isMuted ? 'Unmute' : 'Mute',
+              );
+            },
+          )
         else
           const SizedBox.shrink(),
         if (!_isFullScreen ||
@@ -3268,19 +3335,19 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     },
                   )
                 : _useExoControls
-                    ? ValueListenableBuilder<exo.VideoPlayerValue>(
-                        valueListenable: _exoController!,
-                        builder: (context, v, _) {
-                          return VideoPlayerVolumeSlider(
-                            value: v.volume * 100,
-                            onChanged: (val) => _setVolumeFromUser(val),
-                          );
-                        },
-                      )
-                    : VideoPlayerVolumeSlider(
-                        value: _isMuted ? 0.0 : _savedVolume,
-                        onChanged: (v) => _setVolumeFromUser(v),
-                      ),
+                ? ValueListenableBuilder<exo.VideoPlayerValue>(
+                    valueListenable: _exoController!,
+                    builder: (context, v, _) {
+                      return VideoPlayerVolumeSlider(
+                        value: v.volume * 100,
+                        onChanged: (val) => _setVolumeFromUser(val),
+                      );
+                    },
+                  )
+                : VideoPlayerVolumeSlider(
+                    value: _isMuted ? 0.0 : _savedVolume,
+                    onChanged: (v) => _setVolumeFromUser(v),
+                  ),
           ),
       ],
     );
@@ -3337,8 +3404,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       if ((Platform.isAndroid || Platform.isIOS)) {
         debugPrint('Mobile: attempting RepaintBoundary screenshot first...');
         try {
-          final boundary = _screenshotKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
+          final boundary =
+              _screenshotKey.currentContext?.findRenderObject()
+                  as RenderRepaintBoundary?;
           debugPrint('Mobile RepaintBoundary found: ${boundary != null}');
           if (boundary != null) {
             // Ensure a fresh frame has been painted
@@ -3348,12 +3416,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               final image = await boundary.toImage(
                 pixelRatio: pixelRatio.clamp(1.0, 3.0),
               );
-              final byteData =
-                  await image.toByteData(format: ui.ImageByteFormat.png);
+              final byteData = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
               if (byteData != null) {
                 screenshotBytes = byteData.buffer.asUint8List();
                 debugPrint(
-                    'Mobile RepaintBoundary screenshot successful: ${screenshotBytes.length} bytes');
+                  'Mobile RepaintBoundary screenshot successful: ${screenshotBytes.length} bytes',
+                );
               }
             }
           }
@@ -3366,8 +3436,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       if (screenshotBytes == null && _useFlutterVlc && _vlcController != null) {
         debugPrint('Attempting VLC screenshot via RepaintBoundary...');
         try {
-          final boundary = _screenshotKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
+          final boundary =
+              _screenshotKey.currentContext?.findRenderObject()
+                  as RenderRepaintBoundary?;
           debugPrint('RepaintBoundary found: ${boundary != null}');
           if (boundary != null) {
             // Ensure the latest frame is painted before capturing
@@ -3378,12 +3449,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 pixelRatio: pixelRatio.clamp(1.0, 3.0),
               );
               debugPrint('Image captured: ${image.width}x${image.height}');
-              final byteData =
-                  await image.toByteData(format: ui.ImageByteFormat.png);
+              final byteData = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
               if (byteData != null) {
                 screenshotBytes = byteData.buffer.asUint8List();
                 debugPrint(
-                    'VLC screenshot successful: ${screenshotBytes.length} bytes');
+                  'VLC screenshot successful: ${screenshotBytes.length} bytes',
+                );
               }
             }
           }
@@ -3401,7 +3474,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           screenshotBytes = await _player!.screenshot();
           if (screenshotBytes != null) {
             debugPrint(
-                'Media kit screenshot successful: ${screenshotBytes.length} bytes');
+              'Media kit screenshot successful: ${screenshotBytes.length} bytes',
+            );
           } else {
             debugPrint('Media kit screenshot returned null');
           }
@@ -3413,8 +3487,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       // Final fallback: RepaintBoundary (any platform)
       if (screenshotBytes == null) {
         try {
-          final boundary = _screenshotKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
+          final boundary =
+              _screenshotKey.currentContext?.findRenderObject()
+                  as RenderRepaintBoundary?;
           debugPrint('RepaintBoundary fallback available: ${boundary != null}');
           if (boundary != null) {
             // Ensure the latest frame is painted before capturing
@@ -3424,12 +3499,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               final image = await boundary.toImage(
                 pixelRatio: pixelRatio.clamp(1.0, 3.0),
               );
-              final byteData =
-                  await image.toByteData(format: ui.ImageByteFormat.png);
+              final byteData = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
               if (byteData != null) {
                 screenshotBytes = byteData.buffer.asUint8List();
                 debugPrint(
-                    'RepaintBoundary screenshot successful: ${screenshotBytes.length} bytes');
+                  'RepaintBoundary screenshot successful: ${screenshotBytes.length} bytes',
+                );
               }
             }
           }
@@ -3449,7 +3526,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         }
         if (!canDecode) {
           debugPrint(
-              'Captured bytes not directly decodable; attempting PNG re-encode...');
+            'Captured bytes not directly decodable; attempting PNG re-encode...',
+          );
           try {
             final decoded = img.decodeImage(screenshotBytes);
             if (decoded != null) {
@@ -3472,19 +3550,22 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       }
 
       debugPrint(
-          'Final screenshotBytes: ${screenshotBytes != null ? "${screenshotBytes.length} bytes" : "null"}');
+        'Final screenshotBytes: ${screenshotBytes != null ? "${screenshotBytes.length} bytes" : "null"}',
+      );
       debugPrint('========== END SCREENSHOT CAPTURE DEBUG ==========');
 
       // If we got screenshot bytes, save them
       if (screenshotBytes != null && screenshotBytes.isNotEmpty) {
         debugPrint(
-            'Screenshot captured, size: ${screenshotBytes.length} bytes');
+          'Screenshot captured, size: ${screenshotBytes.length} bytes',
+        );
 
         // Validate screenshot is not completely black/empty by checking file size
         // Completely black images are usually very small (~< 500 bytes)
         if (screenshotBytes.length < 500) {
           debugPrint(
-              'Screenshot rejected: File too small (${screenshotBytes.length} bytes - likely black/empty image)');
+            'Screenshot rejected: File too small (${screenshotBytes.length} bytes - likely black/empty image)',
+          );
           if (mounted) {
             AppToast.error(context, localizations.screenshotFailed);
           }
@@ -3516,20 +3597,24 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               screenshotsDir = Directory('$sdcard/Pictures/VideoScreenshots');
             } else {
               // iOS: Use Documents directory
-              screenshotsDir = Directory(pathlib.join(
-                (await getApplicationDocumentsDirectory()).path,
-                'Screenshots',
-              ));
+              screenshotsDir = Directory(
+                pathlib.join(
+                  (await getApplicationDocumentsDirectory()).path,
+                  'Screenshots',
+                ),
+              );
             }
 
             if (!await screenshotsDir.exists()) {
               await screenshotsDir.create(recursive: true);
             }
 
-            final screenshotFile =
-                File(pathlib.join(screenshotsDir.path, fileName));
+            final screenshotFile = File(
+              pathlib.join(screenshotsDir.path, fileName),
+            );
             debugPrint(
-                '💾 Saving screenshot bytes: ${screenshotBytes.length} bytes to ${screenshotFile.path}');
+              '💾 Saving screenshot bytes: ${screenshotBytes.length} bytes to ${screenshotFile.path}',
+            );
             await screenshotFile.writeAsBytes(screenshotBytes, flush: true);
 
             // Ensure file is fully written to disk
@@ -3543,8 +3628,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
             // Also save to gallery with Gal package for easy access
             try {
-              await Gal.putImage(screenshotFile.path,
-                  album: 'VideoScreenshots');
+              await Gal.putImage(
+                screenshotFile.path,
+                album: 'VideoScreenshots',
+              );
               debugPrint('Screenshot also saved to gallery album');
             } catch (e) {
               debugPrint('Warning: Could not add to gallery: $e');
@@ -3557,7 +3644,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         } else {
           // Desktop: Save to downloads directory
           try {
-            final screenshotDir = await getDownloadsDirectory() ??
+            final screenshotDir =
+                await getDownloadsDirectory() ??
                 await getApplicationDocumentsDirectory();
             final timestamp = DateTime.now()
                 .toIso8601String()
@@ -3648,10 +3736,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         screenshotsDir = Directory('$sdcard/Pictures/VideoScreenshots');
       } else {
         // iOS
-        screenshotsDir = Directory(pathlib.join(
-          (await getApplicationDocumentsDirectory()).path,
-          'Screenshots',
-        ));
+        screenshotsDir = Directory(
+          pathlib.join(
+            (await getApplicationDocumentsDirectory()).path,
+            'Screenshots',
+          ),
+        );
       }
 
       if (!await screenshotsDir.exists()) return;
@@ -3668,7 +3758,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               await file.delete();
               deletedCount++;
               debugPrint(
-                  '🗑️ Deleted black screenshot: ${file.path} ($fileSize bytes)');
+                '🗑️ Deleted black screenshot: ${file.path} ($fileSize bytes)',
+              );
             }
           } catch (e) {
             debugPrint('Could not delete old screenshot: $e');
@@ -3710,7 +3801,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       // Mobile: open directly via Navigator and temporarily hide the video surface to avoid texture overlay
       if (Platform.isAndroid) {
-        final wasPlaying = _player?.state.playing == true ||
+        final wasPlaying =
+            _player?.state.playing == true ||
             (_vlcController?.value.isPlaying == true);
         try {
           await _suspendVideoForRoutePush();
@@ -3724,7 +3816,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           debugPrint('   ✅ Loaded ${imageBytes.length} bytes');
           // Verify bytes are valid image data (PNG signature: 89 50 4E 47)
           if (imageBytes.length > 4) {
-            final isPng = imageBytes[0] == 0x89 &&
+            final isPng =
+                imageBytes[0] == 0x89 &&
                 imageBytes[1] == 0x50 &&
                 imageBytes[2] == 0x4E &&
                 imageBytes[3] == 0x47;
@@ -3734,10 +3827,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           if (mounted) {
             await Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
-                builder: (_) => ImageViewerScreen(
-                  file: imageFile,
-                  imageBytes: imageBytes,
-                ),
+                builder: (_) =>
+                    ImageViewerScreen(file: imageFile, imageBytes: imageBytes),
               ),
             );
           }
@@ -3752,7 +3843,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       }
 
       if (Platform.isIOS) {
-        final wasPlaying = _player?.state.playing == true ||
+        final wasPlaying =
+            _player?.state.playing == true ||
             (_vlcController?.value.isPlaying == true);
         try {
           // Pause playback and hide video surface (prevents texture overlay above pushed route)
@@ -3772,7 +3864,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           debugPrint('   ✅ Loaded ${imageBytes.length} bytes');
           // Verify bytes are valid image data
           if (imageBytes.length > 4) {
-            final isPng = imageBytes[0] == 0x89 &&
+            final isPng =
+                imageBytes[0] == 0x89 &&
                 imageBytes[1] == 0x50 &&
                 imageBytes[2] == 0x4E &&
                 imageBytes[3] == 0x47;
@@ -3784,10 +3877,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           if (mounted) {
             await Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
-                builder: (_) => ImageViewerScreen(
-                  file: imageFile,
-                  imageBytes: imageBytes,
-                ),
+                builder: (_) =>
+                    ImageViewerScreen(file: imageFile, imageBytes: imageBytes),
               ),
             );
           }
@@ -3833,7 +3924,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         }
       } catch (e, stackTrace) {
         debugPrint(
-            'TabManager.openTab failed (TabManagerBloc not in context): $e');
+          'TabManager.openTab failed (TabManagerBloc not in context): $e',
+        );
         debugPrint('Stack trace: $stackTrace');
         // Continue to fallback methods
       }
@@ -3979,8 +4071,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           sourceForPip = widget.streamingUrl!;
         } else if (widget.smbMrl != null) {
           try {
-            final uri =
-                await SmbHttpProxyServer.instance.urlFor(widget.smbMrl!);
+            final uri = await SmbHttpProxyServer.instance.urlFor(
+              widget.smbMrl!,
+            );
             sourceTypeForPip = 'url';
             sourceForPip = uri.toString();
           } catch (_) {}
@@ -4038,8 +4131,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       try {
         final up = UserPreferences.instance;
         await up.init();
-        preferExternal = await up.getVideoPlayerBool('windows_pip_external',
-                defaultValue: true) ??
+        preferExternal =
+            await up.getVideoPlayerBool(
+              'windows_pip_external',
+              defaultValue: true,
+            ) ??
             true;
       } catch (_) {}
       final positionMs = _player != null
@@ -4167,16 +4263,17 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             .cast<List<int>>()
             .transform(utf8.decoder)
             .transform(const LineSplitter())
-            .listen(_handlePipMessage, onDone: () {
-          _closePipIpc();
-        }, onError: (e) {
-          _closePipIpc();
-        });
+            .listen(
+              _handlePipMessage,
+              onDone: () {
+                _closePipIpc();
+              },
+              onError: (e) {
+                _closePipIpc();
+              },
+            );
       });
-      return {
-        'port': server.port,
-        'token': _pipToken!,
-      };
+      return {'port': server.port, 'token': _pipToken!};
     } catch (e) {
       debugPrint('Failed to start PiP IPC server: $e');
       _closePipIpc();
@@ -4384,12 +4481,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               hwAcc: HwAcc.full,
               autoPlay: resumePlaying,
               options: VlcPlayerOptions(
-                advanced: VlcAdvancedOptions([
-                  '--network-caching=1000',
-                ]),
-                video: VlcVideoOptions([
-                  '--android-display-chroma=RV32',
-                ]),
+                advanced: VlcAdvancedOptions(['--network-caching=1000']),
+                video: VlcVideoOptions(['--android-display-chroma=RV32']),
               ),
             );
           } else if (widget.file != null) {
@@ -4399,9 +4492,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
               hwAcc: HwAcc.full,
               autoPlay: resumePlaying,
               options: VlcPlayerOptions(
-                video: VlcVideoOptions([
-                  '--android-display-chroma=RV32',
-                ]),
+                video: VlcVideoOptions(['--android-display-chroma=RV32']),
               ),
             );
           }

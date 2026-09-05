@@ -98,10 +98,10 @@ class ScrollVelocityListener extends StatelessWidget {
   final bool enabled;
 
   const ScrollVelocityListener({
-    Key? key,
+    super.key,
     required this.child,
     this.enabled = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

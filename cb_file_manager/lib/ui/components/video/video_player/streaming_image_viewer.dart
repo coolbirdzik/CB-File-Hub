@@ -15,16 +15,15 @@ class StreamingImageViewer extends StatefulWidget {
   final VoidCallback? onClose;
 
   const StreamingImageViewer({
-    Key? key,
+    super.key,
     this.streamingUrl,
     this.fileStream,
     required this.fileName,
     this.onClose,
-  })  : assert(
-          streamingUrl != null || fileStream != null,
-          'Either streamingUrl or fileStream must be provided',
-        ),
-        super(key: key);
+  }) : assert(
+         streamingUrl != null || fileStream != null,
+         'Either streamingUrl or fileStream must be provided',
+       );
 
   /// Constructor for streaming URL
   const StreamingImageViewer.fromUrl({
@@ -33,11 +32,11 @@ class StreamingImageViewer extends StatefulWidget {
     required String fileName,
     VoidCallback? onClose,
   }) : this(
-          key: key,
-          streamingUrl: streamingUrl,
-          fileName: fileName,
-          onClose: onClose,
-        );
+         key: key,
+         streamingUrl: streamingUrl,
+         fileName: fileName,
+         onClose: onClose,
+       );
 
   /// Constructor for file stream
   const StreamingImageViewer.fromStream({
@@ -46,11 +45,11 @@ class StreamingImageViewer extends StatefulWidget {
     required String fileName,
     VoidCallback? onClose,
   }) : this(
-          key: key,
-          fileStream: fileStream,
-          fileName: fileName,
-          onClose: onClose,
-        );
+         key: key,
+         fileStream: fileStream,
+         fileName: fileName,
+         onClose: onClose,
+       );
 
   @override
   State<StreamingImageViewer> createState() => _StreamingImageViewerState();
@@ -157,15 +156,17 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(PhosphorIconsLight.warningCircle,
-                color: Colors.red, size: 64),
+            const Icon(
+              PhosphorIconsLight.warningCircle,
+              color: Colors.red,
+              size: 64,
+            ),
             const SizedBox(height: 16),
             Text(
               l10n.errorLoadingImage,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(color: Colors.white),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(color: Colors.white),
             ),
             const SizedBox(height: 8),
             Padding(
@@ -173,17 +174,13 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
               child: Text(
                 bodyText,
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Colors.white70),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadImage,
-              child: Text(l10n.retry),
-            ),
+            ElevatedButton(onPressed: _loadImage, child: Text(l10n.retry)),
           ],
         ),
       );
@@ -201,8 +198,11 @@ class _StreamingImageViewerState extends State<StreamingImageViewer> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(PhosphorIconsLight.imageBroken,
-                        color: Colors.red, size: 64),
+                    const Icon(
+                      PhosphorIconsLight.imageBroken,
+                      color: Colors.red,
+                      size: 64,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       l10n.failedToDisplayImage,

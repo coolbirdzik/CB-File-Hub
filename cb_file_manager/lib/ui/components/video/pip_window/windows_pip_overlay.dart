@@ -29,16 +29,19 @@ class WindowsPipOverlay {
       required int positionMs,
       required double volume,
       required bool playing,
-    }) onClose,
+    })
+    onClose,
   }) {
     if (_entry != null) return;
-    final entry = OverlayEntry(builder: (_) {
-      return _WindowsPipOverlayWidget(
-        args: args,
-        onClose: onClose,
-        onRemove: close,
-      );
-    });
+    final entry = OverlayEntry(
+      builder: (_) {
+        return _WindowsPipOverlayWidget(
+          args: args,
+          onClose: onClose,
+          onRemove: close,
+        );
+      },
+    );
     _entry = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
   }
@@ -46,17 +49,18 @@ class WindowsPipOverlay {
 
 class _WindowsPipOverlayWidget extends StatefulWidget {
   final Map<String, dynamic> args;
-  final void Function(
-      {required int positionMs,
-      required double volume,
-      required bool playing}) onClose;
+  final void Function({
+    required int positionMs,
+    required double volume,
+    required bool playing,
+  })
+  onClose;
   final VoidCallback onRemove;
   const _WindowsPipOverlayWidget({
-    Key? key,
     required this.args,
     required this.onClose,
     required this.onRemove,
-  }) : super(key: key);
+  });
 
   @override
   State<_WindowsPipOverlayWidget> createState() =>
@@ -213,8 +217,11 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                const Icon(PhosphorIconsLight.pictureInpicture,
-                    color: Colors.white70, size: 16),
+                const Icon(
+                  PhosphorIconsLight.pictureInpicture,
+                  color: Colors.white70,
+                  size: 16,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -222,9 +229,10 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600),
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -232,11 +240,12 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: Icon(
-                      _isPlaying
-                          ? PhosphorIconsLight.pause
-                          : PhosphorIconsLight.play,
-                      color: Colors.white,
-                      size: 16),
+                    _isPlaying
+                        ? PhosphorIconsLight.pause
+                        : PhosphorIconsLight.play,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   onPressed: () async {
                     if (_player == null) return;
                     if (_player!.state.playing) {
@@ -253,15 +262,21 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: const Icon(PhosphorIconsLight.x,
-                      color: Colors.white, size: 16),
+                  icon: const Icon(
+                    PhosphorIconsLight.x,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   onPressed: () {
                     final pos = _position.inMilliseconds;
                     final vol = (_player?.state.volume ?? 100).toDouble();
                     final playing = _player?.state.playing ?? _isPlaying;
                     widget.onRemove();
                     widget.onClose(
-                        positionMs: pos, volume: vol, playing: playing);
+                      positionMs: pos,
+                      volume: vol,
+                      playing: playing,
+                    );
                   },
                 ),
               ],
@@ -280,57 +295,77 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
         child: Container(
           color: Colors.black.withValues(alpha: 0.45),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(children: [
-            Text(VideoPlayerUtils.formatDuration(_position),
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 2,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 6),
-                ),
-                child: Slider(
-                  value: _duration.inMilliseconds == 0
-                      ? 0
-                      : _position.inMilliseconds.toDouble(),
-                  min: 0,
-                  max: (_duration.inMilliseconds == 0
-                          ? 1
-                          : _duration.inMilliseconds)
-                      .toDouble(),
-                  activeColor: Colors.white,
-                  inactiveColor: Colors.white24,
-                  onChanged: (v) => setState(
-                      () => _position = Duration(milliseconds: v.toInt())),
-                  onChangeEnd: (v) =>
-                      _player?.seek(Duration(milliseconds: v.toInt())),
+          child: Row(
+            children: [
+              Text(
+                VideoPlayerUtils.formatDuration(_position),
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Semantics(
+                  container: true,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                    ),
+                    child: Slider(
+                      value: _duration.inMilliseconds == 0
+                          ? 0
+                          : _position.inMilliseconds.toDouble(),
+                      min: 0,
+                      max:
+                          (_duration.inMilliseconds == 0
+                                  ? 1
+                                  : _duration.inMilliseconds)
+                              .toDouble(),
+                      activeColor: Colors.white,
+                      inactiveColor: Colors.white24,
+                      onChanged: (v) => setState(
+                        () => _position = Duration(milliseconds: v.toInt()),
+                      ),
+                      onChangeEnd: (v) =>
+                          _player?.seek(Duration(milliseconds: v.toInt())),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Text(VideoPlayerUtils.formatDuration(_duration),
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            const SizedBox(width: 8),
-            const Icon(PhosphorIconsLight.speakerHigh,
-                color: Colors.white70, size: 14),
-            SizedBox(
-              width: 80,
-              child: Slider(
-                value:
-                    ((_player?.state.volume ?? 100).clamp(0, 100)).toDouble(),
-                min: 0,
-                max: 100,
-                activeColor: Colors.white,
-                inactiveColor: Colors.white24,
-                onChanged: (v) async {
-                  await _player?.setVolume(v);
-                  setState(() {});
-                },
+              const SizedBox(width: 6),
+              Text(
+                VideoPlayerUtils.formatDuration(_duration),
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
               ),
-            ),
-          ]),
+              const SizedBox(width: 8),
+              const Icon(
+                PhosphorIconsLight.speakerHigh,
+                color: Colors.white70,
+                size: 14,
+              ),
+              SizedBox(
+                width: 80,
+                child: Semantics(
+                  container: true,
+                  child: Slider(
+                    value: ((_player?.state.volume ?? 100).clamp(
+                      0,
+                      100,
+                    )).toDouble(),
+                    min: 0,
+                    max: 100,
+                    activeColor: Colors.white,
+                    inactiveColor: Colors.white24,
+                    onChanged: (v) async {
+                      await _player?.setVolume(v);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -360,32 +395,37 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
 
     return IgnorePointer(
       ignoring: false,
-      child: Stack(children: [
-        Positioned(
-          left: clamped.dx,
-          top: clamped.dy,
-          width: _size.width,
-          height: _size.height,
-          child: Material(
-            color: Colors.transparent,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(16.0),
-                border: Border.all(color: Colors.white24, width: 1),
-                boxShadow: const [
-                  BoxShadow(
-                      color: Colors.black54, blurRadius: 8, spreadRadius: 2),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16.0),
-                child: Stack(children: innerChildren),
+      child: Stack(
+        children: [
+          Positioned(
+            left: clamped.dx,
+            top: clamped.dy,
+            width: _size.width,
+            height: _size.height,
+            child: Material(
+              color: Colors.transparent,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(color: Colors.white24, width: 1),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black54,
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16.0),
+                  child: Stack(children: innerChildren),
+                ),
               ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 

@@ -148,8 +148,9 @@ class NetworkDiscoveryService {
     for (int i = 0; i < hosts.length; i += _batchSize) {
       if (!_isScanning) break;
 
-      final batchEnd =
-          (i + _batchSize < hosts.length) ? i + _batchSize : hosts.length;
+      final batchEnd = (i + _batchSize < hosts.length)
+          ? i + _batchSize
+          : hosts.length;
       final batch = hosts.sublist(i, batchEnd);
 
       // Wait if we've reached the maximum concurrent scans
@@ -257,8 +258,11 @@ class NetworkDiscoveryService {
   /// Fast port checking with minimal timeout
   Future<bool> _isPortOpenFast(String host, int port) async {
     try {
-      final socket = await Socket.connect(host, port,
-          timeout: const Duration(milliseconds: _timeoutMilliseconds));
+      final socket = await Socket.connect(
+        host,
+        port,
+        timeout: const Duration(milliseconds: _timeoutMilliseconds),
+      );
       await socket.close();
       return true;
     } catch (e) {
@@ -270,9 +274,9 @@ class NetworkDiscoveryService {
   Future<String?> _getHostnameAsync(String ipAddress) async {
     try {
       // Increase timeout for better results, especially on mobile networks
-      final result = await InternetAddress(ipAddress)
-          .reverse()
-          .timeout(const Duration(milliseconds: 500));
+      final result = await InternetAddress(
+        ipAddress,
+      ).reverse().timeout(const Duration(milliseconds: 500));
 
       // If hostname is empty or just the IP address, return null to use fallback
       final hostname = result.host;
@@ -292,9 +296,10 @@ class NetworkDiscoveryService {
     try {
       // Look for all non-loopback, non-link-local IPv4 addresses.
       final interfaces = await NetworkInterface.list(
-          type: InternetAddressType.IPv4,
-          includeLoopback: false,
-          includeLinkLocal: false);
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+        includeLinkLocal: false,
+      );
 
       for (final interface in interfaces) {
         for (final addr in interface.addresses) {
@@ -315,8 +320,9 @@ class NetworkDiscoveryService {
   /// Update SMB version for a specific device
   Future<void> updateSmbVersion(String ipAddress, String smbVersion) async {
     // Update in discovered devices list
-    final deviceIndex =
-        _discoveredDevices.indexWhere((d) => d.ipAddress == ipAddress);
+    final deviceIndex = _discoveredDevices.indexWhere(
+      (d) => d.ipAddress == ipAddress,
+    );
     if (deviceIndex != -1) {
       final oldDevice = _discoveredDevices[deviceIndex];
       final updatedDevice = NetworkDevice(
@@ -364,9 +370,4 @@ class NetworkDevice {
 }
 
 /// Types of network devices
-enum NetworkDeviceType {
-  smb,
-  ftp,
-  webdav,
-  unknown,
-}
+enum NetworkDeviceType { smb, ftp, webdav, unknown }

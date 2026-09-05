@@ -31,7 +31,9 @@ val hasReleaseSigningConfig = listOf(
 
 android {
     namespace = "com.cbv.filehub"
-    compileSdk = flutter.compileSdkVersion
+    // flutter.compileSdkVersion is still 36; flutter_secure_storage 11 and
+    // permission_handler_android 14 both compile against 37.
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
 
     compileOptions {

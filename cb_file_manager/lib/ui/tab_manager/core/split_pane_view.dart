@@ -29,12 +29,12 @@ class SplitPaneView extends StatefulWidget {
   final String? highlightedFileName;
 
   const SplitPaneView({
-    Key? key,
+    super.key,
     required this.tabId,
     required this.leftPath,
     required this.rightPath,
     this.highlightedFileName,
-  }) : super(key: key);
+  });
 
   @override
   State<SplitPaneView> createState() => _SplitPaneViewState();
@@ -120,85 +120,83 @@ class _SplitPaneViewState extends State<SplitPaneView> {
       opacity: 0.6,
     );
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final totalWidth = constraints.maxWidth - _dividerWidth;
-      final leftWidth = (totalWidth * _ratio).clamp(
-        _minPaneWidth,
-        totalWidth - _minPaneWidth,
-      );
-      final rightWidth = totalWidth - leftWidth;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth - _dividerWidth;
+        final leftWidth = (totalWidth * _ratio).clamp(
+          _minPaneWidth,
+          totalWidth - _minPaneWidth,
+        );
+        final rightWidth = totalWidth - leftWidth;
 
-      final leftPane = _PaneContainer(
-        width: leftWidth,
-        isFocused: _focus == SplitPaneFocus.left,
-        focusColor: focusColor,
-        borderWidth: borderWidth,
-        onTap: () => _setFocus(SplitPaneFocus.left),
-        child: TabbedFolderListScreen(
-          key: ValueKey('${widget.tabId}_left'),
-          path: widget.leftPath,
-          tabId: widget.tabId,
-          appBarDataNotifier: _leftBarNotifier,
-          highlightedFileName: widget.highlightedFileName,
-        ),
-      );
+        final leftPane = _PaneContainer(
+          width: leftWidth,
+          isFocused: _focus == SplitPaneFocus.left,
+          focusColor: focusColor,
+          borderWidth: borderWidth,
+          onTap: () => _setFocus(SplitPaneFocus.left),
+          child: TabbedFolderListScreen(
+            key: ValueKey('${widget.tabId}_left'),
+            path: widget.leftPath,
+            tabId: widget.tabId,
+            appBarDataNotifier: _leftBarNotifier,
+            highlightedFileName: widget.highlightedFileName,
+          ),
+        );
 
-      final rightPane = _PaneContainer(
-        width: rightWidth,
-        isFocused: _focus == SplitPaneFocus.right,
-        focusColor: focusColor,
-        borderWidth: borderWidth,
-        onTap: () => _setFocus(SplitPaneFocus.right),
-        child: TabbedFolderListScreen(
-          key: ValueKey(_rightTabId),
-          path: widget.rightPath,
-          tabId: _rightTabId,
-          appBarDataNotifier: _rightBarNotifier,
-        ),
-      );
+        final rightPane = _PaneContainer(
+          width: rightWidth,
+          isFocused: _focus == SplitPaneFocus.right,
+          focusColor: focusColor,
+          borderWidth: borderWidth,
+          onTap: () => _setFocus(SplitPaneFocus.right),
+          child: TabbedFolderListScreen(
+            key: ValueKey(_rightTabId),
+            path: widget.rightPath,
+            tabId: _rightTabId,
+            appBarDataNotifier: _rightBarNotifier,
+          ),
+        );
 
-      // Draggable divider.
-      final divider = GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragUpdate: (d) => _onDividerDrag(d, constraints),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.resizeColumn,
-          child: Container(
-            width: _dividerWidth,
-            height: double.infinity,
-            color: theme.dividerColor.withValues(alpha: 0.6),
-            child: Center(
-              child: Container(
-                width: 2,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(1),
+        // Draggable divider.
+        final divider = GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (d) => _onDividerDrag(d, constraints),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.resizeColumn,
+            child: Container(
+              width: _dividerWidth,
+              height: double.infinity,
+              color: theme.dividerColor.withValues(alpha: 0.6),
+              child: Center(
+                child: Container(
+                  width: 2,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      return Column(
-        children: [
-          // Shared address bar — reflects the focused pane.
-          sharedBar,
-          // Pane row.
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                leftPane,
-                divider,
-                rightPane,
-              ],
+        return Column(
+          children: [
+            // Shared address bar — reflects the focused pane.
+            sharedBar,
+            // Pane row.
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [leftPane, divider, rightPane],
+              ),
             ),
-          ),
-        ],
-      );
-    });
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -274,10 +272,7 @@ class _PaneContainer extends StatelessWidget {
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 200),
                   opacity: isFocused ? 1.0 : 0.0,
-                  child: Container(
-                    height: 2,
-                    color: focusColor,
-                  ),
+                  child: Container(height: 2, color: focusColor),
                 ),
               ),
             ),

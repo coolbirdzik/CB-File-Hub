@@ -42,12 +42,12 @@ class DesktopWindowInfo {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'windowId': windowId,
-        'port': port,
-        'title': title,
-        'tabCount': tabCount,
-        'role': role,
-      };
+    'windowId': windowId,
+    'port': port,
+    'title': title,
+    'tabCount': tabCount,
+    'role': role,
+  };
 }
 
 class DesktopWindowingService {
@@ -60,11 +60,11 @@ class DesktopWindowingService {
       Platform.environment[WindowStartupPayload.envSecondaryWindowKey] == '1';
   String _windowRole =
       (Platform.environment[WindowStartupPayload.envWindowRoleKey] ?? 'normal')
-              .trim()
-              .isEmpty
-          ? 'normal'
-          : (Platform.environment[WindowStartupPayload.envWindowRoleKey] ??
-              'normal');
+          .trim()
+          .isEmpty
+      ? 'normal'
+      : (Platform.environment[WindowStartupPayload.envWindowRoleKey] ??
+            'normal');
   Timer? _spareWarmupTimer;
   bool _spareWarmupInFlight = false;
 
@@ -322,7 +322,8 @@ class DesktopWindowingService {
   }
 
   Future<List<WindowTabPayload>> requestTabsFromWindow(
-      DesktopWindowInfo source) async {
+    DesktopWindowInfo source,
+  ) async {
     if (!isDesktop) return const <WindowTabPayload>[];
 
     final response = await _sendPeerMessage(
@@ -355,13 +356,19 @@ class DesktopWindowingService {
     if (_peerServer != null) return;
 
     try {
-      _peerServer = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0,
-          shared: true);
+      _peerServer = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+        shared: true,
+      );
       _peerPort = _peerServer!.port;
       _peerSub = _peerServer!.listen(_handlePeerConnection);
     } catch (e, st) {
-      AppLogger.error('Failed to start window peer server.',
-          error: e, stackTrace: st);
+      AppLogger.error(
+        'Failed to start window peer server.',
+        error: e,
+        stackTrace: st,
+      );
       _peerServer = null;
       _peerPort = null;
     }
@@ -372,35 +379,41 @@ class DesktopWindowingService {
         .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter())
-        .listen((line) async {
-      Map<String, dynamic>? message;
-      try {
-        final decoded = jsonDecode(line);
-        if (decoded is Map) {
-          message = Map<String, dynamic>.from(decoded);
-        }
-      } catch (_) {
-        message = null;
-      }
+        .listen(
+          (line) async {
+            Map<String, dynamic>? message;
+            try {
+              final decoded = jsonDecode(line);
+              if (decoded is Map) {
+                message = Map<String, dynamic>.from(decoded);
+              }
+            } catch (_) {
+              message = null;
+            }
 
-      if (message == null) {
-        _writeJsonLine(socket, <String, dynamic>{
-          'type': 'error',
-          'message': 'Invalid message',
-        });
-        return;
-      }
+            if (message == null) {
+              _writeJsonLine(socket, <String, dynamic>{
+                'type': 'error',
+                'message': 'Invalid message',
+              });
+              return;
+            }
 
-      await _handlePeerMessage(socket, message);
-    }, onDone: () {
-      socket.destroy();
-    }, onError: (_) {
-      socket.destroy();
-    });
+            await _handlePeerMessage(socket, message);
+          },
+          onDone: () {
+            socket.destroy();
+          },
+          onError: (_) {
+            socket.destroy();
+          },
+        );
   }
 
   Future<void> _handlePeerMessage(
-      Socket socket, Map<String, dynamic> message) async {
+    Socket socket,
+    Map<String, dynamic> message,
+  ) async {
     final type = message['type'];
     if (type == 'ping') {
       _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
@@ -433,13 +446,9 @@ class DesktopWindowingService {
         _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
         if (startDragging && isDesktop) {
           unawaited(
-            Future<void>.delayed(
-              kDefaultTabTearOffDragDelay,
-              () async {
-                await WindowsNativeTabDragDropService
-                    .startWindowDragIfMouseDown();
-              },
-            ),
+            Future<void>.delayed(kDefaultTabTearOffDragDelay, () async {
+              await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
+            }),
           );
         }
       } catch (e, st) {
@@ -461,18 +470,22 @@ class DesktopWindowingService {
       final state = bloc?.state;
       final tabs = state?.tabs ?? const [];
       final activeId = state?.activeTabId;
-      final activeIndex =
-          activeId == null ? null : tabs.indexWhere((t) => t.id == activeId);
+      final activeIndex = activeId == null
+          ? null
+          : tabs.indexWhere((t) => t.id == activeId);
       _writeJsonLine(socket, <String, dynamic>{
         'type': 'tabs',
-        'activeIndex':
-            (activeIndex != null && activeIndex >= 0) ? activeIndex : null,
+        'activeIndex': (activeIndex != null && activeIndex >= 0)
+            ? activeIndex
+            : null,
         'tabs': tabs
-            .map((t) => WindowTabPayload(
-                  path: t.path,
-                  name: t.name,
-                  highlightedFileName: t.highlightedFileName,
-                ).toJson())
+            .map(
+              (t) => WindowTabPayload(
+                path: t.path,
+                name: t.name,
+                highlightedFileName: t.highlightedFileName,
+              ).toJson(),
+            )
             .toList(growable: false),
       });
       return;
@@ -499,12 +512,14 @@ class DesktopWindowingService {
       for (int i = 0; i < payloads.length; i++) {
         final p = payloads[i];
         final shouldSwitch = switchToLast ? i == payloads.length - 1 : i == 0;
-        bloc.add(AddTab(
-          path: p.path,
-          name: p.name,
-          switchToTab: shouldSwitch,
-          highlightedFileName: p.highlightedFileName,
-        ));
+        bloc.add(
+          AddTab(
+            path: p.path,
+            name: p.name,
+            switchToTab: shouldSwitch,
+            highlightedFileName: p.highlightedFileName,
+          ),
+        );
       }
 
       _writeJsonLine(socket, <String, dynamic>{'type': 'ok'});
@@ -549,8 +564,10 @@ class DesktopWindowingService {
   Future<bool> _canConnectToRegistry() async {
     try {
       final s = await Socket.connect(
-          InternetAddress.loopbackIPv4, _registryPort,
-          timeout: const Duration(milliseconds: 250));
+        InternetAddress.loopbackIPv4,
+        _registryPort,
+        timeout: const Duration(milliseconds: 250),
+      );
       s.destroy();
       return true;
     } catch (_) {
@@ -583,31 +600,35 @@ class DesktopWindowingService {
         .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter())
-        .listen((line) {
-      Map<String, dynamic>? message;
-      try {
-        final decoded = jsonDecode(line);
-        if (decoded is Map) {
-          message = Map<String, dynamic>.from(decoded);
-        }
-      } catch (_) {
-        message = null;
-      }
+        .listen(
+          (line) {
+            Map<String, dynamic>? message;
+            try {
+              final decoded = jsonDecode(line);
+              if (decoded is Map) {
+                message = Map<String, dynamic>.from(decoded);
+              }
+            } catch (_) {
+              message = null;
+            }
 
-      if (message == null) {
-        _writeJsonLine(socket, <String, dynamic>{
-          'type': 'error',
-          'message': 'Invalid message',
-        });
-        return;
-      }
+            if (message == null) {
+              _writeJsonLine(socket, <String, dynamic>{
+                'type': 'error',
+                'message': 'Invalid message',
+              });
+              return;
+            }
 
-      _handleRegistryMessage(socket, message);
-    }, onDone: () {
-      socket.destroy();
-    }, onError: (_) {
-      socket.destroy();
-    });
+            _handleRegistryMessage(socket, message);
+          },
+          onDone: () {
+            socket.destroy();
+          },
+          onError: (_) {
+            socket.destroy();
+          },
+        );
   }
 
   void _handleRegistryMessage(Socket socket, Map<String, dynamic> message) {
@@ -723,7 +744,8 @@ class DesktopWindowingService {
   }
 
   Future<Map<String, dynamic>?> _sendRegistryMessage(
-      Map<String, dynamic> message) async {
+    Map<String, dynamic> message,
+  ) async {
     if (!isDesktop) return null;
 
     try {
@@ -787,8 +809,5 @@ class _RegistryEntry {
   final DesktopWindowInfo info;
   final DateTime lastSeen;
 
-  const _RegistryEntry({
-    required this.info,
-    required this.lastSeen,
-  });
+  const _RegistryEntry({required this.info, required this.lastSeen});
 }

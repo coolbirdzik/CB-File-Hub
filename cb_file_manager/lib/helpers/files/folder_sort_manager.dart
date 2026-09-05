@@ -437,8 +437,9 @@ class FolderSortManager {
       }
       final columnVisibility = source[_columnVisibilityKey];
       if (columnVisibility is Map) {
-        config[_columnVisibilityKey] =
-            Map<String, dynamic>.from(columnVisibility);
+        config[_columnVisibilityKey] = Map<String, dynamic>.from(
+          columnVisibility,
+        );
       }
       return config;
     } catch (e) {

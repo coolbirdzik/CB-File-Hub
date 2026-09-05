@@ -25,7 +25,7 @@ class CbTooltip extends StatelessWidget {
   final bool? excludeFromSemantics;
 
   const CbTooltip({
-    Key? key,
+    super.key,
     required this.message,
     required this.child,
     this.waitDuration,
@@ -36,7 +36,7 @@ class CbTooltip extends StatelessWidget {
     this.triggerMode,
     this.enableFeedback,
     this.excludeFromSemantics,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -89,10 +89,10 @@ class CbFluentTooltip extends StatefulWidget {
   final Widget child;
 
   const CbFluentTooltip({
-    Key? key,
+    super.key,
     required this.message,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<CbFluentTooltip> createState() => _CbFluentTooltipState();

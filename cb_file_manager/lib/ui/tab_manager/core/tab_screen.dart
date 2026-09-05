@@ -11,6 +11,7 @@ import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'tab_manager.dart';
 import 'tab_data.dart';
 import 'tab_paths.dart';
+import 'tab_content_overlay.dart';
 import '../../drawer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'tabbed_folder/tabbed_folder_list_screen.dart';
@@ -46,16 +47,16 @@ import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 class TabBarMouseScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.trackpad,
-        ...super.dragDevices,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    ...super.dragDevices,
+  };
 }
 
 /// A screen that manages and displays tabbed content
 class TabScreen extends StatefulWidget {
-  const TabScreen({Key? key}) : super(key: key);
+  const TabScreen({super.key});
 
   @override
   State<TabScreen> createState() => _TabScreenState();
@@ -121,14 +122,12 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     super.initState();
     // Initialize with a temporary controller. It will be properly set in postFrameCallback.
     _tabController = TabController(length: 0, vsync: this);
-    _tabStateSubscription = context.read<TabManagerBloc>().stream.listen(
-      (state) {
-        unawaited(_persistLastOpenedTabPath(state));
-      },
-    );
-    unawaited(
-      _persistLastOpenedTabPath(context.read<TabManagerBloc>().state),
-    );
+    _tabStateSubscription = context.read<TabManagerBloc>().stream.listen((
+      state,
+    ) {
+      unawaited(_persistLastOpenedTabPath(state));
+    });
+    unawaited(_persistLastOpenedTabPath(context.read<TabManagerBloc>().state));
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadDrawerPreferences();
@@ -169,30 +168,31 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       // Ensure context is valid for reading BLoC
       final currentState = context.read<TabManagerBloc>().state;
       if (currentState.activeTabId != null && tabCount > 0) {
-        final activeIndexFromBloc = currentState.tabs
-            .indexWhere((tab) => tab.id == currentState.activeTabId);
+        final activeIndexFromBloc = currentState.tabs.indexWhere(
+          (tab) => tab.id == currentState.activeTabId,
+        );
         if (activeIndexFromBloc >= 0 && activeIndexFromBloc < tabCount) {
           newInitialIndex = activeIndexFromBloc;
         } else if (tabCount > 0) {
           // Fallback if activeId is somehow invalid
           newInitialIndex =
               (oldController.index < tabCount && oldController.index >= 0)
-                  ? oldController.index
-                  : tabCount - 1;
+              ? oldController.index
+              : tabCount - 1;
         }
       } else if (tabCount > 0) {
         // No activeTabId, but tabs exist
         newInitialIndex =
             (oldController.index < tabCount && oldController.index >= 0)
-                ? oldController.index
-                : 0;
+            ? oldController.index
+            : 0;
       }
     } else if (tabCount > 0) {
       // Fallback if not mounted (less ideal)
       newInitialIndex =
           (oldController.index < tabCount && oldController.index >= 0)
-              ? oldController.index
-              : 0;
+          ? oldController.index
+          : 0;
     }
 
     _tabController = TabController(
@@ -271,19 +271,23 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       if (lastOpenedTabs.isNotEmpty) {
         for (final path in lastOpenedTabs) {
           final isLastActive = path == lastActivePath;
-          tabBloc.add(AddTab(
-            path: path,
-            name: _tabNameForRestoredPath(path),
-            switchToTab: isLastActive,
-          ));
+          tabBloc.add(
+            AddTab(
+              path: path,
+              name: _tabNameForRestoredPath(path),
+              switchToTab: isLastActive,
+            ),
+          );
         }
       } else if (lastActivePath != null && lastActivePath.trim().isNotEmpty) {
         // Fallback for backward compatibility
-        tabBloc.add(AddTab(
-          path: lastActivePath,
-          name: _tabNameForRestoredPath(lastActivePath),
-          switchToTab: true,
-        ));
+        tabBloc.add(
+          AddTab(
+            path: lastActivePath,
+            name: _tabNameForRestoredPath(lastActivePath),
+            switchToTab: true,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Error restoring last opened tab: $e');
@@ -445,8 +449,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     required VoidCallback onPressed,
   }) {
     final theme = Theme.of(context);
-    final iconColor =
-        isOpen ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant;
+    final iconColor = isOpen
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
     final tooltip = context.tr.cbAgent;
 
     if (_useFluentDesktopShell) {
@@ -593,8 +598,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final theme = Theme.of(context);
     // Match agent cleaner / side-menu chrome: use the acrylic-bridged scaffold
     // color so dynamic backdrop tint stays consistent across the window.
-    final desktopBodyTintColor =
-        _isDesktop ? theme.scaffoldBackgroundColor : null;
+    final desktopBodyTintColor = _isDesktop
+        ? theme.scaffoldBackgroundColor
+        : null;
     final desktopTopBarColor = _isDesktop ? Colors.transparent : null;
     final desktopActiveTabColor = _isDesktop ? Colors.transparent : null;
 
@@ -603,7 +609,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       child: BlocProvider(
         create: (context) => DrawerCubit()
           ..loadStorageLocations(
-              activeTabId: context.read<TabManagerBloc>().state.activeTabId),
+            activeTabId: context.read<TabManagerBloc>().state.activeTabId,
+          ),
         child: BlocListener<TabManagerBloc, TabManagerState>(
           listenWhen: (prev, curr) => prev.activeTabId != curr.activeTabId,
           listener: (context, state) {
@@ -617,13 +624,15 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
                     // Re-read latest state to ensure consistency for the update.
-                    final latestStateForLengthUpdate =
-                        context.read<TabManagerBloc>().state;
+                    final latestStateForLengthUpdate = context
+                        .read<TabManagerBloc>()
+                        .state;
                     if (_tabController.length !=
                         latestStateForLengthUpdate.tabs.length) {
                       // _updateTabController now sets the correct initialIndex from BLoC state
                       _updateTabController(
-                          latestStateForLengthUpdate.tabs.length);
+                        latestStateForLengthUpdate.tabs.length,
+                      );
                     }
                   }
                 });
@@ -636,16 +645,18 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
               else if (isTablet &&
                   state.activeTabId != null &&
                   state.tabs.isNotEmpty) {
-                final activeIndexFromBloc =
-                    state.tabs.indexWhere((tab) => tab.id == state.activeTabId);
+                final activeIndexFromBloc = state.tabs.indexWhere(
+                  (tab) => tab.id == state.activeTabId,
+                );
                 if (activeIndexFromBloc >= 0 &&
                     activeIndexFromBloc < _tabController.length) {
                   if (_tabController.index != activeIndexFromBloc) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) {
                         // Re-read state to ensure we're acting on the most current information.
-                        final latestStateForSync =
-                            context.read<TabManagerBloc>().state;
+                        final latestStateForSync = context
+                            .read<TabManagerBloc>()
+                            .state;
                         if (latestStateForSync.activeTabId != null &&
                             latestStateForSync.tabs.isNotEmpty &&
                             _tabController.length ==
@@ -653,8 +664,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                           // Check length again
 
                           final latestActiveIndex = latestStateForSync.tabs
-                              .indexWhere((tab) =>
-                                  tab.id == latestStateForSync.activeTabId);
+                              .indexWhere(
+                                (tab) =>
+                                    tab.id == latestStateForSync.activeTabId,
+                              );
                           if (latestActiveIndex >= 0 &&
                               latestActiveIndex < _tabController.length) {
                             if (_tabController.index != latestActiveIndex) {
@@ -692,8 +705,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 ): const CreateNewWindowIntent(),
                 // Close current tab with Ctrl+W
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.keyW):
-                    const CloseTabIntent(),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.keyW,
+                ): const CloseTabIntent(),
                 // Toggle split-pane view with Ctrl+\
                 const SingleActivator(
                   LogicalKeyboardKey.backslash,
@@ -701,32 +715,59 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                 ): const ToggleSplitViewIntent(),
                 // Switch to tabs 1-9 with Ctrl+1, Ctrl+2, etc.
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit1):
-                    const SwitchToTabIntent(0),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit1,
+                ): const SwitchToTabIntent(
+                  0,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit2):
-                    const SwitchToTabIntent(1),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit2,
+                ): const SwitchToTabIntent(
+                  1,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit3):
-                    const SwitchToTabIntent(2),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit3,
+                ): const SwitchToTabIntent(
+                  2,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit4):
-                    const SwitchToTabIntent(3),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit4,
+                ): const SwitchToTabIntent(
+                  3,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit5):
-                    const SwitchToTabIntent(4),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit5,
+                ): const SwitchToTabIntent(
+                  4,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit6):
-                    const SwitchToTabIntent(5),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit6,
+                ): const SwitchToTabIntent(
+                  5,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit7):
-                    const SwitchToTabIntent(6),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit7,
+                ): const SwitchToTabIntent(
+                  6,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit8):
-                    const SwitchToTabIntent(7),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit8,
+                ): const SwitchToTabIntent(
+                  7,
+                ),
                 LogicalKeySet(
-                        LogicalKeyboardKey.control, LogicalKeyboardKey.digit9):
-                    const SwitchToTabIntent(8),
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.digit9,
+                ): const SwitchToTabIntent(
+                  8,
+                ),
               };
 
               final Map<Type, Action<Intent>> actions = {
@@ -744,7 +785,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                       await locator<DesktopWindowingService>().openNewWindow(
                         tabs: [
                           WindowTabPayload(
-                              path: '#home', name: context.tr.homeTab),
+                            path: '#home',
+                            name: context.tr.homeTab,
+                          ),
                         ],
                       );
                     });
@@ -805,10 +848,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                   // Check if the active tab can navigate back
                                   if (activeTab.navigationHistory.length > 1) {
                                     // Use the proper backNavigationToPath method
-                                    final tabManagerBloc =
-                                        context.read<TabManagerBloc>();
-                                    tabManagerBloc
-                                        .backNavigationToPath(activeTab.id);
+                                    final tabManagerBloc = context
+                                        .read<TabManagerBloc>();
+                                    tabManagerBloc.backNavigationToPath(
+                                      activeTab.id,
+                                    );
                                     return;
                                   }
                                 }
@@ -837,23 +881,24 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                         builder: (context) {
                                           final FluentSurfaceTokens? chrome =
                                               _useFluentDesktopShell
-                                                  ? FluentSurfaceTokens.of(
-                                                      context,
-                                                    )
-                                                  : null;
+                                              ? FluentSurfaceTokens.of(context)
+                                              : null;
                                           final tabBar = Container(
                                             height: 48,
                                             padding: const EdgeInsets.symmetric(
-                                                horizontal: 8),
+                                              horizontal: 8,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: desktopTopBarColor,
                                               border: chrome == null
                                                   ? Border(
                                                       bottom: BorderSide(
                                                         color: theme
-                                                            .colorScheme.outline
+                                                            .colorScheme
+                                                            .outline
                                                             .withValues(
-                                                                alpha: 0.16),
+                                                              alpha: 0.16,
+                                                            ),
                                                       ),
                                                     )
                                                   : null,
@@ -864,11 +909,12 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                   Padding(
                                                     padding:
                                                         const EdgeInsets.only(
-                                                            right: 8),
+                                                          right: 8,
+                                                        ),
                                                     child:
                                                         _buildDesktopDrawerButton(
-                                                      context,
-                                                    ),
+                                                          context,
+                                                        ),
                                                   ),
                                                 Expanded(
                                                   child: KeyedSubtree(
@@ -885,31 +931,34 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                             desktopTopBarColor,
                                                         activeTabBackgroundColor:
                                                             desktopActiveTabColor,
-                                                        onTabPrimaryClick:
-                                                            (index,
-                                                                shiftPressed) {
+                                                        onTabPrimaryClick: (index, shiftPressed) {
                                                           if (index >=
-                                                              state.tabs
+                                                              state
+                                                                  .tabs
                                                                   .length) {
                                                             return;
                                                           }
 
                                                           final tabId = state
-                                                              .tabs[index].id;
-                                                          final bloc = context.read<
-                                                              TabManagerBloc>();
+                                                              .tabs[index]
+                                                              .id;
+                                                          final bloc = context
+                                                              .read<
+                                                                TabManagerBloc
+                                                              >();
                                                           final selectedIds =
                                                               state
                                                                   .selectedTabIds;
                                                           final keepMultiSelection =
                                                               _isDesktop &&
-                                                                  !shiftPressed &&
-                                                                  selectedIds
-                                                                          .length >
-                                                                      1 &&
-                                                                  selectedIds
-                                                                      .contains(
-                                                                          tabId);
+                                                              !shiftPressed &&
+                                                              selectedIds
+                                                                      .length >
+                                                                  1 &&
+                                                              selectedIds
+                                                                  .contains(
+                                                                    tabId,
+                                                                  );
 
                                                           if (_isDesktop &&
                                                               shiftPressed) {
@@ -926,58 +975,76 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                   activeId !=
                                                                       tabId &&
                                                                   state.tabs.any(
-                                                                      (tab) =>
-                                                                          tab.id ==
-                                                                          activeId)) {
+                                                                    (tab) =>
+                                                                        tab.id ==
+                                                                        activeId,
+                                                                  )) {
                                                                 bloc.add(
-                                                                    ToggleTabSelection(
-                                                                        activeId));
+                                                                  ToggleTabSelection(
+                                                                    activeId,
+                                                                  ),
+                                                                );
                                                               }
                                                               bloc.add(
-                                                                  ToggleTabSelection(
-                                                                      tabId));
+                                                                ToggleTabSelection(
+                                                                  tabId,
+                                                                ),
+                                                              );
                                                             } else if (!selectedIds
                                                                 .contains(
-                                                                    tabId)) {
+                                                                  tabId,
+                                                                )) {
                                                               bloc.add(
-                                                                  ToggleTabSelection(
-                                                                      tabId));
+                                                                ToggleTabSelection(
+                                                                  tabId,
+                                                                ),
+                                                              );
                                                             }
                                                           } else if (_isDesktop &&
                                                               !keepMultiSelection) {
                                                             bloc.add(
-                                                                ClearTabSelection());
+                                                              ClearTabSelection(),
+                                                            );
                                                           }
 
-                                                          bloc.add(SwitchToTab(
-                                                              tabId));
+                                                          bloc.add(
+                                                            SwitchToTab(tabId),
+                                                          );
                                                         },
                                                         draggableTabs:
                                                             _isDesktop
-                                                                ? state.tabs
-                                                                    .map(
-                                                                      (t) =>
-                                                                          DesktopTabDragData(
-                                                                        tabId: t
-                                                                            .id,
-                                                                        tab: _toWindowTabPayload(
-                                                                            t),
-                                                                      ),
-                                                                    )
-                                                                    .toList(
-                                                                        growable:
-                                                                            false)
-                                                                : null,
-                                                        selectedTabIds: _isDesktop
+                                                            ? state.tabs
+                                                                  .map(
+                                                                    (
+                                                                      t,
+                                                                    ) => DesktopTabDragData(
+                                                                      tabId:
+                                                                          t.id,
+                                                                      tab:
+                                                                          _toWindowTabPayload(
+                                                                            t,
+                                                                          ),
+                                                                    ),
+                                                                  )
+                                                                  .toList(
+                                                                    growable:
+                                                                        false,
+                                                                  )
+                                                            : null,
+                                                        selectedTabIds:
+                                                            _isDesktop
                                                             ? state
-                                                                .selectedTabIds
+                                                                  .selectedTabIds
                                                             : const <String>{},
                                                         onTabReorder: _isDesktop
-                                                            ? (fromIndex,
-                                                                toIndex) {
+                                                            ? (
+                                                                fromIndex,
+                                                                toIndex,
+                                                              ) {
                                                                 context
                                                                     .read<
-                                                                        TabManagerBloc>()
+                                                                      TabManagerBloc
+                                                                    >()
                                                                     .add(
                                                                       ReorderTab(
                                                                         fromIndex:
@@ -990,51 +1057,58 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                             : null,
                                                         onNativeTabDragRequested:
                                                             Platform.isWindows
-                                                                ? _handleNativeTabDrag
-                                                                : null,
+                                                            ? _handleNativeTabDrag
+                                                            : null,
                                                         onTabDragStarted:
                                                             (_isDesktop &&
-                                                                    !Platform
-                                                                        .isWindows)
-                                                                ? (d) =>
-                                                                    unawaited(
-                                                                      _showWindowDropOverlay(
-                                                                          context,
-                                                                          d),
-                                                                    )
-                                                                : null,
-                                                        onTabDragEnded: (!Platform
+                                                                !Platform
+                                                                    .isWindows)
+                                                            ? (d) => unawaited(
+                                                                _showWindowDropOverlay(
+                                                                  context,
+                                                                  d,
+                                                                ),
+                                                              )
+                                                            : null,
+                                                        onTabDragEnded:
+                                                            (!Platform
                                                                 .isWindows)
                                                             ? _removeWindowDropOverlay
                                                             : null,
-                                                        onTabContextMenu:
-                                                            (index, pos) {
+                                                        onTabContextMenu: (index, pos) {
                                                           if (index <
-                                                              state.tabs
+                                                              state
+                                                                  .tabs
                                                                   .length) {
                                                             unawaited(
-                                                                _showDesktopTabContextMenu(
-                                                              context: context,
-                                                              tab: state
-                                                                  .tabs[index],
-                                                              globalPosition:
-                                                                  pos,
-                                                            ));
+                                                              _showDesktopTabContextMenu(
+                                                                context:
+                                                                    context,
+                                                                tab: state
+                                                                    .tabs[index],
+                                                                globalPosition:
+                                                                    pos,
+                                                              ),
+                                                            );
                                                           }
                                                         },
                                                         // Add tab close callback
                                                         onTabClose: (index) {
                                                           if (index <
-                                                              state.tabs
+                                                              state
+                                                                  .tabs
                                                                   .length) {
                                                             context
                                                                 .read<
-                                                                    TabManagerBloc>()
-                                                                .add(CloseTab(
+                                                                  TabManagerBloc
+                                                                >()
+                                                                .add(
+                                                                  CloseTab(
                                                                     state
-                                                                        .tabs[
-                                                                            index]
-                                                                        .id));
+                                                                        .tabs[index]
+                                                                        .id,
+                                                                  ),
+                                                                );
                                                           }
                                                         },
                                                         // Keep the add tab button functionality
@@ -1043,32 +1117,30 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                         leadingCaptionActions: [
                                                           const StatusCenterToolbarButton(),
                                                           if (!isAiChatPath(
-                                                              state.activeTab
-                                                                      ?.path ??
-                                                                  ''))
+                                                            state
+                                                                    .activeTab
+                                                                    ?.path ??
+                                                                '',
+                                                          ))
                                                             ListenableBuilder(
                                                               listenable:
                                                                   _aiPanelController,
-                                                              builder:
-                                                                  (context, _) {
+                                                              builder: (context, _) {
                                                                 final isOpen =
                                                                     _aiPanelController
                                                                         .isOpen;
                                                                 return Padding(
                                                                   padding:
-                                                                      const EdgeInsets
-                                                                          .only(
-                                                                          right:
-                                                                              4.0),
-                                                                  child:
-                                                                      _buildAgentToolbarButton(
+                                                                      const EdgeInsets.only(
+                                                                        right:
+                                                                            4.0,
+                                                                      ),
+                                                                  child: _buildAgentToolbarButton(
                                                                     context,
                                                                     isOpen:
                                                                         isOpen,
-                                                                    onPressed:
-                                                                        () {
-                                                                      _aiPanelController
-                                                                          .toggle(
+                                                                    onPressed: () {
+                                                                      _aiPanelController.toggle(
                                                                         path: state
                                                                             .activeTab
                                                                             ?.path,
@@ -1083,15 +1155,17 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                         ],
                                                         tabs: [
                                                           // Generate modern-style tabs from state.tabs
-                                                          ...state.tabs
-                                                              .map((tab) {
+                                                          ...state.tabs.map((
+                                                            tab,
+                                                          ) {
                                                             return Tab(
                                                               height: 38,
                                                               child: Padding(
-                                                                padding: const EdgeInsets
-                                                                    .symmetric(
-                                                                    horizontal:
-                                                                        4),
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          4,
+                                                                    ),
                                                                 child: Row(
                                                                   mainAxisSize:
                                                                       MainAxisSize
@@ -1104,38 +1178,36 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                             14,
                                                                         height:
                                                                             14,
-                                                                        child:
-                                                                            CircularProgressIndicator(
+                                                                        child: CircularProgressIndicator(
                                                                           strokeWidth:
                                                                               2,
                                                                         ),
                                                                       ),
                                                                       const SizedBox(
-                                                                          width:
-                                                                              6),
+                                                                        width:
+                                                                            6,
+                                                                      ),
                                                                     ],
                                                                     Icon(
                                                                       tab.isPinned
-                                                                          ? PhosphorIconsLight
-                                                                              .pushPin
+                                                                          ? PhosphorIconsLight.pushPin
                                                                           : tab.icon ??
-                                                                              PhosphorIconsLight.folder,
+                                                                                PhosphorIconsLight.folder,
                                                                       size: 16,
                                                                     ),
                                                                     const SizedBox(
-                                                                        width:
-                                                                            8),
+                                                                      width: 8,
+                                                                    ),
                                                                     Flexible(
-                                                                      child:
-                                                                          Text(
+                                                                      child: Text(
                                                                         tab.name,
                                                                         overflow:
                                                                             TextOverflow.ellipsis,
                                                                       ),
                                                                     ),
                                                                     const SizedBox(
-                                                                        width:
-                                                                            4),
+                                                                      width: 4,
+                                                                    ),
                                                                     TabAlwaysActiveIndicator(
                                                                       tabId: tab
                                                                           .id,
@@ -1148,7 +1220,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                                 ),
                                                               ),
                                                             );
-                                                          }).toList(),
+                                                          }),
                                                         ],
                                                       ),
                                                     ),
@@ -1158,7 +1230,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                                 Padding(
                                                   padding:
                                                       const EdgeInsets.only(
-                                                          right: 8.0),
+                                                        right: 8.0,
+                                                      ),
                                                   child: _buildTabOptionsButton(
                                                     context,
                                                   ),
@@ -1169,7 +1242,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                           if (chrome == null) return tabBar;
                                           return FluentChromeSurface(
                                             key: const ValueKey<String>(
-                                                'fluent-global-toolbar'),
+                                              'fluent-global-toolbar',
+                                            ),
                                             tint: chrome.chromeTint,
                                             tintAlpha: chrome.toolbarTintAlpha,
                                             blurSigma: chrome.chromeBlur,
@@ -1198,7 +1272,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                   : null,
                               body: Row(
                                 key: const ValueKey<String>(
-                                    'tab-screen-content-block'),
+                                  'tab-screen-content-block',
+                                ),
                                 children: [
                                   // Pinned drawer (if enabled)
                                   if (_isDrawerPinned)
@@ -1215,8 +1290,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                     ),
                                   // Main content area with subtle container styling
                                   Expanded(
-                                    child:
-                                        _buildContent(context, state, isTablet),
+                                    child: _buildContent(
+                                      context,
+                                      state,
+                                      isTablet,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1240,7 +1318,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   // Phương thức mới để xây dựng nội dung dựa trên loại thiết bị
   Widget _buildContent(
-      BuildContext context, TabManagerState state, bool isTablet) {
+    BuildContext context,
+    TabManagerState state,
+    bool isTablet,
+  ) {
     // Giao diện cho tablet sử dụng UI hiện tại
     if (isTablet) {
       if (state.tabs.isEmpty) {
@@ -1260,18 +1341,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           if (mounted) {
             final tabBloc = context.read<TabManagerBloc>();
             if (tabBloc.state.tabs.isEmpty) {
-              tabBloc.add(AddTab(
-                path: '#home',
-                name: 'Home',
-                switchToTab: true,
-              ));
+              tabBloc.add(
+                AddTab(path: '#home', name: 'Home', switchToTab: true),
+              );
             }
           }
         });
       }
-      return MobileTabView(
-        onAddNewTab: _handleAddNewTab,
-      );
+      return MobileTabView(onAddNewTab: _handleAddNewTab);
     }
   }
 
@@ -1306,7 +1383,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (tab.path.startsWith('#') &&
         !isDrivesPath(tab.path) &&
         !ArchivePathUtils.isArchiveBrowsePath(tab.path)) {
-      content = SystemScreenRouter.routeSystemPath(context, tab.path, tab.id) ??
+      content =
+          SystemScreenRouter.routeSystemPath(context, tab.path, tab.id) ??
           Container();
     } else if (tab.splitPanePath != null) {
       // Split-pane mode: render two panes side-by-side.
@@ -1326,12 +1404,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       );
     }
 
-    return KeyedSubtree(
+    return TabContentOverlay(
       key: ValueKey(tab.id),
-      child: RepaintBoundary(
-        key: tab.repaintBoundaryKey,
-        child: content,
-      ),
+      child: RepaintBoundary(key: tab.repaintBoundaryKey, child: content),
     );
   }
 
@@ -1343,20 +1418,19 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         ? 0
         : state.tabs.indexWhere((tab) => tab.id == activeTabId);
 
-    final safeActiveIndex =
-        activeIndex >= 0 && activeIndex < state.tabs.length ? activeIndex : 0;
+    final safeActiveIndex = activeIndex >= 0 && activeIndex < state.tabs.length
+        ? activeIndex
+        : 0;
 
     _syncTabContentCache(state.tabs);
     final children = state.tabs.map(_buildOrGetTabContent).toList();
 
-    final tabContent = IndexedStack(
-      index: safeActiveIndex,
-      children: children,
-    );
+    final tabContent = IndexedStack(index: safeActiveIndex, children: children);
 
     // Keep panel's current path in sync with active tab
-    final activeTab =
-        state.tabs.isNotEmpty ? state.tabs[safeActiveIndex] : null;
+    final activeTab = state.tabs.isNotEmpty
+        ? state.tabs[safeActiveIndex]
+        : null;
     if (activeTab != null && !activeTab.path.startsWith('#')) {
       _aiPanelController.updatePath(activeTab.path);
     }
@@ -1376,8 +1450,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         final ownerTabId = _aiPanelController.ownerTabId;
         if (ownerTabId == null) return tabContent;
         final availableWidth = MediaQuery.of(context).size.width;
-        final panelWidth =
-            _aiPanelController.clampedPanelWidthFor(availableWidth);
+        final panelWidth = _aiPanelController.clampedPanelWidthFor(
+          availableWidth,
+        );
 
         final bloc = _aiPanelController.blocForTab(
           ownerTabId,
@@ -1389,8 +1464,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
             AppLocalizations.of(context)!.aiThinking3,
           ],
           waitingApproval: AppLocalizations.of(context)!.aiWaitingApproval,
-          runningToolTemplate:
-              AppLocalizations.of(context)!.aiRunningTool('{}'),
+          runningToolTemplate: AppLocalizations.of(
+            context,
+          )!.aiRunningTool('{}'),
         );
 
         return Row(
@@ -1418,9 +1494,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   void _handleAddNewTab() {
     // Always create new tab with home page
     if (mounted) {
-      context
-          .read<TabManagerBloc>()
-          .add(AddTab(path: '#home', name: context.tr.homeTab));
+      context.read<TabManagerBloc>().add(
+        AddTab(path: '#home', name: context.tr.homeTab),
+      );
     }
   }
 
@@ -1517,15 +1593,18 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
               final hovered = candidateData.isNotEmpty;
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: hovered
-                      ? theme.colorScheme.primary
-                          .withAlpha((0.12 * 255).round())
+                      ? theme.colorScheme.primary.withAlpha(
+                          (0.12 * 255).round(),
+                        )
                       : (isDarkMode
-                          ? Colors.white.withAlpha((0.06 * 255).round())
-                          : Colors.black.withAlpha((0.04 * 255).round())),
+                            ? Colors.white.withAlpha((0.06 * 255).round())
+                            : Colors.black.withAlpha((0.04 * 255).round())),
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 child: child,
@@ -1564,16 +1643,19 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.textTheme.bodySmall?.color
-                            ?.withValues(alpha: 0.75),
+                        color: theme.textTheme.bodySmall?.color?.withValues(
+                          alpha: 0.75,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
                     buildTarget(
                       child: Row(
                         children: [
-                          const Icon(PhosphorIconsLight.arrowSquareOut,
-                              size: 18),
+                          const Icon(
+                            PhosphorIconsLight.arrowSquareOut,
+                            size: 18,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -1618,8 +1700,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                           child: buildTarget(
                             child: Row(
                               children: [
-                                const Icon(PhosphorIconsLight.appWindow,
-                                    size: 18),
+                                const Icon(
+                                  PhosphorIconsLight.appWindow,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
@@ -1757,12 +1841,14 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     final bloc = context.read<TabManagerBloc>();
     for (int i = 0; i < incomingTabs.length; i++) {
       final t = incomingTabs[i];
-      bloc.add(AddTab(
-        path: t.path,
-        name: t.name,
-        switchToTab: i == incomingTabs.length - 1,
-        highlightedFileName: t.highlightedFileName,
-      ));
+      bloc.add(
+        AddTab(
+          path: t.path,
+          name: t.name,
+          switchToTab: i == incomingTabs.length - 1,
+          highlightedFileName: t.highlightedFileName,
+        ),
+      );
     }
 
     await svc.requestCloseWindow(target);
@@ -1797,7 +1883,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         : null;
     final isAlwaysActive =
         activityManager != null && activityManager.isAlwaysActive(tab.id);
-    final canMarkInactive = activityManager != null &&
+    final canMarkInactive =
+        activityManager != null &&
         !isAlwaysActive &&
         !activityManager.isInactive(tab.id) &&
         activityManager.stateOf(tab.id) != TabActivityState.focused &&
@@ -1887,6 +1974,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         }
       case _DesktopTabAction.moveToWindow:
         {
+          // The menu above was awaited, so re-check this context before handing
+          // it to another dialog.
+          if (!context.mounted) return;
           final target = await _pickTargetWindow(context);
           if (target == null || !mounted) return;
 
@@ -1946,16 +2036,19 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
     // For iOS or other cases, use the last part of the path
     final parts = path.split('/');
-    final lastPart =
-        parts.lastWhere((part) => part.isNotEmpty, orElse: () => '');
+    final lastPart = parts.lastWhere(
+      (part) => part.isNotEmpty,
+      orElse: () => '',
+    );
     return lastPart.isEmpty ? 'Root' : lastPart;
   }
 
   void _showTabOptions(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
-    final backgroundColor =
-        isDarkMode ? theme.colorScheme.surface : theme.colorScheme.surface;
+    final backgroundColor = isDarkMode
+        ? theme.colorScheme.surface
+        : theme.colorScheme.surface;
     final textColor = isDarkMode
         ? theme.textTheme.bodyMedium?.color
         : theme.textTheme.bodyMedium?.color;
@@ -1963,9 +2056,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     RouteUtils.showAcrylicDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
         backgroundColor: backgroundColor,
         child: Container(
@@ -2073,11 +2164,13 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                   if (existingTab.id.isNotEmpty) {
                     tabBloc.add(SwitchToTab(existingTab.id));
                   } else {
-                    tabBloc.add(AddTab(
-                      path: kSettingsPath,
-                      name: context.tr.settings,
-                      switchToTab: true,
-                    ));
+                    tabBloc.add(
+                      AddTab(
+                        path: kSettingsPath,
+                        name: context.tr.settings,
+                        switchToTab: true,
+                      ),
+                    );
                   }
                 },
               ),
@@ -2128,11 +2221,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                     : theme.colorScheme.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16.0),
               ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: theme.colorScheme.primary,
-              ),
+              child: Icon(icon, size: 18, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: 16),
             Text(

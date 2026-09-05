@@ -13,8 +13,10 @@ const bool kCbE2EFast =
     kCbE2E && bool.fromEnvironment('CB_E2E_FAST', defaultValue: true);
 
 /// Captures a screenshot after every wrapped E2E action when enabled.
-const bool kCbE2EFullScreenshots =
-    bool.fromEnvironment('CB_E2E_FULL_SCREENSHOTS', defaultValue: false);
+const bool kCbE2EFullScreenshots = bool.fromEnvironment(
+  'CB_E2E_FULL_SCREENSHOTS',
+  defaultValue: false,
+);
 
 /// Serializes E2E test teardown so the next test never starts [runCbFileApp]
 /// before the previous test's teardown is complete.

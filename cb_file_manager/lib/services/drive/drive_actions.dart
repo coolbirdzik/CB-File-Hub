@@ -63,15 +63,11 @@ class DriveActions {
       if (invoked) return true;
 
       final escaped = root.replaceAll("'", "''");
-      await Process.start(
-        'powershell.exe',
-        <String>[
-          '-NoProfile',
-          '-Command',
-          "Start-Process -FilePath '$escaped' -Verb Format",
-        ],
-        mode: ProcessStartMode.detached,
-      );
+      await Process.start('powershell.exe', <String>[
+        '-NoProfile',
+        '-Command',
+        "Start-Process -FilePath '$escaped' -Verb Format",
+      ], mode: ProcessStartMode.detached);
       return true;
     } catch (e) {
       debugPrint('DriveActions.openFormat failed: $e');
@@ -83,11 +79,10 @@ class DriveActions {
     if (!Platform.isWindows) return false;
     try {
       final letter = drivePath.replaceAll('\\', '').replaceAll('/', '');
-      await Process.start(
-        'cleanmgr.exe',
-        <String>['/d', letter],
-        mode: ProcessStartMode.detached,
-      );
+      await Process.start('cleanmgr.exe', <String>[
+        '/d',
+        letter,
+      ], mode: ProcessStartMode.detached);
       return true;
     } catch (e) {
       debugPrint('DriveActions.openCleanup failed: $e');
@@ -98,23 +93,18 @@ class DriveActions {
   static Future<bool> openTerminal(String drivePath) async {
     if (!Platform.isWindows) return false;
     try {
-      await Process.start(
-        'wt.exe',
-        <String>['-d', drivePath],
-        mode: ProcessStartMode.detached,
-      );
+      await Process.start('wt.exe', <String>[
+        '-d',
+        drivePath,
+      ], mode: ProcessStartMode.detached);
       return true;
     } catch (_) {
       try {
-        await Process.start(
-          'powershell.exe',
-          <String>[
-            '-NoExit',
-            '-Command',
-            "Set-Location -LiteralPath '${drivePath.replaceAll("'", "''")}'",
-          ],
-          mode: ProcessStartMode.detached,
-        );
+        await Process.start('powershell.exe', <String>[
+          '-NoExit',
+          '-Command',
+          "Set-Location -LiteralPath '${drivePath.replaceAll("'", "''")}'",
+        ], mode: ProcessStartMode.detached);
         return true;
       } catch (e) {
         debugPrint('DriveActions.openTerminal failed: $e');
@@ -144,10 +134,10 @@ class DriveActions {
       }
     }
 
-    if (await tryStart(
-      'control.exe',
-      <String>['/name', 'Microsoft.BitLockerDriveEncryption'],
-    )) {
+    if (await tryStart('control.exe', <String>[
+      '/name',
+      'Microsoft.BitLockerDriveEncryption',
+    ])) {
       return true;
     }
     if (await tryStart('cmd.exe', <String>[
@@ -160,11 +150,12 @@ class DriveActions {
     ])) {
       return true;
     }
-    return tryStart(
-      'cmd.exe',
-      <String>['/c', 'start', '', 'ms-settings:deviceencryption'],
-      runInShell: true,
-    );
+    return tryStart('cmd.exe', <String>[
+      '/c',
+      'start',
+      '',
+      'ms-settings:deviceencryption',
+    ], runInShell: true);
   }
 
   static Future<bool> _ejectWindows(String drivePath) async {
@@ -185,17 +176,14 @@ class DriveActions {
     // Shell.Application Namespace(17) = My Computer; InvokeVerb('Eject').
     final letter = root.substring(0, 2); // e.g. E:
     try {
-      await Process.run(
-        'powershell.exe',
-        <String>[
-          '-NoProfile',
-          '-Command',
-          "\$shell = New-Object -ComObject Shell.Application; "
-              "\$item = \$shell.Namespace(17).ParseName('$letter'); "
-              "if (\$null -eq \$item) { exit 2 }; "
-              "\$item.InvokeVerb('Eject');",
-        ],
-      ).timeout(const Duration(seconds: 15));
+      await Process.run('powershell.exe', <String>[
+        '-NoProfile',
+        '-Command',
+        "\$shell = New-Object -ComObject Shell.Application; "
+            "\$item = \$shell.Namespace(17).ParseName('$letter'); "
+            "if (\$null -eq \$item) { exit 2 }; "
+            "\$item.InvokeVerb('Eject');",
+      ]).timeout(const Duration(seconds: 15));
       DriveInventoryService.invalidateCache();
       return true;
     } catch (e) {
@@ -209,8 +197,10 @@ class DriveActions {
     final rootPtr = root.toNativeUtf16();
     final labelPtr = label.toNativeUtf16();
     try {
-      final ok = win32.SetVolumeLabel(rootPtr, labelPtr);
-      return ok != 0;
+      return win32.SetVolumeLabel(
+        win32.PCWSTR(rootPtr),
+        win32.PCWSTR(labelPtr),
+      ).value;
     } catch (e) {
       debugPrint('DriveActions.SetVolumeLabel failed: $e');
       return false;

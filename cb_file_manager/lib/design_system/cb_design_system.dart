@@ -19,7 +19,7 @@
 /// Existing Material widgets still render correctly: `CbThemeBuilder` maps
 /// these tokens onto `ThemeData`, so an un-migrated `ElevatedButton` picks up
 /// the right colour, radius and type even before it is replaced.
-library cb_design_system;
+library;
 
 export 'cb_font_licenses.dart';
 export 'cb_theme_builder.dart';

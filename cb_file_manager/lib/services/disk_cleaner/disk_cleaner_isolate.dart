@@ -43,12 +43,10 @@ class CleanerScanHandle {
   bool _cancelled = false;
 
   CleanerScanHandle._({
-    required Isolate isolate,
-    required ReceivePort receivePort,
-    required List<String> drives,
-  })  : _isolate = isolate,
-        _receivePort = receivePort,
-        _drives = drives;
+    required this._isolate,
+    required this._receivePort,
+    required this._drives,
+  });
 
   Stream<ScanProgress> get progress => _progress.stream;
   Future<ScanReport> get future => _done.future;
@@ -65,12 +63,14 @@ class CleanerScanHandle {
     _receivePort.close();
     if (!_progress.isClosed) _progress.close();
     if (!_done.isCompleted) {
-      _done.complete(ScanReport(
-        drivesScanned: _drives,
-        itemsByCategory: const {},
-        warnings: const ['cancelled'],
-        scannedAt: _startedAt,
-      ));
+      _done.complete(
+        ScanReport(
+          drivesScanned: _drives,
+          itemsByCategory: const {},
+          warnings: const ['cancelled'],
+          scannedAt: _startedAt,
+        ),
+      );
     }
   }
 }
@@ -109,23 +109,27 @@ Future<CleanerScanHandle> spawnScanWithResolvedRules({
     if (handle._cancelled) return;
     if (msg is _ProgressMsg) {
       if (!handle._progress.isClosed) {
-        handle._progress.add(ScanProgress(
-          currentPath: msg.currentPath,
-          itemsFound: msg.itemsFound,
-          bytesFound: msg.bytesFound,
-          categoryId: msg.categoryId,
-        ));
+        handle._progress.add(
+          ScanProgress(
+            currentPath: msg.currentPath,
+            itemsFound: msg.itemsFound,
+            bytesFound: msg.bytesFound,
+            categoryId: msg.categoryId,
+          ),
+        );
       }
     } else if (msg is _DoneMsg) {
       receivePort.close();
       if (!handle._progress.isClosed) handle._progress.close();
       if (!handle._done.isCompleted) {
-        handle._done.complete(ScanReport(
-          drivesScanned: drivesScanned,
-          itemsByCategory: msg.itemsByCategory,
-          warnings: msg.warnings,
-          scannedAt: handle._startedAt,
-        ));
+        handle._done.complete(
+          ScanReport(
+            drivesScanned: drivesScanned,
+            itemsByCategory: msg.itemsByCategory,
+            warnings: msg.warnings,
+            scannedAt: handle._startedAt,
+          ),
+        );
       }
     }
   });
@@ -157,8 +161,9 @@ void _scanWorker(_SpawnArgs args) async {
   for (final rule in compiledRules) {
     final check = await _checkDirectory(
       Directory(rule.source.basePath),
-      timeout:
-          args.rootOpenTimeout == Duration.zero ? null : args.rootOpenTimeout,
+      timeout: args.rootOpenTimeout == Duration.zero
+          ? null
+          : args.rootOpenTimeout,
     );
     if (check == _DirectoryCheck.exists) {
       existingRules.add(rule);
@@ -178,12 +183,14 @@ void _scanWorker(_SpawnArgs args) async {
     final now = DateTime.now();
     if (now.difference(lastFlush).inMilliseconds >= 100) {
       lastFlush = now;
-      sendPort.send(_ProgressMsg(
-        currentPath: path,
-        itemsFound: totalItems,
-        bytesFound: totalBytes,
-        categoryId: currentCategory,
-      ));
+      sendPort.send(
+        _ProgressMsg(
+          currentPath: path,
+          itemsFound: totalItems,
+          bytesFound: totalBytes,
+          categoryId: currentCategory,
+        ),
+      );
     }
   }
 
@@ -191,8 +198,9 @@ void _scanWorker(_SpawnArgs args) async {
     final dir = Directory(group.scanPath);
     final check = await _checkDirectory(
       dir,
-      timeout:
-          args.rootOpenTimeout == Duration.zero ? null : args.rootOpenTimeout,
+      timeout: args.rootOpenTimeout == Duration.zero
+          ? null
+          : args.rootOpenTimeout,
     );
     if (check == _DirectoryCheck.missing) continue;
     if (check == _DirectoryCheck.timedOut) {
@@ -202,14 +210,14 @@ void _scanWorker(_SpawnArgs args) async {
 
     Object? streamError;
     final matchingRules = <_CompiledRule>[];
-    final iterator = StreamIterator<FileSystemEntity>(dir
-        .list(
-      recursive: group.recursive,
-      followLinks: false,
-    )
-        .handleError((Object e, StackTrace st) {
-      streamError ??= e;
-    }));
+    final iterator = StreamIterator<FileSystemEntity>(
+      dir.list(recursive: group.recursive, followLinks: false).handleError((
+        Object e,
+        StackTrace st,
+      ) {
+        streamError ??= e;
+      }),
+    );
     var timedOut = false;
     try {
       final hasFirstEntry = args.rootOpenTimeout == Duration.zero
@@ -253,18 +261,24 @@ void _scanWorker(_SpawnArgs args) async {
             if (cutoff != null && stat.modified.isAfter(cutoff)) continue;
 
             final seen = seenByCategory.putIfAbsent(
-                rule.source.categoryId, () => <String>{});
+              rule.source.categoryId,
+              () => <String>{},
+            );
             if (!seen.add(entityPath)) continue;
 
             currentCategory = rule.source.categoryId;
-            final list =
-                results.putIfAbsent(rule.source.categoryId, () => <JunkItem>[]);
-            list.add(JunkItem(
-              path: entity.path,
-              sizeBytes: stat.size,
-              lastModified: stat.modified,
-              categoryId: rule.source.categoryId,
-            ));
+            final list = results.putIfAbsent(
+              rule.source.categoryId,
+              () => <JunkItem>[],
+            );
+            list.add(
+              JunkItem(
+                path: entity.path,
+                sizeBytes: stat.size,
+                lastModified: stat.modified,
+                categoryId: rule.source.categoryId,
+              ),
+            );
             totalItems++;
             totalBytes += stat.size;
 
@@ -283,18 +297,17 @@ void _scanWorker(_SpawnArgs args) async {
     } else if (streamError != null) {
       for (final rule in group.rules) {
         final error = streamError!;
-        final message =
-            error is FileSystemException ? error.message : error.toString();
+        final message = error is FileSystemException
+            ? error.message
+            : error.toString();
         warnings.add(
-            '${rule.source.categoryId}: $message (${rule.source.basePath})');
+          '${rule.source.categoryId}: $message (${rule.source.basePath})',
+        );
       }
     }
   }
 
-  sendPort.send(_DoneMsg(
-    itemsByCategory: results,
-    warnings: warnings,
-  ));
+  sendPort.send(_DoneMsg(itemsByCategory: results, warnings: warnings));
 }
 
 enum _DirectoryCheck { exists, missing, timedOut }
@@ -311,9 +324,9 @@ Future<_DirectoryCheck> _checkDirectory(
     final exists = timeout == null
         ? await dir.exists()
         : await dir.exists().timeout(
-              timeout,
-              onTimeout: () => throw const _RootEnumerationTimeout(),
-            );
+            timeout,
+            onTimeout: () => throw const _RootEnumerationTimeout(),
+          );
     return exists ? _DirectoryCheck.exists : _DirectoryCheck.missing;
   } on _RootEnumerationTimeout {
     return _DirectoryCheck.timedOut;
@@ -328,16 +341,13 @@ Future<void> _cancelIterator(
 ) async {
   try {
     await iterator.cancel().timeout(
-          timeout == Duration.zero ? const Duration(milliseconds: 1) : timeout,
-          onTimeout: () {},
-        );
+      timeout == Duration.zero ? const Duration(milliseconds: 1) : timeout,
+      onTimeout: () {},
+    );
   } catch (_) {}
 }
 
-void _addTimeoutWarnings(
-  List<String> warnings,
-  Iterable<_CompiledRule> rules,
-) {
+void _addTimeoutWarnings(List<String> warnings, Iterable<_CompiledRule> rules) {
   for (final rule in rules) {
     warnings.add(
       '${rule.source.categoryId}: Permission probe timed out '
@@ -371,14 +381,12 @@ class _CompiledRule {
   final DateTime? minAgeCutoff;
 
   _CompiledRule(this.source, this.order)
-      : baseKey = _pathKey(source.basePath),
-        includePatterns = source.includeGlobs?.map(_globToRegex).toList(),
-        excludePatterns = source.excludeGlobs?.map(_globToRegex).toList(),
-        minAgeCutoff = source.minAgeMs > 0
-            ? DateTime.now().subtract(
-                Duration(milliseconds: source.minAgeMs),
-              )
-            : null;
+    : baseKey = _pathKey(source.basePath),
+      includePatterns = source.includeGlobs?.map(_globToRegex).toList(),
+      excludePatterns = source.excludeGlobs?.map(_globToRegex).toList(),
+      minAgeCutoff = source.minAgeMs > 0
+          ? DateTime.now().subtract(Duration(milliseconds: source.minAgeMs))
+          : null;
 }
 
 /// A single traversal root and every rule whose physical roots overlap it.
@@ -388,13 +396,12 @@ class _ScanGroup {
   final List<_CompiledRule> rules;
 
   _ScanGroup(_CompiledRule first)
-      : scanPath = first.source.basePath,
-        scanKey = first.baseKey,
-        rules = <_CompiledRule>[first];
+    : scanPath = first.source.basePath,
+      scanKey = first.baseKey,
+      rules = <_CompiledRule>[first];
 
-  bool get recursive => rules.any(
-        (rule) => rule.source.recursive || rule.baseKey != scanKey,
-      );
+  bool get recursive =>
+      rules.any((rule) => rule.source.recursive || rule.baseKey != scanKey);
 
   void add(_CompiledRule rule) {
     rules.add(rule);
@@ -411,8 +418,9 @@ List<_ScanGroup> _buildScanGroups(List<_CompiledRule> rules) {
   for (final rule in rules) {
     final matching = <_ScanGroup>[];
     for (final group in groups) {
-      if (group.rules
-          .any((existing) => _pathsOverlap(existing.baseKey, rule.baseKey))) {
+      if (group.rules.any(
+        (existing) => _pathsOverlap(existing.baseKey, rule.baseKey),
+      )) {
         matching.add(group);
       }
     }
@@ -440,8 +448,9 @@ bool _matchesRule(_CompiledRule rule, String entityPath, String fileName) {
 
   if (!rule.source.recursive) {
     final separator = entityPath.lastIndexOf('\\');
-    final parent =
-        separator < 0 ? entityPath : entityPath.substring(0, separator);
+    final parent = separator < 0
+        ? entityPath
+        : entityPath.substring(0, separator);
     if (parent != rule.baseKey) return false;
   }
 
@@ -542,8 +551,5 @@ class _ProgressMsg {
 class _DoneMsg {
   final Map<String, List<JunkItem>> itemsByCategory;
   final List<String> warnings;
-  const _DoneMsg({
-    required this.itemsByCategory,
-    required this.warnings,
-  });
+  const _DoneMsg({required this.itemsByCategory, required this.warnings});
 }

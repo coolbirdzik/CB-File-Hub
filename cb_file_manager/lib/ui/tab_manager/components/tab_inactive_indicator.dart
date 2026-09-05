@@ -1,4 +1,5 @@
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -17,10 +18,10 @@ class TabInactiveIndicator extends StatefulWidget {
   final double iconSize;
 
   const TabInactiveIndicator({
-    Key? key,
+    super.key,
     required this.tabId,
     this.iconSize = 14,
-  }) : super(key: key);
+  });
 
   @override
   State<TabInactiveIndicator> createState() => _TabInactiveIndicatorState();
@@ -74,7 +75,7 @@ class _TabInactiveIndicatorState extends State<TabInactiveIndicator> {
 
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: Tooltip(
+      child: CbTooltip(
         message: 'Inactive (auto-suspended after 60 minutes)',
         waitDuration: const Duration(milliseconds: 350),
         child: Icon(

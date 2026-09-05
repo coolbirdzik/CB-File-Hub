@@ -7,10 +7,10 @@ class BreadcrumbNavigation extends StatelessWidget {
   final Function(String) onPathTap;
 
   const BreadcrumbNavigation({
-    Key? key,
+    super.key,
     required this.currentPath,
     required this.onPathTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -130,8 +130,9 @@ class BreadcrumbNavigation extends StatelessWidget {
         // /storage/emulated/X -> Secondary Storage (X)
         String storageId = parts[3];
         String currentPath = '/storage/emulated/$storageId';
-        result
-            .add(BreadcrumbItem(currentPath, 'Secondary Storage ($storageId)'));
+        result.add(
+          BreadcrumbItem(currentPath, 'Secondary Storage ($storageId)'),
+        );
 
         for (int i = 4; i < parts.length; i++) {
           if (parts[i].isEmpty) continue;

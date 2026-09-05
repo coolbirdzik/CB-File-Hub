@@ -12,11 +12,11 @@ class StreamingPerformanceWidget extends StatefulWidget {
   final bool isStreaming;
 
   const StreamingPerformanceWidget({
-    Key? key,
+    super.key,
     required this.smbService,
     this.currentFilePath,
     this.isStreaming = false,
-  }) : super(key: key);
+  });
 
   @override
   State<StreamingPerformanceWidget> createState() =>
@@ -75,8 +75,9 @@ class _StreamingPerformanceWidgetState
     });
 
     try {
-      final results =
-          await widget.smbService.benchmarkStreaming(widget.currentFilePath!);
+      final results = await widget.smbService.benchmarkStreaming(
+        widget.currentFilePath!,
+      );
       if (mounted) {
         setState(() {
           _benchmarkResults = results;
@@ -85,7 +86,9 @@ class _StreamingPerformanceWidgetState
 
         if (results['error'] != null) {
           AppToast.error(
-              context, l10n.benchmarkError(results['error'].toString()));
+            context,
+            l10n.benchmarkError(results['error'].toString()),
+          );
         }
       }
     } catch (e) {
@@ -113,10 +116,7 @@ class _StreamingPerformanceWidgetState
               children: [
                 const Text(
                   'Streaming Performance',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Row(
                   children: [
@@ -127,16 +127,22 @@ class _StreamingPerformanceWidgetState
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
-                            : const Icon(PhosphorIconsLight.speedometer,
-                                size: 16),
-                        label:
-                            Text(_isBenchmarking ? 'Testing...' : 'Benchmark'),
+                            : const Icon(
+                                PhosphorIconsLight.speedometer,
+                                size: 16,
+                              ),
+                        label: Text(
+                          _isBenchmarking ? 'Testing...' : 'Benchmark',
+                        ),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     const SizedBox(width: 8),
@@ -220,18 +226,28 @@ class _StreamingPerformanceWidgetState
           _buildMetricRow('Chunk Size', streaming['chunkSize'] ?? 'Unknown'),
           _buildMetricRow('Buffer Size', streaming['bufferSize'] ?? 'Unknown'),
           _buildMetricRow(
-              'Prefetch Size', streaming['prefetchSize'] ?? 'Unknown'),
+            'Prefetch Size',
+            streaming['prefetchSize'] ?? 'Unknown',
+          ),
           _buildMetricRow(
-              'Max Connections', '${streaming['maxConnections'] ?? 'Unknown'}'),
+            'Max Connections',
+            '${streaming['maxConnections'] ?? 'Unknown'}',
+          ),
           _buildMetricRow(
-              'Estimated Speed', streaming['estimatedSpeed'] ?? 'Unknown'),
+            'Estimated Speed',
+            streaming['estimatedSpeed'] ?? 'Unknown',
+          ),
         ],
         if (prefetchController != null) ...[
           const SizedBox(height: 8),
-          _buildMetricRow('Cache Hit Rate',
-              '${prefetchController['cacheHitRate'] ?? '0.0'}%'),
           _buildMetricRow(
-              'Buffer Usage', '${prefetchController['bufferSize'] ?? 0} bytes'),
+            'Cache Hit Rate',
+            '${prefetchController['cacheHitRate'] ?? '0.0'}%',
+          ),
+          _buildMetricRow(
+            'Buffer Usage',
+            '${prefetchController['bufferSize'] ?? 0} bytes',
+          ),
         ],
       ],
     );
@@ -310,10 +326,7 @@ class _StreamingPerformanceWidgetState
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Chunks:'),
-                  Text('$chunkCount'),
-                ],
+                children: [const Text('Chunks:'), Text('$chunkCount')],
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -338,10 +351,7 @@ class _StreamingPerformanceWidgetState
           Text(label, style: const TextStyle(fontSize: 12)),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ],
       ),

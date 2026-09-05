@@ -88,7 +88,7 @@ class FileViewShell extends StatefulWidget {
   final bool enableKeyboardShortcuts;
 
   const FileViewShell({
-    Key? key,
+    super.key,
     required this.child,
     required this.viewMode,
     this.onGridZoomDelta,
@@ -105,7 +105,7 @@ class FileViewShell extends StatefulWidget {
     this.onRename,
     this.onSearch,
     this.enableKeyboardShortcuts = true,
-  }) : super(key: key);
+  });
 
   @override
   State<FileViewShell> createState() => _FileViewShellState();
@@ -169,7 +169,8 @@ class _FileViewShellState extends State<FileViewShell> {
       scrollDelta = (raw) => widget.onViewScaleDelta!(-raw);
     } else {
       // Legacy: Ctrl+scroll zoom is active only in grid/gridPreview modes.
-      scrollDelta = (widget.viewMode == ViewMode.grid ||
+      scrollDelta =
+          (widget.viewMode == ViewMode.grid ||
               widget.viewMode == ViewMode.gridPreview)
           ? widget.onGridZoomDelta
           : null;
@@ -180,8 +181,8 @@ class _FileViewShellState extends State<FileViewShell> {
       child: Listener(
         onPointerDown:
             (widget.onMouseBack != null || widget.onMouseForward != null)
-                ? _onPointerDown
-                : null,
+            ? _onPointerDown
+            : null,
         child: Focus(
           focusNode: _focusNode,
           autofocus: widget.enableKeyboardShortcuts,

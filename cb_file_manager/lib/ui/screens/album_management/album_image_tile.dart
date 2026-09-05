@@ -18,14 +18,14 @@ class AlbumImageTile extends StatefulWidget {
   final void Function({bool shiftSelect, bool ctrlSelect}) onSelect;
 
   const AlbumImageTile({
-    Key? key,
+    super.key,
     required this.file,
     required this.isSelected,
     required this.isSelectionMode,
     required this.isDesktopMode,
     required this.onOpen,
     required this.onSelect,
-  }) : super(key: key);
+  });
 
   @override
   State<AlbumImageTile> createState() => _AlbumImageTileState();
@@ -98,8 +98,8 @@ class _AlbumImageTileState extends State<AlbumImageTile> {
     final overlayColor = widget.isSelected
         ? theme.colorScheme.primary.withValues(alpha: 0.22)
         : (_hovering && widget.isDesktopMode
-            ? theme.colorScheme.primary.withValues(alpha: 0.08)
-            : Colors.transparent);
+              ? theme.colorScheme.primary.withValues(alpha: 0.08)
+              : Colors.transparent);
 
     return RepaintBoundary(
       child: MouseRegion(
@@ -169,15 +169,16 @@ class _AlbumImageTileState extends State<AlbumImageTile> {
       return LayoutBuilder(
         builder: (context, constraints) {
           final dpr = MediaQuery.of(context).devicePixelRatio;
-          final cacheWidth =
-              (constraints.maxWidth * dpr).clamp(96.0, 320.0).round();
+          final cacheWidth = (constraints.maxWidth * dpr)
+              .clamp(96.0, 320.0)
+              .round();
           return Image.file(
             widget.file,
             fit: BoxFit.cover,
             cacheWidth: cacheWidth,
             filterQuality: FilterQuality.low,
             gaplessPlayback: false,
-            errorBuilder: (_, __, ___) => _fallbackIcon(theme),
+            errorBuilder: (_, _, _) => _fallbackIcon(theme),
           );
         },
       );
@@ -191,7 +192,7 @@ class _AlbumImageTileState extends State<AlbumImageTile> {
               File(_videoThumbPath!),
               fit: BoxFit.cover,
               filterQuality: FilterQuality.low,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   _fallbackIcon(theme, icon: PhosphorIconsLight.filmSlate),
             ),
             // Play icon overlay
@@ -202,8 +203,11 @@ class _AlbumImageTileState extends State<AlbumImageTile> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Icon(PhosphorIconsLight.play,
-                    color: Colors.white, size: 22),
+                child: const Icon(
+                  PhosphorIconsLight.play,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
             ),
           ],

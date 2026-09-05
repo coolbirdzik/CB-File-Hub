@@ -61,20 +61,14 @@ abstract class AiProvider {
   ///
   /// The [systemPrompt] is prepended as a system message if provided.
   /// Throws [AiProviderException] on failure.
-  Future<AiChatResponse> chat(
-    List<AiMessage> messages, {
-    String? systemPrompt,
-  });
+  Future<AiChatResponse> chat(List<AiMessage> messages, {String? systemPrompt});
 
   /// Sends a list of messages to the AI and returns a stream of text deltas.
   ///
   /// Each string emitted is a partial content chunk. Concatenate them all
   /// to get the full response. The stream closes when the response is complete.
   /// Throws [AiProviderException] on connection/auth failure before streaming.
-  Stream<String> chatStream(
-    List<AiMessage> messages, {
-    String? systemPrompt,
-  });
+  Stream<String> chatStream(List<AiMessage> messages, {String? systemPrompt});
 
   /// Tests whether the provider is reachable and the API key is valid.
   ///

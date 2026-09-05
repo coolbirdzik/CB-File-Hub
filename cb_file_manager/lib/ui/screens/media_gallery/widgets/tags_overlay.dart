@@ -9,11 +9,11 @@ class TagsOverlay extends StatelessWidget {
   final Function(String)? onTagTap;
 
   const TagsOverlay({
-    Key? key,
+    super.key,
     required this.tags,
     required this.gridSize,
     this.onTagTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +57,11 @@ class TagsOverlay extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(PhosphorIconsLight.tag,
-                      color: Colors.white, size: 12),
+                  const Icon(
+                    PhosphorIconsLight.tag,
+                    color: Colors.white,
+                    size: 12,
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     '${tags.length}',
@@ -73,18 +76,25 @@ class TagsOverlay extends StatelessWidget {
     }
 
     for (int i = 0; i < tags.length && i < maxTagsToShow; i++) {
-      tagWidgets.add(TagChip(
+      tagWidgets.add(
+        TagChip(
           tag: tags[i],
           isCompact: useCompactChips,
-          onTap: onTagTap != null ? () => onTagTap!(tags[i]) : null));
+          onTap: onTagTap != null ? () => onTagTap!(tags[i]) : null,
+        ),
+      );
     }
 
     if (tags.length > maxTagsToShow) {
-      tagWidgets.add(Text(
-        '+${tags.length - maxTagsToShow}',
-        style:
-            TextStyle(color: Colors.white, fontSize: useCompactChips ? 10 : 12),
-      ));
+      tagWidgets.add(
+        Text(
+          '+${tags.length - maxTagsToShow}',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: useCompactChips ? 10 : 12,
+          ),
+        ),
+      );
     }
 
     return Positioned(

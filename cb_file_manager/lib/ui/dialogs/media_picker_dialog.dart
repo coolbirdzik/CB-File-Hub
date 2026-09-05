@@ -32,15 +32,9 @@ class MediaPickerFilterOption {
   });
 }
 
-enum MediaPickerViewMode {
-  grid,
-  list,
-}
+enum MediaPickerViewMode { grid, list }
 
-enum MediaPickerSort {
-  name,
-  modified,
-}
+enum MediaPickerSort { name, modified }
 
 class MediaPickerConfig {
   final String initialPath;
@@ -142,19 +136,19 @@ Future<String?> showMediaPickerDialog(
 
       return AlertDialog(
         title: Text(
-            config.title ?? AppLocalizations.of(dialogContext)!.browseFiles),
+          config.title ?? AppLocalizations.of(dialogContext)!.browseFiles,
+        ),
         content: SizedBox(
           width: dialogWidth,
           height: dialogHeight,
-          child: _MediaPickerDialog(
-            config: config,
-          ),
+          child: _MediaPickerDialog(config: config),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child:
-                Text(AppLocalizations.of(dialogContext)!.cancel.toUpperCase()),
+            child: Text(
+              AppLocalizations.of(dialogContext)!.cancel.toUpperCase(),
+            ),
           ),
         ],
       );
@@ -165,9 +159,7 @@ Future<String?> showMediaPickerDialog(
 class _MediaPickerDialog extends StatefulWidget {
   final MediaPickerConfig config;
 
-  const _MediaPickerDialog({
-    required this.config,
-  });
+  const _MediaPickerDialog({required this.config});
 
   @override
   State<_MediaPickerDialog> createState() => _MediaPickerDialogState();
@@ -251,11 +243,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       try {
         final p = await resolve();
         if (p.isNotEmpty && Directory(p).existsSync()) {
-          quick.add(_SidebarEntry(
-            label: label,
-            path: path.normalize(p),
-            icon: icon,
-          ));
+          quick.add(
+            _SidebarEntry(label: label, path: path.normalize(p), icon: icon),
+          );
         }
       } catch (_) {
         // Ignore unresolved quick-access entries.
@@ -269,20 +259,20 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       if (home == null || home.isEmpty) return;
       final p = path.join(home, folder);
       if (Directory(p).existsSync()) {
-        quick.add(_SidebarEntry(
-          label: label,
-          path: path.normalize(p),
-          icon: icon,
-        ));
+        quick.add(
+          _SidebarEntry(label: label, path: path.normalize(p), icon: icon),
+        );
       }
     }
 
     if (home != null && home.isNotEmpty && Directory(home).existsSync()) {
-      quick.add(_SidebarEntry(
-        label: 'Home',
-        path: path.normalize(home),
-        icon: PhosphorIconsLight.house,
-      ));
+      quick.add(
+        _SidebarEntry(
+          label: 'Home',
+          path: path.normalize(home),
+          icon: PhosphorIconsLight.house,
+        ),
+      );
     }
     addHomeChild('Desktop', 'Desktop', PhosphorIconsLight.desktop);
     addHomeChild('Documents', 'Documents', PhosphorIconsLight.fileText);
@@ -630,10 +620,12 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
         }
       }
 
-      files.sort((a, b) => path
-          .basename(a.path)
-          .toLowerCase()
-          .compareTo(path.basename(b.path).toLowerCase()));
+      files.sort(
+        (a, b) => path
+            .basename(a.path)
+            .toLowerCase()
+            .compareTo(path.basename(b.path).toLowerCase()),
+      );
 
       if (!mounted) return;
       setState(() {
@@ -685,8 +677,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleDirs =
-        _directories.where(_matchesSearch).toList(growable: false);
+    final visibleDirs = _directories
+        .where(_matchesSearch)
+        .toList(growable: false);
     final visibleFiles = _files
         .where((file) => _matchesSearch(file) && _matchesFilter(file))
         .toList(growable: false);
@@ -697,8 +690,8 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
         final crossAxisCount = width < 520
             ? 2
             : width < 820
-                ? 3
-                : 4;
+            ? 3
+            : 4;
 
         final inTagMode = _mode == MediaPickerMode.tags;
         // Show the rail only in browse mode and when there is room for it.
@@ -723,19 +716,19 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
               child: inTagMode
                   ? _buildTagContent(context, crossAxisCount)
                   : _isLoading
-                      ? Skeleton(
-                          type: _viewMode == MediaPickerViewMode.grid
-                              ? SkeletonType.grid
-                              : SkeletonType.list,
-                          crossAxisCount: crossAxisCount,
-                          itemCount: 12,
-                        )
-                      : _buildContent(
-                          context,
-                          visibleDirs,
-                          visibleFiles,
-                          crossAxisCount,
-                        ),
+                  ? Skeleton(
+                      type: _viewMode == MediaPickerViewMode.grid
+                          ? SkeletonType.grid
+                          : SkeletonType.list,
+                      crossAxisCount: crossAxisCount,
+                      itemCount: 12,
+                    )
+                  : _buildContent(
+                      context,
+                      visibleDirs,
+                      visibleFiles,
+                      crossAxisCount,
+                    ),
             ),
           ],
         );
@@ -747,10 +740,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              width: 220,
-              child: _buildSidebar(context),
-            ),
+            SizedBox(width: 220, child: _buildSidebar(context)),
             const SizedBox(width: 12),
             const VerticalDivider(width: 1),
             const SizedBox(width: 12),
@@ -812,10 +802,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
           if (_drives.isEmpty)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(
-                l10n.loading,
-                style: theme.textTheme.bodySmall,
-              ),
+              child: Text(l10n.loading, style: theme.textTheme.bodySmall),
             )
           else
             ..._drives.map(_buildSidebarTile),
@@ -831,8 +818,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       dense: true,
       visualDensity: VisualDensity.compact,
       selected: selected,
-      selectedTileColor:
-          theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+      selectedTileColor: theme.colorScheme.primaryContainer.withValues(
+        alpha: 0.4,
+      ),
       leading: Icon(entry.icon, size: 20),
       title: Text(
         entry.label,
@@ -843,17 +831,12 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       subtitle: entry.requiresAdmin
           ? Text(
               AppLocalizations.of(context)!.requiresAdminPrivileges,
-              style: TextStyle(
-                fontSize: 10,
-                color: theme.colorScheme.error,
-              ),
+              style: TextStyle(fontSize: 10, color: theme.colorScheme.error),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             )
           : null,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       onTap: () => _navigateToDirectory(entry.path),
     );
   }
@@ -871,14 +854,13 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
           child: TextField(
             controller: _pathController,
             focusNode: _pathFocusNode,
-            style: const TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-            ),
+            style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
             decoration: InputDecoration(
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
               hintText: _currentPath,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12.0),
@@ -1029,38 +1011,26 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       final emptyMessage = _searchQuery.isNotEmpty
           ? l10n.noFilesMatchFilter(_searchQuery)
           : (widget.config.emptyMessage ?? l10n.emptyFolder);
-      return Center(
-        child: Text(
-          emptyMessage,
-          textAlign: TextAlign.center,
-        ),
-      );
+      return Center(child: Text(emptyMessage, textAlign: TextAlign.center));
     }
 
     return CustomScrollView(
       cacheExtent: 600,
       slivers: [
         if (directories.isNotEmpty) ...[
-          SliverToBoxAdapter(
-            child: _SectionHeader(label: l10n.folders),
-          ),
+          SliverToBoxAdapter(child: _SectionHeader(label: l10n.folders)),
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final directory = directories[index];
-                return _DirectoryTile(
-                  name: path.basename(directory.path),
-                  onTap: () => _navigateToDirectory(directory.path),
-                );
-              },
-              childCount: directories.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final directory = directories[index];
+              return _DirectoryTile(
+                name: path.basename(directory.path),
+                onTap: () => _navigateToDirectory(directory.path),
+              );
+            }, childCount: directories.length),
           ),
         ],
         if (files.isNotEmpty) ...[
-          SliverToBoxAdapter(
-            child: _SectionHeader(label: l10n.files),
-          ),
+          SliverToBoxAdapter(child: _SectionHeader(label: l10n.files)),
           _viewMode == MediaPickerViewMode.grid
               ? SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1069,28 +1039,22 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 0.86,
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final file = files[index];
-                      return _FileGridTile(
-                        file: file,
-                        onTap: () => _selectFile(file),
-                      );
-                    },
-                    childCount: files.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final file = files[index];
+                    return _FileGridTile(
+                      file: file,
+                      onTap: () => _selectFile(file),
+                    );
+                  }, childCount: files.length),
                 )
               : SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final file = files[index];
-                      return _FileListTile(
-                        file: file,
-                        onTap: () => _selectFile(file),
-                      );
-                    },
-                    childCount: files.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final file = files[index];
+                    return _FileListTile(
+                      file: file,
+                      onTap: () => _selectFile(file),
+                    );
+                  }, childCount: files.length),
                 ),
         ],
       ],
@@ -1102,10 +1066,12 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     final suggestions = _tagController.text.trim().isEmpty
         ? _allTags
         : _allTags
-            .where((tag) => tag
-                .toLowerCase()
-                .contains(_tagController.text.trim().toLowerCase()))
-            .toList();
+              .where(
+                (tag) => tag.toLowerCase().contains(
+                  _tagController.text.trim().toLowerCase(),
+                ),
+              )
+              .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1121,8 +1087,9 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                   if (query.isEmpty) {
                     return _allTags;
                   }
-                  return _allTags
-                      .where((tag) => tag.toLowerCase().contains(query));
+                  return _allTags.where(
+                    (tag) => tag.toLowerCase().contains(query),
+                  );
                 },
                 onSelected: (selection) {
                   _tagController.text = selection;
@@ -1130,33 +1097,33 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                 },
                 fieldViewBuilder:
                     (context, controller, focusNode, onFieldSubmitted) {
-                  return TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    decoration: InputDecoration(
-                      hintText: l10n.searchByTags,
-                      prefixIcon: const Icon(PhosphorIconsLight.tag),
-                      suffixIcon: controller.text.isEmpty
-                          ? null
-                          : IconButton(
-                              onPressed: () {
-                                controller.clear();
-                                setState(() {
-                                  _activeTagQuery = null;
-                                  _tagResults = [];
-                                });
-                              },
-                              icon: const Icon(PhosphorIconsLight.x),
-                            ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16.0),
-                      ),
-                      isDense: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (value) => _performTagSearch(value),
-                  );
-                },
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          hintText: l10n.searchByTags,
+                          prefixIcon: const Icon(PhosphorIconsLight.tag),
+                          suffixIcon: controller.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    controller.clear();
+                                    setState(() {
+                                      _activeTagQuery = null;
+                                      _tagResults = [];
+                                    });
+                                  },
+                                  icon: const Icon(PhosphorIconsLight.x),
+                                ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16.0),
+                          ),
+                          isDense: true,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                        onSubmitted: (value) => _performTagSearch(value),
+                      );
+                    },
                 optionsViewBuilder: (context, onSelected, options) {
                   final items = options.toList();
                   return Align(
@@ -1165,8 +1132,10 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                       elevation: 4,
                       borderRadius: BorderRadius.circular(12),
                       child: ConstrainedBox(
-                        constraints:
-                            const BoxConstraints(maxHeight: 240, maxWidth: 360),
+                        constraints: const BoxConstraints(
+                          maxHeight: 240,
+                          maxWidth: 360,
+                        ),
                         child: ListView.builder(
                           padding: EdgeInsets.zero,
                           shrinkWrap: true,
@@ -1175,8 +1144,10 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                             final option = items[index];
                             return ListTile(
                               dense: true,
-                              leading:
-                                  const Icon(PhosphorIconsLight.tag, size: 18),
+                              leading: const Icon(
+                                PhosphorIconsLight.tag,
+                                size: 18,
+                              ),
                               title: Text(option),
                               onTap: () => onSelected(option),
                             );
@@ -1245,7 +1216,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: suggestions.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final tag = suggestions[index];
                 return ActionChip(
@@ -1299,10 +1270,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
 
     if (_tagResults.isEmpty) {
       return Center(
-        child: Text(
-          l10n.noFilesWithTag,
-          textAlign: TextAlign.center,
-        ),
+        child: Text(l10n.noFilesWithTag, textAlign: TextAlign.center),
       );
     }
 
@@ -1323,28 +1291,22 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                   mainAxisSpacing: 10,
                   childAspectRatio: 0.86,
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final file = files[index];
-                    return _FileGridTile(
-                      file: file,
-                      onTap: () => _selectFile(file),
-                    );
-                  },
-                  childCount: files.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final file = files[index];
+                  return _FileGridTile(
+                    file: file,
+                    onTap: () => _selectFile(file),
+                  );
+                }, childCount: files.length),
               )
             : SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final file = files[index];
-                    return _FileListTile(
-                      file: file,
-                      onTap: () => _selectFile(file),
-                    );
-                  },
-                  childCount: files.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final file = files[index];
+                  return _FileListTile(
+                    file: file,
+                    onTap: () => _selectFile(file),
+                  );
+                }, childCount: files.length),
               ),
       ],
     );
@@ -1354,9 +1316,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
 class _SectionHeader extends StatelessWidget {
   final String label;
 
-  const _SectionHeader({
-    required this.label,
-  });
+  const _SectionHeader({required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -1365,9 +1325,9 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              letterSpacing: 1.1,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
+          letterSpacing: 1.1,
+          color: Theme.of(context).colorScheme.secondary,
+        ),
       ),
     );
   }
@@ -1377,21 +1337,14 @@ class _DirectoryTile extends StatelessWidget {
   final String name;
   final VoidCallback onTap;
 
-  const _DirectoryTile({
-    required this.name,
-    required this.onTap,
-  });
+  const _DirectoryTile({required this.name, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       dense: true,
       leading: const Icon(PhosphorIconsLight.folder, color: Colors.amber),
-      title: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(PhosphorIconsLight.caretRight),
       onTap: onTap,
     );
@@ -1402,10 +1355,7 @@ class _FileGridTile extends StatelessWidget {
   final File file;
   final VoidCallback onTap;
 
-  const _FileGridTile({
-    required this.file,
-    required this.onTap,
-  });
+  const _FileGridTile({required this.file, required this.onTap});
 
   bool get _isVideo => VideoThumbnailHelper.isSupportedVideoFormat(file.path);
 
@@ -1449,10 +1399,7 @@ class _FileListTile extends StatelessWidget {
   final File file;
   final VoidCallback onTap;
 
-  const _FileListTile({
-    required this.file,
-    required this.onTap,
-  });
+  const _FileListTile({required this.file, required this.onTap});
 
   bool get _isVideo => VideoThumbnailHelper.isSupportedVideoFormat(file.path);
 
@@ -1465,8 +1412,8 @@ class _FileListTile extends StatelessWidget {
     final typeLabel = _isVideo
         ? l10n.video
         : _isImage
-            ? l10n.image
-            : l10n.file;
+        ? l10n.image
+        : l10n.file;
 
     return ListTile(
       dense: true,
@@ -1483,11 +1430,7 @@ class _FileListTile extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(
-        fileName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(typeLabel),
       onTap: onTap,
     );
@@ -1518,10 +1461,7 @@ class _FilePreview extends StatelessWidget {
         filterQuality: FilterQuality.medium,
         cacheWidth: cacheSize,
         cacheHeight: cacheSize,
-        errorBuilder: (_, __, ___) => _fallbackTile(
-          isVideo: false,
-          isImage: true,
-        ),
+        errorBuilder: (_, _, _) => _fallbackTile(isVideo: false, isImage: true),
       );
     }
 
@@ -1533,17 +1473,11 @@ class _FilePreview extends StatelessWidget {
       );
     }
 
-    return _fallbackTile(
-      isVideo: false,
-      isImage: false,
-    );
+    return _fallbackTile(isVideo: false, isImage: false);
   }
 }
 
-Widget _fallbackTile({
-  required bool isVideo,
-  required bool isImage,
-}) {
+Widget _fallbackTile({required bool isVideo, required bool isImage}) {
   if (isVideo) {
     return Container(
       color: Colors.blueGrey[900],
@@ -1561,11 +1495,7 @@ Widget _fallbackTile({
     return Container(
       color: Colors.black12,
       child: const Center(
-        child: Icon(
-          PhosphorIconsLight.image,
-          color: Colors.blueGrey,
-          size: 36,
-        ),
+        child: Icon(PhosphorIconsLight.image, color: Colors.blueGrey, size: 36),
       ),
     );
   }
@@ -1573,11 +1503,7 @@ Widget _fallbackTile({
   return Container(
     color: Colors.black12,
     child: const Center(
-      child: Icon(
-        PhosphorIconsLight.file,
-        color: Colors.blueGrey,
-        size: 36,
-      ),
+      child: Icon(PhosphorIconsLight.file, color: Colors.blueGrey, size: 36),
     ),
   );
 }
@@ -1606,8 +1532,9 @@ class _PickerVideoThumbnailState extends State<_PickerVideoThumbnail> {
   @override
   void initState() {
     super.initState();
-    _thumbReadySubscription =
-        VideoThumbnailHelper.onThumbnailReady.listen((readyPath) async {
+    _thumbReadySubscription = VideoThumbnailHelper.onThumbnailReady.listen((
+      readyPath,
+    ) async {
       if (readyPath != widget.videoPath) {
         return;
       }
@@ -1649,22 +1576,24 @@ class _PickerVideoThumbnailState extends State<_PickerVideoThumbnail> {
     });
 
     VideoThumbnailHelper.generateThumbnail(
-      widget.videoPath,
-      isPriority: true,
-      quality: widget.thumbnailQuality,
-      thumbnailSize: widget.thumbnailSize,
-    ).then((path) {
-      if (!mounted) return;
-      setState(() {
-        _thumbnailPath = path ?? _thumbnailPath;
-        _isLoading = false;
-      });
-    }).catchError((_) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-    });
+          widget.videoPath,
+          isPriority: true,
+          quality: widget.thumbnailQuality,
+          thumbnailSize: widget.thumbnailSize,
+        )
+        .then((path) {
+          if (!mounted) return;
+          setState(() {
+            _thumbnailPath = path ?? _thumbnailPath;
+            _isLoading = false;
+          });
+        })
+        .catchError((_) {
+          if (!mounted) return;
+          setState(() {
+            _isLoading = false;
+          });
+        });
   }
 
   @override

@@ -131,13 +131,14 @@ void main() {
       }
     });
 
-// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // 4. AI side panel — chat with search results
     // -------------------------------------------------------------------------
     testWidgets('AI side panel — search results', (WidgetTester tester) async {
       final et = E2ETester(tester);
-      final dir =
-          await Directory.systemTemp.createTemp('cb_showcase_ai_search_');
+      final dir = await Directory.systemTemp.createTemp(
+        'cb_showcase_ai_search_',
+      );
       final media = await seedShowcaseLibrary(dir);
       await seedWallpaperBackdrop();
       await seedAiConversationWithResults(
@@ -173,8 +174,9 @@ void main() {
     // -------------------------------------------------------------------------
     testWidgets('AI side panel — approval', (WidgetTester tester) async {
       final et = E2ETester(tester);
-      final dir =
-          await Directory.systemTemp.createTemp('cb_showcase_ai_approval_');
+      final dir = await Directory.systemTemp.createTemp(
+        'cb_showcase_ai_approval_',
+      );
       await seedShowcaseLibrary(dir);
       await seedWallpaperBackdrop();
       await seedAiConversationWithApproval(
@@ -182,7 +184,8 @@ void main() {
         userQuery: 'Delete all duplicate files in Photos',
         actionType: 'deleteFile',
         title: 'Confirm: Delete 3 files',
-        description: 'The following files will be permanently deleted:\n'
+        description:
+            'The following files will be permanently deleted:\n'
             '• Photos/vacation_01.jpg\n'
             '• Photos/vacation_02.jpg',
       );
@@ -420,8 +423,8 @@ Future<Directory> createMobileShowcaseDir(String prefix) async {
     return Directory.systemTemp.createTemp(prefix);
   }
   try {
-    final external =
-        await E2ESandboxPaths.platformProvider.getExternalStoragePath();
+    final external = await E2ESandboxPaths.platformProvider
+        .getExternalStoragePath();
     if (external != null && external.isNotEmpty) {
       final base = Directory(p.join(external, 'showcase'))
         ..createSync(recursive: true);
@@ -628,9 +631,9 @@ class ShowcaseMedia {
 
   /// First image inside `Photos/`, for scenes whose tab opens that folder.
   String get heroPhoto => images.firstWhere(
-        (path) => p.isWithin(photos.path, path),
-        orElse: () => images.first,
-      );
+    (path) => p.isWithin(photos.path, path),
+    orElse: () => images.first,
+  );
 }
 
 Future<ShowcaseMedia> seedShowcaseLibrary(Directory root) async {
@@ -674,8 +677,12 @@ Future<ShowcaseMedia> seedShowcaseLibrary(Directory root) async {
   ]) {
     for (final spec in entry.value) {
       final path = p.join(entry.key.path, spec.name);
-      seedImage(path,
-          width: spec.width, height: spec.height, palette: spec.palette);
+      seedImage(
+        path,
+        width: spec.width,
+        height: spec.height,
+        palette: spec.palette,
+      );
       images.add(path);
     }
   }
@@ -691,14 +698,18 @@ Future<ShowcaseMedia> seedShowcaseLibrary(Directory root) async {
     seedVideo(video);
   }
 
-  File(p.join(albums.path, 'curation_notes.txt')).writeAsStringSync(
-      'Weekend picks, favorite scenes, and smart album rules.');
+  File(
+    p.join(albums.path, 'curation_notes.txt'),
+  ).writeAsStringSync('Weekend picks, favorite scenes, and smart album rules.');
   File(p.join(albums.path, 'shot_list.txt')).writeAsStringSync(
-      'Golden hour at the harbour, rooftop skyline, night market crowd.');
+    'Golden hour at the harbour, rooftop skyline, night market crowd.',
+  );
   File(p.join(root.path, 'README.txt')).writeAsStringSync(
-      'Showcase media library generated for screenshot automation.');
-  File(p.join(root.path, 'export_settings.json'))
-      .writeAsStringSync('{"format":"jpeg","quality":92,"longEdge":2560}');
+    'Showcase media library generated for screenshot automation.',
+  );
+  File(
+    p.join(root.path, 'export_settings.json'),
+  ).writeAsStringSync('{"format":"jpeg","quality":92,"longEdge":2560}');
 
   return ShowcaseMedia(
     root: root,
@@ -737,10 +748,10 @@ Future<int> seedShowcaseAlbum(ShowcaseMedia media) async {
     albumId = album.id;
   }
 
-  await AlbumService.instance.addFilesToAlbum(
-    albumId,
-    <String>[...media.images, ...media.videos],
-  );
+  await AlbumService.instance.addFilesToAlbum(albumId, <String>[
+    ...media.images,
+    ...media.videos,
+  ]);
   await FeaturedAlbumsService.instance.addToFeatured(albumId);
   return albumId;
 }
@@ -781,16 +792,12 @@ Future<void> seedAiConversationWithResults({
     convId: convId,
     title: userQuery,
     messages: <Map<String, dynamic>>[
-      {
-        'id': '1',
-        'role': 'user',
-        'content': userQuery,
-        'isLoading': false,
-      },
+      {'id': '1', 'role': 'user', 'content': userQuery, 'isLoading': false},
       {
         'id': '2',
         'role': 'assistant',
-        'content': 'I found several files matching your query. '
+        'content':
+            'I found several files matching your query. '
             'Here are the most relevant results:',
         'isLoading': false,
       },
@@ -820,18 +827,8 @@ Future<void> seedAiConversationWithApproval({
     convId: convId,
     title: userQuery,
     messages: <Map<String, dynamic>>[
-      {
-        'id': 'a1',
-        'role': 'user',
-        'content': userQuery,
-        'isLoading': false,
-      },
-      {
-        'id': 'a2',
-        'role': 'assistant',
-        'content': title,
-        'isLoading': false,
-      },
+      {'id': 'a1', 'role': 'user', 'content': userQuery, 'isLoading': false},
+      {'id': 'a2', 'role': 'assistant', 'content': title, 'isLoading': false},
     ],
     initialPath: workspacePath,
   );
@@ -856,7 +853,8 @@ Future<void> seedAiMultiTurnConversation({
       {
         'id': 'm2',
         'role': 'assistant',
-        'content': 'I found **2 potential duplicate videos** in your library. '
+        'content':
+            'I found **2 potential duplicate videos** in your library. '
             'Both have similar resolution and duration. '
             'Would you like me to highlight them so you can decide?',
         'isLoading': false,
@@ -872,8 +870,8 @@ Future<void> seedAiMultiTurnConversation({
         'role': 'assistant',
         'content':
             'Done! I\'ve highlighted the two duplicate files in your Photos folder. '
-                'They appear to be the same recording saved at different times. '
-                'Would you like me to suggest a cleanup strategy?',
+            'They appear to be the same recording saved at different times. '
+            'Would you like me to suggest a cleanup strategy?',
         'isLoading': false,
       },
     ],

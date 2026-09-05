@@ -12,18 +12,12 @@ void main() {
 
   group('DriveInfo.isWindowsSystemDrive', () {
     test('detects system drive from env letter', () {
-      expect(
-        DriveInfo.isWindowsSystemDrive('C:\\', systemDrive: 'C:'),
-        isTrue,
-      );
+      expect(DriveInfo.isWindowsSystemDrive('C:\\', systemDrive: 'C:'), isTrue);
       expect(
         DriveInfo.isWindowsSystemDrive('D:\\', systemDrive: 'C:'),
         isFalse,
       );
-      expect(
-        DriveInfo.isWindowsSystemDrive('c:', systemDrive: 'C:\\'),
-        isTrue,
-      );
+      expect(DriveInfo.isWindowsSystemDrive('c:', systemDrive: 'C:\\'), isTrue);
     });
   });
 
@@ -43,8 +37,11 @@ void main() {
   group('DriveInfo grouping', () {
     test('maps kinds to groups and sort order', () {
       expect(
-        const DriveInfo(path: 'C:\\', displayName: 'C', kind: DriveKind.fixed)
-            .group,
+        const DriveInfo(
+          path: 'C:\\',
+          displayName: 'C',
+          kind: DriveKind.fixed,
+        ).group,
         DriveGroup.fixed,
       );
       expect(

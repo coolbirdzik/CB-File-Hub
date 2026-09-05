@@ -21,7 +21,7 @@ class Skeleton extends StatefulWidget {
   final bool wrapInCardOnDesktop;
 
   const Skeleton({
-    Key? key,
+    super.key,
     this.width = double.infinity,
     this.height = double.infinity,
     this.borderRadius,
@@ -31,7 +31,7 @@ class Skeleton extends StatefulWidget {
     this.crossAxisCount = 3,
     this.isAlbum = false,
     this.wrapInCardOnDesktop = true,
-  }) : super(key: key);
+  });
 
   @override
   State<Skeleton> createState() => _SkeletonState();
@@ -102,11 +102,14 @@ class _SkeletonState extends State<Skeleton>
   Widget _buildSingleSkeleton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final baseColor = cs.surfaceContainerHighest.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.45 : 0.6);
+      alpha: Theme.of(context).brightness == Brightness.dark ? 0.45 : 0.6,
+    );
     final midColor = cs.surfaceContainerHighest.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.45);
+      alpha: Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.45,
+    );
     final highlightColor = cs.surface.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.20 : 0.28);
+      alpha: Theme.of(context).brightness == Brightness.dark ? 0.20 : 0.28,
+    );
 
     return AnimatedBuilder(
       animation: _controller,
@@ -125,7 +128,7 @@ class _SkeletonState extends State<Skeleton>
                 midColor,
                 highlightColor,
                 midColor,
-                baseColor
+                baseColor,
               ],
               stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
             ),
@@ -159,8 +162,9 @@ class _SkeletonState extends State<Skeleton>
     final int maxColumns = ((safeWidth + spacing) / (minItemWidth + spacing))
         .floor()
         .clamp(1, 1000);
-    final int crossAxisCount =
-        requestedCrossAxisCount.clamp(1, maxColumns).toInt();
+    final int crossAxisCount = requestedCrossAxisCount
+        .clamp(1, maxColumns)
+        .toInt();
 
     return GridView.builder(
       physics: const ClampingScrollPhysics(),
@@ -173,10 +177,8 @@ class _SkeletonState extends State<Skeleton>
         childAspectRatio: 1.0, // Always use album ratio
       ),
       itemCount: widget.itemCount ?? 12,
-      itemBuilder: (context, index) => _SkeletonGridItem(
-        index: index,
-        controller: _controller,
-      ),
+      itemBuilder: (context, index) =>
+          _SkeletonGridItem(index: index, controller: _controller),
     );
   }
 
@@ -218,8 +220,8 @@ class _SkeletonState extends State<Skeleton>
         final aspectRatio = heightVariation == 0
             ? 0.65 // Tall
             : heightVariation == 1
-                ? 0.75 // Medium
-                : 0.85; // Short
+            ? 0.75 // Medium
+            : 0.85; // Short
 
         return _SkeletonMasonryItem(
           index: index,
@@ -250,10 +252,9 @@ class _SkeletonListItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.3),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -275,8 +276,9 @@ class _SkeletonListItem extends StatelessWidget {
                   height: 18, // Always use album size
                   borderRadius: BorderRadius.circular(16.0),
                   controller: controller,
-                  delay:
-                      Duration(milliseconds: (index * 80 + 40).clamp(0, 840)),
+                  delay: Duration(
+                    milliseconds: (index * 80 + 40).clamp(0, 840),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ShimmerBox(
@@ -284,8 +286,9 @@ class _SkeletonListItem extends StatelessWidget {
                   height: 16, // Always use album size
                   borderRadius: BorderRadius.circular(16.0),
                   controller: controller,
-                  delay:
-                      Duration(milliseconds: (index * 80 + 80).clamp(0, 880)),
+                  delay: Duration(
+                    milliseconds: (index * 80 + 80).clamp(0, 880),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 ShimmerBox(
@@ -293,8 +296,9 @@ class _SkeletonListItem extends StatelessWidget {
                   height: 12,
                   borderRadius: BorderRadius.circular(6),
                   controller: controller,
-                  delay:
-                      Duration(milliseconds: (index * 80 + 120).clamp(0, 920)),
+                  delay: Duration(
+                    milliseconds: (index * 80 + 120).clamp(0, 920),
+                  ),
                 ),
               ],
             ),
@@ -323,10 +327,7 @@ class _SkeletonGridItem extends StatelessWidget {
   final int index;
   final AnimationController controller;
 
-  const _SkeletonGridItem({
-    required this.index,
-    required this.controller,
-  });
+  const _SkeletonGridItem({required this.index, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -334,10 +335,9 @@ class _SkeletonGridItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
-          color: Theme.of(context)
-              .colorScheme
-              .surfaceContainerHighest
-              .withValues(alpha: 0.2),
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -345,8 +345,9 @@ class _SkeletonGridItem extends StatelessWidget {
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(16.0), // Always use album style
+                borderRadius: BorderRadius.circular(
+                  16.0,
+                ), // Always use album style
                 child: ShimmerBox(
                   width: double.infinity,
                   height: double.infinity,
@@ -397,10 +398,9 @@ class _SkeletonMasonryItem extends StatelessWidget {
         aspectRatio: aspectRatio,
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.2),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: ClipRRect(
@@ -427,13 +427,13 @@ class ShimmerBox extends StatefulWidget {
   final AnimationController? controller;
 
   const ShimmerBox({
-    Key? key,
+    super.key,
     required this.width,
     required this.height,
     this.borderRadius,
     this.delay = Duration.zero,
     this.controller,
-  }) : super(key: key);
+  });
 
   @override
   State<ShimmerBox> createState() => _ShimmerBoxState();
@@ -509,11 +509,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
                 value.clamp(0.0, 1.0),
                 (value + 0.3).clamp(0.0, 1.0),
               ],
-              colors: [
-                baseColor,
-                highlightColor,
-                baseColor,
-              ],
+              colors: [baseColor, highlightColor, baseColor],
             ),
           ),
         );
@@ -524,6 +520,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
 
 Color _skeletonColor(BuildContext context) {
   final theme = Theme.of(context);
-  return theme.colorScheme.surfaceContainerHighest
-      .withValues(alpha: theme.brightness == Brightness.dark ? 0.35 : 0.6);
+  return theme.colorScheme.surfaceContainerHighest.withValues(
+    alpha: theme.brightness == Brightness.dark ? 0.35 : 0.6,
+  );
 }

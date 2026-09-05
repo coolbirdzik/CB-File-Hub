@@ -9,21 +9,18 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     controller.onSearchPressed = () => _toggleSearchBar(context);
     controller.onSearchSubmitted = (query) => _handleMobileSearch(query);
     controller.onSortOptionSelected = (option) {
-      _folderListBloc.add(SetSortOption(
-        option,
-        folderPath: _currentPath,
-      ));
+      _folderListBloc.add(SetSortOption(option, folderPath: _currentPath));
     };
     controller.onViewModeToggled = _setViewMode;
     controller.onBack = _handleMouseBackButton;
     controller.onForward = _handleMouseForwardButton;
     controller.onRefresh = _refreshFileList;
     controller.onGridSizePressed = () => SharedActionBar.showGridSizeDialog(
-          context,
-          currentGridSize: _folderListBloc.state.gridZoomLevel,
-          onApply: handleGridZoomChange,
-          sizeMode: GridSizeMode.referenceWidth,
-        );
+      context,
+      currentGridSize: _folderListBloc.state.gridZoomLevel,
+      onApply: handleGridZoomChange,
+      sizeMode: GridSizeMode.referenceWidth,
+    );
     controller.onSelectionModeToggled = _toggleSelectionMode;
     controller.onMasonryToggled = () {
       _setMasonryLayout(controller.isMasonryLayout);
@@ -130,9 +127,7 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
 class _MobileCreateFolderDialog extends StatefulWidget {
   final Future<void> Function(String folderName) onCreateFolder;
 
-  const _MobileCreateFolderDialog({
-    required this.onCreateFolder,
-  });
+  const _MobileCreateFolderDialog({required this.onCreateFolder});
 
   @override
   State<_MobileCreateFolderDialog> createState() =>
@@ -182,10 +177,7 @@ class _MobileCreateFolderDialogState extends State<_MobileCreateFolderDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        TextButton(
-          onPressed: _submit,
-          child: const Text('Create'),
-        ),
+        TextButton(onPressed: _submit, child: const Text('Create')),
       ],
     );
   }

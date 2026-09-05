@@ -4,7 +4,7 @@ import 'package:ffi/ffi.dart';
 
 // --- C Structs definitions for Dart ---
 
-class NativeFileInfo extends Struct {
+base class NativeFileInfo extends Struct {
   external Pointer<Utf16> name;
   @Int64()
   external int size;
@@ -14,32 +14,32 @@ class NativeFileInfo extends Struct {
   external bool isDirectory;
 }
 
-class NativeFileList extends Struct {
+base class NativeFileList extends Struct {
   @Int32()
   external int count;
   external Pointer<NativeFileInfo> files;
 }
 
-class NativeShareInfo extends Struct {
+base class NativeShareInfo extends Struct {
   external Pointer<Utf16> name;
   external Pointer<Utf16> comment;
   @Int32()
   external int type;
 }
 
-class NativeShareList extends Struct {
+base class NativeShareList extends Struct {
   @Int32()
   external int count;
   external Pointer<NativeShareInfo> shares;
 }
 
-class ReadResult extends Struct {
+base class ReadResult extends Struct {
   @Int64()
   external int bytesRead;
   external Pointer<Uint8> data;
 }
 
-class ThumbnailResult extends Struct {
+base class ThumbnailResult extends Struct {
   external Pointer<Uint8> data;
   @Int32()
   external int size;
@@ -48,51 +48,59 @@ class ThumbnailResult extends Struct {
 // --- FFI Function Signatures ---
 
 // Connection
-typedef ConnectNative = Int32 Function(
-    Pointer<Utf16> path, Pointer<Utf16> username, Pointer<Utf16> password);
-typedef ConnectDart = int Function(
-    Pointer<Utf16> path, Pointer<Utf16> username, Pointer<Utf16> password);
+typedef ConnectNative =
+    Int32 Function(
+      Pointer<Utf16> path,
+      Pointer<Utf16> username,
+      Pointer<Utf16> password,
+    );
+typedef ConnectDart =
+    int Function(
+      Pointer<Utf16> path,
+      Pointer<Utf16> username,
+      Pointer<Utf16> password,
+    );
 typedef DisconnectNative = Int32 Function(Pointer<Utf16> path);
 typedef DisconnectDart = int Function(Pointer<Utf16> path);
 
 // File Operations
-typedef ListDirectoryNative = Pointer<NativeFileList> Function(
-    Pointer<Utf16> path);
-typedef ListDirectoryDart = Pointer<NativeFileList> Function(
-    Pointer<Utf16> path);
-typedef EnumerateSharesNative = Pointer<NativeShareList> Function(
-    Pointer<Utf16> server);
-typedef EnumerateSharesDart = Pointer<NativeShareList> Function(
-    Pointer<Utf16> server);
+typedef ListDirectoryNative =
+    Pointer<NativeFileList> Function(Pointer<Utf16> path);
+typedef ListDirectoryDart =
+    Pointer<NativeFileList> Function(Pointer<Utf16> path);
+typedef EnumerateSharesNative =
+    Pointer<NativeShareList> Function(Pointer<Utf16> server);
+typedef EnumerateSharesDart =
+    Pointer<NativeShareList> Function(Pointer<Utf16> server);
 typedef DeleteFileOrDirNative = Bool Function(Pointer<Utf16> path);
 typedef DeleteFileOrDirDart = bool Function(Pointer<Utf16> path);
 typedef CreateDirNative = Bool Function(Pointer<Utf16> path);
 typedef CreateDirDart = bool Function(Pointer<Utf16> path);
-typedef RenameNative = Bool Function(
-    Pointer<Utf16> oldPath, Pointer<Utf16> newPath);
-typedef RenameDart = bool Function(
-    Pointer<Utf16> oldPath, Pointer<Utf16> newPath);
+typedef RenameNative =
+    Bool Function(Pointer<Utf16> oldPath, Pointer<Utf16> newPath);
+typedef RenameDart =
+    bool Function(Pointer<Utf16> oldPath, Pointer<Utf16> newPath);
 
 // File I/O
 typedef OpenFileForReadingNative = IntPtr Function(Pointer<Utf16> path);
 typedef OpenFileForReadingDart = int Function(Pointer<Utf16> path);
 typedef CreateFileForWritingNative = IntPtr Function(Pointer<Utf16> path);
 typedef CreateFileForWritingDart = int Function(Pointer<Utf16> path);
-typedef ReadFileChunkNative = ReadResult Function(
-    IntPtr handle, Int64 chunkSize);
+typedef ReadFileChunkNative =
+    ReadResult Function(IntPtr handle, Int64 chunkSize);
 typedef ReadFileChunkDart = ReadResult Function(int handle, int chunkSize);
-typedef WriteFileChunkNative = Bool Function(
-    IntPtr handle, Pointer<Uint8> data, Int32 length);
-typedef WriteFileChunkDart = bool Function(
-    int handle, Pointer<Uint8> data, int length);
+typedef WriteFileChunkNative =
+    Bool Function(IntPtr handle, Pointer<Uint8> data, Int32 length);
+typedef WriteFileChunkDart =
+    bool Function(int handle, Pointer<Uint8> data, int length);
 typedef CloseFileNative = Void Function(IntPtr handle);
 typedef CloseFileDart = void Function(int handle);
 
 // Thumbnail
-typedef GetThumbnailNative = ThumbnailResult Function(
-    Pointer<Utf16> path, Int32 size);
-typedef GetThumbnailDart = ThumbnailResult Function(
-    Pointer<Utf16> path, int size);
+typedef GetThumbnailNative =
+    ThumbnailResult Function(Pointer<Utf16> path, Int32 size);
+typedef GetThumbnailDart =
+    ThumbnailResult Function(Pointer<Utf16> path, int size);
 
 // Memory Management
 typedef FreeFileListNative = Void Function(Pointer<NativeFileList> list);
@@ -157,7 +165,8 @@ class SMBNativeBindings {
         .asFunction<OpenFileForReadingDart>();
     createFileForWriting = _lib
         .lookup<NativeFunction<CreateFileForWritingNative>>(
-            'CreateFileForWriting')
+          'CreateFileForWriting',
+        )
         .asFunction<CreateFileForWritingDart>();
     readFileChunk = _lib
         .lookup<NativeFunction<ReadFileChunkNative>>('ReadFileChunk')
@@ -182,7 +191,8 @@ class SMBNativeBindings {
         .asFunction<FreeReadResultDataDart>();
     freeThumbnailResult = _lib
         .lookup<NativeFunction<FreeThumbnailResultNative>>(
-            'FreeThumbnailResult')
+          'FreeThumbnailResult',
+        )
         .asFunction<FreeThumbnailResultDart>();
   }
 }

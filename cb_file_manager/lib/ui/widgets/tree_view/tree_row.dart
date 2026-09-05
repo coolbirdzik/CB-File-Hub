@@ -50,7 +50,7 @@ class TreeRowShell<T> extends StatefulWidget {
   final void Function(Offset globalPosition)? onSecondary;
 
   const TreeRowShell({
-    Key? key,
+    super.key,
     required this.node,
     required this.depth,
     required this.indentPerDepth,
@@ -62,7 +62,7 @@ class TreeRowShell<T> extends StatefulWidget {
     this.onTap,
     this.onDoubleTap,
     this.onSecondary,
-  }) : super(key: key);
+  });
 
   @override
   State<TreeRowShell<T>> createState() => _TreeRowShellState<T>();
@@ -161,13 +161,13 @@ class TreePlaceholderRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   const TreePlaceholderRow({
-    Key? key,
+    super.key,
     required this.kind,
     required this.depth,
     required this.indentPerDepth,
     this.extraCount,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -208,10 +208,7 @@ class TreePlaceholderRow extends StatelessWidget {
             Expanded(
               child: Text(
                 'Failed to load. Tap to retry.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.error,
-                ),
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.error),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

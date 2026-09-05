@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ffi' show nullptr;
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -29,8 +28,9 @@ class AppInfo {
 }
 
 class ExternalAppHelper {
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/external_apps');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/external_apps',
+  );
 
   /// Cache for Windows app icons
   static final Map<String, Widget> _windowsAppIconCache = {};
@@ -89,7 +89,8 @@ class ExternalAppHelper {
       final isInstalled = result['isInstalled'] as bool? ?? false;
 
       debugPrint(
-          'APK_DEBUG: Package: $packageName, App: $appName, Installed: $isInstalled, IconBytes: ${iconBytes?.length}');
+        'APK_DEBUG: Package: $packageName, App: $appName, Installed: $isInstalled, IconBytes: ${iconBytes?.length}',
+      );
 
       if (packageName == null || appName == null) {
         debugPrint('APK_DEBUG: Missing package name or app name');
@@ -104,7 +105,8 @@ class ExternalAppHelper {
         try {
           final uint8List = Uint8List.fromList(iconBytes);
           debugPrint(
-              'APK_DEBUG: Created Uint8List with ${uint8List.length} bytes');
+            'APK_DEBUG: Created Uint8List with ${uint8List.length} bytes',
+          );
 
           icon = Image.memory(
             uint8List,
@@ -192,7 +194,9 @@ class ExternalAppHelper {
   }
 
   static Future<bool> _openFileWithApp(
-      String filePath, String packageName) async {
+    String filePath,
+    String packageName,
+  ) async {
     try {
       if (Platform.isAndroid) {
         final result = await _channel.invokeMethod('openFileWithApp', {
@@ -206,11 +210,9 @@ class ExternalAppHelper {
           return await _openWithWindowsDefault(filePath);
         } else {
           // On Windows, the packageName is actually the path to the executable
-          await Process.start(
-            packageName,
-            [filePath],
-            mode: ProcessStartMode.detached,
-          );
+          await Process.start(packageName, [
+            filePath,
+          ], mode: ProcessStartMode.detached);
           return true;
         }
       }
@@ -226,28 +228,31 @@ class ExternalAppHelper {
     try {
       final List<AppInfo> apps = [];
       if (Platform.isAndroid && FileTypeUtils.isVideoFile(filePath)) {
-        apps.add(AppInfo(
-          packageName: '__cb_video_player__',
-          appName: 'CB File Hub Video Player',
-          icon: const Icon(PhosphorIconsLight.playCircle, size: 36),
-        ));
+        apps.add(
+          AppInfo(
+            packageName: '__cb_video_player__',
+            appName: 'CB File Hub Video Player',
+            icon: const Icon(PhosphorIconsLight.playCircle, size: 36),
+          ),
+        );
       }
       final extension = filePath.split('.').last.toLowerCase();
-      final List<dynamic> result =
-          await _channel.invokeMethod('getInstalledAppsForFile', {
-        'filePath': filePath,
-        'extension': extension,
-      });
+      final List<dynamic> result = await _channel.invokeMethod(
+        'getInstalledAppsForFile',
+        {'filePath': filePath, 'extension': extension},
+      );
 
-      apps.addAll(result.map<AppInfo>((app) {
-        return AppInfo(
-          packageName: app['packageName'],
-          appName: app['appName'],
-          icon: app['iconBytes'] != null
-              ? Image.memory(app['iconBytes'], width: 36, height: 36)
-              : const Icon(PhosphorIconsLight.androidLogo, size: 36),
-        );
-      }));
+      apps.addAll(
+        result.map<AppInfo>((app) {
+          return AppInfo(
+            packageName: app['packageName'],
+            appName: app['appName'],
+            icon: app['iconBytes'] != null
+                ? Image.memory(app['iconBytes'], width: 36, height: 36)
+                : const Icon(PhosphorIconsLight.androidLogo, size: 36),
+          );
+        }),
+      );
       return apps;
     } catch (e) {
       // debugPrint('Error getting Android apps: $e');
@@ -274,59 +279,72 @@ class ExternalAppHelper {
           if (path.isEmpty) continue;
           if (_isSelfExecutable(path)) continue;
           if (File(path).existsSync()) {
-            apps.add(AppInfo(
-              packageName: path,
-              appName: name,
-              icon: await _getWindowsAppIcon(path),
-            ));
+            apps.add(
+              AppInfo(
+                packageName: path,
+                appName: name,
+                icon: await _getWindowsAppIcon(path),
+              ),
+            );
           }
         }
       } else {
-        String? associatedAppPath =
-            await WindowsAppIcon.getAssociatedAppPath('.$extension');
+        String? associatedAppPath = await WindowsAppIcon.getAssociatedAppPath(
+          '.$extension',
+        );
         if (associatedAppPath != null &&
             associatedAppPath.isNotEmpty &&
             !_isSelfExecutable(associatedAppPath)) {
           final String appName = _getAppNameFromPath(associatedAppPath);
           final Widget appIcon = await _getWindowsAppIcon(associatedAppPath);
-          apps.add(AppInfo(
-            packageName: associatedAppPath,
-            appName: appName,
-            icon: appIcon,
-          ));
+          apps.add(
+            AppInfo(
+              packageName: associatedAppPath,
+              appName: appName,
+              icon: appIcon,
+            ),
+          );
         }
       }
 
       if (Platform.isWindows && isVideo) {
-        apps.add(AppInfo(
-          packageName: '__cb_video_player__',
-          appName: 'CB File Hub Video Player',
-          icon: const Icon(PhosphorIconsLight.playCircle, size: 36),
-        ));
+        apps.add(
+          AppInfo(
+            packageName: '__cb_video_player__',
+            appName: 'CB File Hub Video Player',
+            icon: const Icon(PhosphorIconsLight.playCircle, size: 36),
+          ),
+        );
       }
 
       if (Platform.isWindows && isArchive) {
-        apps.add(AppInfo(
-          packageName: '__cb_archive_browse__',
-          appName: 'CB File Hub (Browse archive)',
-          icon: const Icon(PhosphorIconsLight.archive, size: 36),
-        ));
+        apps.add(
+          AppInfo(
+            packageName: '__cb_archive_browse__',
+            appName: 'CB File Hub (Browse archive)',
+            icon: const Icon(PhosphorIconsLight.archive, size: 36),
+          ),
+        );
       }
 
       if (apps.isNotEmpty) {
-        apps.add(AppInfo(
-          packageName: 'shell_open',
-          appName: 'Default Program',
-          icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 36),
-        ));
+        apps.add(
+          AppInfo(
+            packageName: 'shell_open',
+            appName: 'Default Program',
+            icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 36),
+          ),
+        );
         return apps;
       }
 
-      apps.add(AppInfo(
-        packageName: 'shell_open',
-        appName: 'Default Program',
-        icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 36),
-      ));
+      apps.add(
+        AppInfo(
+          packageName: 'shell_open',
+          appName: 'Default Program',
+          icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 36),
+        ),
+      );
 
       return apps;
     } catch (e) {
@@ -405,13 +423,18 @@ class ExternalAppHelper {
 
       // Try to make it more readable
       String readable = appName.replaceAllMapped(
-          RegExp(r'([a-z])([A-Z])'), (Match m) => '${m[1]} ${m[2]}');
+        RegExp(r'([a-z])([A-Z])'),
+        (Match m) => '${m[1]} ${m[2]}',
+      );
 
       // Capitalize first letter of each word
-      readable = readable.split(' ').map((word) {
-        if (word.isEmpty) return '';
-        return word[0].toUpperCase() + word.substring(1);
-      }).join(' ');
+      readable = readable
+          .split(' ')
+          .map((word) {
+            if (word.isEmpty) return '';
+            return word[0].toUpperCase() + word.substring(1);
+          })
+          .join(' ');
 
       return readable;
     } catch (e) {
@@ -449,8 +472,9 @@ class ExternalAppHelper {
         return await _openWithWindowsDefault(filePath);
       }
       if (Platform.isAndroid) {
-        final r = await _channel
-            .invokeMethod('openWithSystemDefault', {'filePath': filePath});
+        final r = await _channel.invokeMethod('openWithSystemDefault', {
+          'filePath': filePath,
+        });
         return r == true;
       }
       return false;
@@ -472,11 +496,12 @@ class ExternalAppHelper {
     }
 
     try {
-      await Process.start(
-        'cmd',
-        ['/c', 'start', '', normalizedPath],
-        mode: ProcessStartMode.detached,
-      );
+      await Process.start('cmd', [
+        '/c',
+        'start',
+        '',
+        normalizedPath,
+      ], mode: ProcessStartMode.detached);
       return true;
     } catch (_) {
       // Fall through.
@@ -493,14 +518,15 @@ class ExternalAppHelper {
     final file = filePath.toNativeUtf16();
     try {
       final result = win32.ShellExecute(
-        0,
-        verb,
-        file,
-        nullptr,
-        nullptr,
+        null,
+        win32.PCWSTR(verb),
+        win32.PCWSTR(file),
+        null,
+        null,
         win32.SW_SHOWNORMAL,
       );
-      return result > 32;
+      // ShellExecute reports success with a pseudo-HINSTANCE greater than 32.
+      return result.address > 32;
     } catch (_) {
       return false;
     } finally {
@@ -568,10 +594,12 @@ class ExternalAppHelper {
     if (!Platform.isWindows || _windowsAssociationsEnsured) return;
     _windowsAssociationsEnsured = true;
 
-    final archiveExts =
-        FileTypeRegistry.getExtensionsForCategory(FileCategory.archive);
-    final videoExts =
-        FileTypeRegistry.getExtensionsForCategory(FileCategory.video);
+    final archiveExts = FileTypeRegistry.getExtensionsForCategory(
+      FileCategory.archive,
+    );
+    final videoExts = FileTypeRegistry.getExtensionsForCategory(
+      FileCategory.video,
+    );
     final extensions = {...archiveExts, ...videoExts}.toList(growable: false);
     if (extensions.isEmpty) return;
 
@@ -587,8 +615,9 @@ class ExternalAppHelper {
   static Future<Set<String>> getInstalledAppPackageNames() async {
     if (!Platform.isAndroid) return {};
     try {
-      final result =
-          await _channel.invokeMethod<List<dynamic>>('getInstalledAppPackages');
+      final result = await _channel.invokeMethod<List<dynamic>>(
+        'getInstalledAppPackages',
+      );
       return Set<String>.from(result ?? []);
     } catch (_) {
       return {};

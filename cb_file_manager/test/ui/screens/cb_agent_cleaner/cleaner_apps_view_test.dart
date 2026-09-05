@@ -110,8 +110,9 @@ void main() {
     }
   }
 
-  testWidgets('renders summary, filters, details, and safe callbacks',
-      (tester) async {
+  testWidgets('renders summary, filters, details, and safe callbacks', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -187,8 +188,9 @@ void main() {
     expect(opened?.path, 'C:\\Program Files\\Alpha');
   });
 
-  testWidgets('search and filters keep the visible detail selection aligned',
-      (tester) async {
+  testWidgets('search and filters keep the visible detail selection aligned', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -234,8 +236,9 @@ void main() {
     expect(cubit.state.selectedAppId, 'alpha');
   });
 
-  testWidgets('compact Vietnamese layout localizes visible labels',
-      (tester) async {
+  testWidgets('compact Vietnamese layout localizes visible labels', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(900, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -244,11 +247,7 @@ void main() {
     final cubit = CleanerAppInsightsCubit(nowProvider: () => now)
       ..setReport(fixtureReport());
     addTearDown(cubit.close);
-    await pumpView(
-      tester,
-      cubit: cubit,
-      locale: const Locale('vi'),
-    );
+    await pumpView(tester, cubit: cubit, locale: const Locale('vi'));
 
     expect(find.text('Nên xem lại'), findsOneWidget);
     expect(find.text('Nên xem'), findsWidgets);

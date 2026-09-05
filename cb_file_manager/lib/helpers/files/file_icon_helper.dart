@@ -16,7 +16,8 @@ class FileIconHelper {
   static final Map<String, String> _appPathCache = {};
 
   static Future<String?> _defaultWindowsHandlerForExtension(
-      String extension) async {
+    String extension,
+  ) async {
     final dottedExt = extension.startsWith('.') ? extension : '.$extension';
     final appPath = await WindowsAppIcon.getAssociatedAppPath(dottedExt);
     if (appPath != null && appPath.isNotEmpty && File(appPath).existsSync()) {
@@ -26,17 +27,16 @@ class FileIconHelper {
   }
 
   static Future<Widget?> _windowsIconFromAppPath(
-      String appPath, double size) async {
+    String appPath,
+    double size,
+  ) async {
     if (appPath.isEmpty || !File(appPath).existsSync()) return null;
     final nativeIcon = await WindowsAppIcon.extractIconFromFile(appPath);
     if (nativeIcon == null) return null;
     return SizedBox(
       width: size,
       height: size,
-      child: RawImage(
-        image: nativeIcon,
-        fit: BoxFit.contain,
-      ),
+      child: RawImage(image: nativeIcon, fit: BoxFit.contain),
     );
   }
 
@@ -50,8 +50,10 @@ class FileIconHelper {
   /// Pre-warm icon cache for all extensions visible in the current list.
   /// Call once after listing arrives, before items render.
   /// Safe to call multiple times — only fetches missing extensions.
-  static Future<void> warmExtensionIcons(Set<String> extensions,
-      {int size = 32}) async {
+  static Future<void> warmExtensionIcons(
+    Set<String> extensions, {
+    int size = 32,
+  }) async {
     if (!Platform.isWindows) return;
 
     // Filter to only non-media extensions that aren't already cached
@@ -189,17 +191,20 @@ class FileIconHelper {
     final String extension = _getFileExtension(file);
 
     // For APK files, use file-specific cache key to avoid cache conflicts
-    final String cacheKey =
-        extension == 'apk' ? '${file.path}_$size' : '${extension}_$size';
+    final String cacheKey = extension == 'apk'
+        ? '${file.path}_$size'
+        : '${extension}_$size';
     AppLogger.debug('APK_ICON_DEBUG:Cache key: $cacheKey');
     AppLogger.debug(
-        'APK_ICON_DEBUG:Cache contains key: ${_iconCache.containsKey(cacheKey)}');
+      'APK_ICON_DEBUG:Cache contains key: ${_iconCache.containsKey(cacheKey)}',
+    );
 
     if (_iconCache.containsKey(cacheKey)) {
       AppLogger.debug('APK_ICON_DEBUG:Using cached icon for: $cacheKey');
       final cachedIcon = _iconCache[cacheKey]!;
       AppLogger.debug(
-          'APK_ICON_DEBUG:Cached icon type: ${cachedIcon.runtimeType}');
+        'APK_ICON_DEBUG:Cached icon type: ${cachedIcon.runtimeType}',
+      );
       return cachedIcon;
     }
 
@@ -207,15 +212,21 @@ class FileIconHelper {
 
     // For images and videos, return a generic icon
     if (_isImageFile(extension)) {
-      final icon =
-          Icon(PhosphorIconsLight.image, size: size, color: Colors.blue);
+      final icon = Icon(
+        PhosphorIconsLight.image,
+        size: size,
+        color: Colors.blue,
+      );
       _iconCache[cacheKey] = icon;
       return icon;
     }
 
     if (_isVideoFile(extension)) {
-      final icon =
-          Icon(PhosphorIconsLight.videoCamera, size: size, color: Colors.red);
+      final icon = Icon(
+        PhosphorIconsLight.videoCamera,
+        size: size,
+        color: Colors.red,
+      );
       _iconCache[cacheKey] = icon;
       return icon;
     }
@@ -232,13 +243,16 @@ class FileIconHelper {
           AppLogger.debug('APK_ICON_DEBUG:Test info: $testInfo');
         }
 
-        final appInfo =
-            await ExternalAppHelper.getApkInstalledAppInfo(file.path);
+        final appInfo = await ExternalAppHelper.getApkInstalledAppInfo(
+          file.path,
+        );
         if (appInfo != null) {
           AppLogger.debug(
-              'APK_ICON_DEBUG:Got app info: ${appInfo.appName} (installed: ${appInfo.isInstalled})');
+            'APK_ICON_DEBUG:Got app info: ${appInfo.appName} (installed: ${appInfo.isInstalled})',
+          );
           AppLogger.debug(
-              'APK_ICON_DEBUG:App icon type: ${appInfo.icon.runtimeType}');
+            'APK_ICON_DEBUG:App icon type: ${appInfo.icon.runtimeType}',
+          );
 
           // Use the installed app icon
           final Widget appIcon = SizedBox(
@@ -247,14 +261,16 @@ class FileIconHelper {
             child: appInfo.icon,
           );
           AppLogger.debug(
-              'APK_ICON_DEBUG:Created appIcon widget: ${appIcon.runtimeType}');
+            'APK_ICON_DEBUG:Created appIcon widget: ${appIcon.runtimeType}',
+          );
           _iconCache[cacheKey] = appIcon;
           AppLogger.debug('APK_ICON_DEBUG:Cached appIcon with key: $cacheKey');
           AppLogger.debug('APK_ICON_DEBUG:Returning appIcon widget');
           return appIcon;
         } else {
           AppLogger.debug(
-              'APK_ICON_DEBUG:No app info returned for APK, using fallback');
+            'APK_ICON_DEBUG:No app info returned for APK, using fallback',
+          );
           // Use fallback APK icon
           final Widget fallbackIcon = Icon(
             PhosphorIconsLight.deviceMobile,
@@ -262,10 +278,12 @@ class FileIconHelper {
             color: Colors.green,
           );
           AppLogger.debug(
-              'APK_ICON_DEBUG:Created fallback icon: ${fallbackIcon.runtimeType}');
+            'APK_ICON_DEBUG:Created fallback icon: ${fallbackIcon.runtimeType}',
+          );
           _iconCache[cacheKey] = fallbackIcon;
           AppLogger.debug(
-              'APK_ICON_DEBUG:Cached fallback icon with key: $cacheKey');
+            'APK_ICON_DEBUG:Cached fallback icon with key: $cacheKey',
+          );
           AppLogger.debug('APK_ICON_DEBUG:Returning fallback icon');
           return fallbackIcon;
         }
@@ -303,7 +321,8 @@ class FileIconHelper {
 
     if (extension == 'apk') {
       AppLogger.debug(
-          'APK_ICON_DEBUG:Created generic APK icon: ${icon.runtimeType}');
+        'APK_ICON_DEBUG:Created generic APK icon: ${icon.runtimeType}',
+      );
     }
 
     _iconCache[cacheKey] = icon;
@@ -313,21 +332,21 @@ class FileIconHelper {
   }
 
   /// Get the default application icon for a file extension
-  static Future<Widget?> getDefaultAppIconForExtension(String extension,
-      {double size = 24}) async {
+  static Future<Widget?> getDefaultAppIconForExtension(
+    String extension, {
+    double size = 24,
+  }) async {
     try {
       // For APK files on Android, try to get the installed app icon
       if (extension == 'apk' && Platform.isAndroid) {
-        final tempFile =
-            File('temp.$extension'); // Dummy file với extension cần thiết
-        final appInfo =
-            await ExternalAppHelper.getApkInstalledAppInfo(tempFile.path);
+        final tempFile = File(
+          'temp.$extension',
+        ); // Dummy file với extension cần thiết
+        final appInfo = await ExternalAppHelper.getApkInstalledAppInfo(
+          tempFile.path,
+        );
         if (appInfo != null) {
-          return SizedBox(
-            width: size,
-            height: size,
-            child: appInfo.icon,
-          );
+          return SizedBox(width: size, height: size, child: appInfo.icon);
         }
       }
 
@@ -370,7 +389,8 @@ class FileIconHelper {
     _iconCache.remove(cacheKey); // Remove from cache first
 
     AppLogger.debug(
-        'APK_ICON_DEBUG:Force refreshing APK icon for: ${file.path}');
+      'APK_ICON_DEBUG:Force refreshing APK icon for: ${file.path}',
+    );
     return await getIconForFile(file, size: size);
   }
 
@@ -398,7 +418,8 @@ class FileIconHelper {
       color: Colors.green,
     );
     AppLogger.debug(
-        'APK_ICON_DEBUG:Test icon created: ${testIcon.runtimeType}');
+      'APK_ICON_DEBUG:Test icon created: ${testIcon.runtimeType}',
+    );
 
     // Force clear all cache
     _iconCache.clear();

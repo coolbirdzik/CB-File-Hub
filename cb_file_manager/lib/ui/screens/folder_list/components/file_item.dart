@@ -54,22 +54,13 @@ class NoSplashFactory extends InteractiveInkFeatureFactory {
     double? radius,
     VoidCallback? onRemoved,
   }) {
-    return _NoSplash(
-      controller: controller,
-      referenceBox: referenceBox,
-    );
+    return _NoSplash(controller: controller, referenceBox: referenceBox);
   }
 }
 
 class _NoSplash extends InteractiveInkFeature {
-  _NoSplash({
-    required MaterialInkController controller,
-    required RenderBox referenceBox,
-  }) : super(
-          controller: controller,
-          referenceBox: referenceBox,
-          color: Colors.transparent,
-        );
+  _NoSplash({required super.controller, required super.referenceBox})
+    : super(color: Colors.transparent);
 
   @override
   void paintFeature(Canvas canvas, Matrix4 transform) {
@@ -83,7 +74,7 @@ class FileItem extends StatefulWidget {
   final bool isSelectionMode;
   final bool isSelected;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
   final Future<void> Function(BuildContext, File)? onDeleteFile;
@@ -91,12 +82,12 @@ class FileItem extends StatefulWidget {
   final Function(File, bool)? onFileTap;
   final bool isDesktopMode;
   final String?
-      lastSelectedPath; // Add parameter to track last selected file for shift-selection
+  lastSelectedPath; // Add parameter to track last selected file for shift-selection
   final bool showFileTags; // Add parameter to control tag display
   final bool showItemBackground;
 
   const FileItem({
-    Key? key,
+    super.key,
     required this.file,
     required this.state,
     required this.isSelectionMode,
@@ -111,7 +102,7 @@ class FileItem extends StatefulWidget {
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
     this.showItemBackground = true,
-  }) : super(key: key);
+  });
 
   @override
   State<FileItem> createState() => _FileItemState();
@@ -164,7 +155,8 @@ class _FileItemState extends State<FileItem> {
   // Xử lý sự kiện thay đổi tag
   void _onTagChanged(String changedFilePath) {
     debugPrint(
-        "FileItem: received tag change notification: $changedFilePath for file: ${widget.file.path}");
+      "FileItem: received tag change notification: $changedFilePath for file: ${widget.file.path}",
+    );
 
     // Check for global notifications first
     if (changedFilePath == "global:tag_updated" ||
@@ -195,7 +187,8 @@ class _FileItemState extends State<FileItem> {
   void _updateTagsIfChanged() {
     final newTags = widget.state.getTagsForFile(widget.file.path);
     debugPrint(
-        "FileItem: comparing tags for ${widget.file.path}: old=$_fileTags, new=$newTags");
+      "FileItem: comparing tags for ${widget.file.path}: old=$_fileTags, new=$newTags",
+    );
     if (mounted && !_areTagListsEqual(newTags, _fileTags)) {
       debugPrint("FileItem: updating tags for ${widget.file.path}");
       setState(() {
@@ -250,7 +243,8 @@ class _FileItemState extends State<FileItem> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                AppLocalizations.of(context)!.errorDeletingTag(e.toString())),
+              AppLocalizations.of(context)!.errorDeletingTag(e.toString()),
+            ),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -265,21 +259,24 @@ class _FileItemState extends State<FileItem> {
     } else {
       // Video: default in-app player; only system default when user enabled in Settings
       if (isVideo) {
-        ExternalAppHelper.openWithPreferredVideoApp(widget.file.path)
-            .then((openedPreferred) {
+        ExternalAppHelper.openWithPreferredVideoApp(widget.file.path).then((
+          openedPreferred,
+        ) {
           if (openedPreferred) return;
 
-          locator<UserPreferences>()
-              .getUseSystemDefaultForVideo()
-              .then((useSystem) {
+          locator<UserPreferences>().getUseSystemDefaultForVideo().then((
+            useSystem,
+          ) {
             if (useSystem) {
-              ExternalAppHelper.openWithSystemDefault(widget.file.path)
-                  .then((success) {
+              ExternalAppHelper.openWithSystemDefault(widget.file.path).then((
+                success,
+              ) {
                 if (!success && mounted) {
                   RouteUtils.showAcrylicDialog(
-                      context: context,
-                      builder: (dialogContext) =>
-                          OpenWithDialog(filePath: widget.file.path));
+                    context: context,
+                    builder: (dialogContext) =>
+                        OpenWithDialog(filePath: widget.file.path),
+                  );
                 }
               });
             } else {
@@ -293,12 +290,16 @@ class _FileItemState extends State<FileItem> {
         });
       } else if (isImage) {
         if (!context.mounted) return;
-        Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(
             fullscreenDialog: true,
-            builder: (context) => ImageViewerScreen(file: widget.file)));
+            builder: (context) => ImageViewerScreen(file: widget.file),
+          ),
+        );
       } else if (FileTypeUtils.isArchiveFile(widget.file.path)) {
-        ExternalAppHelper.openFileWithApp(widget.file.path, 'shell_open')
-            .then((success) {
+        ExternalAppHelper.openFileWithApp(widget.file.path, 'shell_open').then((
+          success,
+        ) {
           if (!success && mounted) {
             RouteUtils.showAcrylicDialog(
               context: context,
@@ -313,14 +314,16 @@ class _FileItemState extends State<FileItem> {
           unawaited(InAppFileViewer.open(context, widget.file));
         }
       } else {
-        ExternalAppHelper.openFileWithApp(widget.file.path, 'shell_open')
-            .then((success) {
+        ExternalAppHelper.openFileWithApp(widget.file.path, 'shell_open').then((
+          success,
+        ) {
           if (!success) {
             if (mounted) {
               RouteUtils.showAcrylicDialog(
-                  context: context,
-                  builder: (dialogContext) =>
-                      OpenWithDialog(filePath: widget.file.path));
+                context: context,
+                builder: (dialogContext) =>
+                    OpenWithDialog(filePath: widget.file.path),
+              );
             }
           }
         });
@@ -336,8 +339,11 @@ class _FileItemState extends State<FileItem> {
 
     final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
-    widget.toggleFileSelection(widget.file.path,
-        shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
+    widget.toggleFileSelection(
+      widget.file.path,
+      shiftSelect: isShiftPressed,
+      ctrlSelect: shouldCtrlSelect,
+    );
   }
 
   void _showContextMenu(BuildContext context, Offset globalPosition) {
@@ -405,7 +411,8 @@ class _FileItemState extends State<FileItem> {
     final bool isImage = FileTypeUtils.isImageFile(widget.file.path);
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
     final renameController = InlineRenameScope.maybeOf(context);
-    final isBeingRenamed = renameController != null &&
+    final isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.file.path;
 
     // Use ValueListenableBuilder for hover and selection state to avoid full rebuilds
@@ -426,8 +433,8 @@ class _FileItemState extends State<FileItem> {
             final Color effectiveBackgroundColor = widget.showItemBackground
                 ? backgroundColor
                 : (isSelected || isHovering)
-                    ? backgroundColor
-                    : Colors.transparent;
+                ? backgroundColor
+                : Colors.transparent;
 
             return RepaintBoundary(
               child: Opacity(
@@ -438,20 +445,21 @@ class _FileItemState extends State<FileItem> {
                   cursor: SystemMouseCursors.click,
                   child: Container(
                     margin: EdgeInsets.symmetric(
-                        horizontal:
-                            widget.isDesktopMode && widget.showItemBackground
-                                ? 8.0
-                                : 0,
-                        vertical:
-                            widget.isDesktopMode && widget.showItemBackground
-                                ? 4.0
-                                : 0),
+                      horizontal:
+                          widget.isDesktopMode && widget.showItemBackground
+                          ? 8.0
+                          : 0,
+                      vertical:
+                          widget.isDesktopMode && widget.showItemBackground
+                          ? 4.0
+                          : 0,
+                    ),
                     decoration: BoxDecoration(
                       color: effectiveBackgroundColor,
                       borderRadius:
                           widget.isDesktopMode && widget.showItemBackground
-                              ? BorderRadius.circular(16)
-                              : BorderRadius.zero,
+                          ? BorderRadius.circular(16)
+                          : BorderRadius.zero,
                     ),
                     child: Stack(
                       children: [
@@ -519,13 +527,17 @@ class _FileItemState extends State<FileItem> {
                                   : null,
                               onSecondaryTapUp: (details) {
                                 _showContextMenu(
-                                    context, details.globalPosition);
+                                  context,
+                                  details.globalPosition,
+                                );
                               },
                               onLongPressStart: !widget.isDesktopMode
                                   ? (d) {
                                       HapticFeedback.mediumImpact();
                                       _showContextMenu(
-                                          context, d.globalPosition);
+                                        context,
+                                        d.globalPosition,
+                                      );
                                     }
                                   : null,
                             ),
@@ -546,12 +558,14 @@ class _FileItemState extends State<FileItem> {
                           width: 3,
                           child: IgnorePointer(
                             child: DecoratedBox(
-                              decoration: isSelected &&
+                              decoration:
+                                  isSelected &&
                                       (!widget.isDesktopMode ||
                                           !widget.showItemBackground)
                                   ? BoxDecoration(
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       borderRadius: widget.isDesktopMode
                                           ? const BorderRadius.horizontal(
                                               left: Radius.circular(12),
@@ -772,19 +786,24 @@ class _FileItemContentState extends State<_FileItemContent> {
         if (remotePath != null) {
           final meta = service.getMeta(remotePath);
           if (meta != null) {
-            final sizeText =
-                meta.size >= 0 ? FileUtils.formatFileSize(meta.size) : '--';
+            final sizeText = meta.size >= 0
+                ? FileUtils.formatFileSize(meta.size)
+                : '--';
             final modifiedText = meta.modified.toString().split('.').first;
             return Row(
               children: [
                 Text(sizeText, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(width: 12),
-                Icon(PhosphorIconsLight.calendar,
-                    size: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.calendar,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 4),
-                Text(modifiedText,
-                    style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  modifiedText,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             );
           }
@@ -793,17 +812,22 @@ class _FileItemContentState extends State<_FileItemContent> {
         // For FTP, we keyed meta by UI path directly
         final meta = service.getMeta(widget.file.path);
         if (meta != null) {
-          final sizeText =
-              meta.size >= 0 ? FileUtils.formatFileSize(meta.size) : '--';
-          final modifiedText =
-              (meta.modified ?? DateTime.now()).toString().split('.').first;
+          final sizeText = meta.size >= 0
+              ? FileUtils.formatFileSize(meta.size)
+              : '--';
+          final modifiedText = (meta.modified ?? DateTime.now())
+              .toString()
+              .split('.')
+              .first;
           return Row(
             children: [
               Text(sizeText, style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(width: 12),
-              Icon(PhosphorIconsLight.calendar,
-                  size: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              Icon(
+                PhosphorIconsLight.calendar,
+                size: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               Text(modifiedText, style: Theme.of(context).textTheme.bodySmall),
             ],
@@ -850,13 +874,17 @@ class _FileItemContentState extends State<_FileItemContent> {
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               final size = snapshot.data!.size;
-              return Text(FileUtils.formatFileSize(size),
-                  style: Theme.of(context).textTheme.bodySmall);
+              return Text(
+                FileUtils.formatFileSize(size),
+                style: Theme.of(context).textTheme.bodySmall,
+              );
             } else if (snapshot.hasError) {
               // For network files or files with stat errors
               if (widget.file.path.startsWith('#network/')) {
-                return Text(AppLocalizations.of(context)!.networkFile,
-                    style: Theme.of(context).textTheme.bodySmall);
+                return Text(
+                  AppLocalizations.of(context)!.networkFile,
+                  style: Theme.of(context).textTheme.bodySmall,
+                );
               }
               return Text('--', style: Theme.of(context).textTheme.bodySmall);
             }
@@ -866,8 +894,11 @@ class _FileItemContentState extends State<_FileItemContent> {
         ),
         if (widget.showFileTags && widget.fileTags.isNotEmpty) ...[
           const SizedBox(width: 16),
-          Icon(PhosphorIconsLight.bookmark,
-              size: 14, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            PhosphorIconsLight.bookmark,
+            size: 14,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(width: 4),
           if (tagsToShow.isEmpty)
             // If no tags fit, show count
@@ -884,17 +915,20 @@ class _FileItemContentState extends State<_FileItemContent> {
               child: Wrap(
                 spacing: 4,
                 children: tagsToShow
-                    .map((tag) => TagChip(
-                          tag: tag,
-                          isCompact: true,
-                          onTap: () {
-                            final bloc = BlocProvider.of<FolderListBloc>(
-                                context,
-                                listen: false);
-                            bloc.add(SearchByTag(tag));
-                          },
-                          onDeleted: () => widget.removeTagDirectly(tag),
-                        ))
+                    .map(
+                      (tag) => TagChip(
+                        tag: tag,
+                        isCompact: true,
+                        onTap: () {
+                          final bloc = BlocProvider.of<FolderListBloc>(
+                            context,
+                            listen: false,
+                          );
+                          bloc.add(SearchByTag(tag));
+                        },
+                        onDeleted: () => widget.removeTagDirectly(tag),
+                      ),
+                    )
                     .toList(),
               ),
             )
@@ -904,20 +938,23 @@ class _FileItemContentState extends State<_FileItemContent> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ...tagsToShow.map((tag) => Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: TagChip(
-                          tag: tag,
-                          isCompact: true,
-                          onTap: () {
-                            final bloc = BlocProvider.of<FolderListBloc>(
-                                context,
-                                listen: false);
-                            bloc.add(SearchByTag(tag));
-                          },
-                          onDeleted: () => widget.removeTagDirectly(tag),
-                        ),
-                      )),
+                  ...tagsToShow.map(
+                    (tag) => Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: TagChip(
+                        tag: tag,
+                        isCompact: true,
+                        onTap: () {
+                          final bloc = BlocProvider.of<FolderListBloc>(
+                            context,
+                            listen: false,
+                          );
+                          bloc.add(SearchByTag(tag));
+                        },
+                        onDeleted: () => widget.removeTagDirectly(tag),
+                      ),
+                    ),
+                  ),
                   Text(
                     '+${widget.fileTags.length - tagsToShow.length}',
                     style: TextStyle(
@@ -941,9 +978,9 @@ class _FileItemContentState extends State<_FileItemContent> {
         controller: widget.renameController!,
         onCommit: () => widget.renameController!.commitRename(context),
         onCancel: () => widget.renameController!.cancelRename(),
-        textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
+        textStyle: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
         textAlign: TextAlign.start,
         maxLines: 1,
       );
@@ -951,9 +988,9 @@ class _FileItemContentState extends State<_FileItemContent> {
 
     return Text(
       _getDisplayName(widget.file),
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );

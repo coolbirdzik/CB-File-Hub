@@ -50,6 +50,7 @@ import 'services/windowing/windows_native_tab_drag_drop_service.dart';
 import 'services/windowing/window_acrylic_service.dart';
 import 'ui/screens/progress_window/progress_window_screen.dart';
 import 'dev/dev_overlay.dart';
+
 // Permission explainer is pushed from TabMainScreen; no direct import needed here
 
 // Global access to test the video thumbnail screen (for development)
@@ -107,10 +108,12 @@ void _handleLaunchFiles() {
     if (!f.existsSync()) return;
     final ctx = navigatorKey.currentContext;
     if (FileTypeUtils.isVideoFile(p)) {
-      navigatorKey.currentState?.push(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => VideoPlayerFullScreen(file: f),
-      ));
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => VideoPlayerFullScreen(file: f),
+        ),
+      );
     } else if (FileTypeUtils.isArchiveFile(p) && ctx != null) {
       ArchiveNavigation.openBrowse(ctx, archiveFilePath: p);
     }
@@ -125,12 +128,14 @@ Future<void> _handleAndroidLaunchVideo() async {
     final path = m['path'] ?? '';
     final contentUri = m['contentUri'] ?? '';
     if (path.isEmpty && contentUri.isEmpty) return;
-    navigatorKey.currentState?.push(MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => path.isNotEmpty
-          ? VideoPlayerFullScreen(file: File(path))
-          : VideoPlayerFullScreen(contentUri: contentUri),
-    ));
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => path.isNotEmpty
+            ? VideoPlayerFullScreen(file: File(path))
+            : VideoPlayerFullScreen(contentUri: contentUri),
+      ),
+    );
   } catch (_) {}
 }
 
@@ -165,15 +170,21 @@ Future<bool> _resolveInitialNativeBackdropDarkMode() async {
 
 void main(List<String> args) {
   _launchPaths = List.from(args);
-  runZonedGuarded(() async {
-    await runCbFileApp();
-  }, (error, stackTrace) {
-    debugPrint('Error during app initialization: $error');
-  }, zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) {
-    if (!_shouldSuppressLog(line)) {
-      parent.print(zone, line);
-    }
-  }));
+  runZonedGuarded(
+    () async {
+      await runCbFileApp();
+    },
+    (error, stackTrace) {
+      debugPrint('Error during app initialization: $error');
+    },
+    zoneSpecification: ZoneSpecification(
+      print: (self, parent, zone, line) {
+        if (!_shouldSuppressLog(line)) {
+          parent.print(zone, line);
+        }
+      },
+    ),
+  );
 }
 
 /// Shared entry for production [main] and for `integration_test` (with `--dart-define=CB_E2E=true`).
@@ -220,8 +231,9 @@ Future<void> runCbFileApp() async {
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   final environmentVideoPath = VideoWindowService.startupVideoPath();
-  final commandLineVideoPath =
-      environmentVideoPath == null ? _takeDesktopLaunchVideoPath() : null;
+  final commandLineVideoPath = environmentVideoPath == null
+      ? _takeDesktopLaunchVideoPath()
+      : null;
 
   // Windows starts a new process for a file-association launch. If the player
   // already exists, hand the video to it and close this redundant process
@@ -239,7 +251,7 @@ Future<void> runCbFileApp() async {
   final isDedicatedVideoWindow = startupVideoPath != null;
   final isSecondaryWindow =
       env[WindowStartupPayload.envSecondaryWindowKey] == '1' ||
-          isDedicatedVideoWindow;
+      isDedicatedVideoWindow;
   final startHidden = env[WindowStartupPayload.envStartHiddenKey] == '1';
   final initialWindowPositionX = double.tryParse(
     env[WindowStartupPayload.envWindowPositionXKey] ?? '',
@@ -249,8 +261,8 @@ Future<void> runCbFileApp() async {
   );
   final initialWindowPosition =
       initialWindowPositionX != null && initialWindowPositionY != null
-          ? Offset(initialWindowPositionX, initialWindowPositionY)
-          : null;
+      ? Offset(initialWindowPositionX, initialWindowPositionY)
+      : null;
   final startDraggingWindow =
       env[WindowStartupPayload.envStartDraggingKey] == '1';
   final windowRole = isDedicatedVideoWindow
@@ -264,7 +276,7 @@ Future<void> runCbFileApp() async {
   if (isProgressWindow) {
     final ipcPort =
         int.tryParse(env[WindowStartupPayload.envProgressIpcPortKey] ?? '') ??
-            0;
+        0;
     final progressTitle =
         env[WindowStartupPayload.envProgressTitleKey] ?? 'Operation';
     final progressTotal =
@@ -281,8 +293,9 @@ Future<void> runCbFileApp() async {
     final isDark = platformBrightness == Brightness.dark;
     final solidBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5);
     final textColor = isDark ? Colors.white : Colors.black87;
-    final progressColor =
-        isDark ? const Color(0xFF90CAF9) : const Color(0xFF1565C0);
+    final progressColor = isDark
+        ? const Color(0xFF90CAF9)
+        : const Color(0xFF1565C0);
 
     try {
       final progressWindowOptions = WindowOptions(
@@ -310,34 +323,32 @@ Future<void> runCbFileApp() async {
       });
     } catch (_) {}
 
-    runApp(MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: isDark ? Brightness.dark : Brightness.light,
-        scaffoldBackgroundColor: solidBg,
-        colorScheme: isDark
-            ? ColorScheme.dark(
-                primary: progressColor,
-                surface: solidBg,
-              )
-            : ColorScheme.light(
-                primary: progressColor,
-                surface: solidBg,
-              ),
-        textTheme: TextTheme(
-          titleSmall: TextStyle(color: textColor),
-          titleMedium: TextStyle(color: textColor),
-          bodySmall: TextStyle(color: isDark ? Colors.white60 : Colors.black54),
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          brightness: isDark ? Brightness.dark : Brightness.light,
+          scaffoldBackgroundColor: solidBg,
+          colorScheme: isDark
+              ? ColorScheme.dark(primary: progressColor, surface: solidBg)
+              : ColorScheme.light(primary: progressColor, surface: solidBg),
+          textTheme: TextTheme(
+            titleSmall: TextStyle(color: textColor),
+            titleMedium: TextStyle(color: textColor),
+            bodySmall: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+          ),
+          useMaterial3: true,
         ),
-        useMaterial3: true,
+        home: ProgressWindowScreen(
+          ipcPort: ipcPort,
+          initialTitle: progressTitle,
+          initialTotal: progressTotal,
+          initialIndeterminate: progressIndeterminate,
+        ),
       ),
-      home: ProgressWindowScreen(
-        ipcPort: ipcPort,
-        initialTitle: progressTitle,
-        initialTotal: progressTotal,
-        initialIndeterminate: progressIndeterminate,
-      ),
-    ));
+    );
     return;
   }
 
@@ -438,11 +449,15 @@ Future<void> runCbFileApp() async {
 
   // Platform-specific optimizations
   if (isDesktopPlatform) {
-    SystemChannels.skia
-        .invokeMethod<void>('Skia.setResourceCacheMaxBytes', 512 * 1024 * 1024);
+    SystemChannels.skia.invokeMethod<void>(
+      'Skia.setResourceCacheMaxBytes',
+      512 * 1024 * 1024,
+    );
   } else if (Platform.isAndroid || Platform.isIOS) {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+    );
     SystemChrome.setSystemUIChangeCallback((systemOverlaysAreVisible) async {
       return;
     });
@@ -585,11 +600,13 @@ Future<void> runCbFileApp() async {
         if (decoded is Map<String, dynamic>) args = decoded;
       } catch (_) {}
     }
-    runApp(MaterialApp(
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
-      debugShowCheckedModeBanner: false,
-      home: DesktopPipWindow(args: args),
-    ));
+    runApp(
+      MaterialApp(
+        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+        debugShowCheckedModeBanner: false,
+        home: DesktopPipWindow(args: args),
+      ),
+    );
     return;
   }
 
@@ -621,8 +638,8 @@ Future<void> runCbFileApp() async {
 
   final WindowStartupPayload? startupPayload =
       kCbE2E && CbE2EConfig.startupPayload != null
-          ? CbE2EConfig.startupPayload
-          : WindowStartupPayload.fromEnvironment();
+      ? CbE2EConfig.startupPayload
+      : WindowStartupPayload.fromEnvironment();
   runApp(
     ChangeNotifierProvider(
       create: (context) => locator<ThemeProvider>(),
@@ -639,12 +656,9 @@ Future<void> runCbFileApp() async {
       !startHidden) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       unawaited(
-        Future<void>.delayed(
-          const Duration(milliseconds: 16),
-          () async {
-            await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
-          },
-        ),
+        Future<void>.delayed(const Duration(milliseconds: 16), () async {
+          await WindowsNativeTabDragDropService.startWindowDragIfMouseDown();
+        }),
       );
     });
   }
@@ -668,17 +682,15 @@ void goHome(BuildContext context) {
       return;
     }
 
-    final route = MaterialPageRoute(
-      builder: (_) => const TabMainScreen(),
-    );
+    final route = MaterialPageRoute(builder: (_) => const TabMainScreen());
 
-    Navigator.of(context, rootNavigator: true)
-        .pushAndRemoveUntil(route, (r) => false);
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushAndRemoveUntil(route, (r) => false);
   } catch (e) {
     debugPrint('Error navigating home: $e');
-    runApp(CBFileApp(
-      windowAcrylicService: WindowAcrylicService(),
-    ));
+    runApp(CBFileApp(windowAcrylicService: WindowAcrylicService()));
   }
 }
 
@@ -686,10 +698,10 @@ class CBFileApp extends StatefulWidget {
   final WindowStartupPayload? startupPayload;
   final WindowAcrylicService windowAcrylicService;
   const CBFileApp({
-    Key? key,
+    super.key,
     this.startupPayload,
     required this.windowAcrylicService,
-  }) : super(key: key);
+  });
 
   @override
   State<CBFileApp> createState() => _CBFileAppState();
@@ -979,9 +991,7 @@ class _CBFileAppState extends State<CBFileApp>
   void _disableNativeBackdrop() {
     if (!Platform.isWindows) return;
     unawaited(
-      WindowsNativeTabDragDropService.setWindowsSystemBackdrop(
-        enabled: false,
-      ),
+      WindowsNativeTabDragDropService.setWindowsSystemBackdrop(enabled: false),
     );
   }
 
@@ -1023,10 +1033,7 @@ class _CBFileAppState extends State<CBFileApp>
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('vi', ''),
-        Locale('en', ''),
-      ],
+      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
       builder: (context, child) {
         final wrappedChild = AppBusyCursorOverlay(
           child: child ?? const SizedBox.shrink(),
@@ -1057,18 +1064,13 @@ class _CBFileAppState extends State<CBFileApp>
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('vi', ''),
-        Locale('en', ''),
-      ],
+      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
       builder: (context, child) {
         // FluentApp does not insert [ScaffoldMessenger]; MaterialApp does. Several
         // screens (e.g. [TabbedFolderListScreen]) and [NavigationController] use
         // [ScaffoldMessenger.of] for snackbars — wrap so those lookups succeed.
         final shell = ScaffoldMessenger(
-          child: AppBusyCursorOverlay(
-            child: child ?? const SizedBox.shrink(),
-          ),
+          child: AppBusyCursorOverlay(child: child ?? const SizedBox.shrink()),
         );
         final brightness = fluent.FluentTheme.of(context).brightness;
         final resolvedTheme = brightness == Brightness.dark
@@ -1087,10 +1089,7 @@ class _CBFileAppState extends State<CBFileApp>
               )
             : resolvedTheme;
 
-        Widget result = Theme(
-          data: materialTheme,
-          child: shell,
-        );
+        Widget result = Theme(data: materialTheme, child: shell);
 
         if (_useDesktopAcrylicVisuals) {
           result = DesktopAcrylicBackdrop(
@@ -1134,8 +1133,9 @@ class _CBFileAppState extends State<CBFileApp>
           ? _buildFluentHostApp(themeProvider)
           : _buildMaterialHostApp(themeProvider),
     );
-    final app =
-        isDevOverlayEnabled ? DevOverlay(child: appContent) : appContent;
+    final app = isDevOverlayEnabled
+        ? DevOverlay(child: appContent)
+        : appContent;
 
     return app;
   }

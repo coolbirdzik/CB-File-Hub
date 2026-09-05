@@ -5,7 +5,7 @@ import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
 
 class FeaturedAlbumsSettingsScreen extends StatefulWidget {
-  const FeaturedAlbumsSettingsScreen({Key? key}) : super(key: key);
+  const FeaturedAlbumsSettingsScreen({super.key});
 
   @override
   State<FeaturedAlbumsSettingsScreen> createState() =>
@@ -107,8 +107,10 @@ class _FeaturedAlbumsSettingsScreenState
         const Divider(),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
-          child: Text('Manually select featured albums',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          child: Text(
+            'Manually select featured albums',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
         ...allAlbums.map((album) {
           return CheckboxListTile(

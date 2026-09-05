@@ -18,13 +18,10 @@ class BrowserLikeActionHandlers {
     required BuildContext context,
     required Widget dialog,
     Future<bool?> Function(BuildContext context, Widget dialog)?
-        showDialogWithWidget,
+    showDialogWithWidget,
   }) async {
     final confirmed = showDialogWithWidget == null
-        ? await showDialog<bool>(
-            context: context,
-            builder: (_) => dialog,
-          )
+        ? await showDialog<bool>(context: context, builder: (_) => dialog)
         : await showDialogWithWidget(context, dialog);
     if (!context.mounted) {
       return false;
@@ -59,7 +56,7 @@ class BrowserLikeActionHandlers {
     required bool permanent,
     required VoidCallback onClearSelection,
     void Function(Set<String> deletedPaths, String? nextFocusPath)?
-        onDeleteConfirmed,
+    onDeleteConfirmed,
   }) {
     final selectionState = selectionBloc.state;
     return FileOperationsHandler.handleDelete(
@@ -85,10 +82,12 @@ class BrowserLikeActionHandlers {
       ensureSelectionMode?.call();
     }
 
-    selectionBloc.add(SelectAll(
-      allFilePaths: allFilePaths.toList(),
-      allFolderPaths: allFolderPaths.toList(),
-    ));
+    selectionBloc.add(
+      SelectAll(
+        allFilePaths: allFilePaths.toList(),
+        allFolderPaths: allFolderPaths.toList(),
+      ),
+    );
   }
 
   static void copySelectionOrFocused({
@@ -186,8 +185,9 @@ class BrowserLikeActionHandlers {
   static Future<Set<String>> confirmAndMoveFilesToTrash({
     required BuildContext context,
     required List<String> filePaths,
+    bool permanent = false,
     Future<bool?> Function(BuildContext context, Widget dialog)?
-        showDialogWithWidget,
+    showDialogWithWidget,
     required Future<void> Function(String filePath) onMoved,
     Future<void> Function(Set<String> deletedPaths)? onAfterSuccess,
     void Function(String filePath, Object error)? onMoveError,
@@ -204,11 +204,15 @@ class BrowserLikeActionHandlers {
     final totalCount = filePaths.length;
     final firstName = path.basename(filePaths.first);
     final dialog = DeleteConfirmationDialog(
-      title: l10n.moveToTrash,
-      message: totalCount == 1
-          ? l10n.moveToTrashConfirmMessage(firstName)
-          : l10n.moveItemsToTrashConfirmation(totalCount, l10n.items),
-      confirmText: l10n.moveToTrash,
+      title: permanent ? l10n.permanentDeleteTitle : l10n.moveToTrash,
+      message: permanent
+          ? (totalCount == 1
+                ? l10n.confirmDeletePermanent(firstName)
+                : l10n.confirmDeletePermanentMultiple(totalCount))
+          : (totalCount == 1
+                ? l10n.moveToTrashConfirmMessage(firstName)
+                : l10n.moveItemsToTrashConfirmation(totalCount, l10n.items)),
+      confirmText: permanent ? l10n.deleteTitle : l10n.moveToTrash,
       cancelText: l10n.cancel,
       previewPaths: filePaths.take(4).toList(),
     );
@@ -224,27 +228,48 @@ class BrowserLikeActionHandlers {
 
     final deletedPaths = <String>{};
     final trashManager = TrashManager();
-    await runBatchOperation<String>(
-      items: filePaths,
-      operation: (filePath) async {
-        final moved = await trashManager.moveToTrash(filePath);
-        if (!moved) {
-          return false;
+    if (permanent) {
+      deletedPaths.addAll(
+        await trashManager.deleteMultiplePermanently(
+          filePaths,
+          onError: onMoveError,
+        ),
+      );
+      for (final filePath in deletedPaths) {
+        try {
+          await onMoved(filePath);
+        } catch (error) {
+          onMoveError?.call(filePath, error);
         }
-        deletedPaths.add(filePath);
-        await onMoved(filePath);
-        return true;
-      },
-      onItemError: onMoveError,
-    );
+      }
+    } else {
+      await runBatchOperation<String>(
+        items: filePaths,
+        operation: (filePath) async {
+          final moved = await trashManager.moveToTrash(filePath);
+          if (!moved) {
+            return false;
+          }
+          deletedPaths.add(filePath);
+          await onMoved(filePath);
+          return true;
+        },
+        onItemError: onMoveError,
+      );
+    }
 
     if (!context.mounted) {
       return deletedPaths;
     }
 
+    final failedCount = filePaths.length - deletedPaths.length;
     if (deletedPaths.isEmpty) {
       AppToast.error(
-          context, l10n.failedToDelete(path.basename(filePaths.first)));
+        context,
+        filePaths.length == 1
+            ? l10n.failedToDelete(path.basename(filePaths.first))
+            : l10n.failedToDeleteFilesCount(filePaths.length),
+      );
       return deletedPaths;
     }
 
@@ -256,10 +281,21 @@ class BrowserLikeActionHandlers {
       return deletedPaths;
     }
 
-    final message = deletedPaths.length == 1
-        ? l10n.movedToTrash(path.basename(deletedPaths.first))
-        : l10n.movedToTrash('${deletedPaths.length} ${l10n.items}');
-    AppToast.success(context, message);
+    if (failedCount > 0) {
+      AppToast.error(
+        context,
+        l10n.itemsDeletedWithFailures(deletedPaths.length, failedCount),
+      );
+    } else {
+      final message = permanent
+          ? (deletedPaths.length == 1
+                ? l10n.itemPermanentlyDeleted(path.basename(deletedPaths.first))
+                : l10n.itemsPermanentlyDeletedCount(deletedPaths.length))
+          : (deletedPaths.length == 1
+                ? l10n.movedToTrash(path.basename(deletedPaths.first))
+                : l10n.movedToTrash('${deletedPaths.length} ${l10n.items}'));
+      AppToast.success(context, message);
+    }
 
     return deletedPaths;
   }
@@ -295,7 +331,8 @@ class BrowserLikeActionHandlers {
   }
 
   static List<FileSystemEntity> _selectedEntities(
-      SelectionState selectionState) {
+    SelectionState selectionState,
+  ) {
     final allPaths = <String>[
       ...selectionState.selectedFilePaths,
       ...selectionState.selectedFolderPaths,

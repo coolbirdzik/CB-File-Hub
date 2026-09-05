@@ -45,7 +45,8 @@ class AiChatHistoryService {
 
   /// Returns the most recently updated conversation summary for [workspacePath].
   Future<AiConversationSummary?> findLatestSummaryForPath(
-      String workspacePath) async {
+    String workspacePath,
+  ) async {
     final normalizedPath = normalizeWorkspacePath(workspacePath);
     if (normalizedPath.isEmpty) return null;
 
@@ -70,7 +71,8 @@ class AiChatHistoryService {
           .toList();
     } catch (e) {
       AppLogger.warning(
-          '[AiChatHistoryService] Failed to load conversation $id: $e');
+        '[AiChatHistoryService] Failed to load conversation $id: $e',
+      );
       return [];
     }
   }
@@ -81,17 +83,22 @@ class AiChatHistoryService {
   /// The list is capped at [_maxMessages].
   /// [initialPath] is the directory the user was browsing when the conversation started.
   Future<void> saveConversation(
-      String id, String title, List<AiMessage> messages,
-      {String initialPath = ''}) async {
+    String id,
+    String title,
+    List<AiMessage> messages, {
+    String initialPath = '',
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
       // Persist messages
       final toSave = messages
-          .where((m) =>
-              (m.role == AiMessageRole.user ||
-                  m.role == AiMessageRole.assistant) &&
-              !m.isLoading)
+          .where(
+            (m) =>
+                (m.role == AiMessageRole.user ||
+                    m.role == AiMessageRole.assistant) &&
+                !m.isLoading,
+          )
           .toList();
       final capped = toSave.length > _maxMessages
           ? toSave.sublist(toSave.length - _maxMessages)
@@ -129,7 +136,8 @@ class AiChatHistoryService {
       await _saveIndex(prefs, summaries);
     } catch (e) {
       AppLogger.warning(
-          '[AiChatHistoryService] Failed to save conversation $id: $e');
+        '[AiChatHistoryService] Failed to save conversation $id: $e',
+      );
     }
   }
 
@@ -143,7 +151,8 @@ class AiChatHistoryService {
       await _saveIndex(prefs, summaries);
     } catch (e) {
       AppLogger.warning(
-          '[AiChatHistoryService] Failed to delete conversation $id: $e');
+        '[AiChatHistoryService] Failed to delete conversation $id: $e',
+      );
     }
   }
 
@@ -152,7 +161,8 @@ class AiChatHistoryService {
   // ---------------------------------------------------------------------------
 
   Future<List<AiConversationSummary>> _loadIndex(
-      SharedPreferences prefs) async {
+    SharedPreferences prefs,
+  ) async {
     final jsonStr = prefs.getString(_indexKey);
     if (jsonStr == null) return [];
     try {
@@ -166,7 +176,9 @@ class AiChatHistoryService {
   }
 
   Future<void> _saveIndex(
-      SharedPreferences prefs, List<AiConversationSummary> summaries) async {
+    SharedPreferences prefs,
+    List<AiConversationSummary> summaries,
+  ) async {
     await prefs.setString(
       _indexKey,
       jsonEncode(summaries.map((s) => s.toJson()).toList()),
@@ -191,7 +203,10 @@ class AiChatHistoryService {
           );
           final id = _uuid.v4();
           await saveConversation(
-              id, titleFromContent(firstUser.content), messages);
+            id,
+            titleFromContent(firstUser.content),
+            messages,
+          );
         }
       }
       await prefs.remove(_legacyKey);
@@ -220,10 +235,12 @@ class AiChatHistoryService {
       normalized = normalized.replaceAll('\\', Platform.pathSeparator);
     }
 
-    while (
-        normalized.length > 1 && normalized.endsWith(Platform.pathSeparator)) {
+    while (normalized.length > 1 &&
+        normalized.endsWith(Platform.pathSeparator)) {
       normalized = normalized.substring(
-          0, normalized.length - Platform.pathSeparator.length);
+        0,
+        normalized.length - Platform.pathSeparator.length,
+      );
     }
 
     if (Platform.isWindows) {

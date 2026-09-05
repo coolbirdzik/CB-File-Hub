@@ -42,13 +42,13 @@ class AiSidePanel extends StatefulWidget {
   final VoidCallback onWidthChangeEnd;
 
   const AiSidePanel({
-    Key? key,
+    super.key,
     required this.bloc,
     required this.onClose,
     required this.width,
     required this.onWidthChanged,
     required this.onWidthChangeEnd,
-  }) : super(key: key);
+  });
 
   @override
   State<AiSidePanel> createState() => _AiSidePanelState();
@@ -115,8 +115,9 @@ class _AiSidePanelState extends State<AiSidePanel> {
         // finishes laying out all items (important for large conversations).
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
-            _scrollController
-                .jumpTo(_scrollController.position.maxScrollExtent);
+            _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent,
+            );
           }
         });
       }
@@ -168,7 +169,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
                                 children: [
                                   ConversationListPanel(
                                     onClose: () => setState(
-                                        () => _showConversations = false),
+                                      () => _showConversations = false,
+                                    ),
                                   ),
                                   // Drag handle on the right edge
                                   Positioned(
@@ -181,10 +183,13 @@ class _AiSidePanelState extends State<AiSidePanel> {
                                         behavior: HitTestBehavior.opaque,
                                         onHorizontalDragUpdate: (details) {
                                           setState(() {
-                                            _convPanelWidth = (_convPanelWidth +
-                                                    details.delta.dx)
-                                                .clamp(_convPanelMinWidth,
-                                                    _convPanelMaxWidth);
+                                            _convPanelWidth =
+                                                (_convPanelWidth +
+                                                        details.delta.dx)
+                                                    .clamp(
+                                                      _convPanelMinWidth,
+                                                      _convPanelMaxWidth,
+                                                    );
                                           });
                                         },
                                         child: const SizedBox(width: 4),
@@ -242,7 +247,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
 
                           // Messages
                           Expanded(
-                            child: state.messages.isEmpty &&
+                            child:
+                                state.messages.isEmpty &&
                                     state.pendingApproval == null
                                 ? _buildEmptyState(context, l, theme, state)
                                 : _buildMessages(context, state),
@@ -251,11 +257,15 @@ class _AiSidePanelState extends State<AiSidePanel> {
                           // Workspace indicator + Input
                           ChatInputBar(
                             onStop: () => _bloc.add(const StopGeneration()),
-                            onSend: (text, files) => _bloc
-                                .add(SendMessage(text, referencedFiles: files)),
+                            onSend: (text, files) => _bloc.add(
+                              SendMessage(text, referencedFiles: files),
+                            ),
                             isLoading: state.isLoading,
-                            workspaceIndicator:
-                                _buildWorkspaceIndicator(context, theme, state),
+                            workspaceIndicator: _buildWorkspaceIndicator(
+                              context,
+                              theme,
+                              state,
+                            ),
                           ),
                         ],
                       );
@@ -293,7 +303,10 @@ class _AiSidePanelState extends State<AiSidePanel> {
   }
 
   Widget _buildWorkspaceIndicator(
-      BuildContext context, ThemeData theme, AiAgentState state) {
+    BuildContext context,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     final isDark = theme.brightness == Brightness.dark;
     final path = state.currentPath;
     // Show just the last folder segment for compactness
@@ -350,8 +363,9 @@ class _AiSidePanelState extends State<AiSidePanel> {
               child: Icon(
                 PhosphorIconsLight.info,
                 size: 11,
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.4,
+                ),
               ),
             ),
           // Context size indicator
@@ -375,7 +389,10 @@ class _AiSidePanelState extends State<AiSidePanel> {
   }
 
   Widget _buildErrorBanner(
-      BuildContext context, ThemeData theme, AiAgentState state) {
+    BuildContext context,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -391,8 +408,11 @@ class _AiSidePanelState extends State<AiSidePanel> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(PhosphorIconsLight.warningCircle,
-              size: 14, color: theme.colorScheme.error),
+          Icon(
+            PhosphorIconsLight.warningCircle,
+            size: 14,
+            color: theme.colorScheme.error,
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: Column(
@@ -455,7 +475,8 @@ class _AiSidePanelState extends State<AiSidePanel> {
     }
 
     return Tooltip(
-      message: '$messageCount messages · $totalChars chars\n'
+      message:
+          '$messageCount messages · $totalChars chars\n'
           'Context trimming starts at ~24K chars',
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -475,8 +496,12 @@ class _AiSidePanelState extends State<AiSidePanel> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, AppLocalizations l, ThemeData theme,
-      AiAgentState state) {
+  Widget _buildHeader(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     final isDark = theme.brightness == Brightness.dark;
     return Container(
       height: 44,
@@ -492,8 +517,11 @@ class _AiSidePanelState extends State<AiSidePanel> {
             onPressed: _toggleConversations,
           ),
           const SizedBox(width: 4),
-          Icon(PhosphorIconsLight.sparkle,
-              size: 18, color: theme.colorScheme.primary),
+          Icon(
+            PhosphorIconsLight.sparkle,
+            size: 18,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -537,18 +565,23 @@ class _AiSidePanelState extends State<AiSidePanel> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, AppLocalizations l,
-      ThemeData theme, AiAgentState state) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(PhosphorIconsLight.sparkle,
-                size: 36,
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+            Icon(
+              PhosphorIconsLight.sparkle,
+              size: 36,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 12),
             Text(
               l.askAiToFindFiles,
@@ -564,24 +597,32 @@ class _AiSidePanelState extends State<AiSidePanel> {
                 onTap: () => _navigateToSettings(context),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color:
-                        theme.colorScheme.errorContainer.withValues(alpha: 0.5),
+                    color: theme.colorScheme.errorContainer.withValues(
+                      alpha: 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(PhosphorIconsLight.gear,
-                          size: 12, color: theme.colorScheme.primary),
+                      Icon(
+                        PhosphorIconsLight.gear,
+                        size: 12,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 4),
-                      Text(l.setupAiProvider,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.primary,
-                          )),
+                      Text(
+                        l.setupAiProvider,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -630,10 +671,12 @@ class _AiSidePanelState extends State<AiSidePanel> {
             if (index < state.messages.length) {
               final message = state.messages[index];
               final isAssistant = message.role == AiMessageRole.assistant;
-              final hasResults = isAssistant &&
+              final hasResults =
+                  isAssistant &&
                   message.searchResults != null &&
                   message.searchResults!.isNotEmpty;
-              final hasToolCalls = isAssistant &&
+              final hasToolCalls =
+                  isAssistant &&
                   message.toolCalls != null &&
                   message.toolCalls!.isNotEmpty;
 
@@ -643,8 +686,11 @@ class _AiSidePanelState extends State<AiSidePanel> {
                   // Tool calls render BEFORE the assistant message
                   if (hasToolCalls)
                     Padding(
-                      padding:
-                          const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        bottom: 4,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: message.toolCalls!
@@ -656,22 +702,24 @@ class _AiSidePanelState extends State<AiSidePanel> {
                     message: message,
                     onEdit:
                         !state.isLoading && message.role == AiMessageRole.user
-                            ? (content) => _bloc.add(
-                                  EditMessage(
-                                    messageId: message.id,
-                                    content: content,
-                                  ),
-                                )
-                            : null,
+                        ? (content) => _bloc.add(
+                            EditMessage(
+                              messageId: message.id,
+                              content: content,
+                            ),
+                          )
+                        : null,
                   ),
                   if (hasResults)
-                    ...message.searchResults!.map((r) => FileResultCard(
-                          result: r,
-                          onTap: () => _openFileInTab(context, r.path),
-                          onOpenFolder: () => _openFolderInTab(context, r.path),
-                          onOpenExternal: () =>
-                              _openFileExternal(context, r.path),
-                        )),
+                    ...message.searchResults!.map(
+                      (r) => FileResultCard(
+                        result: r,
+                        onTap: () => _openFileInTab(context, r.path),
+                        onOpenFolder: () => _openFolderInTab(context, r.path),
+                        onOpenExternal: () =>
+                            _openFileExternal(context, r.path),
+                      ),
+                    ),
                 ],
               );
             }
@@ -721,8 +769,10 @@ class _AiSidePanelState extends State<AiSidePanel> {
   void _scrollByPage(int direction) {
     final position = _scrollController.position;
     final viewport = position.viewportDimension;
-    final target = (position.pixels + (viewport * direction))
-        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    final target = (position.pixels + (viewport * direction)).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
     _scrollController.animateTo(
       target.toDouble(),
       duration: const Duration(milliseconds: 160),
@@ -731,7 +781,10 @@ class _AiSidePanelState extends State<AiSidePanel> {
   }
 
   Widget _buildApprovalCard(
-      BuildContext context, ThemeData theme, AiAgentState state) {
+    BuildContext context,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     final approval = state.pendingApproval!;
     return ApprovalCard(
       approval: approval,
@@ -777,18 +830,24 @@ class _AiSidePanelState extends State<AiSidePanel> {
       // Navigate the current tab directly
       tabBloc.add(UpdateTabPath(activeTab.id, parentDir));
       // Also update name and highlight
-      tabBloc.add(UpdateTabName(
-          activeTab.id, parentDir.split(Platform.pathSeparator).last));
+      tabBloc.add(
+        UpdateTabName(
+          activeTab.id,
+          parentDir.split(Platform.pathSeparator).last,
+        ),
+      );
       // Add new tab for highlight (since UpdateTabPath doesn't support highlight)
       // Use AddTab only if the tab is a system screen
     } else {
       // No suitable active tab — open a new one
-      tabBloc.add(AddTab(
-        path: parentDir,
-        name: parentDir.split(Platform.pathSeparator).last,
-        switchToTab: true,
-        highlightedFileName: fileName,
-      ));
+      tabBloc.add(
+        AddTab(
+          path: parentDir,
+          name: parentDir.split(Platform.pathSeparator).last,
+          switchToTab: true,
+          highlightedFileName: fileName,
+        ),
+      );
     }
   }
 
@@ -800,25 +859,27 @@ class _AiSidePanelState extends State<AiSidePanel> {
     final activeTab = tabBloc.state.activeTab;
     if (activeTab != null && !activeTab.path.startsWith('#')) {
       tabBloc.add(UpdateTabPath(activeTab.id, parentDir));
-      tabBloc.add(UpdateTabName(
-          activeTab.id, parentDir.split(Platform.pathSeparator).last));
+      tabBloc.add(
+        UpdateTabName(
+          activeTab.id,
+          parentDir.split(Platform.pathSeparator).last,
+        ),
+      );
     } else {
-      tabBloc.add(AddTab(
-        path: parentDir,
-        name: parentDir.split(Platform.pathSeparator).last,
-        switchToTab: true,
-      ));
+      tabBloc.add(
+        AddTab(
+          path: parentDir,
+          name: parentDir.split(Platform.pathSeparator).last,
+          switchToTab: true,
+        ),
+      );
     }
   }
 
   void _openFileExternal(BuildContext context, String filePath) {
     try {
       if (Platform.isWindows) {
-        Process.start(
-          'explorer',
-          [filePath],
-          mode: ProcessStartMode.detached,
-        );
+        Process.start('explorer', [filePath], mode: ProcessStartMode.detached);
       } else if (Platform.isMacOS) {
         Process.start('open', [filePath], mode: ProcessStartMode.detached);
       } else {
@@ -837,11 +898,13 @@ class _AiSidePanelState extends State<AiSidePanel> {
     if (existingTab.id.isNotEmpty) {
       tabBloc.add(SwitchToTab(existingTab.id));
     } else {
-      tabBloc.add(AddTab(
-        path: kSettingsPath,
-        name: AppLocalizations.of(context)!.settings,
-        switchToTab: true,
-      ));
+      tabBloc.add(
+        AddTab(
+          path: kSettingsPath,
+          name: AppLocalizations.of(context)!.settings,
+          switchToTab: true,
+        ),
+      );
     }
   }
 }
@@ -878,8 +941,9 @@ class _AiPanelResizeHandle extends StatelessWidget {
                 width: 3,
                 height: 72,
                 decoration: BoxDecoration(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.75),
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.75,
+                  ),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -918,13 +982,13 @@ class _PanelHeaderIconButtonState extends State<_PanelHeaderIconButton> {
 
     final bg = _pressed
         ? (widget.isDark
-            ? Colors.white.withValues(alpha: 0.14)
-            : Colors.black.withValues(alpha: 0.10))
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.black.withValues(alpha: 0.10))
         : _hovered
-            ? (widget.isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06))
-            : Colors.transparent;
+        ? (widget.isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06))
+        : Colors.transparent;
 
     Widget btn = MouseRegion(
       cursor: SystemMouseCursors.click,

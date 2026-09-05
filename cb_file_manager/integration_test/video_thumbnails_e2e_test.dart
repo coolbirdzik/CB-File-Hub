@@ -54,7 +54,10 @@ void main() {
           ? Uri.parse(scriptStr).toFilePath()
           : scriptStr;
       return p.join(
-          p.dirname(scriptPath), 'samples', 'file_example_MP4_1920_18MG.mp4');
+        p.dirname(scriptPath),
+        'samples',
+        'file_example_MP4_1920_18MG.mp4',
+      );
     } catch (_) {
       return '';
     }
@@ -103,8 +106,9 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('Video Thumbnails', () {
-    testWidgets('video file row is visible and has correct file type',
-        (WidgetTester tester) async {
+    testWidgets('video file row is visible and has correct file type', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_video_');
       final videoFile = copySampleVideo(dir.path, 'my_video.mp4');
@@ -135,8 +139,9 @@ void main() {
       }
     });
 
-    testWidgets('video context menu shows Play video action (grid view)',
-        (WidgetTester tester) async {
+    testWidgets('video context menu shows Play video action (grid view)', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_videomenu_');
       final videoFile = copySampleVideo(dir.path, 'clip.mp4');
@@ -158,10 +163,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         // The video context menu should contain the play_video action.
-        final playFinder = find
-            .byKey(const ValueKey<String>('context-menu-action-play_video'));
-        expect(playFinder, findsAtLeastNWidgets(1),
-            reason: '"Play video" should appear in video file context menu');
+        final playFinder = find.byKey(
+          const ValueKey<String>('context-menu-action-play_video'),
+        );
+        expect(
+          playFinder,
+          findsAtLeastNWidgets(1),
+          reason: '"Play video" should appear in video file context menu',
+        );
 
         await dismissDialog(tester);
 
@@ -172,11 +181,13 @@ void main() {
       }
     });
 
-    testWidgets('video context menu shows Play video action (list view)',
-        (WidgetTester tester) async {
+    testWidgets('video context menu shows Play video action (list view)', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
-      final dir =
-          await Directory.systemTemp.createTemp('cb_e2e_videomenulist_');
+      final dir = await Directory.systemTemp.createTemp(
+        'cb_e2e_videomenulist_',
+      );
       final videoFile = copySampleVideo(dir.path, 'clip_list.mp4');
 
       CbE2EConfig.startupPayload = WindowStartupPayload(
@@ -196,11 +207,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         // "Play video" should be visible
-        final playFinder = find
-            .byKey(const ValueKey<String>('context-menu-action-play_video'));
-        expect(playFinder, findsAtLeastNWidgets(1),
-            reason:
-                '"Play video" should appear in list view video context menu');
+        final playFinder = find.byKey(
+          const ValueKey<String>('context-menu-action-play_video'),
+        );
+        expect(
+          playFinder,
+          findsAtLeastNWidgets(1),
+          reason: '"Play video" should appear in list view video context menu',
+        );
 
         await dismissDialog(tester);
 
@@ -211,8 +225,9 @@ void main() {
       }
     });
 
-    testWidgets('multiple video formats display correctly in same folder',
-        (WidgetTester tester) async {
+    testWidgets('multiple video formats display correctly in same folder', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_multivideo_');
       final mp4File = copySampleVideo(dir.path, 'video.mp4');
@@ -253,8 +268,9 @@ void main() {
       }
     });
 
-    testWidgets('video files persist after folder refresh (F5)',
-        (WidgetTester tester) async {
+    testWidgets('video files persist after folder refresh (F5)', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_videorefresh_');
       final videoFile = copySampleVideo(dir.path, 'after_refresh.mp4');
@@ -288,8 +304,9 @@ void main() {
       }
     });
 
-    testWidgets('deleting a video file removes it from the list',
-        (WidgetTester tester) async {
+    testWidgets('deleting a video file removes it from the list', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_videodel_');
       final videoFile = copySampleVideo(dir.path, 'to_delete.mp4');
@@ -326,8 +343,11 @@ void main() {
         expectFileRowVisible(keepFile.path);
 
         // File should also be deleted from disk
-        expect(videoFile.existsSync(), isFalse,
-            reason: 'Video file should be deleted from disk');
+        expect(
+          videoFile.existsSync(),
+          isFalse,
+          reason: 'Video file should be deleted from disk',
+        );
 
         if (kDebugMode) debugPrint('[E2E] delete video file — SUCCESS');
       } finally {
@@ -336,8 +356,9 @@ void main() {
       }
     });
 
-    testWidgets('video file can be renamed via context menu',
-        (WidgetTester tester) async {
+    testWidgets('video file can be renamed via context menu', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_videorename_');
       final originalVideo = copySampleVideo(dir.path, 'original_name.mp4');
@@ -365,10 +386,16 @@ void main() {
 
         // Type the new name (overwrite the extension)
         final textFields = find.byType(TextField);
-        expect(textFields, findsAtLeastNWidgets(1),
-            reason: 'Rename TextField not found');
-        await et.enterText(textFields.first, newVideoName,
-            detail: 'type_new_name');
+        expect(
+          textFields,
+          findsAtLeastNWidgets(1),
+          reason: 'Rename TextField not found',
+        );
+        await et.enterText(
+          textFields.first,
+          newVideoName,
+          detail: 'type_new_name',
+        );
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await et.pumpAndSettle(const Duration(seconds: 3));
@@ -384,8 +411,9 @@ void main() {
       }
     });
 
-    testWidgets('opening a video via context menu does not crash app',
-        (WidgetTester tester) async {
+    testWidgets('opening a video via context menu does not crash app', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_videoplay_');
       final videoFile = copySampleVideo(dir.path, 'play_this.mp4');
@@ -425,8 +453,11 @@ void main() {
         //   (c) OpenWithDialog appeared
         // We fail only if the entire widget tree is gone (process crashed).
         final hasAppRoot = find.byType(WidgetsApp).evaluate().isNotEmpty;
-        expect(hasAppRoot, isTrue,
-            reason: 'App root widget gone — process likely crashed.');
+        expect(
+          hasAppRoot,
+          isTrue,
+          reason: 'App root widget gone — process likely crashed.',
+        );
 
         if (kDebugMode) debugPrint('[E2E] open video — SUCCESS');
       } finally {
@@ -435,8 +466,9 @@ void main() {
       }
     });
 
-    testWidgets('video file row is FileItem not FolderItem',
-        (WidgetTester tester) async {
+    testWidgets('video file row is FileItem not FolderItem', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_videothumb_');
       final videoFile = copySampleVideo(dir.path, 'thumb_video.mp4');
@@ -466,8 +498,9 @@ void main() {
       }
     });
 
-    testWidgets('unsupported video extension does not show Play video action',
-        (WidgetTester tester) async {
+    testWidgets('unsupported video extension does not show Play video action', (
+      WidgetTester tester,
+    ) async {
       final et = E2ETester(tester);
       final dir = await Directory.systemTemp.createTemp('cb_e2e_badvideo_');
       // Create a file with an unrecognized extension
@@ -496,8 +529,11 @@ void main() {
 
         final playFinder = find.text('Play video');
         // Unsupported extension should NOT show video actions
-        expect(playFinder, findsNothing,
-            reason: '"Play video" should NOT appear for .abc extension');
+        expect(
+          playFinder,
+          findsNothing,
+          reason: '"Play video" should NOT appear for .abc extension',
+        );
 
         await dismissDialog(tester);
 

@@ -17,8 +17,11 @@ void albumIsolateEntry(SendPort sendPort) async {
         final totalFiles = imageFiles.length;
         int processedFiles = 0;
 
-        replyPort
-            .send({'status': 'scanning', 'current': 0, 'total': totalFiles});
+        replyPort.send({
+          'status': 'scanning',
+          'current': 0,
+          'total': totalFiles,
+        });
 
         for (final _ in imageFiles) {
           // In a real isolate, you'd need a mechanism to access the database.
@@ -39,7 +42,7 @@ void albumIsolateEntry(SendPort sendPort) async {
         replyPort.send({
           'status': 'completed',
           'current': totalFiles,
-          'total': totalFiles
+          'total': totalFiles,
         });
       } catch (e) {
         replyPort.send({'status': 'error', 'error': e.toString()});

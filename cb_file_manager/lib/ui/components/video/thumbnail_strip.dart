@@ -21,13 +21,13 @@ class ThumbnailStrip extends StatefulWidget {
   final double spacing;
 
   const ThumbnailStrip({
-    Key? key,
+    super.key,
     required this.images,
     required this.currentIndex,
     required this.onThumbnailTap,
     this.thumbnailSize = 54.0,
     this.spacing = 4.0,
-  }) : super(key: key);
+  });
 
   @override
   State<ThumbnailStrip> createState() => _ThumbnailStripState();

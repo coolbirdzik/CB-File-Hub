@@ -41,14 +41,16 @@ class SelectionState extends Equatable {
   }
 
   /// Get a list of all selected paths (files and folders combined)
-  List<String> get allSelectedPaths =>
-      [...selectedFilePaths, ...selectedFolderPaths];
+  List<String> get allSelectedPaths => [
+    ...selectedFilePaths,
+    ...selectedFolderPaths,
+  ];
 
   @override
   List<Object?> get props => [
-        selectedFilePaths,
-        selectedFolderPaths,
-        isSelectionMode,
-        lastSelectedPath,
-      ];
+    selectedFilePaths,
+    selectedFolderPaths,
+    isSelectionMode,
+    lastSelectedPath,
+  ];
 }

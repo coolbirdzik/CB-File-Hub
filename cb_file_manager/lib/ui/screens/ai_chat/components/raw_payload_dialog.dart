@@ -13,7 +13,7 @@ import '../../../../bloc/ai_agent/ai_agent_state.dart';
 class RawPayloadDialog extends StatelessWidget {
   final AiAgentState state;
 
-  const RawPayloadDialog({Key? key, required this.state}) : super(key: key);
+  const RawPayloadDialog({super.key, required this.state});
 
   static Future<void> show(BuildContext context, AiAgentState state) {
     return showDialog<void>(
@@ -42,12 +42,18 @@ class RawPayloadDialog extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(PhosphorIconsLight.code,
-                  size: 18, color: theme.colorScheme.primary),
+              Icon(
+                PhosphorIconsLight.code,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 8),
-              Text('Raw API payload',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                'Raw API payload',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(PhosphorIconsLight.copy, size: 18),
@@ -84,8 +90,9 @@ class RawPayloadDialog extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(6),
               ),
               padding: const EdgeInsets.all(10),

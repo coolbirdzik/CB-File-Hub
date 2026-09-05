@@ -24,10 +24,12 @@ void main() {
     final folder = Directory(path.join(testRoot.path, 'folder'));
     final nested = Directory(path.join(folder.path, 'nested'));
     await nested.create(recursive: true);
-    await File(path.join(folder.path, 'one.bin'))
-        .writeAsBytes(List<int>.filled(11, 1));
-    await File(path.join(nested.path, 'two.bin'))
-        .writeAsBytes(List<int>.filled(13, 1));
+    await File(
+      path.join(folder.path, 'one.bin'),
+    ).writeAsBytes(List<int>.filled(11, 1));
+    await File(
+      path.join(nested.path, 'two.bin'),
+    ).writeAsBytes(List<int>.filled(13, 1));
 
     final size = await LazyPathSizeCalculator.calculate(
       filePaths: <String>[selectedFile.path],

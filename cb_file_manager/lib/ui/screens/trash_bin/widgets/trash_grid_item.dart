@@ -17,7 +17,7 @@ class TrashGridItem extends StatelessWidget {
   final VoidCallback? onDoubleTap;
 
   const TrashGridItem({
-    Key? key,
+    super.key,
     required this.item,
     required this.isSelected,
     required this.isSelectionMode,
@@ -27,7 +27,7 @@ class TrashGridItem extends StatelessWidget {
     required this.onContextMenu,
     this.onTap,
     this.onDoubleTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

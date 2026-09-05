@@ -41,16 +41,17 @@ class ThumbnailTaskManager {
   }
 
   /// Tiền tải thumbnail cho danh sách video đầu tiên
-  static Future<void> preloadFirstBatch(List<String> videoPaths,
-      {int count = 20}) async {
+  static Future<void> preloadFirstBatch(
+    List<String> videoPaths, {
+    int count = 20,
+  }) async {
     final pathsToPreload = videoPaths.take(count).toList();
 
     for (final path in pathsToPreload) {
       // Tạo thumbnail không đồng bộ
-      unawaited(VideoThumbnailHelper.generateThumbnail(
-        path,
-        isPriority: false,
-      ));
+      unawaited(
+        VideoThumbnailHelper.generateThumbnail(path, isPriority: false),
+      );
     }
 
     // Không chờ đợi các tác vụ hoàn thành
@@ -127,14 +128,14 @@ class OptimizedLazyThumbnailWidget extends StatelessWidget {
   final bool forceRegenerate;
 
   const OptimizedLazyThumbnailWidget({
-    Key? key,
+    super.key,
     required this.videoPath,
     required this.width,
     required this.height,
     required this.onThumbnailGenerated,
     required this.fallbackBuilder,
     this.forceRegenerate = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

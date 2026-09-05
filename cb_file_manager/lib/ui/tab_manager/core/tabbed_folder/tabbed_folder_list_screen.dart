@@ -108,7 +108,7 @@ class TabbedFolderListScreen extends StatefulWidget {
   final ValueNotifier<SplitPaneAppBarData?>? appBarDataNotifier;
 
   const TabbedFolderListScreen({
-    Key? key,
+    super.key,
     required this.path,
     required this.tabId,
     this.showAppBar = true, // Mặc định là hiển thị AppBar
@@ -116,7 +116,7 @@ class TabbedFolderListScreen extends StatefulWidget {
     this.globalTagSearch = false, // Default to local search
     this.highlightedFileName,
     this.appBarDataNotifier,
-  }) : super(key: key);
+  });
 
   @override
   State<TabbedFolderListScreen> createState() => _TabbedFolderListScreenState();
@@ -233,7 +233,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   /// Scrolls the list/grid when the focused item is outside the viewport.
   void _scrollToIndex(
-      int index, int crossAxisCount, double itemMainAxisExtent) {
+    int index,
+    int crossAxisCount,
+    double itemMainAxisExtent,
+  ) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final sc = _keyboardController.scrollController;
@@ -247,8 +250,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       final double viewEnd = viewStart + pos.viewportDimension;
 
       if (itemEnd > viewEnd) {
-        final double target = (itemEnd - pos.viewportDimension)
-            .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+        final double target = (itemEnd - pos.viewportDimension).clamp(
+          pos.minScrollExtent,
+          pos.maxScrollExtent,
+        );
         sc.jumpTo(target);
       } else if (itemStart < viewStart) {
         sc.jumpTo(itemStart.clamp(pos.minScrollExtent, pos.maxScrollExtent));
@@ -315,8 +320,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     }
 
     // Listen for thumbnail loading changes
-    _pendingTasksSubscription =
-        ThumbnailLoader.onPendingTasksChanged.listen((count) {
+    _pendingTasksSubscription = ThumbnailLoader.onPendingTasksChanged.listen((
+      count,
+    ) {
       final hasBackgroundTasks = count > 0;
       if (_hasPendingThumbnails != hasBackgroundTasks) {
         setState(() {
@@ -347,8 +353,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       folderListBloc: _folderListBloc,
       selectionBloc: _selectionBloc,
     );
-    _fileDropSubscription =
-        WindowsExplorerDragDropService.fileDrops.listen(_handleNativeFileDrop);
+    _fileDropSubscription = WindowsExplorerDragDropService.fileDrops.listen(
+      _handleNativeFileDrop,
+    );
 
     _saveLastAccessedFolder();
 
@@ -493,8 +500,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     savePreviewPaneWidthSetting(width);
   }
 
-  void _toggleFileSelection(String filePath,
-      {bool shiftSelect = false, bool ctrlSelect = false}) {
+  void _toggleFileSelection(
+    String filePath, {
+    bool shiftSelect = false,
+    bool ctrlSelect = false,
+  }) {
     _keyboardController.focusedPath = filePath;
     _showImmediateSelectionForToggle(
       filePath,
@@ -508,8 +518,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     );
   }
 
-  void _toggleFolderSelection(String folderPath,
-      {bool shiftSelect = false, bool ctrlSelect = false}) {
+  void _toggleFolderSelection(
+    String folderPath, {
+    bool shiftSelect = false,
+    bool ctrlSelect = false,
+  }) {
     _keyboardController.focusedPath = folderPath;
     _showImmediateSelectionForToggle(
       folderPath,
@@ -561,9 +574,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     });
   }
 
-  Future<void> _handleNativeFileDrop(
-    WindowsExplorerFileDropEvent event,
-  ) async {
+  Future<void> _handleNativeFileDrop(WindowsExplorerFileDropEvent event) async {
     if (!mounted || !Platform.isWindows) return;
     if (context.read<TabManagerBloc>().state.activeTabId != widget.tabId) {
       return;
@@ -578,10 +589,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       event.globalPosition,
       allowedPaths: folderPaths,
     );
-    await _moveDroppedItemsToFolder(
-      event.paths,
-      hitFolder ?? _currentPath,
-    );
+    await _moveDroppedItemsToFolder(event.paths, hitFolder ?? _currentPath);
   }
 
   Future<void> _moveDroppedItemsToFolder(
@@ -651,8 +659,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       return;
     }
 
-    final hasDeletedItemsStillVisible =
-        _pendingDeletedFocusPaths.any((path) => currentPaths.contains(path));
+    final hasDeletedItemsStillVisible = _pendingDeletedFocusPaths.any(
+      (path) => currentPaths.contains(path),
+    );
     if (hasDeletedItemsStillVisible) {
       return;
     }
@@ -670,11 +679,17 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
     _keyboardController.focusedPath = nextFocusPath;
     if (state.folders.any((entity) => entity.path == nextFocusPath)) {
-      _toggleFolderSelection(nextFocusPath,
-          shiftSelect: false, ctrlSelect: false);
+      _toggleFolderSelection(
+        nextFocusPath,
+        shiftSelect: false,
+        ctrlSelect: false,
+      );
     } else {
-      _toggleFileSelection(nextFocusPath,
-          shiftSelect: false, ctrlSelect: false);
+      _toggleFileSelection(
+        nextFocusPath,
+        shiftSelect: false,
+        ctrlSelect: false,
+      );
     }
   }
 
@@ -770,8 +785,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _toggleDrivesViewMode() {
     final currentMode = _folderListBloc.state.viewMode;
-    final nextMode =
-        (currentMode == ViewMode.grid) ? ViewMode.list : ViewMode.grid;
+    final nextMode = (currentMode == ViewMode.grid)
+        ? ViewMode.list
+        : ViewMode.grid;
     _setViewMode(nextMode);
   }
 
@@ -789,8 +805,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
     // Pull-to-refresh / explicit refresh counts as user interaction.
     if (locator.isRegistered<TabActivityManager>()) {
-      locator<TabActivityManager>()
-          .onTabInteraction(widget.tabId, path: _currentPath);
+      locator<TabActivityManager>().onTabInteraction(
+        widget.tabId,
+        path: _currentPath,
+      );
     }
 
     _refreshController.refreshFileList(
@@ -863,9 +881,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
     debugPrint('_handleDelete called - permanent: $permanent');
     debugPrint(
-        '  Selected files: ${_selectionBloc.state.selectedFilePaths.length}');
+      '  Selected files: ${_selectionBloc.state.selectedFilePaths.length}',
+    );
     debugPrint(
-        '  Selected folders: ${_selectionBloc.state.selectedFolderPaths.length}');
+      '  Selected folders: ${_selectionBloc.state.selectedFolderPaths.length}',
+    );
     debugPrint('  Focused path: ${_keyboardController.focusedPath}');
 
     await BrowserLikeActionHandlers.handleDelete(
@@ -992,7 +1012,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final safeCrossAxisCount = math.max(1, crossAxisCount);
     final totalSpacing = gridSpacing * (safeCrossAxisCount - 1);
     final itemWidth = math.max(
-        56.0, (gridReferenceWidth - totalSpacing) / safeCrossAxisCount);
+      56.0,
+      (gridReferenceWidth - totalSpacing) / safeCrossAxisCount,
+    );
     return (itemWidth / gridAspectRatio) + gridSpacing;
   }
 
@@ -1023,16 +1045,18 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   void _handleRename() {
-    unawaited(BrowserLikeActionHandlers.renameSelectionOrFocused(
-      context: context,
-      selectionState: _selectionBloc.state,
-      focusedPath: _keyboardController.focusedPath,
-      isDesktop: isDesktopPlatform,
-      inlineRenameController: _inlineRenameController,
-      folderListBloc: _folderListBloc,
-      refocusNode: _keyboardController.focusNode,
-      onInlineRenameStarted: () => setState(() {}),
-    ));
+    unawaited(
+      BrowserLikeActionHandlers.renameSelectionOrFocused(
+        context: context,
+        selectionState: _selectionBloc.state,
+        focusedPath: _keyboardController.focusedPath,
+        isDesktop: isDesktopPlatform,
+        inlineRenameController: _inlineRenameController,
+        folderListBloc: _folderListBloc,
+        refocusNode: _keyboardController.focusNode,
+        onInlineRenameStarted: () => setState(() {}),
+      ),
+    );
   }
 
   void _handleCurrentPathChanged(String path) {
@@ -1077,7 +1101,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       final prefs = UserPreferences.instance;
       await prefs.init();
       final folderSortManager = FolderSortManager();
-      final savedViewMode = await folderSortManager.getFolderViewMode(path) ??
+      final savedViewMode =
+          await folderSortManager.getFolderViewMode(path) ??
           await prefs.getViewMode();
       final effectiveViewMode = ViewModeUtils.normalize(
         !isDesktopPlatform && savedViewMode == ViewMode.gridPreview
@@ -1086,22 +1111,22 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       );
       final savedSortOption =
           await folderSortManager.getFolderSortOption(path) ??
-              await prefs.getSortOption();
+          await prefs.getSortOption();
       final savedGridZoomLevel =
           await folderSortManager.getFolderGridZoomLevel(path) ??
-              await prefs.getGridZoomLevel();
+          await prefs.getGridZoomLevel();
       final savedColumnVisibility =
           await folderSortManager.getFolderColumnVisibility(path) ??
-              await prefs.getColumnVisibility();
+          await prefs.getColumnVisibility();
       final savedShowFileTags =
           await folderSortManager.getFolderShowFileTags(path) ??
-              await prefs.getShowFileTags();
+          await prefs.getShowFileTags();
       final savedPreviewPaneVisible =
           await folderSortManager.getFolderPreviewPaneVisible(path) ??
-              await prefs.getPreviewPaneVisible();
+          await prefs.getPreviewPaneVisible();
       final savedPreviewPaneWidth =
           await folderSortManager.getFolderPreviewPaneWidth(path) ??
-              await prefs.getPreviewPaneWidth();
+          await prefs.getPreviewPaneWidth();
       if (!mounted || _currentPath != path) return;
       final maxZoom = GridZoomConstraints.maxGridSizeForContext(
         context,
@@ -1121,10 +1146,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       });
       _previewPaneWidthNotifier.value = savedPreviewPaneWidth;
       _folderListBloc.add(SetViewMode(effectiveViewMode));
-      _folderListBloc.add(SetSortOption(
-        savedSortOption,
-        persist: false,
-      ));
+      _folderListBloc.add(SetSortOption(savedSortOption, persist: false));
       _folderListBloc.add(SetGridZoom(resolvedGridZoom));
     } catch (e) {
       debugPrint('Error applying folder display preferences: $e');
@@ -1153,8 +1175,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final root = path.rootPrefix(normalized);
     if (normalized.length > root.length &&
         normalized.endsWith(path.separator)) {
-      normalized =
-          normalized.substring(0, normalized.length - path.separator.length);
+      normalized = normalized.substring(
+        0,
+        normalized.length - path.separator.length,
+      );
     }
     return Platform.isWindows ? normalized.toLowerCase() : normalized;
   }
@@ -1181,7 +1205,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
           if (currentTab.id.isNotEmpty && currentTab.path != _currentPath) {
             debugPrint(
-                'Tab path updated from $_currentPath to ${currentTab.path}');
+              'Tab path updated from $_currentPath to ${currentTab.path}',
+            );
             _updatePath(currentTab.path);
           }
 
@@ -1253,7 +1278,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         !ArchivePathUtils.isArchiveBrowsePath(_currentPath) &&
         !isDrivesPath(_currentPath)) {
       final systemWidget = SystemScreenRouter.routeSystemPath(
-          context, _currentPath, widget.tabId);
+        context,
+        _currentPath,
+        widget.tabId,
+      );
       if (systemWidget != null) {
         return systemWidget;
       }
@@ -1266,7 +1294,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         debugPrint(
-            'TabbedFolderListScreen PopScope onPopInvokedWithResult: didPop=$didPop, result=$result');
+          'TabbedFolderListScreen PopScope onPopInvokedWithResult: didPop=$didPop, result=$result',
+        );
         if (!didPop) {
           debugPrint('Gesture navigation detected - calling _handleBackButton');
           await _handleBackButton();
@@ -1301,29 +1330,29 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
               shiftSelect: false,
               ctrlSelect: false,
             ),
-            selectRange: ({
-              required Set<String> folderPaths,
-              required Set<String> filePaths,
-              required String lastSelectedPath,
-              required bool ctrlSelect,
-            }) {
-              final currentPaths = _selectionBloc.state.allSelectedPaths;
-              _keyboardController.showImmediateSelection(
-                <String>{
-                  if (ctrlSelect) ...currentPaths,
-                  ...folderPaths,
-                  ...filePaths,
+            selectRange:
+                ({
+                  required Set<String> folderPaths,
+                  required Set<String> filePaths,
+                  required String lastSelectedPath,
+                  required bool ctrlSelect,
+                }) {
+                  final currentPaths = _selectionBloc.state.allSelectedPaths;
+                  _keyboardController.showImmediateSelection(<String>{
+                    if (ctrlSelect) ...currentPaths,
+                    ...folderPaths,
+                    ...filePaths,
+                  }, currentSelectedPaths: currentPaths);
+                  _selectionBloc.add(
+                    SelectItemsInRect(
+                      folderPaths: folderPaths,
+                      filePaths: filePaths,
+                      isCtrlPressed: ctrlSelect,
+                      isShiftPressed: true,
+                      lastSelectedPath: lastSelectedPath,
+                    ),
+                  );
                 },
-                currentSelectedPaths: currentPaths,
-              );
-              _selectionBloc.add(SelectItemsInRect(
-                folderPaths: folderPaths,
-                filePaths: filePaths,
-                isCtrlPressed: ctrlSelect,
-                isShiftPressed: true,
-                lastSelectedPath: lastSelectedPath,
-              ));
-            },
             activateEntity: (entity) {
               if (entity is Directory) {
                 _navigateToPath(entity.path);
@@ -1430,7 +1459,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 // If no video/image files and we have pending thumbnails, reset the count
                 if (!hasVideoOrImageFiles && _hasPendingThumbnails) {
                   debugPrint(
-                      "TabbedFolderListScreen: No video/image files found, resetting pending thumbnail count");
+                    "TabbedFolderListScreen: No video/image files found, resetting pending thumbnail count",
+                  );
                   ThumbnailLoader.resetPendingCount();
                   _hasPendingThumbnails = false;
                 }
@@ -1440,8 +1470,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 final isLoading = _hasPendingThumbnails;
 
                 context.read<TabManagerBloc>().add(
-                      UpdateTabLoading(widget.tabId, isLoading),
-                    );
+                  UpdateTabLoading(widget.tabId, isLoading),
+                );
               },
               child: BlocBuilder<FolderListBloc, FolderListState>(
                 builder: (context, state) {
@@ -1461,7 +1491,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   }
 
                   return _buildWithSelectionState(
-                      context, state, isNetworkPath);
+                    context,
+                    state,
+                    isNetworkPath,
+                  );
                 },
               ),
             ),
@@ -1472,38 +1505,107 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   }
 
   // New helper method that builds the UI with selection state from BLoC
-  Widget _buildWithSelectionState(BuildContext context,
-      FolderListState folderListState, bool isNetworkPath) {
+  Widget _buildWithSelectionState(
+    BuildContext context,
+    FolderListState folderListState,
+    bool isNetworkPath,
+  ) {
     return BlocBuilder<SelectionBloc, SelectionState>(
-        builder: (context, selectionState) {
-      // When a parent (e.g. SplitPaneView) owns the bar, push bar data into
-      // the notifier instead of rendering our own appbar.
-      final notifier = widget.appBarDataNotifier;
-      if (notifier != null) {
-        // In split mode the SearchBar is rendered in the shared top bar
-        // (outside the pane's BlocProvider subtree), so we pass the pane's
-        // FolderListBloc directly to avoid a context lookup failure.
-        final titleWidget = _showSearchBar
-            ? tab_components.SearchBar(
+      builder: (context, selectionState) {
+        // When a parent (e.g. SplitPaneView) owns the bar, push bar data into
+        // the notifier instead of rendering our own appbar.
+        final notifier = widget.appBarDataNotifier;
+        if (notifier != null) {
+          // In split mode the SearchBar is rendered in the shared top bar
+          // (outside the pane's BlocProvider subtree), so we pass the pane's
+          // FolderListBloc directly to avoid a context lookup failure.
+          final titleWidget = _showSearchBar
+              ? tab_components.SearchBar(
+                  currentPath: _currentPath,
+                  tabId: widget.tabId,
+                  folderListBloc: _folderListBloc,
+                  onCloseSearch: () {
+                    setState(() {
+                      _showSearchBar = false;
+                    });
+                  },
+                )
+              : tab_components.PathNavigationBar(
+                  tabId: widget.tabId,
+                  pathController: _pathController,
+                  onPathSubmitted: _handlePathSubmit,
+                  currentPath: _displayPathForInput(_currentPath),
+                  tabPath: _currentPath,
+                  isNetworkPath: isNetworkPath,
+                  canNavigateToParent:
+                      _navigationController.parentPathForUpButton(
+                        _currentPath,
+                      ) !=
+                      null,
+                  onNavigateToParent: () {
+                    _navigationController.navigateToParentFolder(
+                      context,
+                      _currentPath,
+                      _pathController,
+                      (p) => _keyboardController.clearFocus(),
+                    );
+                  },
+                );
+          final newData = SplitPaneAppBarData(
+            titleWidget: titleWidget,
+            actions: _getAppBarActions(),
+            isSelectionMode:
+                selectionState.isSelectionMode && !isDesktopPlatform,
+          );
+          // Schedule notifier update after build to avoid setState-in-build errors.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) notifier.value = newData;
+          });
+        }
+
+        return Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            ScreenScaffold(
+              selectionState: selectionState,
+              body: _buildBody(
+                context,
+                folderListState,
+                selectionState,
+                isNetworkPath,
+              ),
+              isNetworkPath: isNetworkPath,
+              onClearSelection: _clearSelection,
+              showRemoveTagsDialog: _showRemoveTagsDialog,
+              showManageAllTagsDialog: (context) =>
+                  _showManageAllTagsDialog(context),
+              showDeleteConfirmationDialog: (context) =>
+                  _showDeleteConfirmationDialog(context),
+              isDesktop: isDesktopPlatform,
+              selectionModeFloatingActionButton: null,
+              // When notifier is provided, suppress own appbar – parent renders it.
+              showAppBar: notifier != null ? false : widget.showAppBar,
+              // In split mode, search bar is shown in shared bar above; suppress it here.
+              showSearchBar: notifier != null ? false : _showSearchBar,
+              searchBar: tab_components.SearchBar(
                 currentPath: _currentPath,
                 tabId: widget.tabId,
-                folderListBloc: _folderListBloc,
                 onCloseSearch: () {
                   setState(() {
                     _showSearchBar = false;
                   });
                 },
-              )
-            : tab_components.PathNavigationBar(
+              ),
+              pathNavigationBar: tab_components.PathNavigationBar(
                 tabId: widget.tabId,
                 pathController: _pathController,
                 onPathSubmitted: _handlePathSubmit,
                 currentPath: _displayPathForInput(_currentPath),
                 tabPath: _currentPath,
-                isNetworkPath: isNetworkPath,
+                isNetworkPath: isNetworkPath, // Pass network flag
                 canNavigateToParent:
                     _navigationController.parentPathForUpButton(_currentPath) !=
-                        null,
+                    null,
                 onNavigateToParent: () {
                   _navigationController.navigateToParentFolder(
                     context,
@@ -1512,88 +1614,35 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                     (p) => _keyboardController.clearFocus(),
                   );
                 },
-              );
-        final newData = SplitPaneAppBarData(
-          titleWidget: titleWidget,
-          actions: _getAppBarActions(),
-          isSelectionMode: selectionState.isSelectionMode && !isDesktopPlatform,
-        );
-        // Schedule notifier update after build to avoid setState-in-build errors.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) notifier.value = newData;
-        });
-      }
-
-      return Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          ScreenScaffold(
-            selectionState: selectionState,
-            body: _buildBody(
-                context, folderListState, selectionState, isNetworkPath),
-            isNetworkPath: isNetworkPath,
-            onClearSelection: _clearSelection,
-            showRemoveTagsDialog: _showRemoveTagsDialog,
-            showManageAllTagsDialog: (context) =>
-                _showManageAllTagsDialog(context),
-            showDeleteConfirmationDialog: (context) =>
-                _showDeleteConfirmationDialog(context),
-            isDesktop: isDesktopPlatform,
-            selectionModeFloatingActionButton: null,
-            // When notifier is provided, suppress own appbar – parent renders it.
-            showAppBar: notifier != null ? false : widget.showAppBar,
-            // In split mode, search bar is shown in shared bar above; suppress it here.
-            showSearchBar: notifier != null ? false : _showSearchBar,
-            searchBar: tab_components.SearchBar(
-              currentPath: _currentPath,
-              tabId: widget.tabId,
-              onCloseSearch: () {
-                setState(() {
-                  _showSearchBar = false;
-                });
-              },
-            ),
-            pathNavigationBar: tab_components.PathNavigationBar(
-              tabId: widget.tabId,
-              pathController: _pathController,
-              onPathSubmitted: _handlePathSubmit,
-              currentPath: _displayPathForInput(_currentPath),
-              tabPath: _currentPath,
-              isNetworkPath: isNetworkPath, // Pass network flag
-              canNavigateToParent:
-                  _navigationController.parentPathForUpButton(_currentPath) !=
-                      null,
-              onNavigateToParent: () {
-                _navigationController.navigateToParentFolder(
-                  context,
-                  _currentPath,
-                  _pathController,
-                  (p) => _keyboardController.clearFocus(),
-                );
-              },
-            ),
-            actions: _getAppBarActions(),
-          ),
-          if (selectionState.isSelectionMode && isDesktopPlatform)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: SelectionSummaryTooltip(
-                selectedFileCount: selectionState.selectedFilePaths.length,
-                selectedFolderCount: selectionState.selectedFolderPaths.length,
-                selectedFilePaths: selectionState.selectedFilePaths.toList(),
-                selectedFolderPaths:
-                    selectionState.selectedFolderPaths.toList(),
               ),
+              actions: _getAppBarActions(),
             ),
-        ],
-      );
-    });
+            if (selectionState.isSelectionMode && isDesktopPlatform)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: SelectionSummaryTooltip(
+                  selectedFileCount: selectionState.selectedFilePaths.length,
+                  selectedFolderCount:
+                      selectionState.selectedFolderPaths.length,
+                  selectedFilePaths: selectionState.selectedFilePaths.toList(),
+                  selectedFolderPaths: selectionState.selectedFolderPaths
+                      .toList(),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 
-  Widget _buildBody(BuildContext context, FolderListState state,
-      SelectionState selectionState, bool isNetworkPath) {
+  Widget _buildBody(
+    BuildContext context,
+    FolderListState state,
+    SelectionState selectionState,
+    bool isNetworkPath,
+  ) {
     // Apply frame timing optimization before heavy UI operations
     FrameTimingOptimizer().optimizeBeforeHeavyOperation();
 
@@ -1644,15 +1693,18 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         !_currentPath.startsWith('#') && _isPathMismatch(state);
     // When search results are displayed, SearchResults widget owns the search
     // loading surface; suppress the top-level one to avoid duplicate loaders.
-    final bool searchResultsActive = state.searchResults.isNotEmpty ||
+    final bool searchResultsActive =
+        state.searchResults.isNotEmpty ||
         state.currentSearchQuery != null ||
         state.currentSearchTag != null;
     // Status bar: only for initial loads and path mismatches.
     // Refresh operations use `state.isRefreshing` and show at the bottom instead.
-    final bool showStatusLoadingIndicator = !searchResultsActive &&
+    final bool showStatusLoadingIndicator =
+        !searchResultsActive &&
         !state.isRefreshing &&
         (state.isLoading || isPathMismatch);
-    final bool shouldShowSkeleton = (_isRestoringFromInactive && !hasContent) ||
+    final bool shouldShowSkeleton =
+        (_isRestoringFromInactive && !hasContent) ||
         (!hasContent &&
             (state.isLoading || isPathMismatch) &&
             state.error == null &&
@@ -1671,7 +1723,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                 child: shouldShowSkeleton
                     ? _buildSkeletonLoader(state) // Show skeleton while loading
                     : _buildMainContent(
-                        context, state, selectionState, isNetworkPath),
+                        context,
+                        state,
+                        selectionState,
+                        isNetworkPath,
+                      ),
               ),
             ),
           ],
@@ -1735,17 +1791,25 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     );
   }
 
-  Widget _buildMainContent(BuildContext context, FolderListState state,
-      SelectionState selectionState, bool isNetworkPath) {
+  Widget _buildMainContent(
+    BuildContext context,
+    FolderListState state,
+    SelectionState selectionState,
+    bool isNetworkPath,
+  ) {
     final searchDisplayState =
         BrowserLikeDisplayState.resolveSearchOrFilterDisplayState(
-      state: state,
-      currentFilter: _currentFilter,
-      currentSearchTagOverride: _currentSearchTag,
-    );
+          state: state,
+          currentFilter: _currentFilter,
+          currentSearchTagOverride: _currentSearchTag,
+        );
     if (searchDisplayState != null) {
       return _buildFolderAndFileListContent(
-          context, searchDisplayState, selectionState, isNetworkPath);
+        context,
+        searchDisplayState,
+        selectionState,
+        isNetworkPath,
+      );
     }
 
     // Use FolderContentBuilder for error handling and content routing
@@ -1789,9 +1853,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       // Wrap with the same background right-click handler so "Paste Here",
       // "New Folder", etc. remain accessible even in an empty directory.
       return GestureDetector(
-        key: const ValueKey<String>(
-          'file-browser-background-context-target',
-        ),
+        key: const ValueKey<String>('file-browser-background-context-target'),
         onSecondaryTapUp: (details) =>
             _showContextMenu(context, details.globalPosition),
         behavior: HitTestBehavior.translucent,
@@ -1801,14 +1863,19 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
     // Otherwise, show the normal file list with progressive loading
     return _buildFolderAndFileListContent(
-        context, state, selectionState, isNetworkPath);
+      context,
+      state,
+      selectionState,
+      isNetworkPath,
+    );
   }
 
   Widget _buildFolderAndFileListContent(
-      BuildContext context,
-      FolderListState state,
-      SelectionState selectionState,
-      bool isNetworkPath) {
+    BuildContext context,
+    FolderListState state,
+    SelectionState selectionState,
+    bool isNetworkPath,
+  ) {
     // Use RefreshableFileListView for pull-to-refresh functionality
     return RefreshableFileListView(
       folderListState: state,
@@ -1903,20 +1970,27 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   // Helper methods for dialog calls - now using DialogManager
   void _showAddTagToFileDialog(BuildContext context, String filePath) {
-    AppLogger.info('[ManageTags][TabbedFolder] _showAddTagToFileDialog',
-        error: 'filePath=$filePath');
+    AppLogger.info(
+      '[ManageTags][TabbedFolder] _showAddTagToFileDialog',
+      error: 'filePath=$filePath',
+    );
     DialogManager.showAddTagToFile(context, filePath);
   }
 
   void _showDeleteTagDialog(
-      BuildContext context, String filePath, List<String> tags) {
+    BuildContext context,
+    String filePath,
+    List<String> tags,
+  ) {
     DialogManager.showDeleteTag(context, filePath, tags);
   }
 
   void _showRemoveTagsDialog(BuildContext context) {
     final selectionState = context.read<SelectionBloc>().state;
     DialogManager.showRemoveTags(
-        context, selectionState.selectedFilePaths.toList());
+      context,
+      selectionState.selectedFilePaths.toList(),
+    );
   }
 
   void _showManageAllTagsDialog(BuildContext context) {
@@ -1925,7 +1999,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       context,
       _folderListBloc.state.allTags.toList(),
       _currentPath,
-      selectedFiles: selectionState.isSelectionMode &&
+      selectedFiles:
+          selectionState.isSelectionMode &&
               selectionState.selectedFilePaths.isNotEmpty
           ? selectionState.selectedFilePaths.toList()
           : null,
@@ -1969,7 +2044,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   // Method to handle mouse back button press
   void _handleMouseBackButton() {
     _navigationController.handleMouseBackButton(
-        context, _currentPath, _pathController);
+      context,
+      _currentPath,
+      _pathController,
+    );
   }
 
   // Show context menu for the folder
@@ -1994,7 +2072,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   // Method to handle mouse forward button press
   void _handleMouseForwardButton() {
     _navigationController.handleMouseForwardButton(
-        context, _currentPath, _pathController);
+      context,
+      _currentPath,
+      _pathController,
+    );
   }
 
   List<Widget> _getAppBarActions() {
@@ -2037,10 +2118,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       currentPath: _currentPath,
       isNetworkPath: _currentPath.startsWith('#network/'),
       onSortOptionSelected: (SortOption option) {
-        _folderListBloc.add(SetSortOption(
-          option,
-          folderPath: _currentPath,
-        ));
+        _folderListBloc.add(SetSortOption(option, folderPath: _currentPath));
       },
       onViewModeToggled: _toggleViewMode,
       onViewModeSelected: _setViewMode,

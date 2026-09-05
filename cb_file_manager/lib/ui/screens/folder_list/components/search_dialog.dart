@@ -17,13 +17,13 @@ class SearchDialog extends StatefulWidget {
   final Function(File)? onFileSelected; // Callback khi chọn file
 
   const SearchDialog({
-    Key? key,
+    super.key,
     required this.currentPath,
     required this.files,
     required this.folders,
     this.onFolderSelected,
     this.onFileSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<SearchDialog> createState() => _SearchDialogState();
@@ -140,8 +140,10 @@ class _SearchDialogState extends State<SearchDialog> {
       });
 
       // Get all tagged files including in subdirectories
-      final results =
-          await TagManager.findFilesByTag(widget.currentPath, tagQuery);
+      final results = await TagManager.findFilesByTag(
+        widget.currentPath,
+        tagQuery,
+      );
 
       // Tất cả kết quả đều là file do đã sửa đổi findFilesByTag
       final List<File> taggedFiles = results.cast<File>().toList();
@@ -203,8 +205,9 @@ class _SearchDialogState extends State<SearchDialog> {
                         text.substring(0, hashIndex + 1) + tags[index];
                     _searchController.value = TextEditingValue(
                       text: newText,
-                      selection:
-                          TextSelection.collapsed(offset: newText.length),
+                      selection: TextSelection.collapsed(
+                        offset: newText.length,
+                      ),
                     );
                     _removeOverlay();
 
@@ -242,9 +245,7 @@ class _SearchDialogState extends State<SearchDialog> {
         builder: (context) => Positioned.fill(
           child: Container(
             color: Colors.black.withValues(alpha: 0.3),
-            child: const Center(
-              child: CircularProgressIndicator(),
-            ),
+            child: const Center(child: CircularProgressIndicator()),
           ),
         ),
       );
@@ -313,12 +314,17 @@ class _SearchDialogState extends State<SearchDialog> {
                 : 'Tìm kiếm tệp hoặc dùng # để tìm theo tag',
             border: InputBorder.none,
             hintStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             prefixIcon: _isSearchingTags
-                ? Icon(PhosphorIconsLight.tag,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)
-                : Icon(PhosphorIconsLight.magnifyingGlass,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ? Icon(
+                    PhosphorIconsLight.tag,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  )
+                : Icon(
+                    PhosphorIconsLight.magnifyingGlass,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
           ),
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           autofocus: true,
@@ -329,22 +335,30 @@ class _SearchDialogState extends State<SearchDialog> {
           // Tag search hint
           if (_suggestedTags.isNotEmpty)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
               alignment: Alignment.centerLeft,
               child: Wrap(
                 spacing: 8.0,
                 children: [
-                  const Text('Tags phổ biến:',
-                      style: TextStyle(fontStyle: FontStyle.italic)),
-                  ...(_suggestedTags.take(5).map((tag) => ActionChip(
-                        label: Text('#$tag'),
-                        onPressed: () {
-                          _searchController.text = '#$tag';
-                          // Tự động thực hiện tìm kiếm khi chọn tag từ phần gợi ý
-                          _performTagSearch(tag);
-                        },
-                      ))),
+                  const Text(
+                    'Tags phổ biến:',
+                    style: TextStyle(fontStyle: FontStyle.italic),
+                  ),
+                  ...(_suggestedTags
+                      .take(5)
+                      .map(
+                        (tag) => ActionChip(
+                          label: Text('#$tag'),
+                          onPressed: () {
+                            _searchController.text = '#$tag';
+                            // Tự động thực hiện tìm kiếm khi chọn tag từ phần gợi ý
+                            _performTagSearch(tag);
+                          },
+                        ),
+                      )),
                 ],
               ),
             ),
@@ -355,9 +369,7 @@ class _SearchDialogState extends State<SearchDialog> {
               style: const TextStyle(fontStyle: FontStyle.italic),
             ),
           ),
-          Expanded(
-            child: _buildSearchResults(),
-          ),
+          Expanded(child: _buildSearchResults()),
         ],
       ),
     );
@@ -365,9 +377,7 @@ class _SearchDialogState extends State<SearchDialog> {
 
   Widget _buildSearchResults() {
     if (_filteredFiles.isEmpty && _filteredFolders.isEmpty) {
-      return Center(
-        child: Text(AppLocalizations.of(context)!.noResultsFound),
-      );
+      return Center(child: Text(AppLocalizations.of(context)!.noResultsFound));
     }
 
     return ListView(
@@ -380,7 +390,7 @@ class _SearchDialogState extends State<SearchDialog> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          ..._filteredFolders.map(_buildFolderItem).toList(),
+          ..._filteredFolders.map(_buildFolderItem),
         ],
         if (_filteredFiles.isNotEmpty) ...[
           Padding(
@@ -390,7 +400,7 @@ class _SearchDialogState extends State<SearchDialog> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          ..._filteredFiles.map(_buildFileItem).toList(),
+          ..._filteredFiles.map(_buildFileItem),
         ],
       ],
     );
@@ -398,8 +408,10 @@ class _SearchDialogState extends State<SearchDialog> {
 
   Widget _buildFolderItem(Directory folder) {
     return ListTile(
-      leading: Icon(PhosphorIconsLight.folder,
-          color: Theme.of(context).colorScheme.primary),
+      leading: Icon(
+        PhosphorIconsLight.folder,
+        color: Theme.of(context).colorScheme.primary,
+      ),
       title: Text(folder.basename()),
       onTap: () {
         Navigator.pop(context); // Close search dialog
@@ -437,52 +449,58 @@ class _SearchDialogState extends State<SearchDialog> {
     // Get tags for the file if we're in tag search mode
     if (_isSearchingTags) {
       return FutureBuilder<List<String>>(
-          future: TagManager.getTags(file.path),
-          builder: (context, snapshot) {
-            final tags = snapshot.data ?? [];
+        future: TagManager.getTags(file.path),
+        builder: (context, snapshot) {
+          final tags = snapshot.data ?? [];
 
-            return ListTile(
-              leading: Icon(icon, color: iconColor),
-              title: Text(file.path.split('/').last),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(file.path.replaceFirst(widget.currentPath, '')),
-                  if (tags.isNotEmpty)
-                    Wrap(
-                      spacing: 4,
-                      children: tags
-                          .map((tag) => Chip(
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                                label: Text(tag,
-                                    style: const TextStyle(fontSize: 10)),
-                                labelPadding:
-                                    const EdgeInsets.symmetric(horizontal: 4),
-                              ))
-                          .toList(),
-                    ),
-                ],
-              ),
-              onTap: () {
-                Navigator.pop(context); // Close search dialog
+          return ListTile(
+            leading: Icon(icon, color: iconColor),
+            title: Text(file.path.split('/').last),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(file.path.replaceFirst(widget.currentPath, '')),
+                if (tags.isNotEmpty)
+                  Wrap(
+                    spacing: 4,
+                    children: tags
+                        .map(
+                          (tag) => Chip(
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            label: Text(
+                              tag,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            labelPadding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
+            onTap: () {
+              Navigator.pop(context); // Close search dialog
 
-                if (widget.onFileSelected != null) {
-                  // Sử dụng callback để trả về file cho tab hiện tại
-                  widget.onFileSelected!(file);
-                } else {
-                  // Fallback cho màn hình cũ
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FileDetailsScreen(file: file),
-                    ),
-                  );
-                }
-              },
-            );
-          });
+              if (widget.onFileSelected != null) {
+                // Sử dụng callback để trả về file cho tab hiện tại
+                widget.onFileSelected!(file);
+              } else {
+                // Fallback cho màn hình cũ
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FileDetailsScreen(file: file),
+                  ),
+                );
+              }
+            },
+          );
+        },
+      );
     }
 
     return ListTile(

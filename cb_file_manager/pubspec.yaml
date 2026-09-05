@@ -15,7 +15,11 @@ publish_to: none
 version: 1.1.4+2
 
 environment:
-  sdk: ">=2.15.0 <=3.32.1"
+  # Floor set by the resolved dependency graph: sqflite_common, synchronized and
+  # sqflite_android need Dart >=3.12, which pairs with Flutter >=3.44. This is
+  # also the package's language version, so the code is analysed and formatted
+  # as Dart 3.12 rather than the 2.15 the old floor implied.
+  sdk: ">=3.12.0 <4.0.0"
 
 # package:sqlite3 (via sqflite_common_ffi): use OS SQLite on Windows so integration_test
 # does not rely on bundled sqlite3.dll next to the exe (avoids load error 126 on Debug runs).
@@ -34,7 +38,7 @@ dependencies:
   flutter_bloc: ^9.1.0
   provider: ^6.1.2
   path_provider: ^2.1.1
-  package_info_plus: ^4.1.0
+  package_info_plus: ^10.2.1
   equatable: ^2.0.7
   permission_handler: ^13.0.2
   video_player: ^2.8.1
@@ -43,7 +47,9 @@ dependencies:
   video_thumbnail:
     git:
       url: https://github.com/EduardoM-GO/video_thumbnail
-      ref: master # Có thể thay đổi ref để chỉ định branch hoặc tag cụ thể
+      # Pinned to a commit rather than `master`: this is a third-party fork, and
+      # tracking its branch would let `pub upgrade` pull unreviewed changes.
+      ref: ff055bc28bd0394d1d03c14ca2cd41d88bae79dd
   path: ^1.8.3
   shared_preferences: ^2.2.2
   window_manager: ^0.5.2 # Added for desktop window management
@@ -63,21 +69,20 @@ dependencies:
   media_kit_libs_windows_video: ^1.0.11 # Windows video support
   media_kit_libs_android_video: ^1.3.8 # Android video support
   # media_kit_libs_ios_video: ^1.1.4 # Uncomment if you need iOS support
-  # Pin to 7.4.3: 7.4.4 has a Pigeon channel name mismatch that breaks Android initialization
-  # (PlatformException(channel-error, Unable to establish connection on channel.)).
+  # Keep the VLC fallback pinned; validate Android channel initialization on upgrades.
   flutter_vlc_player: 7.4.4
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
-  file_picker: ^10.1.2
-  win32: ^5.0.9
+  file_picker: ^12.2.0
+  win32: ^6.4.0
   crypto: ^3.0.6
   # Dependency injection
   get_it: ^9.2.1
   # Functional programming (Either type)
   dartz: ^0.10.1
-  share_plus: ^11.0.0
+  share_plus: ^13.3.0
   flutter_colorpicker: ^1.1.0
   # File caching
   flutter_cache_manager: ^3.3.1
@@ -86,8 +91,7 @@ dependencies:
   logger: ^2.0.0
   fluent_ui: ^4.13.0
 
-  ffi: any
-  network_info_plus: ^6.1.4
+  ffi: ^2.1.0
   url_launcher: ^6.3.1
   open_filex: ^4.3.4
   gal: ^2.3.0
@@ -105,8 +109,8 @@ dependencies:
   http: ^1.4.0
   mime: ^2.0.0
   desktop_drop: ^0.8.4 # OS-level file drag-and-drop support
-  flutter_markdown: ^0.7.7+1
-  flutter_secure_storage: ^10.3.1 # Secure token storage for local AI advisor
+  flutter_markdown_plus: ^1.0.12 # Continues the discontinued flutter_markdown
+  flutter_secure_storage: ^11.0.0 # Secure token storage for local AI advisor
   flutter_gemma: ^1.7.0
   flutter_gemma_litertlm: ^1.6.1
   google_fonts: ^8.2.1
@@ -126,10 +130,6 @@ dev_dependencies:
 
 # Ghi đè các phiên bản gói phụ thuộc để giải quyết xung đột
 dependency_overrides:
-  intl: ^0.20.2
-  pointycastle: ^4.0.0
-  # Ensure crypto package is compatible with both FTP and SMB
-  crypto: ^3.0.6
   # Upstream 2.1.0 (the newest release, and still what `main` carries) declares
   # `class PhosphorIconData extends IconData`, which no longer compiles now that
   # Flutter marks IconData final. Trimmed local build patches that; see

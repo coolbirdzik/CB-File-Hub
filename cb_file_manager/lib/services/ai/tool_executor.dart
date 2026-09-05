@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../helpers/files/trash_manager.dart';
-import '../../helpers/tags/tag_manager.dart';
 import '../../utils/app_logger.dart';
 import '../album_service.dart';
 import '../disk_cleaner/cleaner_categories.dart';
@@ -11,6 +10,10 @@ import '../disk_cleaner/cleaner_models.dart';
 import '../disk_cleaner/disk_cleaner_service.dart';
 import '../disk_cleaner/disk_tree_node.dart';
 import 'cleaner_scan_registry.dart';
+import 'assistant_response_text.dart';
+import 'agent_tool_catalog.dart';
+import 'agent_file_tools.dart';
+import 'agent_tag_tools.dart';
 import 'disk_cleaner_skill.dart';
 import '../video_library_service.dart';
 
@@ -39,7 +42,72 @@ class ToolCall {
 class ToolExecutor {
   final String? ownerTabId;
 
-  ToolExecutor({this.ownerTabId});
+  ToolExecutor({this.ownerTabId, AgentTagStore? tagStore})
+    : _tagStoreOverride = tagStore;
+
+  AgentTagStore? _tagStoreOverride;
+  AgentTagStore get _tagStore => _tagStoreOverride ??= AgentTagStore();
+  AgentFileTools? _fileToolsCache;
+  AgentFileTools get _fileTools => _fileToolsCache ??= AgentFileTools();
+  String _workingDirectory = '';
+  String _browsingPath = '';
+  bool Function() _isCancelled = () => false;
+
+  void beginTurn({
+    required String currentPath,
+    required bool Function() isCancelled,
+  }) {
+    _browsingPath = currentPath;
+    _workingDirectory =
+        currentPath.isNotEmpty &&
+            !currentPath.startsWith('#') &&
+            !currentPath.contains('://')
+        ? currentPath
+        : Platform.environment['USERPROFILE'] ??
+              Platform.environment['HOME'] ??
+              '';
+    _isCancelled = isCancelled;
+  }
+
+  String? validateCall(ToolCall call) =>
+      AgentToolCatalog.validate(call.name, call.arguments);
+
+  ToolCall prepareCall(ToolCall call) {
+    final normalized = normalizeCall(call);
+    final args = Map<String, dynamic>.from(normalized.arguments);
+    // Freeze exact resolved targets before approval. Empty list_directory path
+    // explicitly means drive discovery; omitted path means the current folder.
+    for (final key in ['path', 'source', 'destination', 'working_directory']) {
+      if (args[key] is String &&
+          !(call.name == 'list_directory' && args[key] == '')) {
+        args[key] = AgentFileTools.resolvePath(
+          args[key] as String,
+          _workingDirectory,
+        );
+      }
+    }
+    if (args['paths'] is List) {
+      args['paths'] = (args['paths'] as List)
+          .map(
+            (path) =>
+                AgentFileTools.resolvePath(path as String, _workingDirectory),
+          )
+          .toList();
+    }
+    if ([
+          'list_directory',
+          'search_files',
+          'search_content',
+          'search_by_tag',
+        ].contains(call.name) &&
+        !args.containsKey('path')) {
+      args['path'] = _workingDirectory;
+    }
+    if (call.name == 'run_command' && !args.containsKey('working_directory')) {
+      args['working_directory'] = _workingDirectory;
+    }
+    return ToolCall(name: normalized.name, arguments: args);
+  }
 
   static const int _maxOutputLength = 8000;
   static const int maxToolCalls = 10;
@@ -52,43 +120,14 @@ class ToolExecutor {
   );
 
   /// Tool names we recognise.
-  static const _knownTools = {
-    'list_directory',
-    'search_files',
-    'read_file',
-    'write_file',
-    'delete_file',
-    'get_file_info',
-    'run_command',
-    'search_by_tag',
-    'get_file_tags',
-    'list_all_tags',
-    'search_content',
-    'list_video_libraries',
-    'get_video_library_files',
-    'list_albums',
-    'get_album_files',
-    // Disk Cleaner skill
-    'list_disk_junk_categories',
-    'get_drive_space',
-    'scan_disk_junk',
-    'clean_disk_junk',
-    'get_pending_cleanup_review',
-    'get_current_cleaner_scan',
-    'get_current_app_storage',
-  };
+  static Set<String> get _knownTools => AgentToolCatalog.names;
 
   static const _toolAliases = {
     'get_current_clean_cleaner_scan': 'get_current_cleaner_scan',
   };
 
   /// Tools that must always go through user approval before executing.
-  static const _dangerousTools = {
-    'run_command',
-    'write_file',
-    'delete_file',
-    'clean_disk_junk',
-  };
+  static Set<String> get _dangerousTools => AgentToolCatalog.approvalTools;
 
   /// Public getter for the BLoC to check.
   static Set<String> get dangerousTools => _dangerousTools;
@@ -101,6 +140,7 @@ class ToolExecutor {
   /// 3. Bare JSON object with "name" and "arguments" keys
   /// 4. Gemma-style `<|tool_call>call:tool_call{name: "..."}<tool_call|>`
   static List<ToolCall> parseToolCalls(String text) {
+    text = stripAssistantReasoning(text);
     final calls = <ToolCall>[];
 
     // Format 1: <tool_call> ... </tool_call>
@@ -144,27 +184,62 @@ class ToolExecutor {
 
     if (calls.isNotEmpty) return calls;
 
-    // Format 3: bare JSON object with "name" key matching a known tool
-    final bareMatches = RegExp(
-      r'\{\s*"name"\s*:\s*"(\w+)"[\s\S]*?"arguments"\s*:\s*\{[\s\S]*?\}\s*\}',
-    ).allMatches(text);
-    for (final match in bareMatches) {
-      _tryParseCall(match.group(0), calls);
+    // Balanced objects preserve nested arguments and braces inside quoted text.
+    for (final object in _jsonObjects(text)) {
+      _tryParseCall(object, calls);
     }
 
     return calls;
+  }
+
+  static Iterable<String> _jsonObjects(String text) sync* {
+    var start = -1;
+    var depth = 0;
+    var quoted = false;
+    var escaped = false;
+    for (var i = 0; i < text.length; i++) {
+      final char = text[i];
+      if (start < 0) {
+        if (char == '{') {
+          start = i;
+          depth = 1;
+        }
+        continue;
+      }
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (quoted && char == r'\') {
+        escaped = true;
+        continue;
+      }
+      if (char == '"') {
+        quoted = !quoted;
+        continue;
+      }
+      if (quoted) continue;
+      if (char == '{') depth++;
+      if (char == '}' && --depth == 0) {
+        yield text.substring(start, i + 1);
+        start = -1;
+      }
+    }
   }
 
   static void _tryParseCall(String? jsonStr, List<ToolCall> calls) {
     if (jsonStr == null) return;
     try {
       final json = jsonDecode(jsonStr.trim()) as Map<String, dynamic>;
+      if (!json.containsKey('arguments')) return;
       final name = _canonicalToolName(json['name'] as String? ?? '');
-      if (_knownTools.contains(name)) {
-        calls.add(ToolCall(
-          name: name,
-          arguments: (json['arguments'] as Map<String, dynamic>?) ?? {},
-        ));
+      if (name.isNotEmpty) {
+        calls.add(
+          ToolCall(
+            name: name,
+            arguments: (json['arguments'] as Map<String, dynamic>?) ?? {},
+          ),
+        );
       }
     } catch (e) {
       AppLogger.debug('[ToolExecutor] Failed to parse tool call: $e');
@@ -177,7 +252,7 @@ class ToolExecutor {
       r'(?:"name"|name)\s*:\s*"([^"]+)"',
     ).firstMatch(body);
     final name = _canonicalToolName(nameMatch?.group(1) ?? '');
-    if (!_knownTools.contains(name)) return;
+    if (name.isEmpty) return;
 
     final args = <String, dynamic>{};
     final fields = RegExp(
@@ -209,7 +284,15 @@ class ToolExecutor {
 
   /// Returns true if the text likely contains a tool call.
   static bool hasToolCalls(String text) {
+    text = stripAssistantReasoning(text);
+    if (text.contains('[approval]') ||
+        RegExp(
+          '(?:^|\\n)\\s*(?:${AgentToolCatalog.names.map(RegExp.escape).join('|')})\\s*\\(',
+        ).hasMatch(text)) {
+      return true; // Invalid syntax: request repair, never execute as prose.
+    }
     if (text.contains('<tool_call>')) return true;
+    if (parseToolCalls(text).isNotEmpty) return true;
     if (text.contains('<|tool_call>') || text.contains('call:tool_call')) {
       return true;
     }
@@ -222,28 +305,93 @@ class ToolExecutor {
 
   /// Executes a single tool call and returns the result.
   Future<ToolResult> execute(ToolCall call) async {
+    final cancelled = _isCancelled;
     try {
+      final validation = validateCall(call);
+      if (validation != null) {
+        return ToolResult(
+          toolName: call.name,
+          output: jsonEncode({'ok': false, 'error': validation}),
+          success: false,
+        );
+      }
+      call = prepareCall(call);
+      if (cancelled()) throw StateError('Operation stopped by user.');
+      if (call.name == 'get_context') {
+        return ToolResult(
+          toolName: call.name,
+          output: jsonEncode({
+            'ok': true,
+            'working_directory': _workingDirectory,
+            'browsing_path': _browsingPath,
+            'platform': Platform.operatingSystem,
+          }),
+        );
+      }
+      if (call.name == 'get_tool_guide') {
+        final topic = call.arguments['topic'];
+        final guide = switch (topic) {
+          'files' =>
+            'Browse/search in the current folder. Follow next_cursor with unchanged filters. Inspect sources and destinations before changes. For identical content, compare exact size_bytes, then file_checksum for candidates; report incomplete scans honestly. Use read_file start_line and next_start_line for text pages. Never infer duplicates from matching names alone.',
+          'tags' =>
+            'Tags are stored by CB File Hub, not the filesystem. Discover actual names with list_all_tags(query). Read get_file_tags(path); search_by_tag(tag,path,global:false) is scoped to a folder. global:true crosses drives. Follow next_cursor. update_file_tags(add/remove) preserves other tags and requires approval.',
+          'media' =>
+            'list_video_libraries({}) -> get_video_library_files({"library_id":actual_id}); list_albums({}) -> get_album_files({"album_id":actual_id}). Use only IDs returned by the listing tool. Read metadata, not binary media contents.',
+          'cleaner' => DiskCleanerSkill.skillBlock,
+          'app' =>
+            'CB File Hub uses tabs and app tags. Virtual #home/#tags/#albums/#video/#ai-chat screens are not filesystem directories. Use get_context for the working folder. get_current_app_storage({}) inspects existing app storage analysis; get_current_cleaner_scan({}) reads an existing scan.',
+          _ => throw ArgumentError(
+            'Unknown topic. Choose files, tags, media, cleaner, app.',
+          ),
+        };
+        return ToolResult(toolName: call.name, output: guide);
+      }
+      if (AgentFileTools.names.contains(call.name)) {
+        List<String>? sourceTags;
+        if (call.name == 'move_file' || call.name == 'copy_file') {
+          sourceTags = await _tagStore.read(call.arguments['source'] as String);
+        }
+        final data = await _fileTools.execute(
+          call.name,
+          call.arguments,
+          isCancelled: cancelled,
+        );
+        try {
+          if (sourceTags != null && sourceTags.isNotEmpty) {
+            final copiedTags = await _tagStore.write(
+              call.arguments['destination'] as String,
+              sourceTags,
+            );
+            if (!copiedTags) {
+              data['warning'] =
+                  'File operation succeeded, but tags could not be copied.';
+            } else {
+              if (call.name == 'move_file' &&
+                  !await _tagStore.write(
+                    call.arguments['source'] as String,
+                    [],
+                  )) {
+                data['warning'] =
+                    'File moved, but old tag metadata could not be cleared.';
+              }
+            }
+          }
+        } catch (error) {
+          data['warning'] =
+              'File operation succeeded; tag metadata update failed: $error';
+        }
+        return ToolResult(toolName: call.name, output: jsonEncode(data));
+      }
+      if (AgentTagTools.names.contains(call.name)) {
+        final data = await AgentTagTools(
+          _tagStore,
+          _fileTools,
+        ).execute(call.name, call.arguments, isCancelled: cancelled);
+        return ToolResult(toolName: call.name, output: jsonEncode(data));
+      }
       switch (call.name) {
-        case 'list_directory':
-          return await _listDirectory(call.arguments);
-        case 'search_files':
-          return await _searchFiles(call.arguments);
-        case 'read_file':
-          return await _readFile(call.arguments);
-        case 'write_file':
-          return await _writeFile(call.arguments);
-        case 'get_file_info':
-          return await _getFileInfo(call.arguments);
         case 'run_command':
           return await _runCommand(call.arguments);
-        case 'search_by_tag':
-          return await _searchByTag(call.arguments);
-        case 'get_file_tags':
-          return await _getFileTags(call.arguments);
-        case 'list_all_tags':
-          return await _listAllTags(call.arguments);
-        case 'search_content':
-          return await _searchContent(call.arguments);
         case 'list_video_libraries':
           return await _listVideoLibraries(call.arguments);
         case 'get_video_library_files':
@@ -288,317 +436,6 @@ class ToolExecutor {
   // ---------------------------------------------------------------------------
   // Tool implementations
   // ---------------------------------------------------------------------------
-
-  Future<ToolResult> _listDirectory(Map<String, dynamic> args) async {
-    final path = args['path'] as String? ?? '';
-    final recursive = args['recursive'] as bool? ?? false;
-    final pattern = args['pattern'] as String?;
-
-    if (path.isEmpty) {
-      if (Platform.isWindows) {
-        try {
-          final result = await Process.run(
-            'cmd',
-            [
-              '/c',
-              'wmic',
-              'logicaldisk',
-              'get',
-              'name,size,freespace',
-              '/format:csv'
-            ],
-          ).timeout(_timeout);
-          return ToolResult(
-            toolName: 'list_directory',
-            output: _truncate('Available drives:\n${result.stdout}'),
-          );
-        } catch (_) {
-          // Fallback: list drive letters
-          final drives = <String>[];
-          for (int i = 65; i <= 90; i++) {
-            final letter = '${String.fromCharCode(i)}:\\';
-            if (Directory(letter).existsSync()) drives.add(letter);
-          }
-          return ToolResult(
-            toolName: 'list_directory',
-            output: 'Available drives: ${drives.join(', ')}',
-          );
-        }
-      }
-      return const ToolResult(toolName: 'list_directory', output: 'Root: /');
-    }
-
-    final dir = Directory(path);
-    if (!await dir.exists()) {
-      return ToolResult(
-        toolName: 'list_directory',
-        output: 'Directory not found: $path',
-        success: false,
-      );
-    }
-
-    final buffer = StringBuffer();
-    int count = 0;
-    const limit = 200;
-
-    try {
-      await for (final entity in dir
-          .list(
-            recursive: recursive,
-            followLinks: false,
-          )
-          .handleError((_) {})
-          .take(limit * 2)) {
-        if (count >= limit) {
-          buffer.writeln('... (truncated, $limit+ entries)');
-          break;
-        }
-
-        final name = entity.path.replaceFirst(path, '').replaceAll('\\', '/');
-        if (name.isEmpty) continue;
-
-        if (pattern != null &&
-            !name.toLowerCase().contains(pattern.toLowerCase())) {
-          continue;
-        }
-
-        try {
-          final stat = await entity.stat();
-          final isDir = entity is Directory;
-          final sizeStr = isDir ? '<DIR>' : _formatSize(stat.size);
-          final dateStr = stat.modified.toIso8601String().substring(0, 10);
-          buffer.writeln('$dateStr  $sizeStr  $name');
-        } catch (_) {
-          buffer.writeln('            ?  $name');
-        }
-        count++;
-      }
-    } on TimeoutException {
-      buffer.writeln('... (timed out after scanning $count entries)');
-    } catch (e) {
-      buffer.writeln('Error: $e');
-    }
-
-    return ToolResult(
-      toolName: 'list_directory',
-      output: _truncate('Directory: $path ($count entries)\n$buffer'),
-    );
-  }
-
-  Future<ToolResult> _searchFiles(Map<String, dynamic> args) async {
-    final query = args['query'] as String? ?? '';
-    final path = args['path'] as String? ?? '';
-    final ext = args['extension'] as String?;
-
-    if (query.isEmpty && ext == null) {
-      return const ToolResult(
-        toolName: 'search_files',
-        output: 'Error: "query" or "extension" argument required',
-        success: false,
-      );
-    }
-
-    // Use Dart directory listing instead of Process.run to avoid encoding issues
-    final searchRoot = path.isNotEmpty
-        ? path
-        : (Platform.isWindows
-            ? 'C:\\Users'
-            : Platform.environment['HOME'] ?? '/');
-
-    final dir = Directory(searchRoot);
-    if (!await dir.exists()) {
-      return ToolResult(
-        toolName: 'search_files',
-        output: 'Directory not found: $searchRoot',
-        success: false,
-      );
-    }
-
-    final queryLower = query.toLowerCase();
-    final extLower = ext?.toLowerCase();
-    final results = <String>[];
-    const maxResults = 100;
-
-    try {
-      await for (final entity in dir
-          .list(recursive: true, followLinks: false)
-          .handleError((_) {})
-          .timeout(_timeout, onTimeout: (sink) => sink.close())) {
-        if (results.length >= maxResults) break;
-        if (entity is! File) continue;
-
-        final fileName =
-            entity.path.split(Platform.pathSeparator).last.toLowerCase();
-
-        bool matches = false;
-        if (queryLower.isNotEmpty && fileName.contains(queryLower)) {
-          matches = true;
-        }
-        if (extLower != null && fileName.endsWith(extLower)) {
-          matches = true;
-        }
-
-        if (matches) {
-          results.add(entity.path);
-        }
-      }
-    } catch (_) {
-      // Timeout or permission error — return what we have
-    }
-
-    return ToolResult(
-      toolName: 'search_files',
-      output: _truncate(
-        'Search for "${query.isNotEmpty ? query : ext}" in $searchRoot:\n'
-        'Found ${results.length} file(s)${results.length >= maxResults ? " (limit reached)" : ""}\n'
-        '${results.join('\n')}',
-      ),
-    );
-  }
-
-  Future<ToolResult> _readFile(Map<String, dynamic> args) async {
-    final path = args['path'] as String? ?? '';
-    final maxLines = args['max_lines'] as int? ?? 50;
-
-    if (path.isEmpty) {
-      return const ToolResult(
-        toolName: 'read_file',
-        output: 'Error: "path" argument required',
-        success: false,
-      );
-    }
-
-    final file = File(path);
-    if (!await file.exists()) {
-      return ToolResult(
-        toolName: 'read_file',
-        output: 'File not found: $path',
-        success: false,
-      );
-    }
-
-    try {
-      final stat = await file.stat();
-      if (stat.size > 1024 * 1024) {
-        return ToolResult(
-          toolName: 'read_file',
-          output: 'File too large (${_formatSize(stat.size)}). Max 1MB.',
-          success: false,
-        );
-      }
-
-      String content;
-      try {
-        content = await file.readAsString(encoding: utf8);
-      } catch (_) {
-        try {
-          content = await file.readAsString(encoding: latin1);
-        } catch (_) {
-          return const ToolResult(
-            toolName: 'read_file',
-            output: 'Cannot read file: binary or unsupported encoding',
-            success: false,
-          );
-        }
-      }
-
-      final lines = content.split('\n');
-      final preview = lines.take(maxLines).join('\n');
-      final truncated = lines.length > maxLines;
-
-      return ToolResult(
-        toolName: 'read_file',
-        output: _truncate(
-          'File: $path (${_formatSize(stat.size)}, ${lines.length} lines)\n'
-          '---\n$preview'
-          '${truncated ? '\n--- (showing $maxLines of ${lines.length} lines)' : ''}',
-        ),
-      );
-    } catch (e) {
-      return ToolResult(
-        toolName: 'read_file',
-        output: 'Error reading file: $e',
-        success: false,
-      );
-    }
-  }
-
-  Future<ToolResult> _writeFile(Map<String, dynamic> args) async {
-    final path = args['path'] as String? ?? '';
-    final content = args['content'] as String? ?? '';
-    final append = args['append'] as bool? ?? false;
-
-    if (path.isEmpty) {
-      return const ToolResult(
-        toolName: 'write_file',
-        output: 'Error: "path" argument required',
-        success: false,
-      );
-    }
-
-    try {
-      final file = File(path);
-      // Ensure parent directory exists
-      await file.parent.create(recursive: true);
-      if (append) {
-        await file.writeAsString(content, mode: FileMode.append);
-      } else {
-        await file.writeAsString(content);
-      }
-      final stat = await file.stat();
-      return ToolResult(
-        toolName: 'write_file',
-        output:
-            'Successfully ${append ? 'appended' : 'wrote'} ${content.length} chars to $path (${_formatSize(stat.size)} total)',
-      );
-    } catch (e) {
-      return ToolResult(
-        toolName: 'write_file',
-        output: 'Error writing file: $e',
-        success: false,
-      );
-    }
-  }
-
-  Future<ToolResult> _getFileInfo(Map<String, dynamic> args) async {
-    final path = args['path'] as String? ?? '';
-
-    if (path.isEmpty) {
-      return const ToolResult(
-        toolName: 'get_file_info',
-        output: 'Error: "path" argument required',
-        success: false,
-      );
-    }
-
-    try {
-      final type = FileSystemEntity.typeSync(path);
-      if (type == FileSystemEntityType.notFound) {
-        return ToolResult(
-          toolName: 'get_file_info',
-          output: 'Not found: $path',
-          success: false,
-        );
-      }
-
-      final stat = FileStat.statSync(path);
-      final buffer = StringBuffer();
-      buffer.writeln('Path: $path');
-      buffer.writeln(
-          'Type: ${type == FileSystemEntityType.directory ? "Directory" : "File"}');
-      buffer.writeln('Size: ${_formatSize(stat.size)}');
-      buffer.writeln('Modified: ${stat.modified}');
-      buffer.writeln('Accessed: ${stat.accessed}');
-
-      return ToolResult(toolName: 'get_file_info', output: buffer.toString());
-    } catch (e) {
-      return ToolResult(
-        toolName: 'get_file_info',
-        output: 'Error: $e',
-        success: false,
-      );
-    }
-  }
 
   Future<ToolResult> _runCommand(Map<String, dynamic> args) async {
     final command = args['command'] as String? ?? '';
@@ -686,260 +523,6 @@ class ToolExecutor {
   // CB File Hub tag & content tools
   // ---------------------------------------------------------------------------
 
-  Future<ToolResult> _searchByTag(Map<String, dynamic> args) async {
-    final tag = args['tag'] as String? ?? '';
-    final path = args['path'] as String?;
-    final global = args['global'] as bool? ?? true;
-
-    if (tag.isEmpty) {
-      return const ToolResult(
-        toolName: 'search_by_tag',
-        output: 'Error: "tag" argument required',
-        success: false,
-      );
-    }
-
-    try {
-      await TagManager.initialize();
-
-      List<FileSystemEntity> files;
-      if (global || path == null || path.isEmpty) {
-        files = await TagManager.findFilesByTagGlobally(tag);
-      } else {
-        files = await TagManager.findFilesByTag(path, tag);
-      }
-
-      if (files.isEmpty) {
-        return ToolResult(
-          toolName: 'search_by_tag',
-          output: 'No files found with tag "$tag"',
-        );
-      }
-
-      final buffer = StringBuffer();
-      buffer.writeln('Files with tag "$tag": ${files.length} found');
-      for (final f in files.take(100)) {
-        final stat = await f.stat();
-        buffer.writeln('  ${f.path}  (${_formatSize(stat.size)})');
-      }
-      if (files.length > 100) {
-        buffer.writeln('  ... and ${files.length - 100} more');
-      }
-
-      return ToolResult(
-        toolName: 'search_by_tag',
-        output: _truncate(buffer.toString()),
-      );
-    } catch (e) {
-      return ToolResult(
-        toolName: 'search_by_tag',
-        output: 'Error: $e',
-        success: false,
-      );
-    }
-  }
-
-  Future<ToolResult> _getFileTags(Map<String, dynamic> args) async {
-    final path = args['path'] as String? ?? '';
-
-    if (path.isEmpty) {
-      return const ToolResult(
-        toolName: 'get_file_tags',
-        output: 'Error: "path" argument required',
-        success: false,
-      );
-    }
-
-    try {
-      await TagManager.initialize();
-      final tags = await TagManager.getTags(path);
-
-      if (tags.isEmpty) {
-        return ToolResult(
-          toolName: 'get_file_tags',
-          output: 'File "$path" has no tags',
-        );
-      }
-
-      return ToolResult(
-        toolName: 'get_file_tags',
-        output: 'Tags for "$path": ${tags.join(", ")}',
-      );
-    } catch (e) {
-      return ToolResult(
-        toolName: 'get_file_tags',
-        output: 'Error: $e',
-        success: false,
-      );
-    }
-  }
-
-  Future<ToolResult> _listAllTags(Map<String, dynamic> args) async {
-    try {
-      await TagManager.initialize();
-      final tags = await TagManager.getAllUniqueTags('');
-
-      if (tags.isEmpty) {
-        return const ToolResult(
-          toolName: 'list_all_tags',
-          output: 'No tags found in the system',
-        );
-      }
-
-      final sorted = tags.toList()..sort();
-      final buffer = StringBuffer();
-      buffer.writeln('All tags (${sorted.length}):');
-      for (final tag in sorted) {
-        buffer.writeln('  #$tag');
-      }
-
-      return ToolResult(
-        toolName: 'list_all_tags',
-        output: _truncate(buffer.toString()),
-      );
-    } catch (e) {
-      return ToolResult(
-        toolName: 'list_all_tags',
-        output: 'Error: $e',
-        success: false,
-      );
-    }
-  }
-
-  Future<ToolResult> _searchContent(Map<String, dynamic> args) async {
-    final query = args['query'] as String? ?? '';
-    final path = args['path'] as String? ?? '';
-    final ext = args['extension'] as String?;
-    final caseSensitive = args['case_sensitive'] as bool? ?? false;
-
-    if (query.isEmpty) {
-      return const ToolResult(
-        toolName: 'search_content',
-        output: 'Error: "query" argument required',
-        success: false,
-      );
-    }
-
-    final searchRoot = path.isNotEmpty
-        ? path
-        : (Platform.isWindows
-            ? (Platform.environment['USERPROFILE'] ?? 'C:\\Users')
-            : Platform.environment['HOME'] ?? '/');
-
-    final dir = Directory(searchRoot);
-    if (!await dir.exists()) {
-      return ToolResult(
-        toolName: 'search_content',
-        output: 'Directory not found: $searchRoot',
-        success: false,
-      );
-    }
-
-    final textExts = ext != null
-        ? {ext.toLowerCase()}
-        : const {
-            '.txt',
-            '.md',
-            '.json',
-            '.xml',
-            '.yaml',
-            '.yml',
-            '.csv',
-            '.log',
-            '.ini',
-            '.cfg',
-            '.conf',
-            '.html',
-            '.css',
-            '.js',
-            '.ts',
-            '.dart',
-            '.py',
-            '.java',
-            '.c',
-            '.cpp',
-            '.h',
-            '.go',
-            '.rs',
-            '.rb',
-            '.php',
-            '.sh',
-            '.bat',
-            '.sql',
-            '.toml',
-          };
-
-    final queryLower = caseSensitive ? query : query.toLowerCase();
-    final results = <String>[];
-    const maxResults = 50;
-
-    try {
-      await for (final entity in dir
-          .list(recursive: true, followLinks: false)
-          .handleError((_) {})
-          .timeout(_timeout, onTimeout: (sink) => sink.close())) {
-        if (results.length >= maxResults) break;
-        if (entity is! File) continue;
-
-        final fileName = entity.path.split(Platform.pathSeparator).last;
-        final fileExt = fileName.contains('.')
-            ? '.${fileName.split('.').last}'.toLowerCase()
-            : '';
-        if (!textExts.contains(fileExt)) continue;
-
-        try {
-          final stat = await entity.stat();
-          if (stat.size > 512 * 1024) continue; // skip files > 512KB
-
-          final content = await entity.readAsString(encoding: utf8);
-          final searchIn = caseSensitive ? content : content.toLowerCase();
-
-          if (searchIn.contains(queryLower)) {
-            // Find the matching line for context
-            final lines = content.split('\n');
-            String? matchLine;
-            int? lineNum;
-            for (int i = 0; i < lines.length; i++) {
-              final lineLower =
-                  caseSensitive ? lines[i] : lines[i].toLowerCase();
-              if (lineLower.contains(queryLower)) {
-                lineNum = i + 1;
-                matchLine = lines[i].trim();
-                if (matchLine.length > 120) {
-                  matchLine = '${matchLine.substring(0, 120)}...';
-                }
-                break;
-              }
-            }
-            results.add(
-              '${entity.path}:$lineNum: $matchLine',
-            );
-          }
-        } catch (_) {
-          // Skip unreadable files
-        }
-      }
-    } catch (_) {
-      // Timeout — return what we have
-    }
-
-    if (results.isEmpty) {
-      return ToolResult(
-        toolName: 'search_content',
-        output: 'No files containing "$query" found in $searchRoot',
-      );
-    }
-
-    return ToolResult(
-      toolName: 'search_content',
-      output: _truncate(
-        'Content search for "$query" in $searchRoot:\n'
-        'Found in ${results.length} file(s)${results.length >= maxResults ? " (limit reached)" : ""}\n\n'
-        '${results.join('\n')}',
-      ),
-    );
-  }
-
   Future<ToolResult> _deleteFile(Map<String, dynamic> args) async {
     AppLogger.info('[ToolExecutor] delete_file called with args: $args');
     // Support single path or array of paths
@@ -947,8 +530,10 @@ class ToolExecutor {
     final pathArg = args['path'];
     final pathsArg = args['paths'];
     if (pathsArg is List) {
-      paths =
-          pathsArg.map((e) => e.toString()).where((p) => p.isNotEmpty).toList();
+      paths = pathsArg
+          .map((e) => e.toString())
+          .where((p) => p.isNotEmpty)
+          .toList();
     } else if (pathArg is String && pathArg.isNotEmpty) {
       paths = [pathArg];
     } else {
@@ -1240,8 +825,9 @@ class ToolExecutor {
     }
 
     final arguments = Map<String, dynamic>.from(call.arguments);
-    final normalizedCategories =
-        _normalizeCleanerCategories(arguments['categories']);
+    final normalizedCategories = _normalizeCleanerCategories(
+      arguments['categories'],
+    );
     if (normalizedCategories != null) {
       arguments['categories'] = normalizedCategories;
     }
@@ -1276,7 +862,8 @@ class ToolExecutor {
       final defaultStr = cat.defaultEnabled ? 'default ON' : 'default OFF';
       final adminStr = cat.requiresAdmin ? ', needs admin' : '';
       buffer.writeln(
-          '- ${cat.id} ($safetyStr, $defaultStr$adminStr): ${cat.description}');
+        '- ${cat.id} ($safetyStr, $defaultStr$adminStr): ${cat.description}',
+      );
     }
     return ToolResult(
       toolName: 'list_disk_junk_categories',
@@ -1307,7 +894,8 @@ class ToolExecutor {
     for (final d in drives) {
       final label = d.label.isNotEmpty ? ' (${d.label})' : '';
       buffer.writeln(
-          '- ${d.path}$label: ${_formatSize(d.usedBytes)} used / ${_formatSize(d.totalBytes)} total, ${_formatSize(d.freeBytes)} free');
+        '- ${d.path}$label: ${_formatSize(d.usedBytes)} used / ${_formatSize(d.totalBytes)} total, ${_formatSize(d.freeBytes)} free',
+      );
     }
     return ToolResult(
       toolName: 'get_drive_space',
@@ -1334,10 +922,9 @@ class ToolExecutor {
       );
     }
 
-    final normalizedArgs = normalizeCall(ToolCall(
-      name: 'scan_disk_junk',
-      arguments: args,
-    )).arguments;
+    final normalizedArgs = normalizeCall(
+      ToolCall(name: 'scan_disk_junk', arguments: args),
+    ).arguments;
 
     // Parse arguments
     final drivesArg = normalizedArgs['drives'];
@@ -1357,53 +944,57 @@ class ToolExecutor {
     }
 
     try {
-      service.emitAgentActivity(DiskCleanerAgentActivity(
-        type: DiskCleanerAgentActivityType.scanStarted,
-        ownerTabId: ownerTabId,
-        message: 'CB Agent is scanning junk files...',
-      ));
+      service.emitAgentActivity(
+        DiskCleanerAgentActivity(
+          type: DiskCleanerAgentActivityType.scanStarted,
+          ownerTabId: ownerTabId,
+          message: 'CB Agent is scanning junk files...',
+        ),
+      );
       final report = await service.scanJunk(
         drivePaths: drives,
         categoryIds: categories,
         onProgress: (progress) {
-          service.emitAgentActivity(DiskCleanerAgentActivity(
-            type: DiskCleanerAgentActivityType.scanProgress,
-            ownerTabId: ownerTabId,
-            message: 'CB Agent is scanning junk files...',
-            itemsFound: progress.itemsFound,
-            bytesFound: progress.bytesFound,
-            currentPath: progress.currentPath,
-          ));
+          service.emitAgentActivity(
+            DiskCleanerAgentActivity(
+              type: DiskCleanerAgentActivityType.scanProgress,
+              ownerTabId: ownerTabId,
+              message: 'CB Agent is scanning junk files...',
+              itemsFound: progress.itemsFound,
+              bytesFound: progress.bytesFound,
+              currentPath: progress.currentPath,
+            ),
+          );
         },
       );
-      service.emitAgentActivity(DiskCleanerAgentActivity(
-        type: DiskCleanerAgentActivityType.scanDone,
-        ownerTabId: ownerTabId,
-        message: 'CB Agent scan complete.',
-        itemsFound: report.totalCount,
-        bytesFound: report.totalBytes,
-        report: report,
-      ));
+      service.emitAgentActivity(
+        DiskCleanerAgentActivity(
+          type: DiskCleanerAgentActivityType.scanDone,
+          ownerTabId: ownerTabId,
+          message: 'CB Agent scan complete.',
+          itemsFound: report.totalCount,
+          bytesFound: report.totalBytes,
+          report: report,
+        ),
+      );
 
       // Generate scan_id and cache the report
       final scanId =
           'sc_${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
-      _scanRegistry.store(
-        scanId,
-        report,
-        ownerTabId: ownerTabId,
-      );
+      _scanRegistry.store(scanId, report, ownerTabId: ownerTabId);
 
       return ToolResult(
         toolName: 'scan_disk_junk',
         output: formatJunkScanReport(report, scanId),
       );
     } catch (e) {
-      service.emitAgentActivity(DiskCleanerAgentActivity(
-        type: DiskCleanerAgentActivityType.scanFailed,
-        ownerTabId: ownerTabId,
-        message: 'CB Agent scan failed: $e',
-      ));
+      service.emitAgentActivity(
+        DiskCleanerAgentActivity(
+          type: DiskCleanerAgentActivityType.scanFailed,
+          ownerTabId: ownerTabId,
+          message: 'CB Agent scan failed: $e',
+        ),
+      );
       return ToolResult(
         toolName: 'scan_disk_junk',
         output: 'Error: $e',
@@ -1421,14 +1012,19 @@ class ToolExecutor {
     buffer.writeln('scan_id=$scanId');
     buffer.writeln('Drives: ${report.drivesScanned.join(', ')}');
     buffer.writeln(
-        'Total rule-matched junk: ${report.totalCount} items, ${_formatSize(report.totalBytes)}');
+      'Total rule-matched junk: ${report.totalCount} items, ${_formatSize(report.totalBytes)}',
+    );
 
     final categories = report.itemsByCategory.entries.toList()
       ..sort((a, b) {
-        final aBytes =
-            a.value.fold<int>(0, (sum, item) => sum + item.sizeBytes);
-        final bBytes =
-            b.value.fold<int>(0, (sum, item) => sum + item.sizeBytes);
+        final aBytes = a.value.fold<int>(
+          0,
+          (sum, item) => sum + item.sizeBytes,
+        );
+        final bBytes = b.value.fold<int>(
+          0,
+          (sum, item) => sum + item.sizeBytes,
+        );
         return bBytes.compareTo(aBytes);
       });
 
@@ -1470,10 +1066,11 @@ class ToolExecutor {
 
     buffer.writeln();
     buffer.writeln(
-        'RESPONSE REQUIREMENT: Summarize the ranked findings in normal '
-        'language. Include path, size, owner/category, CLEAN/REVIEW/KEEP, and '
-        'reason. This scan is analysis-only. Do not call clean_disk_junk unless '
-        'the user explicitly confirms cleanup after seeing the findings.');
+      'RESPONSE REQUIREMENT: Summarize the ranked findings in normal '
+      'language. Include path, size, owner/category, CLEAN/REVIEW/KEEP, and '
+      'reason. This scan is analysis-only. Do not call clean_disk_junk unless '
+      'the user explicitly confirms cleanup after seeing the findings.',
+    );
     return _truncate(buffer.toString().trim());
   }
 
@@ -1486,10 +1083,9 @@ class ToolExecutor {
       );
     }
 
-    final normalizedCall = normalizeCall(ToolCall(
-      name: 'clean_disk_junk',
-      arguments: args,
-    ));
+    final normalizedCall = normalizeCall(
+      ToolCall(name: 'clean_disk_junk', arguments: args),
+    );
     final normalizedArgs = normalizedCall.arguments;
     final scanId = _scanRegistry.resolveId(
       normalizedArgs['scan_id'],
@@ -1499,8 +1095,9 @@ class ToolExecutor {
     if (cached == null) {
       final requestedScanId =
           normalizedArgs['scan_id']?.toString().trim() ?? '';
-      final usedPlaceholder =
-          CleanerScanRegistry.isPlaceholder(requestedScanId);
+      final usedPlaceholder = CleanerScanRegistry.isPlaceholder(
+        requestedScanId,
+      );
       return ToolResult(
         toolName: 'clean_disk_junk',
         output: usedPlaceholder
@@ -1549,13 +1146,16 @@ class ToolExecutor {
       final buffer = StringBuffer();
       buffer.writeln('Cleanup complete.');
       buffer.writeln(
-          'Mode: ${report.wasPermanent ? "Permanent delete" : "Move to Recycle Bin"}');
+        'Mode: ${report.wasPermanent ? "Permanent delete" : "Move to Recycle Bin"}',
+      );
       buffer.writeln(
-          'Freed: ${_formatSize(report.freedBytes)} across ${report.successCount} items');
+        'Freed: ${_formatSize(report.freedBytes)} across ${report.successCount} items',
+      );
       buffer.writeln('Succeeded: ${report.successCount}');
       if (report.failureCount > 0) {
         buffer.writeln(
-            'Failed: ${report.failureCount} (locked by other processes or permission denied)');
+          'Failed: ${report.failureCount} (locked by other processes or permission denied)',
+        );
         final examples = report.failed.entries.take(5);
         buffer.writeln('Examples of failures:');
         for (final e in examples) {
@@ -1564,11 +1164,13 @@ class ToolExecutor {
       }
       if (report.skippedInUse.isNotEmpty) {
         buffer.writeln(
-            'Skipped (currently in use): ${report.skippedInUse.length}');
+          'Skipped (currently in use): ${report.skippedInUse.length}',
+        );
       }
       if (report.skippedUnsafe.isNotEmpty) {
-        buffer
-            .writeln('Skipped (unsafe paths): ${report.skippedUnsafe.length}');
+        buffer.writeln(
+          'Skipped (unsafe paths): ${report.skippedUnsafe.length}',
+        );
       }
 
       // Remove from cache after successful clean
@@ -1603,8 +1205,10 @@ class ToolExecutor {
     final shortcuts = _knownFolderShortcuts();
 
     final buffer = StringBuffer();
-    buffer.writeln('PENDING CLEANUP: ${items.length} items, '
-        '${_formatSize(service.pendingCleanupBytes)}');
+    buffer.writeln(
+      'PENDING CLEANUP: ${items.length} items, '
+      '${_formatSize(service.pendingCleanupBytes)}',
+    );
 
     final byCategory = <String, List<JunkItem>>{};
     for (final item in items) {
@@ -1615,8 +1219,10 @@ class ToolExecutor {
       final catItems = entry.value;
       final catBytes = catItems.fold<int>(0, (s, i) => s + i.sizeBytes);
       buffer.writeln();
-      buffer.writeln('${entry.key}: ${catItems.length} items, '
-          '${_formatSize(catBytes)}');
+      buffer.writeln(
+        '${entry.key}: ${catItems.length} items, '
+        '${_formatSize(catBytes)}',
+      );
 
       // Aggregate by ROOT (top-3 distinct path prefixes after shortcut)
       final byRoot = <String, _RootStat>{};
@@ -1641,28 +1247,37 @@ class ToolExecutor {
         ..sort((a, b) => b.value.bytes.compareTo(a.value.bytes));
       final rootsLine = sortedRoots
           .take(3)
-          .map((e) =>
-              '${e.key} (${e.value.count}, ${_formatSize(e.value.bytes)})')
+          .map(
+            (e) => '${e.key} (${e.value.count}, ${_formatSize(e.value.bytes)})',
+          )
           .join('; ');
       if (rootsLine.isNotEmpty) {
-        buffer.writeln('  roots: $rootsLine'
-            '${sortedRoots.length > 3 ? ' +${sortedRoots.length - 3} more' : ''}');
+        buffer.writeln(
+          '  roots: $rootsLine'
+          '${sortedRoots.length > 3 ? ' +${sortedRoots.length - 3} more' : ''}',
+        );
       }
 
       // Extensions: top 5
       final sortedExts = extCounts.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
-      final extsLine =
-          sortedExts.take(5).map((e) => '${e.key} x${e.value}').join(', ');
+      final extsLine = sortedExts
+          .take(5)
+          .map((e) => '${e.key} x${e.value}')
+          .join(', ');
       if (extsLine.isNotEmpty) {
-        buffer.writeln('  exts: $extsLine'
-            '${sortedExts.length > 5 ? ', +${sortedExts.length - 5}' : ''}');
+        buffer.writeln(
+          '  exts: $extsLine'
+          '${sortedExts.length > 5 ? ', +${sortedExts.length - 5}' : ''}',
+        );
       }
     }
 
     buffer.writeln();
-    buffer.writeln('Review: are these safe to move to Recycle Bin? '
-        'Flag any risky categories or roots.');
+    buffer.writeln(
+      'Review: are these safe to move to Recycle Bin? '
+      'Flag any risky categories or roots.',
+    );
 
     return ToolResult(
       toolName: 'get_pending_cleanup_review',
@@ -1730,24 +1345,35 @@ class ToolExecutor {
     selectedNodes.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
 
     final buffer = StringBuffer();
-    buffer.writeln(context.isCached
-        ? 'PREVIOUS CACHED CLEANER SCAN'
-        : 'CURRENT CLEANER SCAN');
+    buffer.writeln(
+      context.isCached
+          ? 'PREVIOUS CACHED CLEANER SCAN'
+          : 'CURRENT CLEANER SCAN',
+    );
     buffer.writeln('Owner tab: ${context.ownerTabId}');
     buffer.writeln('Context published: ${context.updatedAt.toIso8601String()}');
     buffer.writeln(
-        'Status: ${context.isCached ? "previous cached result" : context.isScanning ? "scanning" : "ready"}');
+      'Status: ${context.isCached
+          ? "previous cached result"
+          : context.isScanning
+          ? "scanning"
+          : "ready"}',
+    );
     if (context.isCached) {
       buffer.writeln(
-          'Freshness: previous cached result; this is not a current scan.');
+        'Freshness: previous cached result; this is not a current scan.',
+      );
       buffer.writeln(
-          'Refresh: Use Scan again to refresh before relying on this data.');
+        'Refresh: Use Scan again to refresh before relying on this data.',
+      );
     }
     buffer.writeln(
-        'Root: ${root.fullPath} (${_formatSize(root.sizeBytes)}, ${root.fileCount} files)');
+      'Root: ${root.fullPath} (${_formatSize(root.sizeBytes)}, ${root.fileCount} files)',
+    );
     buffer.writeln('Junk marked: ${_formatSize(root.junkBytes)}');
     buffer.writeln(
-        'Selected for cleanup: $selectedCount items, ${_formatSize(selectedBytes)}');
+      'Selected for cleanup: $selectedCount items, ${_formatSize(selectedBytes)}',
+    );
 
     if (selectedNode != null) {
       buffer.writeln();
@@ -1804,10 +1430,11 @@ class ToolExecutor {
 
     buffer.writeln();
     buffer.writeln(
-        'RESPONSE REQUIREMENT: Answer with a readable ranked report, '
-        'not JSON. Explain what each item belongs to and label it CLEAN, REVIEW, '
-        'or KEEP with a reason. Do not call clean_disk_junk for an analysis or '
-        'recommendation request.');
+      'RESPONSE REQUIREMENT: Answer with a readable ranked report, '
+      'not JSON. Explain what each item belongs to and label it CLEAN, REVIEW, '
+      'or KEEP with a reason. Do not call clean_disk_junk for an analysis or '
+      'recommendation request.',
+    );
 
     return ToolResult(
       toolName: 'get_current_cleaner_scan',
@@ -1838,7 +1465,8 @@ class ToolExecutor {
     final requestedAppId = (args['app_id'] as String?)?.trim();
     final maxApps = (args['max_apps'] as int?)?.clamp(1, 50) ?? 20;
     final wantsPaths = args['include_paths'] as bool? ?? false;
-    final mayIncludePaths = wantsPaths &&
+    final mayIncludePaths =
+        wantsPaths &&
         requestedAppId != null &&
         requestedAppId.isNotEmpty &&
         requestedAppId == context.selectedAppId;
@@ -1863,10 +1491,8 @@ class ToolExecutor {
         case 'stale':
           profiles = profiles
               .where(
-                (profile) => profile.isStale(
-                  now: now,
-                  threshold: staleThreshold,
-                ),
+                (profile) =>
+                    profile.isStale(now: now, threshold: staleThreshold),
               )
               .toList(growable: false);
           break;
@@ -1893,16 +1519,11 @@ class ToolExecutor {
 
     final staleCount = report.apps
         .where(
-          (profile) => profile.isStale(
-            now: now,
-            threshold: staleThreshold,
-          ),
+          (profile) => profile.isStale(now: now, threshold: staleThreshold),
         )
         .length;
     final largeCount = report.apps
-        .where(
-          (profile) => profile.bestKnownSizeBytes >= largeThresholdBytes,
-        )
+        .where((profile) => profile.bestKnownSizeBytes >= largeThresholdBytes)
         .length;
 
     final buffer = StringBuffer();
@@ -1931,7 +1552,7 @@ class ToolExecutor {
         final lastOpened = lastOpenedAt == null || lastOpenedAt.isAfter(now)
             ? 'unknown'
             : '${now.difference(lastOpenedAt).inDays} days ago '
-                '(${usage.source?.name ?? "unknown"}, ${usage.confidence?.name ?? "unknown"})';
+                  '(${usage.source?.name ?? "unknown"}, ${usage.confidence?.name ?? "unknown"})';
         final possible = profile.possibleSizeBytes > 0
             ? ', possible=${_formatSize(profile.possibleSizeBytes)}'
             : '';
@@ -1994,8 +1615,8 @@ class ToolExecutor {
     final junk = node.isJunk
         ? ', junk=${node.junkCategoryId}'
         : (node.hasJunkChildren
-            ? ', junk_children=${_formatSize(node.junkBytes)}'
-            : '');
+              ? ', junk_children=${_formatSize(node.junkBytes)}'
+              : '');
     final selected = node.isSelectedForDeletion ? ', selected' : '';
     return '${node.fullPath} [$type, ${_formatSize(node.sizeBytes)}, ${node.fileCount} files$junk$selected]';
   }
@@ -2130,8 +1751,10 @@ class ToolExecutor {
   /// shared directory prefix that contains the path. Falls back to the first
   /// 3 path segments if there's no obvious shared root.
   String _findRootPrefix(String path, List<JunkItem> peers) {
-    final segments =
-        path.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).toList();
+    final segments = path
+        .split(RegExp(r'[\\/]'))
+        .where((s) => s.isNotEmpty)
+        .toList();
     if (segments.length <= 3) return path;
     // Use first 3 segments as the root, e.g. C:\Users\ngtan
     return '${segments[0]}\\${segments[1]}\\${segments[2]}';
@@ -2179,126 +1802,7 @@ class ToolExecutor {
   }
 
   /// Tool definitions for the system prompt.
-  static String get toolDefinitions => '''
-=== CB FILE HUB KNOWLEDGE ===
-
-You are **CB Agent**, the AI assistant built into CB File Hub. CB File Hub users call you CB Agent.
-CB File Hub has a powerful **tag system** that lets users tag files with custom labels (like #vacation, #work, #important). Tags are stored in a SQLite database and work across all drives.
-
-Key concepts:
-- **Tags**: Users can add multiple tags to any file. Tags are case-insensitive. Searching by tag is instant (database-indexed).
-- **Tag search**: Users use #tag syntax in the search bar. Multiple tags can be combined (#nature #vacation = files with BOTH tags).
-- **File browsing**: Tab-based file browser with folder navigation, drive switching, and network shares (SMB/FTP).
-- **Media support**: Built-in video player, image gallery, streaming server.
-
-=== AVAILABLE TOOLS ===
-
-To use a tool, respond with a <tool_call> block:
-<tool_call>
-{"name": "tool_name", "arguments": {"arg1": "value1"}}
-</tool_call>
-
-Use that exact XML-style wrapper and valid JSON only. Do not use <|tool_call>,
-call:tool_call, unquoted keys, or invented tool names.
-
-**File System Tools:**
-
-1. **list_directory** — List files and folders
-   {"path": "C:\\\\Users", "recursive": false, "pattern": "optional_filter"}
-   Empty path = list all drives. Use pattern to filter by name.
-
-2. **search_files** — Search files by name or extension
-   {"query": "photo", "path": "C:\\\\Users\\\\Pictures", "extension": ".jpg"}
-   Searches recursively (15s timeout). Use specific paths, NOT entire drives.
-
-3. **read_file** — Read text file content only
-   {"path": "C:\\\\file.txt", "max_lines": 50}
-   IMPORTANT: Only use on text-based files (txt, md, json, dart, py, js, ts, yaml, html, css, etc.).
-   - Text files dropped by the user have their content PRE-LOADED in the message. Do NOT call read_file on them again.
-   - NEVER call read_file on image files (jpg, png, gif, webp), video files (mp4, mkv), audio files (mp3, wav), PDFs, or archives (zip, rar, 7z) — it will fail.
-   - For non-text files: use **get_file_info** instead.
-
-4. **write_file** — Write or append text to a file — REQUIRES USER APPROVAL
-   {"path": "C:\\\\file.txt", "content": "text here", "append": false}
-   append=true adds to the end of the file. Creates the file (and parent directories) if it doesn't exist.
-
-5. **get_file_info** — Get file metadata
-   {"path": "C:\\\\file.txt"}
-
-6. **delete_file** — Move file(s) to recycle bin — REQUIRES USER APPROVAL
-   Single: {"path": "C:\\\\file.txt"}
-   Multiple: {"paths": ["C:\\\\a.txt", "C:\\\\b.txt"]}
-   Files are moved to the system recycle bin, NOT permanently deleted. User can restore them later.
-   Returns a list of all items successfully moved and any that failed.
-
-7. **run_command** — Execute a shell command (15s timeout) — REQUIRES USER APPROVAL
-   Arguments: {"command": "dir /s /b C:\\\\Users\\\\*.pdf", "working_directory": "C:\\\\Users"}
-   Destructive commands are blocked. USER MUST APPROVE before it runs.
-
-**CB File Hub Tag Tools:**
-
-8. **search_by_tag** — Find files tagged with a specific tag
-   {"tag": "vacation", "global": true, "path": "C:\\\\Photos"}
-   global=true searches all files. global=false + path searches within that directory only.
-   This is the BEST way to find files that users have organized with tags.
-
-9. **get_file_tags** — Get all tags of a file
-   {"path": "C:\\\\Photos\\\\beach.jpg"}
-
-10. **list_all_tags** — List all tags in the system
-   {} (no arguments needed)
-   Use this FIRST when the user asks about tags or tagged files to see what tags exist.
-
-**Content Search Tool:**
-
-11. **search_content** — Search inside text files for specific content (grep-like)
-   {"query": "TODO", "path": "C:\\\\Projects", "extension": ".dart", "case_sensitive": false}
-   Searches text files recursively for content matches. Shows matching line with context.
-
-**Video Library and Album Tools:**
-
-12. **list_video_libraries** — List all video libraries in CB File Hub
-   {} (no arguments needed)
-   Returns all video libraries with their IDs, names, descriptions, and metadata.
-   Use this when users ask about video libraries, video collections, or want to see what video libraries exist.
-
-13. **get_video_library_files** — Get all video files in a specific video library
-   {"library_id": 1}
-   Returns all video file paths in the specified video library with file sizes.
-   Use this to search within a specific video library or list its contents.
-   IMPORTANT: You must use **list_video_libraries** first to get the library_id.
-
-14. **list_albums** — List all albums in CB File Hub
-   {} (no arguments needed)
-   Returns all albums with their IDs, names, descriptions, and metadata.
-   Use this when users ask about albums, photo collections, or want to see what albums exist.
-
-15. **get_album_files** — Get all files in a specific album
-   {"album_id": 5}
-   Returns all file paths in the specified album with file sizes and captions.
-   Use this to search within a specific album or list its contents.
-   IMPORTANT: You must use **list_albums** first to get the album_id.
-
-=== STRATEGY ===
-
-- For "find files with tag X": use **list_all_tags** first to check if the tag exists, then **search_by_tag**.
-- For "find files named X": use **search_files** with a specific directory.
-- For "find files containing X": use **search_content**.
-- For "find videos in library X": use **list_video_libraries** first to get the library ID, then **get_video_library_files**.
-- For "find files in album X": use **list_albums** first to get the album ID, then **get_album_files**.
-- For "what video libraries exist": use **list_video_libraries**.
-- For "what albums exist": use **list_albums**.
-- For browsing: use **list_directory** → then narrow down.
-- Referenced files (📎) are pre-loaded — their content is included in the message. Do NOT call read_file on them again.
-- NEVER call read_file on images, videos, audio, PDFs, or archives. Use get_file_info for metadata instead.
-- For creating or editing files: use **write_file** (requires user approval).
-- For deleting files: use **delete_file** (requires user approval). Files go to recycle bin, not permanent deletion.
-- When delete completes, ALWAYS list the files that were deleted in your response so the user knows what happened.
-- Always search in specific directories (user home, known paths), NOT entire drives.
-- You can call multiple tools in sequence. After each result, decide to continue or give a final answer.
-- When done, respond with normal text (NO tool_call blocks).
-${DiskCleanerSkill.isAvailable ? DiskCleanerSkill.skillBlock : ''}
-''';
+  static String get toolDefinitions => AgentToolCatalog.definitions;
 }
 
 class _RootStat {

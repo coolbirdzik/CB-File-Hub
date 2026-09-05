@@ -6,8 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 void main() {
-  testWidgets('player control tooltips keep distinct traversal parents',
-      (tester) async {
+  testWidgets('player control tooltips keep distinct traversal parents', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
 
     await tester.pumpWidget(
@@ -47,8 +48,9 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('desktop player row keeps all five overlay traversal parents',
-      (tester) async {
+  testWidgets('desktop player row keeps all five overlay traversal parents', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
 
     await tester.pumpWidget(
@@ -57,12 +59,7 @@ void main() {
           body: Row(
             children: <Widget>[
               Expanded(
-                child: Slider(
-                  value: 25,
-                  min: 0,
-                  max: 100,
-                  onChanged: (_) {},
-                ),
+                child: Slider(value: 25, min: 0, max: 100, onChanged: (_) {}),
               ),
               VideoPlayerControlButton(
                 icon: PhosphorIconsLight.speakerHigh,
@@ -71,10 +68,7 @@ void main() {
               ),
               SizedBox(
                 width: 80,
-                child: VideoPlayerVolumeSlider(
-                  value: 70,
-                  onChanged: (_) {},
-                ),
+                child: VideoPlayerVolumeSlider(value: 70, onChanged: (_) {}),
               ),
               const VideoPlayerAdvancedMenu(),
               VideoPlayerControlButton(

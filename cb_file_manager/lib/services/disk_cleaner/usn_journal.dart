@@ -90,10 +90,7 @@ class DiskUsnJournalReader {
       }
 
       if (previous.nextUsn == currentCursor.nextUsn) {
-        return DiskJournalReadResult(
-          isUsable: true,
-          cursor: currentCursor,
-        );
+        return DiskJournalReadResult(isUsable: true, cursor: currentCursor);
       }
 
       final changes = <DiskJournalChange>[];
@@ -111,7 +108,7 @@ class DiskUsnJournalReader {
         while (startUsn < currentCursor.nextUsn) {
           input.ref.startUsn = startUsn;
           bytesReturned.value = 0;
-          final ok = win32.DeviceIoControl(
+          final read = win32.DeviceIoControl(
             volume,
             win32.FSCTL_READ_USN_JOURNAL,
             input.cast(),
@@ -121,8 +118,8 @@ class DiskUsnJournalReader {
             bytesReturned,
             nullptr,
           );
-          if (ok == 0) {
-            final error = win32.GetLastError();
+          if (!read.value) {
+            final error = read.error;
             if (error == win32.ERROR_HANDLE_EOF) break;
             return DiskJournalReadResult(
               isUsable: false,
@@ -196,8 +193,8 @@ class DiskUsnJournalReader {
           _probeBufferBytes,
           bytesReturned,
           nullptr,
-        );
-        return ok != 0 && bytesReturned.value >= sizeOf<Int64>();
+        ).value;
+        return ok && bytesReturned.value >= sizeOf<Int64>();
       } finally {
         calloc.free(bytesReturned);
         calloc.free(output);
@@ -225,19 +222,19 @@ class DiskUsnJournalReader {
     final info = calloc<win32.BY_HANDLE_FILE_INFORMATION>();
     try {
       final handle = win32.CreateFile(
-        pathPointer,
+        win32.PCWSTR(pathPointer),
         win32.GENERIC_READ,
         win32.FILE_SHARE_READ |
             win32.FILE_SHARE_WRITE |
             win32.FILE_SHARE_DELETE,
-        nullptr,
+        null,
         win32.OPEN_EXISTING,
         win32.FILE_FLAG_BACKUP_SEMANTICS,
-        0,
-      );
-      if (handle == win32.INVALID_HANDLE_VALUE) return null;
+        null,
+      ).value;
+      if (!handle.isValid) return null;
       try {
-        if (win32.GetFileInformationByHandle(handle, info) == 0) return null;
+        if (!win32.GetFileInformationByHandle(handle, info).value) return null;
         return (info.ref.nFileIndexHigh << 32) |
             (info.ref.nFileIndexLow & 0xffffffff);
       } finally {
@@ -249,7 +246,7 @@ class DiskUsnJournalReader {
     }
   }
 
-  static int? _openMetadataRoot(String drivePath) {
+  static win32.HANDLE? _openMetadataRoot(String drivePath) {
     final root = drivePath.trim();
     if (root.length < 2 || root[1] != ':') return null;
     // A root-directory handle is sufficient for the metadata query and avoids
@@ -258,40 +255,40 @@ class DiskUsnJournalReader {
     final pathPointer = rootPath.toNativeUtf16();
     try {
       final handle = win32.CreateFile(
-        pathPointer,
+        win32.PCWSTR(pathPointer),
         win32.GENERIC_READ,
         win32.FILE_SHARE_READ |
             win32.FILE_SHARE_WRITE |
             win32.FILE_SHARE_DELETE,
-        nullptr,
+        null,
         win32.OPEN_EXISTING,
         win32.FILE_FLAG_BACKUP_SEMANTICS,
-        0,
-      );
-      return handle == win32.INVALID_HANDLE_VALUE ? null : handle;
+        null,
+      ).value;
+      return handle.isValid ? handle : null;
     } finally {
       calloc.free(pathPointer);
     }
   }
 
-  static int? _openJournalVolume(String drivePath) {
+  static win32.HANDLE? _openJournalVolume(String drivePath) {
     final root = drivePath.trim();
     if (root.length < 2 || root[1] != ':') return null;
     final volumePath = '\\\\.\\${root.substring(0, 2)}';
     final pathPointer = volumePath.toNativeUtf16();
     try {
       final handle = win32.CreateFile(
-        pathPointer,
+        win32.PCWSTR(pathPointer),
         win32.GENERIC_READ,
         win32.FILE_SHARE_READ |
             win32.FILE_SHARE_WRITE |
             win32.FILE_SHARE_DELETE,
-        nullptr,
+        null,
         win32.OPEN_EXISTING,
-        0,
-        0,
-      );
-      return handle == win32.INVALID_HANDLE_VALUE ? null : handle;
+        const win32.FILE_FLAGS_AND_ATTRIBUTES(0),
+        null,
+      ).value;
+      return handle.isValid ? handle : null;
     } finally {
       calloc.free(pathPointer);
     }
@@ -313,7 +310,7 @@ class DiskUsnJournalReader {
     input.ref.maxMajorVersion = 2;
   }
 
-  static _JournalQuery? _queryJournal(int volume) {
+  static _JournalQuery? _queryJournal(win32.HANDLE volume) {
     final data = calloc<_UsnJournalData>();
     final bytesReturned = calloc<Uint32>();
     try {
@@ -326,8 +323,8 @@ class DiskUsnJournalReader {
         sizeOf<_UsnJournalData>(),
         bytesReturned,
         nullptr,
-      );
-      if (ok == 0 || bytesReturned.value < sizeOf<_UsnJournalData>()) {
+      ).value;
+      if (!ok || bytesReturned.value < sizeOf<_UsnJournalData>()) {
         return null;
       }
       return _JournalQuery(
@@ -355,35 +352,35 @@ class DiskUsnJournalReader {
       final majorVersion = data.getUint16(offset + 4, Endian.little);
       if (majorVersion == 2) {
         final fileReferenceNumber = data.getUint64(offset + 8, Endian.little);
-        final parentFileReferenceNumber =
-            data.getUint64(offset + 16, Endian.little);
+        final parentFileReferenceNumber = data.getUint64(
+          offset + 16,
+          Endian.little,
+        );
         final reason = data.getUint32(offset + 40, Endian.little);
         final fileAttributes = data.getUint32(offset + 52, Endian.little);
         final fileNameLength = data.getUint16(offset + 56, Endian.little);
         final fileNameOffset = data.getUint16(offset + 58, Endian.little);
         if (fileNameOffset + fileNameLength <= recordLength) {
-          changes.add(DiskJournalChange(
-            fileReferenceNumber: fileReferenceNumber,
-            parentFileReferenceNumber: parentFileReferenceNumber,
-            name: _decodeFileName(
-              bytes,
-              offset + fileNameOffset,
-              fileNameLength,
+          changes.add(
+            DiskJournalChange(
+              fileReferenceNumber: fileReferenceNumber,
+              parentFileReferenceNumber: parentFileReferenceNumber,
+              name: _decodeFileName(
+                bytes,
+                offset + fileNameOffset,
+                fileNameLength,
+              ),
+              reason: reason,
+              isDirectory: fileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0,
             ),
-            reason: reason,
-            isDirectory: fileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0,
-          ));
+          );
         }
       }
       offset += recordLength;
     }
   }
 
-  static String _decodeFileName(
-    Uint8List bytes,
-    int offset,
-    int length,
-  ) {
+  static String _decodeFileName(Uint8List bytes, int offset, int length) {
     final codeUnits = <int>[];
     for (var index = offset; index + 1 < offset + length; index += 2) {
       codeUnits.add(bytes[index] | (bytes[index + 1] << 8));
@@ -396,13 +393,10 @@ class _JournalQuery {
   final DiskScanJournalCursor cursor;
   final int lowestValidUsn;
 
-  const _JournalQuery({
-    required this.cursor,
-    required this.lowestValidUsn,
-  });
+  const _JournalQuery({required this.cursor, required this.lowestValidUsn});
 }
 
-class _UsnJournalData extends Struct {
+base class _UsnJournalData extends Struct {
   @Uint64()
   external int usnJournalId;
 
@@ -425,7 +419,7 @@ class _UsnJournalData extends Struct {
   external int allocationDelta;
 }
 
-class _ReadUsnJournalData extends Struct {
+base class _ReadUsnJournalData extends Struct {
   @Int64()
   external int startUsn;
 

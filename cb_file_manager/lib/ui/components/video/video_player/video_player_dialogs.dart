@@ -18,31 +18,33 @@ class VideoPlayerRadioListContent<T> extends StatelessWidget {
   final ValueChanged<T?> onSelect;
 
   const VideoPlayerRadioListContent({
-    Key? key,
+    super.key,
     required this.options,
     required this.selected,
     required this.onSelect,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: options
-          .map((opt) => ListTile(
-                title: Text(opt.label),
-                leading: Radio<T?>(
-                  // ignore: deprecated_member_use
-                  value: opt.value,
-                  // ignore: deprecated_member_use
-                  groupValue: selected,
-                  // ignore: deprecated_member_use
-                  onChanged: (v) {
-                    onSelect(v);
-                    RouteUtils.safePopDialog(context);
-                  },
-                ),
-              ))
+          .map(
+            (opt) => ListTile(
+              title: Text(opt.label),
+              leading: Radio<T?>(
+                // ignore: deprecated_member_use
+                value: opt.value,
+                // ignore: deprecated_member_use
+                groupValue: selected,
+                // ignore: deprecated_member_use
+                onChanged: (v) {
+                  onSelect(v);
+                  RouteUtils.safePopDialog(context);
+                },
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -58,14 +60,14 @@ class VideoPlayerLabeledSlider extends StatelessWidget {
   final ValueChanged<double> onChanged;
 
   const VideoPlayerLabeledSlider({
-    Key? key,
+    super.key,
     required this.label,
     required this.value,
     required this.min,
     required this.max,
     required this.divisions,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -74,12 +76,15 @@ class VideoPlayerLabeledSlider extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: divisions,
-          onChanged: onChanged,
+        Semantics(
+          container: true,
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
         ),
       ],
     );
@@ -93,11 +98,11 @@ class VideoPlayerFilterSlider extends StatelessWidget {
   final ValueChanged<double> onChanged;
 
   const VideoPlayerFilterSlider({
-    Key? key,
+    super.key,
     required this.label,
     required this.value,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -106,12 +111,15 @@ class VideoPlayerFilterSlider extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('$label: ${(value * 100).round()}%'),
-        Slider(
-          value: value,
-          min: 0.0,
-          max: 2.0,
-          divisions: 20,
-          onChanged: onChanged,
+        Semantics(
+          container: true,
+          child: Slider(
+            value: value,
+            min: 0.0,
+            max: 2.0,
+            divisions: 20,
+            onChanged: onChanged,
+          ),
         ),
       ],
     );
@@ -132,20 +140,19 @@ class SubtitleDialogContent extends StatelessWidget {
   final ValueChanged<int?> onSelect;
 
   const SubtitleDialogContent({
-    Key? key,
+    super.key,
     required this.tracks,
     required this.selected,
     required this.onSelect,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final options = <VideoPlayerRadioOption<int>>[
       const VideoPlayerRadioOption<int>(null, 'Off'),
-      ...tracks
-          .asMap()
-          .entries
-          .map((e) => VideoPlayerRadioOption<int>(e.key, e.value.language)),
+      ...tracks.asMap().entries.map(
+        (e) => VideoPlayerRadioOption<int>(e.key, e.value.language),
+      ),
     ];
     return VideoPlayerRadioListContent<int>(
       options: options,
@@ -162,16 +169,17 @@ class PlaybackSpeedDialogContent extends StatelessWidget {
   final ValueChanged<double> onSelect;
 
   const PlaybackSpeedDialogContent({
-    Key? key,
+    super.key,
     this.speeds = const [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0],
     required this.current,
     required this.onSelect,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final options =
-        speeds.map((s) => VideoPlayerRadioOption<double>(s, '${s}x')).toList();
+    final options = speeds
+        .map((s) => VideoPlayerRadioOption<double>(s, '${s}x'))
+        .toList();
     return VideoPlayerRadioListContent<double>(
       options: options,
       selected: current,
@@ -192,14 +200,14 @@ class VideoFiltersDialogContent extends StatelessWidget {
   final ValueChanged<double> onSaturationChanged;
 
   const VideoFiltersDialogContent({
-    Key? key,
+    super.key,
     required this.brightness,
     required this.contrast,
     required this.saturation,
     required this.onBrightnessChanged,
     required this.onContrastChanged,
     required this.onSaturationChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -233,7 +241,7 @@ class SleepTimerDialogContent extends StatelessWidget {
   final ValueChanged<Duration?> onSelect;
 
   const SleepTimerDialogContent({
-    Key? key,
+    super.key,
     this.durations = const [
       Duration(minutes: 15),
       Duration(minutes: 30),
@@ -242,14 +250,15 @@ class SleepTimerDialogContent extends StatelessWidget {
     ],
     required this.selected,
     required this.onSelect,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final options = <VideoPlayerRadioOption<Duration>>[
       const VideoPlayerRadioOption<Duration>(null, 'Off'),
       ...durations.map(
-          (d) => VideoPlayerRadioOption<Duration>(d, _formatDurationOption(d))),
+        (d) => VideoPlayerRadioOption<Duration>(d, _formatDurationOption(d)),
+      ),
     ];
     return VideoPlayerRadioListContent<Duration>(
       options: options,

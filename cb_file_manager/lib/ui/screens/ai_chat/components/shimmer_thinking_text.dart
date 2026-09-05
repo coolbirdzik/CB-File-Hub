@@ -5,10 +5,7 @@ import 'package:flutter/material.dart';
 class ShimmerThinkingText extends StatefulWidget {
   final String text;
 
-  const ShimmerThinkingText({
-    Key? key,
-    required this.text,
-  }) : super(key: key);
+  const ShimmerThinkingText({super.key, required this.text});
 
   @override
   State<ShimmerThinkingText> createState() => _ShimmerThinkingTextState();
@@ -48,11 +45,7 @@ class _ShimmerThinkingTextState extends State<ShimmerThinkingText>
             return LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [
-                baseColor,
-                highlightColor,
-                baseColor,
-              ],
+              colors: [baseColor, highlightColor, baseColor],
               stops: [
                 (shimmerPosition - 0.3).clamp(0.0, 1.0),
                 shimmerPosition.clamp(0.0, 1.0),
@@ -63,10 +56,7 @@ class _ShimmerThinkingTextState extends State<ShimmerThinkingText>
           blendMode: BlendMode.srcIn,
           child: Text(
             widget.text,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           ),
         );
       },

@@ -39,7 +39,7 @@ class SearchFilterManager {
     required FolderListState state,
     required SelectionState selectionState,
     required Function(String, {bool shiftSelect, bool ctrlSelect})
-        toggleFileSelection,
+    toggleFileSelection,
     required VoidCallback toggleSelectionMode,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
@@ -81,7 +81,7 @@ class SearchFilterManager {
     required SelectionState selectionState,
     required String currentFilter,
     required Function(String, {bool shiftSelect, bool ctrlSelect})
-        toggleFileSelection,
+    toggleFileSelection,
     required VoidCallback toggleSelectionMode,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,

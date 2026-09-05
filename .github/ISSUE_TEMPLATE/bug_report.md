@@ -35,7 +35,7 @@ If applicable, add screenshots to help explain your problem.
 
 - **OS**: [e.g. Windows 11, Android 13, Ubuntu 22.04, macOS 13]
 - **App Version**: [e.g. 1.0.0]
-- **Flutter Version**: [e.g. 3.41.5]
+- **Flutter Version**: [e.g. 3.47.2]
 - **Device**: [e.g. Desktop, Samsung Galaxy S21, iPhone 14]
 
 ## 📝 Additional Context

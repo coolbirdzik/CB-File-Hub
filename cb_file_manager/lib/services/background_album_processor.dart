@@ -36,7 +36,9 @@ class BackgroundAlbumProcessor {
 
   /// Start watching a directory
   Future<void> startWatchingDirectory(
-      String dirPath, Function(String) onFileAdded) async {
+    String dirPath,
+    Function(String) onFileAdded,
+  ) async {
     final dir = Directory(dirPath);
     if (!await dir.exists()) return;
 
@@ -44,7 +46,9 @@ class BackgroundAlbumProcessor {
     await _watchers[dirPath]?.cancel();
 
     // Start new watcher
-    _watchers[dirPath] = dir.watch(recursive: true).listen(
+    _watchers[dirPath] = dir
+        .watch(recursive: true)
+        .listen(
           (event) => _handleFileSystemEvent(dirPath, event, onFileAdded),
           onError: (error) =>
               AppLogger.error('Error watching $dirPath', error: error),
@@ -53,7 +57,10 @@ class BackgroundAlbumProcessor {
 
   /// Handle file system events
   void _handleFileSystemEvent(
-      String dirPath, FileSystemEvent event, Function(String) onFileAdded) {
+    String dirPath,
+    FileSystemEvent event,
+    Function(String) onFileAdded,
+  ) {
     if (event.type == FileSystemEvent.create ||
         event.type == FileSystemEvent.modify) {
       // Debounce to avoid processing too many events
@@ -75,17 +82,16 @@ class BackgroundAlbumProcessor {
 
   /// Process files in background using isolate
   Future<void> processFilesInBackground(
-      List<String> filePaths, int albumId) async {
+    List<String> filePaths,
+    int albumId,
+  ) async {
     final receivePort = ReceivePort();
 
-    await Isolate.spawn(
-      _backgroundFileProcessor,
-      {
-        'sendPort': receivePort.sendPort,
-        'filePaths': filePaths,
-        // albumId is passed but not used in isolate
-      },
-    );
+    await Isolate.spawn(_backgroundFileProcessor, {
+      'sendPort': receivePort.sendPort,
+      'filePaths': filePaths,
+      // albumId is passed but not used in isolate
+    });
 
     // Wait for completion
     final result = await receivePort.first;
@@ -106,7 +112,8 @@ class BackgroundAlbumProcessor {
           // Validate file, get metadata, etc.
           // This runs in background without affecting UI
           await Future.delayed(
-              const Duration(milliseconds: 10)); // Simulate work
+            const Duration(milliseconds: 10),
+          ); // Simulate work
         }
       }
 
@@ -129,13 +136,16 @@ class BackgroundAlbumProcessor {
 
   /// Add album to monitoring (simplified)
   Future<void> addAlbumToMonitoring(
-      int albumId, List<String> directories) async {
+    int albumId,
+    List<String> directories,
+  ) async {
     for (final dir in directories) {
       await startWatchingDirectory(dir, (filePath) {
         // When new file detected, clear cache so it appears in next scan
         clearAlbumCache(albumId);
         AppLogger.debug(
-            'New file detected in album $albumId: ${path.basename(filePath)}');
+          'New file detected in album $albumId: ${path.basename(filePath)}',
+        );
       });
     }
   }

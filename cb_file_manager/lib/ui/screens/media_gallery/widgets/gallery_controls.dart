@@ -10,12 +10,12 @@ class GalleryControls extends StatelessWidget {
   final VoidCallback onToggleMasonry;
 
   const GalleryControls({
-    Key? key,
+    super.key,
     this.searchQuery,
     required this.onClearSearch,
     required this.isMasonry,
     required this.onToggleMasonry,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,8 +32,10 @@ class GalleryControls extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
@@ -83,8 +85,10 @@ class GalleryControls extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   onTap: onToggleMasonry,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12),

@@ -7,11 +7,12 @@ import 'dart:io';
 /// (file locks, duplicate windows) when `dart run tool/run_e2e_with_log.dart` is used without `make`.
 Future<void> _killCbFileHubOnWindows() async {
   if (!Platform.isWindows) return;
-  final r = await Process.run(
-    'taskkill',
-    <String>['/F', '/IM', 'cb_file_hub.exe', '/T'],
-    runInShell: false,
-  );
+  final r = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'cb_file_hub.exe',
+    '/T',
+  ], runInShell: false);
   // 0 = processes terminated; 128 = not found — both OK.
   if (r.exitCode != 0 && r.exitCode != 128) {
     stderr.writeln(
@@ -27,10 +28,12 @@ Future<void> main(List<String> args) async {
   final fullStartup = args.contains('--full-startup');
   final fullScreenshots = args.contains('--full-screenshots');
   final passthrough = args
-      .where((a) =>
-          a != '--json-report' &&
-          a != '--full-startup' &&
-          a != '--full-screenshots')
+      .where(
+        (a) =>
+            a != '--json-report' &&
+            a != '--full-startup' &&
+            a != '--full-screenshots',
+      )
       .toList();
 
   final device = Platform.environment['E2E_DEVICE'] ?? 'windows';
@@ -38,8 +41,9 @@ Future<void> main(List<String> args) async {
       ? 'json'
       : (Platform.environment['TEST_REPORTER'] ?? 'expanded');
 
-  final logRelative =
-      jsonReport ? 'build/e2e_report.jsonl' : 'build/e2e_last_run.log';
+  final logRelative = jsonReport
+      ? 'build/e2e_report.jsonl'
+      : 'build/e2e_last_run.log';
   final logFile = File(logRelative);
   await logFile.parent.create(recursive: true);
   final logSink = logFile.openWrite();
@@ -80,15 +84,11 @@ Future<void> main(List<String> args) async {
   await logSink.close();
 
   if (code != 0) {
-    final sum = await Process.run(
-      Platform.resolvedExecutable,
-      <String>[
-        'run',
-        'tool/e2e_summarize_failures.dart',
-        logRelative,
-      ],
-      workingDirectory: Directory.current.path,
-    );
+    final sum = await Process.run(Platform.resolvedExecutable, <String>[
+      'run',
+      'tool/e2e_summarize_failures.dart',
+      logRelative,
+    ], workingDirectory: Directory.current.path);
     final out = sum.stdout;
     final err = sum.stderr;
     if (out != null && '$out'.isNotEmpty) {

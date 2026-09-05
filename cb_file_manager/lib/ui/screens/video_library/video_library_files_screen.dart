@@ -18,6 +18,7 @@ import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
+import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/ui/dialogs/open_with_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
@@ -44,11 +45,7 @@ class VideoLibraryFilesScreen extends StatefulWidget {
   final VideoLibrary library;
   final String? tabId;
 
-  const VideoLibraryFilesScreen({
-    Key? key,
-    required this.library,
-    this.tabId,
-  }) : super(key: key);
+  const VideoLibraryFilesScreen({super.key, required this.library, this.tabId});
 
   @override
   State<VideoLibraryFilesScreen> createState() =>
@@ -62,8 +59,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   late final SelectionBloc _selectionBloc;
   late final FolderListBloc _dragFolderListBloc;
   late final TabbedFolderDragSelectionController _dragSelectionController;
-  final ValueNotifier<double> _previewPaneWidthNotifier =
-      ValueNotifier<double>(320);
+  final ValueNotifier<double> _previewPaneWidthNotifier = ValueNotifier<double>(
+    320,
+  );
   final TextEditingController _addressController = TextEditingController();
 
   bool _isInitialized = false;
@@ -72,6 +70,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   Set<String>? _tagMatchedPaths;
   bool _showSearchBar = false;
   bool _useRegexSearch = false;
+  bool _isSearchLoading = false;
+  List<FileSystemEntity>? _liveSearchSource;
   bool _showFileTags = true;
   ColumnVisibility _columnVisibility = const ColumnVisibility();
   int _filterToken = 0;
@@ -96,8 +96,12 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (oldWidget.library.id != widget.library.id) {
       _bloc.close();
       // ignore: invalid_use_of_visible_for_testing_member
-      _bloc.add(FileNavigationLoad('#video-library/${widget.library.id}',
-          isVirtualPath: true));
+      _bloc.add(
+        FileNavigationLoad(
+          '#video-library/${widget.library.id}',
+          isVirtualPath: true,
+        ),
+      );
     }
   }
 
@@ -120,8 +124,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         widget.library.id,
         fallback: globalViewMode,
       );
-      final effectiveViewMode =
-          viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode;
+      final effectiveViewMode = viewMode == ViewMode.gridPreview
+          ? ViewMode.grid
+          : viewMode;
       final globalSortOption = await _preferences.getSortOption();
       final sortOption = await _preferences.getVideoLibrarySortOption(
         widget.library.id,
@@ -135,10 +140,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
       // Apply to bloc first
       _bloc.add(FileNavigationSetViewMode(effectiveViewMode));
-      _bloc.add(FileNavigationSetSortOption(
-        sortOption,
-        persist: false,
-      ));
+      _bloc.add(FileNavigationSetSortOption(sortOption, persist: false));
       _bloc.add(FileNavigationSetGridZoom(gridZoomLevel));
 
       setState(() {
@@ -170,6 +172,11 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   }
 
   Future<void> _refresh() async {
+    setState(() {
+      _filterToken++;
+      _liveSearchSource = null;
+      _isSearchLoading = false;
+    });
     // Clear both memory and disk cache before re-scanning
     await VideoLibraryNavigationBloc.invalidateCache(widget.library.id);
     _bloc.refreshLibrary();
@@ -180,6 +187,16 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (!mounted || token != _filterToken) return;
     // Trigger rebuild to re-apply local search filter
     _bloc.add(const FileNavigationClearSearchAndFilters());
+  }
+
+  Future<List<FileSystemEntity>> _loadLiveLibraryFiles() async {
+    final paths = await _service.getLibraryFiles(widget.library.id);
+    final uniquePaths = <String>{};
+    final files = <File>[
+      for (final filePath in paths)
+        if (uniquePaths.add(filePath)) File(filePath),
+    ];
+    return FileSystemSorter.sortFiles(files, _bloc.state.sortOption);
   }
 
   Future<void> _saveColumnVisibility(ColumnVisibility visibility) async {
@@ -279,8 +296,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       context,
       mode: GridSizeMode.referenceWidth,
     );
-    final nextLevel =
-        level.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    final nextLevel = level
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
     _bloc.add(FileNavigationSetGridZoom(nextLevel));
     _saveGridZoomLevel(nextLevel);
   }
@@ -307,20 +325,42 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     );
   }
 
-  void _applySearchWithOptions(String value, bool useRegex) {
+  Future<void> _applySearchWithOptions(String value, bool useRegex) async {
     final trimmed = value.trim();
-    if (_searchQuery == trimmed &&
-        _useRegexSearch == useRegex &&
-        _activeSearchTags.isEmpty) {
-      return;
-    }
+    final int token = ++_filterToken;
     setState(() {
       _searchQuery = trimmed;
       _useRegexSearch = useRegex;
       _activeSearchTags = const [];
       _tagMatchedPaths = null;
+      _liveSearchSource = null;
+      _isSearchLoading = trimmed.isNotEmpty;
     });
-    unawaited(_applyFilters());
+
+    _bloc.add(const FileNavigationClearSearchAndFilters());
+    if (trimmed.isEmpty) return;
+
+    try {
+      // The navigation state may have come from an older disk cache or may
+      // still be receiving a progressive scan. Search the configured library
+      // sources directly so a submitted query is evaluated against the full,
+      // current collection rather than only the files loaded so far.
+      final files = await _loadLiveLibraryFiles();
+      if (!mounted || token != _filterToken) return;
+      setState(() {
+        _liveSearchSource = files;
+        _isSearchLoading = false;
+      });
+    } catch (error) {
+      if (!mounted || token != _filterToken) return;
+      AppLogger.warning(
+        'Failed to refresh video library search source',
+        error: error,
+      );
+      setState(() {
+        _isSearchLoading = false;
+      });
+    }
   }
 
   Future<void> _applyTagSearch(List<String> tags, bool _) async {
@@ -332,8 +372,13 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (normalizedTags.isEmpty) return;
 
     final int token = ++_filterToken;
+    setState(() {
+      _liveSearchSource = null;
+      _isSearchLoading = true;
+    });
     try {
-      final files = List<FileSystemEntity>.from(_bloc.state.files);
+      final files = await _loadLiveLibraryFiles();
+      if (!mounted || token != _filterToken) return;
       final fileTags = await TagManager.getTagsForFiles(
         files.map((entity) => entity.path).toList(),
       );
@@ -341,13 +386,15 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         return;
       }
 
-      final normalizedSearchTags =
-          normalizedTags.map((tag) => tag.toLowerCase()).toSet();
+      final normalizedSearchTags = normalizedTags
+          .map((tag) => tag.toLowerCase())
+          .toSet();
       final matchedPaths = files
           .where((entity) {
             final tagsForFile = fileTags[entity.path] ?? const <String>[];
-            final normalizedFileTags =
-                tagsForFile.map((tag) => tag.toLowerCase()).toSet();
+            final normalizedFileTags = tagsForFile
+                .map((tag) => tag.toLowerCase())
+                .toSet();
             return normalizedSearchTags.every(normalizedFileTags.contains);
           })
           .map((entity) => entity.path)
@@ -358,20 +405,35 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         _tagMatchedPaths = matchedPaths;
         _searchQuery = normalizedTags.map((tag) => '#$tag').join(' ');
         _useRegexSearch = false;
+        _liveSearchSource = files;
+        _isSearchLoading = false;
       });
       _bloc.add(const FileNavigationClearSearchAndFilters());
-    } catch (_) {}
+    } catch (error) {
+      if (!mounted || token != _filterToken) return;
+      AppLogger.warning('Failed to search video library tags', error: error);
+      setState(() {
+        _isSearchLoading = false;
+      });
+    }
   }
 
   void _clearSearch() {
-    if (_searchQuery.isEmpty && !_useRegexSearch && _activeSearchTags.isEmpty) {
+    if (_searchQuery.isEmpty &&
+        !_useRegexSearch &&
+        _activeSearchTags.isEmpty &&
+        !_isSearchLoading &&
+        _liveSearchSource == null) {
       return;
     }
     setState(() {
+      _filterToken++;
       _searchQuery = '';
       _useRegexSearch = false;
       _activeSearchTags = const [];
       _tagMatchedPaths = null;
+      _liveSearchSource = null;
+      _isSearchLoading = false;
     });
     unawaited(_applyFilters());
   }
@@ -398,8 +460,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
     TabNavigator.updateTabPath(context, tabId, '#video');
     context.read<TabManagerBloc>().add(
-          UpdateTabName(tabId, AppLocalizations.of(context)!.videoHubTitle),
-        );
+      UpdateTabName(tabId, AppLocalizations.of(context)!.videoHubTitle),
+    );
   }
 
   Widget _buildPathNavigationBar(AppLocalizations l10n) {
@@ -431,21 +493,20 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   }
 
   Widget _buildSearchBar(AppLocalizations l10n) => tab_components.SearchBar(
-        currentPath: '#video-library/${widget.library.id}',
-        tabId: widget.tabId ?? '#video-library/${widget.library.id}',
-        initialQuery: _searchQuery,
-        hintText: l10n.searchByFilename,
-        onSearchWithOptions: _applySearchWithOptions,
-        onTagSearch: _applyTagSearch,
-        onClearSearch: _clearSearch,
-        onCloseSearch: _closeSearchBar,
-        showClearButton:
-            _searchQuery.isNotEmpty || _activeSearchTags.isNotEmpty,
-        showTipsButton: true,
-        showTagSearch: true,
-        showGlobalSearchToggle: false,
-        showRegexToggle: true,
-      );
+    currentPath: '#video-library/${widget.library.id}',
+    tabId: widget.tabId ?? '#video-library/${widget.library.id}',
+    initialQuery: _searchQuery,
+    hintText: l10n.searchByFilename,
+    onSearchWithOptions: _applySearchWithOptions,
+    onTagSearch: _applyTagSearch,
+    onClearSearch: _clearSearch,
+    onCloseSearch: _closeSearchBar,
+    showClearButton: _searchQuery.isNotEmpty || _activeSearchTags.isNotEmpty,
+    showTipsButton: true,
+    showTagSearch: true,
+    showGlobalSearchToggle: false,
+    showRegexToggle: true,
+  );
 
   void _clearSelection() {
     _selectionBloc.add(ClearSelection());
@@ -475,15 +536,20 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   Future<void> _showDeleteFilesConfirmation(
     BuildContext context,
-    List<String> selectedFiles,
-  ) async {
-    await _deleteSelectedFiles(selectedFiles);
+    List<String> selectedFiles, {
+    bool permanent = false,
+  }) async {
+    await _deleteSelectedFiles(selectedFiles, permanent: permanent);
   }
 
-  Future<void> _deleteSelectedFiles(List<String> filePaths) async {
+  Future<void> _deleteSelectedFiles(
+    List<String> filePaths, {
+    bool permanent = false,
+  }) async {
     await BrowserLikeActionHandlers.confirmAndMoveFilesToTrash(
       context: context,
       filePaths: filePaths,
+      permanent: permanent,
       onMoved: (filePath) =>
           _service.removeFileFromLibrary(widget.library.id, filePath),
       onAfterSuccess: (_) async {
@@ -493,7 +559,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       },
       onMoveError: (filePath, _) {
         AppLogger.warning(
-          'Failed to move video library file to trash: $filePath',
+          permanent
+              ? 'Failed to permanently delete video library file: $filePath'
+              : 'Failed to move video library file to trash: $filePath',
         );
       },
     );
@@ -509,15 +577,16 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   List<FileSystemEntity> _visibleFilesForState(FileNavigationState state) {
     final trimmedQuery = _searchQuery.trim();
+    final sourceFiles = _liveSearchSource ?? state.files;
     if (_activeSearchTags.isNotEmpty) {
       final matchedPaths = _tagMatchedPaths ?? const <String>{};
-      return state.files
+      return sourceFiles
           .where((entity) => matchedPaths.contains(entity.path))
           .toList();
     }
     return trimmedQuery.isEmpty
         ? state.files
-        : _filterFilesBySearch(state.files, trimmedQuery);
+        : _filterFilesBySearch(sourceFiles, trimmedQuery);
   }
 
   FolderListState _folderListStateFor(FileNavigationState state) {
@@ -533,8 +602,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       viewMode: state.viewMode,
       sortOption: state.sortOption,
       gridZoomLevel: state.gridZoomLevel,
-      currentSearchTag:
-          _activeSearchTags.isEmpty ? null : _activeSearchTags.join(', '),
+      currentSearchTag: _activeSearchTags.isEmpty
+          ? null
+          : _activeSearchTags.join(', '),
       currentSearchQuery: trimmedQuery.isEmpty || _activeSearchTags.isNotEmpty
           ? null
           : trimmedQuery,
@@ -547,23 +617,31 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   ) async {
     final selectedFiles = _selectionBloc.state.selectedFilePaths.toList();
     if (selectedFiles.isNotEmpty) {
-      await _showDeleteFilesConfirmation(context, selectedFiles);
+      await _showDeleteFilesConfirmation(
+        context,
+        selectedFiles,
+        permanent: permanent,
+      );
       return;
     }
 
     final focusedPath = keyboardController.focusedPath;
     if (focusedPath == null || focusedPath.isEmpty) return;
 
-    final visiblePaths =
-        _visibleFilesForState(_bloc.state).map((entity) => entity.path).toSet();
+    final visiblePaths = _visibleFilesForState(
+      _bloc.state,
+    ).map((entity) => entity.path).toSet();
     if (!visiblePaths.contains(focusedPath)) return;
 
-    await _showDeleteFilesConfirmation(context, <String>[focusedPath]);
+    await _showDeleteFilesConfirmation(context, <String>[
+      focusedPath,
+    ], permanent: permanent);
   }
 
   void _openVideo(File file) {
-    ExternalAppHelper.openWithPreferredVideoApp(file.path)
-        .then((openedPreferred) {
+    ExternalAppHelper.openWithPreferredVideoApp(file.path).then((
+      openedPreferred,
+    ) {
       if (openedPreferred) return;
 
       _preferences.getUseSystemDefaultForVideo().then((useSystem) {
@@ -604,8 +682,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         ],
         child: BlocBuilder<SelectionBloc, SelectionState>(
           builder: (context, selectionState) {
-            return BlocConsumer<VideoLibraryNavigationBloc,
-                FileNavigationState>(
+            return BlocConsumer<
+              VideoLibraryNavigationBloc,
+              FileNavigationState
+            >(
               listener: (context, state) => _onBlocStateChange(_bloc),
               builder: (context, state) {
                 final folderListState = _folderListStateFor(state);
@@ -613,8 +693,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                   selectionState: selectionState,
                   viewMode: state.viewMode,
                   isDesktop: isDesktop,
-                  visiblePaths:
-                      _visibleFilesForState(state).map((entity) => entity.path),
+                  visiblePaths: _visibleFilesForState(
+                    state,
+                  ).map((entity) => entity.path),
                   bodyBuilder: (context, keyboardController) =>
                       _buildBody(l10n, state, keyboardController),
                   keyboardFolderListState: folderListState,
@@ -627,20 +708,23 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                     shiftSelect: false,
                     ctrlSelect: false,
                   ),
-                  selectRange: ({
-                    required Set<String> folderPaths,
-                    required Set<String> filePaths,
-                    required String lastSelectedPath,
-                    required bool ctrlSelect,
-                  }) {
-                    _selectionBloc.add(SelectItemsInRect(
-                      folderPaths: const <String>{},
-                      filePaths: filePaths,
-                      isCtrlPressed: ctrlSelect,
-                      isShiftPressed: true,
-                      lastSelectedPath: lastSelectedPath,
-                    ));
-                  },
+                  selectRange:
+                      ({
+                        required Set<String> folderPaths,
+                        required Set<String> filePaths,
+                        required String lastSelectedPath,
+                        required bool ctrlSelect,
+                      }) {
+                        _selectionBloc.add(
+                          SelectItemsInRect(
+                            folderPaths: const <String>{},
+                            filePaths: filePaths,
+                            isCtrlPressed: ctrlSelect,
+                            isShiftPressed: true,
+                            lastSelectedPath: lastSelectedPath,
+                          ),
+                        );
+                      },
                   activateEntity: (entity) {
                     if (entity is File) {
                       _openVideo(entity);
@@ -685,8 +769,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
                   onEscape: selectionState.isSelectionMode
                       ? _clearSelection
                       : _showSearchBar
-                          ? _closeSearchBar
-                          : null,
+                      ? _closeSearchBar
+                      : null,
                   onSearch: _toggleSearchBar,
                   onSelectAll: () => _selectAllVisible(state),
                   onDelete: (keyboardController, permanent) =>
@@ -705,7 +789,8 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     FileNavigationState state,
     TabbedFolderKeyboardController keyboardController,
   ) {
-    final isGridView = state.viewMode == ViewMode.grid ||
+    final isGridView =
+        state.viewMode == ViewMode.grid ||
         state.viewMode == ViewMode.gridPreview;
 
     if (state.isLoading && state.files.isEmpty) {
@@ -731,7 +816,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
     if (visibleFiles.isEmpty) {
       return Center(
-        child: state.isLoading
+        child: state.isLoading || _isSearchLoading
             ? SkeletonHelper.responsive(
                 isGridView: isGridView,
                 crossAxisCount: isGridView ? state.gridZoomLevel : null,
@@ -773,7 +858,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       onDeleteFiles: _showDeleteFilesConfirmation,
       toggleSelectionMode: _toggleSelectionMode,
       columnVisibility: _columnVisibility,
-      showContextMenu: (_, __) {},
+      showContextMenu: (_, _) {},
       isPreviewPaneVisible: false,
       previewPaneWidthListenable: _previewPaneWidthNotifier,
       onZoomLevelChanged: _handleGridZoomDelta,
@@ -798,8 +883,12 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     if (!_useRegexSearch) {
       final normalizedQuery = query.toLowerCase();
       return files
-          .where((file) =>
-              path.basename(file.path).toLowerCase().contains(normalizedQuery))
+          .where(
+            (file) => path
+                .basename(file.path)
+                .toLowerCase()
+                .contains(normalizedQuery),
+          )
           .toList();
     }
 
@@ -815,53 +904,67 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         .toList();
   }
 
-  void _toggleFileSelection(String filePath,
-      {bool shiftSelect = false, bool ctrlSelect = false}) {
+  void _toggleFileSelection(
+    String filePath, {
+    bool shiftSelect = false,
+    bool ctrlSelect = false,
+  }) {
     if (!shiftSelect) {
-      _selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
     final selectionState = _selectionBloc.state;
     if (selectionState.lastSelectedPath == null) {
-      _selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
-    final allPaths = _visibleFilesForState(_bloc.state)
-        .map((entity) => entity.path)
-        .toList();
+    final allPaths = _visibleFilesForState(
+      _bloc.state,
+    ).map((entity) => entity.path).toList();
     final currentIndex = allPaths.indexOf(filePath);
     final lastIndex = allPaths.indexOf(selectionState.lastSelectedPath!);
     if (currentIndex == -1 || lastIndex == -1) return;
 
     final start = currentIndex < lastIndex ? currentIndex : lastIndex;
     final end = currentIndex < lastIndex ? lastIndex : currentIndex;
-    _selectionBloc.add(SelectItemsInRect(
-      folderPaths: const <String>{},
-      filePaths: allPaths.sublist(start, end + 1).toSet(),
-      isCtrlPressed: ctrlSelect,
-      isShiftPressed: true,
-      lastSelectedPath: filePath,
-    ));
+    _selectionBloc.add(
+      SelectItemsInRect(
+        folderPaths: const <String>{},
+        filePaths: allPaths.sublist(start, end + 1).toSet(),
+        isCtrlPressed: ctrlSelect,
+        isShiftPressed: true,
+        lastSelectedPath: filePath,
+      ),
+    );
   }
 
   void _showAddTagToFileDialog(BuildContext context, String filePath) {
-    AppLogger.info('[ManageTags][VideoLibrary] _showAddTagToFileDialog',
-        error: 'filePath=$filePath');
+    AppLogger.info(
+      '[ManageTags][VideoLibrary] _showAddTagToFileDialog',
+      error: 'filePath=$filePath',
+    );
     tag_dialogs.showAddTagToFileDialog(context, filePath);
   }
 
   void _showDeleteTagDialog(
-      BuildContext context, String filePath, List<String> tags) {
+    BuildContext context,
+    String filePath,
+    List<String> tags,
+  ) {
     tag_dialogs.showDeleteTagDialog(context, filePath, tags);
   }
 

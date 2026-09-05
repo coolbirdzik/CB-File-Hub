@@ -41,7 +41,8 @@ class BrowserLikeKeyboardShortcuts {
     final key = event.logicalKey;
     // The command modifier is Cmd on macOS and Ctrl everywhere else. Checking
     // only Ctrl left every Cmd shortcut dead on a Mac.
-    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+    final isCtrl =
+        HardwareKeyboard.instance.isControlPressed ||
         (Platform.isMacOS && HardwareKeyboard.instance.isMetaPressed);
     final isShift = HardwareKeyboard.instance.isShiftPressed;
 
@@ -110,7 +111,8 @@ class BrowserLikeKeyboardShortcuts {
       required Set<String> filePaths,
       required String lastSelectedPath,
       required bool ctrlSelect,
-    }) selectRange,
+    })
+    selectRange,
     required void Function(FileSystemEntity entity) activateEntity,
     void Function(FileSystemEntity entity)? activateEntityInNewWindow,
     required void Function(bool permanent) onDelete,
@@ -122,7 +124,7 @@ class BrowserLikeKeyboardShortcuts {
     VoidCallback? onRefresh,
     VoidCallback? onSearch,
     void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
-        onScrollToIndex,
+    onScrollToIndex,
     KeyEvent? event,
   }) {
     if (!isDesktop || event == null || isTextInputFocused()) {

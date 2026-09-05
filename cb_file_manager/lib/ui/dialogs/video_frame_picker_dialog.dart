@@ -19,8 +19,7 @@ class VideoFramePickerDialog extends StatefulWidget {
   /// Path to the video file.
   final String videoPath;
 
-  const VideoFramePickerDialog({Key? key, required this.videoPath})
-      : super(key: key);
+  const VideoFramePickerDialog({super.key, required this.videoPath});
 
   /// Show the dialog and return the path to the extracted thumbnail, or null.
   static Future<String?> show(BuildContext context, String videoPath) {
@@ -246,14 +245,18 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
               padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.filmSlate,
-                      size: 22, color: theme.colorScheme.primary),
+                  Icon(
+                    PhosphorIconsLight.filmSlate,
+                    size: 22,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Pick frame from video',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -273,29 +276,33 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null && _duration == Duration.zero
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(PhosphorIconsLight.warningCircle,
-                                    size: 48, color: theme.colorScheme.error),
-                                const SizedBox(height: 12),
-                                Text(_error!,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        color: theme.colorScheme.error)),
-                              ],
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              PhosphorIconsLight.warningCircle,
+                              size: 48,
+                              color: theme.colorScheme.error,
                             ),
-                          ),
-                        )
-                      : ClipRRect(
-                          child: Video(
-                            controller: _videoController,
-                            controls: NoVideoControls,
-                          ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                          ],
                         ),
+                      ),
+                    )
+                  : ClipRRect(
+                      child: Video(
+                        controller: _videoController,
+                        controls: NoVideoControls,
+                      ),
+                    ),
             ),
 
             // Seek controls
@@ -313,18 +320,23 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
                       ),
                     ),
                     Expanded(
-                      child: Slider(
-                        // Use one discrete tick per second so the selected
-                        // frame always maps to an exact second position.
-                        value: _selectedSecond
-                            .toDouble()
-                            .clamp(0, _duration.inSeconds.toDouble()),
-                        max: _duration.inSeconds.toDouble(),
-                        divisions:
-                            _duration.inSeconds > 0 ? _duration.inSeconds : 1,
-                        onChanged: (value) {
-                          _seekTo(Duration(seconds: value.round()));
-                        },
+                      child: Semantics(
+                        container: true,
+                        child: Slider(
+                          // Use one discrete tick per second so the selected
+                          // frame always maps to an exact second position.
+                          value: _selectedSecond.toDouble().clamp(
+                            0,
+                            _duration.inSeconds.toDouble(),
+                          ),
+                          max: _duration.inSeconds.toDouble(),
+                          divisions: _duration.inSeconds > 0
+                              ? _duration.inSeconds
+                              : 1,
+                          onChanged: (value) {
+                            _seekTo(Duration(seconds: value.round()));
+                          },
+                        ),
                       ),
                     ),
                     Text(
@@ -379,20 +391,26 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
             // Error message
             if (_error != null && _duration.inMilliseconds > 0)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: Text(
                   _error!,
-                  style:
-                      TextStyle(color: theme.colorScheme.error, fontSize: 12),
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontSize: 12,
+                  ),
                 ),
               ),
 
             // Preview
             if (_previewBytes != null)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     ClipRRect(
@@ -471,8 +489,10 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
     return IconButton(
       icon: Icon(icon, size: 20),
       onPressed: () {
-        final newSecond =
-            (_selectedSecond + seconds).clamp(0, _duration.inSeconds);
+        final newSecond = (_selectedSecond + seconds).clamp(
+          0,
+          _duration.inSeconds,
+        );
         final newPos = Duration(seconds: newSecond);
         _seekTo(newPos);
       },

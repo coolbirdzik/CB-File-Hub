@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -40,8 +41,8 @@ class FileView extends StatelessWidget {
   }
 
   static int _gridCrossAxisCount(double availableWidth, double itemWidth) {
-    final raw =
-        ((availableWidth + _gridSpacing) / (itemWidth + _gridSpacing)).floor();
+    final raw = ((availableWidth + _gridSpacing) / (itemWidth + _gridSpacing))
+        .floor();
     return math.max(1, raw);
   }
 
@@ -52,9 +53,9 @@ class FileView extends StatelessWidget {
   final bool isGridView;
   final List<String> selectedFiles;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(String, {bool shiftSelect, bool ctrlSelect})?
-      toggleFolderSelection;
+  toggleFolderSelection;
   final Function() toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
@@ -68,7 +69,7 @@ class FileView extends StatelessWidget {
   final String? lastSelectedPath;
   final ColumnVisibility columnVisibility;
   final Function()?
-      clearSelectionMode; // Add new callback for clearing selection mode
+  clearSelectionMode; // Add new callback for clearing selection mode
   final bool showFileTags; // Add parameter to control tag display
   final ScrollController? scrollController;
   final GlobalKey Function(String path)? itemKeyForPath;
@@ -76,10 +77,10 @@ class FileView extends StatelessWidget {
   final TabbedFolderDragSelectionController? dragSelectionController;
   final ValueChanged<List<String>>? onStartFileDrag;
   final Future<void> Function(List<String> sources, String destinationFolder)?
-      onMoveItemsToFolder;
+  onMoveItemsToFolder;
 
   const FileView({
-    Key? key,
+    super.key,
     required this.files,
     required this.folders,
     required this.state,
@@ -108,11 +109,10 @@ class FileView extends StatelessWidget {
     this.dragSelectionController,
     this.onStartFileDrag,
     this.onMoveItemsToFolder,
-  }) : super(key: key);
+  });
 
   Function(String, {bool shiftSelect, bool ctrlSelect})
-      get _folderSelectionHandler =>
-          toggleFolderSelection ?? toggleFileSelection;
+  get _folderSelectionHandler => toggleFolderSelection ?? toggleFileSelection;
 
   List<String> _dragPayloadFor(String itemPath) {
     if (selectedFiles.contains(itemPath) && selectedFiles.isNotEmpty) {
@@ -209,14 +209,12 @@ class FileView extends StatelessWidget {
       controller: scrollController,
       // Optimized physics for desktop smooth scrolling
       physics: isDesktop
-          ? const ClampingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            )
+          ? const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics())
           : isMobile
-              ? const ClampingScrollPhysics()
-              : const ClampingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
+          ? const ClampingScrollPhysics()
+          : const ClampingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
       // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
       cacheExtent: isDesktop ? 600 : (isMobile ? 400 : 500),
       addAutomaticKeepAlives: true,
@@ -228,9 +226,11 @@ class FileView extends StatelessWidget {
       itemBuilder: (context, index) {
         // Use RepaintBoundary to reduce rendering load during scrolling
         return Container(
-          key: itemKeyForPath?.call(index < folders.length
-              ? folders[index].path
-              : files[index - folders.length].path),
+          key: itemKeyForPath?.call(
+            index < folders.length
+                ? folders[index].path
+                : files[index - folders.length].path,
+          ),
           child: RepaintBoundary(
             child: index < folders.length
                 ? _wrapFileDragDrop(
@@ -253,12 +253,14 @@ class FileView extends StatelessWidget {
                     itemPath: files[index - folders.length].path,
                     child: FileItem(
                       key: ValueKey(
-                          'file-item-${files[index - folders.length].path}'),
+                        'file-item-${files[index - folders.length].path}',
+                      ),
                       file: files[index - folders.length],
                       state: state,
                       isSelectionMode: isSelectionMode,
-                      isSelected: selectedFiles
-                          .contains(files[index - folders.length].path),
+                      isSelected: selectedFiles.contains(
+                        files[index - folders.length].path,
+                      ),
                       toggleFileSelection: toggleFileSelection,
                       showDeleteTagDialog: showDeleteTagDialog,
                       showAddTagToFileDialog: showAddTagToFileDialog,
@@ -293,7 +295,8 @@ class FileView extends StatelessWidget {
 
     // Debug selection count
     debugPrint(
-        "FileView _buildDetailsView - Selected files count: ${selectedFiles.length}");
+      "FileView _buildDetailsView - Selected files count: ${selectedFiles.length}",
+    );
 
     return Column(
       children: [
@@ -303,7 +306,10 @@ class FileView extends StatelessWidget {
             GestureDetector(
               onSecondaryTapUp: (details) {
                 _showColumnHeaderContextMenu(
-                    context, details.globalPosition, l10n);
+                  context,
+                  details.globalPosition,
+                  l10n,
+                );
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -476,7 +482,7 @@ class FileView extends StatelessWidget {
             Positioned(
               right: 8,
               top: 8,
-              child: Tooltip(
+              child: CbTooltip(
                 message: l10n.columnVisibilityInstructions,
                 child: Icon(
                   PhosphorIconsLight.info,
@@ -497,10 +503,10 @@ class FileView extends StatelessWidget {
                     parent: AlwaysScrollableScrollPhysics(),
                   )
                 : isMobile
-                    ? const ClampingScrollPhysics()
-                    : const ClampingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
+                ? const ClampingScrollPhysics()
+                : const ClampingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
             // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
             cacheExtent: isDesktop ? 600 : (isMobile ? 400 : 500),
             addAutomaticKeepAlives: true,
@@ -521,17 +527,16 @@ class FileView extends StatelessWidget {
                   : files[index - folders.length].path;
 
               return Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 2.0, horizontal: 12.0),
-                decoration: BoxDecoration(
-                  color: rowColor,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 2.0,
+                  horizontal: 12.0,
                 ),
+                decoration: BoxDecoration(color: rowColor),
                 // Use KeyedSubtree with a stable key to prevent unnecessary rebuilds
                 child: Container(
                   key: itemKeyForPath?.call(itemPath),
                   child: LayoutBuilder(
-                    builder:
-                        (BuildContext context, BoxConstraints constraints) {
+                    builder: (BuildContext context, BoxConstraints constraints) {
                       // Register item position for drag-selection hit-testing
                       if (isDesktop && dragSelectionController != null) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -541,15 +546,18 @@ class FileView extends StatelessWidget {
                             if (renderBox != null &&
                                 renderBox.hasSize &&
                                 renderBox.attached) {
-                              final position =
-                                  renderBox.localToGlobal(Offset.zero);
+                              final position = renderBox.localToGlobal(
+                                Offset.zero,
+                              );
                               dragSelectionController!.registerItemPosition(
-                                  itemPath,
-                                  Rect.fromLTWH(
-                                      position.dx,
-                                      position.dy,
-                                      renderBox.size.width,
-                                      renderBox.size.height));
+                                itemPath,
+                                Rect.fromLTWH(
+                                  position.dx,
+                                  position.dy,
+                                  renderBox.size.width,
+                                  renderBox.size.height,
+                                ),
+                              );
                             }
                           } catch (e) {
                             debugPrint('Layout error in details view: $e');
@@ -564,11 +572,13 @@ class FileView extends StatelessWidget {
                                 itemPath: folders[index].path,
                                 child: _FolderDetailsItemWrapper(
                                   key: ValueKey(
-                                      'folder-detail-${folders[index].path}'),
+                                    'folder-detail-${folders[index].path}',
+                                  ),
                                   folder: folders[index],
                                   onTap: onFolderTap,
-                                  isSelected: selectedFiles
-                                      .contains(folders[index].path),
+                                  isSelected: selectedFiles.contains(
+                                    folders[index].path,
+                                  ),
                                   columnVisibility: columnVisibility,
                                   toggleFolderSelection:
                                       _folderSelectionHandler,
@@ -582,11 +592,13 @@ class FileView extends StatelessWidget {
                                 itemPath: files[index - folders.length].path,
                                 child: _FileDetailsItemWrapper(
                                   key: ValueKey(
-                                      'file-detail-${files[index - folders.length].path}'),
+                                    'file-detail-${files[index - folders.length].path}',
+                                  ),
                                   file: files[index - folders.length],
                                   state: state,
                                   isSelected: selectedFiles.contains(
-                                      files[index - folders.length].path),
+                                    files[index - folders.length].path,
+                                  ),
                                   columnVisibility: columnVisibility,
                                   toggleFileSelection: toggleFileSelection,
                                   showDeleteTagDialog: showDeleteTagDialog,
@@ -630,21 +642,16 @@ class FileView extends StatelessWidget {
     return InkWell(
       onTap: () {
         final nextSort = isAscending ? descendingOption : ascendingOption;
-        context.read<FolderListBloc>().add(SetSortOption(
-              nextSort,
-              folderPath: state.currentPath.path,
-            ));
+        context.read<FolderListBloc>().add(
+          SetSortOption(nextSort, folderPath: state.currentPath.path),
+        );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
         child: Row(
           children: [
             Flexible(
-              child: Text(
-                label,
-                style: style,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(label, style: style, overflow: TextOverflow.ellipsis),
             ),
             const SizedBox(width: 4),
             Icon(
@@ -667,11 +674,7 @@ class FileView extends StatelessWidget {
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0),
-      child: Text(
-        label,
-        style: style,
-        overflow: TextOverflow.ellipsis,
-      ),
+      child: Text(label, style: style, overflow: TextOverflow.ellipsis),
     );
   }
 
@@ -696,24 +699,48 @@ class FileView extends StatelessWidget {
       items: [
         _buildColumnToggleItem(l10n.columnSize, 'size', columnVisibility.size),
         _buildColumnToggleItem(l10n.columnType, 'type', columnVisibility.type),
-        _buildColumnToggleItem(l10n.columnDateModified, 'dateModified',
-            columnVisibility.dateModified),
-        _buildColumnToggleItem(l10n.columnDateCreated, 'dateCreated',
-            columnVisibility.dateCreated),
         _buildColumnToggleItem(
-            l10n.columnAttributes, 'attributes', columnVisibility.attributes),
-        _buildColumnToggleItem(l10n.columnDateAccessed, 'dateAccessed',
-            columnVisibility.dateAccessed),
+          l10n.columnDateModified,
+          'dateModified',
+          columnVisibility.dateModified,
+        ),
         _buildColumnToggleItem(
-            l10n.columnExtension, 'extension', columnVisibility.extension),
+          l10n.columnDateCreated,
+          'dateCreated',
+          columnVisibility.dateCreated,
+        ),
+        _buildColumnToggleItem(
+          l10n.columnAttributes,
+          'attributes',
+          columnVisibility.attributes,
+        ),
+        _buildColumnToggleItem(
+          l10n.columnDateAccessed,
+          'dateAccessed',
+          columnVisibility.dateAccessed,
+        ),
+        _buildColumnToggleItem(
+          l10n.columnExtension,
+          'extension',
+          columnVisibility.extension,
+        ),
         _buildColumnToggleItem(l10n.columnPath, 'path', columnVisibility.path),
         _buildColumnToggleItem(l10n.columnTags, 'tags', columnVisibility.tags),
         _buildColumnToggleItem(
-            l10n.columnDimensions, 'dimensions', columnVisibility.dimensions),
+          l10n.columnDimensions,
+          'dimensions',
+          columnVisibility.dimensions,
+        ),
         _buildColumnToggleItem(
-            l10n.columnDuration, 'duration', columnVisibility.duration),
+          l10n.columnDuration,
+          'duration',
+          columnVisibility.duration,
+        ),
         _buildColumnToggleItem(
-            l10n.columnItemCount, 'itemCount', columnVisibility.itemCount),
+          l10n.columnItemCount,
+          'itemCount',
+          columnVisibility.itemCount,
+        ),
       ],
     ).then((value) {
       if (value == null || onColumnVisibilityChanged == null) return;
@@ -723,7 +750,10 @@ class FileView extends StatelessWidget {
   }
 
   PopupMenuItem<String> _buildColumnToggleItem(
-      String label, String key, bool isVisible) {
+    String label,
+    String key,
+    bool isVisible,
+  ) {
     return PopupMenuItem<String>(
       value: key,
       child: Row(
@@ -749,31 +779,38 @@ class FileView extends StatelessWidget {
         return columnVisibility.copyWith(type: !columnVisibility.type);
       case 'dateModified':
         return columnVisibility.copyWith(
-            dateModified: !columnVisibility.dateModified);
+          dateModified: !columnVisibility.dateModified,
+        );
       case 'dateCreated':
         return columnVisibility.copyWith(
-            dateCreated: !columnVisibility.dateCreated);
+          dateCreated: !columnVisibility.dateCreated,
+        );
       case 'attributes':
         return columnVisibility.copyWith(
-            attributes: !columnVisibility.attributes);
+          attributes: !columnVisibility.attributes,
+        );
       case 'dateAccessed':
         return columnVisibility.copyWith(
-            dateAccessed: !columnVisibility.dateAccessed);
+          dateAccessed: !columnVisibility.dateAccessed,
+        );
       case 'extension':
         return columnVisibility.copyWith(
-            extension: !columnVisibility.extension);
+          extension: !columnVisibility.extension,
+        );
       case 'path':
         return columnVisibility.copyWith(path: !columnVisibility.path);
       case 'tags':
         return columnVisibility.copyWith(tags: !columnVisibility.tags);
       case 'dimensions':
         return columnVisibility.copyWith(
-            dimensions: !columnVisibility.dimensions);
+          dimensions: !columnVisibility.dimensions,
+        );
       case 'duration':
         return columnVisibility.copyWith(duration: !columnVisibility.duration);
       case 'itemCount':
         return columnVisibility.copyWith(
-            itemCount: !columnVisibility.itemCount);
+          itemCount: !columnVisibility.itemCount,
+        );
       default:
         return columnVisibility;
     }
@@ -803,8 +840,10 @@ class FileView extends StatelessWidget {
               .clamp(UserPreferences.minGridZoomLevel, maxZoom)
               .toInt();
           final itemWidth = _gridItemWidthForZoom(effectiveZoom);
-          final availableWidth =
-              math.max(0.0, constraints.maxWidth - (_gridSpacing * 2));
+          final availableWidth = math.max(
+            0.0,
+            constraints.maxWidth - (_gridSpacing * 2),
+          );
           final crossAxisCount = _gridCrossAxisCount(availableWidth, itemWidth);
           final itemHeight = itemWidth / _gridAspectRatio;
           final folderIndexByPath = <String, int>{
@@ -821,10 +860,10 @@ class FileView extends StatelessWidget {
                       parent: AlwaysScrollableScrollPhysics(),
                     )
                   : isMobile
-                      ? const ClampingScrollPhysics()
-                      : const ClampingScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
-                        ),
+                  ? const ClampingScrollPhysics()
+                  : const ClampingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
               // Reduced cache extent to prevent pre-building too many widgets during fast scroll
               cacheExtent: isDesktop ? 600 : (isMobile ? 400 : 500),
               addAutomaticKeepAlives: true,
@@ -875,11 +914,13 @@ class FileView extends StatelessWidget {
                                 itemPath: folders[index].path,
                                 child: FolderGridItem(
                                   key: ValueKey(
-                                      'folder-grid-item-${folders[index].path}'),
+                                    'folder-grid-item-${folders[index].path}',
+                                  ),
                                   folder: folders[index],
                                   onNavigate: onFolderTap ?? (_) {},
-                                  isSelected: selectedFiles
-                                      .contains(folders[index].path),
+                                  isSelected: selectedFiles.contains(
+                                    folders[index].path,
+                                  ),
                                   toggleFolderSelection:
                                       _folderSelectionHandler,
                                   isDesktopMode: isDesktopMode,
@@ -892,11 +933,13 @@ class FileView extends StatelessWidget {
                                 itemPath: files[index - folders.length].path,
                                 child: FileGridItem(
                                   key: ValueKey(
-                                      'file-grid-item-${files[index - folders.length].path}'),
+                                    'file-grid-item-${files[index - folders.length].path}',
+                                  ),
                                   file: files[index - folders.length],
                                   state: state,
                                   isSelected: selectedFiles.contains(
-                                      files[index - folders.length].path),
+                                    files[index - folders.length].path,
+                                  ),
                                   toggleFileSelection: toggleFileSelection,
                                   toggleSelectionMode: toggleSelectionMode,
                                   isSelectionMode: isSelectionMode,
@@ -933,7 +976,7 @@ class _FileDetailsItemWrapper extends StatelessWidget {
   final bool isSelected;
   final ColumnVisibility columnVisibility;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
   final Future<void> Function(BuildContext, File)? onDeleteFile;
@@ -944,7 +987,7 @@ class _FileDetailsItemWrapper extends StatelessWidget {
   final bool showFileTags; // Add parameter to control tag display
 
   const _FileDetailsItemWrapper({
-    Key? key,
+    super.key,
     required this.file,
     required this.state,
     required this.isSelected,
@@ -958,7 +1001,7 @@ class _FileDetailsItemWrapper extends StatelessWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -988,13 +1031,13 @@ class _FolderDetailsItemWrapper extends StatelessWidget {
   final bool isSelected;
   final ColumnVisibility columnVisibility;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFolderSelection;
+  toggleFolderSelection;
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
 
   const _FolderDetailsItemWrapper({
-    Key? key,
+    super.key,
     required this.folder,
     required this.isSelected,
     required this.columnVisibility,
@@ -1003,7 +1046,7 @@ class _FolderDetailsItemWrapper extends StatelessWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.clearSelectionMode,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

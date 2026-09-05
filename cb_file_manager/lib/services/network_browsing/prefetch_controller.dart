@@ -119,12 +119,9 @@ class PrefetchController {
   int _cacheHits = 0;
   int _cacheMisses = 0;
 
-  PrefetchController({
-    required SmbChunkReader reader,
-    PrefetchControllerConfig? config,
-  })  : _reader = reader,
-        _config = config ?? const PrefetchControllerConfig(),
-        _buffer = CircularBuffer(config?.bufferSize ?? 5 * 1024 * 1024);
+  PrefetchController({required this._reader, PrefetchControllerConfig? config})
+    : _config = config ?? const PrefetchControllerConfig(),
+      _buffer = CircularBuffer(config?.bufferSize ?? 5 * 1024 * 1024);
 
   /// Initialize the prefetch controller
   Future<bool> initialize() async {
@@ -134,7 +131,8 @@ class PrefetchController {
     }
 
     debugPrint(
-        'PrefetchController: Initialized with ${_config.bufferSize} bytes buffer');
+      'PrefetchController: Initialized with ${_config.bufferSize} bytes buffer',
+    );
     return true;
   }
 
@@ -163,7 +161,8 @@ class PrefetchController {
       _cacheHits++;
       _currentPosition += cachedData.length;
       debugPrint(
-          'PrefetchController: Cache hit - read ${cachedData.length} bytes');
+        'PrefetchController: Cache hit - read ${cachedData.length} bytes',
+      );
       return cachedData;
     }
 
@@ -180,7 +179,8 @@ class PrefetchController {
 
       final duration = DateTime.now().difference(startTime);
       debugPrint(
-          'PrefetchController: Network read ${chunk.size} bytes in ${duration.inMilliseconds}ms');
+        'PrefetchController: Network read ${chunk.size} bytes in ${duration.inMilliseconds}ms',
+      );
 
       return chunk.data;
     }
@@ -190,13 +190,15 @@ class PrefetchController {
     final fileSize = _reader.fileSize;
     if (fileSize != null && _currentPosition >= fileSize) {
       debugPrint(
-          'PrefetchController: Reached end of file at position $_currentPosition');
+        'PrefetchController: Reached end of file at position $_currentPosition',
+      );
       return null; // End of file
     }
 
     // If not at end of file, return empty data to indicate temporary unavailability
     debugPrint(
-        'PrefetchController: No data available at position $_currentPosition, retrying...');
+      'PrefetchController: No data available at position $_currentPosition, retrying...',
+    );
     return Uint8List(0); // Empty data, not null
   }
 
@@ -262,7 +264,8 @@ class PrefetchController {
       }
 
       debugPrint(
-          'PrefetchController: Prefetching from $prefetchStart to $prefetchEnd');
+        'PrefetchController: Prefetching from $prefetchStart to $prefetchEnd',
+      );
 
       // Calculate chunk requests for prefetch
       final chunkRequests = <Map<String, int>>[];
@@ -274,13 +277,11 @@ class PrefetchController {
           currentOffset < (_reader.fileSize ?? 0)) {
         const chunkSize = 256 * 1024; // 256KB default chunk size
         final remainingSize = prefetchEnd - currentOffset;
-        final actualChunkSize =
-            remainingSize < chunkSize ? remainingSize : chunkSize;
+        final actualChunkSize = remainingSize < chunkSize
+            ? remainingSize
+            : chunkSize;
 
-        chunkRequests.add({
-          'offset': currentOffset,
-          'size': actualChunkSize,
-        });
+        chunkRequests.add({'offset': currentOffset, 'size': actualChunkSize});
 
         currentOffset += actualChunkSize;
         chunksRequested++;
@@ -296,7 +297,8 @@ class PrefetchController {
       }
 
       debugPrint(
-          'PrefetchController: Prefetched ${chunks.length} chunks ($_totalPrefetched bytes total)');
+        'PrefetchController: Prefetched ${chunks.length} chunks ($_totalPrefetched bytes total)',
+      );
     } catch (e) {
       debugPrint('PrefetchController: Prefetch error: $e');
     } finally {
@@ -359,8 +361,9 @@ class PrefetchController {
       'cacheHits': _cacheHits,
       'cacheMisses': _cacheMisses,
       'cacheHitRate': _cacheHits + _cacheMisses > 0
-          ? ((_cacheHits / (_cacheHits + _cacheMisses)) * 100)
-              .toStringAsFixed(1)
+          ? ((_cacheHits / (_cacheHits + _cacheMisses)) * 100).toStringAsFixed(
+              1,
+            )
           : '0.0',
     };
   }

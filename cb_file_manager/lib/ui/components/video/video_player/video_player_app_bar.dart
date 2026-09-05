@@ -15,14 +15,14 @@ class VideoPlayerAppBar extends StatefulWidget implements PreferredSizeWidget {
   final double opacity;
 
   const VideoPlayerAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.actions,
     this.onClose,
     this.showWindowControls = true,
     this.blurAmount = 12.0,
     this.opacity = 0.6,
-  }) : super(key: key);
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -46,12 +46,12 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   VoidCallback get _onCloseDefault => () {
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        } else {
-          exit(0);
-        }
-      };
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      exit(0);
+    }
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +65,10 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
       title: _buildTitle(),
       leading: _isDesktopPlatform
           ? IconButton(
-              icon:
-                  const Icon(PhosphorIconsLight.arrowLeft, color: Colors.white),
+              icon: const Icon(
+                PhosphorIconsLight.arrowLeft,
+                color: Colors.white,
+              ),
               onPressed: onClose,
             )
           : null,
@@ -79,8 +81,11 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
   Widget _buildTitle() {
     final content = Row(
       children: [
-        const Icon(PhosphorIconsLight.videoCamera,
-            color: Colors.white70, size: 20),
+        const Icon(
+          PhosphorIconsLight.videoCamera,
+          color: Colors.white70,
+          size: 20,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -101,10 +106,7 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
     // visible title strip is draggable, including its empty top/bottom space.
     if (_isDesktopPlatform) {
       return DragToMoveArea(
-        child: SizedBox(
-          height: kToolbarHeight,
-          child: content,
-        ),
+        child: SizedBox(height: kToolbarHeight, child: content),
       );
     }
     return content;
@@ -128,12 +130,14 @@ class _VideoPlayerAppBarState extends State<VideoPlayerAppBar> {
 
     // Add window controls for desktop platforms
     if (widget.showWindowControls && _isDesktopPlatform) {
-      actions.add(WindowCaptionButtons(
-        // Caption glyphs pick their colour from brightness; keep the app's
-        // accent but read it as dark so they stay visible on the dark bar.
-        theme: _darkFacadeOf(Theme.of(context)),
-        onClose: onClose,
-      ));
+      actions.add(
+        WindowCaptionButtons(
+          // Caption glyphs pick their colour from brightness; keep the app's
+          // accent but read it as dark so they stay visible on the dark bar.
+          theme: _darkFacadeOf(Theme.of(context)),
+          onClose: onClose,
+        ),
+      );
     }
 
     return actions;

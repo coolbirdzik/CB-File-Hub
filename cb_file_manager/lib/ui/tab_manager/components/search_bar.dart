@@ -7,6 +7,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart'; // Add TabManager import
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'search_tips_dialog.dart';
 
 /// Search bar displayed directly in the toolbar.
@@ -33,7 +34,7 @@ class SearchBar extends StatefulWidget {
   final FolderListBloc? folderListBloc;
 
   const SearchBar({
-    Key? key,
+    super.key,
     required this.currentPath,
     required this.onCloseSearch,
     required this.tabId, // Include tabId in constructor
@@ -50,7 +51,7 @@ class SearchBar extends StatefulWidget {
     this.showGlobalSearchToggle = true,
     this.showRegexToggle = true,
     this.showClearButton = false,
-  }) : super(key: key);
+  });
 
   @override
   State<SearchBar> createState() => _SearchBarState();
@@ -159,8 +160,9 @@ class _SearchBarState extends State<SearchBar> {
       return;
     }
 
-    _suggestionsWidth =
-        (renderObject.size.width - 24).clamp(0, double.infinity).toDouble();
+    _suggestionsWidth = (renderObject.size.width - 24)
+        .clamp(0, double.infinity)
+        .toDouble();
   }
 
   void _onSearchFocusChanged() {
@@ -281,162 +283,180 @@ class _SearchBarState extends State<SearchBar> {
     // Create a new overlay entry.
     _overlayEntry = OverlayEntry(
       builder: (context) {
-        return Positioned.fill(
-          child: CompositedTransformFollower(
-            link: _suggestionsLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomLeft,
-            followerAnchor: Alignment.topLeft,
-            offset: const Offset(12, 4),
-            child: Align(
-              alignment: Alignment.topLeft,
-              widthFactor: 1,
-              heightFactor: 1,
-              child: TextFieldTapRegion(
-                child: TapRegion(
-                  groupId: _tapRegionGroupId,
-                  child: SizedBox(
-                    width: _suggestionsWidth,
-                    child: Material(
-                      elevation: 0,
-                      borderRadius: BorderRadius.circular(16),
-                      color:
-                          isDark ? Colors.grey[850] : theme.colorScheme.surface,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.grey[850]
-                              : theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [],
-                          border: Border.all(
-                            color: theme.colorScheme.outline
-                                .withValues(alpha: 0.2),
-                            width: 1,
-                          ),
-                        ),
-                        constraints: const BoxConstraints(
-                          maxHeight: 300,
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${localizations.suggestedTags} (${_currentTags.length} ${localizations.results})',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                  // Close overlay.
-                                  InkWell(
-                                    onTap: _removeOverlay,
-                                    borderRadius: BorderRadius.circular(16.0),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(4.0),
-                                      child: Icon(
-                                        PhosphorIconsLight.x,
-                                        size: 16,
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+        return ExcludeSemantics(
+          child: Positioned.fill(
+            child: CompositedTransformFollower(
+              link: _suggestionsLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.bottomLeft,
+              followerAnchor: Alignment.topLeft,
+              offset: const Offset(12, 4),
+              child: Align(
+                alignment: Alignment.topLeft,
+                widthFactor: 1,
+                heightFactor: 1,
+                child: TextFieldTapRegion(
+                  child: TapRegion(
+                    groupId: _tapRegionGroupId,
+                    child: SizedBox(
+                      width: _suggestionsWidth,
+                      child: Material(
+                        elevation: 0,
+                        borderRadius: BorderRadius.circular(16),
+                        color: isDark
+                            ? Colors.grey[850]
+                            : theme.colorScheme.surface,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.grey[850]
+                                : theme.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [],
+                            border: Border.all(
+                              color: theme.colorScheme.outline.withValues(
+                                alpha: 0.2,
                               ),
+                              width: 1,
                             ),
-                            const Divider(height: 1, thickness: 1),
-                            _currentTags.isEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Text(
-                                      localizations.noMatchingTags,
-                                      style: TextStyle(
-                                        fontStyle: FontStyle.italic,
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
+                          ),
+                          constraints: const BoxConstraints(maxHeight: 300),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${localizations.suggestedTags} (${_currentTags.length} ${localizations.results})',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
                                       ),
                                     ),
-                                  )
-                                : Flexible(
-                                    child: ListView.builder(
-                                      shrinkWrap: true,
-                                      padding: EdgeInsets.zero,
-                                      itemCount: _currentTags.length,
-                                      itemBuilder: (context, index) {
-                                        final bool isSelected =
-                                            index == _selectedTagIndex;
-                                        return InkWell(
-                                          onTap: () {
-                                            _applySelectedTag(
-                                              _currentTags[index],
-                                              submitSearch: true,
-                                            );
-                                            _removeOverlay();
-                                          },
-                                          child: Container(
-                                            color: isSelected
-                                                ? theme.colorScheme
-                                                    .primaryContainer
-                                                : Colors.transparent,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8.0,
-                                                horizontal: 16.0),
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  PhosphorIconsLight
-                                                      .shoppingBagOpen,
-                                                  size: 16,
-                                                  color: isSelected
-                                                      ? theme
-                                                          .colorScheme.primary
-                                                      : theme
-                                                          .colorScheme.primary
-                                                          .withValues(
-                                                              alpha: 0.7),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Text(
-                                                    _currentTags[index],
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: isSelected
-                                                          ? theme.colorScheme
-                                                              .onPrimaryContainer
-                                                          : theme.colorScheme
-                                                              .onSurface,
-                                                      fontWeight: isSelected
-                                                          ? FontWeight.bold
-                                                          : FontWeight.normal,
-                                                    ),
+                                    // Close overlay.
+                                    InkWell(
+                                      onTap: _removeOverlay,
+                                      borderRadius: BorderRadius.circular(16.0),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4.0),
+                                        child: Icon(
+                                          PhosphorIconsLight.x,
+                                          size: 16,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(height: 1, thickness: 1),
+                              _currentTags.isEmpty
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Text(
+                                        localizations.noMatchingTags,
+                                        style: TextStyle(
+                                          fontStyle: FontStyle.italic,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                      ),
+                                    )
+                                  : Flexible(
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        padding: EdgeInsets.zero,
+                                        itemCount: _currentTags.length,
+                                        itemBuilder: (context, index) {
+                                          final bool isSelected =
+                                              index == _selectedTagIndex;
+                                          return InkWell(
+                                            onTap: () {
+                                              _applySelectedTag(
+                                                _currentTags[index],
+                                                submitSearch: true,
+                                              );
+                                              _removeOverlay();
+                                            },
+                                            child: Container(
+                                              color: isSelected
+                                                  ? theme
+                                                        .colorScheme
+                                                        .primaryContainer
+                                                  : Colors.transparent,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 8.0,
+                                                    horizontal: 16.0,
                                                   ),
-                                                ),
-                                                if (isSelected)
+                                              child: Row(
+                                                children: [
                                                   Icon(
                                                     PhosphorIconsLight
-                                                        .arrowRight,
-                                                    size: 14,
-                                                    color: theme
-                                                        .colorScheme.primary,
+                                                        .shoppingBagOpen,
+                                                    size: 16,
+                                                    color: isSelected
+                                                        ? theme
+                                                              .colorScheme
+                                                              .primary
+                                                        : theme
+                                                              .colorScheme
+                                                              .primary
+                                                              .withValues(
+                                                                alpha: 0.7,
+                                                              ),
                                                   ),
-                                              ],
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Text(
+                                                      _currentTags[index],
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: isSelected
+                                                            ? theme
+                                                                  .colorScheme
+                                                                  .onPrimaryContainer
+                                                            : theme
+                                                                  .colorScheme
+                                                                  .onSurface,
+                                                        fontWeight: isSelected
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  if (isSelected)
+                                                    Icon(
+                                                      PhosphorIconsLight
+                                                          .arrowRight,
+                                                      size: 14,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .primary,
+                                                    ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -447,9 +467,7 @@ class _SearchBarState extends State<SearchBar> {
           ),
         );
       },
-    );
-
-    // Show the overlay.
+    ); // Show the overlay.
     Overlay.of(context).insert(_overlayEntry!);
 
     // Keep focus in the text field so keyboard navigation keeps working.
@@ -617,8 +635,9 @@ class _SearchBarState extends State<SearchBar> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final localizations = AppLocalizations.of(context)!;
-    final Color baseSearchFill =
-        isDark ? Colors.grey[850]! : theme.colorScheme.surface;
+    final Color baseSearchFill = isDark
+        ? Colors.grey[850]!
+        : theme.colorScheme.surface;
     final Color focusedSearchFill = Color.alphaBlend(
       isDark
           ? Colors.white.withValues(alpha: 0.06)
@@ -651,8 +670,11 @@ class _SearchBarState extends State<SearchBar> {
                     duration: const Duration(milliseconds: 200),
                     transitionBuilder:
                         (Widget child, Animation<double> animation) {
-                      return ScaleTransition(scale: animation, child: child);
-                    },
+                          return ScaleTransition(
+                            scale: animation,
+                            child: child,
+                          );
+                        },
                     child: _isSearchingTags
                         ? Icon(
                             PhosphorIconsLight.shoppingBagOpen,
@@ -769,10 +791,11 @@ class _SearchBarState extends State<SearchBar> {
                                       _isSearchingTags
                                           ? localizations.searchHintTextTags
                                           : widget.hintText ??
-                                              localizations.searchHintText,
+                                                localizations.searchHintText,
                                       style: TextStyle(
                                         color: theme
-                                            .colorScheme.onSurfaceVariant
+                                            .colorScheme
+                                            .onSurfaceVariant
                                             .withValues(alpha: 0.7),
                                         fontSize: 15,
                                         height: 1,
@@ -796,7 +819,7 @@ class _SearchBarState extends State<SearchBar> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
                     onTap: () => _showSearchTipsDialog(context),
-                    child: Tooltip(
+                    child: CbTooltip(
                       message: AppLocalizations.of(context)!.searchTips,
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -821,12 +844,13 @@ class _SearchBarState extends State<SearchBar> {
                       final query = _searchController.text;
                       if (query.contains('#')) {
                         final hashPosition = query.lastIndexOf('#');
-                        final tagQuery =
-                            query.substring(hashPosition + 1).trim();
+                        final tagQuery = query
+                            .substring(hashPosition + 1)
+                            .trim();
                         _showTagSuggestionsDialog(tagQuery);
                       }
                     },
-                    child: Tooltip(
+                    child: CbTooltip(
                       message: AppLocalizations.of(context)!.viewTagSuggestions,
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -854,11 +878,15 @@ class _SearchBarState extends State<SearchBar> {
                       final messenger = ScaffoldMessenger.maybeOf(context);
                       messenger?.showSnackBar(
                         SnackBar(
-                          content: Text(_isGlobalSearch
-                              ? AppLocalizations.of(context)!
-                                  .globalSearchModeEnabled
-                              : AppLocalizations.of(context)!
-                                  .localSearchModeEnabled),
+                          content: Text(
+                            _isGlobalSearch
+                                ? AppLocalizations.of(
+                                    context,
+                                  )!.globalSearchModeEnabled
+                                : AppLocalizations.of(
+                                    context,
+                                  )!.localSearchModeEnabled,
+                          ),
                           duration: const Duration(milliseconds: 1000),
                           behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
@@ -868,7 +896,7 @@ class _SearchBarState extends State<SearchBar> {
                         ),
                       );
                     },
-                    child: Tooltip(
+                    child: CbTooltip(
                       message: _isGlobalSearch
                           ? AppLocalizations.of(context)!.globalSearchMode
                           : AppLocalizations.of(context)!.localSearchMode,
@@ -908,10 +936,13 @@ class _SearchBarState extends State<SearchBar> {
                       final messenger = ScaffoldMessenger.maybeOf(context);
                       messenger?.showSnackBar(
                         SnackBar(
-                          content: Text(_useRegex
-                              ? AppLocalizations.of(context)!.regexModeEnabled
-                              : AppLocalizations.of(context)!
-                                  .regexModeDisabled),
+                          content: Text(
+                            _useRegex
+                                ? AppLocalizations.of(context)!.regexModeEnabled
+                                : AppLocalizations.of(
+                                    context,
+                                  )!.regexModeDisabled,
+                          ),
                           duration: const Duration(milliseconds: 1000),
                           behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
@@ -921,7 +952,7 @@ class _SearchBarState extends State<SearchBar> {
                         ),
                       );
                     },
-                    child: Tooltip(
+                    child: CbTooltip(
                       message: AppLocalizations.of(context)!.regexMode,
                       child: Container(
                         padding: const EdgeInsets.all(8),
@@ -963,7 +994,7 @@ class _SearchBarState extends State<SearchBar> {
                       _searchController.clear();
                       widget.onClearSearch?.call();
                     },
-                    child: Tooltip(
+                    child: CbTooltip(
                       message: AppLocalizations.of(context)!.clearSearch,
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),

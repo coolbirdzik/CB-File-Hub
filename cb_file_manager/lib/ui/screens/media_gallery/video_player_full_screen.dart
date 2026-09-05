@@ -26,12 +26,11 @@ class VideoPlayerFullScreen extends StatefulWidget {
   final void Function(Map<String, dynamic> metadata)? onVideoMetadata;
 
   VideoPlayerFullScreen({
-    Key? key,
+    super.key,
     this.file,
     this.contentUri,
     this.onVideoMetadata,
-  })  : assert(file != null || (contentUri != null && contentUri.isNotEmpty)),
-        super(key: key);
+  }) : assert(file != null || (contentUri != null && contentUri.isNotEmpty));
 
   // ignore: library_private_types_in_public_api
   @override
@@ -56,12 +55,16 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     super.initState();
     // On mobile, show full UI (both status bar and nav bar)
     if (Platform.isAndroid || Platform.isIOS) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+      );
       // Also force style after first frame to avoid being overridden
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
         SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
       });
       // Ensure Flutter re-applies overlays automatically while this route is on top
@@ -70,15 +73,18 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
       // Re-assert overlays for a short period in case platform view toggles them off
       int attempts = 0;
       _uiEnforceTimer?.cancel();
-      _uiEnforceTimer =
-          Timer.periodic(const Duration(milliseconds: 400), (t) async {
+      _uiEnforceTimer = Timer.periodic(const Duration(milliseconds: 400), (
+        t,
+      ) async {
         attempts++;
         if (!mounted || _isFullScreen || attempts > 10) {
           t.cancel();
           return;
         }
-        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+        await SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
         SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
       });
     }
@@ -125,8 +131,10 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     }
 
     // Restore system UI when leaving video player
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+    );
     // Keep automatic adjustment enabled for underlying screens
     RendererBinding.instance.renderViews.first.automaticSystemUiAdjustment =
         true;
@@ -142,32 +150,32 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
       appBar: isMobile
           ? null
           : ((_isFullScreen && !_showAppBar) || _inAndroidPip
-              ? null // Hide app bar completely when in fullscreen and _showAppBar is false
-              : VideoPlayerAppBar(
-                  title: widget.file != null
-                      ? pathlib.basename(widget.file!.path)
-                      : _shortName(widget.contentUri),
-                  actions: [
-                    if (widget.file != null)
-                      IconButton(
-                        icon: const Icon(PhosphorIconsLight.info,
-                            color: Colors.white70),
-                        onPressed: () => _showVideoInfo(context),
-                      ),
-                  ],
-                  onClose: null,
-                  // Default: pop when in a route, else exit(0)
-                  showWindowControls: true,
-                  blurAmount: 12.0,
-                  opacity: 0.6,
-                )),
+                ? null // Hide app bar completely when in fullscreen and _showAppBar is false
+                : VideoPlayerAppBar(
+                    title: widget.file != null
+                        ? pathlib.basename(widget.file!.path)
+                        : _shortName(widget.contentUri),
+                    actions: [
+                      if (widget.file != null)
+                        IconButton(
+                          icon: const Icon(
+                            PhosphorIconsLight.info,
+                            color: Colors.white70,
+                          ),
+                          onPressed: () => _showVideoInfo(context),
+                        ),
+                    ],
+                    onClose: null,
+                    // Default: pop when in a route, else exit(0)
+                    showWindowControls: true,
+                    blurAmount: 12.0,
+                    opacity: 0.6,
+                  )),
       extendBody: true,
       extendBodyBehindAppBar: false,
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.black,
-      body: Center(
-        child: _buildPlayer(context),
-      ),
+      body: Center(child: _buildPlayer(context)),
     );
 
     if (isMobile) {
@@ -202,8 +210,10 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     setState(() => _videoMetadata = metadata);
     widget.onVideoMetadata?.call(metadata);
     if (Platform.isAndroid || Platform.isIOS) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+      );
       SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     }
   }
@@ -275,10 +285,8 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
     if (widget.file == null) return;
     RouteUtils.showAcrylicDialog(
       context: context,
-      builder: (context) => VideoInfoDialog(
-        file: widget.file!,
-        videoMetadata: _videoMetadata,
-      ),
+      builder: (context) =>
+          VideoInfoDialog(file: widget.file!, videoMetadata: _videoMetadata),
     );
   }
 }

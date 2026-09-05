@@ -44,7 +44,8 @@ class WebDAVService implements NetworkServiceBase {
   void _addMeta(String remotePath, WebDavMeta meta) {
     _metaMap[remotePath] = meta;
     debugPrint(
-        'WebDAVService: Added meta for $remotePath: size=${meta.size}, modified=${meta.modified}');
+      'WebDAVService: Added meta for $remotePath: size=${meta.size}, modified=${meta.modified}',
+    );
   }
 
   /// Get remote path from local temp path
@@ -125,13 +126,16 @@ class WebDAVService implements NetworkServiceBase {
       debugPrint('WebDAVService: Testing connection with PROPFIND request...');
       final testResult = await _makeRequest('PROPFIND', '/', depth: '0');
       debugPrint(
-          'WebDAVService: Connection test result: ${testResult.statusCode}');
+        'WebDAVService: Connection test result: ${testResult.statusCode}',
+      );
       debugPrint(
-          'WebDAVService: Response body: ${testResult.body.substring(0, testResult.body.length > 200 ? 200 : testResult.body.length)}...');
+        'WebDAVService: Response body: ${testResult.body.substring(0, testResult.body.length > 200 ? 200 : testResult.body.length)}...',
+      );
 
       if (testResult.statusCode != 200 && testResult.statusCode != 207) {
         throw Exception(
-            'WebDAV server not accessible: ${testResult.statusCode} - ${testResult.body}');
+          'WebDAV server not accessible: ${testResult.statusCode} - ${testResult.body}',
+        );
       }
 
       // Set connected status
@@ -174,11 +178,14 @@ class WebDAVService implements NetworkServiceBase {
       }
 
       debugPrint(
-          'WebDAVService: Directory listing response: ${result.body.substring(0, result.body.length > 500 ? 500 : result.body.length)}...');
+        'WebDAVService: Directory listing response: ${result.body.substring(0, result.body.length > 500 ? 500 : result.body.length)}...',
+      );
 
       // Parse XML response manually
-      final List<FileSystemEntity> entities =
-          _parseWebDAVResponse(result.body, normalizedPath);
+      final List<FileSystemEntity> entities = _parseWebDAVResponse(
+        result.body,
+        normalizedPath,
+      );
 
       debugPrint('WebDAVService: Found ${entities.length} entities');
       return entities;
@@ -291,8 +298,11 @@ class WebDAVService implements NetworkServiceBase {
       final normalizedOldPath = _normalizePath(oldPath);
       final normalizedNewPath = _normalizePath(newPath);
 
-      final result = await _makeRequest('MOVE', normalizedOldPath,
-          headers: {'Destination': normalizedNewPath});
+      final result = await _makeRequest(
+        'MOVE',
+        normalizedOldPath,
+        headers: {'Destination': normalizedNewPath},
+      );
 
       return result.statusCode == 200 || result.statusCode == 201;
     } catch (e) {
@@ -328,8 +338,9 @@ class WebDAVService implements NetworkServiceBase {
       const chunkSize = 8192;
 
       for (int i = 0; i < bytes.length; i += chunkSize) {
-        final end =
-            (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+        final end = (i + chunkSize < bytes.length)
+            ? i + chunkSize
+            : bytes.length;
         final chunk = bytes.sublist(i, end);
         sink.add(chunk);
         writtenBytes += chunk.length;
@@ -447,7 +458,9 @@ class WebDAVService implements NetworkServiceBase {
   }
 
   Future<void> _downloadAndStream(
-      String remotePath, StreamController<List<int>> controller) async {
+    String remotePath,
+    StreamController<List<int>> controller,
+  ) async {
     try {
       final normalizedPath = _normalizePath(remotePath);
       debugPrint('WebDAVService: Streaming file: $normalizedPath');
@@ -461,15 +474,17 @@ class WebDAVService implements NetworkServiceBase {
       }
 
       debugPrint(
-          'WebDAVService: Stream created successfully: ${result.bodyBytes.length} bytes');
+        'WebDAVService: Stream created successfully: ${result.bodyBytes.length} bytes',
+      );
 
       // Send the data in chunks
       const chunkSize = 8192;
       final bytes = result.bodyBytes;
 
       for (int i = 0; i < bytes.length; i += chunkSize) {
-        final end =
-            (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+        final end = (i + chunkSize < bytes.length)
+            ? i + chunkSize
+            : bytes.length;
         final chunk = bytes.sublist(i, end);
         controller.add(chunk);
 
@@ -525,7 +540,8 @@ class WebDAVService implements NetworkServiceBase {
       }
 
       debugPrint(
-          'WebDAVService: File data read successfully: ${result.bodyBytes.length} bytes');
+        'WebDAVService: File data read successfully: ${result.bodyBytes.length} bytes',
+      );
       return Uint8List.fromList(result.bodyBytes);
     } catch (e) {
       debugPrint('WebDAVService: Error reading file data: $e');
@@ -585,12 +601,13 @@ class WebDAVService implements NetworkServiceBase {
       debugPrint('WebDAVService: Response status: ${response.statusCode}');
 
       // Read response body as bytes first
-      final responseBytes = await response
-          .toList()
-          .then((chunks) => chunks.expand((chunk) => chunk).toList());
+      final responseBytes = await response.toList().then(
+        (chunks) => chunks.expand((chunk) => chunk).toList(),
+      );
 
       debugPrint(
-          'WebDAVService: Response body size: ${responseBytes.length} bytes');
+        'WebDAVService: Response body size: ${responseBytes.length} bytes',
+      );
 
       // Convert bytes to string for text responses
       final responseBody = utf8.decode(responseBytes, allowMalformed: true);
@@ -609,13 +626,17 @@ class WebDAVService implements NetworkServiceBase {
 
   // Simple XML parser for WebDAV response with metadata parsing
   List<FileSystemEntity> _parseWebDAVResponse(
-      String xmlResponse, String basePath) {
+    String xmlResponse,
+    String basePath,
+  ) {
     final List<FileSystemEntity> entities = [];
 
     try {
       // Extract response blocks
-      final responsePattern =
-          RegExp(r'<D:response>(.*?)</D:response>', dotAll: true);
+      final responsePattern = RegExp(
+        r'<D:response>(.*?)</D:response>',
+        dotAll: true,
+      );
       final responseMatches = responsePattern.allMatches(xmlResponse);
 
       for (final responseMatch in responseMatches) {
@@ -623,8 +644,9 @@ class WebDAVService implements NetworkServiceBase {
         if (responseBlock == null) continue;
 
         // Extract href from this response block
-        final hrefMatch =
-            RegExp(r'<D:href>(.*?)</D:href>').firstMatch(responseBlock);
+        final hrefMatch = RegExp(
+          r'<D:href>(.*?)</D:href>',
+        ).firstMatch(responseBlock);
         if (hrefMatch == null) continue;
 
         final href = hrefMatch.group(1);
@@ -649,8 +671,9 @@ class WebDAVService implements NetworkServiceBase {
         String relativePath = hrefUri.path;
 
         // Determine configured base path from _baseUrl (e.g. '/webdav')
-        final String configuredBasePath =
-            Uri.parse(_baseUrl).path; // includes leading '/'
+        final String configuredBasePath = Uri.parse(
+          _baseUrl,
+        ).path; // includes leading '/'
 
         // Remove configured base path (e.g. '/webdav') if present to avoid double usage later
         if (relativePath.startsWith(configuredBasePath)) {
@@ -666,27 +689,28 @@ class WebDAVService implements NetworkServiceBase {
         if (relativePath.isEmpty) continue;
 
         // Check if it's a directory by looking for iscollection tag
-        final isDirectory = responseBlock
-                .contains('<D:iscollection>1</D:iscollection>') ||
-            responseBlock
-                .contains('<D:resourcetype><D:collection/></D:resourcetype>');
+        final isDirectory =
+            responseBlock.contains('<D:iscollection>1</D:iscollection>') ||
+            responseBlock.contains(
+              '<D:resourcetype><D:collection/></D:resourcetype>',
+            );
 
         // Extract metadata
         int size = -1;
         DateTime modified = DateTime.now();
 
         // Parse getcontentlength
-        final sizeMatch =
-            RegExp(r'<D:getcontentlength>(\d+)</D:getcontentlength>')
-                .firstMatch(responseBlock);
+        final sizeMatch = RegExp(
+          r'<D:getcontentlength>(\d+)</D:getcontentlength>',
+        ).firstMatch(responseBlock);
         if (sizeMatch != null) {
           size = int.tryParse(sizeMatch.group(1) ?? '') ?? -1;
         }
 
         // Parse getlastmodified
-        final modifiedMatch =
-            RegExp(r'<D:getlastmodified>(.*?)</D:getlastmodified>')
-                .firstMatch(responseBlock);
+        final modifiedMatch = RegExp(
+          r'<D:getlastmodified>(.*?)</D:getlastmodified>',
+        ).firstMatch(responseBlock);
         if (modifiedMatch != null) {
           try {
             // Parse HTTP date format (e.g., "Wed, 21 Oct 2015 07:28:00 GMT")
@@ -706,7 +730,8 @@ class WebDAVService implements NetworkServiceBase {
         final name = relativePath.split('/').last;
 
         debugPrint(
-            'WebDAVService: Found entity - Name: $name, Path: $relativePath, IsDirectory: $isDirectory, Size: $size, Modified: $modified');
+          'WebDAVService: Found entity - Name: $name, Path: $relativePath, IsDirectory: $isDirectory, Size: $size, Modified: $modified',
+        );
 
         // Create temporary local files/directories for UI display
         final tempDir = Directory.systemTemp;

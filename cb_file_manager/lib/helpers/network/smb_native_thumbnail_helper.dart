@@ -19,8 +19,9 @@ class SmbNativeThumbnailHelper {
   static final _operationSemaphore = Completer<void>()..complete();
 
   /// Maximum time to wait for a native operation
-  static const Duration _operationTimeout =
-      Duration(seconds: 3); // Shorter for SMB
+  static const Duration _operationTimeout = Duration(
+    seconds: 3,
+  ); // Shorter for SMB
 
   /// Initialize the native SMB thumbnail bridge
   static Future<bool> initialize() async {
@@ -29,7 +30,8 @@ class SmbNativeThumbnailHelper {
     try {
       if (!Platform.isWindows) {
         debugPrint(
-            'SmbNativeThumbnailHelper: Not running on Windows, initialization skipped');
+          'SmbNativeThumbnailHelper: Not running on Windows, initialization skipped',
+        );
         return false;
       }
 
@@ -38,7 +40,8 @@ class SmbNativeThumbnailHelper {
         await _channel.invokeMethod<bool>('isAvailable');
         _initialized = true;
         debugPrint(
-            'SmbNativeThumbnailHelper: Native SMB thumbnail bridge initialized');
+          'SmbNativeThumbnailHelper: Native SMB thumbnail bridge initialized',
+        );
         return true;
       } on MissingPluginException {
         debugPrint('SmbNativeThumbnailHelper: Native plugin not available');
@@ -84,14 +87,16 @@ class SmbNativeThumbnailHelper {
       // Check format support
       if (!isSupportedFormat(filePath)) {
         debugPrint(
-            'SmbNativeThumbnailHelper: Potentially unsupported format: $filePath');
+          'SmbNativeThumbnailHelper: Potentially unsupported format: $filePath',
+        );
         // Still try but with lower expectations
       }
 
       // Wait for operation slot (like fc_native_video_thumbnail.dart)
       if (_operationInProgress) {
         debugPrint(
-            'SmbNativeThumbnailHelper: Another operation in progress, waiting...');
+          'SmbNativeThumbnailHelper: Another operation in progress, waiting...',
+        );
 
         if (_operationSemaphore.isCompleted) {
           var oldSemaphore = _operationSemaphore;
@@ -101,7 +106,8 @@ class SmbNativeThumbnailHelper {
             await _operationSemaphore.future.timeout(_operationTimeout);
           } catch (e) {
             debugPrint(
-                'SmbNativeThumbnailHelper: Timed out waiting for previous operation');
+              'SmbNativeThumbnailHelper: Timed out waiting for previous operation',
+            );
             return null;
           }
         }
@@ -115,22 +121,29 @@ class SmbNativeThumbnailHelper {
         // Call native method
         Uint8List? result;
         try {
-          result = await _channel.invokeMethod<Uint8List>(
-              useFastMode ? 'getThumbnailFast' : 'getThumbnail', {
-            'filePath': filePath,
-            'thumbnailSize': thumbnailSize,
-          }).timeout(_operationTimeout, onTimeout: () {
-            debugPrint(
-                'SmbNativeThumbnailHelper: Native operation timed out for $filePath');
-            return null;
-          });
+          result = await _channel
+              .invokeMethod<Uint8List>(
+                useFastMode ? 'getThumbnailFast' : 'getThumbnail',
+                {'filePath': filePath, 'thumbnailSize': thumbnailSize},
+              )
+              .timeout(
+                _operationTimeout,
+                onTimeout: () {
+                  debugPrint(
+                    'SmbNativeThumbnailHelper: Native operation timed out for $filePath',
+                  );
+                  return null;
+                },
+              );
         } on MissingPluginException catch (e) {
           debugPrint(
-              'SmbNativeThumbnailHelper: Plugin not available: ${e.message}');
+            'SmbNativeThumbnailHelper: Plugin not available: ${e.message}',
+          );
           return null;
         } on PlatformException catch (e) {
           debugPrint(
-              'SmbNativeThumbnailHelper: Platform error for $filePath: ${e.message}');
+            'SmbNativeThumbnailHelper: Platform error for $filePath: ${e.message}',
+          );
           return null;
         } catch (e) {
           debugPrint('SmbNativeThumbnailHelper: Channel error: $e');
@@ -139,11 +152,13 @@ class SmbNativeThumbnailHelper {
 
         if (result != null && result.isNotEmpty) {
           debugPrint(
-              'SmbNativeThumbnailHelper: Successfully generated thumbnail for $filePath (${result.length} bytes)');
+            'SmbNativeThumbnailHelper: Successfully generated thumbnail for $filePath (${result.length} bytes)',
+          );
           return result;
         } else {
           debugPrint(
-              'SmbNativeThumbnailHelper: Could not extract thumbnail from $filePath (null or empty result)');
+            'SmbNativeThumbnailHelper: Could not extract thumbnail from $filePath (null or empty result)',
+          );
           return null;
         }
       } finally {
@@ -152,7 +167,8 @@ class SmbNativeThumbnailHelper {
       }
     } catch (e, stack) {
       debugPrint(
-          'SmbNativeThumbnailHelper: Unhandled error generating thumbnail for $filePath: $e\n$stack');
+        'SmbNativeThumbnailHelper: Unhandled error generating thumbnail for $filePath: $e\n$stack',
+      );
       return null;
     }
   }
@@ -179,7 +195,7 @@ class SmbNativeThumbnailHelper {
       '.mpg',
       '.mpeg',
       '.m4v',
-      '.ts'
+      '.ts',
     ];
 
     return supportedExtensions.contains(extension);
@@ -218,11 +234,13 @@ class SmbNativeThumbnailHelper {
       // Verify the file was created and has content
       if (await outputFile.exists() && await outputFile.length() > 0) {
         debugPrint(
-            'SmbNativeThumbnailHelper: Successfully saved thumbnail to $outputPath');
+          'SmbNativeThumbnailHelper: Successfully saved thumbnail to $outputPath',
+        );
         return outputPath;
       } else {
         debugPrint(
-            'SmbNativeThumbnailHelper: File reported as created but doesn\'t exist or is empty at $outputPath');
+          'SmbNativeThumbnailHelper: File reported as created but doesn\'t exist or is empty at $outputPath',
+        );
         try {
           if (await outputFile.exists()) await outputFile.delete();
         } catch (_) {}
@@ -230,7 +248,8 @@ class SmbNativeThumbnailHelper {
       }
     } catch (e) {
       debugPrint(
-          'SmbNativeThumbnailHelper: Error saving thumbnail to file: $e');
+        'SmbNativeThumbnailHelper: Error saving thumbnail to file: $e',
+      );
       return null;
     }
   }
@@ -249,7 +268,8 @@ class SmbNativeThumbnailHelper {
       );
     } catch (e) {
       debugPrint(
-          'SmbNativeThumbnailHelper: Fallback - cannot use platform channels in isolate');
+        'SmbNativeThumbnailHelper: Fallback - cannot use platform channels in isolate',
+      );
       return null;
     }
   }

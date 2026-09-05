@@ -34,11 +34,13 @@ class SelectionCoordinator {
   }) {
     if (!shiftSelect) {
       // Simple selection, use the SelectionBloc directly
-      selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: shiftSelect,
-        ctrlSelect: ctrlSelect,
-      ));
+      selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: shiftSelect,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
     } else {
       // Range selection requires knowledge of all items in current view
       // Get the current selection state
@@ -46,11 +48,13 @@ class SelectionCoordinator {
 
       // If no last selected path, treat as normal selection
       if (selectionState.lastSelectedPath == null) {
-        selectionBloc.add(ToggleFileSelection(
-          filePath,
-          shiftSelect: false,
-          ctrlSelect: ctrlSelect,
-        ));
+        selectionBloc.add(
+          ToggleFileSelection(
+            filePath,
+            shiftSelect: false,
+            ctrlSelect: ctrlSelect,
+          ),
+        );
         return;
       }
 
@@ -60,8 +64,10 @@ class SelectionCoordinator {
           .whereType<Directory>()
           .map((entity) => entity.path)
           .toList();
-      final List<String> allFilePaths =
-          visibleItems.whereType<File>().map((entity) => entity.path).toList();
+      final List<String> allFilePaths = visibleItems
+          .whereType<File>()
+          .map((entity) => entity.path)
+          .toList();
       final List<String> allPaths = [...allFolderPaths, ...allFilePaths];
 
       // Find indices
@@ -87,12 +93,14 @@ class SelectionCoordinator {
         }
 
         // Send bulk selection event
-        selectionBloc.add(SelectItemsInRect(
-          folderPaths: foldersToSelect,
-          filePaths: filesToSelect,
-          isCtrlPressed: ctrlSelect,
-          isShiftPressed: true,
-        ));
+        selectionBloc.add(
+          SelectItemsInRect(
+            folderPaths: foldersToSelect,
+            filePaths: filesToSelect,
+            isCtrlPressed: ctrlSelect,
+            isShiftPressed: true,
+          ),
+        );
       }
     }
   }
@@ -105,11 +113,13 @@ class SelectionCoordinator {
   }) {
     if (!shiftSelect) {
       // Simple selection, use the SelectionBloc directly
-      selectionBloc.add(ToggleFolderSelection(
-        folderPath,
-        shiftSelect: shiftSelect,
-        ctrlSelect: ctrlSelect,
-      ));
+      selectionBloc.add(
+        ToggleFolderSelection(
+          folderPath,
+          shiftSelect: shiftSelect,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
     } else {
       // Range selection requires knowledge of all items in current view
       // Get the current selection state
@@ -117,11 +127,13 @@ class SelectionCoordinator {
 
       // If no last selected path, treat as normal selection
       if (selectionState.lastSelectedPath == null) {
-        selectionBloc.add(ToggleFolderSelection(
-          folderPath,
-          shiftSelect: false,
-          ctrlSelect: ctrlSelect,
-        ));
+        selectionBloc.add(
+          ToggleFolderSelection(
+            folderPath,
+            shiftSelect: false,
+            ctrlSelect: ctrlSelect,
+          ),
+        );
         return;
       }
 
@@ -131,8 +143,10 @@ class SelectionCoordinator {
           .whereType<Directory>()
           .map((entity) => entity.path)
           .toList();
-      final List<String> allFilePaths =
-          visibleItems.whereType<File>().map((entity) => entity.path).toList();
+      final List<String> allFilePaths = visibleItems
+          .whereType<File>()
+          .map((entity) => entity.path)
+          .toList();
       final List<String> allPaths = [...allFolderPaths, ...allFilePaths];
 
       // Find indices
@@ -158,12 +172,14 @@ class SelectionCoordinator {
         }
 
         // Send bulk selection event
-        selectionBloc.add(SelectItemsInRect(
-          folderPaths: foldersToSelect,
-          filePaths: filesToSelect,
-          isCtrlPressed: ctrlSelect,
-          isShiftPressed: true,
-        ));
+        selectionBloc.add(
+          SelectItemsInRect(
+            folderPaths: foldersToSelect,
+            filePaths: filesToSelect,
+            isCtrlPressed: ctrlSelect,
+            isShiftPressed: true,
+          ),
+        );
       }
     }
   }
@@ -194,7 +210,9 @@ class SelectionCoordinator {
   void showRemoveTagsDialog(BuildContext context) {
     final selectionState = selectionBloc.state;
     tab_components.showRemoveTagsDialog(
-        context, selectionState.selectedFilePaths.toList());
+      context,
+      selectionState.selectedFilePaths.toList(),
+    );
   }
 
   /// Show dialog to manage all tags for selected files or current folder
@@ -233,8 +251,8 @@ class SelectionCoordinator {
     final String itemType = fileCount > 0 && folderCount > 0
         ? l10n.items
         : fileCount > 0
-            ? (fileCount == 1 ? l10n.file : l10n.files)
-            : (folderCount == 1 ? l10n.folder : l10n.folders);
+        ? (fileCount == 1 ? l10n.file : l10n.files)
+        : (folderCount == 1 ? l10n.folder : l10n.folders);
 
     RouteUtils.showAcrylicDialog(
       context: context,

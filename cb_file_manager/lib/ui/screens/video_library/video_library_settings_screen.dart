@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -27,10 +28,10 @@ class VideoLibrarySettingsScreen extends StatefulWidget {
   final String tabId;
 
   const VideoLibrarySettingsScreen({
-    Key? key,
+    super.key,
     required this.library,
     required this.tabId,
-  }) : super(key: key);
+  });
 
   @override
   State<VideoLibrarySettingsScreen> createState() =>
@@ -84,12 +85,16 @@ class _VideoLibrarySettingsScreenState
     final selectedDirectory = await VideoLibraryHelpers.pickDirectory();
     if (selectedDirectory != null && _config != null) {
       final success = await _service.addDirectoryToLibrary(
-          widget.library.id, selectedDirectory);
+        widget.library.id,
+        selectedDirectory,
+      );
 
       if (success && mounted) {
         final localizations = AppLocalizations.of(context)!;
         VideoLibraryHelpers.showSuccessMessage(
-            context, localizations.sourceAdded);
+          context,
+          localizations.sourceAdded,
+        );
         _loadConfig();
       }
     }
@@ -98,13 +103,17 @@ class _VideoLibrarySettingsScreenState
   Future<void> _removeDirectory(String directory) async {
     if (_config == null) return;
 
-    final success =
-        await _service.removeDirectoryFromLibrary(widget.library.id, directory);
+    final success = await _service.removeDirectoryFromLibrary(
+      widget.library.id,
+      directory,
+    );
 
     if (success && mounted) {
       final localizations = AppLocalizations.of(context)!;
       VideoLibraryHelpers.showSuccessMessage(
-          context, localizations.sourceRemoved);
+        context,
+        localizations.sourceRemoved,
+      );
       _loadConfig();
     }
   }
@@ -191,7 +200,9 @@ class _VideoLibrarySettingsScreenState
           _isScanning = false;
         });
         VideoLibraryHelpers.showSuccessMessage(
-            context, localizations.scanComplete);
+          context,
+          localizations.scanComplete,
+        );
         _loadConfig();
       }
     }
@@ -204,10 +215,7 @@ class _VideoLibrarySettingsScreenState
 
     TabNavigator.updateTabPath(context, activeTab.id, '#video');
     tabManager.add(
-      UpdateTabName(
-        activeTab.id,
-        AppLocalizations.of(context)!.videoHubTitle,
-      ),
+      UpdateTabName(activeTab.id, AppLocalizations.of(context)!.videoHubTitle),
     );
   }
 
@@ -240,10 +248,7 @@ class _VideoLibrarySettingsScreenState
           icon: PhosphorIconsLight.filmStrip,
           onTap: _openVideoGallery,
         ),
-        BreadcrumbSegment(
-          label: _library.name,
-          onTap: _openLibrary,
-        ),
+        BreadcrumbSegment(label: _library.name, onTap: _openLibrary),
         BreadcrumbSegment(label: localizations.settings),
       ],
     );
@@ -268,9 +273,7 @@ class _VideoLibrarySettingsScreenState
         title: localizations.videoLibrarySettings,
         titleWidget: _buildAddressBar(localizations),
         automaticallyImplyLeading: false,
-        body: Center(
-          child: Text(localizations.operationFailed),
-        ),
+        body: Center(child: Text(localizations.operationFailed)),
       );
     }
 
@@ -536,11 +539,7 @@ class _VideoLibrarySettingsScreenState
           color: cs.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(
-          PhosphorIconsLight.folder,
-          size: 18,
-          color: cs.primary,
-        ),
+        child: Icon(PhosphorIconsLight.folder, size: 18, color: cs.primary),
       ),
       title: Text(
         p.basename(directory),
@@ -571,10 +570,7 @@ class _VideoLibrarySettingsScreenState
     );
   }
 
-  Widget _buildAddSourceTile(
-    ThemeData theme,
-    AppLocalizations localizations,
-  ) {
+  Widget _buildAddSourceTile(ThemeData theme, AppLocalizations localizations) {
     final cs = theme.colorScheme;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -584,11 +580,7 @@ class _VideoLibrarySettingsScreenState
           color: cs.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(
-          PhosphorIconsLight.plusCircle,
-          size: 18,
-          color: cs.primary,
-        ),
+        child: Icon(PhosphorIconsLight.plusCircle, size: 18, color: cs.primary),
       ),
       title: Text(
         localizations.addVideoSource,
@@ -601,10 +593,7 @@ class _VideoLibrarySettingsScreenState
     );
   }
 
-  Widget _buildSettingsCard(
-    ThemeData theme,
-    AppLocalizations localizations,
-  ) {
+  Widget _buildSettingsCard(ThemeData theme, AppLocalizations localizations) {
     final cs = theme.colorScheme;
     return _buildSectionCard(
       theme: theme,
@@ -615,10 +604,7 @@ class _VideoLibrarySettingsScreenState
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           value: _config!.includeSubdirectories,
           onChanged: _toggleSubdirectories,
-          secondary: Icon(
-            PhosphorIconsLight.folderOpen,
-            color: cs.primary,
-          ),
+          secondary: Icon(PhosphorIconsLight.folderOpen, color: cs.primary),
           title: Text(
             localizations.includeSubdirectories,
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -725,10 +711,7 @@ class _StatChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _StatChip({
-    required this.icon,
-    required this.label,
-  });
+  const _StatChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -821,7 +804,7 @@ class _CoverIconButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: Tooltip(
+        child: CbTooltip(
           message: tooltip,
           child: Padding(
             padding: const EdgeInsets.all(7),

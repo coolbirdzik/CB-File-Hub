@@ -17,7 +17,8 @@ set -euo pipefail
 # llama.cpp release to bundle. Keep in sync with the ABI the Dart HTTP client
 # talks to (the server is launched as a subprocess, so only the HTTP contract
 # matters, but pinning avoids surprise behavior changes).
-LLAMA_RELEASE_TAG="b9874"
+LLAMA_RELEASE_TAG="b10809"
+LLAMA_SHA256="97e50b3ef0cdd2cb4d5afd446a9006b3496bee6c0d0ba7083d32f36075771870"
 LLAMA_ASSET="llama-${LLAMA_RELEASE_TAG}-bin-win-vulkan-x64.zip"
 LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_RELEASE_TAG}/${LLAMA_ASSET}"
 
@@ -32,7 +33,8 @@ REQUIRED_FILES=(
   "ggml-cpu-x64.dll"
   "ggml-vulkan.dll"
   "ggml.dll"
-  "libomp140.x86_64.dll"
+  "libomp.dll"
+  "LICENSE-LLVM-OpenMP"
   "llama-common.dll"
   "llama.dll"
   "llama-server-impl.dll"
@@ -46,6 +48,8 @@ if [ "${1:-}" = "--force" ]; then
 fi
 
 all_present() {
+  [ -f "$DEST_DIR/.runtime-version" ] || return 1
+  [ "$(cat "$DEST_DIR/.runtime-version")" = "$LLAMA_RELEASE_TAG $LLAMA_SHA256" ] || return 1
   for f in "${REQUIRED_FILES[@]}"; do
     if [ ! -f "$DEST_DIR/$f" ]; then
       return 1
@@ -63,7 +67,14 @@ fi
 mkdir -p "$DEST_DIR"
 
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+TMP_DIR="$(cd -- "$TMP_DIR" && pwd)"
+cleanup() {
+  # Only remove the exact temporary directory created by this invocation.
+  case "$TMP_DIR" in
+    /tmp/tmp.*|/c/Users/*/AppData/Local/Temp/tmp.*) rm -rf -- "$TMP_DIR" ;;
+  esac
+}
+trap cleanup EXIT
 
 ZIP_PATH="$TMP_DIR/$LLAMA_ASSET"
 EXTRACT_DIR="$TMP_DIR/extracted"
@@ -79,6 +90,11 @@ else
   exit 1
 fi
 
+echo "$LLAMA_SHA256  $ZIP_PATH" | sha256sum --check --status || {
+  echo "[fetch_llama_runtime] ERROR: archive checksum mismatch." >&2
+  exit 1
+}
+
 echo "[fetch_llama_runtime] Extracting..."
 if command -v unzip >/dev/null 2>&1; then
   unzip -q -o "$ZIP_PATH" -d "$EXTRACT_DIR"
@@ -91,8 +107,7 @@ else
   exit 1
 fi
 
-# The zip may nest files one level deep; find each required file wherever it is.
-echo "[fetch_llama_runtime] Copying required files to $DEST_DIR"
+# Validate the complete archive before replacing any installed runtime file.
 missing=0
 for f in "${REQUIRED_FILES[@]}"; do
   src="$(find "$EXTRACT_DIR" -type f -name "$f" -print -quit 2>/dev/null || true)"
@@ -101,12 +116,19 @@ for f in "${REQUIRED_FILES[@]}"; do
     missing=1
     continue
   fi
-  cp -f "$src" "$DEST_DIR/$f"
 done
 
 if [ "$missing" -ne 0 ]; then
   echo "[fetch_llama_runtime] ERROR: one or more required files were missing." >&2
   exit 1
 fi
+
+echo "[fetch_llama_runtime] Copying required files to $DEST_DIR"
+rm -f -- "$DEST_DIR/.runtime-version"
+for f in "${REQUIRED_FILES[@]}"; do
+  src="$(find "$EXTRACT_DIR" -type f -name "$f" -print -quit)"
+  cp -f "$src" "$DEST_DIR/$f"
+done
+printf '%s %s\n' "$LLAMA_RELEASE_TAG" "$LLAMA_SHA256" > "$DEST_DIR/.runtime-version"
 
 echo "[fetch_llama_runtime] Done. Runtime ready in $DEST_DIR"

@@ -16,9 +16,9 @@ class SearchResultsView extends StatefulWidget {
   final List<String> selectedFiles;
   final String? lastSelectedPath;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(String, {bool shiftSelect, bool ctrlSelect})?
-      toggleFolderSelection;
+  toggleFolderSelection;
   final VoidCallback toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
@@ -31,7 +31,7 @@ class SearchResultsView extends StatefulWidget {
   final ValueChanged<int>? onZoomLevelChanged;
 
   const SearchResultsView({
-    Key? key,
+    super.key,
     required this.state,
     required this.isSelectionMode,
     required this.selectedFiles,
@@ -48,7 +48,7 @@ class SearchResultsView extends StatefulWidget {
     this.onForwardButtonPressed,
     this.onLoadMore,
     this.onZoomLevelChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<SearchResultsView> createState() => _SearchResultsViewState();
@@ -99,8 +99,10 @@ class _SearchResultsViewState extends State<SearchResultsView> {
         children: [
           // Search results header with clear search button
           Container(
-            padding:
-                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 8.0,
+              horizontal: 16.0,
+            ),
             color: Theme.of(context).colorScheme.primaryContainer,
             child: Row(
               children: [
@@ -109,9 +111,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 8.0),
-                Expanded(
-                  child: Text(_getSearchTitle(context)),
-                ),
+                Expanded(child: Text(_getSearchTitle(context))),
                 IconButton(
                   icon: const Icon(PhosphorIconsLight.x),
                   onPressed: widget.onClearSearch,
@@ -173,20 +173,26 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     if (state.currentSearchTag != null) {
       if (state.isGlobalSearch) {
         return l10n.searchResultsTitleForTagGlobal(
-            state.currentSearchTag!, countText);
+          state.currentSearchTag!,
+          countText,
+        );
       }
       return l10n.searchResultsTitleForTag(state.currentSearchTag!, countText);
     }
     if (state.currentSearchQuery != null) {
       return l10n.searchResultsTitleForQuery(
-          state.currentSearchQuery!, countText);
+        state.currentSearchQuery!,
+        countText,
+      );
     }
     if (state.currentFilter != null) {
       final int filteredCount = state.filteredFiles.length;
       final String filteredCountText =
           ' ($filteredCount ${filteredCount == 1 ? l10n.file : l10n.files})';
       return l10n.searchResultsTitleForFilter(
-          state.currentFilter!, filteredCountText);
+        state.currentFilter!,
+        filteredCountText,
+      );
     } else if (state.currentMediaSearch != null) {
       String mediaType = '';
       switch (state.currentMediaSearch) {
@@ -212,15 +218,19 @@ class _SearchResultsViewState extends State<SearchResultsView> {
   }
 
   String _buildCountText(
-      AppLocalizations l10n, int folderCount, int fileCount) {
+    AppLocalizations l10n,
+    int folderCount,
+    int fileCount,
+  ) {
     if (folderCount == 0 && fileCount == 0) {
       return ' (0 ${l10n.results})';
     }
 
     final parts = <String>[];
     if (folderCount > 0) {
-      parts
-          .add('$folderCount ${folderCount == 1 ? l10n.folder : l10n.folders}');
+      parts.add(
+        '$folderCount ${folderCount == 1 ? l10n.folder : l10n.folders}',
+      );
     }
     if (fileCount > 0) {
       parts.add('$fileCount ${fileCount == 1 ? l10n.file : l10n.files}');
@@ -232,10 +242,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     final state = widget.state;
     final files = state.searchResults.whereType<File>().toList();
     final folders = state.searchResults.whereType<Directory>().toList();
-    final displayState = state.copyWith(
-      files: files,
-      folders: folders,
-    );
+    final displayState = state.copyWith(files: files, folders: folders);
 
     return Stack(
       children: [

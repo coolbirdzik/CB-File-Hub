@@ -86,21 +86,23 @@ class FileNavigationBloc
     final removedFromSearch = searchBefore - filteredSearchResults.length;
     final currentTotal = state.searchResultsTotal;
 
-    emit(state.copyWith(
-      folders: state.folders
-          .where((entity) => !removed.contains(entity.path))
-          .toList(),
-      files: state.files
-          .where((entity) => !removed.contains(entity.path))
-          .toList(),
-      filteredFiles: state.filteredFiles
-          .where((entity) => !removed.contains(entity.path))
-          .toList(),
-      searchResults: filteredSearchResults,
-      searchResultsTotal: currentTotal == null
-          ? null
-          : math.max(0, currentTotal - removedFromSearch),
-    ));
+    emit(
+      state.copyWith(
+        folders: state.folders
+            .where((entity) => !removed.contains(entity.path))
+            .toList(),
+        files: state.files
+            .where((entity) => !removed.contains(entity.path))
+            .toList(),
+        filteredFiles: state.filteredFiles
+            .where((entity) => !removed.contains(entity.path))
+            .toList(),
+        searchResults: filteredSearchResults,
+        searchResultsTotal: currentTotal == null
+            ? null
+            : math.max(0, currentTotal - removedFromSearch),
+      ),
+    );
   }
 
   @override
@@ -144,10 +146,7 @@ class FileNavigationBloc
   // Lifecycle handlers
   // ─────────────────────────────────────────────────────────────
 
-  void _onInit(
-    FileNavigationInit event,
-    Emitter<FileNavigationState> emit,
-  ) {
+  void _onInit(FileNavigationInit event, Emitter<FileNavigationState> emit) {
     emit(state.copyWith(isLoading: true));
   }
 
@@ -161,7 +160,8 @@ class FileNavigationBloc
     // Skip virtual paths — handled by specialized blocs (e.g. VideoLibraryNavigationBloc)
     if (event.isVirtualPath || event.path.startsWith('#')) {
       AppLogger.perf(
-          'Virtual path skipped total=${totalSw.elapsedMilliseconds}ms');
+        'Virtual path skipped total=${totalSw.elapsedMilliseconds}ms',
+      );
       return;
     }
 
@@ -172,7 +172,8 @@ class FileNavigationBloc
     // staying empty for a long time on large folders.
     if (_inFlightScans.contains(event.path)) {
       AppLogger.perf(
-          'Load skipped — scan already in flight path=${event.path}');
+        'Load skipped — scan already in flight path=${event.path}',
+      );
       return;
     }
     _inFlightScans.add(event.path);
@@ -188,24 +189,26 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
     Stopwatch totalSw,
   ) async {
-    emit(state.copyWith(
-      isLoading: true,
-      isRefreshing: false,
-      error: null,
-      currentPath: Directory(event.path),
-      folders: const [],
-      files: const [],
-      filteredFiles: const [],
-      searchResults: const [],
-      hasMoreSearchResults: false,
-      isLoadingMoreSearchResults: false,
-      searchResultsTotal: null,
-      currentFilter: null,
-      currentSearchQuery: null,
-      isSearchByName: false,
-      searchRecursive: false,
-      fileStatsCache: const {},
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        isRefreshing: false,
+        error: null,
+        currentPath: Directory(event.path),
+        folders: const [],
+        files: const [],
+        filteredFiles: const [],
+        searchResults: const [],
+        hasMoreSearchResults: false,
+        isLoadingMoreSearchResults: false,
+        searchResultsTotal: null,
+        currentFilter: null,
+        currentSearchQuery: null,
+        isSearchByName: false,
+        searchRecursive: false,
+        fileStatsCache: const {},
+      ),
+    );
 
     // Gate: pause thumbnail generation while we scan/sort the file list.
     // Thumbnails will start AFTER the listing is emitted to the UI.
@@ -232,10 +235,12 @@ class FileNavigationBloc
     try {
       final directory = Directory(event.path);
       if (!await directory.exists()) {
-        emit(state.copyWith(
-          isLoading: false,
-          error: 'Directory does not exist: ${event.path}',
-        ));
+        emit(
+          state.copyWith(
+            isLoading: false,
+            error: 'Directory does not exist: ${event.path}',
+          ),
+        );
         return;
       }
 
@@ -244,10 +249,12 @@ class FileNavigationBloc
       if (!await permService.hasStorageOrPhotosPermission()) {
         final granted = await permService.requestStorageOrPhotos();
         if (!granted) {
-          emit(state.copyWith(
-            isLoading: false,
-            error: 'Storage permission required',
-          ));
+          emit(
+            state.copyWith(
+              isLoading: false,
+              error: 'Storage permission required',
+            ),
+          );
           return;
         }
       }
@@ -263,13 +270,15 @@ class FileNavigationBloc
       // Before scanning the disk, check if we have a cached listing for this
       // folder. Cache hit = instant return, no OS I/O. This mirrors how Windows
       // Explorer re-uses its in-memory folder enumeration cache on navigate-back.
-      final cacheResult =
-          DirectoryListingCacheService.instance.getListing(event.path);
+      final cacheResult = DirectoryListingCacheService.instance.getListing(
+        event.path,
+      );
       if (cacheResult != null) {
         final sortNeedsStats = _sortOptionNeedsStats(sortOption);
         if (sortNeedsStats && cacheResult.stats.isEmpty) {
           AppLogger.perf(
-              'Dir listing CACHE BYPASS "${event.path}" — sort needs stats');
+            'Dir listing CACHE BYPASS "${event.path}" — sort needs stats',
+          );
         } else {
           final sortedFolders = await FileSystemSorter.sortDirectories(
             cacheResult.folders,
@@ -281,22 +290,27 @@ class FileNavigationBloc
             sortOption,
             fileStatsCache: cacheResult.stats,
           );
-          emit(state.copyWith(
-            isLoading: false,
-            folders: sortedFolders,
-            files: sortedFiles,
-            fileStatsCache: Map.from(cacheResult.stats),
-            sortOption: sortOption,
-          ));
+          emit(
+            state.copyWith(
+              isLoading: false,
+              folders: sortedFolders,
+              files: sortedFiles,
+              fileStatsCache: Map.from(cacheResult.stats),
+              sortOption: sortOption,
+            ),
+          );
           AppLogger.perf(
-              'Dir listing CACHE HIT "${event.path}" (${sortedFiles.length} files)');
+            'Dir listing CACHE HIT "${event.path}" (${sortedFiles.length} files)',
+          );
           ThumbnailLoader.updateDisplayIndexMap(
-              sortedFiles.map((f) => f.path).toList());
+            sortedFiles.map((f) => f.path).toList(),
+          );
           ThumbnailLoader.clearFileExistsCache();
           ThumbnailLoader.setListingReady(true);
           await _directoryWatcher.startWatching(event.path);
           AppLogger.perf(
-              'Complete (cached) total=${totalSw.elapsedMilliseconds}ms');
+            'Complete (cached) total=${totalSw.elapsedMilliseconds}ms',
+          );
           return;
         }
       }
@@ -325,20 +339,24 @@ class FileNavigationBloc
       // to populate the cache (large folders skip to avoid blocking).
       if (scanResult.statRows.length <= 500) {
         final allPaths = [...scanResult.folderPaths, ...scanResult.filePaths];
-        await Future.wait(allPaths.map((p) async {
-          try {
-            statsCache[p] = await FileStat.stat(p);
-          } catch (_) {}
-        }));
+        await Future.wait(
+          allPaths.map((p) async {
+            try {
+              statsCache[p] = await FileStat.stat(p);
+            } catch (_) {}
+          }),
+        );
       }
 
-      emit(state.copyWith(
-        isLoading: false,
-        folders: sortedFolders,
-        files: sortedFiles,
-        fileStatsCache: Map.from(statsCache),
-        sortOption: sortOption,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          folders: sortedFolders,
+          files: sortedFiles,
+          fileStatsCache: Map.from(statsCache),
+          sortOption: sortOption,
+        ),
+      );
 
       // Store in directory listing cache so navigating back is instant.
       DirectoryListingCacheService.instance.storeListing(
@@ -352,7 +370,8 @@ class FileNavigationBloc
       // not file-system listing order. This fixes the issue where thumbnails were
       // loaded for files at the bottom of the sort order first.
       ThumbnailLoader.updateDisplayIndexMap(
-          sortedFiles.map((f) => f.path).toList());
+        sortedFiles.map((f) => f.path).toList(),
+      );
       // Clear file-exists cache so stale entries from previous folders don't
       // persist to the new directory.
       ThumbnailLoader.clearFileExistsCache();
@@ -391,7 +410,8 @@ class FileNavigationBloc
     // produces fresh data, so skipping this refresh is safe.
     if (_inFlightScans.contains(event.path)) {
       AppLogger.perf(
-          'Refresh skipped — scan already in flight path=${event.path}');
+        'Refresh skipped — scan already in flight path=${event.path}',
+      );
       return;
     }
     _inFlightScans.add(event.path);
@@ -416,10 +436,12 @@ class FileNavigationBloc
     try {
       final directory = Directory(event.path);
       if (!await directory.exists()) {
-        emit(state.copyWith(
-          isRefreshing: false,
-          error: 'Directory does not exist',
-        ));
+        emit(
+          state.copyWith(
+            isRefreshing: false,
+            error: 'Directory does not exist',
+          ),
+        );
         return;
       }
 
@@ -438,14 +460,16 @@ class FileNavigationBloc
       final sortedFolders = scanResult.folderPaths.map(Directory.new).toList();
       final sortedFiles = scanResult.filePaths.map(File.new).toList();
 
-      emit(state.copyWith(
-        isRefreshing: false,
-        folders: sortedFolders,
-        files: sortedFiles,
-        currentPath: Directory(event.path),
-        sortOption: sortOption,
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isRefreshing: false,
+          folders: sortedFolders,
+          files: sortedFiles,
+          currentPath: Directory(event.path),
+          sortOption: sortOption,
+          error: null,
+        ),
+      );
 
       // Re-cache after refresh so navigating back is still instant.
       DirectoryListingCacheService.instance.storeListing(
@@ -457,7 +481,8 @@ class FileNavigationBloc
 
       // Update thumbnail priority map so loading respects display (sort) order.
       ThumbnailLoader.updateDisplayIndexMap(
-          sortedFiles.map((f) => f.path).toList());
+        sortedFiles.map((f) => f.path).toList(),
+      );
 
       // Thumbnail prefetch
       if (event.forceRegenerateThumbnails) {
@@ -516,10 +541,12 @@ class FileNavigationBloc
     try {
       if (event.persist) {
         final folderSortManager = FolderSortManager();
-        await _safeCall(() => folderSortManager.saveFolderSortOption(
-              event.folderPath ?? state.currentPath.path,
-              event.sortOption,
-            ));
+        await _safeCall(
+          () => folderSortManager.saveFolderSortOption(
+            event.folderPath ?? state.currentPath.path,
+            event.sortOption,
+          ),
+        );
       }
 
       if (isStale()) return;
@@ -556,7 +583,8 @@ class FileNavigationBloc
         ..sort(cmp);
 
       // Rebase if newer content arrived while sorting
-      final hasNewerContent = state.currentPath.path == targetPath &&
+      final hasNewerContent =
+          state.currentPath.path == targetPath &&
           (state.folders.isNotEmpty || state.files.isNotEmpty) &&
           sortedFolders.isEmpty &&
           sortedFiles.isEmpty;
@@ -578,24 +606,29 @@ class FileNavigationBloc
         sortedSearch.sort(cmp);
       }
 
-      emit(state.copyWith(
-        isLoading: false,
-        sortOption: event.sortOption,
-        folders: sortedFolders,
-        files: sortedFiles,
-        filteredFiles: sortedFiltered,
-        searchResults: sortedSearch,
-        fileStatsCache: statsCache,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          sortOption: event.sortOption,
+          folders: sortedFolders,
+          files: sortedFiles,
+          filteredFiles: sortedFiltered,
+          searchResults: sortedSearch,
+          fileStatsCache: statsCache,
+        ),
+      );
 
       // Re-sort changes display order — update thumbnail priority map accordingly.
       ThumbnailLoader.updateDisplayIndexMap(
-          sortedFiles.map((f) => f.path).toList());
+        sortedFiles.map((f) => f.path).toList(),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Error sorting: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'Error sorting: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -634,10 +667,12 @@ class FileNavigationBloc
         try {
           regex = RegExp(event.query, caseSensitive: false, unicode: true);
         } on FormatException catch (e) {
-          emit(state.copyWith(
-            isLoading: false,
-            error: 'Invalid regex: ${e.message}',
-          ));
+          emit(
+            state.copyWith(
+              isLoading: false,
+              error: 'Invalid regex: ${e.message}',
+            ),
+          );
           return;
         }
       }
@@ -670,19 +705,23 @@ class FileNavigationBloc
         ...results.whereType<File>(),
       ];
 
-      emit(state.copyWith(
-        isLoading: false,
-        searchResults: grouped,
-        currentSearchQuery: event.query,
-        searchRecursive: event.recursive,
-        isSearchByName: true,
-        error: grouped.isEmpty ? 'No files found matching "$query"' : null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          searchResults: grouped,
+          currentSearchQuery: event.query,
+          searchRecursive: event.recursive,
+          isSearchByName: true,
+          error: grouped.isEmpty ? 'No files found matching "$query"' : null,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Search error: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'Search error: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -691,18 +730,20 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) {
     _pendingSearchResults = [];
-    emit(state.copyWith(
-      currentSearchQuery: null,
-      currentFilter: null,
-      searchResults: [],
-      filteredFiles: [],
-      isSearchByName: false,
-      searchRecursive: false,
-      hasMoreSearchResults: false,
-      isLoadingMoreSearchResults: false,
-      searchResultsTotal: null,
-      error: null,
-    ));
+    emit(
+      state.copyWith(
+        currentSearchQuery: null,
+        currentFilter: null,
+        searchResults: [],
+        filteredFiles: [],
+        isSearchByName: false,
+        searchRecursive: false,
+        hasMoreSearchResults: false,
+        isLoadingMoreSearchResults: false,
+        searchResultsTotal: null,
+        error: null,
+      ),
+    );
   }
 
   void _onLoadMoreSearchResults(
@@ -710,10 +751,12 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) {
     if (_pendingSearchResults.isEmpty) {
-      emit(state.copyWith(
-        hasMoreSearchResults: false,
-        isLoadingMoreSearchResults: false,
-      ));
+      emit(
+        state.copyWith(
+          hasMoreSearchResults: false,
+          isLoadingMoreSearchResults: false,
+        ),
+      );
       return;
     }
     if (state.isLoadingMoreSearchResults) return;
@@ -733,11 +776,13 @@ class FileNavigationBloc
       }
     }
 
-    emit(state.copyWith(
-      searchResults: currentResults,
-      hasMoreSearchResults: _pendingSearchResults.isNotEmpty,
-      isLoadingMoreSearchResults: false,
-    ));
+    emit(
+      state.copyWith(
+        searchResults: currentResults,
+        hasMoreSearchResults: _pendingSearchResults.isNotEmpty,
+        isLoadingMoreSearchResults: false,
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -875,8 +920,10 @@ class FileNavigationBloc
     RegExp? regex,
   ) async {
     try {
-      await for (final entity
-          in dir.list(recursive: false, followLinks: false)) {
+      await for (final entity in dir.list(
+        recursive: false,
+        followLinks: false,
+      )) {
         try {
           final name = pathlib.basename(entity.path);
           if (_matchesQuery(name, query, regex)) {
@@ -924,21 +971,25 @@ class FileNavigationBloc
   ) {
     final msg = e.toString().toLowerCase();
     if (msg.contains('permission denied') || msg.contains('access denied')) {
-      emit(state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        error: 'Access denied. Try running as administrator.',
-        folders: [],
-        files: [],
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          error: 'Access denied. Try running as administrator.',
+          folders: [],
+          files: [],
+        ),
+      );
     } else {
-      emit(state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        error: e.toString(),
-        folders: [],
-        files: [],
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          error: e.toString(),
+          folders: [],
+          files: [],
+        ),
+      );
     }
   }
 

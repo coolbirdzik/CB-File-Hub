@@ -71,10 +71,12 @@ class InlineRenameController extends ChangeNotifier {
     final isFile =
         FileSystemEntity.typeSync(entityPath) == FileSystemEntityType.file;
     final baseName = path.basename(entityPath);
-    final nameWithoutExt =
-        isFile ? path.basenameWithoutExtension(entityPath) : baseName;
-    final initialValue =
-        isFile && allowFileExtensionRename ? baseName : nameWithoutExt;
+    final nameWithoutExt = isFile
+        ? path.basenameWithoutExtension(entityPath)
+        : baseName;
+    final initialValue = isFile && allowFileExtensionRename
+        ? baseName
+        : nameWithoutExt;
     final extension = isFile ? path.extension(entityPath) : '';
     _lockedSuffix = isFile && !allowFileExtensionRename && extension.isNotEmpty
         ? extension
@@ -118,10 +120,7 @@ class InlineRenameController extends ChangeNotifier {
     final extension = isFile ? path.extension(entityPath) : '';
 
     final finalNewName = isFile
-        ? _resolveFileRename(
-            rawName: newName,
-            extension: extension,
-          )
+        ? _resolveFileRename(rawName: newName, extension: extension)
         : newName;
 
     if (finalNewName.isEmpty) {
@@ -214,10 +213,10 @@ class InlineRenameController extends ChangeNotifier {
 /// InheritedWidget to provide InlineRenameController down the widget tree.
 class InlineRenameScope extends InheritedNotifier<InlineRenameController> {
   const InlineRenameScope({
-    Key? key,
+    super.key,
     required InlineRenameController controller,
-    required Widget child,
-  }) : super(key: key, notifier: controller, child: child);
+    required super.child,
+  }) : super(notifier: controller);
 
   static InlineRenameController? of(BuildContext context) {
     return context

@@ -7,10 +7,7 @@ import 'package:cb_file_manager/main.dart' show goHome;
 class SafeNavigationWrapper extends StatefulWidget {
   final Widget child;
 
-  const SafeNavigationWrapper({
-    Key? key,
-    required this.child,
-  }) : super(key: key);
+  const SafeNavigationWrapper({super.key, required this.child});
 
   @override
   State<SafeNavigationWrapper> createState() => _SafeNavigationWrapperState();
@@ -50,7 +47,8 @@ class _SafeNavigationWrapperState extends State<SafeNavigationWrapper> {
       }
 
       debugPrint(
-          'Flutter Error in SafeNavigationWrapper: ${details.exception}');
+        'Flutter Error in SafeNavigationWrapper: ${details.exception}',
+      );
 
       // Check if this is a navigation-related error
       if (message.contains('_history.isNotEmpty') ||

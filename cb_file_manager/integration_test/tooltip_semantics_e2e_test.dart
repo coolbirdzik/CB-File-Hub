@@ -8,8 +8,9 @@ import 'package:integration_test/integration_test.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('sibling list tooltips keep a valid Windows AX tree',
-      (tester) async {
+  testWidgets('sibling list tooltips keep a valid Windows AX tree', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
 
     await tester.pumpWidget(
@@ -32,7 +33,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final root = tester
-        .binding.renderViews.first.owner?.semanticsOwner?.rootSemanticsNode;
+        .binding
+        .renderViews
+        .first
+        .owner
+        ?.semanticsOwner
+        ?.rootSemanticsNode;
     expect(root, isNotNull);
 
     final traversalParents = <Object>{};

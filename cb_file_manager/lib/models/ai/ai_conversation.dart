@@ -46,21 +46,22 @@ class AiConversationSummary {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-        'initialPath': initialPath,
-      };
+    'id': id,
+    'title': title,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'initialPath': initialPath,
+  };
 
-  factory AiConversationSummary.fromJson(Map<String, dynamic> json) =>
-      AiConversationSummary(
-        id: json['id'] as String,
-        title: json['title'] as String? ?? 'Conversation',
-        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
-        updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
-            DateTime.now(),
-        initialPath: json['initialPath'] as String? ?? '',
-      );
+  factory AiConversationSummary.fromJson(
+    Map<String, dynamic> json,
+  ) => AiConversationSummary(
+    id: json['id'] as String,
+    title: json['title'] as String? ?? 'Conversation',
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+    updatedAt:
+        DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+    initialPath: json['initialPath'] as String? ?? '',
+  );
 }

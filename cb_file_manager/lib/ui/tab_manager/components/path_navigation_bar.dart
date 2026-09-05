@@ -13,14 +13,14 @@ class PathNavigationBar extends StatefulWidget {
   final List<AddressBarMenuItem>? menuItems;
 
   const PathNavigationBar({
-    Key? key,
+    super.key,
     required this.currentPath,
     required this.tabId,
     required this.isNetworkPath,
     required this.pathController,
     required this.onPathSubmitted,
     this.menuItems,
-  }) : super(key: key);
+  });
 
   @override
   // ignore: library_private_types_in_public_api
@@ -114,7 +114,9 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
                 borderRadius: BorderRadius.circular(16.0),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8.0, vertical: 4.0),
+                    horizontal: 8.0,
+                    vertical: 4.0,
+                  ),
                   child: Text(
                     segment.isEmpty && index == 0 ? 'Root' : segment,
                     style: const TextStyle(fontSize: 16.0),
@@ -143,16 +145,16 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           _stopEditing();
         },
         decoration: InputDecoration(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12.0,
+            vertical: 8.0,
+          ),
           border: InputBorder.none,
           hintText: 'Enter path...',
           hintStyle: TextStyle(
-            color: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.color
-                ?.withValues(alpha: 0.6),
+            color: Theme.of(
+              context,
+            ).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
           ),
         ),
         style: TextStyle(
@@ -172,10 +174,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           child: _isEditing ? _buildEditablePathField() : _buildPathSegments(),
         ),
         if (widget.menuItems != null && widget.menuItems!.isNotEmpty)
-          AddressBarMenu(
-            items: widget.menuItems!,
-            tooltip: 'Tùy chọn',
-          ),
+          AddressBarMenu(items: widget.menuItems!, tooltip: 'Tùy chọn'),
       ],
     );
   }

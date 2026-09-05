@@ -25,7 +25,7 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int currentGridZoomLevel;
 
   const FolderListAppBar({
-    Key? key,
+    super.key,
     required this.currentPath,
     required this.isSelectionMode,
     required this.isGridView,
@@ -38,22 +38,19 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.refresh,
     required this.setGridZoomLevel,
     required this.currentGridZoomLevel,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     // Get the last part of the path for the title
     final String title = isSelectionMode
         ? '${selectedFiles.length} selected'
-        : currentPath.split(RegExp(r'[/\\]')).where((s) => s.isNotEmpty).last;
+        : currentPath.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).last;
 
     return AppBar(
       title: Text(
         title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w500,
-          fontSize: 18,
-        ),
+        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18),
       ),
       centerTitle: false,
       elevation: 0,
@@ -71,27 +68,32 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
           Container(
             width: 150,
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 2.0,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                overlayShape:
-                    const RoundSliderOverlayShape(overlayRadius: 14.0),
-                valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-                valueIndicatorTextStyle: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.0,
+            child: Semantics(
+              container: true,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2.0,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6.0,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 14.0,
+                  ),
+                  valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
+                  valueIndicatorTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.0,
+                  ),
                 ),
-              ),
-              child: Slider(
-                // Invert: right = larger items (fewer columns).
-                // display = (2 + 5) - zoom; convert back on change.
-                value: (7 - currentGridZoomLevel).toDouble(),
-                min: 2,
-                max: 5,
-                divisions: 3,
-                onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
+                child: Slider(
+                  // Invert: right = larger items (fewer columns).
+                  // display = (2 + 5) - zoom; convert back on change.
+                  value: (7 - currentGridZoomLevel).toDouble(),
+                  min: 2,
+                  max: 5,
+                  divisions: 3,
+                  onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
+                ),
               ),
             ),
           ),
@@ -128,8 +130,9 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
             );
 
             if (confirmed == true && context.mounted) {
-              BlocProvider.of<FolderListBloc>(context)
-                  .add(FolderListDeleteFiles(selectedFiles));
+              BlocProvider.of<FolderListBloc>(
+                context,
+              ).add(FolderListDeleteFiles(selectedFiles));
               toggleSelectionMode();
             }
           },
@@ -159,21 +162,26 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
           Container(
             width: 120,
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 2.0,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                overlayShape:
-                    const RoundSliderOverlayShape(overlayRadius: 14.0),
-              ),
-              child: Slider(
-                // Invert: right = larger items (fewer columns).
-                value: (7 - currentGridZoomLevel).toDouble(),
-                min: 2,
-                max: 5,
-                divisions: 3,
-                onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
+            child: Semantics(
+              container: true,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2.0,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6.0,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 14.0,
+                  ),
+                ),
+                child: Slider(
+                  // Invert: right = larger items (fewer columns).
+                  value: (7 - currentGridZoomLevel).toDouble(),
+                  min: 2,
+                  max: 5,
+                  divisions: 3,
+                  onChanged: (value) => setGridZoomLevel(7 - value.toInt()),
+                ),
               ),
             ),
           ),
@@ -216,8 +224,11 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
               value: 'refresh',
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.arrowsClockwise,
-                      size: 20, color: theme.iconTheme.color),
+                  Icon(
+                    PhosphorIconsLight.arrowsClockwise,
+                    size: 20,
+                    color: theme.iconTheme.color,
+                  ),
                   const SizedBox(width: 12),
                   const Text('Refresh'),
                 ],
@@ -227,8 +238,11 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
               value: 'select_all',
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.checkSquare,
-                      size: 20, color: theme.iconTheme.color),
+                  Icon(
+                    PhosphorIconsLight.checkSquare,
+                    size: 20,
+                    color: theme.iconTheme.color,
+                  ),
                   const SizedBox(width: 12),
                   const Text('Select All'),
                 ],
@@ -238,8 +252,11 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
               value: 'manage_tags',
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.tag,
-                      size: 20, color: theme.iconTheme.color),
+                  Icon(
+                    PhosphorIconsLight.tag,
+                    size: 20,
+                    color: theme.iconTheme.color,
+                  ),
                   const SizedBox(width: 12),
                   const Text('Manage Tags'),
                 ],
@@ -249,8 +266,11 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
               value: 'debug_apk',
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.gear,
-                      size: 20, color: theme.iconTheme.color),
+                  Icon(
+                    PhosphorIconsLight.gear,
+                    size: 20,
+                    color: theme.iconTheme.color,
+                  ),
                   const SizedBox(width: 12),
                   const Text('Debug APK Icons'),
                 ],

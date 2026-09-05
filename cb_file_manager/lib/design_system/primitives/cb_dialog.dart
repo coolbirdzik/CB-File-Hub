@@ -39,7 +39,7 @@ class CbDialog extends StatelessWidget {
   final bool showCloseButton;
 
   const CbDialog({
-    Key? key,
+    super.key,
     required this.title,
     this.subtitle,
     this.content,
@@ -48,7 +48,7 @@ class CbDialog extends StatelessWidget {
     this.destructive = false,
     this.width = 440,
     this.showCloseButton = true,
-  }) : super(key: key);
+  });
 
   /// Shows this dialog and completes with the value passed to
   /// `Navigator.pop`.
@@ -70,8 +70,9 @@ class CbDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.cbColors;
     final Color accentColor = destructive ? c.status.danger : c.accent.text;
-    final Color accentSurface =
-        destructive ? c.status.dangerSurface : c.accent.tint;
+    final Color accentSurface = destructive
+        ? c.status.dangerSurface
+        : c.accent.tint;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -121,15 +122,17 @@ class CbDialog extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: CbTypography.headingLg
-                                .copyWith(color: c.textPrimary),
+                            style: CbTypography.headingLg.copyWith(
+                              color: c.textPrimary,
+                            ),
                           ),
                           if (subtitle != null) ...[
                             const SizedBox(height: CbSpacing.xs),
                             Text(
                               subtitle!,
-                              style: CbTypography.body
-                                  .copyWith(color: c.textSecondary),
+                              style: CbTypography.body.copyWith(
+                                color: c.textSecondary,
+                              ),
                             ),
                           ],
                         ],
@@ -139,8 +142,9 @@ class CbDialog extends StatelessWidget {
                       const SizedBox(width: CbSpacing.sm),
                       CbButton.icon(
                         icon: Icons.close,
-                        tooltip: MaterialLocalizations.of(context)
-                            .closeButtonTooltip,
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).closeButtonTooltip,
                         size: CbButtonSize.sm,
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
@@ -212,8 +216,9 @@ Future<bool?> showCbConfirmDialog({
         ),
         CbButton(
           label: confirmLabel ?? materialL10n.okButtonLabel,
-          variant:
-              destructive ? CbButtonVariant.danger : CbButtonVariant.primary,
+          variant: destructive
+              ? CbButtonVariant.danger
+              : CbButtonVariant.primary,
           autofocus: true,
           onPressed: () => Navigator.of(dialogContext).pop(true),
         ),

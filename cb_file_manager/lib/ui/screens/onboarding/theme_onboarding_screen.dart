@@ -13,10 +13,10 @@ class ThemeOnboardingScreen extends StatefulWidget {
   final VoidCallback? onCompleted;
 
   const ThemeOnboardingScreen({
-    Key? key,
+    super.key,
     this.embedded = false,
     this.onCompleted,
-  }) : super(key: key);
+  });
 
   @override
   State<ThemeOnboardingScreen> createState() => _ThemeOnboardingScreenState();
@@ -31,8 +31,9 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
   void initState() {
     super.initState();
     final currentTheme = context.read<ThemeProvider>().currentTheme;
-    _selectedTheme =
-        _isDarkTheme(currentTheme) ? AppThemeType.dark : AppThemeType.light;
+    _selectedTheme = _isDarkTheme(currentTheme)
+        ? AppThemeType.dark
+        : AppThemeType.light;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() => _showContent = true);
@@ -172,12 +173,12 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
                                       fit: BoxFit.contain,
                                       errorBuilder:
                                           (context, error, stackTrace) {
-                                        return Icon(
-                                          PhosphorIconsLight.folder,
-                                          size: 34,
-                                          color: theme.colorScheme.primary,
-                                        );
-                                      },
+                                            return Icon(
+                                              PhosphorIconsLight.folder,
+                                              size: 34,
+                                              color: theme.colorScheme.primary,
+                                            );
+                                          },
                                     ),
                                   ),
                                 ),
@@ -252,9 +253,10 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     if (widget.embedded) {
-      final bg = (theme.dialogTheme.backgroundColor ??
-              theme.colorScheme.surfaceContainerHigh)
-          .withValues(alpha: 1);
+      final bg =
+          (theme.dialogTheme.backgroundColor ??
+                  theme.colorScheme.surfaceContainerHigh)
+              .withValues(alpha: 1);
       return ColoredBox(color: bg, child: _buildBody(context));
     }
 
@@ -310,8 +312,8 @@ class _ThemeCardOption extends StatelessWidget {
           color: selected
               ? theme.colorScheme.primary.withValues(alpha: 0.10)
               : isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : Colors.white.withValues(alpha: 0.45),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.white.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected
@@ -329,8 +331,9 @@ class _ThemeCardOption extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                    : theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.6),
+                    : theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.6,
+                      ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(

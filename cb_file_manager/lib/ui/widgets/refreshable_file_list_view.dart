@@ -23,7 +23,7 @@ class RefreshableFileListView extends StatefulWidget {
   final Function(bool)? onRefreshStateChanged;
 
   const RefreshableFileListView({
-    Key? key,
+    super.key,
     required this.folderListState,
     required this.currentPath,
     required this.tabId,
@@ -32,7 +32,7 @@ class RefreshableFileListView extends StatefulWidget {
     required this.child,
     this.isMounted,
     this.onRefreshStateChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<RefreshableFileListView> createState() =>
@@ -96,7 +96,8 @@ class _RefreshableFileListViewState extends State<RefreshableFileListView> {
           completer.complete();
         });
       } else if (widget.currentPath.startsWith('#search?tag=')) {
-        final tag = UriUtils.extractTagFromSearchPath(widget.currentPath) ??
+        final tag =
+            UriUtils.extractTagFromSearchPath(widget.currentPath) ??
             widget.currentPath.substring('#search?tag='.length);
         TagManager.clearCache();
         // Clear the system screen router cache for this path
@@ -108,18 +109,24 @@ class _RefreshableFileListViewState extends State<RefreshableFileListView> {
         SystemScreenRouter.refreshSystemPath(widget.currentPath, widget.tabId);
 
         // Force TabManager to re-set the same path to trigger rebuild
-        widget.tabManagerBloc
-            .add(UpdateTabPath(widget.tabId, widget.currentPath));
+        widget.tabManagerBloc.add(
+          UpdateTabPath(widget.tabId, widget.currentPath),
+        );
 
         // If this screen still uses FolderList, trigger bloc refresh to regenerate thumbnails
-        widget.folderListBloc.add(FolderListRefresh(widget.currentPath,
-            forceRegenerateThumbnails: true));
+        widget.folderListBloc.add(
+          FolderListRefresh(
+            widget.currentPath,
+            forceRegenerateThumbnails: true,
+          ),
+        );
       }
     } else {
       // Use FolderListRefresh instead of FolderListLoad to force thumbnail regeneration
       VideoThumbnailHelper.trimCache();
-      widget.folderListBloc.add(FolderListRefresh(widget.currentPath,
-          forceRegenerateThumbnails: true));
+      widget.folderListBloc.add(
+        FolderListRefresh(widget.currentPath, forceRegenerateThumbnails: true),
+      );
     }
 
     // Wait for the loading to complete before returning

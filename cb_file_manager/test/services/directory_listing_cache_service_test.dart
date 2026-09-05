@@ -9,28 +9,30 @@ void main() {
   setUp(cache.clearAll);
   tearDown(cache.clearAll);
 
-  test('removePaths removes moved items while keeping the source cache warm',
-      () {
-    final separator = Platform.pathSeparator;
-    final sourcePath = '${separator}source';
-    final keptFile = File('$sourcePath${separator}keep.txt');
-    final movedFile = File('$sourcePath${separator}move.txt');
-    final movedFolder = Directory('$sourcePath${separator}folder');
+  test(
+    'removePaths removes moved items while keeping the source cache warm',
+    () {
+      final separator = Platform.pathSeparator;
+      final sourcePath = '${separator}source';
+      final keptFile = File('$sourcePath${separator}keep.txt');
+      final movedFile = File('$sourcePath${separator}move.txt');
+      final movedFolder = Directory('$sourcePath${separator}folder');
 
-    cache.storeListing(
-      path: sourcePath,
-      files: [keptFile, movedFile],
-      folders: [movedFolder],
-      stats: const {},
-    );
+      cache.storeListing(
+        path: sourcePath,
+        files: [keptFile, movedFile],
+        folders: [movedFolder],
+        stats: const {},
+      );
 
-    cache.removePaths([movedFile.path, movedFolder.path]);
+      cache.removePaths([movedFile.path, movedFolder.path]);
 
-    final listing = cache.getListing(sourcePath);
-    expect(listing, isNotNull);
-    expect(listing!.files.map((file) => file.path), [keptFile.path]);
-    expect(listing.folders, isEmpty);
-  });
+      final listing = cache.getListing(sourcePath);
+      expect(listing, isNotNull);
+      expect(listing!.files.map((file) => file.path), [keptFile.path]);
+      expect(listing.folders, isEmpty);
+    },
+  );
 
   test('removePaths leaves unrelated cached folders unchanged', () {
     final separator = Platform.pathSeparator;
@@ -55,9 +57,8 @@ void main() {
     cache.removePaths([sourceFile.path]);
 
     expect(cache.getListing(sourcePath)!.files, isEmpty);
-    expect(
-      cache.getListing(otherPath)!.files.map((file) => file.path),
-      [otherFile.path],
-    );
+    expect(cache.getListing(otherPath)!.files.map((file) => file.path), [
+      otherFile.path,
+    ]);
   });
 }

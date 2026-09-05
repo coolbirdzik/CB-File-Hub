@@ -17,8 +17,9 @@ class TabbedFolderDragSelectionController {
 
   final ValueNotifier<bool> isDragging = ValueNotifier<bool>(false);
   final ValueNotifier<Offset?> dragStartPosition = ValueNotifier<Offset?>(null);
-  final ValueNotifier<Offset?> dragCurrentPosition =
-      ValueNotifier<Offset?>(null);
+  final ValueNotifier<Offset?> dragCurrentPosition = ValueNotifier<Offset?>(
+    null,
+  );
 
   /// Key assigned to the Stack that wraps the grid/list/details view.
   /// Used to convert the local-coordinate selectionRect into global
@@ -66,10 +67,7 @@ class TabbedFolderDragSelectionController {
     _itemPositions[path] = position;
   }
 
-  String? hitTestItem(
-    Offset globalPosition, {
-    Set<String>? allowedPaths,
-  }) {
+  String? hitTestItem(Offset globalPosition, {Set<String>? allowedPaths}) {
     final entries = _itemPositions.entries.toList(growable: false).reversed;
     for (final entry in entries) {
       if (allowedPaths != null && !allowedPaths.contains(entry.key)) {
@@ -88,8 +86,8 @@ class TabbedFolderDragSelectionController {
     // Snapshot the current selection so Ctrl+drag can compute a stable delta
     // against this baseline on every pan-update frame.
     final keyboard = HardwareKeyboard.instance;
-    final bool isCtrlPressed = keyboard.logicalKeysPressed
-            .contains(LogicalKeyboardKey.control) ||
+    final bool isCtrlPressed =
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.control) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlLeft) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlRight) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.meta) ||
@@ -151,10 +149,9 @@ class TabbedFolderDragSelectionController {
             child: CustomPaint(
               painter: SelectionRectanglePainter(
                 selectionRect: selectionRect,
-                fillColor: Theme.of(context)
-                    .colorScheme
-                    .primaryContainer
-                    .withValues(alpha: 0.4),
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.4),
                 borderColor: Theme.of(context).primaryColor,
               ),
             ),
@@ -177,16 +174,16 @@ class TabbedFolderDragSelectionController {
         : selectionRect;
 
     final keyboard = HardwareKeyboard.instance;
-    final bool isCtrlPressed = keyboard.logicalKeysPressed
-            .contains(LogicalKeyboardKey.control) ||
+    final bool isCtrlPressed =
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.control) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlLeft) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlRight) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.meta) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaLeft) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaRight);
 
-    final bool isShiftPressed = keyboard.logicalKeysPressed
-            .contains(LogicalKeyboardKey.shift) ||
+    final bool isShiftPressed =
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shift) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
 
@@ -208,15 +205,17 @@ class TabbedFolderDragSelectionController {
       }
     });
 
-    selectionBloc.add(SelectItemsInRect(
-      folderPaths: selectedFoldersInDrag,
-      filePaths: selectedFilesInDrag,
-      isCtrlPressed: isCtrlPressed,
-      isShiftPressed: isShiftPressed,
-      // Pass the pre-drag snapshot so the bloc can compute a stable toggle
-      // delta instead of re-toggling against the live state each frame.
-      preCtrlDragFiles: _preCtrlDragFiles,
-      preCtrlDragFolders: _preCtrlDragFolders,
-    ));
+    selectionBloc.add(
+      SelectItemsInRect(
+        folderPaths: selectedFoldersInDrag,
+        filePaths: selectedFilesInDrag,
+        isCtrlPressed: isCtrlPressed,
+        isShiftPressed: isShiftPressed,
+        // Pass the pre-drag snapshot so the bloc can compute a stable toggle
+        // delta instead of re-toggling against the live state each frame.
+        preCtrlDragFiles: _preCtrlDragFiles,
+        preCtrlDragFolders: _preCtrlDragFolders,
+      ),
+    );
   }
 }

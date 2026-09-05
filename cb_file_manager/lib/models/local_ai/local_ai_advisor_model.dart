@@ -3,14 +3,10 @@
 /// Supports Hugging Face model catalog browsing, local model installation,
 /// and on-device cleanup advisory inference. Token storage and runtime state
 /// are kept isolated from existing remote AI providers.
+library;
 
 /// Download state for a model.
-enum LocalModelDownloadState {
-  notStarted,
-  downloading,
-  completed,
-  failed,
-}
+enum LocalModelDownloadState { notStarted, downloading, completed, failed }
 
 /// On-device runtime family required to run an installed artifact.
 enum LocalModelRuntimeKind {
@@ -45,14 +41,14 @@ class HuggingFaceModelEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'displayName': displayName,
-        'description': description,
-        'sizeBytes': sizeBytes,
-        'license': license,
-        'compatible': compatible,
-        'artifactFileName': artifactFileName,
-      };
+    'id': id,
+    'displayName': displayName,
+    'description': description,
+    'sizeBytes': sizeBytes,
+    'license': license,
+    'compatible': compatible,
+    'artifactFileName': artifactFileName,
+  };
 
   static HuggingFaceModelEntry fromJson(Map<String, dynamic> json) =>
       HuggingFaceModelEntry(
@@ -75,7 +71,7 @@ class InstalledLocalModel {
   final int sizeBytes;
   final DateTime installedAt;
   final String?
-      runtimeArtifactId; // Mapped runtime artifact name (if available)
+  runtimeArtifactId; // Mapped runtime artifact name (if available)
 
   const InstalledLocalModel({
     required this.catalogId,
@@ -87,13 +83,13 @@ class InstalledLocalModel {
   });
 
   Map<String, dynamic> toJson() => {
-        'catalogId': catalogId,
-        'displayName': displayName,
-        'localPath': localPath,
-        'sizeBytes': sizeBytes,
-        'installedAt': installedAt.millisecondsSinceEpoch,
-        'runtimeArtifactId': runtimeArtifactId,
-      };
+    'catalogId': catalogId,
+    'displayName': displayName,
+    'localPath': localPath,
+    'sizeBytes': sizeBytes,
+    'installedAt': installedAt.millisecondsSinceEpoch,
+    'runtimeArtifactId': runtimeArtifactId,
+  };
 
   static InstalledLocalModel fromJson(Map<String, dynamic> json) =>
       InstalledLocalModel(
@@ -101,8 +97,9 @@ class InstalledLocalModel {
         displayName: json['displayName'] as String,
         localPath: json['localPath'] as String,
         sizeBytes: json['sizeBytes'] as int,
-        installedAt:
-            DateTime.fromMillisecondsSinceEpoch(json['installedAt'] as int),
+        installedAt: DateTime.fromMillisecondsSinceEpoch(
+          json['installedAt'] as int,
+        ),
         runtimeArtifactId: json['runtimeArtifactId'] as String?,
       );
 
@@ -168,6 +165,16 @@ abstract class LocalAiChatRuntime {
   Future<void> dispose() async {}
 }
 
+/// Optional capability for runtimes whose chat template preserves turn roles.
+abstract interface class LocalAiConversationRuntime {
+  Stream<String> sendConversationStream({
+    required InstalledLocalModel model,
+    required List<Map<String, String>> messages,
+    String? systemPrompt,
+    int maxTokens = 4096,
+  });
+}
+
 /// Result of an advisory inference request.
 class AdvisorSuggestion {
   final String itemPath;
@@ -181,10 +188,10 @@ class AdvisorSuggestion {
   });
 
   Map<String, dynamic> toJson() => {
-        'itemPath': itemPath,
-        'reason': reason,
-        'recommended': recommended,
-      };
+    'itemPath': itemPath,
+    'reason': reason,
+    'recommended': recommended,
+  };
 
   static AdvisorSuggestion fromJson(Map<String, dynamic> json) =>
       AdvisorSuggestion(

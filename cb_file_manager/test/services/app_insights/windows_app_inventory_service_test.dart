@@ -14,59 +14,62 @@ void main() {
   group('WindowsAppInventoryParser', () {
     const parser = WindowsAppInventoryParser();
 
-    test('filters hidden entries and deterministically merges registry views',
-        () {
-      final apps = parser.parseWin32Entries(<Map<String, Object?>>[
-        <String, Object?>{
-          'registryRoot': 'HKLM',
-          'registryView': '32',
-          'registryKeyName': '{11111111-2222-3333-4444-555555555555}',
-          'displayName': 'Example App',
-          'publisher': 'Example Inc.',
-          'displayVersion': '1.0',
-        },
-        <String, Object?>{
-          'registryRoot': 'HKLM',
-          'registryView': '64',
-          'registryKeyName': '{11111111-2222-3333-4444-555555555555}',
-          'displayName': 'Example App',
-          'publisher': 'Example Inc.',
-          'displayVersion': '2.0',
-          'installLocation': r'C:\Program Files\Example',
-          'displayIcon': r'"C:\Program Files\Example\example.exe",0',
-          'uninstallString': 'uninstall.exe',
-          'estimatedSizeKb': 2048,
-          'installDate': '20260731',
-        },
-        <String, Object?>{
-          'registryKeyName': 'system',
-          'displayName': 'System Component',
-          'systemComponent': 1,
-        },
-        <String, Object?>{
-          'registryKeyName': 'child',
-          'displayName': 'Child Feature',
-          'parentKeyName': 'parent',
-        },
-        <String, Object?>{
-          'registryKeyName': 'update',
-          'displayName': 'Security Update for Windows (KB5030000)',
-          'releaseType': 'Security Update',
-        },
-      ]);
+    test(
+      'filters hidden entries and deterministically merges registry views',
+      () {
+        final apps = parser.parseWin32Entries(<Map<String, Object?>>[
+          <String, Object?>{
+            'registryRoot': 'HKLM',
+            'registryView': '32',
+            'registryKeyName': '{11111111-2222-3333-4444-555555555555}',
+            'displayName': 'Example App',
+            'publisher': 'Example Inc.',
+            'displayVersion': '1.0',
+          },
+          <String, Object?>{
+            'registryRoot': 'HKLM',
+            'registryView': '64',
+            'registryKeyName': '{11111111-2222-3333-4444-555555555555}',
+            'displayName': 'Example App',
+            'publisher': 'Example Inc.',
+            'displayVersion': '2.0',
+            'installLocation': r'C:\Program Files\Example',
+            'displayIcon': r'"C:\Program Files\Example\example.exe",0',
+            'uninstallString': 'uninstall.exe',
+            'estimatedSizeKb': 2048,
+            'installDate': '20260731',
+          },
+          <String, Object?>{
+            'registryKeyName': 'system',
+            'displayName': 'System Component',
+            'systemComponent': 1,
+          },
+          <String, Object?>{
+            'registryKeyName': 'child',
+            'displayName': 'Child Feature',
+            'parentKeyName': 'parent',
+          },
+          <String, Object?>{
+            'registryKeyName': 'update',
+            'displayName': 'Security Update for Windows (KB5030000)',
+            'releaseType': 'Security Update',
+          },
+        ]);
 
-      expect(apps, hasLength(1));
-      final app = apps.single;
-      expect(app.id, 'win32:{11111111-2222-3333-4444-555555555555}');
-      expect(app.version, '2.0');
-      expect(app.installLocation, r'C:\Program Files\Example');
-      expect(app.displayIconPath, r'C:\Program Files\Example\example.exe');
-      expect(app.executablePaths,
-          <String>[r'C:\Program Files\Example\example.exe']);
-      expect(app.estimatedSizeBytes, 2 * 1024 * 1024);
-      expect(app.canManage, isTrue);
-      expect(app.installedOrUpdatedAt, DateTime(2026, 7, 31));
-    });
+        expect(apps, hasLength(1));
+        final app = apps.single;
+        expect(app.id, 'win32:{11111111-2222-3333-4444-555555555555}');
+        expect(app.version, '2.0');
+        expect(app.installLocation, r'C:\Program Files\Example');
+        expect(app.displayIconPath, r'C:\Program Files\Example\example.exe');
+        expect(app.executablePaths, <String>[
+          r'C:\Program Files\Example\example.exe',
+        ]);
+        expect(app.estimatedSizeBytes, 2 * 1024 * 1024);
+        expect(app.canManage, isTrue);
+        expect(app.installedOrUpdatedAt, DateTime(2026, 7, 31));
+      },
+    );
 
     test('deduplicates non-MSI entries by name publisher and install path', () {
       final entries = <Map<String, Object?>>[
@@ -153,14 +156,8 @@ void main() {
     });
 
     test('rejects short and zero-FILETIME records', () {
-      expect(
-        parser.parseModernUserAssistLastOpened(Uint8List(71)),
-        isNull,
-      );
-      expect(
-        parser.parseModernUserAssistLastOpened(Uint8List(72)),
-        isNull,
-      );
+      expect(parser.parseModernUserAssistLastOpened(Uint8List(71)), isNull);
+      expect(parser.parseModernUserAssistLastOpened(Uint8List(72)), isNull);
     });
 
     test('parses executable names with hyphens from Prefetch files', () {
@@ -298,59 +295,60 @@ void main() {
     expect(usage[inventory.apps.single.id]!.source, AppUsageSource.userAssist);
   });
 
-  test('service publishes each inventory source as soon as it completes',
-      () async {
-    final source = _ControlledInventoryDataSource();
-    final service = WindowsAppInventoryService(dataSource: source);
-    final snapshots = <InstalledAppInventoryResult>[];
+  test(
+    'service publishes each inventory source as soon as it completes',
+    () async {
+      final source = _ControlledInventoryDataSource();
+      final service = WindowsAppInventoryService(dataSource: source);
+      final snapshots = <InstalledAppInventoryResult>[];
 
-    final inventoryFuture = service.loadInventory(
-      onSnapshot: snapshots.add,
-    );
-    source.win32.complete(
-      const WindowsRawAppInsightsResult(
-        records: <Map<String, Object?>>[
-          <String, Object?>{
-            'registryKeyName': 'example',
-            'displayName': 'Example Win32',
-          },
-        ],
-      ),
-    );
-    await Future<void>.delayed(Duration.zero);
+      final inventoryFuture = service.loadInventory(onSnapshot: snapshots.add);
+      source.win32.complete(
+        const WindowsRawAppInsightsResult(
+          records: <Map<String, Object?>>[
+            <String, Object?>{
+              'registryKeyName': 'example',
+              'displayName': 'Example Win32',
+            },
+          ],
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
 
-    expect(snapshots, hasLength(1));
-    expect(snapshots.single.apps.single.displayName, 'Example Win32');
-    expect(snapshots.single.isPartial, isTrue);
-    expect(
-      snapshots.single.warnings,
-      contains('MSIX app inventory is still loading.'),
-    );
+      expect(snapshots, hasLength(1));
+      expect(snapshots.single.apps.single.displayName, 'Example Win32');
+      expect(snapshots.single.isPartial, isTrue);
+      expect(
+        snapshots.single.warnings,
+        contains('MSIX app inventory is still loading.'),
+      );
 
-    source.msix.complete(
-      const WindowsRawAppInsightsResult(
-        records: <Map<String, Object?>>[
-          <String, Object?>{
-            'packageName': 'Contoso.App',
-            'packageFamilyName': 'Contoso.App_123',
-            'displayName': 'Contoso Store',
-            'isLaunchable': true,
-          },
-        ],
-      ),
-    );
-    final inventory = await inventoryFuture;
+      source.msix.complete(
+        const WindowsRawAppInsightsResult(
+          records: <Map<String, Object?>>[
+            <String, Object?>{
+              'packageName': 'Contoso.App',
+              'packageFamilyName': 'Contoso.App_123',
+              'displayName': 'Contoso Store',
+              'isLaunchable': true,
+            },
+          ],
+        ),
+      );
+      final inventory = await inventoryFuture;
 
-    expect(snapshots, hasLength(2));
-    expect(snapshots.last.apps, hasLength(2));
-    expect(inventory.apps, hasLength(2));
-    expect(inventory.isPartial, isFalse);
-  });
+      expect(snapshots, hasLength(2));
+      expect(snapshots.last.apps, hasLength(2));
+      expect(inventory.apps, hasLength(2));
+      expect(inventory.isPartial, isFalse);
+    },
+  );
 }
 
 Uint8List _userAssistData(DateTime timestamp) {
   const windowsToUnixEpochMicroseconds = 11644473600000000;
-  final fileTime = (timestamp.toUtc().microsecondsSinceEpoch +
+  final fileTime =
+      (timestamp.toUtc().microsecondsSinceEpoch +
           windowsToUnixEpochMicroseconds) *
       10;
   final data = Uint8List(72);
@@ -383,8 +381,7 @@ class _FakeDataSource implements WindowsAppInsightsDataSource {
   @override
   Future<Map<String, String>> resolveUserAssistTargets(
     List<String> targets,
-  ) async =>
-      <String, String>{for (final target in targets) target: target};
+  ) async => <String, String>{for (final target in targets) target: target};
 }
 
 class _ControlledInventoryDataSource implements WindowsAppInsightsDataSource {
@@ -406,6 +403,5 @@ class _ControlledInventoryDataSource implements WindowsAppInsightsDataSource {
   @override
   Future<Map<String, String>> resolveUserAssistTargets(
     List<String> targets,
-  ) async =>
-      <String, String>{};
+  ) async => <String, String>{};
 }

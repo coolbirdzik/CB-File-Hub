@@ -21,7 +21,7 @@ below).
 
 ## Flutter version
 
-Pinned to **3.41.5 stable** (`build.config`, CI workflows). Use this exact version.
+Pinned to **3.47.2 stable** (`build.config`, CI workflows). Use this exact version.
 
 ## Developer commands
 
@@ -106,8 +106,8 @@ CB Agent can run local GGUF models on-device via a bundled llama.cpp runtime.
 - **Binaries are not in git:** the runtime (Vulkan DLLs + `llama-server.exe`,
   ~69MB) lives in `cb_file_manager/windows/llama/`, which is git-ignored. It is
   downloaded at build time by `scripts/fetch_llama_runtime.sh` (pinned to
-  llama.cpp release `b9874`, `win-vulkan-x64`). The script is idempotent and
-  skips the download when all files are already present (`--force` to redownload).
+  llama.cpp release `b10809`, `win-vulkan-x64`). The script verifies SHA-256 and
+  skips only when all files and the version marker match (`--force` to redownload).
 - **Fetch before building:** every Windows build path runs the fetch script
   first — `scripts/build.sh` (release), the `build-windows` and `e2e-windows` CI
   jobs, and the `just windows` recipe (`just fetch-llama`). If you run

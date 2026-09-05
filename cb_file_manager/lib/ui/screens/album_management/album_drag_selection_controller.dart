@@ -19,8 +19,9 @@ class AlbumDragSelectionController {
   // ── Drag state ─────────────────────────────────────────────────────────────
   final ValueNotifier<bool> isDragging = ValueNotifier<bool>(false);
   final ValueNotifier<Offset?> dragStartPosition = ValueNotifier<Offset?>(null);
-  final ValueNotifier<Offset?> dragCurrentPosition =
-      ValueNotifier<Offset?>(null);
+  final ValueNotifier<Offset?> dragCurrentPosition = ValueNotifier<Offset?>(
+    null,
+  );
 
   /// [GlobalKey] that must be assigned to the [Stack] wrapping the grid so
   /// that local drag coordinates can be converted to global screen coords.
@@ -54,8 +55,9 @@ class AlbumDragSelectionController {
     final keyboard = HardwareKeyboard.instance;
     final bool isCtrl = _isCtrlPressed(keyboard);
 
-    _preCtrlDragFiles =
-        isCtrl ? Set.of(selectionBloc.state.selectedFilePaths) : const {};
+    _preCtrlDragFiles = isCtrl
+        ? Set.of(selectionBloc.state.selectedFilePaths)
+        : const {};
 
     isDragging.value = true;
     dragStartPosition.value = localPosition;
@@ -67,8 +69,10 @@ class AlbumDragSelectionController {
     dragCurrentPosition.value = localPosition;
     if (dragStartPosition.value == null) return;
 
-    final selectionRect =
-        Rect.fromPoints(dragStartPosition.value!, localPosition);
+    final selectionRect = Rect.fromPoints(
+      dragStartPosition.value!,
+      localPosition,
+    );
     _selectItemsInRect(selectionRect);
   }
 
@@ -95,10 +99,9 @@ class AlbumDragSelectionController {
             child: CustomPaint(
               painter: SelectionRectanglePainter(
                 selectionRect: rect,
-                fillColor: Theme.of(context)
-                    .colorScheme
-                    .primaryContainer
-                    .withValues(alpha: 0.4),
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.4),
                 borderColor: Theme.of(context).primaryColor,
               ),
             ),
@@ -131,14 +134,16 @@ class AlbumDragSelectionController {
       if (globalRect.overlaps(itemRect)) selected.add(path);
     });
 
-    selectionBloc.add(SelectItemsInRect(
-      folderPaths: const {}, // albums have no sub-folders
-      filePaths: selected,
-      isCtrlPressed: isCtrl,
-      isShiftPressed: isShift,
-      preCtrlDragFiles: _preCtrlDragFiles,
-      preCtrlDragFolders: const {},
-    ));
+    selectionBloc.add(
+      SelectItemsInRect(
+        folderPaths: const {}, // albums have no sub-folders
+        filePaths: selected,
+        isCtrlPressed: isCtrl,
+        isShiftPressed: isShift,
+        preCtrlDragFiles: _preCtrlDragFiles,
+        preCtrlDragFolders: const {},
+      ),
+    );
   }
 
   static bool _isCtrlPressed(HardwareKeyboard kb) {

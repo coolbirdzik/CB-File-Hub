@@ -100,8 +100,9 @@ class SmartAlbumService {
 
   Future<void> setSmartAlbum(int albumId, bool smart) async {
     final data = await _read();
-    final ids =
-        ((data['smartAlbumIds'] as List?) ?? []).map((e) => e as int).toSet();
+    final ids = ((data['smartAlbumIds'] as List?) ?? [])
+        .map((e) => e as int)
+        .toSet();
     if (smart) {
       ids.add(albumId);
     } else {
@@ -124,8 +125,13 @@ class SmartAlbumService {
 
   Future<void> setScanRoots(int albumId, List<String> directories) async {
     final data = await _read();
-    final roots = (data['roots'] as Map?)?.map((k, v) => MapEntry(
-            k.toString(), (v as List).map((e) => e.toString()).toList())) ??
+    final roots =
+        (data['roots'] as Map?)?.map(
+          (k, v) => MapEntry(
+            k.toString(),
+            (v as List).map((e) => e.toString()).toList(),
+          ),
+        ) ??
         {};
     roots['$albumId'] = directories.toSet().toList();
     data['roots'] = roots;

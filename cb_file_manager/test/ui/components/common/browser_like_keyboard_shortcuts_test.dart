@@ -74,16 +74,18 @@ void main() {
     expect(renames, 1);
   });
 
-  testWidgets('F2 without a rename target is left for someone else',
-      (tester) async {
+  testWidgets('F2 without a rename target is left for someone else', (
+    tester,
+  ) async {
     // A screen with nothing selected passes no callback; the event must stay
     // unhandled rather than being silently swallowed.
     final result = await _press(tester, LogicalKeyboardKey.f2);
     expect(result, KeyEventResult.ignored);
   });
 
-  testWidgets('Delete deletes, and Shift asks for the permanent kind',
-      (tester) async {
+  testWidgets('Delete deletes, and Shift asks for the permanent kind', (
+    tester,
+  ) async {
     bool? permanent;
 
     await _press(
@@ -102,8 +104,9 @@ void main() {
     expect(permanent, isTrue);
   });
 
-  testWidgets('Escape, F5 and Ctrl+R, Ctrl+A and Ctrl+F all route',
-      (tester) async {
+  testWidgets('Escape, F5 and Ctrl+R, Ctrl+A and Ctrl+F all route', (
+    tester,
+  ) async {
     var escapes = 0;
     var refreshes = 0;
     var selectAlls = 0;
@@ -136,8 +139,9 @@ void main() {
     expect(searches, 1);
   });
 
-  testWidgets('an unmodified letter is not mistaken for a shortcut',
-      (tester) async {
+  testWidgets('an unmodified letter is not mistaken for a shortcut', (
+    tester,
+  ) async {
     var selectAlls = 0;
     final result = await _press(
       tester,
@@ -166,11 +170,11 @@ void main() {
     final focusNode = FocusNode();
     addTearDown(focusNode.dispose);
 
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: TextField(focusNode: focusNode, autofocus: true),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TextField(focusNode: focusNode, autofocus: true)),
       ),
-    ));
+    );
     await tester.pump();
     expect(focusNode.hasFocus, isTrue);
 

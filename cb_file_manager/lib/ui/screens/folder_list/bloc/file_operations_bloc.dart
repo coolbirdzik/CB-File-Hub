@@ -49,11 +49,11 @@ class FileOperationsState extends Equatable {
 
   @override
   List<Object?> get props => [
-        clipboardRevision,
-        error,
-        isProcessing,
-        retryableElevatedDeletePaths,
-      ];
+    clipboardRevision,
+    error,
+    isProcessing,
+    retryableElevatedDeletePaths,
+  ];
 }
 
 class FileOperationsBloc
@@ -63,46 +63,41 @@ class FileOperationsBloc
 
   FileOperationsBloc({
     required this.navigationBloc,
-    required OperationProgressController progressController,
-  })  : _progressController = progressController,
-        super(const FileOperationsState()) {
+    required this._progressController,
+  }) : super(const FileOperationsState()) {
     on<FileOperationsCopy>(_onCopy);
     on<FileOperationsCut>(_onCut);
     on<FileOperationsPaste>(_onPaste);
     on<FileOperationsDeleteFiles>(_onDeleteFiles);
     on<FileOperationsDeleteItems>(_onDeleteItems);
-    on<FileOperationsRetryDeleteAsAdministrator>(
-      _onRetryDeleteAsAdministrator,
-    );
+    on<FileOperationsRetryDeleteAsAdministrator>(_onRetryDeleteAsAdministrator);
     on<FileOperationsRename>(_onRename);
     on<FileOperationsClearClipboard>(_onClearClipboard);
   }
 
-  void _onCopy(
-    FileOperationsCopy event,
-    Emitter<FileOperationsState> emit,
-  ) {
+  void _onCopy(FileOperationsCopy event, Emitter<FileOperationsState> emit) {
     try {
       FileOperations().copyFilesToClipboard(event.entities);
-      emit(state.copyWith(
-        error: null,
-        clipboardRevision: state.clipboardRevision + 1,
-      ));
+      emit(
+        state.copyWith(
+          error: null,
+          clipboardRevision: state.clipboardRevision + 1,
+        ),
+      );
     } catch (e) {
       emit(state.copyWith(error: 'Error copying: ${e.toString()}'));
     }
   }
 
-  void _onCut(
-    FileOperationsCut event,
-    Emitter<FileOperationsState> emit,
-  ) {
+  void _onCut(FileOperationsCut event, Emitter<FileOperationsState> emit) {
     try {
       FileOperations().cutFilesToClipboard(event.entities);
-      emit(state.copyWith(
-        error: null,
-        clipboardRevision: state.clipboardRevision + 1,
-      ));
+      emit(
+        state.copyWith(
+          error: null,
+          clipboardRevision: state.clipboardRevision + 1,
+        ),
+      );
     } catch (e) {
       emit(state.copyWith(error: 'Error cutting: ${e.toString()}'));
     }
@@ -123,10 +118,12 @@ class FileOperationsBloc
     final itemCount = FileOperations().clipboardItemCount;
     final clipboardItems = FileOperations().clipboardItems;
     final opType = isCut ? 'Moving' : 'Copying';
-    final firstItemPath =
-        clipboardItems.isNotEmpty ? clipboardItems.first.path : null;
-    final firstItemName =
-        firstItemPath == null ? null : path.basename(firstItemPath);
+    final firstItemPath = clipboardItems.isNotEmpty
+        ? clipboardItems.first.path
+        : null;
+    final firstItemName = firstItemPath == null
+        ? null
+        : path.basename(firstItemPath);
 
     final progressId = _progressController.begin(
       title: itemCount == 1 && firstItemName != null
@@ -177,22 +174,24 @@ class FileOperationsBloc
             '${isCut ? 'Moved' : 'Copied'} $itemCount item${itemCount > 1 ? 's' : ''} to ${event.destinationPath}',
       );
 
-      emit(state.copyWith(
-        isProcessing: false,
-        clipboardRevision: state.clipboardRevision + 1,
-      ));
+      emit(
+        state.copyWith(
+          isProcessing: false,
+          clipboardRevision: state.clipboardRevision + 1,
+        ),
+      );
 
       // Refresh the navigation bloc
       final navState = navigationBloc.state;
-      navigationBloc.add(
-        FileNavigationRefresh(navState.currentPath.path),
-      );
+      navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
     } catch (e) {
       _progressController.fail(progressId, detail: 'Error: ${e.toString()}');
-      emit(state.copyWith(
-        isProcessing: false,
-        error: 'Error pasting: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isProcessing: false,
+          error: 'Error pasting: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -202,10 +201,12 @@ class FileOperationsBloc
   ) async {
     final targetPaths = event.filePaths.toSet();
     if (targetPaths.isEmpty) return;
-    emit(state.copyWith(
-      error: null,
-      retryableElevatedDeletePaths: const <String>[],
-    ));
+    emit(
+      state.copyWith(
+        error: null,
+        retryableElevatedDeletePaths: const <String>[],
+      ),
+    );
     final firstPath = event.filePaths.first;
     final destinationLabel = event.permanent ? 'permanently' : 'to Trash Bin';
 
@@ -275,26 +276,27 @@ class FileOperationsBloc
         failedPaths: failed,
         errorsByPath: failureErrors,
       );
-      _progressController.fail(
-        progressId,
-        detail: failureMessage,
+      _progressController.fail(progressId, detail: failureMessage);
+      emit(
+        state.copyWith(
+          error: failureMessage,
+          retryableElevatedDeletePaths: event.permanent
+              ? _accessDeniedPaths(failed, failureErrors)
+              : const <String>[],
+        ),
       );
-      emit(state.copyWith(
-        error: failureMessage,
-        retryableElevatedDeletePaths: event.permanent
-            ? _accessDeniedPaths(failed, failureErrors)
-            : const <String>[],
-      ));
     } else {
       _progressController.succeed(
         progressId,
         detail:
             '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} ${event.filePaths.length} file${event.filePaths.length > 1 ? 's' : ''}',
       );
-      emit(state.copyWith(
-        error: null,
-        retryableElevatedDeletePaths: const <String>[],
-      ));
+      emit(
+        state.copyWith(
+          error: null,
+          retryableElevatedDeletePaths: const <String>[],
+        ),
+      );
     }
 
     // Refresh
@@ -308,21 +310,23 @@ class FileOperationsBloc
   ) async {
     final Set<String> targets = {...event.filePaths, ...event.folderPaths};
     if (targets.isEmpty) return;
-    emit(state.copyWith(
-      error: null,
-      retryableElevatedDeletePaths: const <String>[],
-    ));
+    emit(
+      state.copyWith(
+        error: null,
+        retryableElevatedDeletePaths: const <String>[],
+      ),
+    );
 
     final total = event.filePaths.length + event.folderPaths.length;
     final orderedTargets = <String>[...event.filePaths, ...event.folderPaths];
     final firstPath = orderedTargets.first;
     final title = event.permanent
         ? (total == 1
-            ? 'Deleting "${path.basename(firstPath)}" permanently'
-            : 'Deleting $total items permanently')
+              ? 'Deleting "${path.basename(firstPath)}" permanently'
+              : 'Deleting $total items permanently')
         : (total == 1
-            ? 'Moving "${path.basename(firstPath)}" to Trash Bin'
-            : 'Moving $total items to Trash Bin');
+              ? 'Moving "${path.basename(firstPath)}" to Trash Bin'
+              : 'Moving $total items to Trash Bin');
 
     final progressId = _progressController.begin(
       title: title,
@@ -347,10 +351,7 @@ class FileOperationsBloc
 
     // Combine files + folders into a single batch — SHFileOperationW handles
     // both in one shell call, much faster than per-item Dart deletes.
-    final pathsList = <String>[
-      ...event.filePaths,
-      ...event.folderPaths,
-    ];
+    final pathsList = <String>[...event.filePaths, ...event.folderPaths];
 
     final Set<String> succeededSet = event.permanent
         ? await trashManager.deleteMultiplePermanently(
@@ -399,26 +400,27 @@ class FileOperationsBloc
         failedPaths: failed,
         errorsByPath: failureErrors,
       );
-      _progressController.fail(
-        progressId,
-        detail: failureMessage,
+      _progressController.fail(progressId, detail: failureMessage);
+      emit(
+        state.copyWith(
+          error: failureMessage,
+          retryableElevatedDeletePaths: event.permanent
+              ? _accessDeniedPaths(failed, failureErrors)
+              : const <String>[],
+        ),
       );
-      emit(state.copyWith(
-        error: failureMessage,
-        retryableElevatedDeletePaths: event.permanent
-            ? _accessDeniedPaths(failed, failureErrors)
-            : const <String>[],
-      ));
     } else {
       _progressController.succeed(
         progressId,
         detail:
             '${event.permanent ? 'Permanently deleted' : 'Moved to Trash Bin'} $total item${total > 1 ? 's' : ''}',
       );
-      emit(state.copyWith(
-        error: null,
-        retryableElevatedDeletePaths: const <String>[],
-      ));
+      emit(
+        state.copyWith(
+          error: null,
+          retryableElevatedDeletePaths: const <String>[],
+        ),
+      );
     }
 
     final navState = navigationBloc.state;
@@ -435,11 +437,13 @@ class FileOperationsBloc
     ).toSet();
     if (exactRetryPaths.isEmpty) return;
 
-    emit(state.copyWith(
-      error: null,
-      isProcessing: true,
-      retryableElevatedDeletePaths: const <String>[],
-    ));
+    emit(
+      state.copyWith(
+        error: null,
+        isProcessing: true,
+        retryableElevatedDeletePaths: const <String>[],
+      ),
+    );
 
     final paths = exactRetryPaths.toList(growable: false);
     final progressId = _progressController.begin(
@@ -453,8 +457,9 @@ class FileOperationsBloc
       sourcePath: paths.first,
     );
 
-    final succeeded =
-        await TrashManager().retryPermanentDeleteAsAdministrator(paths);
+    final succeeded = await TrashManager().retryPermanentDeleteAsAdministrator(
+      paths,
+    );
     final failed = paths.where((path) => !succeeded.contains(path)).toList();
 
     if (succeeded.isNotEmpty) {
@@ -466,21 +471,25 @@ class FileOperationsBloc
           ? 'Deleted "${paths.first}" as administrator.'
           : 'Deleted ${paths.length} items as administrator.';
       _progressController.succeed(progressId, detail: message);
-      emit(state.copyWith(
-        error: null,
-        isProcessing: false,
-        retryableElevatedDeletePaths: const <String>[],
-      ));
+      emit(
+        state.copyWith(
+          error: null,
+          isProcessing: false,
+          retryableElevatedDeletePaths: const <String>[],
+        ),
+      );
     } else {
       final message = failed.length == 1
           ? 'Administrator delete was cancelled or failed for "${failed.first}".'
           : 'Administrator delete was cancelled or failed for ${failed.length} items.';
       _progressController.fail(progressId, detail: message);
-      emit(state.copyWith(
-        error: message,
-        isProcessing: false,
-        retryableElevatedDeletePaths: failed,
-      ));
+      emit(
+        state.copyWith(
+          error: message,
+          isProcessing: false,
+          retryableElevatedDeletePaths: failed,
+        ),
+      );
     }
 
     final navState = navigationBloc.state;
@@ -568,10 +577,12 @@ class FileOperationsBloc
     List<String> failedPaths,
     Map<String, Object> errorsByPath,
   ) {
-    return failedPaths.where((path) {
-      final error = errorsByPath[path];
-      return error is FileSystemException && error.osError?.errorCode == 5;
-    }).toList(growable: false);
+    return failedPaths
+        .where((path) {
+          final error = errorsByPath[path];
+          return error is FileSystemException && error.osError?.errorCode == 5;
+        })
+        .toList(growable: false);
   }
 
   static List<String> retainApprovedRetryPaths({

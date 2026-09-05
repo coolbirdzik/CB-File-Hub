@@ -10,28 +10,23 @@ class WindowsMenuEntry {
 
   const WindowsMenuEntry._(this.type, {this.id, this.label});
 
-  const WindowsMenuEntry.item({
-    required String id,
-    required String label,
-  }) : this._('item', id: id, label: label);
+  const WindowsMenuEntry.item({required String id, required String label})
+    : this._('item', id: id, label: label);
 
   const WindowsMenuEntry.separator() : this._('separator');
 
   Map<String, Object?> toMap() => {
-        'type': type,
-        if (id != null) 'id': id,
-        if (label != null) 'label': label,
-      };
+    'type': type,
+    if (id != null) 'id': id,
+    if (label != null) 'label': label,
+  };
 }
 
 class WindowsCombinedMenuResult {
   final bool shown;
   final String? action;
 
-  const WindowsCombinedMenuResult({
-    required this.shown,
-    required this.action,
-  });
+  const WindowsCombinedMenuResult({required this.shown, required this.action});
 
   factory WindowsCombinedMenuResult.fromMap(Map<Object?, Object?> map) {
     final shown = map['shown'] == true;
@@ -74,9 +69,9 @@ class WindowsShellMenuEntry {
       iconBytes: map['iconBytes'] as Uint8List?,
       children: rawChildren is List<Object?>
           ? rawChildren
-              .whereType<Map<Object?, Object?>>()
-              .map(WindowsShellMenuEntry.fromMap)
-              .toList(growable: false)
+                .whereType<Map<Object?, Object?>>()
+                .map(WindowsShellMenuEntry.fromMap)
+                .toList(growable: false)
           : const [],
     );
   }
@@ -86,10 +81,7 @@ class WindowsShellMenuSession {
   final String id;
   final List<WindowsShellMenuEntry> entries;
 
-  const WindowsShellMenuSession({
-    required this.id,
-    required this.entries,
-  });
+  const WindowsShellMenuSession({required this.id, required this.entries});
 
   factory WindowsShellMenuSession.fromMap(Map<Object?, Object?> map) {
     final rawEntries = map['entries'];
@@ -97,9 +89,9 @@ class WindowsShellMenuSession {
       id: map['sessionId'] as String? ?? '',
       entries: rawEntries is List<Object?>
           ? rawEntries
-              .whereType<Map<Object?, Object?>>()
-              .map(WindowsShellMenuEntry.fromMap)
-              .toList(growable: false)
+                .whereType<Map<Object?, Object?>>()
+                .map(WindowsShellMenuEntry.fromMap)
+                .toList(growable: false)
           : const [],
     );
   }
@@ -119,8 +111,9 @@ class _CachedWindowsShellMenuSession {
 }
 
 class WindowsShellContextMenu {
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/shell_context_menu');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/shell_context_menu',
+  );
   // Keep one target-bound native session warm for repeated context-menu opens.
   // A longer-lived cross-target cache is unsafe because Shell command IDs and
   // handlers are created for the exact PIDL selection passed by the caller.
@@ -131,9 +124,9 @@ class WindowsShellContextMenu {
   static String? _pendingThirdPartyMenuSelectionKey;
   static Timer? _thirdPartyMenuExpiryTimer;
   static final Map<String, List<WindowsShellMenuEntry>>
-      _cachedThirdPartySubmenus = <String, List<WindowsShellMenuEntry>>{};
+  _cachedThirdPartySubmenus = <String, List<WindowsShellMenuEntry>>{};
   static final Map<String, Future<List<WindowsShellMenuEntry>>>
-      _pendingThirdPartySubmenuLoads =
+  _pendingThirdPartySubmenuLoads =
       <String, Future<List<WindowsShellMenuEntry>>>{};
 
   static Future<bool> showForPaths({
@@ -244,10 +237,7 @@ class WindowsShellContextMenu {
     try {
       final result = await _channel.invokeMethod<Object?>(
         'invokeVerb',
-        <String, Object?>{
-          'paths': paths,
-          'verb': verb.trim(),
-        },
+        <String, Object?>{'paths': paths, 'verb': verb.trim()},
       );
       return result == true;
     } catch (_) {
@@ -375,10 +365,7 @@ class WindowsShellContextMenu {
     try {
       final result = await _channel.invokeMethod<Object?>(
         'loadContextMenuSubmenu',
-        <String, Object?>{
-          'sessionId': sessionId,
-          'submenuId': submenuId,
-        },
+        <String, Object?>{'sessionId': sessionId, 'submenuId': submenuId},
       );
       if (result is! List<Object?>) {
         return const <WindowsShellMenuEntry>[];
@@ -403,10 +390,7 @@ class WindowsShellContextMenu {
     try {
       final result = await _channel.invokeMethod<Object?>(
         'invokeContextMenuCommand',
-        <String, Object?>{
-          'sessionId': sessionId,
-          'commandId': commandId,
-        },
+        <String, Object?>{'sessionId': sessionId, 'commandId': commandId},
       );
       final invoked = result == true;
       if (invoked) {
@@ -462,18 +446,19 @@ class WindowsShellContextMenu {
   }
 
   static String _thirdPartyMenuSelectionKey(List<String> paths) {
-    final normalizedPaths = paths
-        .map(
-          (path) => path
-              .trim()
-              .replaceAll('/', r'\')
-              .replaceFirst(RegExp(r'\\+$'), '')
-              .toLowerCase(),
-        )
-        .where((path) => path.isNotEmpty)
-        .toSet()
-        .toList(growable: false)
-      ..sort();
+    final normalizedPaths =
+        paths
+            .map(
+              (path) => path
+                  .trim()
+                  .replaceAll('/', r'\')
+                  .replaceFirst(RegExp(r'\\+$'), '')
+                  .toLowerCase(),
+            )
+            .where((path) => path.isNotEmpty)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
     final extendedVerbs = HardwareKeyboard.instance.isShiftPressed ? '1' : '0';
     return '$extendedVerbs|${normalizedPaths.join('\u0000')}';
   }
@@ -523,9 +508,7 @@ class WindowsShellContextMenu {
 
   static void _removeCachedThirdPartySubmenus(String sessionId) {
     final prefix = '$sessionId:';
-    _cachedThirdPartySubmenus.removeWhere(
-      (key, _) => key.startsWith(prefix),
-    );
+    _cachedThirdPartySubmenus.removeWhere((key, _) => key.startsWith(prefix));
     _pendingThirdPartySubmenuLoads.removeWhere(
       (key, _) => key.startsWith(prefix),
     );

@@ -22,18 +22,14 @@ class WindowsAppInventoryService {
 
   WindowsAppInventoryService({
     WindowsAppInsightsDataSource? dataSource,
-    WindowsAppInventoryParser inventoryParser =
-        const WindowsAppInventoryParser(),
-    WindowsAppUsageParser usageParser = const WindowsAppUsageParser(),
-    WindowsAppUsageMatcher usageMatcher = const WindowsAppUsageMatcher(),
+    this._inventoryParser = const WindowsAppInventoryParser(),
+    this._usageParser = const WindowsAppUsageParser(),
+    this._usageMatcher = const WindowsAppUsageMatcher(),
     this.prefetchDirectory,
     DateTime Function()? now,
-  })  : _dataSource =
-            dataSource ?? const MethodChannelWindowsAppInsightsDataSource(),
-        _inventoryParser = inventoryParser,
-        _usageParser = usageParser,
-        _usageMatcher = usageMatcher,
-        _now = now ?? DateTime.now;
+  }) : _dataSource =
+           dataSource ?? const MethodChannelWindowsAppInsightsDataSource(),
+       _now = now ?? DateTime.now;
 
   List<String> get lastUsageWarnings => _lastUsageWarnings;
 
@@ -56,22 +52,24 @@ class WindowsAppInventoryService {
       );
     }
 
-    final win32Future = _safeRead(
-      _dataSource.readWin32Inventory,
-      'Win32 app inventory failed',
-    ).then((result) {
-      win32 = result;
-      publishSnapshot();
-      return result;
-    });
-    final msixFuture = _safeRead(
-      _dataSource.readMsixInventory,
-      'MSIX app inventory failed',
-    ).then((result) {
-      msix = result;
-      publishSnapshot();
-      return result;
-    });
+    final win32Future =
+        _safeRead(
+          _dataSource.readWin32Inventory,
+          'Win32 app inventory failed',
+        ).then((result) {
+          win32 = result;
+          publishSnapshot();
+          return result;
+        });
+    final msixFuture =
+        _safeRead(
+          _dataSource.readMsixInventory,
+          'MSIX app inventory failed',
+        ).then((result) {
+          msix = result;
+          publishSnapshot();
+          return result;
+        });
 
     await Future.wait<WindowsRawAppInsightsResult>(
       <Future<WindowsRawAppInsightsResult>>[win32Future, msixFuture],
@@ -88,15 +86,16 @@ class WindowsAppInventoryService {
     final availableWin32 = win32 ?? const WindowsRawAppInsightsResult();
     final availableMsix = msix ?? const WindowsRawAppInsightsResult();
 
-    final apps = <InstalledAppInfo>[
-      ..._inventoryParser.parseWin32Entries(availableWin32.records),
-      ..._inventoryParser.parseMsixEntries(availableMsix.records),
-    ]..sort((left, right) {
-        final byName = left.displayName
-            .toLowerCase()
-            .compareTo(right.displayName.toLowerCase());
-        return byName != 0 ? byName : left.id.compareTo(right.id);
-      });
+    final apps =
+        <InstalledAppInfo>[
+          ..._inventoryParser.parseWin32Entries(availableWin32.records),
+          ..._inventoryParser.parseMsixEntries(availableMsix.records),
+        ]..sort((left, right) {
+          final byName = left.displayName.toLowerCase().compareTo(
+            right.displayName.toLowerCase(),
+          );
+          return byName != 0 ? byName : left.id.compareTo(right.id);
+        });
 
     return InstalledAppInventoryResult(
       apps: apps,
@@ -106,7 +105,8 @@ class WindowsAppInventoryService {
         if (loadingWin32) 'Win32 app inventory is still loading.',
         if (loadingMsix) 'MSIX app inventory is still loading.',
       ]),
-      isPartial: loadingWin32 ||
+      isPartial:
+          loadingWin32 ||
           loadingMsix ||
           availableWin32.isPartial ||
           availableMsix.isPartial,

@@ -27,15 +27,21 @@ void main() {
     test('14.01 fetches curated mobile tool-call models by default', () async {
       final catalog = await service.fetchModelCatalog();
       expect(catalog, isNotEmpty);
-      expect(catalog.first.id,
-          'litert-community/functiongemma-270m-ft-mobile-actions');
       expect(
-          catalog.first.artifactFileName, 'mobile_actions_q8_ekv1024.litertlm');
+        catalog.first.id,
+        'litert-community/functiongemma-270m-ft-mobile-actions',
+      );
+      expect(
+        catalog.first.artifactFileName,
+        'mobile_actions_q8_ekv1024.litertlm',
+      );
       expect(catalog.first.compatible, isTrue);
       expect(catalog.any((entry) => entry.id.contains('gemma-4')), isFalse);
       expect(
-        catalog.any((entry) =>
-            entry.id == 'unsloth/Qwen3-0.6B-GGUF' && entry.compatible == true),
+        catalog.any(
+          (entry) =>
+              entry.id == 'unsloth/Qwen3-0.6B-GGUF' && entry.compatible == true,
+        ),
         isTrue,
       );
     });
@@ -118,103 +124,114 @@ void main() {
       expect(installed.first.localPath, contains(r'\local_ai_models\'));
     });
 
-    test('14.08 downloads model artifact and persists real file metadata',
-        () async {
-      final tempDir = await Directory.systemTemp.createTemp('local_ai_test_');
-      addTearDown(() async {
-        if (await tempDir.exists()) {
-          await tempDir.delete(recursive: true);
-        }
-      });
+    test(
+      '14.08 downloads model artifact and persists real file metadata',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp('local_ai_test_');
+        addTearDown(() async {
+          if (await tempDir.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
 
-      final chunks = <List<int>>[
-        utf8.encode('abc'),
-        utf8.encode('defg'),
-        utf8.encode('hi'),
-      ];
-      final client = _FakeDownloadClient(chunks: chunks);
-      service = LocalAiAdvisorService(
-        secureStorage: const FlutterSecureStorage(),
-        prefs: prefs,
-        httpClient: client,
-        documentsDirectoryProvider: () async => tempDir,
-      );
+        final chunks = <List<int>>[
+          utf8.encode('abc'),
+          utf8.encode('defg'),
+          utf8.encode('hi'),
+        ];
+        final client = _FakeDownloadClient(chunks: chunks);
+        service = LocalAiAdvisorService(
+          secureStorage: const FlutterSecureStorage(),
+          prefs: prefs,
+          httpClient: client,
+          documentsDirectoryProvider: () async => tempDir,
+        );
 
-      const entry = HuggingFaceModelEntry(
-        id: 'test/model-download',
-        displayName: 'Download Model',
-        artifactFileName: 'model.safetensors',
-      );
-      final progressUpdates = <ModelDownloadProgress>[];
+        const entry = HuggingFaceModelEntry(
+          id: 'test/model-download',
+          displayName: 'Download Model',
+          artifactFileName: 'model.safetensors',
+        );
+        final progressUpdates = <ModelDownloadProgress>[];
 
-      final installed = await service.installModel(
-        entry,
-        onProgress: progressUpdates.add,
-      );
+        final installed = await service.installModel(
+          entry,
+          onProgress: progressUpdates.add,
+        );
 
-      final installedFile = File(installed.localPath);
-      expect(await installedFile.exists(), isTrue);
-      expect(await installedFile.readAsString(), 'abcdefghi');
-      expect(installed.sizeBytes, 9);
-      expect(installed.runtimeArtifactId, 'model.safetensors');
-      expect(progressUpdates, isNotEmpty);
-      expect(progressUpdates.last.state, LocalModelDownloadState.completed);
-      expect(progressUpdates.last.downloadedBytes, 9);
+        final installedFile = File(installed.localPath);
+        expect(await installedFile.exists(), isTrue);
+        expect(await installedFile.readAsString(), 'abcdefghi');
+        expect(installed.sizeBytes, 9);
+        expect(installed.runtimeArtifactId, 'model.safetensors');
+        expect(progressUpdates, isNotEmpty);
+        expect(progressUpdates.last.state, LocalModelDownloadState.completed);
+        expect(progressUpdates.last.downloadedBytes, 9);
 
-      final models = service.getInstalledModels();
-      expect(models, hasLength(1));
-      expect(models.first.localPath, installed.localPath);
-    });
+        final models = service.getInstalledModels();
+        expect(models, hasLength(1));
+        expect(models.first.localPath, installed.localPath);
+      },
+    );
 
     test(
-        '14.09 flags .safetensors artifacts as not runnable, allows .litertlm and .gguf',
-        () {
-      final safetensors = InstalledLocalModel(
-        catalogId: 'legacy/model',
-        displayName: 'Legacy',
-        localPath: r'C:\models\model.safetensors',
-        sizeBytes: 10,
-        installedAt: DateTime.now(),
-      );
-      final litertlm = InstalledLocalModel(
-        catalogId: 'litert/model',
-        displayName: 'LiteRT',
-        localPath: r'C:\models\functiongemma-270m.litertlm',
-        sizeBytes: 10,
-        installedAt: DateTime.now(),
-      );
-      final gguf = InstalledLocalModel(
-        catalogId: 'qwen/model',
-        displayName: 'Qwen GGUF',
-        localPath: r'C:\models\Qwen3-0.6B-Q4_K_M.gguf',
-        sizeBytes: 10,
-        installedAt: DateTime.now(),
-      );
+      '14.09 flags .safetensors artifacts as not runnable, allows .litertlm and .gguf',
+      () {
+        final safetensors = InstalledLocalModel(
+          catalogId: 'legacy/model',
+          displayName: 'Legacy',
+          localPath: r'C:\models\model.safetensors',
+          sizeBytes: 10,
+          installedAt: DateTime.now(),
+        );
+        final litertlm = InstalledLocalModel(
+          catalogId: 'litert/model',
+          displayName: 'LiteRT',
+          localPath: r'C:\models\functiongemma-270m.litertlm',
+          sizeBytes: 10,
+          installedAt: DateTime.now(),
+        );
+        final gguf = InstalledLocalModel(
+          catalogId: 'qwen/model',
+          displayName: 'Qwen GGUF',
+          localPath: r'C:\models\Qwen3-0.6B-Q4_K_M.gguf',
+          sizeBytes: 10,
+          installedAt: DateTime.now(),
+        );
 
-      expect(safetensors.isRunnableArtifact, isFalse);
-      expect(litertlm.isRunnableArtifact, isTrue);
-      expect(gguf.isRunnableArtifact, isTrue);
-      expect(safetensors.runtimeKind, LocalModelRuntimeKind.unsupported);
-      expect(litertlm.runtimeKind, LocalModelRuntimeKind.liteRtLm);
-      expect(gguf.runtimeKind, LocalModelRuntimeKind.llamaCpp);
-    });
+        expect(safetensors.isRunnableArtifact, isFalse);
+        expect(litertlm.isRunnableArtifact, isTrue);
+        expect(gguf.isRunnableArtifact, isTrue);
+        expect(safetensors.runtimeKind, LocalModelRuntimeKind.unsupported);
+        expect(litertlm.runtimeKind, LocalModelRuntimeKind.liteRtLm);
+        expect(gguf.runtimeKind, LocalModelRuntimeKind.llamaCpp);
+      },
+    );
 
-    test('14.10 context window defaults and clamps to supported range',
-        () async {
-      expect(service.getMaxContextTokens(),
-          LocalAiAdvisorService.defaultContextTokens);
+    test(
+      '14.10 context window defaults and clamps to supported range',
+      () async {
+        expect(
+          service.getMaxContextTokens(),
+          LocalAiAdvisorService.defaultContextTokens,
+        );
 
-      await service.setMaxContextTokens(8192);
-      expect(service.getMaxContextTokens(), 8192);
+        await service.setMaxContextTokens(8192);
+        expect(service.getMaxContextTokens(), 8192);
 
-      await service.setMaxContextTokens(999999);
-      expect(service.getMaxContextTokens(),
-          LocalAiAdvisorService.maxContextTokens);
+        await service.setMaxContextTokens(999999);
+        expect(
+          service.getMaxContextTokens(),
+          LocalAiAdvisorService.maxContextTokens,
+        );
 
-      await service.setMaxContextTokens(1);
-      expect(service.getMaxContextTokens(),
-          LocalAiAdvisorService.minContextTokens);
-    });
+        await service.setMaxContextTokens(1);
+        expect(
+          service.getMaxContextTokens(),
+          LocalAiAdvisorService.minContextTokens,
+        );
+      },
+    );
 
     test('14.11 streams local chat chunks from runtime', () async {
       final model = InstalledLocalModel(

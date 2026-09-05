@@ -1,4 +1,5 @@
 /// Enums and models shared by the video player and related components.
+library;
 
 enum LoopMode { none, single, all }
 

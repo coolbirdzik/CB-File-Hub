@@ -4,8 +4,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
 class WindowsAppIcon {
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/app_icon');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/app_icon',
+  );
 
   /// Cache for extracted icons
   static final Map<String, ui.Image> _iconCache = {};
@@ -24,9 +25,9 @@ class WindowsAppIcon {
     try {
       final Map<dynamic, dynamic>? result = await _channel
           .invokeMethod<Map<dynamic, dynamic>>('extractIconsForExtensions', {
-        'extensions': extensions,
-        'iconSize': iconSize,
-      });
+            'extensions': extensions,
+            'iconSize': iconSize,
+          });
 
       if (result == null) return {};
 
@@ -64,10 +65,10 @@ class WindowsAppIcon {
     if (!Platform.isWindows) return null;
 
     try {
-      final String? result =
-          await _channel.invokeMethod<String>('getAssociatedAppPath', {
-        'extension': extension,
-      });
+      final String? result = await _channel.invokeMethod<String>(
+        'getAssociatedAppPath',
+        {'extension': extension},
+      );
       return result;
     } catch (e) {
       // Removed debugPrint statement
@@ -87,8 +88,8 @@ class WindowsAppIcon {
     try {
       final Map<dynamic, dynamic>? result = await _channel
           .invokeMethod<Map<dynamic, dynamic>>('extractIconFromFile', {
-        'exePath': exePath,
-      });
+            'exePath': exePath,
+          });
 
       if (result != null) {
         final Uint8List iconData = result['iconData'] as Uint8List;
@@ -138,14 +139,15 @@ class WindowsAppIcon {
   /// Get all apps that can handle a file extension (from Windows registry
   /// OpenWithList and App Paths). Returns list of maps: [{'path': '...', 'name': '...'}]
   static Future<List<Map<String, String>>> getAppsForExtension(
-      String extension) async {
+    String extension,
+  ) async {
     if (!Platform.isWindows) return [];
 
     try {
-      final List<dynamic>? result =
-          await _channel.invokeMethod<List<dynamic>>('getAppsForExtension', {
-        'extension': extension,
-      });
+      final List<dynamic>? result = await _channel.invokeMethod<List<dynamic>>(
+        'getAppsForExtension',
+        {'extension': extension},
+      );
       if (result == null) return [];
       final List<Map<String, String>> apps = [];
       for (final e in result) {
@@ -225,8 +227,9 @@ class WindowsAppIcon {
   static Future<Set<String>> getInstalledBrands() async {
     if (!Platform.isWindows) return {};
     try {
-      final result =
-          await _channel.invokeMethod<List<dynamic>>('getInstalledAppBrands');
+      final result = await _channel.invokeMethod<List<dynamic>>(
+        'getInstalledAppBrands',
+      );
       return Set<String>.from(result ?? []);
     } catch (_) {
       return {};

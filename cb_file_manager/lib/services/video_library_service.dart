@@ -92,11 +92,14 @@ class VideoLibraryService {
         coverImagePath: coverImagePath,
         colorTheme: colorTheme,
       );
-      final libraryId =
-          await database.insert('video_libraries', library.toDatabaseMap());
+      final libraryId = await database.insert(
+        'video_libraries',
+        library.toDatabaseMap(),
+      );
       library.id = libraryId;
 
-      final libraryConfig = config ??
+      final libraryConfig =
+          config ??
           VideoLibraryConfig(
             videoLibraryId: libraryId,
             directories: directories?.join(',') ?? '',
@@ -189,9 +192,7 @@ class VideoLibraryService {
         where: 'video_library_id = ?',
         whereArgs: <Object?>[libraryId],
       );
-      allFiles.addAll(
-        rows.map((row) => row['file_path']).whereType<String>(),
-      );
+      allFiles.addAll(rows.map((row) => row['file_path']).whereType<String>());
 
       return allFiles.toList(growable: false);
     } catch (error) {
@@ -253,7 +254,8 @@ class VideoLibraryService {
         return true;
       }
 
-      final nextOrderIndex = sqflite.Sqflite.firstIntValue(
+      final nextOrderIndex =
+          sqflite.Sqflite.firstIntValue(
             await database.rawQuery(
               '''
               SELECT MAX(order_index)
@@ -271,10 +273,7 @@ class VideoLibraryService {
         caption: caption,
         orderIndex: nextOrderIndex + 1,
       );
-      await database.insert(
-        'video_library_files',
-        libraryFile.toDatabaseMap(),
-      );
+      await database.insert('video_library_files', libraryFile.toDatabaseMap());
 
       final library = await getLibraryById(libraryId);
       if (library != null) {
@@ -305,7 +304,8 @@ class VideoLibraryService {
         );
         if (existing.isNotEmpty) continue;
 
-        final nextOrderIndex = sqflite.Sqflite.firstIntValue(
+        final nextOrderIndex =
+            sqflite.Sqflite.firstIntValue(
               await txn.rawQuery(
                 'SELECT MAX(order_index) FROM video_library_files WHERE video_library_id = ?',
                 <Object?>[libraryId],
@@ -318,10 +318,7 @@ class VideoLibraryService {
           filePath: filePath,
           orderIndex: nextOrderIndex + 1,
         );
-        await txn.insert(
-          'video_library_files',
-          libraryFile.toDatabaseMap(),
-        );
+        await txn.insert('video_library_files', libraryFile.toDatabaseMap());
         successCount++;
       }
     });
@@ -380,7 +377,8 @@ class VideoLibraryService {
   Future<bool> isFileInLibrary(int libraryId, String filePath) async {
     try {
       final database = await _getDatabase();
-      final count = sqflite.Sqflite.firstIntValue(
+      final count =
+          sqflite.Sqflite.firstIntValue(
             await database.rawQuery(
               '''
               SELECT COUNT(*)
@@ -446,7 +444,9 @@ class VideoLibraryService {
   }
 
   Future<bool> addDirectoryToLibrary(
-      int libraryId, String directoryPath) async {
+    int libraryId,
+    String directoryPath,
+  ) async {
     try {
       final config = await getLibraryConfig(libraryId);
       if (config == null) {
@@ -603,7 +603,8 @@ class VideoLibraryService {
   /// Batch-load video counts for multiple libraries in parallel.
   /// Returns a map of libraryId -> videoCount.
   Future<Map<int, int>> getAllLibraryVideoCounts(
-      List<VideoLibrary> libraries) async {
+    List<VideoLibrary> libraries,
+  ) async {
     if (libraries.isEmpty) return <int, int>{};
 
     final results = await Future.wait(
@@ -620,7 +621,8 @@ class VideoLibraryService {
   /// updated whenever a library is scanned via [refreshLibrary].
   /// Returns a map of libraryId -> cached fileCount.
   Future<Map<int, int>> getCachedLibraryVideoCounts(
-      List<VideoLibrary> libraries) async {
+    List<VideoLibrary> libraries,
+  ) async {
     if (libraries.isEmpty) return <int, int>{};
     try {
       final database = await _getDatabase();
@@ -678,10 +680,12 @@ class VideoLibraryService {
       }
 
       final staleBefore = DateTime.now().subtract(maxAge);
-      return libraries.where((library) {
-        final lastScan = lastScanByLibrary[library.id];
-        return lastScan == null || lastScan.isBefore(staleBefore);
-      }).toList(growable: false);
+      return libraries
+          .where((library) {
+            final lastScan = lastScanByLibrary[library.id];
+            return lastScan == null || lastScan.isBefore(staleBefore);
+          })
+          .toList(growable: false);
     } catch (error) {
       debugPrint('Error checking stale library video counts: $error');
       return libraries;
@@ -692,7 +696,8 @@ class VideoLibraryService {
   /// cached file counts in the database. Call this in the background
   /// after showing the cached counts for a responsive UI.
   Future<Map<int, int>> refreshAllLibraryVideoCounts(
-      List<VideoLibrary> libraries) async {
+    List<VideoLibrary> libraries,
+  ) async {
     if (libraries.isEmpty) return <int, int>{};
 
     final results = await Future.wait(

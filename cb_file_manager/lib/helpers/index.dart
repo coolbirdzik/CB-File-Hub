@@ -1,5 +1,6 @@
 /// Main exports for helpers package - organized by category
 /// This file provides a single entry point for importing all helper classes
+library;
 
 // Core utilities
 export 'core/filesystem_utils.dart';

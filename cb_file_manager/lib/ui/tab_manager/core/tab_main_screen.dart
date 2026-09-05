@@ -26,7 +26,7 @@ import 'tab_screen.dart';
 /// The main screen that provides the tabbed interface for the file manager
 class TabMainScreen extends StatefulWidget {
   final WindowStartupPayload? startupPayload;
-  const TabMainScreen({Key? key, this.startupPayload}) : super(key: key);
+  const TabMainScreen({super.key, this.startupPayload});
 
   /// Static method to create and open a new tab with a specific path
   static void openPath(BuildContext context, String path) {
@@ -75,8 +75,9 @@ class _TabMainScreenState extends State<TabMainScreen> {
       );
     }
     if (Platform.isWindows) {
-      WindowsNativeTabDragDropService.isDragHoveringWindow
-          .addListener(_handleNativeDropHoverChanged);
+      WindowsNativeTabDragDropService.isDragHoveringWindow.addListener(
+        _handleNativeDropHoverChanged,
+      );
       _handleNativeDropHoverChanged();
     }
 
@@ -85,16 +86,20 @@ class _TabMainScreenState extends State<TabMainScreen> {
 
       final payload = widget.startupPayload;
       if (payload != null && payload.tabs.isNotEmpty) {
-        final active =
-            (payload.activeIndex ?? 0).clamp(0, payload.tabs.length - 1);
+        final active = (payload.activeIndex ?? 0).clamp(
+          0,
+          payload.tabs.length - 1,
+        );
         for (int i = 0; i < payload.tabs.length; i++) {
           final tab = payload.tabs[i];
-          _tabManagerBloc.add(AddTab(
-            path: tab.path,
-            name: tab.name,
-            switchToTab: i == active,
-            highlightedFileName: tab.highlightedFileName,
-          ));
+          _tabManagerBloc.add(
+            AddTab(
+              path: tab.path,
+              name: tab.name,
+              switchToTab: i == active,
+              highlightedFileName: tab.highlightedFileName,
+            ),
+          );
         }
       }
 
@@ -160,19 +165,23 @@ class _TabMainScreenState extends State<TabMainScreen> {
         barrierDismissible: false,
         pageBuilder: (routeCtx, animation, _) {
           return Consumer<ThemeProvider>(
-            builder: (ctx, provider, __) {
+            builder: (ctx, provider, _) {
               final theme = Theme.of(ctx);
-              final solidBg =
-                  theme.scaffoldBackgroundColor.withValues(alpha: 1);
-              final cardBg = (theme.dialogTheme.backgroundColor ??
-                      theme.colorScheme.surfaceContainerHigh)
-                  .withValues(alpha: 1);
+              final solidBg = theme.scaffoldBackgroundColor.withValues(
+                alpha: 1,
+              );
+              final cardBg =
+                  (theme.dialogTheme.backgroundColor ??
+                          theme.colorScheme.surfaceContainerHigh)
+                      .withValues(alpha: 1);
               return Material(
                 color: solidBg,
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 24),
+                      horizontal: 24,
+                      vertical: 24,
+                    ),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(
                         maxWidth: 760,
@@ -211,17 +220,18 @@ class _TabMainScreenState extends State<TabMainScreen> {
   }
 
   Future<void> _showPermissionExplainerIfNeeded() async {
-    final hasStorage =
-        await PermissionStateService.instance.hasStorageOrPhotosPermission();
+    final hasStorage = await PermissionStateService.instance
+        .hasStorageOrPhotosPermission();
     final hasAllFiles = Platform.isAndroid
         ? await PermissionStateService.instance.hasAllFilesAccessPermission()
         : true;
     final hasInstallPackages = Platform.isAndroid
         ? await PermissionStateService.instance.hasInstallPackagesPermission()
         : true;
-    final hasLocal =
-        await PermissionStateService.instance.hasLocalNetworkPermission();
-    final needsExplainer = !hasStorage ||
+    final hasLocal = await PermissionStateService.instance
+        .hasLocalNetworkPermission();
+    final needsExplainer =
+        !hasStorage ||
         !hasAllFiles ||
         !hasInstallPackages ||
         (Platform.isIOS ? !hasLocal : false);
@@ -239,8 +249,9 @@ class _TabMainScreenState extends State<TabMainScreen> {
   @override
   void dispose() {
     if (Platform.isWindows) {
-      WindowsNativeTabDragDropService.isDragHoveringWindow
-          .removeListener(_handleNativeDropHoverChanged);
+      WindowsNativeTabDragDropService.isDragHoveringWindow.removeListener(
+        _handleNativeDropHoverChanged,
+      );
     }
     _nativeDropHighlightOverlayEntry?.remove();
     _nativeDropHighlightOverlayEntry = null;
@@ -326,10 +337,12 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
     final isDarkMode = theme.brightness == Brightness.dark;
 
     final frameColor = baseColor.withValues(alpha: isDarkMode ? 0.26 : 0.22);
-    final stripBorderColor =
-        baseColor.withValues(alpha: isDarkMode ? 0.76 : 0.70);
-    final stripFillColor =
-        baseColor.withValues(alpha: isDarkMode ? 0.14 : 0.11);
+    final stripBorderColor = baseColor.withValues(
+      alpha: isDarkMode ? 0.76 : 0.70,
+    );
+    final stripFillColor = baseColor.withValues(
+      alpha: isDarkMode ? 0.14 : 0.11,
+    );
     final veilColor = isDarkMode
         ? Colors.black.withValues(alpha: 0.06)
         : Colors.black.withValues(alpha: 0.03);
@@ -343,9 +356,7 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
 
             return Stack(
               children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(color: veilColor),
-                ),
+                DecoratedBox(decoration: BoxDecoration(color: veilColor)),
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.all(5),

@@ -61,22 +61,22 @@ class TagSearchState extends Equatable {
 
   @override
   List<Object?> get props => [
-        fileTags,
-        allUniqueTags,
-        searchResultPaths,
-        currentSearchTag,
-        isGlobalSearch,
-        searchResultsTotal,
-        isLoading,
-        error,
-      ];
+    fileTags,
+    allUniqueTags,
+    searchResultPaths,
+    currentSearchTag,
+    isGlobalSearch,
+    searchResultsTotal,
+    isLoading,
+    error,
+  ];
 }
 
 class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   final FileNavigationBloc navigationBloc;
 
   TagSearchBloc({required this.navigationBloc})
-      : super(const TagSearchState()) {
+    : super(const TagSearchState()) {
     on<TagSearchLoadTagsForFile>(_onLoadTagsForFile);
     on<TagSearchLoadTagsForFiles>(_onLoadTagsForFiles);
     on<TagSearchLoadAllTags>(_onLoadAllTags);
@@ -233,18 +233,22 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         event.tag,
       );
       final paths = results.map((e) => e.path).toList();
-      emit(state.copyWith(
-        isLoading: false,
-        searchResultPaths: paths,
-        currentSearchTag: event.tag,
-        isGlobalSearch: false,
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          searchResultPaths: paths,
+          currentSearchTag: event.tag,
+          isGlobalSearch: false,
+          error: null,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Tag search error: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'Tag search error: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -262,19 +266,23 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
           validPaths.add(entity.path);
         }
       }
-      emit(state.copyWith(
-        isLoading: false,
-        searchResultPaths: validPaths,
-        currentSearchTag: event.tag,
-        isGlobalSearch: true,
-        searchResultsTotal: validPaths.length,
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          searchResultPaths: validPaths,
+          currentSearchTag: event.tag,
+          isGlobalSearch: true,
+          searchResultsTotal: validPaths.length,
+          error: null,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Global tag search error: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'Global tag search error: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -306,18 +314,22 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       }
 
       final paths = results.map((e) => e.path).toList();
-      emit(state.copyWith(
-        isLoading: false,
-        searchResultPaths: paths,
-        currentSearchTag: event.tags.join(', '),
-        isGlobalSearch: false,
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          searchResultPaths: paths,
+          currentSearchTag: event.tags.join(', '),
+          isGlobalSearch: false,
+          error: null,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Multi-tag search error: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'Multi-tag search error: ${e.toString()}',
+        ),
+      );
     }
   }
 
@@ -351,45 +363,50 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
           .map((f) => f.path)
           .toList();
 
-      emit(state.copyWith(
-        isLoading: false,
-        searchResultPaths: validPaths,
-        currentSearchTag: event.tags.join(', '),
-        isGlobalSearch: true,
-        searchResultsTotal: validPaths.length,
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          searchResultPaths: validPaths,
+          currentSearchTag: event.tags.join(', '),
+          isGlobalSearch: true,
+          searchResultsTotal: validPaths.length,
+          error: null,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Global multi-tag search error: ${e.toString()}',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          error: 'Global multi-tag search error: ${e.toString()}',
+        ),
+      );
     }
   }
 
-  void _onSetResults(
-    TagSearchSetResults event,
-    Emitter<TagSearchState> emit,
-  ) {
-    emit(state.copyWith(
-      searchResultPaths: event.resultPaths,
-      currentSearchTag: event.tagName,
-      isGlobalSearch: event.isGlobal,
-      searchResultsTotal: event.total,
-      error: null,
-    ));
+  void _onSetResults(TagSearchSetResults event, Emitter<TagSearchState> emit) {
+    emit(
+      state.copyWith(
+        searchResultPaths: event.resultPaths,
+        currentSearchTag: event.tagName,
+        isGlobalSearch: event.isGlobal,
+        searchResultsTotal: event.total,
+        error: null,
+      ),
+    );
   }
 
   void _onClearResults(
     TagSearchClearResults event,
     Emitter<TagSearchState> emit,
   ) {
-    emit(state.copyWith(
-      searchResultPaths: const [],
-      currentSearchTag: null,
-      isGlobalSearch: false,
-      searchResultsTotal: null,
-      error: null,
-    ));
+    emit(
+      state.copyWith(
+        searchResultPaths: const [],
+        currentSearchTag: null,
+        isGlobalSearch: false,
+        searchResultsTotal: null,
+        error: null,
+      ),
+    );
   }
 }

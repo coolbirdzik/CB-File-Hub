@@ -36,8 +36,9 @@ class FTPTester {
         final name = path.basename(item.path);
         final type = item.isDirectory ? "dir" : "file";
         final size = item is File ? (await item.stat()).size : 0;
-        final modified =
-            item is File ? (await item.stat()).modified : DateTime.now();
+        final modified = item is File
+            ? (await item.stat()).modified
+            : DateTime.now();
 
         // Thêm vào kết quả
         result.add({

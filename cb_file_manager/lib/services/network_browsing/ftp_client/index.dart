@@ -4,6 +4,7 @@
 /// without relying on external libraries. It supports all basic FTP operations
 /// such as browsing directories, uploading and downloading files, creating and
 /// deleting directories, and more.
+library;
 
 export 'ftp_client.dart';
 export 'ftp_commands.dart';

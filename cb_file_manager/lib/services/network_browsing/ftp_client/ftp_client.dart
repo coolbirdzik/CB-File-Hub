@@ -33,14 +33,11 @@ class FtpClient {
 
   /// Creates a new FTP client instance
   FtpClient({
-    required String host,
-    int port = 21,
-    String username = 'anonymous',
-    String password = 'anonymous@',
-  })  : _host = host,
-        _port = port,
-        _username = username,
-        _password = password;
+    required this._host,
+    this._port = 21,
+    String this._username = 'anonymous',
+    String this._password = 'anonymous@',
+  });
 
   /// Returns true if connected to the server
   bool get isConnected => _isConnected;
@@ -182,7 +179,8 @@ class FtpClient {
         rawData.addAll(data);
       }
       debugPrint(
-          "FTP: Received ${rawData.length} bytes of directory listing data");
+        "FTP: Received ${rawData.length} bytes of directory listing data",
+      );
     } catch (e) {
       debugPrint("FTP: Error reading data from socket: $e");
     }
@@ -194,7 +192,8 @@ class FtpClient {
     final transferResponse = await _waitForResponse();
     if (transferResponse.code != 226) {
       throw Exception(
-          'Failed to complete directory listing: ${transferResponse.message}');
+        'Failed to complete directory listing: ${transferResponse.message}',
+      );
     }
 
     // Parse directory listing
@@ -225,7 +224,8 @@ class FtpClient {
     // If listing seems to contain only whitespace or invalid lines, try NLST command as fallback
     if (listing.split('\n').every((line) => line.trim().isEmpty)) {
       debugPrint(
-          "FTP: LIST returned only empty lines, trying NLST as fallback");
+        "FTP: LIST returned only empty lines, trying NLST as fallback",
+      );
 
       // Setup new data connection
       await _setupDataConnection();
@@ -236,7 +236,8 @@ class FtpClient {
 
       if (nlstResponse.code != 150 && nlstResponse.code != 125) {
         throw Exception(
-            'Failed to list directory with NLST: ${nlstResponse.message}');
+          'Failed to list directory with NLST: ${nlstResponse.message}',
+        );
       }
 
       // Read NLST data
@@ -252,7 +253,8 @@ class FtpClient {
       final nlstTransferResponse = await _waitForResponse();
       if (nlstTransferResponse.code != 226) {
         throw Exception(
-            'Failed to complete NLST listing: ${nlstTransferResponse.message}');
+          'Failed to complete NLST listing: ${nlstTransferResponse.message}',
+        );
       }
 
       // Parse NLST listing (simple list of filenames)
@@ -285,14 +287,16 @@ class FtpClient {
           final hasExtension = name.contains('.');
           final isDir = !hasExtension;
 
-          result.add(FtpFileInfo(
-            name: name,
-            path: fullPath,
-            size: 0, // Size unknown
-            isDirectory: isDir,
-            lastModified: null, // Date unknown
-            rawListing: name,
-          ));
+          result.add(
+            FtpFileInfo(
+              name: name,
+              path: fullPath,
+              size: 0, // Size unknown
+              isDirectory: isDir,
+              lastModified: null, // Date unknown
+              rawListing: name,
+            ),
+          );
 
           debugPrint("FTP: Added ${isDir ? 'directory' : 'file'}: $name");
         }
@@ -304,14 +308,17 @@ class FtpClient {
     }
 
     // Parse with the regular method
-    final result =
-        FtpFileInfo.parseDirectoryListing(listing, _currentDirectory ?? '/');
+    final result = FtpFileInfo.parseDirectoryListing(
+      listing,
+      _currentDirectory ?? '/',
+    );
 
     // Log the results
     debugPrint("FTP: Parsed directory listing into ${result.length} items");
     for (var item in result) {
       debugPrint(
-          "FTP: - ${item.isDirectory ? 'Directory' : 'File'}: ${item.name}");
+        "FTP: - ${item.isDirectory ? 'Directory' : 'File'}: ${item.name}",
+      );
     }
 
     return result;
@@ -421,7 +428,8 @@ class FtpClient {
     final transferResponse = await _waitForResponse();
     if (transferResponse.code != 226) {
       throw Exception(
-          'Failed to complete file download: ${transferResponse.message}');
+        'Failed to complete file download: ${transferResponse.message}',
+      );
     }
 
     return Uint8List.fromList(fileData);
@@ -429,7 +437,9 @@ class FtpClient {
 
   /// Downloads a file from the server with progress tracking
   Future<Uint8List?> downloadFileWithProgress(
-      String remotePath, void Function(int bytesReceived) onProgress) async {
+    String remotePath,
+    void Function(int bytesReceived) onProgress,
+  ) async {
     if (!_isConnected) {
       throw Exception('Not connected to FTP server');
     }
@@ -464,7 +474,8 @@ class FtpClient {
     final transferResponse = await _waitForResponse();
     if (transferResponse.code != 226) {
       throw Exception(
-          'Failed to complete file download: ${transferResponse.message}');
+        'Failed to complete file download: ${transferResponse.message}',
+      );
     }
 
     return Uint8List.fromList(fileData);
@@ -501,15 +512,19 @@ class FtpClient {
     final transferResponse = await _waitForResponse();
     if (transferResponse.code != 226 && transferResponse.code != 250) {
       throw Exception(
-          'Failed to complete file upload: ${transferResponse.message}');
+        'Failed to complete file upload: ${transferResponse.message}',
+      );
     }
 
     return true;
   }
 
   /// Uploads a file to the server with progress tracking
-  Future<bool> uploadFileWithProgress(String localPath, String remotePath,
-      void Function(int bytesSent) onProgress) async {
+  Future<bool> uploadFileWithProgress(
+    String localPath,
+    String remotePath,
+    void Function(int bytesSent) onProgress,
+  ) async {
     if (!_isConnected) {
       throw Exception('Not connected to FTP server');
     }
@@ -548,7 +563,8 @@ class FtpClient {
     final transferResponse = await _waitForResponse();
     if (transferResponse.code != 226 && transferResponse.code != 250) {
       throw Exception(
-          'Failed to complete file upload: ${transferResponse.message}');
+        'Failed to complete file upload: ${transferResponse.message}',
+      );
     }
 
     return true;
@@ -569,7 +585,8 @@ class FtpClient {
 
     if (storResponse.code != 150 && storResponse.code != 125) {
       throw Exception(
-          'Failed to initiate data upload: ${storResponse.message}');
+        'Failed to initiate data upload: ${storResponse.message}',
+      );
     }
 
     // Send data
@@ -658,8 +675,9 @@ class FtpClient {
     }
 
     // Parse the passive mode response to extract IP and port
-    final match = RegExp(r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)')
-        .firstMatch(response.message);
+    final match = RegExp(
+      r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)',
+    ).firstMatch(response.message);
     if (match == null) {
       throw Exception('Invalid passive mode response: ${response.message}');
     }
@@ -775,8 +793,10 @@ class FtpClient {
     final response = utf8.decode(data);
     debugPrint('< $response');
 
-    final lines =
-        response.split('\r\n').where((line) => line.isNotEmpty).toList();
+    final lines = response
+        .split('\r\n')
+        .where((line) => line.isNotEmpty)
+        .toList();
 
     for (final line in lines) {
       final ftpResponse = FtpResponse.parse(line);
@@ -790,7 +810,7 @@ class FtpClient {
   }
 
   /// Handles errors on the control connection
-  void _handleControlError(error) {
+  void _handleControlError(Object error) {
     _handleError('Control connection error: $error');
 
     // Complete the current command with an error

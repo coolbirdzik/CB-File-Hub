@@ -22,11 +22,11 @@ class FtpServiceAdapter {
     String username = 'anonymous',
     String password = 'anonymous@',
   }) : _client = FtpClient(
-          host: host,
-          port: port,
-          username: username,
-          password: password,
-        );
+         host: host,
+         port: port,
+         username: username,
+         password: password,
+       );
 
   /// Connects to the FTP server
   Future<bool> connect() async {
@@ -73,7 +73,8 @@ class FtpServiceAdapter {
 
     final ftpFileInfos = await _client.listDirectory(targetPath);
     debugPrint(
-        'FtpServiceAdapter: Got ${ftpFileInfos.length} FtpFileInfo objects');
+      'FtpServiceAdapter: Got ${ftpFileInfos.length} FtpFileInfo objects',
+    );
 
     // Convert FtpFileInfo objects to FileSystemEntity objects
     final List<FileSystemEntity> results = [];
@@ -86,7 +87,8 @@ class FtpServiceAdapter {
       }
 
       debugPrint(
-          'FtpServiceAdapter: Processing ${fileInfo.isDirectory ? 'directory' : 'file'}: ${fileInfo.name}, path: ${fileInfo.path}');
+        'FtpServiceAdapter: Processing ${fileInfo.isDirectory ? 'directory' : 'file'}: ${fileInfo.name}, path: ${fileInfo.path}',
+      );
 
       try {
         if (fileInfo.isDirectory) {
@@ -112,7 +114,8 @@ class FtpServiceAdapter {
     }
 
     debugPrint(
-        'FtpServiceAdapter: Returning ${results.length} FileSystemEntity objects');
+      'FtpServiceAdapter: Returning ${results.length} FileSystemEntity objects',
+    );
     for (var item in results) {
       debugPrint('  - ${item.runtimeType}: ${item.path}');
     }
@@ -199,7 +202,9 @@ class FtpServiceAdapter {
 
   /// Downloads a file with progress tracking
   Future<Uint8List?> downloadFileWithProgress(
-      String remotePath, void Function(int bytesReceived) onProgress) async {
+    String remotePath,
+    void Function(int bytesReceived) onProgress,
+  ) async {
     if (!_isConnected) {
       throw Exception('Not connected to FTP server');
     }
@@ -217,14 +222,20 @@ class FtpServiceAdapter {
   }
 
   /// Uploads a file with progress tracking
-  Future<bool> uploadFileWithProgress(String localPath, String remotePath,
-      void Function(int bytesSent) onProgress) async {
+  Future<bool> uploadFileWithProgress(
+    String localPath,
+    String remotePath,
+    void Function(int bytesSent) onProgress,
+  ) async {
     if (!_isConnected) {
       throw Exception('Not connected to FTP server');
     }
 
     return await _client.uploadFileWithProgress(
-        localPath, remotePath, onProgress);
+      localPath,
+      remotePath,
+      onProgress,
+    );
   }
 
   /// Uploads data directly

@@ -31,7 +31,7 @@ class FolderContentRouter {
     required VoidCallback onForwardButtonPressed,
     required bool isLazyLoadingDrives,
     required Widget Function(FolderListState, SelectionState, bool)
-        contentBuilder,
+    contentBuilder,
   }) {
     // Drive view (Windows only)
     if (currentPath.isEmpty && Platform.isWindows) {
@@ -88,11 +88,7 @@ class FolderContentRouter {
     required String currentPath,
     required String tabId,
   }) {
-    return SystemScreenRouter.routeSystemPath(
-      context,
-      currentPath,
-      tabId,
-    );
+    return SystemScreenRouter.routeSystemPath(context, currentPath, tabId);
   }
 
   /// Build the body content with loading states
@@ -104,8 +100,12 @@ class FolderContentRouter {
     required bool isDesktopPlatform,
     required bool isRefreshing,
     required Widget Function(
-            BuildContext, FolderListState, SelectionState, bool)
-        mainContentBuilder,
+      BuildContext,
+      FolderListState,
+      SelectionState,
+      bool,
+    )
+    mainContentBuilder,
   }) {
     // Apply frame timing optimization before heavy UI operations
     FrameTimingOptimizer().optimizeBeforeHeavyOperation();
@@ -115,7 +115,8 @@ class FolderContentRouter {
     final bool hasContent = state.folders.isNotEmpty || state.files.isNotEmpty;
     // Top bar: only for initial loads (no existing content yet).
     // Refresh operations show at the bottom and don't affect content layout.
-    final bool shouldShowSkeleton = !hasContent &&
+    final bool shouldShowSkeleton =
+        !hasContent &&
         state.isLoading &&
         !state.isRefreshing &&
         state.error == null &&
@@ -138,7 +139,11 @@ class FolderContentRouter {
             child: shouldShowSkeleton
                 ? const SizedBox.shrink() // Show an empty space while loading
                 : mainContentBuilder(
-                    context, state, selectionState, isNetworkPath),
+                    context,
+                    state,
+                    selectionState,
+                    isNetworkPath,
+                  ),
           ),
         ),
       ],
@@ -156,8 +161,12 @@ class FolderContentRouter {
     required FolderListBloc folderListBloc,
     required Function(String) onNavigateToPath,
     required Widget Function(
-            BuildContext, FolderListState, SelectionState, bool)
-        folderAndFileListContentBuilder,
+      BuildContext,
+      FolderListState,
+      SelectionState,
+      bool,
+    )
+    folderAndFileListContentBuilder,
   }) {
     if (state.error != null) {
       return _buildErrorView(
@@ -173,7 +182,11 @@ class FolderContentRouter {
 
     // Show files/folders even while loading (progressive loading)
     return folderAndFileListContentBuilder(
-        context, state, selectionState, isNetworkPath);
+      context,
+      state,
+      selectionState,
+      isNetworkPath,
+    );
   }
 
   /// Build error view with retry and go back options

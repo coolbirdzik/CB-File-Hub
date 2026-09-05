@@ -6,7 +6,7 @@ import 'package:cb_file_manager/services/album_service.dart';
 class BatchAddDialog extends StatefulWidget {
   final int albumId;
 
-  const BatchAddDialog({Key? key, required this.albumId}) : super(key: key);
+  const BatchAddDialog({super.key, required this.albumId});
 
   @override
   State<BatchAddDialog> createState() => _BatchAddDialogState();
@@ -18,7 +18,7 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
 
   Future<void> _addFromFolder() async {
     try {
-      final directoryPath = await FilePicker.platform.getDirectoryPath();
+      final directoryPath = await FilePicker.getDirectoryPath();
       if (directoryPath != null) {
         // Chạy thêm vào album ở background, không chặn UI
         AlbumService.instance.addFilesFromDirectoryInBackground(
@@ -52,22 +52,25 @@ class _BatchAddDialogState extends State<BatchAddDialog> {
     });
 
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: true,
-      );
+      final picked = await FilePicker.pickFiles(type: FileType.image);
 
-      if (result != null) {
+      if (picked.isNotEmpty) {
         setState(() => _statusMessage = 'Adding selected files...');
 
-        final filePaths =
-            result.paths.where((p) => p != null).cast<String>().toList();
-        final addResult = await AlbumService.instance
-            .addFilesToAlbum(widget.albumId, filePaths);
+        final filePaths = picked
+            .map((f) => f.path)
+            .whereType<String>()
+            .toList();
+        final addResult = await AlbumService.instance.addFilesToAlbum(
+          widget.albumId,
+          filePaths,
+        );
 
         if (mounted) {
-          Navigator.pop(
-              context, {'added': addResult, 'total': filePaths.length});
+          Navigator.pop(context, {
+            'added': addResult,
+            'total': filePaths.length,
+          });
         }
       } else {
         if (mounted) {

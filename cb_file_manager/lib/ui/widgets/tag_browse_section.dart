@@ -48,15 +48,20 @@ class _BrowseRow {
 /// tags without hierarchy still show up as roots).
 class TagBrowseSection extends StatefulWidget {
   const TagBrowseSection({
-    Key? key,
+    super.key,
     required this.onTagSelected,
+    this.onTagDeselected,
     this.selectedTags = const <String>[],
     this.maxHeight = 260,
     this.fillHeight = false,
-  }) : super(key: key);
+  });
 
   /// Called with the original-cased tag name when a row is tapped.
   final ValueChanged<String> onTagSelected;
+
+  /// Called when a selected row is tapped again. When null, a second tap on
+  /// an already-selected tag is ignored.
+  final ValueChanged<String>? onTagDeselected;
 
   /// Tags already assigned in the host dialog (shown with a check mark).
   final List<String> selectedTags;
@@ -120,6 +125,11 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
   /// Pending single-tap used to tell a click apart from a double-click on
   /// desktop, mirroring the tag management screen's 250ms window.
+  ///
+  /// Do not also register [InkWell.onDoubleTap]: that holds every tap ~300ms
+  /// and then the delayed assign still fires, so expanding a parent assigns it
+  /// and a later chip-delete of that parent gets undone.
+  static const Duration _doubleTapWindow = Duration(milliseconds: 250);
   Timer? _singleTapTimer;
   String? _pendingTapTag;
 
@@ -161,8 +171,9 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
   /// Applies a new grid item size and remembers it for the next open.
   Future<void> _setGridZoomLevel(int value) async {
-    final next =
-        value.clamp(UserPreferences.minGridZoomLevel, _maxGridZoom).toInt();
+    final next = value
+        .clamp(UserPreferences.minGridZoomLevel, _maxGridZoom)
+        .toInt();
     if (next == _gridZoomLevel) return;
     setState(() => _gridZoomLevel = next);
     try {
@@ -175,8 +186,10 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
   /// Width budget for a single grid tile at the current zoom level.
   double get _gridTileExtent {
-    final zoom =
-        _gridZoomLevel.clamp(UserPreferences.minGridZoomLevel, _maxGridZoom);
+    final zoom = _gridZoomLevel.clamp(
+      UserPreferences.minGridZoomLevel,
+      _maxGridZoom,
+    );
     final totalSpacing = _gridSpacing * (zoom - 1);
     return math.max(
       _minTileExtent,
@@ -243,7 +256,8 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
       final roots = display.keys
           .where(
-              (normalized) => _hierarchyManager.getParents(normalized).isEmpty)
+            (normalized) => _hierarchyManager.getParents(normalized).isEmpty,
+          )
           .toList();
       roots.sort((a, b) => _compareDisplay(display, a, b));
 
@@ -275,8 +289,9 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   String _nameOf(String normalized) => _display[normalized] ?? normalized;
 
   bool _isSelected(String normalized) {
-    return widget.selectedTags
-        .any((tag) => tag.trim().toLowerCase() == normalized);
+    return widget.selectedTags.any(
+      (tag) => tag.trim().toLowerCase() == normalized,
+    );
   }
 
   /// Tags matching the current query plus all of their ancestors, so matches
@@ -296,7 +311,10 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   }
 
   void _collectAncestors(
-      String normalized, Set<String> into, Set<String> seen) {
+    String normalized,
+    Set<String> into,
+    Set<String> seen,
+  ) {
     if (!seen.add(normalized)) return;
     for (final parent in _hierarchyManager.getParents(normalized)) {
       into.add(parent);
@@ -321,13 +339,15 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
       // While filtering, keep the path to matches open automatically.
       final isExpanded = filter != null ? true : _expanded.contains(normalized);
 
-      rows.add(_BrowseRow(
-        normalized: normalized,
-        display: _nameOf(normalized),
-        depth: depth,
-        childCount: visibleChildren.length,
-        isExpanded: isExpanded,
-      ));
+      rows.add(
+        _BrowseRow(
+          normalized: normalized,
+          display: _nameOf(normalized),
+          depth: depth,
+          childCount: visibleChildren.length,
+          isExpanded: isExpanded,
+        ),
+      );
 
       if (isExpanded) {
         for (final child in visibleChildren) {
@@ -399,7 +419,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   void _activateTag(String normalized) {
     final hasChildren = _hierarchyManager.getChildren(normalized).isNotEmpty;
     if (!hasChildren) {
-      widget.onTagSelected(_nameOf(normalized));
+      _assignOrToggle(normalized);
       return;
     }
 
@@ -412,6 +432,15 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     }
 
     _drillIntoGrid(normalized);
+  }
+
+  void _assignOrToggle(String normalized) {
+    final name = _nameOf(normalized);
+    if (_isSelected(normalized)) {
+      widget.onTagDeselected?.call(name);
+      return;
+    }
+    widget.onTagSelected(name);
   }
 
   /// Navigates the grid to the children of [normalized], clearing an active
@@ -432,20 +461,19 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
   /// Single tap with double-click detection.
   ///
-  /// Desktop: the assign action is delayed 250ms; a second tap inside that
-  /// window cancels it and activates the tag instead (drill into children).
-  /// Touch: there is no double-tap, so a tap assigns immediately.
+  /// Desktop: assign/toggle is delayed [_doubleTapWindow]; a second tap inside
+  /// that window cancels it and drills into children instead.
+  /// Touch: there is no double-tap, so a tap assigns or toggles immediately.
   void _handleTagTap(String normalized) {
     if (!_isDesktop) {
-      widget.onTagSelected(_nameOf(normalized));
+      _assignOrToggle(normalized);
       return;
     }
 
-    // Leaves have nothing to drill into — assign right away, no delay.
     if (_hierarchyManager.getChildren(normalized).isEmpty) {
       _singleTapTimer?.cancel();
       _pendingTapTag = null;
-      widget.onTagSelected(_nameOf(normalized));
+      _assignOrToggle(normalized);
       return;
     }
 
@@ -458,17 +486,11 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
     _singleTapTimer?.cancel();
     _pendingTapTag = normalized;
-    _singleTapTimer = Timer(const Duration(milliseconds: 250), () {
+    _singleTapTimer = Timer(_doubleTapWindow, () {
       if (!mounted || _pendingTapTag != normalized) return;
       _pendingTapTag = null;
-      widget.onTagSelected(_nameOf(normalized));
+      _assignOrToggle(normalized);
     });
-  }
-
-  void _handleTagDoubleTap(String normalized) {
-    _singleTapTimer?.cancel();
-    _pendingTapTag = null;
-    _activateTag(normalized);
   }
 
   @override
@@ -617,11 +639,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   }
 
   Widget _buildViewModeToggle(AppLocalizations l10n, ThemeData theme) {
-    Widget button(
-      TagBrowseViewMode mode,
-      IconData icon,
-      String tooltip,
-    ) {
+    Widget button(TagBrowseViewMode mode, IconData icon, String tooltip) {
       final isActive = _viewMode == mode;
       return CbTooltip(
         message: tooltip,
@@ -652,8 +670,9 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.35,
+        ),
         borderRadius: BorderRadius.circular(13),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
@@ -708,28 +727,32 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     for (var i = 0; i < _gridPath.length; i++) {
       final isLast = i == _gridPath.length - 1;
       crumbs
-        ..add(Icon(
-          PhosphorIconsLight.caretRight,
-          size: 11,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-        ))
-        ..add(InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: isLast ? null : () => _popGridTo(i + 1),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: Text(
-              _nameOf(_gridPath[i]),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isLast ? FontWeight.w600 : FontWeight.w400,
-                color: isLast
-                    ? theme.colorScheme.onSurface
-                    : theme.colorScheme.onSurfaceVariant,
+        ..add(
+          Icon(
+            PhosphorIconsLight.caretRight,
+            size: 11,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+        )
+        ..add(
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: isLast ? null : () => _popGridTo(i + 1),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              child: Text(
+                _nameOf(_gridPath[i]),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isLast ? FontWeight.w600 : FontWeight.w400,
+                  color: isLast
+                      ? theme.colorScheme.onSurface
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
-        ));
+        );
     }
 
     return SingleChildScrollView(
@@ -770,14 +793,13 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () => _handleTagTap(normalized),
-      onDoubleTap:
-          childCount > 0 ? () => _handleTagDoubleTap(normalized) : null,
       child: Container(
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.35),
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.35,
+                ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
@@ -799,7 +821,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
                         ? Image.file(
                             File(thumbnailPath),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
+                            errorBuilder: (_, _, _) =>
                                 _buildGridPlaceholder(tagColor, childCount),
                           )
                         : _buildGridPlaceholder(tagColor, childCount),
@@ -915,8 +937,10 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
         hintText: l10n.searchTagsHint,
         prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass, size: 18),
         suffixIcon: _query.isEmpty
@@ -963,8 +987,6 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
     return InkWell(
       onTap: () => _handleTagTap(row.normalized),
-      onDoubleTap:
-          row.hasChildren ? () => _handleTagDoubleTap(row.normalized) : null,
       child: Container(
         padding: EdgeInsets.only(
           left: 8 + row.depth * 16,
@@ -1015,8 +1037,9 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.6),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.6,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -1054,7 +1077,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
           width: 22,
           height: 22,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildIconBadge(row, tagColor),
+          errorBuilder: (_, _, _) => _buildIconBadge(row, tagColor),
         ),
       );
     }

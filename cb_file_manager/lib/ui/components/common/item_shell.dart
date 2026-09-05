@@ -33,7 +33,7 @@ class ItemShell extends StatefulWidget {
   final bool enableSelectionHighlight;
 
   const ItemShell({
-    Key? key,
+    super.key,
     required this.child,
     required this.isSelected,
     required this.isSelectionMode,
@@ -44,7 +44,7 @@ class ItemShell extends StatefulWidget {
     this.onToggleSelection,
     this.onEnterSelectionMode,
     this.enableSelectionHighlight = true,
-  }) : super(key: key);
+  });
 
   @override
   State<ItemShell> createState() => _ItemShellState();
@@ -76,7 +76,8 @@ class _ItemShellState extends State<ItemShell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool showHighlight = widget.enableSelectionHighlight &&
+    final bool showHighlight =
+        widget.enableSelectionHighlight &&
         (widget.isSelected || (_isHovering && widget.isSelectionMode));
 
     final Color backgroundColor = ItemInteractionStyle.backgroundColor(
@@ -124,7 +125,7 @@ class ListItemShell extends StatefulWidget {
   final BorderRadius? borderRadius;
 
   const ListItemShell({
-    Key? key,
+    super.key,
     required this.child,
     required this.isSelected,
     required this.isSelectionMode,
@@ -136,7 +137,7 @@ class ListItemShell extends StatefulWidget {
     this.onEnterSelectionMode,
     this.padding = const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
     this.borderRadius,
-  }) : super(key: key);
+  });
 
   @override
   State<ListItemShell> createState() => _ListItemShellState();
@@ -216,7 +217,7 @@ class GridItemShell extends StatefulWidget {
   final VoidCallback? onEnterSelectionMode;
 
   const GridItemShell({
-    Key? key,
+    super.key,
     required this.child,
     required this.isSelected,
     required this.isSelectionMode,
@@ -226,7 +227,7 @@ class GridItemShell extends StatefulWidget {
     this.onSecondaryTapUp,
     this.onToggleSelection,
     this.onEnterSelectionMode,
-  }) : super(key: key);
+  });
 
   @override
   State<GridItemShell> createState() => _GridItemShellState();
@@ -272,8 +273,8 @@ class _GridItemShellState extends State<GridItemShell> {
     final Color cellBorderColor = widget.isSelected
         ? primary
         : (_isHovering && widget.isDesktopMode
-            ? primary.withValues(alpha: 0.4)
-            : Colors.transparent);
+              ? primary.withValues(alpha: 0.4)
+              : Colors.transparent);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),

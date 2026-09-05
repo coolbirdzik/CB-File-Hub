@@ -58,8 +58,10 @@ class CleanerGrowthHistoryService {
         ? const <CleanerFolderGrowth>[]
         : await _compare(previous, current);
 
-    final saved =
-        await _preferences.setString(key, jsonEncode(current.toJson()));
+    final saved = await _preferences.setString(
+      key,
+      jsonEncode(current.toJson()),
+    );
     if (!saved) {
       throw StateError('Unable to persist the Cleaner growth baseline.');
     }
@@ -101,11 +103,13 @@ class CleanerGrowthHistoryService {
       }
       final increasedBytes = folder.sizeBytes - oldFolder.sizeBytes;
       if (increasedBytes < minimumGrowthBytes) continue;
-      growth.add(CleanerFolderGrowth(
-        path: folder.path,
-        previousSizeBytes: oldFolder.sizeBytes,
-        currentSizeBytes: folder.sizeBytes,
-      ));
+      growth.add(
+        CleanerFolderGrowth(
+          path: folder.path,
+          previousSizeBytes: oldFolder.sizeBytes,
+          currentSizeBytes: folder.sizeBytes,
+        ),
+      );
     }
 
     // Prefer the most specific useful folder when the same increase rolls up
@@ -117,7 +121,8 @@ class CleanerGrowthHistoryService {
       final candidate = growth[index];
       final candidatePath = _normalizePath(candidate.path);
       final descendantGrowth = largestRetainedDescendantGrowth[candidatePath];
-      final explainedByDescendant = descendantGrowth != null &&
+      final explainedByDescendant =
+          descendantGrowth != null &&
           descendantGrowth * 100 >= candidate.increasedBytes * 80;
       if (!explainedByDescendant) {
         retained.add(candidate);
@@ -164,10 +169,12 @@ class CleanerGrowthHistoryService {
     while (pendingDirectories.isNotEmpty) {
       final node = pendingDirectories.removeLast();
       if (!identical(node, result.root)) {
-        folders.add(_CleanerDirectorySnapshot(
-          path: node.fullPath,
-          sizeBytes: node.sizeBytes,
-        ));
+        folders.add(
+          _CleanerDirectorySnapshot(
+            path: node.fullPath,
+            sizeBytes: node.sizeBytes,
+          ),
+        );
       }
       for (final child in node.children) {
         if (!child.isFile) pendingDirectories.add(child);
@@ -189,8 +196,9 @@ class CleanerGrowthHistoryService {
 
     folders.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
 
-    final retainedFolders =
-        folders.take(maximumSnapshotDirectories).toList(growable: false);
+    final retainedFolders = folders
+        .take(maximumSnapshotDirectories)
+        .toList(growable: false);
     // Keep the source lazy: a scan can report hundreds of thousands of issue
     // paths, so materializing a second raw Set here would create one large
     // synchronous UI-isolate burst before the cooperative index can yield.
@@ -200,10 +208,13 @@ class CleanerGrowthHistoryService {
     final foldersWithCoverage = <_CleanerDirectorySnapshot>[];
     for (var index = 0; index < retainedFolders.length; index++) {
       final folder = retainedFolders[index];
-      foldersWithCoverage.add(folder.copyWith(
-        hasIncompleteCoverage:
-            incompleteIndex.overlaps(_normalizePath(folder.path)),
-      ));
+      foldersWithCoverage.add(
+        folder.copyWith(
+          hasIncompleteCoverage: incompleteIndex.overlaps(
+            _normalizePath(folder.path),
+          ),
+        ),
+      );
       if (index % 256 == 0) {
         await Future<void>.delayed(Duration.zero);
       }
@@ -275,11 +286,13 @@ class _CleanerGrowthSnapshot {
       capturedAt: DateTime.parse(json['capturedAt'] as String),
       folders: rawFolders is List
           ? rawFolders
-              .whereType<Map>()
-              .map((folder) => _CleanerDirectorySnapshot.fromJson(
+                .whereType<Map>()
+                .map(
+                  (folder) => _CleanerDirectorySnapshot.fromJson(
                     Map<String, dynamic>.from(folder),
-                  ))
-              .toList(growable: false)
+                  ),
+                )
+                .toList(growable: false)
           : const <_CleanerDirectorySnapshot>[],
       incompletePaths: rawIncompletePaths is List
           ? rawIncompletePaths.whereType<String>().toList(growable: false)
@@ -288,10 +301,10 @@ class _CleanerGrowthSnapshot {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'capturedAt': capturedAt.toIso8601String(),
-        'folders': folders.map((folder) => folder.toJson()).toList(),
-        'incompletePaths': incompletePaths,
-      };
+    'capturedAt': capturedAt.toIso8601String(),
+    'folders': folders.map((folder) => folder.toJson()).toList(),
+    'incompletePaths': incompletePaths,
+  };
 }
 
 class _CleanerDirectorySnapshot {
@@ -323,10 +336,10 @@ class _CleanerDirectorySnapshot {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'path': path,
-        'sizeBytes': sizeBytes,
-        'hasIncompleteCoverage': hasIncompleteCoverage,
-      };
+    'path': path,
+    'sizeBytes': sizeBytes,
+    'hasIncompleteCoverage': hasIncompleteCoverage,
+  };
 }
 
 /// Normalized, boundary-aware index for legacy raw coverage paths.
@@ -388,10 +401,12 @@ class _IncompletePathIndex {
         if (index + 1 == sortedChunks.length) {
           mergedChunks.add(sortedChunks[index]);
         } else {
-          mergedChunks.add(await _mergeSortedChunks(
-            sortedChunks[index],
-            sortedChunks[index + 1],
-          ));
+          mergedChunks.add(
+            await _mergeSortedChunks(
+              sortedChunks[index],
+              sortedChunks[index + 1],
+            ),
+          );
         }
       }
       sortedChunks = mergedChunks;

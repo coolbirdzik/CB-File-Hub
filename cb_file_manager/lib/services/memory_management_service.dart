@@ -26,16 +26,18 @@ class MemoryManagementService {
         _channel.setMethodCallHandler(_handleMethodCall);
 
         // Listen to memory events from Android
-        _memoryEventSubscription =
-            _memoryEventChannel.receiveBroadcastStream().listen(
-          (event) {
-            _handleMemoryEvent(event);
-          },
-          onError: (error) {
-            debugPrint(
-                'MemoryManagementService: Error receiving memory events: $error');
-          },
-        );
+        _memoryEventSubscription = _memoryEventChannel
+            .receiveBroadcastStream()
+            .listen(
+              (event) {
+                _handleMemoryEvent(event);
+              },
+              onError: (error) {
+                debugPrint(
+                  'MemoryManagementService: Error receiving memory events: $error',
+                );
+              },
+            );
 
         // Initialize Android memory management
         await _channel.invokeMethod('initialize');
@@ -59,7 +61,8 @@ class MemoryManagementService {
         break;
       default:
         debugPrint(
-            'MemoryManagementService: Unknown method call: ${call.method}');
+          'MemoryManagementService: Unknown method call: ${call.method}',
+        );
     }
   }
 
@@ -82,7 +85,8 @@ class MemoryManagementService {
             break;
           default:
             debugPrint(
-                'MemoryManagementService: Unknown memory event: $eventType');
+              'MemoryManagementService: Unknown memory event: $eventType',
+            );
         }
       }
     } catch (e) {
@@ -104,7 +108,8 @@ class MemoryManagementService {
   /// Handle ImageReader_JNI errors
   void _handleImageReaderError(dynamic data) {
     debugPrint(
-        'MemoryManagementService: ImageReader_JNI error detected: $data');
+      'MemoryManagementService: ImageReader_JNI error detected: $data',
+    );
 
     // Force aggressive cleanup
     _forceAggressiveCleanup();
@@ -134,7 +139,8 @@ class MemoryManagementService {
       }
     } catch (e) {
       debugPrint(
-          'MemoryManagementService: Error forcing garbage collection: $e');
+        'MemoryManagementService: Error forcing garbage collection: $e',
+      );
     }
   }
 
@@ -148,7 +154,8 @@ class MemoryManagementService {
       }
     } catch (e) {
       debugPrint(
-          'MemoryManagementService: Error forcing aggressive cleanup: $e');
+        'MemoryManagementService: Error forcing aggressive cleanup: $e',
+      );
     }
   }
 
@@ -195,12 +202,14 @@ class MemoryManagementService {
   Future<void> setVideoBufferSize(int sizeInBytes) async {
     try {
       if (Platform.isAndroid) {
-        await _channel
-            .invokeMethod('setVideoBufferSize', {'size': sizeInBytes});
+        await _channel.invokeMethod('setVideoBufferSize', {
+          'size': sizeInBytes,
+        });
       }
     } catch (e) {
       debugPrint(
-          'MemoryManagementService: Error setting video buffer size: $e');
+        'MemoryManagementService: Error setting video buffer size: $e',
+      );
     }
   }
 
@@ -208,12 +217,14 @@ class MemoryManagementService {
   Future<void> setAggressiveMemoryManagement(bool enabled) async {
     try {
       if (Platform.isAndroid) {
-        await _channel.invokeMethod(
-            'setAggressiveMemoryManagement', {'enabled': enabled});
+        await _channel.invokeMethod('setAggressiveMemoryManagement', {
+          'enabled': enabled,
+        });
       }
     } catch (e) {
       debugPrint(
-          'MemoryManagementService: Error setting aggressive memory management: $e');
+        'MemoryManagementService: Error setting aggressive memory management: $e',
+      );
     }
   }
 

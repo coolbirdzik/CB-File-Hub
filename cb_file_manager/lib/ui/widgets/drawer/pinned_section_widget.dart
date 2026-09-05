@@ -13,11 +13,11 @@ class PinnedSectionWidget extends StatefulWidget {
   final ValueChanged<bool>? onExpansionChanged;
 
   const PinnedSectionWidget({
-    Key? key,
+    super.key,
     required this.onNavigate,
     this.initialExpanded = false,
     this.onExpansionChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<PinnedSectionWidget> createState() => _PinnedSectionWidgetState();
@@ -55,9 +55,7 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
         }
 
         return Theme(
-          data: Theme.of(context).copyWith(
-            dividerColor: Colors.transparent,
-          ),
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Material(
@@ -102,19 +100,23 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
                   });
                   widget.onExpansionChanged?.call(isExpanded);
                 },
-                children: state.pinnedPaths.map((pinnedPath) {
-                  return _buildPinnedItem(
-                    context,
-                    pinnedPath: pinnedPath,
-                    onTap: () => widget.onNavigate(
-                      pinnedPath,
-                      _getPinnedDisplayName(pinnedPath),
-                    ),
-                    onUnpin: () {
-                      context.read<DrawerCubit>().togglePinnedPath(pinnedPath);
-                    },
-                  );
-                }).toList(growable: false),
+                children: state.pinnedPaths
+                    .map((pinnedPath) {
+                      return _buildPinnedItem(
+                        context,
+                        pinnedPath: pinnedPath,
+                        onTap: () => widget.onNavigate(
+                          pinnedPath,
+                          _getPinnedDisplayName(pinnedPath),
+                        ),
+                        onUnpin: () {
+                          context.read<DrawerCubit>().togglePinnedPath(
+                            pinnedPath,
+                          );
+                        },
+                      );
+                    })
+                    .toList(growable: false),
               ),
             ),
           ),
@@ -141,10 +143,7 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
       ),
       title: Text(
         _getPinnedDisplayName(pinnedPath),
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
       trailing: IconButton(
         icon: Icon(

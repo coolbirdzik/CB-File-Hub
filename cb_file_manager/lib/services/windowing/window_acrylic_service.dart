@@ -34,7 +34,8 @@ class WindowAcrylicService {
 
     if (_isWindows10() && !DesignSystemConfig.keepAcrylicOnWindows10) {
       debugPrint(
-          '[WindowAcrylic] Skipped: Windows 10 and feature flag disables it');
+        '[WindowAcrylic] Skipped: Windows 10 and feature flag disables it',
+      );
       return;
     }
 
@@ -47,8 +48,9 @@ class WindowAcrylicService {
         );
       } on MissingPluginException catch (e) {
         debugPrint(
-            '[WindowAcrylic] MissingPluginException: native plugin not available. '
-            'Ensure the Windows plugin is built. Details: $e');
+          '[WindowAcrylic] MissingPluginException: native plugin not available. '
+          'Ensure the Windows plugin is built. Details: $e',
+        );
       } catch (e) {
         debugPrint('[WindowAcrylic] Error applying native backdrop: $e');
       }

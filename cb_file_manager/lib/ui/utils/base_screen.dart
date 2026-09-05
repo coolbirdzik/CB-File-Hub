@@ -11,6 +11,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 // Import RouteUtils
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+
 // For Platform check
 
 /// A base screen widget that handles common functionality across all screens
@@ -33,8 +34,9 @@ class BaseScreen extends StatefulWidget {
 
   /// Static key for accessing drawer from anywhere - for backward compatibility only
   /// THIS SHOULD NOT BE USED IN NEW CODE - it's only here for legacy support
-  static final GlobalKey<ScaffoldState> scaffoldKey =
-      GlobalKey<ScaffoldState>(debugLabel: 'legacyGlobalScaffoldKey');
+  static final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>(
+    debugLabel: 'legacyGlobalScaffoldKey',
+  );
 
   /// Static reference to the most recently active BaseScreen state
   /// This is used for backward compatibility
@@ -53,7 +55,7 @@ class BaseScreen extends StatefulWidget {
   }
 
   const BaseScreen({
-    Key? key,
+    super.key,
     required this.title,
     this.titleWidget,
     required this.body,
@@ -64,7 +66,7 @@ class BaseScreen extends StatefulWidget {
     this.backgroundColor,
     this.resizeToAvoidBottomInset = true,
     this.showAppBar = true,
-  }) : super(key: key);
+  });
 
   @override
   State<BaseScreen> createState() => _BaseScreenState();
@@ -72,8 +74,9 @@ class BaseScreen extends StatefulWidget {
 
 class _BaseScreenState extends State<BaseScreen> {
   // Instance-specific scaffold key
-  final GlobalKey<ScaffoldState> _scaffoldKey =
-      GlobalKey<ScaffoldState>(debugLabel: 'instanceScaffoldKey');
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>(
+    debugLabel: 'instanceScaffoldKey',
+  );
 
   // Drawer state variables
   bool _isDrawerPinned = false;

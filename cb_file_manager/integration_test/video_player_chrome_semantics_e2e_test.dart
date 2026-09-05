@@ -19,8 +19,9 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  testWidgets('video player chrome keeps a valid Windows AX tree',
-      (tester) async {
+  testWidgets('video player chrome keeps a valid Windows AX tree', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
     var tick = 0;
     var showChrome = true;
@@ -130,8 +131,9 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('real local video playback keeps a valid Windows AX tree',
-      (tester) async {
+  testWidgets('real local video playback keeps a valid Windows AX tree', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
     final sample = File(
       p.join(
@@ -152,10 +154,7 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const <Locale>[
-          Locale('vi'),
-          Locale('en'),
-        ],
+        supportedLocales: const <Locale>[Locale('vi'), Locale('en')],
         home: VideoPlayerFullScreen(file: sample),
       ),
     );

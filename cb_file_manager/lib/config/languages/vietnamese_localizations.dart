@@ -3529,11 +3529,17 @@ class VietnameseLocalizations implements AppLocalizations {
       'Đã xóa vĩnh viễn $count mục ($size)';
   @override
   String diskCleanerPermanentDeletedWithInUse(
-          int count, String size, int skipped) =>
+    int count,
+    String size,
+    int skipped,
+  ) =>
       'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp đang dùng; chi tiết đã được ghi nhật ký.';
   @override
   String diskCleanerPermanentDeletedWithSkipped(
-          int count, String size, int skipped) =>
+    int count,
+    String size,
+    int skipped,
+  ) =>
       'Đã xóa vĩnh viễn $count mục ($size). Đã bỏ qua $skipped tệp sau khi xóa thất bại.';
 
   // Cleaner - chon o dia, don nhanh, ly do rac
@@ -3898,4 +3904,6 @@ class VietnameseLocalizations implements AppLocalizations {
   String get localAiTokensSuffix => 'token';
   @override
   String get localAiInvalidTokenCount => 'Vui lòng nhập số hợp lệ';
+  @override
+  String get aiReasoning => 'Suy nghĩ';
 }

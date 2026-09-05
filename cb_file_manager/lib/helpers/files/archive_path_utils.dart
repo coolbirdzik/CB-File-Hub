@@ -14,10 +14,8 @@ class ArchiveBrowseLocation {
 
   bool get isAtArchiveRoot => innerPath.isEmpty;
 
-  String get virtualPath => ArchivePathUtils.build(
-        archiveFile: archiveFile,
-        innerPath: innerPath,
-      );
+  String get virtualPath =>
+      ArchivePathUtils.build(archiveFile: archiveFile, innerPath: innerPath);
 }
 
 /// Breadcrumb segment for archive address bars.
@@ -25,10 +23,7 @@ class ArchiveBreadcrumb {
   final String label;
   final String virtualPath;
 
-  const ArchiveBreadcrumb({
-    required this.label,
-    required this.virtualPath,
-  });
+  const ArchiveBreadcrumb({required this.label, required this.virtualPath});
 }
 
 /// Virtual paths for in-tab archive browsing (`#archive?file=…&inner=…`).
@@ -60,10 +55,7 @@ class ArchivePathUtils {
     );
   }
 
-  static String build({
-    required String archiveFile,
-    String innerPath = '',
-  }) {
+  static String build({required String archiveFile, String innerPath = ''}) {
     final params = <String, String>{'file': archiveFile};
     final inner = _normalizeInner(innerPath);
     if (inner.isNotEmpty) {

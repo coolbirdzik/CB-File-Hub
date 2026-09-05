@@ -19,7 +19,7 @@ class OptimizedInteractionLayer extends StatefulWidget {
   final void Function(TapUpDetails)? onTertiaryTapUp;
 
   const OptimizedInteractionLayer({
-    Key? key,
+    super.key,
     this.child,
     required this.onTap,
     this.onDoubleTap,
@@ -28,7 +28,7 @@ class OptimizedInteractionLayer extends StatefulWidget {
     this.onSecondaryTap,
     this.onSecondaryTapUp,
     this.onTertiaryTapUp,
-  }) : super(key: key);
+  });
 
   @override
   OptimizedInteractionLayerState createState() =>
@@ -117,8 +117,9 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
       onTap: _handleTap,
       onTapCancel: _handleTapCancel,
       onLongPress: widget.onLongPress,
-      onLongPressStart:
-          widget.onLongPressStart != null ? _handleLongPressStart : null,
+      onLongPressStart: widget.onLongPressStart != null
+          ? _handleLongPressStart
+          : null,
       onSecondaryTap: widget.onSecondaryTap,
       onSecondaryTapUp: widget.onSecondaryTapUp,
       onTertiaryTapUp: widget.onTertiaryTapUp,
@@ -139,7 +140,7 @@ class OptimizedFileIcon extends StatefulWidget {
   final BoxFit fit;
 
   const OptimizedFileIcon({
-    Key? key,
+    super.key,
     required this.file,
     this.isVideo = false,
     this.isImage = false,
@@ -148,7 +149,7 @@ class OptimizedFileIcon extends StatefulWidget {
     this.fallbackColor,
     this.borderRadius,
     this.fit = BoxFit.cover,
-  }) : super(key: key);
+  });
 
   @override
   OptimizedFileIconState createState() => OptimizedFileIconState();
@@ -166,8 +167,10 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
     super.initState();
     // Initialize the icon future only once if it's a regular file
     if (!widget.isVideo && !widget.isImage) {
-      _iconFuture =
-          FileIconHelper.getIconForFile(widget.file, size: widget.size);
+      _iconFuture = FileIconHelper.getIconForFile(
+        widget.file,
+        size: widget.size,
+      );
     }
   }
 
@@ -179,8 +182,10 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
         widget.isVideo != oldWidget.isVideo ||
         widget.isImage != oldWidget.isImage) {
       if (!widget.isVideo && !widget.isImage) {
-        _iconFuture =
-            FileIconHelper.getIconForFile(widget.file, size: widget.size);
+        _iconFuture = FileIconHelper.getIconForFile(
+          widget.file,
+          size: widget.size,
+        );
       }
     }
   }
@@ -190,9 +195,7 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
     super.build(context);
 
     // Wrap in RepaintBoundary to prevent parent changes from triggering repaints
-    return RepaintBoundary(
-      child: _buildOptimizedIcon(),
-    );
+    return RepaintBoundary(child: _buildOptimizedIcon());
   }
 
   Widget _buildOptimizedIcon() {
@@ -210,8 +213,11 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
             width: widget.size,
             height: widget.size,
             fit: widget.fit,
-            fallbackBuilder: () => Icon(widget.fallbackIcon,
-                size: widget.size, color: widget.fallbackColor),
+            fallbackBuilder: () => Icon(
+              widget.fallbackIcon,
+              size: widget.size,
+              color: widget.fallbackColor,
+            ),
             key: ValueKey('video-thumbnail-${widget.file.path}'),
           ),
         ),
@@ -229,16 +235,21 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
             width: widget.size,
             height: widget.size,
             fit: widget.fit,
-            fallbackBuilder: () => Icon(widget.fallbackIcon,
-                size: widget.size, color: widget.fallbackColor),
+            fallbackBuilder: () => Icon(
+              widget.fallbackIcon,
+              size: widget.size,
+              color: widget.fallbackColor,
+            ),
           ),
         ),
       );
     } else {
       // Try sync extension icon cache first (warmed by batch native call)
       final ext = p.extension(widget.file.path).toLowerCase();
-      final cachedIcon =
-          FileIconHelper.getExtensionIconSync(ext, size: widget.size.toInt());
+      final cachedIcon = FileIconHelper.getExtensionIconSync(
+        ext,
+        size: widget.size.toInt(),
+      );
       if (cachedIcon != null) {
         return SizedBox(
           width: widget.size,
@@ -253,8 +264,11 @@ class OptimizedFileIconState extends State<OptimizedFileIcon>
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting ||
               !snapshot.hasData) {
-            return Icon(widget.fallbackIcon,
-                size: widget.size, color: widget.fallbackColor);
+            return Icon(
+              widget.fallbackIcon,
+              size: widget.size,
+              color: widget.fallbackColor,
+            );
           }
           return snapshot.data!;
         },

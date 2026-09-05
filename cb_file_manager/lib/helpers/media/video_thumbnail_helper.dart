@@ -76,13 +76,15 @@ Future<int> _getActualVideoDuration(String videoPath) async {
       }
     } catch (e) {
       debugPrint(
-          'VideoThumbnail: ✗ FFmpeg native exception for $videoPath: $e');
+        'VideoThumbnail: ✗ FFmpeg native exception for $videoPath: $e',
+      );
     }
   }
 
   // Fallback to estimation if native method not available or failed
   debugPrint(
-      'VideoThumbnail: Using file size estimation for duration of $videoPath');
+    'VideoThumbnail: Using file size estimation for duration of $videoPath',
+  );
   return _getEstimatedVideoDurationIsolate(videoPath);
 }
 
@@ -115,8 +117,8 @@ Future<int> _getEstimatedVideoDurationIsolate(String videoPath) async {
           estimationFactor = 10.0; // Default estimation
       }
 
-      final estimatedSeconds =
-          (fileSize / (1024 * 1024) * estimationFactor).round();
+      final estimatedSeconds = (fileSize / (1024 * 1024) * estimationFactor)
+          .round();
 
       // Clamp to reasonable bounds (minimum 10 seconds, maximum 10 minutes for estimation)
       final clampedDuration = estimatedSeconds.clamp(10, 600);
@@ -160,13 +162,14 @@ Future<int> _calculateTimestampFromPercentageIsolate(
   }
 
   // Calculate timestamp in seconds
-  int timestampSeconds =
-      ((adjustedPercentage / 100.0) * actualDuration).round();
+  int timestampSeconds = ((adjustedPercentage / 100.0) * actualDuration)
+      .round();
 
   // Ensure timestamp is within safe bounds (avoid first/last 5 seconds)
   const minTimestamp = 5;
-  final maxTimestamp =
-      actualDuration > 10 ? actualDuration - 5 : actualDuration ~/ 2;
+  final maxTimestamp = actualDuration > 10
+      ? actualDuration - 5
+      : actualDuration ~/ 2;
   timestampSeconds = timestampSeconds.clamp(minTimestamp, maxTimestamp);
 
   return timestampSeconds;
@@ -229,7 +232,8 @@ Future<String?> _generateThumbnailIsolate(_ThumbnailIsolateArgs args) async {
     // Non-blocking file check
     bool cacheExists = false;
     try {
-      cacheExists = !args.forceRegenerate &&
+      cacheExists =
+          !args.forceRegenerate &&
           await cacheFile.exists() &&
           await cacheFile.length() > 0;
 
@@ -261,9 +265,9 @@ Future<String?> _generateThumbnailIsolate(_ThumbnailIsolateArgs args) async {
       // Custom mode: calculate timestamp from percentage
       final int timestampSeconds =
           await _calculateTimestampFromPercentageIsolate(
-        args.videoPath,
-        args.thumbnailPercentage,
-      );
+            args.videoPath,
+            args.thumbnailPercentage,
+          );
       timeMs = timestampSeconds * 1000;
       debugPrint(
         'VideoThumbnail (Isolate): [Custom Mode] Using ${timestampSeconds}s (${args.thumbnailPercentage.toInt()}%)',
@@ -341,7 +345,7 @@ class VideoThumbnailHelper {
   /// Stream to notify about generation status for a specific video
   /// Emits a ThumbnailGenerationStatus with video path and status info
   static final StreamController<ThumbnailGenerationStatus>
-      _generationStatusController =
+  _generationStatusController =
       StreamController<ThumbnailGenerationStatus>.broadcast();
   static Stream<ThumbnailGenerationStatus> get onGenerationStatus =>
       _generationStatusController.stream;
@@ -445,8 +449,9 @@ class VideoThumbnailHelper {
       // Also refresh thumbnail mode
       final modeString = await _userPrefs.getThumbnailMode();
       final oldMode = _thumbnailMode;
-      _thumbnailMode =
-          modeString == 'fast' ? ThumbnailMode.fast : ThumbnailMode.custom;
+      _thumbnailMode = modeString == 'fast'
+          ? ThumbnailMode.fast
+          : ThumbnailMode.custom;
 
       debugPrint(
         'VideoThumbnail: Refreshed settings - percentage: $oldPercentage% -> $_thumbnailPercentage%, mode: ${oldMode.name} -> ${_thumbnailMode.name}',
@@ -479,8 +484,9 @@ class VideoThumbnailHelper {
 
       final modeString = await _userPrefs.getThumbnailMode();
       final oldMode = _thumbnailMode;
-      _thumbnailMode =
-          modeString == 'fast' ? ThumbnailMode.fast : ThumbnailMode.custom;
+      _thumbnailMode = modeString == 'fast'
+          ? ThumbnailMode.fast
+          : ThumbnailMode.custom;
 
       debugPrint(
         'VideoThumbnail: Refreshed thumbnail mode from ${oldMode.name} to ${_thumbnailMode.name}',
@@ -601,8 +607,9 @@ class VideoThumbnailHelper {
 
           // Also load thumbnail mode
           final modeString = await _userPrefs.getThumbnailMode();
-          _thumbnailMode =
-              modeString == 'fast' ? ThumbnailMode.fast : ThumbnailMode.custom;
+          _thumbnailMode = modeString == 'fast'
+              ? ThumbnailMode.fast
+              : ThumbnailMode.custom;
 
           // Also load max concurrency
           final concurrency = await _userPrefs.getMaxThumbnailConcurrency();
@@ -924,40 +931,42 @@ class VideoThumbnailHelper {
         }
 
         // Launch all batch items in parallel.
-        await Future.wait(batch.map((request) async {
-          try {
-            final result = await _generateThumbnailInternal(
-              request.videoPath,
-              forceRegenerate: request.forceRegenerate,
-              quality: request.quality,
-              thumbnailSize: request.thumbnailSize,
-            );
+        await Future.wait(
+          batch.map((request) async {
+            try {
+              final result = await _generateThumbnailInternal(
+                request.videoPath,
+                forceRegenerate: request.forceRegenerate,
+                quality: request.quality,
+                thumbnailSize: request.thumbnailSize,
+              );
 
-            if (result != null) {
-              _fileCache[request.videoPath] = result;
-              if (!request.completer.isCompleted) {
-                request.completer.complete(result);
+              if (result != null) {
+                _fileCache[request.videoPath] = result;
+                if (!request.completer.isCompleted) {
+                  request.completer.complete(result);
+                }
+                try {
+                  _thumbnailReadyController.add(request.videoPath);
+                } catch (_) {}
+              } else {
+                if (!request.completer.isCompleted) {
+                  request.completer.complete(null);
+                }
               }
-              try {
-                _thumbnailReadyController.add(request.videoPath);
-              } catch (_) {}
-            } else {
+            } catch (e) {
+              debugPrint(
+                'VideoThumbnail: Error processing request for ${request.videoPath}: $e',
+              );
               if (!request.completer.isCompleted) {
                 request.completer.complete(null);
               }
+            } finally {
+              _processingQueue.remove(request);
+              _activeGenerations--;
             }
-          } catch (e) {
-            debugPrint(
-              'VideoThumbnail: Error processing request for ${request.videoPath}: $e',
-            );
-            if (!request.completer.isCompleted) {
-              request.completer.complete(null);
-            }
-          } finally {
-            _processingQueue.remove(request);
-            _activeGenerations--;
-          }
-        }));
+          }),
+        );
 
         // Yield to event loop between batches.
         if (_pendingQueue.isNotEmpty) {
@@ -1132,7 +1141,8 @@ class VideoThumbnailHelper {
 
       if (_isWindows) {
         _log(
-            'VideoThumbnail: Using direct generation on Windows for $cacheKey');
+          'VideoThumbnail: Using direct generation on Windows for $cacheKey',
+        );
         try {
           generatedPath = await _generateThumbnailDirectWindows(
             videoPath: cacheKey,
@@ -1163,16 +1173,19 @@ class VideoThumbnailHelper {
         // Emit status for non-Windows platforms
         final mode = _thumbnailMode;
         try {
-          _generationStatusController.add(ThumbnailGenerationStatus(
-            videoPath: videoPath,
-            isGenerating: true,
-            mode: mode,
-            positionPercent:
-                mode == ThumbnailMode.custom ? percentage.toInt() : null,
-            statusMessage: mode == ThumbnailMode.fast
-                ? 'Fast mode'
-                : '${percentage.toInt()}%',
-          ));
+          _generationStatusController.add(
+            ThumbnailGenerationStatus(
+              videoPath: videoPath,
+              isGenerating: true,
+              mode: mode,
+              positionPercent: mode == ThumbnailMode.custom
+                  ? percentage.toInt()
+                  : null,
+              statusMessage: mode == ThumbnailMode.fast
+                  ? 'Fast mode'
+                  : '${percentage.toInt()}%',
+            ),
+          );
         } catch (_) {}
 
         final args = _ThumbnailIsolateArgs(
@@ -1189,8 +1202,7 @@ class VideoThumbnailHelper {
         );
 
         try {
-          generatedPath =
-              await compute(_generateThumbnailIsolate, args).timeout(
+          generatedPath = await compute(_generateThumbnailIsolate, args).timeout(
             const Duration(seconds: 8),
             onTimeout: () {
               _log(
@@ -1281,16 +1293,19 @@ class VideoThumbnailHelper {
       if (mode == ThumbnailMode.fast) {
         // Fast mode: use OS shell thumbnail (Windows shell cache)
         _log(
-            'VideoThumbnail: [Fast Mode] Using shell thumbnail for $videoPath');
+          'VideoThumbnail: [Fast Mode] Using shell thumbnail for $videoPath',
+        );
 
         // Emit status for fast mode
         try {
-          _generationStatusController.add(ThumbnailGenerationStatus(
-            videoPath: videoPath,
-            isGenerating: true,
-            mode: ThumbnailMode.fast,
-            statusMessage: 'Fast mode',
-          ));
+          _generationStatusController.add(
+            ThumbnailGenerationStatus(
+              videoPath: videoPath,
+              isGenerating: true,
+              mode: ThumbnailMode.fast,
+              statusMessage: 'Fast mode',
+            ),
+          );
         } catch (_) {}
 
         try {
@@ -1307,29 +1322,34 @@ class VideoThumbnailHelper {
             final file = File(nativePath);
             if (await file.exists() && await file.length() > 0) {
               _log(
-                  'VideoThumbnail: [Fast Mode] Shell thumbnail successful for $videoPath');
+                'VideoThumbnail: [Fast Mode] Shell thumbnail successful for $videoPath',
+              );
               return nativePath;
             }
           }
         } catch (e) {
           _log(
-              'VideoThumbnail: [Fast Mode] Shell thumbnail failed for $videoPath: $e');
+            'VideoThumbnail: [Fast Mode] Shell thumbnail failed for $videoPath: $e',
+          );
         }
       } else {
         // Custom mode: use FFmpeg with user-configured timestamp percentage
         // Using optimized single-pass extraction that gets duration + thumbnail in one file open
         _log(
-            'VideoThumbnail: [Custom Mode] Extracting at $percentage% of video for $videoPath');
+          'VideoThumbnail: [Custom Mode] Extracting at $percentage% of video for $videoPath',
+        );
 
         // Emit status for custom mode with position info
         try {
-          _generationStatusController.add(ThumbnailGenerationStatus(
-            videoPath: videoPath,
-            isGenerating: true,
-            mode: ThumbnailMode.custom,
-            positionPercent: percentage,
-            statusMessage: '$percentage%',
-          ));
+          _generationStatusController.add(
+            ThumbnailGenerationStatus(
+              videoPath: videoPath,
+              isGenerating: true,
+              mode: ThumbnailMode.custom,
+              positionPercent: percentage,
+              statusMessage: '$percentage%',
+            ),
+          );
         } catch (_) {}
 
         try {
@@ -1337,19 +1357,20 @@ class VideoThumbnailHelper {
           // This is ~2x faster than separate getVideoDuration + generateThumbnail calls
           nativePath =
               await FcNativeVideoThumbnail.generateThumbnailAtPercentage(
-            videoPath: absoluteVideoPath,
-            outputPath: thumbnailPath,
-            percentage: percentage.toDouble(),
-            width: maxSize,
-            format: 'jpg',
-            quality: quality,
-          );
+                videoPath: absoluteVideoPath,
+                outputPath: thumbnailPath,
+                percentage: percentage.toDouble(),
+                width: maxSize,
+                format: 'jpg',
+                quality: quality,
+              );
 
           if (nativePath != null) {
             final file = File(nativePath);
             if (await file.exists() && await file.length() > 0) {
               _log(
-                  'VideoThumbnail: [Custom Mode] Extraction successful at $percentage% for $videoPath');
+                'VideoThumbnail: [Custom Mode] Extraction successful at $percentage% for $videoPath',
+              );
               return nativePath;
             }
           }
@@ -1377,14 +1398,16 @@ class VideoThumbnailHelper {
             );
           } catch (e) {
             _log(
-                'VideoThumbnail: Shell thumbnail also failed for $videoPath: $e');
+              'VideoThumbnail: Shell thumbnail also failed for $videoPath: $e',
+            );
           }
 
           if (nativePath != null) {
             final file = File(nativePath);
             if (await file.exists() && await file.length() > 0) {
               _log(
-                  'VideoThumbnail: Thumbnail generation successful for $videoPath');
+                'VideoThumbnail: Thumbnail generation successful for $videoPath',
+              );
               return nativePath;
             }
           } else {
@@ -1763,17 +1786,16 @@ class VideoThumbnailHelper {
     void Function(String?)? onThumbnailGenerated,
   }) {
     defaultFallback() => Container(
-          color: Colors.grey[300],
-          child: const Center(
-            child: Icon(PhosphorIconsLight.filmStrip,
-                size: 40, color: Colors.grey),
-          ),
-        );
+      color: Colors.grey[300],
+      child: const Center(
+        child: Icon(PhosphorIconsLight.filmStrip, size: 40, color: Colors.grey),
+      ),
+    );
 
     final requestedSize =
         (max(width, height).isFinite && max(width, height) > 0)
-            ? max(width, height).toInt()
-            : null;
+        ? max(width, height).toInt()
+        : null;
 
     return FutureBuilder<String?>(
       key: key ?? ValueKey('thumb_$videoPath'),
@@ -1803,10 +1825,12 @@ class VideoThumbnailHelper {
           );
           content = fallbackBuilder?.call() ?? defaultFallback();
         } else if (thumbnailPath != null) {
-          final int? cWidth =
-              (width.isFinite && width > 0) ? width.toInt() : null;
-          final int? cHeight =
-              (height.isFinite && height > 0) ? height.toInt() : null;
+          final int? cWidth = (width.isFinite && width > 0)
+              ? width.toInt()
+              : null;
+          final int? cHeight = (height.isFinite && height > 0)
+              ? height.toInt()
+              : null;
           content = Image(
             image: ResizeImage(
               FileImage(File(thumbnailPath)),
@@ -2098,8 +2122,10 @@ class VideoThumbnailHelper {
     // 3. Nhóm còn lại - tải với ưu tiên thấp
 
     final visiblePaths = videoPaths.take(visibleCount).toList();
-    final nearPaths =
-        videoPaths.skip(visibleCount).take(visibleCount * 2).toList();
+    final nearPaths = videoPaths
+        .skip(visibleCount)
+        .take(visibleCount * 2)
+        .toList();
     final otherPaths = videoPaths.skip(visibleCount * 3).toList();
 
     // Tạm dừng các yêu cầu đang chờ để xếp các yêu cầu mới
@@ -2411,13 +2437,13 @@ class _ThumbnailRequest {
   final int? thumbnailSize;
 
   _ThumbnailRequest.empty()
-      : videoPath = '',
-        priority = -1,
-        completer = Completer<String?>(),
-        timestamp = DateTime(0),
-        forceRegenerate = false,
-        quality = null,
-        thumbnailSize = null;
+    : videoPath = '',
+      priority = -1,
+      completer = Completer<String?>(),
+      timestamp = DateTime(0),
+      forceRegenerate = false,
+      quality = null,
+      thumbnailSize = null;
 
   _ThumbnailRequest({
     required this.videoPath,

@@ -63,7 +63,7 @@ class SmbChunkReader {
   int? _fileSize;
 
   SmbChunkReader({SmbChunkReaderConfig? config})
-      : config = config ?? const SmbChunkReaderConfig();
+    : config = config ?? const SmbChunkReaderConfig();
 
   /// Indicates whether [initialize] has completed successfully.
   bool get isInitialized => _initialized;
@@ -169,7 +169,8 @@ class SmbChunkReader {
   /// Each map in [requests] must contain `offset` and `size` keys.
   /// This stub implementation simply issues sequential [readChunk] calls.
   Future<List<SmbChunk>> readChunksParallel(
-      List<Map<String, int>> requests) async {
+    List<Map<String, int>> requests,
+  ) async {
     final results = <SmbChunk>[];
     for (final req in requests) {
       final offset = req['offset'] ?? 0;

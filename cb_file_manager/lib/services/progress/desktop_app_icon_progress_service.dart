@@ -8,9 +8,7 @@ import 'package:flutter/services.dart';
 class DesktopAppIconProgressService {
   static const _channel = MethodChannel('cb_file_manager/app_icon');
 
-  DesktopAppIconProgressService({
-    OperationProgressController? progressController,
-  }) : _progressController = progressController;
+  DesktopAppIconProgressService({this._progressController});
 
   OperationProgressController? _progressController;
   bool _started = false;
@@ -75,10 +73,12 @@ class DesktopAppIconProgressService {
       return;
     }
 
-    unawaited(setProgress(
-      aggregate.fraction,
-      indeterminate: aggregate.isIndeterminate,
-      error: aggregate.hasError,
-    ));
+    unawaited(
+      setProgress(
+        aggregate.fraction,
+        indeterminate: aggregate.isIndeterminate,
+        error: aggregate.hasError,
+      ),
+    );
   }
 }

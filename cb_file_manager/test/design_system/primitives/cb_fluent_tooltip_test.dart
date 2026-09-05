@@ -35,8 +35,9 @@ Map<int, SemanticsData> _snapshot(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('keeps every semantics id when the mouse connects',
-      (tester) async {
+  testWidgets('keeps every semantics id when the mouse connects', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
 
     await tester.pumpWidget(
@@ -77,7 +78,8 @@ void main() {
     expect(
       after.keys.toList(),
       equals(before.keys.toList()),
-      reason: 'connecting a mouse renumbered the semantics tree; the Windows '
+      reason:
+          'connecting a mouse renumbered the semantics tree; the Windows '
           'accessibility bridge drops an update that reclaims ids like that',
     );
     expect(

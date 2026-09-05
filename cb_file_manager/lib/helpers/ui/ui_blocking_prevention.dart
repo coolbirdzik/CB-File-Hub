@@ -14,11 +14,13 @@ class UIBlockingPrevention {
     int yieldCount = 0;
 
     // Start the operation
-    operation().then((result) {
-      completer.complete(result);
-    }).catchError((error) {
-      completer.completeError(error);
-    });
+    operation()
+        .then((result) {
+          completer.complete(result);
+        })
+        .catchError((error) {
+          completer.completeError(error);
+        });
 
     // Periodically yield to allow UI updates
     Timer.periodic(yieldInterval, (timer) async {
@@ -52,9 +54,7 @@ class UIBlockingPrevention {
       final chunk = operations.skip(i).take(chunkSize);
 
       // Execute chunk
-      final chunkResults = await Future.wait(
-        chunk.map((op) => op()),
-      );
+      final chunkResults = await Future.wait(chunk.map((op) => op()));
 
       results.addAll(chunkResults);
 

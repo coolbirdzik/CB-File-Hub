@@ -9,11 +9,11 @@ class DirectoryCardListWidget extends StatelessWidget {
   final String? emptyMessage;
 
   const DirectoryCardListWidget({
-    Key? key,
+    super.key,
     required this.directories,
     required this.onRemove,
     this.emptyMessage,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

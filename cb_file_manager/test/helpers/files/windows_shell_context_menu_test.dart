@@ -59,112 +59,103 @@ void main() {
     );
   });
 
-  test(
-    'loads each native submenu once per cached Shell session',
-    () async {
-      var submenuLoadCalls = 0;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        if (call.method == 'loadThirdPartyMenu') {
-          return <Object?, Object?>{
-            'sessionId': 'lazy-session',
-            'entries': <Object?>[
-              <Object?, Object?>{
-                'type': 'submenu',
-                'submenuId': 11,
-                'label': 'Tools',
-              },
-            ],
-          };
-        }
-        if (call.method == 'loadContextMenuSubmenu') {
-          submenuLoadCalls++;
-          return <Object?>[
-            <Object?, Object?>{
-              'type': 'item',
-              'commandId': 27,
-              'label': 'Inspect',
-            },
-          ];
-        }
-        return null;
-      });
-
-      final session = await WindowsShellContextMenu.loadThirdPartyMenu(
-        paths: <String>[r'C:\Temp\Example.txt'],
-      );
-      final first = await WindowsShellContextMenu.loadThirdPartySubmenu(
-        sessionId: session!.id,
-        submenuId: session.entries.single.submenuId!,
-      );
-      final second = await WindowsShellContextMenu.loadThirdPartySubmenu(
-        sessionId: session.id,
-        submenuId: session.entries.single.submenuId!,
-      );
-
-      expect(first.single.label, 'Inspect');
-      expect(second.single.commandId, 27);
-      expect(submenuLoadCalls, 1);
-    },
-    skip: !Platform.isWindows,
-  );
-
-  test(
-    'reuses the cached Shell session for the same path selection',
-    () async {
-      expect(
-        WindowsShellContextMenu.thirdPartyMenuCacheDuration,
-        const Duration(minutes: 5),
-      );
-
-      var loadCalls = 0;
-      var releaseCalls = 0;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        switch (call.method) {
-          case 'loadThirdPartyMenu':
-            loadCalls++;
+  test('loads each native submenu once per cached Shell session', () async {
+    var submenuLoadCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'loadThirdPartyMenu') {
             return <Object?, Object?>{
-              'sessionId': 'session-$loadCalls',
+              'sessionId': 'lazy-session',
               'entries': <Object?>[
                 <Object?, Object?>{
-                  'type': 'item',
-                  'commandId': 7,
-                  'label': 'Open in tool',
+                  'type': 'submenu',
+                  'submenuId': 11,
+                  'label': 'Tools',
                 },
               ],
             };
-          case 'releaseContextMenuSession':
-            releaseCalls++;
-            return null;
-        }
-        return null;
-      });
+          }
+          if (call.method == 'loadContextMenuSubmenu') {
+            submenuLoadCalls++;
+            return <Object?>[
+              <Object?, Object?>{
+                'type': 'item',
+                'commandId': 27,
+                'label': 'Inspect',
+              },
+            ];
+          }
+          return null;
+        });
 
-      final first = await WindowsShellContextMenu.loadThirdPartyMenu(
-        paths: <String>[r'C:\Temp\Example.txt'],
-      );
-      final second = await WindowsShellContextMenu.loadThirdPartyMenu(
-        paths: <String>[r'c:/temp/example.txt'],
-      );
+    final session = await WindowsShellContextMenu.loadThirdPartyMenu(
+      paths: <String>[r'C:\Temp\Example.txt'],
+    );
+    final first = await WindowsShellContextMenu.loadThirdPartySubmenu(
+      sessionId: session!.id,
+      submenuId: session.entries.single.submenuId!,
+    );
+    final second = await WindowsShellContextMenu.loadThirdPartySubmenu(
+      sessionId: session.id,
+      submenuId: session.entries.single.submenuId!,
+    );
 
-      expect(first?.id, 'session-1');
-      expect(second?.id, first?.id);
-      expect(loadCalls, 1);
+    expect(first.single.label, 'Inspect');
+    expect(second.single.commandId, 27);
+    expect(submenuLoadCalls, 1);
+  }, skip: !Platform.isWindows);
 
-      final differentSelection =
-          await WindowsShellContextMenu.loadThirdPartyMenu(
-        paths: <String>[r'C:\Temp\Other.txt'],
-      );
-      expect(differentSelection?.id, 'session-2');
-      expect(loadCalls, 2);
-      expect(releaseCalls, 1);
+  test('reuses the cached Shell session for the same path selection', () async {
+    expect(
+      WindowsShellContextMenu.thirdPartyMenuCacheDuration,
+      const Duration(minutes: 5),
+    );
 
-      await WindowsShellContextMenu.clearThirdPartyMenuCache();
-      expect(releaseCalls, 2);
-    },
-    skip: !Platform.isWindows,
-  );
+    var loadCalls = 0;
+    var releaseCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          switch (call.method) {
+            case 'loadThirdPartyMenu':
+              loadCalls++;
+              return <Object?, Object?>{
+                'sessionId': 'session-$loadCalls',
+                'entries': <Object?>[
+                  <Object?, Object?>{
+                    'type': 'item',
+                    'commandId': 7,
+                    'label': 'Open in tool',
+                  },
+                ],
+              };
+            case 'releaseContextMenuSession':
+              releaseCalls++;
+              return null;
+          }
+          return null;
+        });
+
+    final first = await WindowsShellContextMenu.loadThirdPartyMenu(
+      paths: <String>[r'C:\Temp\Example.txt'],
+    );
+    final second = await WindowsShellContextMenu.loadThirdPartyMenu(
+      paths: <String>[r'c:/temp/example.txt'],
+    );
+
+    expect(first?.id, 'session-1');
+    expect(second?.id, first?.id);
+    expect(loadCalls, 1);
+
+    final differentSelection = await WindowsShellContextMenu.loadThirdPartyMenu(
+      paths: <String>[r'C:\Temp\Other.txt'],
+    );
+    expect(differentSelection?.id, 'session-2');
+    expect(loadCalls, 2);
+    expect(releaseCalls, 1);
+
+    await WindowsShellContextMenu.clearThirdPartyMenuCache();
+    expect(releaseCalls, 2);
+  }, skip: !Platform.isWindows);
 
   test(
     'invalidates the cached Shell session after invoking a command',
@@ -172,24 +163,24 @@ void main() {
       var loadCalls = 0;
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
-        if (call.method == 'loadThirdPartyMenu') {
-          loadCalls++;
-          return <Object?, Object?>{
-            'sessionId': 'session-$loadCalls',
-            'entries': <Object?>[
-              <Object?, Object?>{
-                'type': 'item',
-                'commandId': 9,
-                'label': 'Scan',
-              },
-            ],
-          };
-        }
-        if (call.method == 'invokeContextMenuCommand') {
-          return true;
-        }
-        return null;
-      });
+            if (call.method == 'loadThirdPartyMenu') {
+              loadCalls++;
+              return <Object?, Object?>{
+                'sessionId': 'session-$loadCalls',
+                'entries': <Object?>[
+                  <Object?, Object?>{
+                    'type': 'item',
+                    'commandId': 9,
+                    'label': 'Scan',
+                  },
+                ],
+              };
+            }
+            if (call.method == 'invokeContextMenuCommand') {
+              return true;
+            }
+            return null;
+          });
 
       final first = await WindowsShellContextMenu.loadThirdPartyMenu(
         paths: <String>[r'C:\Temp\Example.txt'],

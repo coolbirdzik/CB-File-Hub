@@ -10,10 +10,7 @@ import '../core/tabbed_folder/tabbed_folder_list_screen.dart';
 class TabView extends StatelessWidget {
   final VoidCallback? onAddNewTab;
 
-  const TabView({
-    Key? key,
-    this.onAddNewTab,
-  }) : super(key: key);
+  const TabView({super.key, this.onAddNewTab});
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +23,7 @@ class TabView extends StatelessWidget {
         return Column(
           children: [
             _buildTabBar(context, state),
-            Expanded(
-              child: _buildTabContent(state),
-            ),
+            Expanded(child: _buildTabContent(state)),
           ],
         );
       },
@@ -40,11 +35,7 @@ class TabView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            PhosphorIconsLight.file,
-            size: 64,
-            color: Colors.grey,
-          ),
+          const Icon(PhosphorIconsLight.file, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           const Text(
             'No tabs open',
@@ -72,10 +63,7 @@ class TabView extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).canvasColor,
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1.0,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1.0),
         ),
       ),
       child: Row(

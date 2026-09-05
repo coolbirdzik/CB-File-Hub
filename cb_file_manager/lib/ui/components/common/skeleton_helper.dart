@@ -29,10 +29,7 @@ class SkeletonHelper {
   /// Parameters:
   /// - [crossAxisCount]: Number of columns in grid (default: 3)
   /// - [itemCount]: Number of skeleton items to show (default: 12)
-  static Widget fileGrid({
-    int crossAxisCount = 3,
-    int itemCount = 12,
-  }) {
+  static Widget fileGrid({int crossAxisCount = 3, int itemCount = 12}) {
     return Skeleton(
       type: SkeletonType.albumGrid,
       crossAxisCount: crossAxisCount,
@@ -65,10 +62,7 @@ class SkeletonHelper {
   /// Parameters:
   /// - [crossAxisCount]: Number of columns in grid (default: 3)
   /// - [itemCount]: Number of skeleton items to show (default: 12)
-  static Widget albumGrid({
-    int crossAxisCount = 3,
-    int itemCount = 12,
-  }) {
+  static Widget albumGrid({int crossAxisCount = 3, int itemCount = 12}) {
     return Skeleton(
       type: SkeletonType.albumGrid,
       crossAxisCount: crossAxisCount,
@@ -136,14 +130,8 @@ class SkeletonHelper {
   }) {
     if (isGridView) {
       return isAlbum
-          ? albumGrid(
-              crossAxisCount: crossAxisCount ?? 3,
-              itemCount: itemCount,
-            )
-          : fileGrid(
-              crossAxisCount: crossAxisCount ?? 3,
-              itemCount: itemCount,
-            );
+          ? albumGrid(crossAxisCount: crossAxisCount ?? 3, itemCount: itemCount)
+          : fileGrid(crossAxisCount: crossAxisCount ?? 3, itemCount: itemCount);
     } else {
       return isAlbum
           ? albumList(
@@ -184,10 +172,7 @@ class SkeletonHelper {
   /// Parameters:
   /// - [crossAxisCount]: Number of columns in masonry grid (default: 3)
   /// - [itemCount]: Number of skeleton items to show (default: 12)
-  static Widget masonry({
-    int crossAxisCount = 3,
-    int itemCount = 12,
-  }) {
+  static Widget masonry({int crossAxisCount = 3, int itemCount = 12}) {
     return Skeleton(
       type: SkeletonType.masonry,
       crossAxisCount: crossAxisCount,

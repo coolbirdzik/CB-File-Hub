@@ -11,7 +11,7 @@ workflow:
 variables:
   GIT_DEPTH: "0"
   GIT_STRATEGY: clone
-  FLUTTER_VERSION: "3.41.5"
+  FLUTTER_VERSION: "3.47.2"
   GITHUB_REPO: "coolbirdzik/cb-file-hub"
   RELEASE_OUTPUT_DIR: "ci/release"
 

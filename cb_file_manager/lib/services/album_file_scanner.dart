@@ -50,8 +50,11 @@ class AlbumFileScanner {
         followLinks: false,
       )) {
         if (entity is File) {
-          final fileInfo =
-              await _processFile(entity, extensions, excludePatterns);
+          final fileInfo = await _processFile(
+            entity,
+            extensions,
+            excludePatterns,
+          );
           if (fileInfo != null) {
             files.add(fileInfo);
 
@@ -76,23 +79,22 @@ class AlbumFileScanner {
 
   /// Scan files in background isolate (for large albums)
   Future<List<FileInfo>> _scanInBackground(
-      Album album, AlbumConfig config) async {
+    Album album,
+    AlbumConfig config,
+  ) async {
     final receivePort = ReceivePort();
 
-    await Isolate.spawn(
-      _backgroundScanner,
-      {
-        'sendPort': receivePort.sendPort,
-        'albumId': album.id,
-        'directories': config.directoriesList,
-        'extensions': config.fileExtensionsList,
-        'excludePatterns': config.excludePatternsList,
-        'includeSubdirectories': config.includeSubdirectories,
-        'maxFileCount': config.maxFileCount,
-        'sortBy': config.sortBy,
-        'sortAscending': config.sortAscending,
-      },
-    );
+    await Isolate.spawn(_backgroundScanner, {
+      'sendPort': receivePort.sendPort,
+      'albumId': album.id,
+      'directories': config.directoriesList,
+      'extensions': config.fileExtensionsList,
+      'excludePatterns': config.excludePatternsList,
+      'includeSubdirectories': config.includeSubdirectories,
+      'maxFileCount': config.maxFileCount,
+      'sortBy': config.sortBy,
+      'sortAscending': config.sortAscending,
+    });
 
     final result = await receivePort.first as Map<String, dynamic>;
 
@@ -134,8 +136,11 @@ class AlbumFileScanner {
           followLinks: false,
         )) {
           if (entity is File) {
-            final fileInfo =
-                await _processFileStatic(entity, extensions, excludePatterns);
+            final fileInfo = await _processFileStatic(
+              entity,
+              extensions,
+              excludePatterns,
+            );
             if (fileInfo != null) {
               files.add(fileInfo);
 
@@ -155,22 +160,25 @@ class AlbumFileScanner {
         'files': files.map((f) => f.toMap()).toList(),
       });
     } catch (e) {
-      sendPort.send({
-        'success': false,
-        'error': e.toString(),
-      });
+      sendPort.send({'success': false, 'error': e.toString()});
     }
   }
 
   /// Process a single file
   Future<FileInfo?> _processFile(
-      File file, List<String> extensions, List<String> excludePatterns) async {
+    File file,
+    List<String> extensions,
+    List<String> excludePatterns,
+  ) async {
     return await _processFileStatic(file, extensions, excludePatterns);
   }
 
   /// Static version for isolate
   static Future<FileInfo?> _processFileStatic(
-      File file, List<String> extensions, List<String> excludePatterns) async {
+    File file,
+    List<String> extensions,
+    List<String> excludePatterns,
+  ) async {
     final fileName = path.basename(file.path);
     final extension = path.extension(file.path).toLowerCase();
 
@@ -215,20 +223,29 @@ class AlbumFileScanner {
 
   /// Static version for isolate
   static void _sortFilesStatic(
-      List<FileInfo> files, String sortBy, bool ascending) {
+    List<FileInfo> files,
+    String sortBy,
+    bool ascending,
+  ) {
     switch (sortBy) {
       case 'name':
-        files.sort((a, b) =>
-            ascending ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
+        files.sort(
+          (a, b) =>
+              ascending ? a.name.compareTo(b.name) : b.name.compareTo(a.name),
+        );
         break;
       case 'date':
-        files.sort((a, b) => ascending
-            ? a.modifiedTime.compareTo(b.modifiedTime)
-            : b.modifiedTime.compareTo(a.modifiedTime));
+        files.sort(
+          (a, b) => ascending
+              ? a.modifiedTime.compareTo(b.modifiedTime)
+              : b.modifiedTime.compareTo(a.modifiedTime),
+        );
         break;
       case 'size':
-        files.sort((a, b) =>
-            ascending ? a.size.compareTo(b.size) : b.size.compareTo(a.size));
+        files.sort(
+          (a, b) =>
+              ascending ? a.size.compareTo(b.size) : b.size.compareTo(a.size),
+        );
         break;
     }
   }

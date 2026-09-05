@@ -12,8 +12,10 @@ void main() {
     test('05.01 SystemScreenRouter clearWidgetCache should work correctly', () {
       // Test that clearWidgetCache method exists and works
       expect(() => SystemScreenRouter.clearWidgetCache(), returnsNormally);
-      expect(() => SystemScreenRouter.clearWidgetCache('test-tab'),
-          returnsNormally);
+      expect(
+        () => SystemScreenRouter.clearWidgetCache('test-tab'),
+        returnsNormally,
+      );
     });
 
     test('05.02 Path transition logic should work correctly', () {
@@ -40,23 +42,25 @@ void main() {
       expect(shouldClearCache, isFalse);
     });
 
-    test('05.03 Tab history should include and navigate back to drives path',
-        () async {
-      final bloc = TabManagerBloc();
-      bloc.add(AddTab(path: kDrivesPath, name: 'Drives'));
-      await Future<void>.delayed(Duration.zero);
+    test(
+      '05.03 Tab history should include and navigate back to drives path',
+      () async {
+        final bloc = TabManagerBloc();
+        bloc.add(AddTab(path: kDrivesPath, name: 'Drives'));
+        await Future<void>.delayed(Duration.zero);
 
-      final tab = bloc.state.activeTab;
-      expect(tab, isNotNull);
+        final tab = bloc.state.activeTab;
+        expect(tab, isNotNull);
 
-      final tabId = tab!.id;
-      bloc.add(UpdateTabPath(tabId, r'C:\'));
-      await Future<void>.delayed(Duration.zero);
+        final tabId = tab!.id;
+        bloc.add(UpdateTabPath(tabId, r'C:\'));
+        await Future<void>.delayed(Duration.zero);
 
-      expect(bloc.canTabNavigateBack(tabId), isTrue);
-      final previousPath = bloc.backNavigationToPath(tabId);
-      expect(previousPath, equals(kDrivesPath));
-      expect(bloc.canTabNavigateForward(tabId), isTrue);
-    });
+        expect(bloc.canTabNavigateBack(tabId), isTrue);
+        final previousPath = bloc.backNavigationToPath(tabId);
+        expect(previousPath, equals(kDrivesPath));
+        expect(bloc.canTabNavigateForward(tabId), isTrue);
+      },
+    );
   });
 }

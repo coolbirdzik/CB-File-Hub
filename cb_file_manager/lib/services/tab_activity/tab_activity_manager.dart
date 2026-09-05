@@ -35,9 +35,9 @@ class _TabActivityRecord {
     required this.lastFocusedAt,
     required this.lastInteractionAt,
     this.lastKnownPath,
-  })  : inactiveSince = null,
-        needsReload = false,
-        alwaysActive = false;
+  }) : inactiveSince = null,
+       needsReload = false,
+       alwaysActive = false;
 }
 
 /// Snapshot of a tab's activity, exposed for UI/diagnostics.
@@ -102,10 +102,8 @@ class TabActivityManager extends ChangeNotifier {
   Timer? _evaluationTimer;
   bool _disposed = false;
 
-  TabActivityManager({
-    DateTime Function()? clock,
-    Duration? initialThreshold,
-  }) : _now = clock ?? DateTime.now {
+  TabActivityManager({DateTime Function()? clock, Duration? initialThreshold})
+    : _now = clock ?? DateTime.now {
     if (initialThreshold != null) {
       _inactiveThreshold = initialThreshold;
     }

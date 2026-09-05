@@ -26,14 +26,14 @@ class FolderItem extends StatefulWidget {
   final Function(String)? onTap;
   final bool isSelected;
   final Function(String, {bool shiftSelect, bool ctrlSelect})?
-      toggleFolderSelection;
+  toggleFolderSelection;
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
   final bool showItemBackground;
 
   const FolderItem({
-    Key? key,
+    super.key,
     required this.folder,
     this.onTap,
     this.isSelected = false,
@@ -42,7 +42,7 @@ class FolderItem extends StatefulWidget {
     this.lastSelectedPath,
     this.clearSelectionMode,
     this.showItemBackground = true,
-  }) : super(key: key);
+  });
 
   @override
   State<FolderItem> createState() => _FolderItemState();
@@ -131,8 +131,9 @@ class _FolderItemState extends State<FolderItem> {
     final tagName = _tagName;
     if (tagName != null) {
       final tagColor = TagColorManager.instance.getTagColor(tagName);
-      final thumbnailPath =
-          TagThumbnailManager.instance.getThumbnailSync(tagName);
+      final thumbnailPath = TagThumbnailManager.instance.getThumbnailSync(
+        tagName,
+      );
       if (thumbnailPath != null) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(16.0),
@@ -141,7 +142,7 @@ class _FolderItemState extends State<FolderItem> {
             width: 48,
             height: 48,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildTagIconPlaceholder(tagColor),
+            errorBuilder: (_, _, _) => _buildTagIconPlaceholder(tagColor),
           ),
         );
       }
@@ -207,8 +208,11 @@ class _FolderItemState extends State<FolderItem> {
     final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
     // Call toggleFolderSelection with appropriate parameters
-    widget.toggleFolderSelection!(widget.folder.path,
-        shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
+    widget.toggleFolderSelection!(
+      widget.folder.path,
+      shiftSelect: isShiftPressed,
+      ctrlSelect: shouldCtrlSelect,
+    );
   }
 
   void _showFolderContextMenu(BuildContext context, Offset? globalPosition) {
@@ -216,11 +220,7 @@ class _FolderItemState extends State<FolderItem> {
     // filesystem folder menu.
     final tagName = _tagName;
     if (tagName != null) {
-      showTagContextMenu(
-        context,
-        tagName,
-        globalPosition: globalPosition,
-      );
+      showTagContextMenu(context, tagName, globalPosition: globalPosition);
       return;
     }
 
@@ -250,7 +250,8 @@ class _FolderItemState extends State<FolderItem> {
       context: context,
       folder: widget.folder,
       onNavigate: widget.onTap,
-      folderTags: [], // Pass empty tags or fetch from database in real implementation
+      folderTags:
+          [], // Pass empty tags or fetch from database in real implementation
       globalPosition: globalPosition, // Pass position for desktop popup menu
     );
   }
@@ -259,7 +260,8 @@ class _FolderItemState extends State<FolderItem> {
   Widget build(BuildContext context) {
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
     final renameController = InlineRenameScope.maybeOf(context);
-    final isBeingRenamed = renameController != null &&
+    final isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.folder.path;
 
     return ValueListenableBuilder<bool>(
@@ -271,8 +273,9 @@ class _FolderItemState extends State<FolderItem> {
           isSelected: widget.isSelected,
           isHovering: isHovering,
         );
-        final Color effectiveBackgroundColor =
-            widget.showItemBackground ? backgroundColor : Colors.transparent;
+        final Color effectiveBackgroundColor = widget.showItemBackground
+            ? backgroundColor
+            : Colors.transparent;
 
         return Opacity(
           opacity: isBeingCut ? ItemInteractionStyle.cutOpacity : 1.0,
@@ -285,25 +288,27 @@ class _FolderItemState extends State<FolderItem> {
               cursor: SystemMouseCursors.click,
               child: Container(
                 margin: EdgeInsets.symmetric(
-                    horizontal:
-                        widget.isDesktopMode && widget.showItemBackground
-                            ? 8.0
-                            : 0,
-                    vertical: widget.isDesktopMode && widget.showItemBackground
-                        ? 4.0
-                        : 0),
+                  horizontal: widget.isDesktopMode && widget.showItemBackground
+                      ? 8.0
+                      : 0,
+                  vertical: widget.isDesktopMode && widget.showItemBackground
+                      ? 4.0
+                      : 0,
+                ),
                 decoration: BoxDecoration(
                   color: effectiveBackgroundColor,
                   borderRadius:
                       widget.isDesktopMode && widget.showItemBackground
-                          ? BorderRadius.circular(16.0)
-                          : BorderRadius.zero,
+                      ? BorderRadius.circular(16.0)
+                      : BorderRadius.zero,
                 ),
                 child: Stack(
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 12.0, horizontal: 16.0),
+                        vertical: 12.0,
+                        horizontal: 16.0,
+                      ),
                       child: Row(
                         children: [
                           _buildLeadingIcon(context),
@@ -344,9 +349,7 @@ class _FolderItemState extends State<FolderItem> {
                                 if (_tagName != null)
                                   Text(
                                     AppLocalizations.of(context)!.tagPrefix,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
                                           color: Theme.of(context)
                                               .colorScheme
@@ -363,17 +366,18 @@ class _FolderItemState extends State<FolderItem> {
                                           future: _folderSizeFuture,
                                           builder: (context, sizeSnapshot) {
                                             final modified = snapshot
-                                                .data!.modified
+                                                .data!
+                                                .modified
                                                 .toString()
                                                 .split('.')[0];
                                             final size = sizeSnapshot.data;
-                                            final suffix = sizeSnapshot
-                                                        .connectionState ==
+                                            final suffix =
+                                                sizeSnapshot.connectionState ==
                                                     ConnectionState.waiting
                                                 ? '  •  Calculating size...'
                                                 : size == null
-                                                    ? ''
-                                                    : '  •  ${FormatUtils.formatFileSize(size)}';
+                                                ? ''
+                                                : '  •  ${FormatUtils.formatFileSize(size)}';
                                             return Text(
                                               '$modified$suffix',
                                               maxLines: 1,
@@ -446,9 +450,9 @@ class _FolderItemState extends State<FolderItem> {
                               }
                             : null,
                         onTertiaryTapUp: (_) {
-                          context
-                              .read<TabManagerBloc>()
-                              .add(AddTab(path: widget.folder.path));
+                          context.read<TabManagerBloc>().add(
+                            AddTab(path: widget.folder.path),
+                          );
                         },
                       ),
                     ),
@@ -490,9 +494,9 @@ class _FolderItemState extends State<FolderItem> {
                                 }
                               : null,
                           onTertiaryTapUp: (_) {
-                            context
-                                .read<TabManagerBloc>()
-                                .add(AddTab(path: widget.folder.path));
+                            context.read<TabManagerBloc>().add(
+                              AddTab(path: widget.folder.path),
+                            );
                           },
                         ),
                       ),

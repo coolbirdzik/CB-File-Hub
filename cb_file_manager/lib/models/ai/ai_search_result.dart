@@ -54,20 +54,20 @@ class AiSearchResult extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
-        'path': path,
-        'fileName': fileName,
-        'relevance': relevance,
-        'explanation': explanation,
-        'verified': verified,
-      };
+    'path': path,
+    'fileName': fileName,
+    'relevance': relevance,
+    'explanation': explanation,
+    'verified': verified,
+  };
 
   factory AiSearchResult.fromJson(Map<String, dynamic> json) => AiSearchResult(
-        path: json['path'] as String? ?? '',
-        fileName: json['fileName'] as String? ?? '',
-        relevance: (json['relevance'] as num?)?.toInt() ?? 0,
-        explanation: json['explanation'] as String? ?? '',
-        verified: json['verified'] as bool? ?? true,
-      );
+    path: json['path'] as String? ?? '',
+    fileName: json['fileName'] as String? ?? '',
+    relevance: (json['relevance'] as num?)?.toInt() ?? 0,
+    explanation: json['explanation'] as String? ?? '',
+    verified: json['verified'] as bool? ?? true,
+  );
 
   @override
   List<Object?> get props => [path, fileName, relevance, explanation, verified];

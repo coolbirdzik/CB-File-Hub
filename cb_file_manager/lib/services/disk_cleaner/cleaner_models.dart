@@ -2,6 +2,7 @@
 ///
 /// All types here are platform-agnostic and contain no Flutter, BLoC, or LLM
 /// dependencies, so they are safe to ship into an isolate.
+library;
 
 import '../app_insights/app_insights_models.dart';
 
@@ -55,18 +56,11 @@ class PathSource {
 
   /// `%envVar%/relative`
   const PathSource.env(String envVar, [String relative = ''])
-      : this._(
-          kind: PathSourceKind.env,
-          envVar: envVar,
-          relative: relative,
-        );
+    : this._(kind: PathSourceKind.env, envVar: envVar, relative: relative);
 
   /// Absolute path that does not depend on the user.
   const PathSource.absolute(String path)
-      : this._(
-          kind: PathSourceKind.absolute,
-          absolutePath: path,
-        );
+    : this._(kind: PathSourceKind.absolute, absolutePath: path);
 
   /// Recycle Bin on every fixed drive.
   const PathSource.recycleBin() : this._(kind: PathSourceKind.recycleBin);
@@ -204,28 +198,28 @@ class JunkItem {
   });
 
   Map<String, dynamic> toJson() => {
-        'path': path,
-        'sizeBytes': sizeBytes,
-        'lastModified': lastModified?.millisecondsSinceEpoch,
-        'categoryId': categoryId,
-        'isContainerOnly': isContainerOnly,
-        'isRecycleBinItem': isRecycleBinItem,
-        'originalPath': originalPath,
-        'isUserSelected': isUserSelected,
-      };
+    'path': path,
+    'sizeBytes': sizeBytes,
+    'lastModified': lastModified?.millisecondsSinceEpoch,
+    'categoryId': categoryId,
+    'isContainerOnly': isContainerOnly,
+    'isRecycleBinItem': isRecycleBinItem,
+    'originalPath': originalPath,
+    'isUserSelected': isUserSelected,
+  };
 
   static JunkItem fromJson(Map<String, dynamic> json) => JunkItem(
-        path: json['path'] as String,
-        sizeBytes: json['sizeBytes'] as int,
-        lastModified: json['lastModified'] is int
-            ? DateTime.fromMillisecondsSinceEpoch(json['lastModified'] as int)
-            : null,
-        categoryId: json['categoryId'] as String,
-        isContainerOnly: json['isContainerOnly'] as bool? ?? false,
-        isRecycleBinItem: json['isRecycleBinItem'] as bool? ?? false,
-        originalPath: json['originalPath'] as String?,
-        isUserSelected: json['isUserSelected'] as bool? ?? false,
-      );
+    path: json['path'] as String,
+    sizeBytes: json['sizeBytes'] as int,
+    lastModified: json['lastModified'] is int
+        ? DateTime.fromMillisecondsSinceEpoch(json['lastModified'] as int)
+        : null,
+    categoryId: json['categoryId'] as String,
+    isContainerOnly: json['isContainerOnly'] as bool? ?? false,
+    isRecycleBinItem: json['isRecycleBinItem'] as bool? ?? false,
+    originalPath: json['originalPath'] as String?,
+    isUserSelected: json['isUserSelected'] as bool? ?? false,
+  );
 }
 
 /// Free / total / used info for a single drive.
@@ -264,13 +258,15 @@ class ScanReport {
   int get totalCount =>
       itemsByCategory.values.fold(0, (sum, list) => sum + list.length);
 
-  int get totalBytes => itemsByCategory.values
-      .fold(0, (sum, list) => sum + list.fold(0, (s, i) => s + i.sizeBytes));
+  int get totalBytes => itemsByCategory.values.fold(
+    0,
+    (sum, list) => sum + list.fold(0, (s, i) => s + i.sizeBytes),
+  );
 
   /// Flat list of all items across all categories.
   List<JunkItem> get allItems => [
-        for (final list in itemsByCategory.values) ...list,
-      ];
+    for (final list in itemsByCategory.values) ...list,
+  ];
 }
 
 /// Streamed progress event from the isolate scanner.

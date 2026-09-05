@@ -46,11 +46,11 @@ class BreadcrumbAddressBar extends StatefulWidget {
   final void Function(String)? onPathSubmitted;
 
   const BreadcrumbAddressBar({
-    Key? key,
+    super.key,
     required this.segments,
     this.editController,
     this.onPathSubmitted,
-  }) : super(key: key);
+  });
 
   @override
   State<BreadcrumbAddressBar> createState() => _BreadcrumbAddressBarState();
@@ -59,6 +59,7 @@ class BreadcrumbAddressBar extends StatefulWidget {
 class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
   bool _isEditing = false;
   final FocusNode _focusNode = FocusNode();
+  final FocusNode _addressFocusNode = FocusNode();
 
   bool get _canEdit =>
       widget.editController != null && widget.onPathSubmitted != null;
@@ -66,11 +67,17 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _addressFocusNode.dispose();
     super.dispose();
   }
 
   void _startEditing() {
-    if (!_canEdit) return;
+    if (!_canEdit || _isEditing) return;
+    final controller = widget.editController!;
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: controller.text.length,
+    );
     setState(() => _isEditing = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
@@ -85,78 +92,154 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isEditing) return _buildEditField(context);
-    return _buildBreadcrumbs(context);
+    return Focus(
+      focusNode: _addressFocusNode,
+      canRequestFocus: _canEdit && !_isEditing,
+      onFocusChange: (focused) {
+        if (focused && _addressFocusNode.hasPrimaryFocus) _startEditing();
+      },
+      child: _isEditing
+          ? _buildEditField(context)
+          : MouseRegion(
+              cursor: _canEdit ? SystemMouseCursors.text : MouseCursor.defer,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _canEdit ? _startEditing : null,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: FluentSurfaceTokens.controlHeight,
+                  child: _buildBreadcrumbs(context),
+                ),
+              ),
+            ),
+    );
   }
 
   Widget _buildBreadcrumbs(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final useFluentDesktopShell =
         (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
-            DesignSystemConfig.enableFluentDesktopShell &&
-            !DesignSystemConfig.enableLegacyMaterialDesktopShell;
-    final surfaces =
-        useFluentDesktopShell ? FluentSurfaceTokens.of(context) : null;
-    final items = <Widget>[];
+        DesignSystemConfig.enableFluentDesktopShell &&
+        !DesignSystemConfig.enableLegacyMaterialDesktopShell;
+    final surfaces = useFluentDesktopShell
+        ? FluentSurfaceTokens.of(context)
+        : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact =
+            constraints.hasBoundedWidth &&
+            _estimatedNaturalWidth(context) > constraints.maxWidth;
+        final items = <Widget>[];
+
+        for (int i = 0; i < widget.segments.length; i++) {
+          final seg = widget.segments[i];
+          final isLast = i == widget.segments.length - 1;
+
+          if (i > 0) {
+            items.add(
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Icon(
+                  PhosphorIconsLight.caretRight,
+                  size: 11,
+                  color:
+                      surfaces?.textSecondary ?? colorScheme.onSurfaceVariant,
+                ),
+              ),
+            );
+          }
+
+          // For the last segment: fall back to _startEditing if canEdit and no
+          // explicit onTap was provided.
+          final effectiveTap =
+              seg.onTap ?? (isLast && _canEdit ? _startEditing : null);
+
+          final chip = _BreadcrumbChip(
+            key: ValueKey(i),
+            segment: seg,
+            isLast: isLast,
+            colorScheme: colorScheme,
+            surfaces: surfaces,
+            onTap: effectiveTap,
+          );
+
+          // Keep short paths content-sized. Only deep paths need flex shares;
+          // applying Flexible all the time makes Fluent controls consume their
+          // entire allocation and visually spreads folder names apart.
+          items.add(
+            compact
+                ? Flexible(
+                    // Icons need roughly the same horizontal space as eight
+                    // label characters. Account for that in the flex share so
+                    // the root drive icon is not squeezed too aggressively.
+                    flex: (seg.label.length + 4 + (seg.icon == null ? 0 : 8))
+                        .clamp(1, 100),
+                    child: chip,
+                  )
+                : chip,
+          );
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: items,
+        );
+      },
+    );
+  }
+
+  double _estimatedNaturalWidth(BuildContext context) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    double width = (widget.segments.length - 1).clamp(0, 100000) * 15.0;
 
     for (int i = 0; i < widget.segments.length; i++) {
-      final seg = widget.segments[i];
-      final isLast = i == widget.segments.length - 1;
-
-      if (i > 0) {
-        items.add(Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Icon(
-            PhosphorIconsLight.caretRight,
-            size: 11,
-            color: surfaces?.textSecondary ?? colorScheme.onSurfaceVariant,
-          ),
-        ));
-      }
-
-      // For the last segment: fall back to _startEditing if canEdit and no
-      // explicit onTap was provided.
-      final effectiveTap =
-          seg.onTap ?? (isLast && _canEdit ? _startEditing : null);
-
-      final chip = _BreadcrumbChip(
-        key: ValueKey(i),
-        segment: seg,
-        isLast: isLast,
-        colorScheme: colorScheme,
-        surfaces: surfaces,
-        onTap: effectiveTap,
-      );
-
-      // Every segment must be allowed to shrink. Windows CI paths commonly
-      // contain several long parent segments (for example RUNNER~1/AppData/
-      // Local/Temp/cb_e2e_*); keeping all parents inflexible makes the Row
-      // overflow before the final segment gets a chance to truncate.
-      items.add(
-        Flexible(
-          // Icons need roughly the same horizontal space as eight label
-          // characters. Account for that in the flex share so the root drive
-          // icon is not squeezed into a text-only allocation.
-          flex:
-              (seg.label.length + 4 + (seg.icon == null ? 0 : 8)).clamp(1, 100),
-          child: chip,
+      final segment = widget.segments[i];
+      width += 16; // Chip horizontal padding.
+      width += _measureTextWidth(
+        segment.label,
+        TextStyle(
+          fontSize: 13,
+          fontWeight: i == widget.segments.length - 1
+              ? FontWeight.w500
+              : FontWeight.normal,
         ),
+        textScaler,
       );
+      if (segment.icon != null) width += 18;
+      if (segment.badge != null) {
+        width +=
+            6 +
+            _measureTextWidth(
+              segment.badge!,
+              const TextStyle(fontSize: 11),
+              textScaler,
+            );
+      }
     }
+    return width;
+  }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: items,
-    );
+  double _measureTextWidth(
+    String text,
+    TextStyle style,
+    TextScaler textScaler,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+      textScaler: textScaler,
+    )..layout();
+    return painter.width;
   }
 
   Widget _buildEditField(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final useFluentDesktopShell =
         (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
-            DesignSystemConfig.enableFluentDesktopShell &&
-            !DesignSystemConfig.enableLegacyMaterialDesktopShell;
+        DesignSystemConfig.enableFluentDesktopShell &&
+        !DesignSystemConfig.enableLegacyMaterialDesktopShell;
     if (useFluentDesktopShell) {
       final surfaces = FluentSurfaceTokens.of(context);
       return fluent.TextBox(
@@ -169,17 +252,13 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
         },
         onTapOutside: (_) => _stopEditing(),
         placeholder: 'Enter path...',
-        style: TextStyle(
-          fontSize: 13,
-          color: surfaces.textPrimary,
-        ),
+        style: TextStyle(fontSize: 13, color: surfaces.textPrimary),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: WidgetStatePropertyAll(
-          BoxDecoration(
-            color: surfaces.control,
-            borderRadius: FluentSurfaceTokens.controlRadius,
-            border: Border.all(color: surfaces.stroke),
-          ),
+        decoration: const WidgetStatePropertyAll(
+          BoxDecoration(color: Colors.transparent, border: Border()),
+        ),
+        foregroundDecoration: const WidgetStatePropertyAll(
+          BoxDecoration(border: Border()),
         ),
       );
     }
@@ -216,13 +295,13 @@ class _BreadcrumbChip extends StatefulWidget {
   final VoidCallback? onTap;
 
   const _BreadcrumbChip({
-    Key? key,
+    super.key,
     required this.segment,
     required this.isLast,
     required this.colorScheme,
     this.surfaces,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   State<_BreadcrumbChip> createState() => _BreadcrumbChipState();
@@ -266,7 +345,7 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
           decoration: BoxDecoration(
             color: _hovering
                 ? surfaces?.controlHover ??
-                    colorScheme.onSurface.withValues(alpha: 0.08)
+                      colorScheme.onSurface.withValues(alpha: 0.08)
                 : Colors.transparent,
             borderRadius: surfaces != null
                 ? FluentSurfaceTokens.controlRadius
@@ -285,7 +364,12 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                   seg.badge != null && available >= _minWidthForBadge;
 
               return Row(
-                mainAxisSize: MainAxisSize.max,
+                // Stay content-sized when the address bar has spare room so
+                // neighbouring breadcrumb names sit beside their separators
+                // instead of stretching across the full bar. The surrounding
+                // Flexible still lets this row shrink and ellipsize on deep
+                // paths in narrow windows.
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (showIcon) ...[
                     Icon(seg.icon, size: 13, color: secondaryColor),
@@ -296,8 +380,9 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                       seg.label,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight:
-                            widget.isLast ? FontWeight.w500 : FontWeight.normal,
+                        fontWeight: widget.isLast
+                            ? FontWeight.w500
+                            : FontWeight.normal,
                         color: widget.isLast ? textColor : secondaryColor,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -308,10 +393,7 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                     Flexible(
                       child: Text(
                         seg.badge!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: secondaryColor,
-                        ),
+                        style: TextStyle(fontSize: 11, color: secondaryColor),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -342,8 +424,8 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
         final Color backgroundColor = isPressed
             ? surfaces.controlPressed
             : isHovered
-                ? surfaces.controlHover
-                : Colors.transparent;
+            ? surfaces.controlHover
+            : Colors.transparent;
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 120),
@@ -373,7 +455,9 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
   }) {
     final seg = widget.segment;
     return Row(
-      mainAxisSize: MainAxisSize.max,
+      // HoverButton otherwise adopts the full flex allocation and leaves a
+      // large empty gap after short folder names.
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (seg.icon != null) ...[
           Icon(seg.icon, size: 13, color: secondaryColor),
@@ -394,10 +478,7 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
           const SizedBox(width: 6),
           Text(
             seg.badge!,
-            style: TextStyle(
-              fontSize: 11,
-              color: secondaryColor,
-            ),
+            style: TextStyle(fontSize: 11, color: secondaryColor),
           ),
         ],
       ],

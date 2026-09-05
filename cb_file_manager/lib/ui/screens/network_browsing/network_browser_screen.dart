@@ -56,11 +56,11 @@ class NetworkBrowserScreen extends StatefulWidget {
   final bool showAppBar;
 
   const NetworkBrowserScreen({
-    Key? key,
+    super.key,
     required this.path,
     required this.tabId,
     this.showAppBar = true,
-  }) : super(key: key);
+  });
 
   @override
   State<NetworkBrowserScreen> createState() => _NetworkBrowserScreenState();
@@ -138,23 +138,23 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _selectionBloc = SelectionBloc();
 
     // Listen for thumbnail loading changes
-    _thumbnailLoadingSubscription =
-        ThumbnailLoader.onPendingTasksChanged.listen((count) {
-      final hasBackgroundTasks = count > 0;
-      if (_hasPendingThumbnails != hasBackgroundTasks) {
-        setState(() {
-          _hasPendingThumbnails = hasBackgroundTasks;
-        });
+    _thumbnailLoadingSubscription = ThumbnailLoader.onPendingTasksChanged
+        .listen((count) {
+          final hasBackgroundTasks = count > 0;
+          if (_hasPendingThumbnails != hasBackgroundTasks) {
+            setState(() {
+              _hasPendingThumbnails = hasBackgroundTasks;
+            });
 
-        // Only show tab loading when there are actual thumbnail tasks
-        final isLoading = _hasPendingThumbnails;
-        if (mounted) {
-          context
-              .read<TabManagerBloc>()
-              .add(UpdateTabLoading(widget.tabId, isLoading));
-        }
-      }
-    });
+            // Only show tab loading when there are actual thumbnail tasks
+            final isLoading = _hasPendingThumbnails;
+            if (mounted) {
+              context.read<TabManagerBloc>().add(
+                UpdateTabLoading(widget.tabId, isLoading),
+              );
+            }
+          }
+        });
 
     // Load preferences
     _loadPreferences();
@@ -164,7 +164,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       if (state.currentService != null && mounted) {
         StreamingHelper.instance.initializeStreaming(state.currentService!);
         debugPrint(
-            "NetworkBrowserScreen: StreamingHelper initialized with ${state.currentService!.serviceName}");
+          "NetworkBrowserScreen: StreamingHelper initialized with ${state.currentService!.serviceName}",
+        );
       }
     });
 
@@ -313,7 +314,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     controller.currentPath = _currentPath;
 
     debugPrint(
-        'NetworkBrowserScreen: Mobile actions controller registered for tab ${widget.tabId}');
+      'NetworkBrowserScreen: Mobile actions controller registered for tab ${widget.tabId}',
+    );
   }
 
   // Helper methods
@@ -326,8 +328,9 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       final viewMode = await prefs.getNetworkBrowserViewMode(
         fallback: globalViewMode,
       );
-      final effectiveViewMode =
-          viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode;
+      final effectiveViewMode = viewMode == ViewMode.gridPreview
+          ? ViewMode.grid
+          : viewMode;
       final globalSortOption = await prefs.getSortOption();
       final sortOption = await prefs.getNetworkBrowserSortOption(
         fallback: globalSortOption,
@@ -405,10 +408,12 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   List<String> _visiblePathsForState(NetworkBrowsingState state) {
-    final folders = (state.directories ?? const <FileSystemEntity>[])
-        .map((entity) => entity.path);
-    final files = (state.files ?? const <FileSystemEntity>[])
-        .map((entity) => entity.path);
+    final folders = (state.directories ?? const <FileSystemEntity>[]).map(
+      (entity) => entity.path,
+    );
+    final files = (state.files ?? const <FileSystemEntity>[]).map(
+      (entity) => entity.path,
+    );
     return [...folders, ...files];
   }
 
@@ -418,25 +423,32 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         .toSet();
   }
 
-  void _toggleFileSelection(String filePath,
-      {bool shiftSelect = false, bool ctrlSelect = false}) {
+  void _toggleFileSelection(
+    String filePath, {
+    bool shiftSelect = false,
+    bool ctrlSelect = false,
+  }) {
     if (!shiftSelect) {
-      _selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
     final browsingState = _networkBrowsingBloc.state;
     final selectionState = _selectionBloc.state;
     if (selectionState.lastSelectedPath == null) {
-      _selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
@@ -460,25 +472,32 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     );
   }
 
-  void _toggleFolderSelection(String folderPath,
-      {bool shiftSelect = false, bool ctrlSelect = false}) {
+  void _toggleFolderSelection(
+    String folderPath, {
+    bool shiftSelect = false,
+    bool ctrlSelect = false,
+  }) {
     if (!shiftSelect) {
-      _selectionBloc.add(ToggleFolderSelection(
-        folderPath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFolderSelection(
+          folderPath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
     final browsingState = _networkBrowsingBloc.state;
     final selectionState = _selectionBloc.state;
     if (selectionState.lastSelectedPath == null) {
-      _selectionBloc.add(ToggleFolderSelection(
-        folderPath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFolderSelection(
+          folderPath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
@@ -507,16 +526,18 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   }
 
   void _selectAll(NetworkBrowsingState state) {
-    _selectionBloc.add(SelectAll(
-      allFilePaths: (state.files ?? const <FileSystemEntity>[])
-          .whereType<File>()
-          .map((file) => file.path)
-          .toList(),
-      allFolderPaths: (state.directories ?? const <FileSystemEntity>[])
-          .whereType<Directory>()
-          .map((directory) => directory.path)
-          .toList(),
-    ));
+    _selectionBloc.add(
+      SelectAll(
+        allFilePaths: (state.files ?? const <FileSystemEntity>[])
+            .whereType<File>()
+            .map((file) => file.path)
+            .toList(),
+        allFolderPaths: (state.directories ?? const <FileSystemEntity>[])
+            .whereType<Directory>()
+            .map((directory) => directory.path)
+            .toList(),
+      ),
+    );
   }
 
   void _toggleViewMode() {
@@ -650,10 +671,13 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _scheduleNetworkDirectoryLoad();
 
     final pathParts = path.split('/');
-    final lastPart = pathParts.lastWhere((part) => part.isNotEmpty,
-        orElse: () => AppLocalizations.of(context)!.networkTab);
-    final tabName =
-        lastPart.isEmpty ? AppLocalizations.of(context)!.networkTab : lastPart;
+    final lastPart = pathParts.lastWhere(
+      (part) => part.isNotEmpty,
+      orElse: () => AppLocalizations.of(context)!.networkTab,
+    );
+    final tabName = lastPart.isEmpty
+        ? AppLocalizations.of(context)!.networkTab
+        : lastPart;
 
     context.read<TabManagerBloc>().add(UpdateTabName(widget.tabId, tabName));
   }
@@ -718,145 +742,159 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             }
           },
           child: BlocConsumer<NetworkBrowsingBloc, NetworkBrowsingState>(
-              listenWhen: (previous, current) {
-            // Only trigger listener when state actually changes
-            return previous.isLoading != current.isLoading ||
-                previous.directories != current.directories ||
-                previous.files != current.files ||
-                previous.hasError != current.hasError;
-          }, listener: (context, state) {
-            // Check if there are any video/image files in the current directory
-            final hasVideoOrImageFiles = _hasVideoOrImageFiles(state);
+            listenWhen: (previous, current) {
+              // Only trigger listener when state actually changes
+              return previous.isLoading != current.isLoading ||
+                  previous.directories != current.directories ||
+                  previous.files != current.files ||
+                  previous.hasError != current.hasError;
+            },
+            listener: (context, state) {
+              // Check if there are any video/image files in the current directory
+              final hasVideoOrImageFiles = _hasVideoOrImageFiles(state);
 
-            // If no video/image files and we have pending thumbnails, reset the count
-            if (!hasVideoOrImageFiles && _hasPendingThumbnails) {
-              ThumbnailLoader.resetPendingCount();
-              _hasPendingThumbnails = false;
-            }
+              // If no video/image files and we have pending thumbnails, reset the count
+              if (!hasVideoOrImageFiles && _hasPendingThumbnails) {
+                ThumbnailLoader.resetPendingCount();
+                _hasPendingThumbnails = false;
+              }
 
-            // Only show tab loading when there are actual thumbnail tasks
-            final isLoading = _hasPendingThumbnails;
-            context
-                .read<TabManagerBloc>()
-                .add(UpdateTabLoading(widget.tabId, isLoading));
+              // Only show tab loading when there are actual thumbnail tasks
+              final isLoading = _hasPendingThumbnails;
+              context.read<TabManagerBloc>().add(
+                UpdateTabLoading(widget.tabId, isLoading),
+              );
 
-            if (!mounted) return;
+              if (!mounted) return;
 
-            final bool shouldClearLoadingStarted =
-                !state.isLoading && _isLoadingStarted;
-            final bool shouldClearNavigationPending = _isNavigationPending &&
-                (state.hasError ||
-                    (state.currentPath != null &&
-                        state.currentPath == _currentPath));
+              final bool shouldClearLoadingStarted =
+                  !state.isLoading && _isLoadingStarted;
+              final bool shouldClearNavigationPending =
+                  _isNavigationPending &&
+                  (state.hasError ||
+                      (state.currentPath != null &&
+                          state.currentPath == _currentPath));
 
-            if (shouldClearLoadingStarted || shouldClearNavigationPending) {
-              setState(() {
-                if (shouldClearLoadingStarted) {
-                  _isLoadingStarted = false;
-                }
-                if (shouldClearNavigationPending) {
-                  _isNavigationPending = false;
-                }
-              });
-            }
-          }, buildWhen: (previous, current) {
-            // Only rebuild when state actually changes
-            return previous.isLoading != current.isLoading ||
-                previous.directories != current.directories ||
-                previous.files != current.files ||
-                previous.hasError != current.hasError;
-          }, builder: (context, state) {
-            return _buildWithSelectionState(context, state);
-          }),
+              if (shouldClearLoadingStarted || shouldClearNavigationPending) {
+                setState(() {
+                  if (shouldClearLoadingStarted) {
+                    _isLoadingStarted = false;
+                  }
+                  if (shouldClearNavigationPending) {
+                    _isNavigationPending = false;
+                  }
+                });
+              }
+            },
+            buildWhen: (previous, current) {
+              // Only rebuild when state actually changes
+              return previous.isLoading != current.isLoading ||
+                  previous.directories != current.directories ||
+                  previous.files != current.files ||
+                  previous.hasError != current.hasError;
+            },
+            builder: (context, state) {
+              return _buildWithSelectionState(context, state);
+            },
+          ),
         ),
       ),
     );
   }
 
   Widget _buildWithSelectionState(
-      BuildContext context, NetworkBrowsingState networkState) {
+    BuildContext context,
+    NetworkBrowsingState networkState,
+  ) {
     return BlocBuilder<SelectionBloc, SelectionState>(
-        builder: (context, selectionState) {
-      final bool visualSelectionMode = isDesktopPlatform
-          ? selectionState.selectedCount > 1
-          : selectionState.isSelectionMode;
-      List<Widget> actions = [];
+      builder: (context, selectionState) {
+        final bool visualSelectionMode = isDesktopPlatform
+            ? selectionState.selectedCount > 1
+            : selectionState.isSelectionMode;
+        List<Widget> actions = [];
 
-      if (!visualSelectionMode) {
-        actions.addAll(SharedActionBar.buildCommonActions(
-          context: context,
-          onSearchPressed: () => _toggleSearchBar(context),
-          isSearchActive: _showSearchBar,
-          onSortOptionSelected: (SortOption option) {
-            setState(() {
-              _sortOption = option;
-            });
-            _saveSortSetting(option);
-            // Refresh the list with the new sort option
-            _refreshFileList();
-          },
-          currentSortOption: _sortOption,
-          viewMode: _viewMode,
-          onViewModeToggled: _toggleViewMode,
-          onViewModeSelected: _setViewMode,
-          onRefresh: _refreshFileList,
-          currentGridZoomLevel:
-              _viewMode == ViewMode.grid ? _gridZoomLevel : null,
-          onGridZoomChanged: _handleGridZoomChange,
-          onColumnSettingsPressed: _viewMode == ViewMode.details
-              ? () {
-                  _showColumnVisibilityDialog(context);
-                }
-              : null,
-          onSelectionModeToggled: _toggleSelectionMode,
-        ));
-      } else {
-        // Selection mode actions
-        actions.addAll([
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.x),
-            onPressed: _clearSelection,
-          ),
-          Text(AppLocalizations.of(context)!
-              .itemsSelected(selectionState.selectedCount)),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(PhosphorIconsLight.checks),
-            tooltip: AppLocalizations.of(context)!.selectAll,
-            onPressed: () => _selectAll(networkState),
-          ),
-        ]);
-      }
-
-      return Scaffold(
-        appBar: widget.showAppBar
-            ? AppBar(
-                title: _buildAppBarTitle(context),
-                actions: actions,
-                elevation: 0,
-                backgroundColor: Colors.transparent,
-              )
-            : null,
-        body: FileViewShell(
-          viewMode: _viewMode,
-          onViewScaleDelta: _handleViewScaleDelta,
-          onMouseBack: _handleBackButton,
-          onMouseForward: _handleMouseForwardButton,
-          onRefresh: _refreshFileList,
-          onSelectAll: () => _selectAll(networkState),
-          onSearch: () => _toggleSearchBar(context),
-          onEscape: selectionState.selectedCount > 0
-              ? _clearSelection
-              : _showSearchBar
-                  ? () => setState(() {
-                        _showSearchBar = false;
-                      })
+        if (!visualSelectionMode) {
+          actions.addAll(
+            SharedActionBar.buildCommonActions(
+              context: context,
+              onSearchPressed: () => _toggleSearchBar(context),
+              isSearchActive: _showSearchBar,
+              onSortOptionSelected: (SortOption option) {
+                setState(() {
+                  _sortOption = option;
+                });
+                _saveSortSetting(option);
+                // Refresh the list with the new sort option
+                _refreshFileList();
+              },
+              currentSortOption: _sortOption,
+              viewMode: _viewMode,
+              onViewModeToggled: _toggleViewMode,
+              onViewModeSelected: _setViewMode,
+              onRefresh: _refreshFileList,
+              currentGridZoomLevel: _viewMode == ViewMode.grid
+                  ? _gridZoomLevel
                   : null,
-          child: _buildBody(context, networkState, selectionState),
-        ),
-        floatingActionButton: _buildFloatingActionButton(selectionState),
-      );
-    });
+              onGridZoomChanged: _handleGridZoomChange,
+              onColumnSettingsPressed: _viewMode == ViewMode.details
+                  ? () {
+                      _showColumnVisibilityDialog(context);
+                    }
+                  : null,
+              onSelectionModeToggled: _toggleSelectionMode,
+            ),
+          );
+        } else {
+          // Selection mode actions
+          actions.addAll([
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.x),
+              onPressed: _clearSelection,
+            ),
+            Text(
+              AppLocalizations.of(
+                context,
+              )!.itemsSelected(selectionState.selectedCount),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(PhosphorIconsLight.checks),
+              tooltip: AppLocalizations.of(context)!.selectAll,
+              onPressed: () => _selectAll(networkState),
+            ),
+          ]);
+        }
+
+        return Scaffold(
+          appBar: widget.showAppBar
+              ? AppBar(
+                  title: _buildAppBarTitle(context),
+                  actions: actions,
+                  elevation: 0,
+                  backgroundColor: Colors.transparent,
+                )
+              : null,
+          body: FileViewShell(
+            viewMode: _viewMode,
+            onViewScaleDelta: _handleViewScaleDelta,
+            onMouseBack: _handleBackButton,
+            onMouseForward: _handleMouseForwardButton,
+            onRefresh: _refreshFileList,
+            onSelectAll: () => _selectAll(networkState),
+            onSearch: () => _toggleSearchBar(context),
+            onEscape: selectionState.selectedCount > 0
+                ? _clearSelection
+                : _showSearchBar
+                ? () => setState(() {
+                    _showSearchBar = false;
+                  })
+                : null,
+            child: _buildBody(context, networkState, selectionState),
+          ),
+          floatingActionButton: _buildFloatingActionButton(selectionState),
+        );
+      },
+    );
   }
 
   Widget _buildAppBarTitle(BuildContext context) {
@@ -872,11 +910,14 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
               borderSide: BorderSide.none,
             ),
             filled: true,
-            fillColor:
-                Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
+            fillColor: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.8),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-            prefixIcon:
-                const Icon(PhosphorIconsLight.magnifyingGlass, size: 20),
+            prefixIcon: const Icon(
+              PhosphorIconsLight.magnifyingGlass,
+              size: 20,
+            ),
             suffixIcon: _searchController.text.isEmpty
                 ? null
                 : IconButton(
@@ -909,17 +950,16 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16.0),
               ),
               child: Text(
                 _currentPath,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -930,8 +970,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     );
   }
 
-  Widget _buildBody(BuildContext context, NetworkBrowsingState state,
-      SelectionState selectionState) {
+  Widget _buildBody(
+    BuildContext context,
+    NetworkBrowsingState state,
+    SelectionState selectionState,
+  ) {
     FrameTimingOptimizer().optimizeBeforeHeavyOperation();
 
     if (_enableVerboseLogs) {
@@ -950,7 +993,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final bool isStatePathOutOfSync =
         state.currentPath != null && state.currentPath != _currentPath;
 
-    final bool shouldShowSkeleton = !state.hasError &&
+    final bool shouldShowSkeleton =
+        !state.hasError &&
         (_isNavigationPending ||
             (state.isLoading && !state.hasContent) ||
             isStatePathOutOfSync);
@@ -1104,10 +1148,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       mode: GridSizeMode.columns,
     );
     final crossAxisCount = _gridZoomLevel
-        .clamp(
-          UserPreferences.minGridZoomLevel,
-          maxZoom,
-        )
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
         .toInt();
     return BrowserLikeCollectionView<FileSystemEntity>(
       viewMode: _viewMode,
@@ -1168,8 +1209,9 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
       context,
       mode: GridSizeMode.columns,
     );
-    final clamped =
-        newZoomLevel.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    final clamped = newZoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
     _saveGridZoomSetting(clamped);
   }
 
@@ -1276,15 +1318,12 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     final String fileName = p.basename(filePath);
 
     debugPrint(
-        "NetworkBrowserScreen: Opening file $filePath with extension $extension");
+      "NetworkBrowserScreen: Opening file $filePath with extension $extension",
+    );
 
     // For all file types (including images), use StreamingHelper for network files
     // This ensures proper handling of SMB files on mobile
-    StreamingHelper.instance.openFileWithStreaming(
-      context,
-      filePath,
-      fileName,
-    );
+    StreamingHelper.instance.openFileWithStreaming(context, filePath, fileName);
   }
 
   Widget _wrapNetworkItem(bool isSelected, Widget child) {
@@ -1295,10 +1334,9 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         blurAmount: 5.0,
         opacity: isSelected ? 0.8 : 0.6,
         backgroundColor: isSelected
-            ? Theme.of(context)
-                .colorScheme
-                .primaryContainer
-                .withValues(alpha: 0.6)
+            ? Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.6)
             : Theme.of(context).cardColor.withValues(alpha: 0.4),
         child: child,
       ),
@@ -1391,8 +1429,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           isSelected: isSelected,
           toggleFileSelection: _toggleFileSelection,
           state: FolderListState(_currentPath),
-          showDeleteTagDialog: (_, __, ___) {},
-          showAddTagToFileDialog: (_, __) {},
+          showDeleteTagDialog: (_, _, _) {},
+          showAddTagToFileDialog: (_, _) {},
           isDesktopMode: _isDesktopMode,
           lastSelectedPath: selectionState.lastSelectedPath,
           columnVisibility: _columnVisibility,
@@ -1440,8 +1478,8 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
               : selectionState.isSelectionMode,
           isSelected: isSelected,
           toggleFileSelection: _toggleFileSelection,
-          showDeleteTagDialog: (_, __, ___) {},
-          showAddTagToFileDialog: (_, __) {},
+          showDeleteTagDialog: (_, _, _) {},
+          showAddTagToFileDialog: (_, _) {},
           onFileTap: (openedFile, _) =>
               _handleFileOpen(itemContext, openedFile),
           isDesktopMode: _isDesktopMode,
@@ -1467,28 +1505,28 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     try {
       final contents = await service.listDirectory(entity.path);
       final folders = contents.whereType<Directory>().toList()
-        ..sort((a, b) => a.path
-            .split('/')
-            .last
-            .toLowerCase()
-            .compareTo(b.path.split('/').last.toLowerCase()));
+        ..sort(
+          (a, b) => a.path
+              .split('/')
+              .last
+              .toLowerCase()
+              .compareTo(b.path.split('/').last.toLowerCase()),
+        );
       final files = contents.whereType<File>().toList()
-        ..sort((a, b) => a.path
-            .split('/')
-            .last
-            .toLowerCase()
-            .compareTo(b.path.split('/').last.toLowerCase()));
+        ..sort(
+          (a, b) => a.path
+              .split('/')
+              .last
+              .toLowerCase()
+              .compareTo(b.path.split('/').last.toLowerCase()),
+        );
       return [
-        ...folders.map((d) => TreeNode<FileSystemEntity>(
-              id: d.path,
-              data: d,
-              isLeaf: false,
-            )),
-        ...files.map((f) => TreeNode<FileSystemEntity>(
-              id: f.path,
-              data: f,
-              isLeaf: true,
-            )),
+        ...folders.map(
+          (d) => TreeNode<FileSystemEntity>(id: d.path, data: d, isLeaf: false),
+        ),
+        ...files.map(
+          (f) => TreeNode<FileSystemEntity>(id: f.path, data: f, isLeaf: true),
+        ),
       ];
     } catch (_) {
       return const [];

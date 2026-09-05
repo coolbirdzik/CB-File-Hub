@@ -51,9 +51,9 @@ class ViewModeSpectrum {
   /// dense → spacious order. [ViewMode.grid]/[ViewMode.gridPreview] entries in
   /// [supported] are ignored here (grid stops are generated separately).
   static List<ViewMode> nonGridStops(Set<ViewMode> supported) => [
-        for (final m in nonGridOrder)
-          if (supported.contains(m)) m
-      ];
+    for (final m in nonGridOrder)
+      if (supported.contains(m)) m,
+  ];
 
   /// Computes the next `(mode, gridZoomLevel)` for a scroll [delta].
   ///
@@ -108,8 +108,9 @@ class ViewModeSpectrum {
       }
     }
 
-    final int nextIndex =
-        (currentIndex + delta).clamp(0, totalStops - 1).toInt();
+    final int nextIndex = (currentIndex + delta)
+        .clamp(0, totalStops - 1)
+        .toInt();
 
     if (nextIndex < nonGrid.length) {
       // Landed on a non-grid mode; preserve the current zoom for when the user

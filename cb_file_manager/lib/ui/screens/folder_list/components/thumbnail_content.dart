@@ -10,11 +10,7 @@ class ThumbnailContent extends StatelessWidget {
   final FileSystemEntity file;
   final double iconSize;
 
-  const ThumbnailContent({
-    Key? key,
-    required this.file,
-    this.iconSize = 48.0,
-  }) : super(key: key);
+  const ThumbnailContent({super.key, required this.file, this.iconSize = 48.0});
 
   @override
   Widget build(BuildContext context) {

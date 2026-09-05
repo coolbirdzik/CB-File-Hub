@@ -53,8 +53,9 @@ class DriveInventoryService {
   }
 
   static int _compareDrives(DriveInfo a, DriveInfo b) {
-    final groupCmp = DriveInfo.groupSortOrder(a.group)
-        .compareTo(DriveInfo.groupSortOrder(b.group));
+    final groupCmp = DriveInfo.groupSortOrder(
+      a.group,
+    ).compareTo(DriveInfo.groupSortOrder(b.group));
     if (groupCmp != 0) return groupCmp;
     return a.path.toLowerCase().compareTo(b.path.toLowerCase());
   }
@@ -107,7 +108,7 @@ class DriveInventoryService {
   static DriveKind _windowsDriveKind(String root) {
     final pathPtr = root.toNativeUtf16();
     try {
-      final type = win32.GetDriveType(pathPtr);
+      final type = win32.GetDriveType(win32.PCWSTR(pathPtr));
       switch (type) {
         case win32.DRIVE_REMOVABLE:
           return DriveKind.removable;
@@ -132,25 +133,26 @@ class DriveInventoryService {
   static Future<_WindowsVolumeMeta> _readWindowsVolume(String root) async {
     final drive = root.endsWith('\\') ? root : '$root\\';
     final volumeNameBuffer = calloc<Uint16>(win32.MAX_PATH + 1).cast<Utf16>();
-    final fileSystemNameBuffer =
-        calloc<Uint16>(win32.MAX_PATH + 1).cast<Utf16>();
+    final fileSystemNameBuffer = calloc<Uint16>(
+      win32.MAX_PATH + 1,
+    ).cast<Utf16>();
     final volumeSerialNumber = calloc<Uint32>();
     final maximumComponentLength = calloc<Uint32>();
     final fileSystemFlags = calloc<Uint32>();
     final pathPtr = drive.toNativeUtf16();
 
     try {
-      final result = win32.GetVolumeInformation(
-        pathPtr,
-        volumeNameBuffer,
+      final ok = win32.GetVolumeInformation(
+        win32.PCWSTR(pathPtr),
+        win32.PWSTR(volumeNameBuffer),
         win32.MAX_PATH + 1,
         volumeSerialNumber,
         maximumComponentLength,
         fileSystemFlags,
-        fileSystemNameBuffer,
+        win32.PWSTR(fileSystemNameBuffer),
         win32.MAX_PATH + 1,
-      );
-      if (result == 0) {
+      ).value;
+      if (!ok) {
         return const _WindowsVolumeMeta();
       }
       final label = volumeNameBuffer.toDartString();
@@ -159,11 +161,7 @@ class DriveInventoryService {
           .toRadixString(16)
           .padLeft(8, '0')
           .toUpperCase();
-      return _WindowsVolumeMeta(
-        label: label,
-        filesystem: fs,
-        serial: serial,
-      );
+      return _WindowsVolumeMeta(label: label, filesystem: fs, serial: serial);
     } catch (e) {
       debugPrint('DriveInventoryService volume info failed for $root: $e');
       return const _WindowsVolumeMeta();
@@ -185,13 +183,13 @@ class DriveInventoryService {
     final pathPtr = drive.toNativeUtf16();
 
     try {
-      final result = win32.GetDiskFreeSpaceEx(
-        pathPtr,
+      final ok = win32.GetDiskFreeSpaceEx(
+        win32.PCWSTR(pathPtr),
         lpFreeBytesAvailable,
         lpTotalNumberOfBytes,
         lpTotalNumberOfFreeBytes,
-      );
-      if (result == 0) return const DriveSpaceInfo.empty();
+      ).value;
+      if (!ok) return const DriveSpaceInfo.empty();
       return DriveSpaceInfo.fromTotalFree(
         lpTotalNumberOfBytes.value,
         lpFreeBytesAvailable.value,
@@ -243,10 +241,10 @@ class DriveInventoryService {
     final label = volume.label.isNotEmpty
         ? volume.label
         : (isPrimary
-            ? 'Internal storage'
-            : (volume.description.isNotEmpty
-                ? volume.description
-                : volume.path));
+              ? 'Internal storage'
+              : (volume.description.isNotEmpty
+                    ? volume.description
+                    : volume.path));
     return DriveInfo(
       path: volume.path,
       displayName: label,

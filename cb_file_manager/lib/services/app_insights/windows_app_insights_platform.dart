@@ -23,9 +23,7 @@ abstract class WindowsAppInsightsDataSource {
 
   Future<WindowsRawAppInsightsResult> readUserAssist();
 
-  Future<Map<String, String>> resolveUserAssistTargets(
-    List<String> targets,
-  );
+  Future<Map<String, String>> resolveUserAssistTargets(List<String> targets);
 }
 
 abstract class AppInsightsProcessRunner {
@@ -44,8 +42,9 @@ class SystemAppInsightsProcessRunner implements AppInsightsProcessRunner {
 /// Windows platform bridge for registry, PackageManager, and UserAssist reads.
 class MethodChannelWindowsAppInsightsDataSource
     implements WindowsAppInsightsDataSource {
-  static const MethodChannel _defaultChannel =
-      MethodChannel('cb_file_manager/app_insights');
+  static const MethodChannel _defaultChannel = MethodChannel(
+    'cb_file_manager/app_insights',
+  );
 
   final MethodChannel channel;
   final AppInsightsProcessRunner processRunner;
@@ -159,9 +158,9 @@ class MethodChannelWindowsAppInsightsDataSource
     return WindowsRawAppInsightsResult(
       records: rawRecords is Iterable
           ? rawRecords
-              .whereType<Map>()
-              .map(_stringKeyedMap)
-              .toList(growable: false)
+                .whereType<Map>()
+                .map(_stringKeyedMap)
+                .toList(growable: false)
           : const <Map<String, Object?>>[],
       warnings: rawWarnings is Iterable
           ? rawWarnings.map((item) => item.toString()).toList(growable: false)
@@ -212,18 +211,15 @@ $result | ConvertTo-Json -Compress -Depth 4
 ''';
 
     try {
-      final result = await processRunner.run(
-        'powershell.exe',
-        <String>[
-          '-NoLogo',
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-EncodedCommand',
-          _encodePowerShellCommand(script),
-        ],
-      );
+      final result = await processRunner.run('powershell.exe', <String>[
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-EncodedCommand',
+        _encodePowerShellCommand(script),
+      ]);
       if (result.exitCode != 0) {
         final message = result.stderr.toString().trim();
         return WindowsRawAppInsightsResult(

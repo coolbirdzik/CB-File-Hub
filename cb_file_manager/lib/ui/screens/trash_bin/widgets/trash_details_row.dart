@@ -6,12 +6,12 @@ import 'trash_list_item.dart';
 
 /// Shared helpers for details-view columns
 Widget detailsCell({required int flex, required Widget child}) => Expanded(
-      flex: flex,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-        child: child,
-      ),
-    );
+  flex: flex,
+  child: Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+    child: child,
+  ),
+);
 
 /// Details row widget for trash bin - displays trash item in details view
 class TrashDetailsRow extends StatelessWidget {
@@ -29,7 +29,7 @@ class TrashDetailsRow extends StatelessWidget {
   final VoidCallback? onDoubleTap;
 
   const TrashDetailsRow({
-    Key? key,
+    super.key,
     required this.item,
     required this.isSelected,
     required this.isSelectionMode,
@@ -42,7 +42,7 @@ class TrashDetailsRow extends StatelessWidget {
     required this.l10n,
     this.onTap,
     this.onDoubleTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +66,12 @@ class TrashDetailsRow extends StatelessWidget {
             child: Row(
               children: [
                 TrashItemIcon(
-                    originalPath: item.originalPath,
-                    actualFilePath: item.actualFilePath,
-                    displayName: item.displayNameValue,
-                    size: 24,
-                    isFolder: item.isFolder),
+                  originalPath: item.originalPath,
+                  actualFilePath: item.actualFilePath,
+                  displayName: item.displayNameValue,
+                  size: 24,
+                  isFolder: item.isFolder,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -109,10 +110,7 @@ class TrashDetailsRow extends StatelessWidget {
           // Size column (flex 1)
           detailsCell(
             flex: 1,
-            child: Text(
-              formatSize(item.size),
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(formatSize(item.size), overflow: TextOverflow.ellipsis),
           ),
         ],
       ),

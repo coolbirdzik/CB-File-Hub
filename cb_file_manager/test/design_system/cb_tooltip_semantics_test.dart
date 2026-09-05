@@ -4,8 +4,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('keeps sibling tooltip traversal anchors on separate nodes',
-      (tester) async {
+  testWidgets('keeps sibling tooltip traversal anchors on separate nodes', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
 
     await tester.pumpWidget(
@@ -27,7 +28,12 @@ void main() {
     );
 
     final root = tester
-        .binding.renderViews.first.owner?.semanticsOwner?.rootSemanticsNode;
+        .binding
+        .renderViews
+        .first
+        .owner
+        ?.semanticsOwner
+        ?.rootSemanticsNode;
     expect(root, isNotNull);
 
     final traversalParents = <Object>{};

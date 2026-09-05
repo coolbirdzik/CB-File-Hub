@@ -47,14 +47,14 @@ class DrawerState extends Equatable {
 
   @override
   List<Object?> get props => [
-        storageLocations,
-        pinnedPaths,
-        activeTabId,
-        isStorageExpanded,
-        isPinnedExpanded,
-        isLoading,
-        error,
-      ];
+    storageLocations,
+    pinnedPaths,
+    activeTabId,
+    isStorageExpanded,
+    isPinnedExpanded,
+    isLoading,
+    error,
+  ];
 }
 
 // Cubit
@@ -100,11 +100,13 @@ class DrawerCubit extends Cubit<DrawerState> {
 
   Future<void> loadStorageLocations({String? activeTabId}) async {
     final normalizedTabId = _normalizeTabId(activeTabId ?? state.activeTabId);
-    emit(state.copyWith(
-      isLoading: true,
-      error: null,
-      activeTabId: normalizedTabId,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        error: null,
+        activeTabId: normalizedTabId,
+      ),
+    );
     try {
       final locations = await getAllStorageLocations();
       final prefs = UserPreferences.instance;
@@ -130,7 +132,8 @@ class DrawerCubit extends Cubit<DrawerState> {
         if (storageExpandedTab != null) {
           storageExpanded = storageExpandedTab;
         } else {
-          storageExpanded = await prefs.getLastDrawerSectionExpanded(
+          storageExpanded =
+              await prefs.getLastDrawerSectionExpanded(
                 sectionKey: _storageSectionKey,
               ) ??
               false;
@@ -145,7 +148,8 @@ class DrawerCubit extends Cubit<DrawerState> {
         if (pinnedExpandedTab != null) {
           pinnedExpanded = pinnedExpandedTab;
         } else {
-          pinnedExpanded = await prefs.getLastDrawerSectionExpanded(
+          pinnedExpanded =
+              await prefs.getLastDrawerSectionExpanded(
                 sectionKey: _pinnedSectionKey,
               ) ??
               false;
@@ -157,19 +161,18 @@ class DrawerCubit extends Cubit<DrawerState> {
           );
         }
       }
-      emit(state.copyWith(
-        storageLocations: locations,
-        pinnedPaths: pinned,
-        activeTabId: normalizedTabId,
-        isStorageExpanded: storageExpanded,
-        isPinnedExpanded: pinnedExpanded,
-        isLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          storageLocations: locations,
+          pinnedPaths: pinned,
+          activeTabId: normalizedTabId,
+          isStorageExpanded: storageExpanded,
+          isPinnedExpanded: pinnedExpanded,
+          isLoading: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      ));
+      emit(state.copyWith(isLoading: false, error: e.toString()));
     }
   }
 
@@ -199,11 +202,13 @@ class DrawerCubit extends Cubit<DrawerState> {
     final rememberWorkspace = await prefs.getRememberTabWorkspaceEnabled();
 
     if (!rememberWorkspace) {
-      emit(state.copyWith(
-        activeTabId: normalizedTabId,
-        isStorageExpanded: false,
-        isPinnedExpanded: false,
-      ));
+      emit(
+        state.copyWith(
+          activeTabId: normalizedTabId,
+          isStorageExpanded: false,
+          isPinnedExpanded: false,
+        ),
+      );
       return;
     }
 
@@ -225,7 +230,8 @@ class DrawerCubit extends Cubit<DrawerState> {
     if (storageExpandedTab != null) {
       storageExpanded = storageExpandedTab;
     } else {
-      storageExpanded = await prefs.getLastDrawerSectionExpanded(
+      storageExpanded =
+          await prefs.getLastDrawerSectionExpanded(
             sectionKey: _storageSectionKey,
           ) ??
           false;
@@ -240,7 +246,8 @@ class DrawerCubit extends Cubit<DrawerState> {
     if (pinnedExpandedTab != null) {
       pinnedExpanded = pinnedExpandedTab;
     } else {
-      pinnedExpanded = await prefs.getLastDrawerSectionExpanded(
+      pinnedExpanded =
+          await prefs.getLastDrawerSectionExpanded(
             sectionKey: _pinnedSectionKey,
           ) ??
           false;
@@ -264,11 +271,13 @@ class DrawerCubit extends Cubit<DrawerState> {
       isExpanded: pinnedExpanded,
     );
 
-    emit(state.copyWith(
-      activeTabId: normalizedTabId,
-      isStorageExpanded: storageExpanded,
-      isPinnedExpanded: pinnedExpanded,
-    ));
+    emit(
+      state.copyWith(
+        activeTabId: normalizedTabId,
+        isStorageExpanded: storageExpanded,
+        isPinnedExpanded: pinnedExpanded,
+      ),
+    );
   }
 
   Future<void> setStorageExpanded(bool isExpanded) async {

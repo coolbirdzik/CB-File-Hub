@@ -5,7 +5,7 @@ import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 
 class ChipsInput<T> extends StatefulWidget {
   const ChipsInput({
-    Key? key,
+    super.key,
     required this.values,
     this.decoration = const InputDecoration(),
     this.style,
@@ -19,7 +19,7 @@ class ChipsInput<T> extends StatefulWidget {
     this.onSuggestionSelected,
     this.suggestionBuilder,
     this.enableColonAutocomplete = false,
-  }) : super(key: key);
+  });
 
   final List<T> values;
   final InputDecoration decoration;
@@ -40,8 +40,13 @@ class ChipsInput<T> extends StatefulWidget {
 
   /// Custom builder for suggestion items. If null, uses default rendering.
   /// Parameters: context, suggestion string, isHighlighted, tagColor.
-  final Widget Function(BuildContext context, String suggestion,
-      bool isHighlighted, Color tagColor)? suggestionBuilder;
+  final Widget Function(
+    BuildContext context,
+    String suggestion,
+    bool isHighlighted,
+    Color tagColor,
+  )?
+  suggestionBuilder;
 
   /// When true, pressing ":" while a suggestion is highlighted promotes that
   /// suggestion into a "parent:" prefix in the input, so the user can keep
@@ -72,8 +77,9 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   void initState() {
     super.initState();
 
-    controller = ChipsInputEditingController<T>(
-        <T>[...widget.values], widget.chipBuilder);
+    controller = ChipsInputEditingController<T>(<T>[
+      ...widget.values,
+    ], widget.chipBuilder);
     controller.addListener(_textListener);
     _focusNode = FocusNode();
     _focusNode.addListener(_onFocusChanged);
@@ -189,10 +195,13 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                             const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.12),
+                                color: theme.colorScheme.primary.withValues(
+                                  alpha: 0.12,
+                                ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -226,11 +235,16 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                                 onTap: () => _pickSuggestion(suggestion),
                                 child: Container(
                                   color: isHighlighted
-                                      ? theme.colorScheme.primary
-                                          .withValues(alpha: 0.1)
+                                      ? theme.colorScheme.primary.withValues(
+                                          alpha: 0.1,
+                                        )
                                       : null,
-                                  child: widget.suggestionBuilder!(context,
-                                      suggestion, isHighlighted, tagColor),
+                                  child: widget.suggestionBuilder!(
+                                    context,
+                                    suggestion,
+                                    isHighlighted,
+                                    tagColor,
+                                  ),
                                 ),
                               );
                             }
@@ -239,10 +253,13 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                               onTap: () => _pickSuggestion(suggestion),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                                 color: isHighlighted
-                                    ? theme.colorScheme.primary
-                                        .withValues(alpha: 0.1)
+                                    ? theme.colorScheme.primary.withValues(
+                                        alpha: 0.1,
+                                      )
                                     : null,
                                 child: Row(
                                   children: [
@@ -293,11 +310,13 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     _focusNode.requestFocus();
   }
 
-  /// Replaces the currently-typed text with "<parent>:" so the user can keep
+  /// Replaces the currently-typed text with `"<parent>:"` so the user can keep
   /// typing/autocompleting the child tag.
   void _promoteToParent(String parent) {
-    final String chipChars = String.fromCharCode(
-            ChipsInputEditingController.kObjectReplacementChar) *
+    final String chipChars =
+        String.fromCharCode(
+          ChipsInputEditingController.kObjectReplacementChar,
+        ) *
         widget.values.length;
     final String newTyped = '$parent:';
     controller.value = TextEditingValue(
@@ -323,7 +342,8 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     // included when selecting the editable draft. Otherwise, typing after
     // Ctrl/Cmd+A removes those placeholders while the chips are still present,
     // causing the new text to render on top of the existing tags.
-    final isSelectAll = event.logicalKey == LogicalKeyboardKey.keyA &&
+    final isSelectAll =
+        event.logicalKey == LogicalKeyboardKey.keyA &&
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed);
     if (isSelectAll) {
@@ -417,7 +437,8 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   static int countReplacements(String text) {
     return text.codeUnits
         .where(
-            (int u) => u == ChipsInputEditingController.kObjectReplacementChar)
+          (int u) => u == ChipsInputEditingController.kObjectReplacementChar,
+        )
         .length;
   }
 
@@ -442,7 +463,8 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
             maxLines: 8,
             textInputAction: TextInputAction.done,
             style: widget.style,
-            strutStyle: widget.strutStyle ??
+            strutStyle:
+                widget.strutStyle ??
                 const StrutStyle(forceStrutHeight: true, height: 1.25),
             controller: controller,
             focusNode: _focusNode,
@@ -463,8 +485,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
 class ChipsInputEditingController<T> extends TextEditingController {
   ChipsInputEditingController(this.values, this.chipBuilder)
-      : super(
-            text: String.fromCharCode(kObjectReplacementChar) * values.length);
+    : super(text: String.fromCharCode(kObjectReplacementChar) * values.length);
 
   // This constant character acts as a placeholder in the TextField text value.
   // There will be one character for each of the InputChip displayed.
@@ -525,16 +546,18 @@ class ChipsInputEditingController<T> extends TextEditingController {
       final verticalPadding = currentLineCount > 0 ? 4.0 : 0.0;
 
       // Add the chip widget
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: EdgeInsets.only(right: 4, bottom: verticalPadding, top: 0),
-          child: Transform.translate(
-            offset: const Offset(0, 2),
-            child: chipBuilder(context, values[i]),
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: EdgeInsets.only(right: 4, bottom: verticalPadding, top: 0),
+            child: Transform.translate(
+              offset: const Offset(0, 2),
+              child: chipBuilder(context, values[i]),
+            ),
           ),
         ),
-      ));
+      );
 
       // Update current line width
       currentLineWidth += chipWidth;
@@ -545,20 +568,17 @@ class ChipsInputEditingController<T> extends TextEditingController {
       spans.add(TextSpan(text: textWithoutReplacements));
     }
 
-    return TextSpan(
-      style: style,
-      children: spans,
-    );
+    return TextSpan(style: style, children: spans);
   }
 }
 
 class TagInputChip extends StatefulWidget {
   const TagInputChip({
-    Key? key,
+    super.key,
     required this.tag,
     required this.onDeleted,
     required this.onSelected,
-  }) : super(key: key);
+  });
 
   final String tag;
   final ValueChanged<String> onDeleted;
@@ -583,10 +603,14 @@ class _TagInputChipState extends State<TagInputChip>
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
     _controller.forward();
   }
 
@@ -613,8 +637,9 @@ class _TagInputChipState extends State<TagInputChip>
     final foregroundColor = _bestForegroundColor(
       Color.alphaBlend(backgroundColor, Theme.of(context).colorScheme.surface),
     );
-    final contentColor =
-        foregroundColor == Colors.white ? Colors.white : tagColor;
+    final contentColor = foregroundColor == Colors.white
+        ? Colors.white
+        : tagColor;
     final borderColor = tagColor.withValues(alpha: isHovered ? 0.75 : 0.35);
 
     return AnimatedBuilder(
@@ -633,18 +658,18 @@ class _TagInputChipState extends State<TagInputChip>
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap:
-                        isDeleting ? null : () => widget.onSelected(widget.tag),
+                    onTap: isDeleting
+                        ? null
+                        : () => widget.onSelected(widget.tag),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: backgroundColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: borderColor,
-                          width: 1,
-                        ),
+                        border: Border.all(color: borderColor, width: 1),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

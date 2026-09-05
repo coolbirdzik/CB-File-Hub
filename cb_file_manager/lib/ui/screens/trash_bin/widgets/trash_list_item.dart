@@ -21,14 +21,14 @@ class TrashItemIcon extends StatelessWidget {
   final bool fillAvailable;
 
   const TrashItemIcon({
-    Key? key,
+    super.key,
     required this.originalPath,
     required this.actualFilePath,
     required this.displayName,
     this.size = 48,
     this.isFolder = false,
     this.fillAvailable = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -40,8 +40,9 @@ class TrashItemIcon extends StatelessWidget {
       );
     }
 
-    final String typePath =
-        displayName.isNotEmpty ? displayName : p.basename(originalPath);
+    final String typePath = displayName.isNotEmpty
+        ? displayName
+        : p.basename(originalPath);
     final String extension = p.extension(typePath).toLowerCase();
     final FileCategory category = FileTypeRegistry.getCategory(extension);
     final IconData fallback = FileTypeRegistry.getIcon(extension);
@@ -59,11 +60,7 @@ class TrashItemIcon extends StatelessWidget {
         fit: BoxFit.cover,
         borderRadius: BorderRadius.circular(0),
         fallbackBuilder: () => Center(
-          child: Icon(
-            fallback,
-            size: size,
-            color: fallbackColor,
-          ),
+          child: Icon(fallback, size: size, color: fallbackColor),
         ),
       );
     }
@@ -96,7 +93,7 @@ class TrashListItem extends StatelessWidget {
   final VoidCallback? onDoubleTap;
 
   const TrashListItem({
-    Key? key,
+    super.key,
     required this.item,
     required this.isSelected,
     required this.isSelectionMode,
@@ -109,7 +106,7 @@ class TrashListItem extends StatelessWidget {
     required this.l10n,
     this.onTap,
     this.onDoubleTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -132,11 +129,12 @@ class TrashListItem extends StatelessWidget {
             width: 48,
             height: 48,
             child: TrashItemIcon(
-                originalPath: item.originalPath,
-                actualFilePath: item.actualFilePath,
-                displayName: item.displayNameValue,
-                size: 48,
-                isFolder: item.isFolder),
+              originalPath: item.originalPath,
+              actualFilePath: item.actualFilePath,
+              displayName: item.displayNameValue,
+              size: 48,
+              isFolder: item.isFolder,
+            ),
           ),
           const SizedBox(width: 16),
           // Text content
@@ -173,8 +171,11 @@ class TrashListItem extends StatelessWidget {
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: 12),
-                    Icon(PhosphorIconsLight.calendar,
-                        size: 12, color: theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      PhosphorIconsLight.calendar,
+                      size: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       formatDate(item.trashedDate),
@@ -184,7 +185,9 @@ class TrashListItem extends StatelessWidget {
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(16.0),

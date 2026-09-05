@@ -26,16 +26,13 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   /// node so callers can render whatever depth-aware UI they want
   /// (icon, name, badge, etc.). The shell handles the indent column +
   /// expand chevron itself.
-  final Widget Function(
-    BuildContext itemContext,
-    TreeNode<T> node,
-    int depth,
-  )? treeItemBuilder;
+  final Widget Function(BuildContext itemContext, TreeNode<T> node, int depth)?
+  treeItemBuilder;
 
   /// Async loader called the first time a folder node is expanded.
   /// Result is cached on the node.
   final Future<List<TreeNode<T>>> Function(TreeNode<T> node)?
-      treeChildrenLoader;
+  treeChildrenLoader;
 
   /// Per-item flag indicating whether the item itself is a leaf
   /// (e.g. a file). Used to decide whether the chevron is shown and
@@ -44,7 +41,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   final bool Function(T item)? treeIsLeaf;
   final Widget? detailsHeader;
   final Widget Function(BuildContext context, int index)?
-      detailsSeparatorBuilder;
+  detailsSeparatorBuilder;
   final Widget dragSelectionOverlay;
   final int gridCrossAxisCount;
   final double gridSpacing;
@@ -60,7 +57,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
   final bool measurePositions;
 
   const BrowserLikeCollectionView({
-    Key? key,
+    super.key,
     required this.viewMode,
     required this.items,
     required this.isDesktop,
@@ -90,7 +87,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
     this.gridCacheExtent,
     this.detailsCacheExtent,
     this.measurePositions = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -106,10 +103,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               : null,
           onPanEnd: isDesktop && onDragEnd != null ? (_) => onDragEnd!() : null,
           behavior: HitTestBehavior.translucent,
-          child: RefreshIndicator(
-            onRefresh: onRefresh,
-            child: _buildContent(),
-          ),
+          child: RefreshIndicator(onRefresh: onRefresh, child: _buildContent()),
         ),
         dragSelectionOverlay,
       ],
@@ -130,12 +124,16 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
       return null;
     }
 
-    Widget buildItem(BuildContext context, int index,
-        Widget Function(BuildContext, T) builder) {
+    Widget buildItem(
+      BuildContext context,
+      int index,
+      Widget Function(BuildContext, T) builder,
+    ) {
       final item = items[index];
       final id = itemIdentity(item);
-      final child =
-          Builder(builder: (itemContext) => builder(itemContext, item));
+      final child = Builder(
+        builder: (itemContext) => builder(itemContext, item),
+      );
       final wrapped = RepaintBoundary(
         child: measurePositions
             ? _MeasuredCollectionItem(
@@ -145,10 +143,7 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
               )
             : child,
       );
-      return KeyedSubtree(
-        key: ValueKey<String>(id),
-        child: wrapped,
-      );
+      return KeyedSubtree(key: ValueKey<String>(id), child: wrapped);
     }
 
     if (viewMode == ViewMode.grid || viewMode == ViewMode.gridPreview) {
@@ -204,10 +199,8 @@ class BrowserLikeCollectionView<T> extends StatelessWidget {
             );
       return Column(
         children: [
-          if (detailsHeader != null) detailsHeader!,
-          Expanded(
-            child: listView,
-          ),
+          ?detailsHeader,
+          Expanded(child: listView),
         ],
       );
     }
@@ -244,23 +237,20 @@ class _BrowserTreeView<T> extends StatefulWidget {
   final String Function(T item) itemIdentity;
   final bool Function(T item)? treeIsLeaf;
   final Future<List<TreeNode<T>>> Function(TreeNode<T> node)?
-      treeChildrenLoader;
-  final Widget Function(
-    BuildContext itemContext,
-    TreeNode<T> node,
-    int depth,
-  ) treeItemBuilder;
+  treeChildrenLoader;
+  final Widget Function(BuildContext itemContext, TreeNode<T> node, int depth)
+  treeItemBuilder;
   final ScrollController? scrollController;
 
   const _BrowserTreeView({
-    Key? key,
+    super.key,
     required this.items,
     required this.itemIdentity,
     required this.treeIsLeaf,
     required this.treeChildrenLoader,
     required this.treeItemBuilder,
     required this.scrollController,
-  }) : super(key: key);
+  });
 
   @override
   State<_BrowserTreeView<T>> createState() => _BrowserTreeViewState<T>();

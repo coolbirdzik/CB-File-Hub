@@ -18,7 +18,7 @@ class VideoPlayerCircularLoadingIndicator extends StatelessWidget {
   final List<Widget>? stackOverlays;
 
   const VideoPlayerCircularLoadingIndicator({
-    Key? key,
+    super.key,
     required this.size,
     required this.primaryColor,
     this.progressColor,
@@ -27,7 +27,7 @@ class VideoPlayerCircularLoadingIndicator extends StatelessWidget {
     this.iconSize = 20,
     this.iconColor,
     this.stackOverlays,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -72,11 +72,11 @@ class LoopingTweenBuilder extends StatefulWidget {
   final Widget Function(double animationValue) builder;
 
   const LoopingTweenBuilder({
-    Key? key,
+    super.key,
     this.delay = 0,
     required this.duration,
     required this.builder,
-  }) : super(key: key);
+  });
 
   @override
   State<LoopingTweenBuilder> createState() => _LoopingTweenBuilderState();
@@ -105,10 +105,10 @@ class VideoPlayerErrorWidget extends StatelessWidget {
   final VoidCallback onRetry;
 
   const VideoPlayerErrorWidget({
-    Key? key,
+    super.key,
     required this.message,
     required this.onRetry,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -116,15 +116,17 @@ class VideoPlayerErrorWidget extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(PhosphorIconsLight.warningCircle,
-              color: Colors.red, size: 64),
+          const Icon(
+            PhosphorIconsLight.warningCircle,
+            color: Colors.red,
+            size: 64,
+          ),
           const SizedBox(height: 16),
           Text(
             'Error playing media',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(color: Colors.white),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -132,10 +134,9 @@ class VideoPlayerErrorWidget extends StatelessWidget {
             child: Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Colors.white70),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
             ),
           ),
           const SizedBox(height: 24),
@@ -155,10 +156,10 @@ class VideoPlayerLoadingWidget extends StatefulWidget {
   final String fileName;
 
   const VideoPlayerLoadingWidget({
-    Key? key,
+    super.key,
     required this.loadingMessage,
     required this.fileName,
-  }) : super(key: key);
+  });
 
   @override
   State<VideoPlayerLoadingWidget> createState() =>
@@ -177,17 +178,17 @@ class _VideoPlayerLoadingWidgetState extends State<VideoPlayerLoadingWidget> {
           Text(
             widget.loadingMessage,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             widget.fileName,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w400,
-                ),
+              color: Colors.white70,
+              fontWeight: FontWeight.w400,
+            ),
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -268,7 +269,7 @@ class _VideoPlayerLoadingWidgetState extends State<VideoPlayerLoadingWidget> {
 
 /// VLC-specific placeholder shown while VLC player is initializing.
 class VideoPlayerVlcPlaceholder extends StatefulWidget {
-  const VideoPlayerVlcPlaceholder({Key? key}) : super(key: key);
+  const VideoPlayerVlcPlaceholder({super.key});
 
   @override
   State<VideoPlayerVlcPlaceholder> createState() =>
@@ -296,9 +297,9 @@ class _VideoPlayerVlcPlaceholderState extends State<VideoPlayerVlcPlaceholder> {
             Text(
               'Loading...',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w400,
-                  ),
+                color: Colors.white70,
+                fontWeight: FontWeight.w400,
+              ),
             ),
             const SizedBox(height: 8),
             Row(

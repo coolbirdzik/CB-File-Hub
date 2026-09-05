@@ -54,8 +54,9 @@ class ImageMemoryPool {
   static void _evictOldest() {
     if (_lastUsed.isEmpty) return;
 
-    final oldest =
-        _lastUsed.entries.reduce((a, b) => a.value.isBefore(b.value) ? a : b);
+    final oldest = _lastUsed.entries.reduce(
+      (a, b) => a.value.isBefore(b.value) ? a : b,
+    );
 
     _imagePool[oldest.key]?.dispose();
     _imagePool.remove(oldest.key);
@@ -363,7 +364,7 @@ class ThumbnailLoader extends StatefulWidget {
   }
 
   const ThumbnailLoader({
-    Key? key,
+    super.key,
     required this.filePath,
     required this.isVideo,
     required this.isImage,
@@ -375,7 +376,7 @@ class ThumbnailLoader extends StatefulWidget {
     this.onThumbnailLoaded,
     this.borderRadius,
     this.isPriority = false,
-  }) : super(key: key);
+  });
 
   @override
   State<ThumbnailLoader> createState() => _ThumbnailLoaderState();
@@ -399,8 +400,9 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   // Debounce for VisibilityDetector: kept short because loading a cached
   // thumbnail JPEG is cheap.  Fast-scroll detection (ScrollVelocityNotifier)
   // is the primary gating mechanism, not this timer.
-  static const Duration _visibilityDebounceDuration =
-      Duration(milliseconds: 100);
+  static const Duration _visibilityDebounceDuration = Duration(
+    milliseconds: 100,
+  );
 
   // No extra delay: thumbnail display is fast once the JPEG is cached.
   static const Duration _thumbnailLoadDelay = Duration.zero;
@@ -453,8 +455,9 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
 
   static void _ensureGlobalCacheListener() {
     if (_globalCacheChangedSubscription != null) return;
-    _globalCacheChangedSubscription =
-        VideoThumbnailHelper.onCacheChanged.listen((_) {
+    _globalCacheChangedSubscription = VideoThumbnailHelper.onCacheChanged.listen((
+      _,
+    ) {
       if (_cacheInvalidationPending) return; // coalesce rapid bursts
       _cacheInvalidationPending = true;
       // Clear the shared cache exactly once, then invalidate all live instances.
@@ -586,7 +589,8 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   // The SplayTreeMap keeps the queue always sorted — O(log N) insert.
   void _addToLoadingQueue([int? displayIndex]) {
     // Look up display index from the map if not explicitly provided.
-    final baseIndex = displayIndex ??
+    final baseIndex =
+        displayIndex ??
         ThumbnailLoader.getDisplayIndex(widget.filePath) ??
         999999;
     // Combine display index and insertion counter into a single sortable key
@@ -815,8 +819,10 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
         }
         _activeLoaders++;
         try {
-          thumbPath =
-              await thumbnailHelper.generateThumbnail(path, size: genSize);
+          thumbPath = await thumbnailHelper.generateThumbnail(
+            path,
+            size: genSize,
+          );
         } finally {
           _activeLoaders--;
         }
@@ -956,7 +962,8 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
           File(thumbnailPath),
           excludeFromSemantics: true, // decorative, see lazy_video_thumbnail
           key: ValueKey(
-              'thumb-img-${widget.filePath}-${thumbnailPath.hashCode}-$_thumbnailVersion'),
+            'thumb-img-${widget.filePath}-${thumbnailPath.hashCode}-$_thumbnailVersion',
+          ),
           width: widget.width,
           height: widget.height,
           fit: widget.fit,
@@ -982,8 +989,9 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
             }
             // Compute play icon size proportional to thumbnail so it
             // doesn't overflow small containers (e.g. 20x20 Miller columns).
-            final double minDim =
-                widget.width < widget.height ? widget.width : widget.height;
+            final double minDim = widget.width < widget.height
+                ? widget.width
+                : widget.height;
             final double playSize = minDim == double.infinity
                 ? 32
                 : (minDim * 0.7).clamp(12.0, 32.0);
@@ -1026,47 +1034,46 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
         // Use NetworkThumbnailHelper to generate the thumbnail
         final int genSize = (Platform.isAndroid || Platform.isIOS) ? 128 : 256;
         NetworkThumbnailHelper()
-            .generateThumbnail(
-              widget.filePath,
-              size: genSize,
-            )
+            .generateThumbnail(widget.filePath, size: genSize)
             .timeout(
-                const Duration(seconds: 30)) // Longer timeout for 4K videos
+              const Duration(seconds: 30),
+            ) // Longer timeout for 4K videos
             .then((path) {
-          if (_widgetMounted && path != null) {
-            setState(() {
-              _networkThumbnailPath = path;
-              _cache.cacheThumbnailPath(widget.filePath, path);
+              if (_widgetMounted && path != null) {
+                setState(() {
+                  _networkThumbnailPath = path;
+                  _cache.cacheThumbnailPath(widget.filePath, path);
+                });
+                _isLoadingNotifier.value = false;
+                if (widget.onThumbnailLoaded != null) {
+                  widget.onThumbnailLoaded!();
+                }
+              } else {
+                _isLoadingNotifier.value = false;
+              }
+              _cache.markThumbnailGenerated(widget.filePath);
+              _activeLoaders--;
+
+              // Decrement pending thumbnail count
+              ThumbnailLoader.pendingThumbnailCount--;
+              ThumbnailLoader._pendingTasksController.add(
+                ThumbnailLoader.pendingThumbnailCount,
+              );
+            })
+            .catchError((error) {
+              if (_widgetMounted) {
+                _isLoadingNotifier.value = false;
+                _hasErrorNotifier.value = true;
+              }
+              _cache.markThumbnailGenerated(widget.filePath);
+              _activeLoaders--;
+
+              // Decrement pending thumbnail count
+              ThumbnailLoader.pendingThumbnailCount--;
+              ThumbnailLoader._pendingTasksController.add(
+                ThumbnailLoader.pendingThumbnailCount,
+              );
             });
-            _isLoadingNotifier.value = false;
-            if (widget.onThumbnailLoaded != null) {
-              widget.onThumbnailLoaded!();
-            }
-          } else {
-            _isLoadingNotifier.value = false;
-          }
-          _cache.markThumbnailGenerated(widget.filePath);
-          _activeLoaders--;
-
-          // Decrement pending thumbnail count
-          ThumbnailLoader.pendingThumbnailCount--;
-          ThumbnailLoader._pendingTasksController.add(
-            ThumbnailLoader.pendingThumbnailCount,
-          );
-        }).catchError((error) {
-          if (_widgetMounted) {
-            _isLoadingNotifier.value = false;
-            _hasErrorNotifier.value = true;
-          }
-          _cache.markThumbnailGenerated(widget.filePath);
-          _activeLoaders--;
-
-          // Decrement pending thumbnail count
-          ThumbnailLoader.pendingThumbnailCount--;
-          ThumbnailLoader._pendingTasksController.add(
-            ThumbnailLoader.pendingThumbnailCount,
-          );
-        });
       }
 
       // Return fallback while loading
@@ -1167,67 +1174,69 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
             ThumbnailLoader.pendingThumbnailCount,
           );
 
-          final int genSize =
-              (Platform.isAndroid || Platform.isIOS) ? 128 : 256;
+          final int genSize = (Platform.isAndroid || Platform.isIOS)
+              ? 128
+              : 256;
           NetworkThumbnailHelper()
               .generateThumbnail(widget.filePath, size: genSize)
               .timeout(const Duration(seconds: 6))
               .then((path) {
-            if (_widgetMounted && path != null) {
-              setState(() {
-                _networkThumbnailPath = path;
-                _cache.cacheThumbnailPath(widget.filePath, path);
+                if (_widgetMounted && path != null) {
+                  setState(() {
+                    _networkThumbnailPath = path;
+                    _cache.cacheThumbnailPath(widget.filePath, path);
+                  });
+                  _isLoadingNotifier.value = false;
+                  if (widget.onThumbnailLoaded != null) {
+                    widget.onThumbnailLoaded!();
+                  }
+                } else {
+                  _isLoadingNotifier.value = false;
+                }
+                _cache.markThumbnailGenerated(widget.filePath);
+                _activeLoaders--;
+
+                // Decrement pending thumbnail count
+                ThumbnailLoader.pendingThumbnailCount--;
+                ThumbnailLoader._pendingTasksController.add(
+                  ThumbnailLoader.pendingThumbnailCount,
+                );
+              })
+              .catchError((error) {
+                // Check if this is a skip exception (backoff)
+                if (error.toString().contains('ThumbnailSkippedException')) {
+                  // Don't update error state for skipped thumbnails
+                  if (_widgetMounted) {
+                    _isLoadingNotifier.value = false;
+                  }
+                  _cache.markThumbnailGenerated(widget.filePath);
+                  _activeLoaders--;
+
+                  // Decrement counter since we incremented it at the start
+                  ThumbnailLoader.pendingThumbnailCount--;
+                  ThumbnailLoader._pendingTasksController.add(
+                    ThumbnailLoader.pendingThumbnailCount,
+                  );
+                  return; // Don't log or update error state
+                }
+
+                if (_widgetMounted) {
+                  _isLoadingNotifier.value = false;
+                  _hasErrorNotifier.value = true;
+                }
+                _cache.markThumbnailGenerated(widget.filePath);
+                _activeLoaders--;
+
+                // Decrement pending thumbnail count
+                ThumbnailLoader.pendingThumbnailCount--;
+                ThumbnailLoader._pendingTasksController.add(
+                  ThumbnailLoader.pendingThumbnailCount,
+                );
+
+                // Only log errors if they're not related to BackgroundIsolateBinaryMessenger
+                if (error is! String ||
+                    !error.contains('BackgroundIsolateBinaryMessenger')) {}
               });
-              _isLoadingNotifier.value = false;
-              if (widget.onThumbnailLoaded != null) {
-                widget.onThumbnailLoaded!();
-              }
-            } else {
-              _isLoadingNotifier.value = false;
-            }
-            _cache.markThumbnailGenerated(widget.filePath);
-            _activeLoaders--;
-
-            // Decrement pending thumbnail count
-            ThumbnailLoader.pendingThumbnailCount--;
-            ThumbnailLoader._pendingTasksController.add(
-              ThumbnailLoader.pendingThumbnailCount,
-            );
-          }).catchError((error) {
-            // Check if this is a skip exception (backoff)
-            if (error.toString().contains('ThumbnailSkippedException')) {
-              // Don't update error state for skipped thumbnails
-              if (_widgetMounted) {
-                _isLoadingNotifier.value = false;
-              }
-              _cache.markThumbnailGenerated(widget.filePath);
-              _activeLoaders--;
-
-              // Decrement counter since we incremented it at the start
-              ThumbnailLoader.pendingThumbnailCount--;
-              ThumbnailLoader._pendingTasksController.add(
-                ThumbnailLoader.pendingThumbnailCount,
-              );
-              return; // Don't log or update error state
-            }
-
-            if (_widgetMounted) {
-              _isLoadingNotifier.value = false;
-              _hasErrorNotifier.value = true;
-            }
-            _cache.markThumbnailGenerated(widget.filePath);
-            _activeLoaders--;
-
-            // Decrement pending thumbnail count
-            ThumbnailLoader.pendingThumbnailCount--;
-            ThumbnailLoader._pendingTasksController.add(
-              ThumbnailLoader.pendingThumbnailCount,
-            );
-
-            // Only log errors if they're not related to BackgroundIsolateBinaryMessenger
-            if (error is! String ||
-                !error.contains('BackgroundIsolateBinaryMessenger')) {}
-          });
         }
 
         return _buildFallbackWidget();
@@ -1282,7 +1291,8 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
     }
 
     // ── Network image thumbnails (old path) ───────────────────────────────────────
-    final bool hasCachedThumbnail = _networkThumbnailPath != null &&
+    final bool hasCachedThumbnail =
+        _networkThumbnailPath != null &&
         _networkThumbnailPath != widget.filePath;
 
     if (!hasCachedThumbnail) {
@@ -1331,22 +1341,25 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
   /// in a background isolate.  Uses a simple shimmer-free grey surface -
   /// no async work, no Image.file, no I/O.
   Widget _buildLoadingPlaceholderForThumbnail() {
-    return LayoutBuilder(builder: (context, constraints) {
-      final theme = Theme.of(context);
-      return Container(
-        width: constraints.maxWidth,
-        height: constraints.maxHeight,
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        child: Center(
-          child: Icon(
-            PhosphorIconsLight.image,
-            size: 24,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final theme = Theme.of(context);
+        return Container(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.35,
           ),
-        ),
-      );
-    });
+          child: Center(
+            child: Icon(
+              PhosphorIconsLight.image,
+              size: 24,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildFallbackWidget() {
@@ -1358,8 +1371,11 @@ class _ThumbnailLoaderState extends State<ThumbnailLoader>
       return Container(
         color: Colors.black12,
         child: const Center(
-          child:
-              Icon(PhosphorIconsLight.videoCamera, size: 36, color: Colors.red),
+          child: Icon(
+            PhosphorIconsLight.videoCamera,
+            size: 36,
+            color: Colors.red,
+          ),
         ),
       );
     } else if (widget.isImage) {

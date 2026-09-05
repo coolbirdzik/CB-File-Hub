@@ -4,8 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('01.01 submits pending text when the field is submitted',
-      (tester) async {
+  testWidgets('01.01 submits pending text when the field is submitted', (
+    tester,
+  ) async {
     String? submittedValue;
 
     await tester.pumpWidget(
@@ -20,9 +21,7 @@ void main() {
                 ),
               ),
               const Positioned.fill(
-                child: IgnorePointer(
-                  child: ColoredBox(color: Colors.white),
-                ),
+                child: IgnorePointer(child: ColoredBox(color: Colors.white)),
               ),
               Center(
                 child: SizedBox(
@@ -31,9 +30,7 @@ void main() {
                     values: const <String>[],
                     onChanged: (_) {},
                     onSubmitted: (value) => submittedValue = value,
-                    chipBuilder: (context, value) => Chip(
-                      label: Text(value),
-                    ),
+                    chipBuilder: (context, value) => Chip(label: Text(value)),
                   ),
                 ),
               ),
@@ -55,8 +52,9 @@ void main() {
     expect(submittedValue, equals('urgent'));
   });
 
-  testWidgets('01.02 Ctrl+A replaces only draft text and preserves chips',
-      (tester) async {
+  testWidgets('01.02 Ctrl+A replaces only draft text and preserves chips', (
+    tester,
+  ) async {
     final key = GlobalKey<ChipsInputState<String>>();
     String? draftText;
 
@@ -89,8 +87,10 @@ void main() {
     await tester.pump();
 
     final controller = key.currentState!.controller;
-    expect(controller.selection,
-        const TextSelection(baseOffset: 2, extentOffset: 11));
+    expect(
+      controller.selection,
+      const TextSelection(baseOffset: 2, extentOffset: 11),
+    );
 
     tester.testTextInput.updateEditingValue(
       const TextEditingValue(

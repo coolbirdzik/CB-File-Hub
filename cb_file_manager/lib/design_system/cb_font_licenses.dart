@@ -14,13 +14,11 @@ import 'package:flutter/services.dart' show rootBundle;
 /// Call once during startup, after the binding is initialised.
 void registerCbFontLicenses() {
   LicenseRegistry.addLicense(() async* {
-    yield LicenseEntryWithLineBreaks(
-      const <String>['Inter'],
-      await rootBundle.loadString('assets/fonts/Inter-OFL.txt'),
-    );
-    yield LicenseEntryWithLineBreaks(
-      const <String>['JetBrains Mono'],
-      await rootBundle.loadString('assets/fonts/JetBrainsMono-OFL.txt'),
-    );
+    yield LicenseEntryWithLineBreaks(const <String>[
+      'Inter',
+    ], await rootBundle.loadString('assets/fonts/Inter-OFL.txt'));
+    yield LicenseEntryWithLineBreaks(const <String>[
+      'JetBrains Mono',
+    ], await rootBundle.loadString('assets/fonts/JetBrainsMono-OFL.txt'));
   });
 }

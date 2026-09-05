@@ -16,10 +16,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 class ArchiveBrowserDialog extends StatefulWidget {
   final String archivePath;
 
-  const ArchiveBrowserDialog({
-    Key? key,
-    required this.archivePath,
-  }) : super(key: key);
+  const ArchiveBrowserDialog({super.key, required this.archivePath});
 
   static Future<void> show(
     BuildContext context, {
@@ -153,42 +150,39 @@ class _ArchiveBrowserDialogState extends State<ArchiveBrowserDialog> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(
-                              _error!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: theme.colorScheme.error,
-                              ),
-                            ),
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: theme.colorScheme.error),
+                        ),
+                      ),
+                    )
+                  : _entries.isEmpty
+                  ? Center(child: Text(l10n.archiveEmpty))
+                  : ListView.separated(
+                      itemCount: _entries.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final entry = _entries[index];
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(_iconForEntry(entry)),
+                          title: Text(
+                            entry.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        )
-                      : _entries.isEmpty
-                          ? Center(child: Text(l10n.archiveEmpty))
-                          : ListView.separated(
-                              itemCount: _entries.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final entry = _entries[index];
-                                return ListTile(
-                                  dense: true,
-                                  leading: Icon(_iconForEntry(entry)),
-                                  title: Text(
-                                    entry.name,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    entry.isDirectory
-                                        ? l10n.folder
-                                        : _formatSize(entry.size),
-                                  ),
-                                );
-                              },
-                            ),
+                          subtitle: Text(
+                            entry.isDirectory
+                                ? l10n.folder
+                                : _formatSize(entry.size),
+                          ),
+                        );
+                      },
+                    ),
             ),
             const Divider(height: 1),
             Padding(

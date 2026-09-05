@@ -17,7 +17,7 @@ import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 
 class AlbumManagementScreen extends StatefulWidget {
-  const AlbumManagementScreen({Key? key}) : super(key: key);
+  const AlbumManagementScreen({super.key});
 
   @override
   State<AlbumManagementScreen> createState() => _AlbumManagementScreenState();
@@ -122,8 +122,9 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     try {
       final isSmart = await SmartAlbumService.instance.isSmartAlbum(album.id);
       if (isSmart) {
-        final cached =
-            await SmartAlbumService.instance.getCachedFiles(album.id);
+        final cached = await SmartAlbumService.instance.getCachedFiles(
+          album.id,
+        );
         return cached.length;
       }
       final files = await _albumService.getAlbumFiles(album.id);
@@ -149,11 +150,9 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
             tabBloc.add(UpdateTabName(activeTab.id, album.name));
           } else {
             // Fallback: if no active tab, open as new tab
-            tabBloc.add(AddTab(
-              path: path,
-              name: album.name,
-              switchToTab: true,
-            ));
+            tabBloc.add(
+              AddTab(path: path, name: album.name, switchToTab: true),
+            );
           }
         },
         child: Padding(
@@ -167,11 +166,15 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   color: album.colorTheme != null
-                      ? Color(int.parse(
-                          album.colorTheme!.replaceFirst('#', '0xFF')))
+                      ? Color(
+                          int.parse(
+                            album.colorTheme!.replaceFirst('#', '0xFF'),
+                          ),
+                        )
                       : Theme.of(context).colorScheme.outlineVariant,
                 ),
-                child: album.coverImagePath != null &&
+                child:
+                    album.coverImagePath != null &&
                         File(album.coverImagePath!).existsSync()
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -179,13 +182,18 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           File(album.coverImagePath!),
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            return const Icon(PhosphorIconsLight.imageSquare,
-                                size: 30);
+                            return const Icon(
+                              PhosphorIconsLight.imageSquare,
+                              size: 30,
+                            );
                           },
                         ),
                       )
-                    : const Icon(PhosphorIconsLight.imageSquare,
-                        size: 30, color: Colors.white),
+                    : const Icon(
+                        PhosphorIconsLight.imageSquare,
+                        size: 30,
+                        color: Colors.white,
+                      ),
               ),
               const SizedBox(width: 16),
               // Album info
@@ -222,8 +230,9 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           '$fileCount ${fileCount == 1 ? 'image' : 'images'}',
                           style: TextStyle(
                             fontSize: 12,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         );
                       },
@@ -269,9 +278,11 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
       title: 'Albums',
       actions: [
         IconButton(
-          icon: Icon(_isGridView
-              ? PhosphorIconsLight.listBullets
-              : PhosphorIconsLight.gridFour),
+          icon: Icon(
+            _isGridView
+                ? PhosphorIconsLight.listBullets
+                : PhosphorIconsLight.gridFour,
+          ),
           tooltip: _isGridView ? 'List view' : 'Grid view',
           onPressed: () {
             setState(() => _isGridView = !_isGridView);
@@ -312,76 +323,75 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
               itemCount: 12,
             )
           : _albums.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        PhosphorIconsLight.imageSquare,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No albums yet',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Create your first album to organize your images',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: _showCreateAlbumDialog,
-                        icon: const Icon(PhosphorIconsLight.plus),
-                        label: const Text('Create Album'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    PhosphorIconsLight.imageSquare,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                )
-              : _isGridView
-                  ? LayoutBuilder(
-                      builder: (context, constraints) {
-                        final width = constraints.maxWidth;
-                        int crossAxisCount = 2;
-                        if (width > 1200) {
-                          crossAxisCount = 5;
-                        } else if (width > 900) {
-                          crossAxisCount = 4;
-                        } else if (width > 600) {
-                          crossAxisCount = 3;
-                        }
-
-                        return GridView.builder(
-                          padding: const EdgeInsets.all(12),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 1.2,
-                          ),
-                          itemCount: _albums.length,
-                          itemBuilder: (context, index) {
-                            return _buildAlbumGridTile(_albums[index]);
-                          },
-                        );
-                      },
-                    )
-                  : ListView.builder(
-                      itemCount: _albums.length,
-                      itemBuilder: (context, index) {
-                        return _buildAlbumCard(_albums[index]);
-                      },
+                  const SizedBox(height: 16),
+                  Text(
+                    'No albums yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Create your first album to organize your images',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _showCreateAlbumDialog,
+                    icon: const Icon(PhosphorIconsLight.plus),
+                    label: const Text('Create Album'),
+                  ),
+                ],
+              ),
+            )
+          : _isGridView
+          ? LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                int crossAxisCount = 2;
+                if (width > 1200) {
+                  crossAxisCount = 5;
+                } else if (width > 900) {
+                  crossAxisCount = 4;
+                } else if (width > 600) {
+                  crossAxisCount = 3;
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.2,
+                  ),
+                  itemCount: _albums.length,
+                  itemBuilder: (context, index) {
+                    return _buildAlbumGridTile(_albums[index]);
+                  },
+                );
+              },
+            )
+          : ListView.builder(
+              itemCount: _albums.length,
+              itemBuilder: (context, index) {
+                return _buildAlbumCard(_albums[index]);
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateAlbumDialog,
         tooltip: 'Create Album',
@@ -427,13 +437,15 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                             await _showPickCoverDialog(album);
                             break;
                           case 'random_cover':
-                            final files =
-                                await _albumService.getAlbumFiles(album.id);
+                            final files = await _albumService.getAlbumFiles(
+                              album.id,
+                            );
                             if (files.isNotEmpty) {
                               final rnd = math.Random();
                               final chosen = files[rnd.nextInt(files.length)];
                               final updated = album.copyWith(
-                                  coverImagePath: chosen.filePath);
+                                coverImagePath: chosen.filePath,
+                              );
                               await _albumService.updateAlbum(updated);
                               _loadAlbums();
                             }
@@ -450,7 +462,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                             children: [
                               Icon(PhosphorIconsLight.image, size: 16),
                               SizedBox(width: 8),
-                              Text('Set Cover…')
+                              Text('Set Cover…'),
                             ],
                           ),
                         ),
@@ -460,7 +472,7 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                             children: [
                               Icon(PhosphorIconsLight.shuffle, size: 16),
                               SizedBox(width: 8),
-                              Text('Random Cover')
+                              Text('Random Cover'),
                             ],
                           ),
                         ),
@@ -468,10 +480,13 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(PhosphorIconsLight.trash,
-                                  size: 16, color: Colors.red),
+                              Icon(
+                                PhosphorIconsLight.trash,
+                                size: 16,
+                                color: Colors.red,
+                              ),
                               SizedBox(width: 8),
-                              Text('Delete')
+                              Text('Delete'),
                             ],
                           ),
                         ),
@@ -501,15 +516,15 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
                       return Text(
                         '$count ${count == 1 ? 'image' : 'images'}',
                         style: TextStyle(
-                            fontSize: 12,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant),
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       );
                     },
                   ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -571,7 +586,8 @@ class _AlbumManagementScreenState extends State<AlbumManagementScreen> {
     if (files.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No images to pick as cover')));
+          const SnackBar(content: Text('No images to pick as cover')),
+        );
       }
       return;
     }

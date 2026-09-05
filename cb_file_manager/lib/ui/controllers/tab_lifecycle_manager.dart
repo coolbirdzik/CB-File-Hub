@@ -25,7 +25,8 @@ class TabLifecycleManager {
     required Function(String) onPathUpdate,
   }) {
     debugPrint(
-        '🟡 [TabLifecycleManager] handleDidChangeDependencies called for tab: $tabId');
+      '🟡 [TabLifecycleManager] handleDidChangeDependencies called for tab: $tabId',
+    );
     debugPrint('🟡 [TabLifecycleManager] Current path: $currentPath');
 
     // Set up a listener for TabManagerBloc state changes
@@ -33,13 +34,15 @@ class TabLifecycleManager {
     final activeTab = tabBloc.state.activeTab;
 
     debugPrint(
-        '🟡 [TabLifecycleManager] Active tab: ${activeTab?.id}, Active tab path: ${activeTab?.path}');
+      '🟡 [TabLifecycleManager] Active tab: ${activeTab?.id}, Active tab path: ${activeTab?.path}',
+    );
 
     if (activeTab != null &&
         activeTab.id == tabId &&
         activeTab.path != currentPath) {
       debugPrint(
-          '🟡 [TabLifecycleManager] Path mismatch detected, updating path from $currentPath to ${activeTab.path}');
+        '🟡 [TabLifecycleManager] Path mismatch detected, updating path from $currentPath to ${activeTab.path}',
+      );
       // Only update if the path has actually changed
       onPathUpdate(activeTab.path);
     }
@@ -48,7 +51,8 @@ class TabLifecycleManager {
     if (activeTab != null && activeTab.id == tabId) {
       // Check if we actually need to reload
       final currentState = folderListBloc.state;
-      final shouldReload = currentState.currentPath.path != currentPath ||
+      final shouldReload =
+          currentState.currentPath.path != currentPath ||
           (currentState.folders.isEmpty &&
               currentState.files.isEmpty &&
               currentState.searchResults.isEmpty &&
@@ -59,15 +63,19 @@ class TabLifecycleManager {
 
       debugPrint('🟡 [TabLifecycleManager] Should reload: $shouldReload');
       debugPrint(
-          '🟡 [TabLifecycleManager] Current state path: ${currentState.currentPath.path}');
+        '🟡 [TabLifecycleManager] Current state path: ${currentState.currentPath.path}',
+      );
       debugPrint(
-          '🟡 [TabLifecycleManager] Folders: ${currentState.folders.length}, Files: ${currentState.files.length}');
+        '🟡 [TabLifecycleManager] Folders: ${currentState.folders.length}, Files: ${currentState.files.length}',
+      );
       debugPrint(
-          '🟡 [TabLifecycleManager] Is loading: ${currentState.isLoading}');
+        '🟡 [TabLifecycleManager] Is loading: ${currentState.isLoading}',
+      );
 
       if (shouldReload) {
         debugPrint(
-            '🟡 [TabLifecycleManager] Scheduling reload for path: $currentPath');
+          '🟡 [TabLifecycleManager] Scheduling reload for path: $currentPath',
+        );
         // Enter loading immediately so startup does not render the empty-folder
         // state while the delayed FolderListLoad waits for path synchronization.
         folderListBloc.add(const FolderListInit());
@@ -75,17 +83,20 @@ class TabLifecycleManager {
         Future.delayed(const Duration(milliseconds: 50), () {
           if (isMounted) {
             debugPrint(
-                '🟡 [TabLifecycleManager] Tab $tabId became active, reloading content for path: $currentPath');
+              '🟡 [TabLifecycleManager] Tab $tabId became active, reloading content for path: $currentPath',
+            );
 
             // Don't try to load virtual paths as directories.
             if (currentPath.startsWith('#') || currentPath.isEmpty) {
               debugPrint(
-                  '🟡 [TabLifecycleManager] Skipping directory load for virtual path: $currentPath');
+                '🟡 [TabLifecycleManager] Skipping directory load for virtual path: $currentPath',
+              );
               return;
             }
 
             debugPrint(
-                '🟡 [TabLifecycleManager] Triggering FolderListLoad for: $currentPath');
+              '🟡 [TabLifecycleManager] Triggering FolderListLoad for: $currentPath',
+            );
             folderListBloc.add(FolderListLoad(currentPath));
           }
         });

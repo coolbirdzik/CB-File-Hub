@@ -10,11 +10,7 @@ class VideoInfoDialog extends StatelessWidget {
   final File file;
   final Map<String, dynamic>? videoMetadata;
 
-  const VideoInfoDialog({
-    Key? key,
-    required this.file,
-    this.videoMetadata,
-  }) : super(key: key);
+  const VideoInfoDialog({super.key, required this.file, this.videoMetadata});
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +23,9 @@ class VideoInfoDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _infoRow(
-                l10n.fileName, file.path.split(Platform.pathSeparator).last),
+              l10n.fileName,
+              file.path.split(Platform.pathSeparator).last,
+            ),
             const Divider(),
             _infoRow(l10n.filePath, file.path),
             const Divider(),
@@ -56,16 +54,8 @@ class VideoInfoDialog extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$title: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );

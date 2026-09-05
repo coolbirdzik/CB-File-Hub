@@ -37,8 +37,11 @@ class ProgressWindowIpcServer {
       AppLogger.info('[ProgressIPC] Server started on port $_port');
       return _port;
     } catch (e, st) {
-      AppLogger.error('[ProgressIPC] Failed to start server',
-          error: e, stackTrace: st);
+      AppLogger.error(
+        '[ProgressIPC] Failed to start server',
+        error: e,
+        stackTrace: st,
+      );
       return null;
     }
   }
@@ -54,13 +57,15 @@ class ProgressWindowIpcServer {
       } catch (_) {}
     }
 
-    socket.done.then((_) {
-      _clients.remove(socket);
-      return null;
-    }).catchError((Object _) {
-      _clients.remove(socket);
-      return null;
-    });
+    socket.done
+        .then((_) {
+          _clients.remove(socket);
+          return null;
+        })
+        .catchError((Object _) {
+          _clients.remove(socket);
+          return null;
+        });
   }
 
   /// Gửi update progress tới tất cả client đang kết nối.

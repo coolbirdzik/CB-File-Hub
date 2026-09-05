@@ -7,10 +7,10 @@ class DrawerHeaderWidget extends StatelessWidget {
   final Function(bool) onPinStateChanged;
 
   const DrawerHeaderWidget({
-    Key? key,
+    super.key,
     required this.isPinned,
     required this.onPinStateChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -98,10 +98,7 @@ class DrawerHeaderWidget extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'File Management Made Simple',
-            style: TextStyle(
-              color: cs.onSurfaceVariant,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
           ),
         ],
       ),

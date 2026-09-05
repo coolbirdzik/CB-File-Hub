@@ -7,8 +7,9 @@ import '../../utils/app_logger.dart';
 
 /// Helper class for Windows-native file operations with progress dialog
 class WindowsFileOperations {
-  static const MethodChannel _channel =
-      MethodChannel('cb_file_manager/file_operations');
+  static const MethodChannel _channel = MethodChannel(
+    'cb_file_manager/file_operations',
+  );
 
   /// Check if native Windows file operations are available
   static bool get isAvailable => Platform.isWindows;
@@ -24,13 +25,10 @@ class WindowsFileOperations {
     }
 
     try {
-      final result = await _channel.invokeMethod<bool>(
-        'copyItems',
-        {
-          'sources': sources,
-          'destination': destination,
-        },
-      );
+      final result = await _channel.invokeMethod<bool>('copyItems', {
+        'sources': sources,
+        'destination': destination,
+      });
       return result ?? false;
     } catch (e) {
       return false;
@@ -48,13 +46,10 @@ class WindowsFileOperations {
     }
 
     try {
-      final result = await _channel.invokeMethod<bool>(
-        'moveItems',
-        {
-          'sources': sources,
-          'destination': destination,
-        },
-      );
+      final result = await _channel.invokeMethod<bool>('moveItems', {
+        'sources': sources,
+        'destination': destination,
+      });
       return result ?? false;
     } catch (e) {
       return false;
@@ -84,16 +79,13 @@ class WindowsFileOperations {
         '[WindowsFileOperations] Starting $action | count=${sources.length} | silent=$silent | first=${sources.first}'
         '${sources.length > 1 ? ' | last=${sources.last}' : ''}',
       );
-      final nativeCall = _channel.invokeMethod<bool>(
-        'deleteItems',
-        {
-          'sources': sources,
-          'permanent': permanent,
-          'silent': silent,
-          'requireElevation': requireElevation,
-          if (timeout != null) 'timeoutMs': timeout.inMilliseconds,
-        },
-      );
+      final nativeCall = _channel.invokeMethod<bool>('deleteItems', {
+        'sources': sources,
+        'permanent': permanent,
+        'silent': silent,
+        'requireElevation': requireElevation,
+        if (timeout != null) 'timeoutMs': timeout.inMilliseconds,
+      });
       // Dart-side guard: if the native side hangs (COM deadlock, OneDrive
       // log file blocked indefinitely, etc.), fail fast instead of
       // freezing the UI on the await.
@@ -144,10 +136,7 @@ class WindowsFileOperations {
       final stopwatch = Stopwatch()..start();
       final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'enumerateRecycleBin',
-        {
-          if (offset > 0) 'offset': offset,
-          if (limit != null) 'limit': limit,
-        },
+        {if (offset > 0) 'offset': offset, 'limit': ?limit},
       );
       stopwatch.stop();
       if (raw == null) {
@@ -161,13 +150,13 @@ class WindowsFileOperations {
       final total = totalRaw is int
           ? totalRaw
           : totalRaw is num
-              ? totalRaw.toInt()
-              : 0;
+          ? totalRaw.toInt()
+          : 0;
       final items = (rawItems is List)
           ? rawItems
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList(growable: false)
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList(growable: false)
           : const <Map<String, dynamic>>[];
       AppLogger.info(
         '[WindowsFileOperations] Native enumerateRecycleBin finished | offset=$offset | limit=$limit | returned=${items.length} | total=$total | elapsedMs=${stopwatch.elapsedMilliseconds}',

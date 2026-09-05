@@ -9,11 +9,11 @@ class DirectoryListWidget extends StatelessWidget {
   final String? emptyMessage;
 
   const DirectoryListWidget({
-    Key? key,
+    super.key,
     required this.directories,
     required this.onRemove,
     this.emptyMessage,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +24,9 @@ class DirectoryListWidget extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.3,
+          ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
@@ -51,10 +52,7 @@ class DirectoryListWidget extends StatelessWidget {
           return ListTile(
             dense: true,
             leading: const Icon(PhosphorIconsLight.folder),
-            title: Text(
-              directory,
-              overflow: TextOverflow.ellipsis,
-            ),
+            title: Text(directory, overflow: TextOverflow.ellipsis),
             trailing: IconButton(
               icon: const Icon(PhosphorIconsLight.x),
               onPressed: () => onRemove(directory),

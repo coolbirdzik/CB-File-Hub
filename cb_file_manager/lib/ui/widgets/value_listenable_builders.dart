@@ -11,17 +11,18 @@ class ValueListenableBuilder3<A, B, C> extends StatelessWidget {
     B value2,
     C value3,
     Widget? child,
-  ) builder;
+  )
+  builder;
   final Widget? child;
 
   const ValueListenableBuilder3({
-    Key? key,
+    super.key,
     required this.valueListenable1,
     required this.valueListenable2,
     required this.valueListenable3,
     required this.builder,
     this.child,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

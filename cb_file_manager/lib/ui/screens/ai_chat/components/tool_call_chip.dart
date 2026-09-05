@@ -12,7 +12,7 @@ import '../../../../models/ai/ai_message.dart';
 class ToolCallChip extends StatefulWidget {
   final AiToolCall toolCall;
 
-  const ToolCallChip({Key? key, required this.toolCall}) : super(key: key);
+  const ToolCallChip({super.key, required this.toolCall});
 
   @override
   State<ToolCallChip> createState() => _ToolCallChipState();
@@ -29,8 +29,8 @@ class _ToolCallChipState extends State<ToolCallChip> {
     final accent = call.isRunning
         ? theme.colorScheme.tertiary
         : isSuccess
-            ? theme.colorScheme.primary
-            : theme.colorScheme.error;
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
@@ -163,7 +163,9 @@ class _ToolCallChipState extends State<ToolCallChip> {
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: accent.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(3),

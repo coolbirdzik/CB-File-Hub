@@ -11,9 +11,9 @@ class ContextMenuLayoutSettingsScreen extends StatefulWidget {
   final ContextMenuLayoutTarget initialTarget;
 
   const ContextMenuLayoutSettingsScreen({
-    Key? key,
+    super.key,
     this.initialTarget = ContextMenuLayoutTarget.file,
-  }) : super(key: key);
+  });
 
   @override
   State<ContextMenuLayoutSettingsScreen> createState() =>
@@ -85,7 +85,9 @@ class _ContextMenuLayoutSettingsScreenState
       _layouts[target] = ContextMenuLayoutPreference.defaults(target);
     });
     AppToast.info(
-        context, AppLocalizations.of(context)!.contextMenuLayoutReset);
+      context,
+      AppLocalizations.of(context)!.contextMenuLayoutReset,
+    );
   }
 
   @override
@@ -125,12 +127,13 @@ class _ContextMenuLayoutSettingsScreenState
               children: [
                 Container(
                   width: double.infinity,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest
-                      .withAlpha(110),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withAlpha(110),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
                   child: Row(
                     children: [
                       const Icon(PhosphorIconsLight.info, size: 20),
@@ -173,8 +176,9 @@ class _ContextMenuLayoutSettingsScreenState
         if (newIndex > oldIndex) {
           newIndex -= 1;
         }
-        final reorderedIds =
-            orderedDescriptors.map((descriptor) => descriptor.id).toList();
+        final reorderedIds = orderedDescriptors
+            .map((descriptor) => descriptor.id)
+            .toList();
         final movedId = reorderedIds.removeAt(oldIndex);
         reorderedIds.insert(newIndex, movedId);
         var reorderedIndex = 0;
@@ -210,10 +214,7 @@ class _ContextMenuLayoutSettingsScreenState
                     } else {
                       hiddenIds.add(descriptor.id);
                     }
-                    _saveLayout(
-                      target,
-                      layout.copyWith(hiddenIds: hiddenIds),
-                    );
+                    _saveLayout(target, layout.copyWith(hiddenIds: hiddenIds));
                   },
                 ),
                 const SizedBox(width: 4),

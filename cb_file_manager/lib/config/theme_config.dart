@@ -7,10 +7,7 @@ import 'app_ui_font.dart';
 
 export 'app_ui_font.dart';
 
-enum AppThemeType {
-  light,
-  dark,
-}
+enum AppThemeType { light, dark }
 
 enum AppAccentColor {
   blue,
@@ -149,11 +146,7 @@ class ThemeConfig {
     required AppAccentColor accentColor,
     required Color fallback,
   }) {
-    return resolveFontColor(
-          fontColor,
-          brightness,
-          accentColor: accentColor,
-        ) ??
+    return resolveFontColor(fontColor, brightness, accentColor: accentColor) ??
         fallback;
   }
 
@@ -257,6 +250,6 @@ class ThemeConfig {
   /// the convenience extension on ThemeData.
   static Color addressBarFillColorFor(Brightness brightness) =>
       brightness == Brightness.light
-          ? Colors.black.withValues(alpha: 0.07)
-          : Colors.white.withValues(alpha: 0.10);
+      ? Colors.black.withValues(alpha: 0.07)
+      : Colors.white.withValues(alpha: 0.10);
 }

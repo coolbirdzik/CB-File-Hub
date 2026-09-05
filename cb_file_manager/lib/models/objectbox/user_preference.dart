@@ -1,9 +1,4 @@
-enum PreferenceType {
-  string,
-  integer,
-  double,
-  boolean,
-}
+enum PreferenceType { string, integer, double, boolean }
 
 class UserPreference {
   int id;
@@ -34,46 +29,46 @@ class UserPreference {
     required this.key,
     required String value,
     int? timestamp,
-  })  : stringValue = value,
-        intValue = null,
-        doubleValue = null,
-        boolValue = null,
-        typeValue = PreferenceType.string.index,
-        timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
+  }) : stringValue = value,
+       intValue = null,
+       doubleValue = null,
+       boolValue = null,
+       typeValue = PreferenceType.string.index,
+       timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
 
   UserPreference.integer({
     this.id = 0,
     required this.key,
     required int value,
     int? timestamp,
-  })  : stringValue = null,
-        intValue = value,
-        doubleValue = null,
-        boolValue = null,
-        typeValue = PreferenceType.integer.index,
-        timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
+  }) : stringValue = null,
+       intValue = value,
+       doubleValue = null,
+       boolValue = null,
+       typeValue = PreferenceType.integer.index,
+       timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
 
   UserPreference.double({
     this.id = 0,
     required this.key,
     required double value,
     int? timestamp,
-  })  : stringValue = null,
-        intValue = null,
-        doubleValue = value,
-        boolValue = null,
-        typeValue = PreferenceType.double.index,
-        timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
+  }) : stringValue = null,
+       intValue = null,
+       doubleValue = value,
+       boolValue = null,
+       typeValue = PreferenceType.double.index,
+       timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
 
   UserPreference.boolean({
     this.id = 0,
     required this.key,
     required bool value,
     int? timestamp,
-  })  : stringValue = null,
-        intValue = null,
-        doubleValue = null,
-        boolValue = value,
-        typeValue = PreferenceType.boolean.index,
-        timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
+  }) : stringValue = null,
+       intValue = null,
+       doubleValue = null,
+       boolValue = value,
+       typeValue = PreferenceType.boolean.index,
+       timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
 }

@@ -6,6 +6,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 // Import app theme
 import 'package:window_manager/window_manager.dart'; // Import window_manager
 import 'dart:io'; // Import dart:io for Platform check
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import '../../components/common/window_caption_buttons.dart';
 import 'desktop_tab_drag_data.dart';
 
@@ -33,16 +34,14 @@ class ScrollableTabBar extends StatefulWidget {
   final Set<String> selectedTabIds;
   final ValueChanged<DesktopTabDragData>? onTabDragStarted;
   final VoidCallback? onTabDragEnded;
-  final Future<void> Function(
-    DesktopTabDragData data,
-    Offset globalPosition,
-  )? onNativeTabDragRequested;
+  final Future<void> Function(DesktopTabDragData data, Offset globalPosition)?
+  onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
   final List<Widget> leadingCaptionActions;
 
   const ScrollableTabBar({
-    Key? key,
+    super.key,
     required this.controller,
     required this.tabs,
     this.barBackgroundColor,
@@ -68,7 +67,7 @@ class ScrollableTabBar extends StatefulWidget {
     this.onTabReorder,
     this.onTabPrimaryClick,
     this.leadingCaptionActions = const <Widget>[],
-  }) : super(key: key);
+  });
 
   @override
   State<ScrollableTabBar> createState() => _ScrollableTabBarState();
@@ -105,10 +104,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
       height: Platform.isWindows
           ? 50
           : null, // Provide a specific height for the custom title bar on Windows
-      decoration: BoxDecoration(
-        color: tabBackgroundColor,
-        boxShadow: const [],
-      ),
+      decoration: BoxDecoration(color: tabBackgroundColor, boxShadow: const []),
       margin: Platform.isWindows
           ? EdgeInsets.zero
           : const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -118,10 +114,7 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
         children: [
           if (Platform.isWindows)
             const DragToMoveArea(
-              child: SizedBox(
-                width: 12,
-                height: double.infinity,
-              ),
+              child: SizedBox(width: 12, height: double.infinity),
             ),
           // Tab strip area (not draggable) so tab drag gestures can win.
           Expanded(
@@ -137,8 +130,10 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
                           ? event.scrollDelta.dx
                           : event.scrollDelta.dy;
 
-                      GestureBinding.instance.pointerSignalResolver
-                          .register(event, (_) {});
+                      GestureBinding.instance.pointerSignalResolver.register(
+                        event,
+                        (_) {},
+                      );
 
                       if (delta == 0.0) return;
                       if (!_scrollController.hasClients) return;
@@ -199,17 +194,11 @@ class _ScrollableTabBarState extends State<ScrollableTabBar> {
           ),
           if (Platform.isWindows && widget.leadingCaptionActions.isEmpty)
             const DragToMoveArea(
-              child: SizedBox(
-                width: 84,
-                height: double.infinity,
-              ),
+              child: SizedBox(width: 84, height: double.infinity),
             ),
           if (Platform.isWindows && widget.leadingCaptionActions.isNotEmpty)
             const DragToMoveArea(
-              child: SizedBox(
-                width: 24,
-                height: double.infinity,
-              ),
+              child: SizedBox(width: 24, height: double.infinity),
             ),
           if (Platform.isWindows && widget.leadingCaptionActions.isNotEmpty)
             Row(
@@ -231,12 +220,12 @@ class _NoMouseDragScrollBehavior extends MaterialScrollBehavior {
   // the tab strip from scrolling when the user is trying to drag a tab.
   @override
   Set<PointerDeviceKind> get dragDevices => const <PointerDeviceKind>{
-        PointerDeviceKind.touch,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.stylus,
-        PointerDeviceKind.invertedStylus,
-        PointerDeviceKind.unknown,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+    PointerDeviceKind.unknown,
+  };
 }
 
 /// Modern tab bar implementation with softer, more elegant styling
@@ -252,7 +241,7 @@ class _ModernTabBar extends StatefulWidget {
   final Color activeTabColor;
   final Color hoverColor;
   final Color
-      tabBackgroundColor; // This is the background of the tab itself, not the whole bar
+  tabBackgroundColor; // This is the background of the tab itself, not the whole bar
   final VoidCallback? onAddTabPressed;
   final Function(int)? onTabClose;
   final void Function(int index, Offset globalPosition)? onTabContextMenu;
@@ -260,16 +249,13 @@ class _ModernTabBar extends StatefulWidget {
   final Set<String> selectedTabIds;
   final ValueChanged<DesktopTabDragData>? onTabDragStarted;
   final VoidCallback? onTabDragEnded;
-  final Future<void> Function(
-    DesktopTabDragData data,
-    Offset globalPosition,
-  )? onNativeTabDragRequested;
+  final Future<void> Function(DesktopTabDragData data, Offset globalPosition)?
+  onNativeTabDragRequested;
   final void Function(int fromIndex, int toIndex)? onTabReorder;
   final void Function(int index, bool shiftPressed)? onTabPrimaryClick;
   final ThemeData theme;
 
   const _ModernTabBar({
-    Key? key,
     required this.viewportWidth,
     required this.controller,
     required this.tabs,
@@ -292,7 +278,7 @@ class _ModernTabBar extends StatefulWidget {
     this.onTabReorder,
     this.onTabPrimaryClick,
     required this.theme,
-  }) : super(key: key);
+  });
 
   @override
   State<_ModernTabBar> createState() => _ModernTabBarState();
@@ -343,7 +329,8 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     // tab row bounds. This avoids starting a window drag when the user drags a
     // tab (reorder/native drag).
     final rowLocal = rowBox.globalToLocal(globalPosition);
-    final isOverTabRow = rowLocal.dx >= 0 &&
+    final isOverTabRow =
+        rowLocal.dx >= 0 &&
         rowLocal.dx <= rowBox.size.width &&
         rowLocal.dy >= 0 &&
         rowLocal.dy <= rowBox.size.height;
@@ -387,19 +374,18 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     return 0;
   }
 
-  Widget _wrapTabReorderEffect({
-    required int index,
-    required Widget child,
-  }) {
+  Widget _wrapTabReorderEffect({required int index, required Widget child}) {
     final slideX = _slideOffsetForIndex(index);
     final isAnyDragActive = _activeDragTabId != null;
     final isDraggedTab = _isDraggedTabAt(index);
-    final shouldDimDraggedTab = Platform.isWindows &&
+    final shouldDimDraggedTab =
+        Platform.isWindows &&
         widget.onNativeTabDragRequested != null &&
         isAnyDragActive &&
         isDraggedTab;
-    final scale =
-        isDraggedTab ? 0.97 : (isAnyDragActive && slideX != 0 ? 1.01 : 1.0);
+    final scale = isDraggedTab
+        ? 0.97
+        : (isAnyDragActive && slideX != 0 ? 1.01 : 1.0);
 
     return AnimatedSlide(
       duration: const Duration(milliseconds: 120),
@@ -484,10 +470,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     _notifyReorder(data, toIndex);
   }
 
-  void _handleDragUpdate(
-    DesktopTabDragData data,
-    DragUpdateDetails details,
-  ) {
+  void _handleDragUpdate(DesktopTabDragData data, DragUpdateDetails details) {
     _handleNativeReorderMove(data, details.globalPosition);
   }
 
@@ -519,7 +502,8 @@ class _ModernTabBarState extends State<_ModernTabBar> {
         _notifyReorder(details.data, targetIndex);
       },
       builder: (context, candidateData, rejectedData) {
-        final isHovering = candidateData.isNotEmpty ||
+        final isHovering =
+            candidateData.isNotEmpty ||
             (_activeDragTabId != null && _previewTargetIndex == targetIndex);
         return Stack(
           clipBehavior: Clip.none,
@@ -532,12 +516,15 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                   curve: Curves.easeOutCubic,
                   opacity: isHovering ? 1 : 0,
                   child: Container(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16.0),
-                      color: widget.theme.colorScheme.primary
-                          .withValues(alpha: 0.10),
+                      color: widget.theme.colorScheme.primary.withValues(
+                        alpha: 0.10,
+                      ),
                     ),
                   ),
                 ),
@@ -683,12 +670,14 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                   final showRightDivider =
                       isDesktop && index < widget.tabs.length - 1;
 
-                  final dragData = (widget.draggableTabs != null &&
+                  final dragData =
+                      (widget.draggableTabs != null &&
                           index < (widget.draggableTabs?.length ?? 0))
                       ? widget.draggableTabs![index]
                       : null;
 
-                  final isSelected = dragData != null &&
+                  final isSelected =
+                      dragData != null &&
                       widget.selectedTabIds.contains(dragData.tabId);
 
                   final tabWidget = _ModernTab(
@@ -699,8 +688,8 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                       final keys = HardwareKeyboard.instance.logicalKeysPressed;
                       final shiftPressed =
                           HardwareKeyboard.instance.isShiftPressed ||
-                              keys.contains(LogicalKeyboardKey.shiftLeft) ||
-                              keys.contains(LogicalKeyboardKey.shiftRight);
+                          keys.contains(LogicalKeyboardKey.shiftLeft) ||
+                          keys.contains(LogicalKeyboardKey.shiftRight);
                       final handler = widget.onTabPrimaryClick;
                       if (handler != null) {
                         handler(index, shiftPressed);
@@ -737,7 +726,8 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                     );
                   }
 
-                  final shouldUseNativeDrag = Platform.isWindows &&
+                  final shouldUseNativeDrag =
+                      Platform.isWindows &&
                       widget.onNativeTabDragRequested != null;
                   if (shouldUseNativeDrag) {
                     return _wrapTabReorderEffect(
@@ -771,8 +761,10 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                           onDragUpdate: (details) =>
                               _handleDragUpdate(dragData, details),
                           onDragEnd: (_) => _endDrag(),
-                          childWhenDragging:
-                              Opacity(opacity: 0.35, child: tabWidget),
+                          childWhenDragging: Opacity(
+                            opacity: 0.35,
+                            child: tabWidget,
+                          ),
                           feedback: Material(
                             color: Colors.transparent,
                             child: Opacity(
@@ -781,7 +773,9 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                                 scale: 1.02,
                                 child: ConstrainedBox(
                                   constraints: const BoxConstraints.tightFor(
-                                      width: 210, height: 38),
+                                    width: 210,
+                                    height: 38,
+                                  ),
                                   child: DecoratedBox(
                                     decoration: BoxDecoration(
                                       color: widget.activeTabColor,
@@ -819,7 +813,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                     key: _addTabButtonKey,
                     child: Material(
                       color: Colors.transparent,
-                      child: Tooltip(
+                      child: CbTooltip(
                         message: 'Add new tab',
                         child: Container(
                           margin: const EdgeInsets.only(left: 4, right: 4),
@@ -886,11 +880,7 @@ class _CaptionStyleAddTabButtonState extends State<_CaptionStyleAddTabButton> {
             color: _isHovered ? hoverBg : idleBg,
             borderRadius: BorderRadius.circular(16.0),
           ),
-          child: Icon(
-            PhosphorIconsLight.plus,
-            size: 18,
-            color: accentColor,
-          ),
+          child: Icon(PhosphorIconsLight.plus, size: 18, color: accentColor),
         ),
       ),
     );
@@ -914,7 +904,6 @@ class _ModernTab extends StatefulWidget {
   final ThemeData theme;
 
   const _ModernTab({
-    Key? key,
     required this.isActive,
     required this.isSelected,
     required this.showRightDivider,
@@ -928,7 +917,7 @@ class _ModernTab extends StatefulWidget {
     required this.child,
     this.onClose,
     required this.theme,
-  }) : super(key: key);
+  });
 
   @override
   State<_ModernTab> createState() => _ModernTabState();
@@ -948,10 +937,7 @@ class _ModernTabState extends State<_ModernTab>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
 
     if (widget.isActive) {
       _controller.value = 1.0;
@@ -986,8 +972,9 @@ class _ModernTabState extends State<_ModernTab>
     final hoverColor = isDarkMode
         ? cs.surfaceContainerHighest.withValues(alpha: 0.75)
         : cs.surfaceContainerHighest.withValues(alpha: 0.95);
-    final selectedFillColor =
-        primaryColor.withValues(alpha: isDarkMode ? 0.22 : 0.12);
+    final selectedFillColor = primaryColor.withValues(
+      alpha: isDarkMode ? 0.22 : 0.12,
+    );
     final activeFillColor = widget.activeTabColor;
     const inactiveFillColor = Colors.transparent;
 
@@ -1001,9 +988,10 @@ class _ModernTabState extends State<_ModernTab>
           final effectiveLabelColor = widget.isSelected
               ? cs.onSurface
               : (widget.isActive
-                  ? cs.onSurface
-                  : cs.onSurfaceVariant
-                      .withValues(alpha: isDarkMode ? 0.94 : 1.0));
+                    ? cs.onSurface
+                    : cs.onSurfaceVariant.withValues(
+                        alpha: isDarkMode ? 0.94 : 1.0,
+                      ));
 
           return _OptimizedTabInteraction(
             onPrimaryDown: widget.onPrimaryDown,
@@ -1023,10 +1011,10 @@ class _ModernTabState extends State<_ModernTab>
                     color: widget.isSelected
                         ? selectedFillColor
                         : (widget.isActive
-                            ? activeFillColor
-                            : (_isHovered && !_isCloseButtonHovered
-                                ? hoverColor
-                                : inactiveFillColor)),
+                              ? activeFillColor
+                              : (_isHovered && !_isCloseButtonHovered
+                                    ? hoverColor
+                                    : inactiveFillColor)),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(10),
                       topRight: Radius.circular(10),
@@ -1055,8 +1043,9 @@ class _ModernTabState extends State<_ModernTab>
                                 children: [
                                   Expanded(
                                     child: Padding(
-                                      padding:
-                                          const EdgeInsets.only(right: 24.0),
+                                      padding: const EdgeInsets.only(
+                                        right: 24.0,
+                                      ),
                                       child: Center(child: widget.child),
                                     ),
                                   ),
@@ -1073,8 +1062,9 @@ class _ModernTabState extends State<_ModernTab>
                           top: 0,
                           height: 2,
                           child: ColoredBox(
-                            color: cs.primary
-                                .withValues(alpha: isDarkMode ? 0.75 : 0.65),
+                            color: cs.primary.withValues(
+                              alpha: isDarkMode ? 0.75 : 0.65,
+                            ),
                           ),
                         ),
                     ],
@@ -1108,10 +1098,12 @@ class _ModernTabState extends State<_ModernTab>
                               decoration: BoxDecoration(
                                 color: _isCloseButtonHovered
                                     ? (isDarkMode
-                                        ? Colors.white
-                                            .withAlpha((0.15 * 255).round())
-                                        : Colors.black
-                                            .withAlpha((0.08 * 255).round()))
+                                          ? Colors.white.withAlpha(
+                                              (0.15 * 255).round(),
+                                            )
+                                          : Colors.black.withAlpha(
+                                              (0.08 * 255).round(),
+                                            ))
                                     : Colors.transparent,
                                 shape: BoxShape.circle,
                               ),
@@ -1145,12 +1137,11 @@ class _OptimizedTabInteraction extends StatefulWidget {
   final Widget child;
 
   const _OptimizedTabInteraction({
-    Key? key,
     required this.onPrimaryDown,
     this.onMiddleClick,
     this.onSecondaryClick,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   _OptimizedTabInteractionState createState() =>
@@ -1190,11 +1181,7 @@ class _OptimizedButtonInteraction extends StatefulWidget {
   final VoidCallback onTap;
   final Widget child;
 
-  const _OptimizedButtonInteraction({
-    Key? key,
-    required this.onTap,
-    required this.child,
-  }) : super(key: key);
+  const _OptimizedButtonInteraction({required this.onTap, required this.child});
 
   @override
   _OptimizedButtonInteractionState createState() =>
@@ -1223,23 +1210,20 @@ class _NativeTabDragHandle extends StatefulWidget {
   final DesktopTabDragData data;
   final ValueChanged<DesktopTabDragData>? onDragStarted;
   final void Function(DesktopTabDragData data, Offset globalPosition)?
-      onDragMove;
+  onDragMove;
   final ValueChanged<DesktopTabDragData>? onDragFinished;
-  final Future<void> Function(
-    DesktopTabDragData data,
-    Offset globalPosition,
-  ) onDetachRequested;
+  final Future<void> Function(DesktopTabDragData data, Offset globalPosition)
+  onDetachRequested;
   final Widget child;
 
   const _NativeTabDragHandle({
-    Key? key,
     required this.data,
     this.onDragStarted,
     this.onDragMove,
     this.onDragFinished,
     required this.onDetachRequested,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<_NativeTabDragHandle> createState() => _NativeTabDragHandleState();

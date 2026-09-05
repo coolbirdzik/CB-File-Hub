@@ -27,9 +27,9 @@ class SearchFilterResultsView extends StatelessWidget {
   final Function(String) onNavigateToPath;
   final Function(File, bool) onFileTap;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFolderSelection;
+  toggleFolderSelection;
   final VoidCallback toggleSelectionMode;
   final Function(BuildContext, String, List<String>) showDeleteTagDialog;
   final Function(BuildContext, String) showAddTagToFileDialog;
@@ -41,7 +41,7 @@ class SearchFilterResultsView extends StatelessWidget {
   final ValueChanged<int> onZoomLevelChanged;
 
   const SearchFilterResultsView({
-    Key? key,
+    super.key,
     required this.folderListState,
     required this.selectionState,
     required this.currentPath,
@@ -62,7 +62,7 @@ class SearchFilterResultsView extends StatelessWidget {
     required this.isDesktopPlatform,
     required this.showFileTags,
     required this.onZoomLevelChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +82,8 @@ class SearchFilterResultsView extends StatelessWidget {
   }
 
   Widget _buildSearchResults(BuildContext context) {
-    final bool shouldShowLoading = folderListState.isLoading ||
+    final bool shouldShowLoading =
+        folderListState.isLoading ||
         (currentPath.startsWith('#search?tag=') &&
             currentSearchTag != null &&
             folderListState.searchResults.isEmpty &&
@@ -143,8 +144,9 @@ class SearchFilterResultsView extends StatelessWidget {
             ? l10n.noFilesFoundTagGlobal({'tag': tag})
             : l10n.noFilesFoundTag({'tag': tag});
       }
-      return l10n.noFilesFoundQuery(
-          {'query': folderListState.currentSearchQuery ?? ''});
+      return l10n.noFilesFoundQuery({
+        'query': folderListState.currentSearchQuery ?? '',
+      });
     }();
 
     return Column(
@@ -152,13 +154,14 @@ class SearchFilterResultsView extends StatelessWidget {
         FluentBackground(
           blurAmount: 8.0,
           opacity: 0.7,
-          backgroundColor: Theme.of(context)
-              .colorScheme
-              .primaryContainer
-              .withValues(alpha: 0.7),
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.primaryContainer.withValues(alpha: 0.7),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 8.0,
+              horizontal: 16.0,
+            ),
             child: Row(
               children: [
                 Icon(
@@ -168,16 +171,15 @@ class SearchFilterResultsView extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: 8.0),
-                Expanded(
-                  child: Text(noResultsMessage),
-                ),
+                Expanded(child: Text(noResultsMessage)),
                 IconButton(
                   icon: const Icon(PhosphorIconsLight.x),
                   onPressed: () {
                     // If this is a search tag tab, close it instead of clearing search
                     if (currentPath.startsWith('#search?tag=')) {
-                      final tabManagerBloc =
-                          BlocProvider.of<TabManagerBloc>(context);
+                      final tabManagerBloc = BlocProvider.of<TabManagerBloc>(
+                        context,
+                      );
                       tabManagerBloc.add(CloseTab(tabId));
                       return;
                     }
@@ -192,8 +194,11 @@ class SearchFilterResultsView extends StatelessWidget {
         ),
         const Expanded(
           child: Center(
-            child: Icon(PhosphorIconsLight.magnifyingGlass,
-                size: 64, color: Colors.grey),
+            child: Icon(
+              PhosphorIconsLight.magnifyingGlass,
+              size: 64,
+              color: Colors.grey,
+            ),
           ),
         ),
       ],
@@ -209,10 +214,9 @@ class SearchFilterResultsView extends StatelessWidget {
         // Filter indicator with clear button
         Container(
           padding: const EdgeInsets.all(8.0),
-          color: Theme.of(context)
-              .colorScheme
-              .primaryContainer
-              .withValues(alpha: 0.3),
+          color: Theme.of(
+            context,
+          ).colorScheme.primaryContainer.withValues(alpha: 0.3),
           child: Row(
             children: [
               const Icon(PhosphorIconsLight.funnelSimple, size: 16),
@@ -221,9 +225,9 @@ class SearchFilterResultsView extends StatelessWidget {
               const Spacer(),
               TextButton(
                 onPressed: () {
-                  context
-                      .read<FolderListBloc>()
-                      .add(const ClearSearchAndFilters());
+                  context.read<FolderListBloc>().add(
+                    const ClearSearchAndFilters(),
+                  );
                 },
                 child: Text(l10n.clearFilter),
               ),
@@ -234,14 +238,16 @@ class SearchFilterResultsView extends StatelessWidget {
         Expanded(
           child: folderListState.filteredFiles.isNotEmpty
               ? folder_list_components.FileView(
-                  files:
-                      folderListState.filteredFiles.whereType<File>().toList(),
+                  files: folderListState.filteredFiles
+                      .whereType<File>()
+                      .toList(),
                   folders: const [], // No folders in filtered view
                   state: folderListState,
                   isSelectionMode:
                       selectionState.isSelectionMode && !isDesktopPlatform,
-                  isGridView:
-                      ViewModeUtils.isGridLike(folderListState.viewMode),
+                  isGridView: ViewModeUtils.isGridLike(
+                    folderListState.viewMode,
+                  ),
                   selectedFiles: selectionState.selectedFilePaths.toList(),
                   toggleFileSelection: toggleFileSelection,
                   toggleFolderSelection: toggleFolderSelection,
@@ -251,9 +257,7 @@ class SearchFilterResultsView extends StatelessWidget {
                   onZoomChanged: onZoomLevelChanged,
                   showFileTags: showFileTags,
                 )
-              : Center(
-                  child: Text(l10n.noFilesMatchFilter(displayFilter)),
-                ),
+              : Center(child: Text(l10n.noFilesMatchFilter(displayFilter))),
         ),
       ],
     );

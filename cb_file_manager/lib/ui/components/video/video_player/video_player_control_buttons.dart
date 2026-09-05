@@ -7,10 +7,10 @@ class VideoPlayerVolumeSlider extends StatelessWidget {
   final ValueChanged<double> onChanged;
 
   const VideoPlayerVolumeSlider({
-    Key? key,
+    super.key,
     required this.value,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -48,23 +48,19 @@ class VideoPlayerControlButton extends StatelessWidget {
   final String? tooltip;
 
   const VideoPlayerControlButton({
-    Key? key,
+    super.key,
     required this.icon,
     required this.onPressed,
     this.enabled = true,
     this.size = 24,
     this.padding = 8,
     this.tooltip,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final button = IconButton(
-      icon: Icon(
-        icon,
-        size: size,
-        color: enabled ? Colors.white : Colors.grey,
-      ),
+      icon: Icon(icon, size: size, color: enabled ? Colors.white : Colors.grey),
       onPressed: enabled ? onPressed : null,
       padding: EdgeInsets.all(padding),
       constraints: const BoxConstraints(),
@@ -72,10 +68,7 @@ class VideoPlayerControlButton extends StatelessWidget {
     );
 
     return tooltip != null
-        ? CbTooltip(
-            message: tooltip!,
-            child: button,
-          )
+        ? CbTooltip(message: tooltip!, child: button)
         : button;
   }
 }

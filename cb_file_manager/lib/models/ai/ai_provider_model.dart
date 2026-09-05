@@ -4,11 +4,7 @@ import 'package:equatable/equatable.dart';
 enum AiApiType { openaiCompatible, anthropic }
 
 /// Authentication mode for an AI provider configuration.
-enum AiProviderAuthMode {
-  apiKey,
-  codexOAuth,
-  none,
-}
+enum AiProviderAuthMode { apiKey, codexOAuth, none }
 
 String aiApiTypeToDbString(AiApiType type) {
   switch (type) {
@@ -187,8 +183,9 @@ class AiProviderConfig extends Equatable {
       modelName: modelName ?? this.modelName,
       temperature: temperature ?? this.temperature,
       maxTokens: maxTokens ?? this.maxTokens,
-      systemPrompt:
-          clearSystemPrompt ? null : (systemPrompt ?? this.systemPrompt),
+      systemPrompt: clearSystemPrompt
+          ? null
+          : (systemPrompt ?? this.systemPrompt),
       timeoutSeconds: timeoutSeconds ?? this.timeoutSeconds,
       maxRetries: maxRetries ?? this.maxRetries,
       isEnabled: isEnabled ?? this.isEnabled,
@@ -210,23 +207,23 @@ class AiProviderConfig extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        name,
-        apiType,
-        authMode,
-        apiKey,
-        endpoint,
-        modelName,
-        temperature,
-        maxTokens,
-        systemPrompt,
-        timeoutSeconds,
-        maxRetries,
-        isEnabled,
-        priority,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    name,
+    apiType,
+    authMode,
+    apiKey,
+    endpoint,
+    modelName,
+    temperature,
+    maxTokens,
+    systemPrompt,
+    timeoutSeconds,
+    maxRetries,
+    isEnabled,
+    priority,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 /// Available chat models grouped under a single configured provider.
@@ -249,11 +246,11 @@ class AiProviderModelCatalog extends Equatable {
 
   @override
   List<Object?> get props => [
-        providerId,
-        providerName,
-        apiType,
-        authMode,
-        defaultModelName,
-        models,
-      ];
+    providerId,
+    providerName,
+    apiType,
+    authMode,
+    defaultModelName,
+    models,
+  ];
 }

@@ -26,7 +26,7 @@ class FileGridItem extends StatefulWidget {
   final FileSystemEntity file;
   final bool isSelected;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function() toggleSelectionMode;
   final Function(File, bool)? onFileTap;
   final FolderListState? state;
@@ -42,7 +42,7 @@ class FileGridItem extends StatefulWidget {
   final ValueListenable<bool?>? immediateSelectionListenable;
 
   const FileGridItem({
-    Key? key,
+    super.key,
     required this.file,
     required this.isSelected,
     required this.toggleFileSelection,
@@ -59,7 +59,7 @@ class FileGridItem extends StatefulWidget {
     this.onDeleteFiles,
     this.showFileTags = true,
     this.immediateSelectionListenable,
-  }) : super(key: key);
+  });
 
   @override
   State<FileGridItem> createState() => _FileGridItemState();
@@ -233,10 +233,7 @@ class _FileGridItemState extends State<FileGridItem> {
       return;
     }
 
-    widget.onFileTap?.call(
-      widget.file as File,
-      isVideo,
-    );
+    widget.onFileTap?.call(widget.file as File, isVideo);
   }
 
   void _handleDoubleTap() {
@@ -295,7 +292,8 @@ class _FileGridItemState extends State<FileGridItem> {
 
     // Check if this item is being renamed inline (desktop only)
     final renameController = InlineRenameScope.maybeOf(context);
-    final isBeingRenamed = renameController != null &&
+    final isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.file.path;
 
     // Don't show selected background when renaming to avoid color conflict
@@ -315,8 +313,8 @@ class _FileGridItemState extends State<FileGridItem> {
     final Color cellBorderColor = showAsSelected
         ? primary
         : (_isHovering && widget.isDesktopMode
-            ? primary.withValues(alpha: 0.4)
-            : Colors.transparent);
+              ? primary.withValues(alpha: 0.4)
+              : Colors.transparent);
 
     // Windows Explorer style: transparent background, icon + name layout
     final double nameAreaHeight = (widget.showFileTags && widget.state != null)
@@ -389,8 +387,11 @@ class _FileGridItemState extends State<FileGridItem> {
                 SizedBox(
                   height: nameAreaHeight,
                   child: Padding(
-                    padding:
-                        const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                    padding: const EdgeInsets.only(
+                      top: 4.0,
+                      left: 4.0,
+                      right: 4.0,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -431,8 +432,9 @@ class _FileGridItemState extends State<FileGridItem> {
   ) {
     final textWidget = Text(
       fileName,
-      style: theme.textTheme.bodySmall
-          ?.copyWith(fontSize: GridZoomConstraints.gridItemFilenameFontSize),
+      style: theme.textTheme.bodySmall?.copyWith(
+        fontSize: GridZoomConstraints.gridItemFilenameFontSize,
+      ),
       textAlign: TextAlign.center,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
@@ -485,8 +487,9 @@ class _FileGridItemState extends State<FileGridItem> {
           (tag) => Container(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
             decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16.0),
             ),
             child: Text(
@@ -505,8 +508,9 @@ class _FileGridItemState extends State<FileGridItem> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
             decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16.0),
             ),
             child: Text(

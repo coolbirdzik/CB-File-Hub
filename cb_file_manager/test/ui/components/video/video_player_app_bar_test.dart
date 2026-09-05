@@ -16,19 +16,20 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  testWidgets('desktop title drag area fills the complete video toolbar',
-      (tester) async {
+  testWidgets('desktop title drag area fills the complete video toolbar', (
+    tester,
+  ) async {
     var dragCalls = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'startDragging') {
-        dragCalls++;
-      }
-      if (call.method == 'isMaximized' || call.method == 'isFullScreen') {
-        return false;
-      }
-      return true;
-    });
+          if (call.method == 'startDragging') {
+            dragCalls++;
+          }
+          if (call.method == 'isMaximized' || call.method == 'isFullScreen') {
+            return false;
+          }
+          return true;
+        });
 
     await tester.pumpWidget(
       const MaterialApp(

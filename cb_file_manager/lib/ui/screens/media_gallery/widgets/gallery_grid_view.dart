@@ -18,7 +18,7 @@ class GalleryGridView extends StatelessWidget {
   final Future<double> Function(File) getAspectRatio;
 
   const GalleryGridView({
-    Key? key,
+    super.key,
     required this.imageFiles,
     required this.fileTagsMap,
     required this.selectedFilePaths,
@@ -28,7 +28,7 @@ class GalleryGridView extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.getAspectRatio,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -73,8 +73,9 @@ class GalleryGridView extends StatelessWidget {
       );
     }
 
-    final childAspect =
-        gridCols >= 4 ? 1.0 : 0.9; // More square on denser grids
+    final childAspect = gridCols >= 4
+        ? 1.0
+        : 0.9; // More square on denser grids
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

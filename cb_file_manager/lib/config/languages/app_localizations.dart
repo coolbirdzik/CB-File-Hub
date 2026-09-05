@@ -480,7 +480,7 @@ abstract class AppLocalizations {
   String get useDatabaseStorage;
   String get databaseStorageEnabled;
   String
-      get objectBoxStorage; // Kept for backward compatibility if needed, or remove if unused
+  get objectBoxStorage; // Kept for backward compatibility if needed, or remove if unused
   String get jsonStorage;
   String get databaseDescription;
 
@@ -1525,9 +1525,15 @@ abstract class AppLocalizations {
   String diskCleanerReviewAndClean(String size);
   String diskCleanerPermanentDeletedSuccess(int count, String size);
   String diskCleanerPermanentDeletedWithInUse(
-      int count, String size, int skipped);
+    int count,
+    String size,
+    int skipped,
+  );
   String diskCleanerPermanentDeletedWithSkipped(
-      int count, String size, int skipped);
+    int count,
+    String size,
+    int skipped,
+  );
 
   // Cleaner - drive picker, quick clean, junk reasons
   String get diskCleanerDriveLowSpace;
@@ -1698,4 +1704,5 @@ abstract class AppLocalizations {
   String get localAiContextWindowHint;
   String get localAiTokensSuffix;
   String get localAiInvalidTokenCount;
+  String get aiReasoning;
 }

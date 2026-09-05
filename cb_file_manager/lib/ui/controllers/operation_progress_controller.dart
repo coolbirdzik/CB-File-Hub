@@ -109,15 +109,17 @@ class OperationProgressEntry {
       finishedAt: finishedAt ?? this.finishedAt,
       kind: kind ?? this.kind,
       canCancel: canCancel ?? this.canCancel,
-      cancelAction:
-          clearCancelAction ? null : (cancelAction ?? this.cancelAction),
+      cancelAction: clearCancelAction
+          ? null
+          : (cancelAction ?? this.cancelAction),
       sourcePath: clearSourcePath ? null : (sourcePath ?? this.sourcePath),
       destinationPath: clearDestinationPath
           ? null
           : (destinationPath ?? this.destinationPath),
       bytesTotal: clearBytesTotal ? null : (bytesTotal ?? this.bytesTotal),
-      bytesCompleted:
-          clearBytesCompleted ? null : (bytesCompleted ?? this.bytesCompleted),
+      bytesCompleted: clearBytesCompleted
+          ? null
+          : (bytesCompleted ?? this.bytesCompleted),
       showInStatusCenter: showInStatusCenter ?? this.showInStatusCenter,
     );
   }
@@ -284,11 +286,13 @@ class OperationProgressController extends ChangeNotifier {
     final current = _entriesById[id];
     if (current == null || !current.isRunning) return;
 
-    final nextCompleted =
-        completed == null ? current.completed : max(0, completed);
+    final nextCompleted = completed == null
+        ? current.completed
+        : max(0, completed);
     final nextTotal = total == null ? current.total : max(0, total);
-    final nextBytesTotal =
-        bytesTotal == null ? current.bytesTotal : max(0, bytesTotal);
+    final nextBytesTotal = bytesTotal == null
+        ? current.bytesTotal
+        : max(0, bytesTotal);
     final nextBytesCompleted = bytesCompleted == null
         ? current.bytesCompleted
         : max(0, bytesCompleted);
@@ -395,10 +399,12 @@ class OperationProgressController extends ChangeNotifier {
   void _pruneFinished() {
     final now = DateTime.now();
     final expired = _entriesById.entries
-        .where((entry) =>
-            entry.value.isFinished &&
-            entry.value.finishedAt != null &&
-            now.difference(entry.value.finishedAt!) > finishedRetention)
+        .where(
+          (entry) =>
+              entry.value.isFinished &&
+              entry.value.finishedAt != null &&
+              now.difference(entry.value.finishedAt!) > finishedRetention,
+        )
         .map((entry) => entry.key)
         .toList(growable: false);
     for (final id in expired) {
@@ -406,14 +412,15 @@ class OperationProgressController extends ChangeNotifier {
       _seenEntryIds.remove(id);
     }
 
-    final finished = _entriesById.values
-        .where((entry) => entry.isFinished)
-        .toList(growable: false)
-      ..sort((a, b) {
-        final aFinished = a.finishedAt ?? a.startedAt;
-        final bFinished = b.finishedAt ?? b.startedAt;
-        return bFinished.compareTo(aFinished);
-      });
+    final finished =
+        _entriesById.values
+            .where((entry) => entry.isFinished)
+            .toList(growable: false)
+          ..sort((a, b) {
+            final aFinished = a.finishedAt ?? a.startedAt;
+            final bFinished = b.finishedAt ?? b.startedAt;
+            return bFinished.compareTo(aFinished);
+          });
     if (finished.length <= finishedHistoryLimit) return;
     for (final entry in finished.skip(finishedHistoryLimit)) {
       _entriesById.remove(entry.id);

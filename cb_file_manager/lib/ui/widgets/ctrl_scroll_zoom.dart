@@ -27,11 +27,7 @@ class CtrlScrollZoom extends StatelessWidget {
   final void Function(int delta)? onDelta;
   final Widget child;
 
-  const CtrlScrollZoom({
-    Key? key,
-    required this.child,
-    this.onDelta,
-  }) : super(key: key);
+  const CtrlScrollZoom({super.key, required this.child, this.onDelta});
 
   bool _isCtrlPressed() {
     final keys = HardwareKeyboard.instance.logicalKeysPressed;

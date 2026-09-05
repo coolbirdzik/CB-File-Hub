@@ -31,8 +31,14 @@ import 'package:integration_test/integration_test.dart';
 import 'e2e_helpers.dart';
 
 class _NodeSnap {
-  _NodeSnap(this.label, this.rect, this.childIds, this.parentId,
-      this.traversalParent, this.traversalChild);
+  _NodeSnap(
+    this.label,
+    this.rect,
+    this.childIds,
+    this.parentId,
+    this.traversalParent,
+    this.traversalChild,
+  );
   final String label;
   final Rect rect;
   final List<int> childIds;
@@ -80,8 +86,14 @@ Map<int, _NodeSnap> _snapshot() {
       return true;
     });
     final data = node.getSemanticsData();
-    out[node.id] = _NodeSnap(data.label, node.rect, children, parentId,
-        data.traversalParentIdentifier, data.traversalChildIdentifier);
+    out[node.id] = _NodeSnap(
+      data.label,
+      node.rect,
+      children,
+      parentId,
+      data.traversalParentIdentifier,
+      data.traversalChildIdentifier,
+    );
     node.visitChildren((child) {
       walk(child, node.id);
       return true;
@@ -111,8 +123,9 @@ String _sampleVideoPath() {
   final candidates = <String>[];
   try {
     final script = Platform.script.toString();
-    final scriptPath =
-        script.startsWith('file:///') ? Uri.parse(script).toFilePath() : script;
+    final scriptPath = script.startsWith('file:///')
+        ? Uri.parse(script).toFilePath()
+        : script;
     candidates.add(p.join(p.dirname(scriptPath), 'samples', name));
   } catch (_) {
     // Fall through to the working-directory candidates.
@@ -159,8 +172,9 @@ void main() {
 
     final dir = await Directory.systemTemp.createTemp('cb_ax_');
     for (var i = 0; i < 30; i++) {
-      File('${dir.path}${Platform.pathSeparator}file_$i.txt')
-          .writeAsStringSync('ax');
+      File(
+        '${dir.path}${Platform.pathSeparator}file_$i.txt',
+      ).writeAsStringSync('ax');
     }
     Directory('${dir.path}${Platform.pathSeparator}sub').createSync();
 
@@ -178,8 +192,9 @@ void main() {
     // Image tiles render their thumbnail immediately (no generation step), so
     // they exercise the same decorative-Image path deterministically.
     for (var i = 0; i < 8; i++) {
-      File('${dir.path}${Platform.pathSeparator}pic_$i.png')
-          .writeAsBytesSync(_onePixelPng);
+      File(
+        '${dir.path}${Platform.pathSeparator}pic_$i.png',
+      ).writeAsBytesSync(_onePixelPng);
     }
     debugPrint('[AX] sandbox videos=$videoCount images=8');
 
@@ -197,18 +212,23 @@ void main() {
     void checkFrame() {
       frames++;
       final current = _snapshot();
-      final added =
-          current.keys.where((k) => !previous.containsKey(k)).toList();
-      final removed =
-          previous.keys.where((k) => !current.containsKey(k)).toList();
+      final added = current.keys
+          .where((k) => !previous.containsKey(k))
+          .toList();
+      final removed = previous.keys
+          .where((k) => !current.containsKey(k))
+          .toList();
 
       if (added.isNotEmpty && removed.isNotEmpty) {
         final buffer = StringBuffer()
-          ..writeln('[AX-MIXED] phase=$phase frame=$frames '
-              '+${added.length} -${removed.length}');
+          ..writeln(
+            '[AX-MIXED] phase=$phase frame=$frames '
+            '+${added.length} -${removed.length}',
+          );
         for (final id in added.take(4)) {
-          buffer
-              .writeln('    + $id ${current[id]}  owner=${_describeOwner(id)}');
+          buffer.writeln(
+            '    + $id ${current[id]}  owner=${_describeOwner(id)}',
+          );
         }
         for (final id in removed.take(4)) {
           buffer.writeln('    - $id ${previous[id]}');
@@ -222,10 +242,12 @@ void main() {
         for (final removedId in removed) {
           final gone = previous[removedId]!;
           if (gone.label != fresh.label || gone.rect != fresh.rect) continue;
-          churn.add('[AX-CHURN] phase=$phase frame=$frames: node $removedId '
-              'was destroyed and recreated as $addedId in one frame '
-              '(${fresh.label} @ ${fresh.rect}) '
-              'owner=${_describeOwner(addedId)}');
+          churn.add(
+            '[AX-CHURN] phase=$phase frame=$frames: node $removedId '
+            'was destroyed and recreated as $addedId in one frame '
+            '(${fresh.label} @ ${fresh.rect}) '
+            'owner=${_describeOwner(addedId)}',
+          );
           break;
         }
       }
@@ -246,10 +268,12 @@ void main() {
       for (final entry in current.entries) {
         final wanted = entry.value.traversalChild;
         if (wanted == null || anchors.contains(wanted)) continue;
-        orphans.add('[AX-ORPHAN] phase=$phase frame=$frames node ${entry.key} '
-            '("${entry.value.label}") wants traversal parent $wanted, '
-            'which no node in the tree claims. '
-            'owner=${_describeOwner(entry.key)}');
+        orphans.add(
+          '[AX-ORPHAN] phase=$phase frame=$frames node ${entry.key} '
+          '("${entry.value.label}") wants traversal parent $wanted, '
+          'which no node in the tree claims. '
+          'owner=${_describeOwner(entry.key)}',
+        );
       }
       previous = current;
     }
@@ -266,14 +290,16 @@ void main() {
     }
 
     final labels = previous.values.map((n) => n.label).toList();
-    debugPrint('[AX] after thumbnails:'
-        ' Image=${find.byType(Image).evaluate().length}'
-        ' RawImage=${find.byType(RawImage).evaluate().length}'
-        ' LazyVideoThumbnail=${find.byType(LazyVideoThumbnail).evaluate().length}'
-        ' ThumbnailLoader=${find.byType(ThumbnailLoader).evaluate().length}'
-        ' mp4Labels=${labels.where((l) => l.contains('.mp4')).length}'
-        ' txtLabels=${labels.where((l) => l.contains('.txt')).length}'
-        ' mp4Finder=${find.textContaining('.mp4').evaluate().length}');
+    debugPrint(
+      '[AX] after thumbnails:'
+      ' Image=${find.byType(Image).evaluate().length}'
+      ' RawImage=${find.byType(RawImage).evaluate().length}'
+      ' LazyVideoThumbnail=${find.byType(LazyVideoThumbnail).evaluate().length}'
+      ' ThumbnailLoader=${find.byType(ThumbnailLoader).evaluate().length}'
+      ' mp4Labels=${labels.where((l) => l.contains('.mp4')).length}'
+      ' txtLabels=${labels.where((l) => l.contains('.txt')).length}'
+      ' mp4Finder=${find.textContaining('.mp4').evaluate().length}',
+    );
 
     phase = 'click-row';
     final firstRow = find.textContaining('file_0.txt');
@@ -331,7 +357,8 @@ void main() {
     phase = 'hover-tooltips';
     final tooltipAnchors = find.byType(Tooltip);
     debugPrint(
-        '[AX] tooltip anchors on screen=${tooltipAnchors.evaluate().length}');
+      '[AX] tooltip anchors on screen=${tooltipAnchors.evaluate().length}',
+    );
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
     for (var i = 0; i < tooltipAnchors.evaluate().length && i < 12; i++) {
@@ -353,10 +380,12 @@ void main() {
     for (final line in mixed.take(25)) {
       debugPrint(line);
     }
-    debugPrint('[AX] semanticsEnabled='
-        '${SemanticsBinding.instance.semanticsEnabled} '
-        'nodes=${previous.length} frames=$frames '
-        'remounts=${churn.length} orphans=${orphans.length}');
+    debugPrint(
+      '[AX] semanticsEnabled='
+      '${SemanticsBinding.instance.semanticsEnabled} '
+      'nodes=${previous.length} frames=$frames '
+      'remounts=${churn.length} orphans=${orphans.length}',
+    );
     for (final line in churn.take(40)) {
       debugPrint(line);
     }
@@ -372,10 +401,17 @@ void main() {
       isTrue,
       reason: 'the run must actually have produced semantics frames',
     );
-    expect(churn, isEmpty,
-        reason: 'semantics nodes were destroyed and recreated unchanged');
-    expect(orphans, isEmpty,
-        reason: 'an overlay subtree named a traversal parent that is not in '
-            'the tree; the Windows AccessibilityBridge drops the whole update');
+    expect(
+      churn,
+      isEmpty,
+      reason: 'semantics nodes were destroyed and recreated unchanged',
+    );
+    expect(
+      orphans,
+      isEmpty,
+      reason:
+          'an overlay subtree named a traversal parent that is not in '
+          'the tree; the Windows AccessibilityBridge drops the whole update',
+    );
   });
 }

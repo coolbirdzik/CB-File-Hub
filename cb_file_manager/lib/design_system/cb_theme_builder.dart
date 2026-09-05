@@ -226,7 +226,8 @@ class CbThemeBuilder {
         elevation: 0,
         shadowColor: c.shadow,
         labelTextStyle: WidgetStatePropertyAll(
-            CbTypography.body.copyWith(color: c.textPrimary)),
+          CbTypography.body.copyWith(color: c.textPrimary),
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: CbRadii.lgAll,
           side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
@@ -300,8 +301,10 @@ class CbThemeBuilder {
         disabledBorder: _inputBorder(c.strokeSubtle),
         focusedBorder: _inputBorder(c.strokeStrong),
         errorBorder: _inputBorder(c.status.danger),
-        focusedErrorBorder:
-            _inputBorder(c.status.danger, width: CbStrokes.emphasis),
+        focusedErrorBorder: _inputBorder(
+          c.status.danger,
+          width: CbStrokes.emphasis,
+        ),
       ),
 
       textSelectionTheme: TextSelectionThemeData(
@@ -388,8 +391,9 @@ class CbThemeBuilder {
         disabledColor: c.surfaceSunken,
         surfaceTintColor: Colors.transparent,
         labelStyle: CbTypography.labelSm.copyWith(color: c.textPrimary),
-        secondaryLabelStyle:
-            CbTypography.labelSm.copyWith(color: c.accent.text),
+        secondaryLabelStyle: CbTypography.labelSm.copyWith(
+          color: c.accent.text,
+        ),
         padding: const EdgeInsets.symmetric(
           horizontal: CbSpacing.sm,
           vertical: CbSpacing.xxs,
@@ -424,13 +428,17 @@ class CbThemeBuilder {
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: c.canvas,
         indicatorColor: c.surfaceSelected,
-        selectedIconTheme:
-            IconThemeData(color: c.accent.text, size: CbSizes.iconLg),
+        selectedIconTheme: IconThemeData(
+          color: c.accent.text,
+          size: CbSizes.iconLg,
+        ),
         unselectedIconTheme: IconThemeData(color: c.icon, size: CbSizes.iconLg),
-        selectedLabelTextStyle:
-            CbTypography.labelSm.copyWith(color: c.textPrimary),
-        unselectedLabelTextStyle:
-            CbTypography.labelSm.copyWith(color: c.textSecondary),
+        selectedLabelTextStyle: CbTypography.labelSm.copyWith(
+          color: c.textPrimary,
+        ),
+        unselectedLabelTextStyle: CbTypography.labelSm.copyWith(
+          color: c.textSecondary,
+        ),
       ),
 
       drawerTheme: DrawerThemeData(
@@ -498,9 +506,7 @@ class CbThemeBuilder {
 
   static ButtonStyle _baseButtonStyle(CbColorTokens c) {
     return ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(
-        Size(0, CbSizes.controlMd),
-      ),
+      minimumSize: const WidgetStatePropertyAll(Size(0, CbSizes.controlMd)),
       fixedSize: const WidgetStatePropertyAll(
         Size.fromHeight(CbSizes.controlMd),
       ),
@@ -530,7 +536,10 @@ class CbThemeBuilder {
   }
 
   static ButtonStyle _filledStyle(
-      CbColorTokens c, CbAccentRamp accent, bool isDark) {
+    CbColorTokens c,
+    CbAccentRamp accent,
+    bool isDark,
+  ) {
     return _baseButtonStyle(c).copyWith(
       foregroundColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.disabled)) return c.textDisabled;
@@ -567,8 +576,10 @@ class CbThemeBuilder {
     );
   }
 
-  static OutlineInputBorder _inputBorder(Color color,
-      {double width = CbStrokes.hairline}) {
+  static OutlineInputBorder _inputBorder(
+    Color color, {
+    double width = CbStrokes.hairline,
+  }) {
     return OutlineInputBorder(
       borderRadius: CbRadii.smAll,
       borderSide: BorderSide(color: color, width: width),

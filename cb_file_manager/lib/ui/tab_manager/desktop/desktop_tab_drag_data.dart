@@ -4,8 +4,5 @@ class DesktopTabDragData {
   final String tabId;
   final WindowTabPayload tab;
 
-  const DesktopTabDragData({
-    required this.tabId,
-    required this.tab,
-  });
+  const DesktopTabDragData({required this.tabId, required this.tab});
 }

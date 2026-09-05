@@ -15,10 +15,11 @@ class WindowsAppInventoryParser {
   List<InstalledAppInfo> parseWin32Entries(
     Iterable<Map<String, Object?>> rawEntries,
   ) {
-    final candidates = rawEntries
-        .where((entry) => !_shouldHideWin32Entry(entry))
-        .toList(growable: false)
-      ..sort(_compareRawWin32Entries);
+    final candidates =
+        rawEntries
+            .where((entry) => !_shouldHideWin32Entry(entry))
+            .toList(growable: false)
+          ..sort(_compareRawWin32Entries);
 
     final grouped = <String, List<Map<String, Object?>>>{};
     for (final entry in candidates) {
@@ -91,13 +92,12 @@ class WindowsAppInventoryParser {
       final candidate = InstalledAppInfo(
         id: 'msix:$normalizedFamily',
         displayName: displayName,
-        publisher: _string(entry['publisherDisplayName']) ??
+        publisher:
+            _string(entry['publisherDisplayName']) ??
             _string(entry['publisher']),
         version: _string(entry['version']),
         source: InstalledAppSource.msix,
-        installLocation: _normalizeDirectory(
-          _string(entry['installLocation']),
-        ),
+        installLocation: _normalizeDirectory(_string(entry['installLocation'])),
         packageFamilyName: family,
         installedOrUpdatedAt: _parseIsoDate(entry['installedDate']),
         canManage: true,
@@ -124,8 +124,9 @@ class WindowsAppInventoryParser {
     String candidate;
     if (raw.startsWith('"')) {
       final closingQuote = raw.indexOf('"', 1);
-      candidate =
-          closingQuote > 1 ? raw.substring(1, closingQuote) : raw.substring(1);
+      candidate = closingQuote > 1
+          ? raw.substring(1, closingQuote)
+          : raw.substring(1);
     } else {
       final iconIndex = RegExp(r',\s*-?\d+\s*$').firstMatch(raw);
       candidate = iconIndex == null
@@ -155,8 +156,9 @@ class WindowsAppInventoryParser {
     if (hiddenReleaseTypes.contains(releaseType)) return true;
 
     final normalizedName = displayName.toLowerCase();
-    if (RegExp(r'^(security update|update|hotfix)\s+for\b')
-        .hasMatch(normalizedName)) {
+    if (RegExp(
+      r'^(security update|update|hotfix)\s+for\b',
+    ).hasMatch(normalizedName)) {
       return true;
     }
     if (RegExp(r'\(kb\d{6,}\)\s*$').hasMatch(normalizedName)) return true;
@@ -171,9 +173,7 @@ class WindowsAppInventoryParser {
 
     final name = _identityPart(_string(entry['displayName']));
     final publisher = _identityPart(_string(entry['publisher']));
-    final installLocation = _identityPath(
-      _string(entry['installLocation']),
-    );
+    final installLocation = _identityPath(_string(entry['installLocation']));
     if (installLocation.isNotEmpty) {
       return 'app:$name|$publisher|$installLocation';
     }
@@ -238,16 +238,13 @@ class WindowsAppInventoryParser {
   }
 
   int _compareApps(InstalledAppInfo left, InstalledAppInfo right) {
-    final byName = left.displayName
-        .toLowerCase()
-        .compareTo(right.displayName.toLowerCase());
+    final byName = left.displayName.toLowerCase().compareTo(
+      right.displayName.toLowerCase(),
+    );
     return byName != 0 ? byName : left.id.compareTo(right.id);
   }
 
-  int _compareMsixCandidates(
-    InstalledAppInfo left,
-    InstalledAppInfo right,
-  ) {
+  int _compareMsixCandidates(InstalledAppInfo left, InstalledAppInfo right) {
     final leftScore = _msixScore(left);
     final rightScore = _msixScore(right);
     if (leftScore != rightScore) return rightScore.compareTo(leftScore);
@@ -263,10 +260,7 @@ class WindowsAppInventoryParser {
     return score;
   }
 
-  String? _firstString(
-    Iterable<Map<String, Object?>> records,
-    String key,
-  ) {
+  String? _firstString(Iterable<Map<String, Object?>> records, String key) {
     for (final record in records) {
       final value = _string(record[key]);
       if (value != null) return value;

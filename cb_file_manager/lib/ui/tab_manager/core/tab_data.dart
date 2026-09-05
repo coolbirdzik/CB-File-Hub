@@ -66,10 +66,10 @@ class TabData {
     this.highlightedFileName,
     this.splitPanePath,
     this.splitPaneTabData,
-  })  : navigationHistory = navigationHistory ?? [path],
-        forwardHistory = forwardHistory ?? <String>[],
-        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
-        repaintBoundaryKey = repaintBoundaryKey ?? GlobalKey();
+  }) : navigationHistory = navigationHistory ?? [path],
+       forwardHistory = forwardHistory ?? <String>[],
+       navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
+       repaintBoundaryKey = repaintBoundaryKey ?? GlobalKey();
 
   /// Create a copy of this tab with some properties changed
   TabData copyWith({
@@ -109,10 +109,12 @@ class TabData {
       highlightedFileName: clearHighlightedFile
           ? null
           : (highlightedFileName ?? this.highlightedFileName),
-      splitPanePath:
-          clearSplitPane ? null : (splitPanePath ?? this.splitPanePath),
-      splitPaneTabData:
-          clearSplitPane ? null : (splitPaneTabData ?? this.splitPaneTabData),
+      splitPanePath: clearSplitPane
+          ? null
+          : (splitPanePath ?? this.splitPanePath),
+      splitPaneTabData: clearSplitPane
+          ? null
+          : (splitPaneTabData ?? this.splitPaneTabData),
     );
   }
 
@@ -128,7 +130,9 @@ class TabData {
 
         // Remove all paths after the one we're navigating to from backward history
         navigationHistory.removeRange(
-            existingIndex + 1, navigationHistory.length);
+          existingIndex + 1,
+          navigationHistory.length,
+        );
       } else {
         // Only add the new path to history if it's different from the last path in history
         if (navigationHistory.isEmpty || navigationHistory.last != newPath) {
@@ -175,7 +179,8 @@ class TabData {
       while (navigationHistory.length > 1 &&
           navigationHistory.last == previousPath) {
         debugPrint(
-            'TabData: Removing duplicate path from history: ${navigationHistory.last}');
+          'TabData: Removing duplicate path from history: ${navigationHistory.last}',
+        );
         previousPath = navigationHistory.last;
         navigationHistory.removeLast();
       }

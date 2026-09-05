@@ -26,11 +26,11 @@ class NetworkConnectionDialog extends StatefulWidget {
   final Function(String connectionPath, String tabName)? onConnectionRequested;
 
   const NetworkConnectionDialog({
-    Key? key,
+    super.key,
     this.initialService,
     this.initialHost,
     this.onConnectionRequested,
-  }) : super(key: key);
+  });
 
   @override
   State<NetworkConnectionDialog> createState() =>
@@ -67,7 +67,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
   void initState() {
     super.initState();
     debugPrint(
-        'NetworkConnectionDialog: initState() called on platform: ${Platform.operatingSystem}');
+      'NetworkConnectionDialog: initState() called on platform: ${Platform.operatingSystem}',
+    );
     _selectedService = widget.initialService ?? 'SMB';
     _localBloc = NetworkBrowsingBloc();
 
@@ -75,7 +76,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
     if (widget.initialHost != null) {
       _hostController.text = widget.initialHost!;
       debugPrint(
-          'NetworkConnectionDialog: Initial host set to: ${widget.initialHost}');
+        'NetworkConnectionDialog: Initial host set to: ${widget.initialHost}',
+      );
     } else {
       debugPrint('NetworkConnectionDialog: No initial host provided');
     }
@@ -90,7 +92,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
     // Trên mobile, cần thêm delay dài hơn để đảm bảo giá trị đã được cập nhật
     Future.delayed(const Duration(milliseconds: 500), () {
       debugPrint(
-          'NetworkConnectionDialog: Before loading credentials, host is: ${_hostController.text}');
+        'NetworkConnectionDialog: Before loading credentials, host is: ${_hostController.text}',
+      );
       _loadSavedCredentials();
     });
 
@@ -146,11 +149,13 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
     try {
       final hostToSearch = _hostController.text.trim();
       debugPrint(
-          'NetworkConnectionDialog: Loading saved credentials for host: "$hostToSearch", service: $_selectedService, platform: ${Platform.operatingSystem}');
+        'NetworkConnectionDialog: Loading saved credentials for host: "$hostToSearch", service: $_selectedService, platform: ${Platform.operatingSystem}',
+      );
 
       if (hostToSearch.isEmpty) {
         debugPrint(
-            'NetworkConnectionDialog: Host is empty, skipping credential load');
+          'NetworkConnectionDialog: Host is empty, skipping credential load',
+        );
         return;
       }
 
@@ -167,15 +172,18 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
       );
 
       debugPrint(
-          'NetworkConnectionDialog: Credentials search result: ${credentials != null ? "FOUND" : "NOT FOUND"}');
+        'NetworkConnectionDialog: Credentials search result: ${credentials != null ? "FOUND" : "NOT FOUND"}',
+      );
       if (credentials != null) {
         debugPrint(
-            'NetworkConnectionDialog: Found credentials details - host: ${credentials.host}, username: ${credentials.username}, domain: ${credentials.domain}, port: ${credentials.port}');
+          'NetworkConnectionDialog: Found credentials details - host: ${credentials.host}, username: ${credentials.username}, domain: ${credentials.domain}, port: ${credentials.port}',
+        );
       }
 
       if (credentials != null && mounted) {
         debugPrint(
-            'NetworkConnectionDialog: Applying saved credentials for $hostToSearch - username: ${credentials.username}');
+          'NetworkConnectionDialog: Applying saved credentials for $hostToSearch - username: ${credentials.username}',
+        );
         setState(() {
           _hostController.text = credentials.host;
           _usernameController.text = credentials.username;
@@ -205,24 +213,29 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
 
         // Kiểm tra sau khi cập nhật
         debugPrint(
-            'NetworkConnectionDialog: After update - Username controller: "${_usernameController.text}", Password set: ${_passwordController.text.isNotEmpty}');
+          'NetworkConnectionDialog: After update - Username controller: "${_usernameController.text}", Password set: ${_passwordController.text.isNotEmpty}',
+        );
       } else {
         debugPrint(
-            'NetworkConnectionDialog: No saved credentials found for host: "$hostToSearch"');
+          'NetworkConnectionDialog: No saved credentials found for host: "$hostToSearch"',
+        );
 
         // Kiểm tra tất cả thông tin đăng nhập đã lưu để debug
         final allCredentials = NetworkCredentialsService()
             .getCredentialsByServiceType(_selectedService);
         debugPrint(
-            'NetworkConnectionDialog: Found ${allCredentials.length} saved credentials for service "$_selectedService":');
+          'NetworkConnectionDialog: Found ${allCredentials.length} saved credentials for service "$_selectedService":',
+        );
         for (var cred in allCredentials) {
           debugPrint(
-              '  - Host: "${cred.host}", Username: "${cred.username}", Domain: "${cred.domain}", Port: ${cred.port}');
+            '  - Host: "${cred.host}", Username: "${cred.username}", Domain: "${cred.domain}", Port: ${cred.port}',
+          );
         }
       }
     } catch (e) {
       debugPrint(
-          'NetworkConnectionDialog: Error loading saved credentials: $e');
+        'NetworkConnectionDialog: Error loading saved credentials: $e',
+      );
     }
   }
 
@@ -243,7 +256,8 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
         setState(() {
           _savedHosts = hostSet.toList();
           debugPrint(
-              'Loaded ${_savedHosts.length} saved hosts for $_selectedService');
+            'Loaded ${_savedHosts.length} saved hosts for $_selectedService',
+          );
         });
       }
     } catch (e) {
@@ -266,8 +280,10 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.delete,
-                style: TextStyle(color: theme.colorScheme.error)),
+            child: Text(
+              l10n.delete,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -301,8 +317,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                  content: Text(l10n.connectionNotFoundToDelete(host)),
-                  backgroundColor: theme.colorScheme.secondary),
+                content: Text(l10n.connectionNotFoundToDelete(host)),
+                backgroundColor: theme.colorScheme.secondary,
+              ),
             );
           }
         }
@@ -349,9 +366,11 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
       final password = _passwordController.text;
 
       debugPrint(
-          'NetworkConnectionDialog: Connecting to SMB server: $serverAddress, username: $username, platform: ${Platform.operatingSystem}');
+        'NetworkConnectionDialog: Connecting to SMB server: $serverAddress, username: $username, platform: ${Platform.operatingSystem}',
+      );
       debugPrint(
-          'NetworkConnectionDialog: _saveCredentials value: $_saveCredentials');
+        'NetworkConnectionDialog: _saveCredentials value: $_saveCredentials',
+      );
 
       // Kết nối trực tiếp với SMB server mà không cần chọn share
       // Tạo event kết nối với server (không cần share)
@@ -363,19 +382,19 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
         port: _portController.text.isNotEmpty
             ? int.tryParse(_portController.text)
             : null,
-        additionalOptions: {
-          if (_domain != null) 'domain': _domain,
-        },
+        additionalOptions: {if (_domain != null) 'domain': _domain},
       );
 
       _localBloc.add(event);
 
       // Lưu thông tin đăng nhập nếu được chọn
       debugPrint(
-          'NetworkConnectionDialog: Should save credentials? $_saveCredentials');
+        'NetworkConnectionDialog: Should save credentials? $_saveCredentials',
+      );
       if (_saveCredentials) {
         debugPrint(
-            'NetworkConnectionDialog: Saving credentials for SMB - host: $serverAddress, username: $username');
+          'NetworkConnectionDialog: Saving credentials for SMB - host: $serverAddress, username: $username',
+        );
         await NetworkCredentialsService().saveCredentials(
           serviceType: _selectedService,
           host: serverAddress,
@@ -389,15 +408,18 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
         debugPrint('NetworkConnectionDialog: Credentials saved successfully');
       } else {
         debugPrint(
-            'NetworkConnectionDialog: Not saving credentials because _saveCredentials is false');
+          'NetworkConnectionDialog: Not saving credentials because _saveCredentials is false',
+        );
       }
     } catch (e) {
       debugPrint('Error connecting to server: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(AppLocalizations.of(context)!
-                  .connectionFailed(e.toString()))),
+            content: Text(
+              AppLocalizations.of(context)!.connectionFailed(e.toString()),
+            ),
+          ),
         );
       }
     } finally {
@@ -458,40 +480,42 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                       Autocomplete<String>(
                         fieldViewBuilder:
                             (context, controller, focusNode, onFieldSubmitted) {
-                          // Sync the controller with our _hostController
-                          if (controller.text != _hostController.text) {
-                            controller.text = _hostController.text;
-                          }
-                          _hostController.addListener(() {
-                            if (controller.text != _hostController.text) {
-                              controller.text = _hostController.text;
-                            }
-                          });
+                              // Sync the controller with our _hostController
+                              if (controller.text != _hostController.text) {
+                                controller.text = _hostController.text;
+                              }
+                              _hostController.addListener(() {
+                                if (controller.text != _hostController.text) {
+                                  controller.text = _hostController.text;
+                                }
+                              });
 
-                          return TextFormField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            enabled: !isLoading,
-                            decoration: InputDecoration(
-                              labelText: l10n.host,
-                              border: const OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              _hostController.text = value;
-                              _loadSavedCredentials();
+                              return TextFormField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                enabled: !isLoading,
+                                decoration: InputDecoration(
+                                  labelText: l10n.host,
+                                  border: const OutlineInputBorder(),
+                                ),
+                                onChanged: (value) {
+                                  _hostController.text = value;
+                                  _loadSavedCredentials();
+                                },
+                                onFieldSubmitted: (value) {
+                                  onFieldSubmitted();
+                                },
+                              );
                             },
-                            onFieldSubmitted: (value) {
-                              onFieldSubmitted();
-                            },
-                          );
-                        },
                         optionsBuilder: (TextEditingValue textEditingValue) {
                           if (textEditingValue.text.isEmpty) {
                             return _savedHosts;
                           }
-                          return _savedHosts.where((option) => option
-                              .toLowerCase()
-                              .contains(textEditingValue.text.toLowerCase()));
+                          return _savedHosts.where(
+                            (option) => option.toLowerCase().contains(
+                              textEditingValue.text.toLowerCase(),
+                            ),
+                          );
                         },
                         onSelected: (String option) {
                           _hostController.text = option;
@@ -513,8 +537,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(
-                                            PhosphorIconsLight.pencilSimple,
-                                            size: 16),
+                                          PhosphorIconsLight.pencilSimple,
+                                          size: 16,
+                                        ),
                                         onPressed: () {
                                           // Stop dropdown from closing
                                           RouteUtils.safePopDialog(context);
@@ -601,8 +626,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                                     _useSSL = value ?? true;
                                     if (_portController.text == '443' ||
                                         _portController.text == '80') {
-                                      _portController.text =
-                                          _useSSL ? '443' : '80';
+                                      _portController.text = _useSSL
+                                          ? '443'
+                                          : '80';
                                     }
                                   });
                                 },
@@ -644,23 +670,30 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color:
-                                theme.colorScheme.error.withValues(alpha: 0.1),
+                            color: theme.colorScheme.error.withValues(
+                              alpha: 0.1,
+                            ),
                             border: Border.all(
-                                color: theme.colorScheme.error
-                                    .withValues(alpha: 0.3)),
+                              color: theme.colorScheme.error.withValues(
+                                alpha: 0.3,
+                              ),
+                            ),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Row(
                             children: [
-                              Icon(PhosphorIconsLight.warning,
-                                  color: theme.colorScheme.error, size: 20),
+                              Icon(
+                                PhosphorIconsLight.warning,
+                                color: theme.colorScheme.error,
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   state.errorMessage!,
-                                  style:
-                                      TextStyle(color: theme.colorScheme.error),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.error,
+                                  ),
                                 ),
                               ),
                             ],
@@ -697,67 +730,67 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                 onPressed: isLoading
                     ? null
                     : _selectedService == 'SMB'
-                        ? _connectToServerAndListShares
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              _localBloc
-                                  .add(const NetworkClearLastConnectedPath());
+                    ? _connectToServerAndListShares
+                    : () {
+                        if (_formKey.currentState!.validate()) {
+                          _localBloc.add(const NetworkClearLastConnectedPath());
 
-                              final host = _hostController.text.trim();
-                              final username = _usernameController.text.trim();
-                              final password = _passwordController.text;
-                              final port = _portController.text.isNotEmpty
-                                  ? int.tryParse(_portController.text)
-                                  : null;
+                          final host = _hostController.text.trim();
+                          final username = _usernameController.text.trim();
+                          final password = _passwordController.text;
+                          final port = _portController.text.isNotEmpty
+                              ? int.tryParse(_portController.text)
+                              : null;
 
-                              final event = NetworkConnectionRequested(
-                                serviceName: _selectedService,
-                                host: host,
-                                username: username,
-                                password: password,
-                                port: port,
-                                additionalOptions: {
-                                  if (_selectedService == 'WebDAV')
-                                    'useSSL': _useSSL,
-                                  if (_selectedService == 'WebDAV' &&
-                                      _basePathController.text.isNotEmpty)
-                                    'basePath': _basePathController.text.trim(),
-                                  if (_selectedService == 'SMB' &&
-                                      _domain != null)
-                                    'domain': _domain,
-                                },
-                              );
-                              debugPrint(
-                                  'NetworkConnectionDialog: Sending WebDAV connection event: $event');
-                              _localBloc.add(event);
+                          final event = NetworkConnectionRequested(
+                            serviceName: _selectedService,
+                            host: host,
+                            username: username,
+                            password: password,
+                            port: port,
+                            additionalOptions: {
+                              if (_selectedService == 'WebDAV')
+                                'useSSL': _useSSL,
+                              if (_selectedService == 'WebDAV' &&
+                                  _basePathController.text.isNotEmpty)
+                                'basePath': _basePathController.text.trim(),
+                              if (_selectedService == 'SMB' && _domain != null)
+                                'domain': _domain,
+                            },
+                          );
+                          debugPrint(
+                            'NetworkConnectionDialog: Sending WebDAV connection event: $event',
+                          );
+                          _localBloc.add(event);
 
-                              // Lưu thông tin đăng nhập nếu được chọn
-                              if (_saveCredentials) {
-                                NetworkCredentialsService().saveCredentials(
-                                  serviceType: _selectedService,
-                                  host: host,
-                                  username: username,
-                                  password: password,
-                                  port: port,
-                                  domain: _domain,
-                                  additionalOptions: {
-                                    if (_selectedService == 'WebDAV')
-                                      'useSSL': _useSSL,
-                                    if (_selectedService == 'WebDAV' &&
-                                        _basePathController.text.isNotEmpty)
-                                      'basePath':
-                                          _basePathController.text.trim(),
-                                  },
-                                );
-                              }
-                            }
-                          },
+                          // Lưu thông tin đăng nhập nếu được chọn
+                          if (_saveCredentials) {
+                            NetworkCredentialsService().saveCredentials(
+                              serviceType: _selectedService,
+                              host: host,
+                              username: username,
+                              password: password,
+                              port: port,
+                              domain: _domain,
+                              additionalOptions: {
+                                if (_selectedService == 'WebDAV')
+                                  'useSSL': _useSSL,
+                                if (_selectedService == 'WebDAV' &&
+                                    _basePathController.text.isNotEmpty)
+                                  'basePath': _basePathController.text.trim(),
+                              },
+                            );
+                          }
+                        }
+                      },
                 child: isLoading
                     ? SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: theme.colorScheme.onPrimary),
+                          strokeWidth: 2,
+                          color: theme.colorScheme.onPrimary,
+                        ),
                       )
                     : Text(l10n.connect),
               ),

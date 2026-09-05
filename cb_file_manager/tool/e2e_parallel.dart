@@ -105,7 +105,8 @@ Future<void> main(List<String> args) async {
       fileMode = true;
     } else {
       print(
-          '[Parallel E2E] WARNING: file not found "$resolved" — using default.');
+        '[Parallel E2E] WARNING: file not found "$resolved" — using default.',
+      );
     }
   }
 
@@ -141,8 +142,10 @@ Future<void> main(List<String> args) async {
       print('[Parallel E2E] No previous failures found — running all groups.');
       groups = _kAllGroups;
     } else {
-      print('[Parallel E2E] Rerunning ${groups.length} failed group(s): '
-          '${groups.join(", ")}');
+      print(
+        '[Parallel E2E] Rerunning ${groups.length} failed group(s): '
+        '${groups.join(", ")}',
+      );
     }
   } else {
     groups = _kAllGroups;
@@ -152,8 +155,9 @@ Future<void> main(List<String> args) async {
   if (fileMode) {
     print('[Parallel E2E] Running file: $testFile');
     // Build extra args (plain name filter if provided)
-    final extraArgs =
-        plainNameArg != null ? ['--plain-name', plainNameArg] : <String>[];
+    final extraArgs = plainNameArg != null
+        ? ['--plain-name', plainNameArg]
+        : <String>[];
 
     await _runSingleFile(
       testFile: testFile,
@@ -166,8 +170,10 @@ Future<void> main(List<String> args) async {
   }
 
   if (maxParallel < groups.length) {
-    print('[Parallel E2E] Limiting to $maxParallel parallel workers '
-        '(${groups.length} groups total)');
+    print(
+      '[Parallel E2E] Limiting to $maxParallel parallel workers '
+      '(${groups.length} groups total)',
+    );
   }
 
   // ---- Prepare output directories ----
@@ -191,14 +197,21 @@ Future<void> main(List<String> args) async {
 
   if (!noWarmup) {
     final warmupGroup = groups.first;
-    print('[Parallel E2E] Warmup build: running "$warmupGroup" first '
-        'to cache the build...\n');
-    results[warmupGroup] = await _runWorker(warmupGroup,
-        fullStartup: fullStartup, fullScreenshots: fullScreenshots);
+    print(
+      '[Parallel E2E] Warmup build: running "$warmupGroup" first '
+      'to cache the build...\n',
+    );
+    results[warmupGroup] = await _runWorker(
+      warmupGroup,
+      fullStartup: fullStartup,
+      fullScreenshots: fullScreenshots,
+    );
 
     final remaining = groups.skip(1).toList();
-    print('\n[Parallel E2E] Build cached. Launching ${remaining.length} '
-        'remaining group(s) ($maxParallel workers max)...\n');
+    print(
+      '\n[Parallel E2E] Build cached. Launching ${remaining.length} '
+      'remaining group(s) ($maxParallel workers max)...\n',
+    );
 
     final semaphore = _Semaphore(maxParallel);
     final futures = <Future<void>>[];
@@ -206,8 +219,11 @@ Future<void> main(List<String> args) async {
       futures.add(() async {
         await semaphore.acquire();
         try {
-          results[group] = await _runWorker(group,
-              fullStartup: fullStartup, fullScreenshots: fullScreenshots);
+          results[group] = await _runWorker(
+            group,
+            fullStartup: fullStartup,
+            fullScreenshots: fullScreenshots,
+          );
         } finally {
           semaphore.release();
         }
@@ -215,8 +231,10 @@ Future<void> main(List<String> args) async {
     }
     await Future.wait(futures);
   } else {
-    print('[Parallel E2E] Launching ${groups.length} test group(s) '
-        '($maxParallel workers max)...\n');
+    print(
+      '[Parallel E2E] Launching ${groups.length} test group(s) '
+      '($maxParallel workers max)...\n',
+    );
 
     final semaphore = _Semaphore(maxParallel);
     final futures = <Future<void>>[];
@@ -224,8 +242,11 @@ Future<void> main(List<String> args) async {
       futures.add(() async {
         await semaphore.acquire();
         try {
-          results[group] = await _runWorker(group,
-              fullStartup: fullStartup, fullScreenshots: fullScreenshots);
+          results[group] = await _runWorker(
+            group,
+            fullStartup: fullStartup,
+            fullScreenshots: fullScreenshots,
+          );
         } finally {
           semaphore.release();
         }
@@ -234,8 +255,11 @@ Future<void> main(List<String> args) async {
     await Future.wait(futures);
   }
 
-  await _retryInfrastructureFailures(results,
-      fullStartup: fullStartup, fullScreenshots: fullScreenshots);
+  await _retryInfrastructureFailures(
+    results,
+    fullStartup: fullStartup,
+    fullScreenshots: fullScreenshots,
+  );
 
   // ---- Print summary ----
   _printSummary(results);
@@ -257,25 +281,22 @@ Future<void> main(List<String> args) async {
   if (!noGenerate) {
     print('[Parallel E2E] Generating dashboard...');
 
-    final adapter = await Process.run(
-      Platform.resolvedExecutable,
-      [
-        'run',
-        'tool/e2e_allure_adapter.dart',
-        _kMergedJsonl,
-        '--build-dir',
-        'build'
-      ],
-      workingDirectory: Directory.current.path,
-    );
+    final adapter = await Process.run(Platform.resolvedExecutable, [
+      'run',
+      'tool/e2e_allure_adapter.dart',
+      _kMergedJsonl,
+      '--build-dir',
+      'build',
+    ], workingDirectory: Directory.current.path);
     stdout.write(adapter.stdout);
     if (adapter.stderr.isNotEmpty) stderr.write(adapter.stderr);
 
-    final dash = await Process.run(
-      Platform.resolvedExecutable,
-      ['run', 'tool/e2e_dashboard.dart', '--build-dir', 'build'],
-      workingDirectory: Directory.current.path,
-    );
+    final dash = await Process.run(Platform.resolvedExecutable, [
+      'run',
+      'tool/e2e_dashboard.dart',
+      '--build-dir',
+      'build',
+    ], workingDirectory: Directory.current.path);
     stdout.write(dash.stdout);
     if (dash.stderr.isNotEmpty) stderr.write(dash.stderr);
 
@@ -288,7 +309,8 @@ Future<void> main(List<String> args) async {
       exit(hasFailures ? 1 : 0);
     } else {
       print(
-          '[Parallel E2E] Dashboard generation failed (exit ${dash.exitCode}).');
+        '[Parallel E2E] Dashboard generation failed (exit ${dash.exitCode}).',
+      );
     }
   }
 
@@ -359,27 +381,31 @@ Future<void> _runSingleFile({
   final status = exitCode == 0 ? 'PASS' : 'FAIL';
   final elapsed = _formatDuration(stopwatch.elapsed);
   final filename = testFile.split('/').last;
-  print('[File:$filename] $status ($elapsed) — '
-      '${stats.passed} passed, ${stats.failed} failed, ${stats.total} total');
+  print(
+    '[File:$filename] $status ($elapsed) — '
+    '${stats.passed} passed, ${stats.failed} failed, ${stats.total} total',
+  );
   if (reason != null && reason.isNotEmpty) {
     print('[File:$filename] Reason: $reason');
   }
 
   // Generate the dashboard for the single-file results
   await _runPubGetOnce();
-  final adapter = await Process.run(
-    Platform.resolvedExecutable,
-    ['run', 'tool/e2e_allure.dart', '--no-open', '--skip-generate'],
-    workingDirectory: Directory.current.path,
-  );
+  final adapter = await Process.run(Platform.resolvedExecutable, [
+    'run',
+    'tool/e2e_allure.dart',
+    '--no-open',
+    '--skip-generate',
+  ], workingDirectory: Directory.current.path);
   if (adapter.stdout.isNotEmpty) stdout.write(adapter.stdout);
   if (adapter.stderr.isNotEmpty) stderr.write(adapter.stderr);
 
-  final dash = await Process.run(
-    Platform.resolvedExecutable,
-    ['run', 'tool/e2e_dashboard.dart', '--build-dir', 'build'],
-    workingDirectory: Directory.current.path,
-  );
+  final dash = await Process.run(Platform.resolvedExecutable, [
+    'run',
+    'tool/e2e_dashboard.dart',
+    '--build-dir',
+    'build',
+  ], workingDirectory: Directory.current.path);
   stdout.write(dash.stdout);
   if (dash.stderr.isNotEmpty) stderr.write(dash.stderr);
 
@@ -461,8 +487,10 @@ Future<_WorkerResult> _runWorker(
 
   final status = exitCode == 0 ? 'PASS' : 'FAIL';
   final elapsed = _formatDuration(stopwatch.elapsed);
-  print('[Worker:$group] $status ($elapsed) — '
-      '${stats.passed} passed, ${stats.failed} failed, ${stats.total} total');
+  print(
+    '[Worker:$group] $status ($elapsed) — '
+    '${stats.passed} passed, ${stats.failed} failed, ${stats.total} total',
+  );
   if (reason != null && reason.isNotEmpty) {
     print('[Worker:$group] Reason: $reason');
   }
@@ -506,8 +534,10 @@ Future<void> _retryInfrastructureFailures(
       .toList();
   if (retryGroups.isEmpty) return;
 
-  print('\n[Parallel E2E] Retrying ${retryGroups.length} infrastructure '
-      'failure(s) serially: ${retryGroups.join(", ")}');
+  print(
+    '\n[Parallel E2E] Retrying ${retryGroups.length} infrastructure '
+    'failure(s) serially: ${retryGroups.join(", ")}',
+  );
 
   for (final group in retryGroups) {
     results[group] = await _runWorker(
@@ -584,18 +614,20 @@ Future<Directory> _prepareWorkerFlutterConfig(String slug) async {
 Future<void> _seedTelemetryConfig(Directory configDir) async {
   final telemetryDir = Directory('${configDir.path}/.dart-tool');
   await telemetryDir.create(recursive: true);
-  final telemetryFile =
-      File('${telemetryDir.path}/dart-flutter-telemetry.config');
+  final telemetryFile = File(
+    '${telemetryDir.path}/dart-flutter-telemetry.config',
+  );
   if (telemetryFile.existsSync()) return;
 
   // Try to copy from the real APPDATA so the worker inherits user's prefs.
   final realAppData = Platform.isWindows
       ? Platform.environment['APPDATA']
       : Platform.environment['XDG_CONFIG_HOME'] ??
-          '${Platform.environment['HOME']}/.config';
+            '${Platform.environment['HOME']}/.config';
   if (realAppData != null) {
     final realConfig = File(
-        '$realAppData${Platform.pathSeparator}.dart-tool${Platform.pathSeparator}dart-flutter-telemetry.config');
+      '$realAppData${Platform.pathSeparator}.dart-tool${Platform.pathSeparator}dart-flutter-telemetry.config',
+    );
     if (realConfig.existsSync()) {
       try {
         await realConfig.copy(telemetryFile.path);
@@ -739,7 +771,8 @@ Future<void> _saveFailedGroupsFromMerged(String jsonlPath) async {
   } else {
     await outFile.writeAsString(failed.join('|'));
     print(
-        '[Parallel E2E] Saved ${failed.length} failed test(s) → $_kFailedTestsFile');
+      '[Parallel E2E] Saved ${failed.length} failed test(s) → $_kFailedTestsFile',
+    );
   }
 }
 
@@ -856,11 +889,14 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
   }
   merged.addAll(strippedResults);
 
-  final entries =
-      merged.entries.map((e) => '  "${_esc(e.key)}": ${e.value}').join(',\n');
+  final entries = merged.entries
+      .map((e) => '  "${_esc(e.key)}": ${e.value}')
+      .join(',\n');
   await resultsFile.writeAsString('{\n$entries\n}');
-  print('[Parallel E2E] Wrote ${merged.length} test results → results.json '
-      '(${strippedResults.length} fresh, ${merged.length - strippedResults.length} preserved)');
+  print(
+    '[Parallel E2E] Wrote ${merged.length} test results → results.json '
+    '(${strippedResults.length} fresh, ${merged.length - strippedResults.length} preserved)',
+  );
 }
 
 String _esc(String s) => s
@@ -985,8 +1021,10 @@ void _printSummary(Map<String, _WorkerResult> results) {
     final r = entry.value;
     final elapsed = _formatDuration(Duration(milliseconds: r.elapsedMs));
     final status = r.success ? '\x1B[32mPASS\x1B[0m' : '\x1B[31mFAIL\x1B[0m';
-    print('  [$status] ${r.group.padRight(30)} $elapsed  '
-        '${r.passed}/${r.total}');
+    print(
+      '  [$status] ${r.group.padRight(30)} $elapsed  '
+      '${r.passed}/${r.total}',
+    );
     if (!r.success) {
       failedWorkers++;
       final reason = r.failureReason;
@@ -1002,15 +1040,20 @@ void _printSummary(Map<String, _WorkerResult> results) {
   }
 
   final passRate = totalTests > 0 ? (totalPassed / totalTests * 100) : 0.0;
-  final workerSuffix =
-      failedWorkers > 0 ? ', $failedWorkers worker failure(s)' : '';
+  final workerSuffix = failedWorkers > 0
+      ? ', $failedWorkers worker failure(s)'
+      : '';
 
   print(divider);
-  print('  ${'[Parallel]'.padRight(30)} Combined: '
-      '$totalPassed/$totalTests (${passRate.toStringAsFixed(1)}%)'
-      '$workerSuffix');
-  print('  ${'Max group wall time:'.padRight(30)} '
-      '${_formatDuration(Duration(milliseconds: maxMs))}');
+  print(
+    '  ${'[Parallel]'.padRight(30)} Combined: '
+    '$totalPassed/$totalTests (${passRate.toStringAsFixed(1)}%)'
+    '$workerSuffix',
+  );
+  print(
+    '  ${'Max group wall time:'.padRight(30)} '
+    '${_formatDuration(Duration(milliseconds: maxMs))}',
+  );
   print('$divider\n');
 }
 
@@ -1045,21 +1088,23 @@ Future<void> _killAllTestProcesses() async {
   print('[Parallel E2E] Cleaning up test processes...');
 
   // Kill app process
-  final r1 = await Process.run(
-    'taskkill',
-    <String>['/F', '/IM', 'cb_file_hub.exe', '/T'],
-    runInShell: false,
-  );
+  final r1 = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'cb_file_hub.exe',
+    '/T',
+  ], runInShell: false);
   if (r1.exitCode != 0 && r1.exitCode != 128) {
     // Not critical — may simply not exist
   }
 
   // Kill flutter test runner processes
-  final r2 = await Process.run(
-    'taskkill',
-    <String>['/F', '/IM', 'flutter_test.exe', '/T'],
-    runInShell: false,
-  );
+  final r2 = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'flutter_test.exe',
+    '/T',
+  ], runInShell: false);
   if (r2.exitCode != 0 && r2.exitCode != 128) {
     // May not exist — fine
   }
@@ -1078,11 +1123,12 @@ String _formatDuration(Duration d) {
 
 Future<void> _killCbFileHubOnWindows() async {
   if (!Platform.isWindows) return;
-  final r = await Process.run(
-    'taskkill',
-    <String>['/F', '/IM', 'cb_file_hub.exe', '/T'],
-    runInShell: false,
-  );
+  final r = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'cb_file_hub.exe',
+    '/T',
+  ], runInShell: false);
   if (r.exitCode != 0 && r.exitCode != 128) {
     stderr.writeln('[Parallel E2E] taskkill exit ${r.exitCode} (continuing)');
   }
@@ -1091,8 +1137,12 @@ Future<void> _killCbFileHubOnWindows() async {
 Future<void> _openInBrowser(String filePath) async {
   try {
     if (Platform.isWindows) {
-      await Process.run('cmd', ['/c', 'start', '', filePath],
-          runInShell: false);
+      await Process.run('cmd', [
+        '/c',
+        'start',
+        '',
+        filePath,
+      ], runInShell: false);
     } else if (Platform.isMacOS) {
       await Process.run('open', [filePath]);
     } else {
@@ -1105,24 +1155,33 @@ void _printDryRun() {
   print('[Dry run] E2E Parallel runner');
   print('');
   print(
-      '  dart run tool/e2e_parallel.dart                   All groups in parallel');
+    '  dart run tool/e2e_parallel.dart                   All groups in parallel',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --max-parallel 2  Limit concurrency');
+    '  dart run tool/e2e_parallel.dart --max-parallel 2  Limit concurrency',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --plain-name "Navigation"  Single suite');
+    '  dart run tool/e2e_parallel.dart --plain-name "Navigation"  Single suite',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --groups "View Mode|Search & Filter"');
+    '  dart run tool/e2e_parallel.dart --groups "View Mode|Search & Filter"',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --file video_thumbnails_e2e_test  Run by file name');
+    '  dart run tool/e2e_parallel.dart --file video_thumbnails_e2e_test  Run by file name',
+  );
   print('  dart run tool/e2e_parallel.dart --no-generate    Skip dashboard');
   print(
-      '  dart run tool/e2e_parallel.dart --rerun-failed   Rerun previously failed');
+    '  dart run tool/e2e_parallel.dart --rerun-failed   Rerun previously failed',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --full-startup   Include production startup services');
+    '  dart run tool/e2e_parallel.dart --full-startup   Include production startup services',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --full-screenshots  Capture every E2E action');
+    '  dart run tool/e2e_parallel.dart --full-screenshots  Capture every E2E action',
+  );
   print(
-      '  dart run tool/e2e_parallel.dart --no-warmup      Skip build warmup (risky on Windows)');
+    '  dart run tool/e2e_parallel.dart --no-warmup      Skip build warmup (risky on Windows)',
+  );
   print('  dart run tool/e2e_parallel.dart --dry-run          This message');
   print('');
   print('[Dry run] Available groups (${_kAllGroups.length}):');
@@ -1132,8 +1191,10 @@ void _printDryRun() {
   print('');
   print('[Dry run] Device: ${Platform.environment['E2E_DEVICE'] ?? 'windows'}');
   print('[Dry run] CPU cores: ${Platform.numberOfProcessors}');
-  print('[Dry run] Default max parallel: ${_defaultMaxParallel()} '
-      '(override with --max-parallel N or env CB_E2E_MAX_PARALLEL=N)');
+  print(
+    '[Dry run] Default max parallel: ${_defaultMaxParallel()} '
+    '(override with --max-parallel N or env CB_E2E_MAX_PARALLEL=N)',
+  );
 }
 
 // ---------------------------------------------------------------------------

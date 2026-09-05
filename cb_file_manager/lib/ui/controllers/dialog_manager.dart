@@ -11,8 +11,10 @@ import 'package:cb_file_manager/utils/app_logger.dart';
 class DialogManager {
   /// Show dialog to add a tag to a specific file
   static void showAddTagToFile(BuildContext context, String filePath) {
-    AppLogger.info('[ManageTags][DialogManager] showAddTagToFile',
-        error: 'filePath=$filePath');
+    AppLogger.info(
+      '[ManageTags][DialogManager] showAddTagToFile',
+      error: 'filePath=$filePath',
+    );
     tab_components.showAddTagToFileDialog(context, filePath);
   }
 
@@ -48,11 +50,7 @@ class DialogManager {
         selectedFiles: selectedFiles,
       );
     } else {
-      tab_components.showManageTagsDialog(
-        context,
-        allTags,
-        currentPath,
-      );
+      tab_components.showManageTagsDialog(context, allTags, currentPath);
     }
   }
 
@@ -73,8 +71,8 @@ class DialogManager {
     final String itemType = fileCount > 0 && folderCount > 0
         ? l10n.items
         : fileCount > 0
-            ? (fileCount == 1 ? l10n.file : l10n.files)
-            : (folderCount == 1 ? l10n.folder : l10n.folders);
+        ? (fileCount == 1 ? l10n.file : l10n.files)
+        : (folderCount == 1 ? l10n.folder : l10n.folders);
 
     final String firstItemName = selectedFilePaths.isNotEmpty
         ? selectedFilePaths.first.split(RegExp(r'[/\\]')).last
@@ -98,11 +96,13 @@ class DialogManager {
 
     if (confirmed == true) {
       // Dispatch through bloc so progress dialog is shown
-      folderListBloc.add(FolderListDeleteItems(
-        filePaths: selectedFilePaths,
-        folderPaths: selectedFolderPaths,
-        permanent: false,
-      ));
+      folderListBloc.add(
+        FolderListDeleteItems(
+          filePaths: selectedFilePaths,
+          folderPaths: selectedFolderPaths,
+          permanent: false,
+        ),
+      );
       onClearSelection();
     }
   }

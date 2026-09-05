@@ -13,7 +13,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 class DesktopPipWindow extends StatefulWidget {
   final Map<String, dynamic> args;
-  const DesktopPipWindow({Key? key, required this.args}) : super(key: key);
+  const DesktopPipWindow({super.key, required this.args});
 
   @override
   State<DesktopPipWindow> createState() => _DesktopPipWindowState();
@@ -78,7 +78,8 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
 
     const Size defaultSize = Size(384, 216); // 16:9, reasonably sized
     const Size minSize = Size(240, 135); // 16:9, small but usable
-    final Size initialSize = (savedW != null &&
+    final Size initialSize =
+        (savedW != null &&
             savedH != null &&
             savedW >= minSize.width &&
             savedH >= minSize.height)
@@ -130,9 +131,11 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
     try {
       final prefs = UserPreferences.instance;
       await prefs.init();
-      _hardwareAcceleration = await prefs.getVideoPlayerBool(
-              'hardware_acceleration',
-              defaultValue: !Platform.isWindows) ??
+      _hardwareAcceleration =
+          await prefs.getVideoPlayerBool(
+            'hardware_acceleration',
+            defaultValue: !Platform.isWindows,
+          ) ??
           !Platform.isWindows;
       _bufferSizeMB =
           await prefs.getVideoPlayerInt('buffer_size', defaultValue: 10) ?? 10;
@@ -311,15 +314,20 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
             final RenderBox? renderBox =
                 context.findRenderObject() as RenderBox?;
             if (renderBox != null) {
-              final localPosition =
-                  renderBox.globalToLocal(details.globalPosition);
+              final localPosition = renderBox.globalToLocal(
+                details.globalPosition,
+              );
               final size = renderBox.size;
 
               // Top bar area (first 36 pixels)
               final topBarRect = Rect.fromLTWH(0, 0, size.width, 36);
               // Bottom controls area (last 60 pixels)
-              final bottomControlsRect =
-                  Rect.fromLTWH(0, size.height - 60, size.width, 60);
+              final bottomControlsRect = Rect.fromLTWH(
+                0,
+                size.height - 60,
+                size.width,
+                60,
+              );
 
               // If tap is in interactive areas, don't start dragging
               if (topBarRect.contains(localPosition) ||
@@ -361,7 +369,9 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white60),
+                      strokeWidth: 2,
+                      color: Colors.white60,
+                    ),
                   ),
                 ),
 
@@ -372,8 +382,10 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                   right: 8,
                   bottom: _showOverlay ? 48 : 8,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(6),
@@ -420,8 +432,9 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                       behavior: HitTestBehavior.opaque,
                       onPanStart: (_) async {
                         try {
-                          await windowManager
-                              .startResizing(ResizeEdge.bottomRight);
+                          await windowManager.startResizing(
+                            ResizeEdge.bottomRight,
+                          );
                         } catch (_) {}
                       },
                       child: Container(
@@ -447,9 +460,11 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
       ),
     );
 
-    final mq = MediaQuery.maybeOf(context) ??
+    final mq =
+        MediaQuery.maybeOf(context) ??
         MediaQueryData.fromView(
-            WidgetsBinding.instance.platformDispatcher.views.first);
+          WidgetsBinding.instance.platformDispatcher.views.first,
+        );
     final locale = WidgetsBinding.instance.platformDispatcher.locale;
     return MediaQuery(
       data: mq,
@@ -461,8 +476,9 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
           GlobalCupertinoLocalizations.delegate,
         ],
         child: Theme(
-          data:
-              ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+          data: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: Colors.black,
+          ),
           child: Material(color: Colors.black, child: content),
         ),
       ),
@@ -485,8 +501,11 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
         child: Row(
           children: [
             const SizedBox(width: 4),
-            const Icon(PhosphorIconsLight.pictureInpicture,
-                color: Colors.white70, size: 16),
+            const Icon(
+              PhosphorIconsLight.pictureInpicture,
+              color: Colors.white70,
+              size: 16,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -494,9 +513,10 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             IconButton(
@@ -504,11 +524,10 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               icon: Icon(
-                  _isPlaying
-                      ? PhosphorIconsLight.pause
-                      : PhosphorIconsLight.play,
-                  color: Colors.white,
-                  size: 18),
+                _isPlaying ? PhosphorIconsLight.pause : PhosphorIconsLight.play,
+                color: Colors.white,
+                size: 18,
+              ),
               onPressed: () async {
                 if (_player == null) return;
                 if (_player!.state.playing) {
@@ -525,8 +544,11 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              icon: const Icon(PhosphorIconsLight.x,
-                  color: Colors.white, size: 18),
+              icon: const Icon(
+                PhosphorIconsLight.x,
+                color: Colors.white,
+                size: 18,
+              ),
               onPressed: () async {
                 try {
                   await windowManager.close();
@@ -672,58 +694,77 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                 },
               ),
               const SizedBox(width: 8),
-              Text(_formatTime(_position),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text(
+                _formatTime(_position),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
               const SizedBox(width: 8),
               Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 2.5,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 7),
-                  ),
-                  child: Slider(
-                    value: totalMs == 0 ? 0 : posMs.toDouble(),
-                    min: 0,
-                    max: (totalMs == 0 ? 1 : totalMs).toDouble(),
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white24,
-                    onChangeStart: (_) => _seeking = true,
-                    onChanged: (v) {
-                      setState(
-                          () => _position = Duration(milliseconds: v.toInt()));
-                    },
-                    onChangeEnd: (v) async {
-                      _seeking = false;
-                      if (_player != null) {
-                        await _player!.seek(Duration(milliseconds: v.toInt()));
-                      }
-                    },
+                child: Semantics(
+                  container: true,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2.5,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 7,
+                      ),
+                    ),
+                    child: Slider(
+                      value: totalMs == 0 ? 0 : posMs.toDouble(),
+                      min: 0,
+                      max: (totalMs == 0 ? 1 : totalMs).toDouble(),
+                      activeColor: Colors.white,
+                      inactiveColor: Colors.white24,
+                      onChangeStart: (_) => _seeking = true,
+                      onChanged: (v) {
+                        setState(
+                          () => _position = Duration(milliseconds: v.toInt()),
+                        );
+                      },
+                      onChangeEnd: (v) async {
+                        _seeking = false;
+                        if (_player != null) {
+                          await _player!.seek(
+                            Duration(milliseconds: v.toInt()),
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(_formatTime(_duration),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text(
+                _formatTime(_duration),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
               const SizedBox(width: 8),
-              const Icon(PhosphorIconsLight.speakerHigh,
-                  color: Colors.white, size: 18),
+              const Icon(
+                PhosphorIconsLight.speakerHigh,
+                color: Colors.white,
+                size: 18,
+              ),
               const SizedBox(width: 4),
               SizedBox(
                 width: 90,
-                child: Slider(
-                  value:
-                      ((_player?.state.volume ?? 100).clamp(0, 100)).toDouble(),
-                  min: 0,
-                  max: 100,
-                  activeColor: Colors.white,
-                  inactiveColor: Colors.white24,
-                  onChanged: (v) async {
-                    if (_player != null) {
-                      await _player!.setVolume(v);
-                      setState(() {});
-                    }
-                  },
+                child: Semantics(
+                  container: true,
+                  child: Slider(
+                    value: ((_player?.state.volume ?? 100).clamp(
+                      0,
+                      100,
+                    )).toDouble(),
+                    min: 0,
+                    max: 100,
+                    activeColor: Colors.white,
+                    inactiveColor: Colors.white24,
+                    onChanged: (v) async {
+                      if (_player != null) {
+                        await _player!.setVolume(v);
+                        setState(() {});
+                      }
+                    },
+                  ),
                 ),
               ),
             ],
@@ -774,14 +815,14 @@ extension _IpcHelpers on _DesktopPipWindowState {
     if (port is int && token is String) {
       _ipcToken = token;
       try {
-        final sock = await Socket.connect(InternetAddress.loopbackIPv4, port,
-            timeout: const Duration(seconds: 2));
+        final sock = await Socket.connect(
+          InternetAddress.loopbackIPv4,
+          port,
+          timeout: const Duration(seconds: 2),
+        );
         _ipc = sock;
         // hello
-        _ipc!.writeln(jsonEncode({
-          'type': 'hello',
-          'token': _ipcToken,
-        }));
+        _ipc!.writeln(jsonEncode({'type': 'hello', 'token': _ipcToken}));
       } catch (_) {
         // ignore
       }

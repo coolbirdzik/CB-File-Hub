@@ -25,10 +25,10 @@ class ScreenMenuItem {
 
   /// Tạo divider item
   const ScreenMenuItem.divider()
-      : title = '',
-        icon = PhosphorIconsLight.minus,
-        onTap = _emptyCallback,
-        isDivider = true;
+    : title = '',
+      icon = PhosphorIconsLight.minus,
+      onTap = _emptyCallback,
+      isDivider = true;
 
   static void _emptyCallback() {}
 }
@@ -242,7 +242,9 @@ class _TagManagementHelper {
   }
 
   static Future<void> _createNewTagInDatabase(
-      BuildContext context, String tagName) async {
+    BuildContext context,
+    String tagName,
+  ) async {
     final l10n = AppLocalizations.of(context)!;
     final toast = AppToast.capture(context);
     try {
@@ -412,8 +414,9 @@ class FileBrowserHelper {
       context,
       directoryPath: currentPath,
       onAfterFileCreated: _afterFileCreated,
-      inlineRenameController:
-          _afterFileCreated == null ? _inlineRenameController : null,
+      inlineRenameController: _afterFileCreated == null
+          ? _inlineRenameController
+          : null,
     );
   }
 

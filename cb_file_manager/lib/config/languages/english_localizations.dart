@@ -689,7 +689,8 @@ class EnglishLocalizations implements AppLocalizations {
       'Tags help you organize files by adding custom labels. '
       'You can add or remove tags from files, and find all files with specific tags.';
   @override
-  String get aboutTagsScreenDescription => '• All tags in your library\n'
+  String get aboutTagsScreenDescription =>
+      '• All tags in your library\n'
       '• Files tagged with selected tag\n'
       '• Options to delete tags';
   @override
@@ -3530,11 +3531,17 @@ class EnglishLocalizations implements AppLocalizations {
       'Permanently deleted $count items ($size)';
   @override
   String diskCleanerPermanentDeletedWithInUse(
-          int count, String size, int skipped) =>
+    int count,
+    String size,
+    int skipped,
+  ) =>
       'Permanently deleted $count items ($size). Skipped $skipped in-use file(s); details were logged.';
   @override
   String diskCleanerPermanentDeletedWithSkipped(
-          int count, String size, int skipped) =>
+    int count,
+    String size,
+    int skipped,
+  ) =>
       'Permanently deleted $count items ($size). Skipped $skipped file(s) after delete failed.';
 
   // Cleaner - drive picker, quick clean, junk reasons
@@ -3898,4 +3905,6 @@ class EnglishLocalizations implements AppLocalizations {
   String get localAiTokensSuffix => 'tokens';
   @override
   String get localAiInvalidTokenCount => 'Please enter a valid number';
+  @override
+  String get aiReasoning => 'Thinking';
 }

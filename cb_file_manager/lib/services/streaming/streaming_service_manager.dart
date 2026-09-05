@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../network_browsing/i_smb_service.dart';
 import 'streaming_helper_base.dart';
+
 // import 'native_smb_streaming_helper.dart';
 
 /// Manager for streaming services and helpers
@@ -22,29 +23,35 @@ class StreamingServiceManager {
       _helpers.sort((a, b) => (b).priority.compareTo((a).priority));
 
       debugPrint(
-          'StreamingServiceManager: Initialized with ${_helpers.length} helpers');
+        'StreamingServiceManager: Initialized with ${_helpers.length} helpers',
+      );
       for (final helper in _helpers) {
         final typedHelper = helper;
         debugPrint(
-            '  - ${typedHelper.name} (priority: ${typedHelper.priority})');
+          '  - ${typedHelper.name} (priority: ${typedHelper.priority})',
+        );
       }
     }
   }
 
   /// Get the best streaming helper for the given service and media type (instance method)
   StreamingHelperBase? _getBestHelperInstance(
-      ISmbService smbService, String fileName) {
+    ISmbService smbService,
+    String fileName,
+  ) {
     for (final helper in _helpers) {
       if (helper.isServiceSupported(smbService) &&
           helper.isSupportedMediaType(fileName)) {
         debugPrint(
-            'StreamingServiceManager: Selected ${(helper).name} for $fileName');
+          'StreamingServiceManager: Selected ${(helper).name} for $fileName',
+        );
         return helper;
       }
     }
 
     debugPrint(
-        'StreamingServiceManager: No suitable helper found for $fileName');
+      'StreamingServiceManager: No suitable helper found for $fileName',
+    );
     return null;
   }
 

@@ -48,16 +48,12 @@ Future<void> setupServiceLocator() async {
   // Media and file services
 
   // Register AlbumService for managing photo/video albums
-  locator.registerLazySingleton<AlbumService>(
-    () => AlbumService.instance,
-  );
+  locator.registerLazySingleton<AlbumService>(() => AlbumService.instance);
 
   // Tag management services
 
   // Register TagManager for file tagging functionality
-  locator.registerLazySingleton<TagManager>(
-    () => TagManager.instance,
-  );
+  locator.registerLazySingleton<TagManager>(() => TagManager.instance);
 
   // Register BatchTagManager for batch tag operations
   locator.registerLazySingleton<BatchTagManager>(
@@ -91,9 +87,7 @@ Future<void> setupServiceLocator() async {
   // Register ThemeProvider for theme management
   // Note: This is registered as a factory since it extends ChangeNotifier
   // and we want to ensure proper lifecycle management
-  locator.registerLazySingleton<ThemeProvider>(
-    () => ThemeProvider(),
-  );
+  locator.registerLazySingleton<ThemeProvider>(() => ThemeProvider());
 
   // Register FolderThumbnailService
   locator.registerLazySingleton<FolderThumbnailService>(
@@ -101,9 +95,7 @@ Future<void> setupServiceLocator() async {
   );
 
   // Register LanguageController
-  locator.registerLazySingleton<LanguageController>(
-    () => LanguageController(),
-  );
+  locator.registerLazySingleton<LanguageController>(() => LanguageController());
 
   // Register OperationProgressController (global operation progress UI)
   locator.registerLazySingleton<OperationProgressController>(
@@ -122,9 +114,7 @@ Future<void> setupServiceLocator() async {
   // AI services
 
   // Register AiProviderService for AI provider management and chat
-  locator.registerLazySingleton<AiProviderService>(
-    () => AiProviderService(),
-  );
+  locator.registerLazySingleton<AiProviderService>(() => AiProviderService());
 
   // Register AiChatHistoryService for persisting conversation history
   locator.registerLazySingleton<AiChatHistoryService>(
@@ -145,9 +135,7 @@ Future<void> setupServiceLocator() async {
     () => FileMetadataService(),
   );
 
-  locator.registerLazySingleton<ArchiveService>(
-    () => ArchiveService(),
-  );
+  locator.registerLazySingleton<ArchiveService>(() => ArchiveService());
 
   // Disk cleaner skill — Windows-only, used both by the AI agent's
   // disk_cleaner tools and the companion CB Agent Cleaner screen.

@@ -11,7 +11,7 @@ import '../../../../models/ai/referenced_file.dart';
 class ReferencedFileCard extends StatelessWidget {
   final List<ReferencedFile> files;
 
-  const ReferencedFileCard({Key? key, required this.files}) : super(key: key);
+  const ReferencedFileCard({super.key, required this.files});
 
   @override
   Widget build(BuildContext context) {
@@ -133,8 +133,10 @@ class ReferencedFileCard extends StatelessWidget {
               ),
               if (file.isTextFile)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: accentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),

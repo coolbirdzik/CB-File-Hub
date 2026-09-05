@@ -120,9 +120,7 @@ extension _VlcSmbExt on _VideoPlayerState {
       autoPlay: autoPlay,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions(advancedOptions),
-        video: VlcVideoOptions([
-          '--android-display-chroma=RV32',
-        ]),
+        video: VlcVideoOptions(['--android-display-chroma=RV32']),
         extras: extras,
       ),
     );

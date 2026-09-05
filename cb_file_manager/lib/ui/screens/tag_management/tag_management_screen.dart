@@ -69,11 +69,11 @@ class TagManagementScreen extends StatefulWidget {
   final Function(String)? onTagSelected;
 
   const TagManagementScreen({
-    Key? key,
+    super.key,
     required this.tabId,
     this.startingDirectory = '',
     this.onTagSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<TagManagementScreen> createState() => _TagManagementScreenState();
@@ -110,8 +110,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   // Search functionality
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _addressController =
-      TextEditingController(text: '#tags');
+  final TextEditingController _addressController = TextEditingController(
+    text: '#tags',
+  );
   bool _isSearching = false;
 
   // Pagination variables
@@ -154,8 +155,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   /// [_allTags]. Used by the tree view because [TagHierarchyManager] stores
   /// relationships normalized while [_allTags] keeps original case.
   Map<String, String> get _normalizedToDisplay => {
-        for (final t in _allTags) t.trim().toLowerCase(): t,
-      };
+    for (final t in _allTags) t.trim().toLowerCase(): t,
+  };
 
   // Selection state
   final Set<String> _selectedTags = {};
@@ -265,8 +266,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       event: event,
       onEscape: _handleEscapeShortcut,
       onRefresh: browsingTags ? _refreshTags : _refreshSelectedTagFiles,
-      onSelectAll:
-          browsingTags && _editingTag == null ? _selectAllFilteredTags : null,
+      onSelectAll: browsingTags && _editingTag == null
+          ? _selectAllFilteredTags
+          : null,
       onSearch: browsingTags ? _toggleSearch : null,
       onRename: renameTarget == null
           ? null
@@ -561,8 +563,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           if (mounted) {
             setState(() {
               _allTags = tags.toList();
-              _allTags
-                  .sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+              _allTags.sort(
+                (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
+              );
               _filterTags();
               _isInitialLoading = false;
             });
@@ -572,7 +575,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     } catch (e) {
       if (mounted) {
         AppToast.error(
-            context, '${AppLocalizations.of(context)!.errorLoadingTags}$e');
+          context,
+          '${AppLocalizations.of(context)!.errorLoadingTags}$e',
+        );
         setState(() {
           _allTags = [];
           _filterTags();
@@ -608,8 +613,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       } else {
         // Searching ignores the drill scope and matches across the whole
         // hierarchy so children are always findable.
-        result =
-            _allTags.where((tag) => tag.toLowerCase().contains(query)).toList();
+        result = _allTags
+            .where((tag) => tag.toLowerCase().contains(query))
+            .toList();
       }
 
       // Step 2: Hierarchy filter
@@ -781,7 +787,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       }
     } catch (e) {
       AppLogger.warning(
-          'TagManagementScreen: Error sorting by $_sortCriteria: $e');
+        'TagManagementScreen: Error sorting by $_sortCriteria: $e',
+      );
     }
   }
 
@@ -806,8 +813,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final endIndex = startIndex + _tagsPerPage;
 
     if (startIndex < _filteredTags.length) {
-      _currentPageTags = _filteredTags.sublist(startIndex,
-          endIndex > _filteredTags.length ? _filteredTags.length : endIndex);
+      _currentPageTags = _filteredTags.sublist(
+        startIndex,
+        endIndex > _filteredTags.length ? _filteredTags.length : endIndex,
+      );
     } else {
       _currentPageTags = [];
     }
@@ -885,11 +894,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       } else {
         // No active tab to reuse: open one.
         tabManagerBloc.add(
-          AddTab(
-            path: tagSearchPath,
-            name: 'Tag: $tag',
-            switchToTab: true,
-          ),
+          AddTab(path: tagSearchPath, name: 'Tag: $tag', switchToTab: true),
         );
       }
     } catch (e) {
@@ -913,11 +918,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         tabManagerBloc.add(SwitchToTab(existingTab.id));
       } else {
         tabManagerBloc.add(
-          AddTab(
-            path: tagSearchPath,
-            name: 'Tag: $tag',
-            switchToTab: true,
-          ),
+          AddTab(path: tagSearchPath, name: 'Tag: $tag', switchToTab: true),
         );
       }
     } catch (e) {
@@ -950,7 +951,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     // gesture recogniser, is what keeps the tap itself immediate.
     final DateTime now = DateTime.now();
     final DateTime? last = _lastTagTapAt;
-    final bool isSecondClick = last != null &&
+    final bool isSecondClick =
+        last != null &&
         _pendingSingleTapTag == tag &&
         now.difference(last) <= _doubleTapWindow;
 
@@ -1042,8 +1044,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   void _selectTagsInRect() {
     if (_dragStartPosition == null || _dragCurrentPosition == null) return;
 
-    final selectionRect =
-        Rect.fromPoints(_dragStartPosition!, _dragCurrentPosition!);
+    final selectionRect = Rect.fromPoints(
+      _dragStartPosition!,
+      _dragCurrentPosition!,
+    );
 
     // Check which tags intersect with the selection rectangle
     final Set<String> newlySelected = {};
@@ -1082,16 +1086,19 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     final theme = Theme.of(context);
-    final selectionRect =
-        Rect.fromPoints(_dragStartPosition!, _dragCurrentPosition!);
+    final selectionRect = Rect.fromPoints(
+      _dragStartPosition!,
+      _dragCurrentPosition!,
+    );
 
     return Positioned.fill(
       child: IgnorePointer(
         child: CustomPaint(
           painter: SelectionRectanglePainter(
             selectionRect: selectionRect,
-            fillColor:
-                theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+            fillColor: theme.colorScheme.primaryContainer.withValues(
+              alpha: 0.4,
+            ),
             borderColor: theme.colorScheme.primary,
           ),
         ),
@@ -1194,8 +1201,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           await _deleteTag(t, silent: tagsToDelete.length > 1);
         }
         if (mounted) {
-          AppToast.success(context,
-              'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}');
+          AppToast.success(
+            context,
+            'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}',
+          );
         }
       }
       return;
@@ -1259,10 +1268,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       if (_selectedTagForFiles == tag) {
         _clearTagSelection();
       }
-      operation.succeed(
-        operationId,
-        detail: localizations.tagDeleted(tag),
-      );
+      operation.succeed(operationId, detail: localizations.tagDeleted(tag));
     } catch (e) {
       operation.fail(
         operationId,
@@ -1521,11 +1527,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         await TagManager.deleteTagGlobally(tag);
         await _tagColorManager.removeTagColor(tag);
         completed++;
-        operation.update(
-          operationId,
-          completed: completed,
-          detail: tag,
-        );
+        operation.update(operationId, completed: completed, detail: tag);
       }
 
       _selectedTags.clear();
@@ -1660,8 +1662,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: theme.colorScheme.outlineVariant
-                            .withValues(alpha: 0.3),
+                        color: theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.3,
+                        ),
                       ),
                     ),
                     child: currentThumbnail != null
@@ -1672,21 +1675,24 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                               width: 160,
                               height: 160,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Center(
+                              errorBuilder: (_, _, _) => Center(
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(PhosphorIconsLight.imageSquare,
-                                        size: 48,
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant),
+                                    Icon(
+                                      PhosphorIconsLight.imageSquare,
+                                      size: 48,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
                                     const SizedBox(height: 8),
-                                    Text('File not found',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant,
-                                        )),
+                                    Text(
+                                      'File not found',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1696,17 +1702,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(PhosphorIconsLight.image,
-                                    size: 48,
-                                    color: theme.colorScheme.onSurfaceVariant
-                                        .withValues(alpha: 0.5)),
+                                Icon(
+                                  PhosphorIconsLight.image,
+                                  size: 48,
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                ),
                                 const SizedBox(height: 8),
-                                Text('No thumbnail',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: theme.colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.7),
-                                    )),
+                                Text(
+                                  'No thumbnail',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.7),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -1794,10 +1804,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      child: TagChip(
-                        tag: tag,
-                        customColor: currentColor,
-                      ),
+                      child: TagChip(tag: tag, customColor: currentColor),
                     ),
                     ColorPicker(
                       pickerColor: currentColor,
@@ -1811,10 +1818,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       displayThumbColor: true,
                       labelTypes: const [
                         ColorLabelType.rgb,
-                        ColorLabelType.hsv
+                        ColorLabelType.hsv,
                       ],
-                      pickerAreaBorderRadius:
-                          const BorderRadius.all(Radius.circular(12)),
+                      pickerAreaBorderRadius: const BorderRadius.all(
+                        Radius.circular(12),
+                      ),
                     ),
                   ],
                 ),
@@ -1828,8 +1836,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.of(dialogContext, rootNavigator: true)
-                        .pop(currentColor);
+                    Navigator.of(
+                      dialogContext,
+                      rootNavigator: true,
+                    ).pop(currentColor);
                   },
                   child: Text(localizations.save),
                 ),
@@ -1873,10 +1883,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       // Show skeleton while loading tags for the first time
       body = const Padding(
         padding: EdgeInsets.all(16),
-        child: Skeleton(
-          type: SkeletonType.list,
-          itemCount: 8,
-        ),
+        child: Skeleton(type: SkeletonType.list, itemCount: 8),
       );
     } else if (showingTaggedFiles) {
       body = _buildFilesByTagList();
@@ -1929,12 +1936,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           decoration: InputDecoration(
                             hintText: localizations.searchTagsHint,
                             hintStyle: TextStyle(
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.5),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                             border: InputBorder.none,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
                           ),
                         ),
                       )
@@ -1959,16 +1968,18 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         onPressed: _isLoading
                             ? null
                             : showingTaggedFiles
-                                ? _refreshSelectedTagFiles
-                                : _refreshTags,
+                            ? _refreshSelectedTagFiles
+                            : _refreshTags,
                         tooltip: localizations.refresh,
                       ),
                     ],
                     if (!showingTaggedFiles)
                       IconButton(
-                        icon: Icon(_isSearching
-                            ? PhosphorIconsLight.x
-                            : PhosphorIconsLight.magnifyingGlass),
+                        icon: Icon(
+                          _isSearching
+                              ? PhosphorIconsLight.x
+                              : PhosphorIconsLight.magnifyingGlass,
+                        ),
                         onPressed: _toggleSearch,
                         tooltip: localizations.searchTags,
                       ),
@@ -2123,10 +2134,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         )
         .toInt();
     final clampedZoom = _tagGridZoomLevel
-        .clamp(
-          UserPreferences.minGridZoomLevel,
-          clampedMax,
-        )
+        .clamp(UserPreferences.minGridZoomLevel, clampedMax)
         .toInt();
 
     if (_isMobile) {
@@ -2179,10 +2187,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     _saveTagGridZoom(next);
   }
 
-  Widget _buildSortMenuButton(
-    ThemeData theme,
-    AppLocalizations localizations,
-  ) {
+  Widget _buildSortMenuButton(ThemeData theme, AppLocalizations localizations) {
     return PopupMenuButton<String>(
       tooltip: localizations.sortTags,
       onSelected: _changeSortCriteria,
@@ -2262,9 +2267,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-      ),
+      decoration: BoxDecoration(color: theme.scaffoldBackgroundColor),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -2411,8 +2414,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               },
             ),
             ListTile(
-              leading: Icon(PhosphorIconsLight.trash,
-                  color: theme.colorScheme.error),
+              leading: Icon(
+                PhosphorIconsLight.trash,
+                color: theme.colorScheme.error,
+              ),
               title: Text(
                 localizations.deleteTagFromAllFiles,
                 style: TextStyle(color: theme.colorScheme.error),
@@ -2674,8 +2679,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               icon: const Icon(PhosphorIconsLight.plus),
               label: Text(AppLocalizations.of(context)!.createNewTagButton),
               style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -2695,8 +2702,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              AppLocalizations.of(context)!
-                  .noMatchingTagsMessage(_searchController.text),
+              AppLocalizations.of(
+                context,
+              )!.noMatchingTagsMessage(_searchController.text),
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -2712,8 +2720,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               icon: const Icon(PhosphorIconsLight.x, size: 20),
               label: Text(AppLocalizations.of(context)!.clearSearch),
               style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
             ),
           ],
@@ -2731,8 +2741,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Row(
             children: [
-              Icon(PhosphorIconsLight.tag,
-                  size: 20, color: theme.colorScheme.primary),
+              Icon(
+                PhosphorIconsLight.tag,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -2747,8 +2760,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               if (_selectedTags.isNotEmpty && !_isDesktop) ...[
                 IconButton(
                   icon: const Icon(PhosphorIconsLight.trash, size: 20),
-                  onPressed:
-                      _selectedTags.isNotEmpty ? _confirmBulkDeleteTags : null,
+                  onPressed: _selectedTags.isNotEmpty
+                      ? _confirmBulkDeleteTags
+                      : null,
                   tooltip: localizations.deleteSelected,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -2768,9 +2782,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           _buildActiveFiltersBar(theme),
 
         // Tags list, grid or tree
-        Expanded(
-          child: _buildTagsContent(),
-        ),
+        Expanded(child: _buildTagsContent()),
 
         // Bottom pagination controls
         if (_totalPages > 1)
@@ -2810,15 +2822,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   PopupMenuItem<String> _buildSortMenuItem(
-      String value, IconData icon, String label) {
+    String value,
+    IconData icon,
+    String label,
+  ) {
     final theme = Theme.of(context);
     final isActive = _sortCriteria == value;
     return PopupMenuItem(
       value: value,
       child: Row(
         children: [
-          Icon(icon,
-              size: 18, color: isActive ? theme.colorScheme.primary : null),
+          Icon(
+            icon,
+            size: 18,
+            color: isActive ? theme.colorScheme.primary : null,
+          ),
           const SizedBox(width: 12),
           Text(label),
           if (isActive)
@@ -2838,7 +2856,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
   /// Filter button with badge showing active filter count.
   Widget _buildFilterButton(ThemeData theme, AppLocalizations localizations) {
-    final activeCount = (_hierarchyFilter != 'all' ? 1 : 0) +
+    final activeCount =
+        (_hierarchyFilter != 'all' ? 1 : 0) +
         (_thumbnailFilter != 'all' ? 1 : 0);
     final hasActive = activeCount > 0;
 
@@ -2906,44 +2925,47 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           label = '';
           icon = PhosphorIconsLight.funnel;
       }
-      chips.add(_buildFilterChip(
-        theme,
-        label: label,
-        icon: icon,
-        onRemove: () {
-          setState(() => _hierarchyFilter = 'all');
-          _filterTags();
-        },
-      ));
+      chips.add(
+        _buildFilterChip(
+          theme,
+          label: label,
+          icon: icon,
+          onRemove: () {
+            setState(() => _hierarchyFilter = 'all');
+            _filterTags();
+          },
+        ),
+      );
     }
 
     if (_thumbnailFilter != 'all') {
-      chips.add(_buildFilterChip(
-        theme,
-        label: _thumbnailFilter == 'with' ? 'Has thumbnail' : 'No thumbnail',
-        icon: PhosphorIconsLight.image,
-        onRemove: () {
-          setState(() => _thumbnailFilter = 'all');
-          _filterTags();
-        },
-      ));
+      chips.add(
+        _buildFilterChip(
+          theme,
+          label: _thumbnailFilter == 'with' ? 'Has thumbnail' : 'No thumbnail',
+          icon: PhosphorIconsLight.image,
+          onRemove: () {
+            setState(() => _thumbnailFilter = 'all');
+            _filterTags();
+          },
+        ),
+      );
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          Icon(PhosphorIconsLight.funnel,
-              size: 14,
-              color: theme.colorScheme.primary.withValues(alpha: 0.7)),
+          Icon(
+            PhosphorIconsLight.funnel,
+            size: 14,
+            color: theme.colorScheme.primary.withValues(alpha: 0.7),
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Wrap(
-                spacing: 6,
-                children: chips,
-              ),
+              child: Wrap(spacing: 6, children: chips),
             ),
           ),
           TextButton(
@@ -2980,11 +3002,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       onDeleted: onRemove,
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      backgroundColor:
-          theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-      side: BorderSide(
-        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+      backgroundColor: theme.colorScheme.primaryContainer.withValues(
+        alpha: 0.3,
       ),
+      side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
     );
   }
 
@@ -3000,8 +3021,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             return AlertDialog(
               title: Row(
                 children: [
-                  Icon(PhosphorIconsLight.funnel,
-                      size: 20, color: theme.colorScheme.primary),
+                  Icon(
+                    PhosphorIconsLight.funnel,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 8),
                   const Text('Filter tags'),
                 ],
@@ -3012,12 +3036,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Hierarchy',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: theme.colorScheme.primary,
-                        )),
+                    Text(
+                      'Hierarchy',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -3036,7 +3062,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           icon: PhosphorIconsLight.treeStructure,
                           selected: _hierarchyFilter == 'parents',
                           onTap: () => setDialogState(
-                              () => _hierarchyFilter = 'parents'),
+                            () => _hierarchyFilter = 'parents',
+                          ),
                         ),
                         _buildFilterOption(
                           theme,
@@ -3044,7 +3071,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           icon: PhosphorIconsLight.arrowBendUpLeft,
                           selected: _hierarchyFilter == 'children',
                           onTap: () => setDialogState(
-                              () => _hierarchyFilter = 'children'),
+                            () => _hierarchyFilter = 'children',
+                          ),
                         ),
                         _buildFilterOption(
                           theme,
@@ -3052,17 +3080,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           icon: PhosphorIconsLight.tag,
                           selected: _hierarchyFilter == 'standalone',
                           onTap: () => setDialogState(
-                              () => _hierarchyFilter = 'standalone'),
+                            () => _hierarchyFilter = 'standalone',
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
-                    Text('Thumbnail',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: theme.colorScheme.primary,
-                        )),
+                    Text(
+                      'Thumbnail',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -3089,7 +3120,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           icon: PhosphorIconsLight.imageBroken,
                           selected: _thumbnailFilter == 'without',
                           onTap: () => setDialogState(
-                              () => _thumbnailFilter = 'without'),
+                            () => _thumbnailFilter = 'without',
+                          ),
                         ),
                       ],
                     ),
@@ -3136,8 +3168,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         decoration: BoxDecoration(
           color: selected
               ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.4),
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.4,
+                ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
@@ -3150,11 +3183,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon,
-                  size: 14,
-                  color: selected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant),
+              Icon(
+                icon,
+                size: 14,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
             ],
             Text(
@@ -3186,18 +3221,26 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     if (endPage >= _totalPages) {
-      startPage =
-          (startPage - (endPage - _totalPages + 1)).clamp(0, _totalPages - 1);
+      startPage = (startPage - (endPage - _totalPages + 1)).clamp(
+        0,
+        _totalPages - 1,
+      );
       endPage = _totalPages - 1;
     }
 
     if (startPage > 0) {
-      indicators.add(Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text('...',
+      indicators.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            '...',
             style: TextStyle(
-                fontSize: 16, color: theme.colorScheme.onSurfaceVariant)),
-      ));
+              fontSize: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
     }
 
     for (int i = startPage; i <= endPage; i++) {
@@ -3219,8 +3262,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 '${i + 1}',
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight:
-                      i == _currentPage ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: i == _currentPage
+                      ? FontWeight.w600
+                      : FontWeight.normal,
                   color: i == _currentPage
                       ? theme.colorScheme.onPrimary
                       : theme.colorScheme.onSurfaceVariant,
@@ -3233,20 +3277,29 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     }
 
     if (endPage < _totalPages - 1) {
-      indicators.add(Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text('...',
+      indicators.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            '...',
             style: TextStyle(
-                fontSize: 16, color: theme.colorScheme.onSurfaceVariant)),
-      ));
+              fontSize: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
     }
 
     return indicators;
   }
 
   /// Builds a thumbnail image or a color dot fallback for a tag.
-  Widget _buildTagThumbnailOrDot(String tag, Color tagColor,
-      {double size = 40}) {
+  Widget _buildTagThumbnailOrDot(
+    String tag,
+    Color tagColor, {
+    double size = 40,
+  }) {
     final thumbnailPath = _tagThumbnailManager.getThumbnailSync(tag);
     if (thumbnailPath != null) {
       return ClipRRect(
@@ -3256,7 +3309,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             width: size,
             height: size,
             decoration: BoxDecoration(
@@ -3294,7 +3347,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               : BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          errorBuilder: (_, __, ___) => _buildTagCardThumbnailPlaceholder(
+          errorBuilder: (_, _, _) => _buildTagCardThumbnailPlaceholder(
             tagColor,
             PhosphorIconsLight.image,
           ),
@@ -3327,8 +3380,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   /// Builds a small hierarchy context label below the tag name.
-  Widget _buildHierarchyContext(String tag, ThemeData theme,
-      {bool centered = false}) {
+  Widget _buildHierarchyContext(
+    String tag,
+    ThemeData theme, {
+    bool centered = false,
+  }) {
     final parents = _tagHierarchyManager.getParents(tag);
     final children = _tagHierarchyManager.getChildren(tag);
 
@@ -3337,8 +3393,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     return Padding(
       padding: const EdgeInsets.only(top: 3),
       child: Column(
-        crossAxisAlignment:
-            centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        crossAxisAlignment: centered
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (parents.isNotEmpty)
@@ -3393,8 +3450,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   /// Build a single tag list tile with proper widget key for position tracking
-  Widget _buildTagListTile(String tag, int index, Color tagColor,
-      bool isEditing, bool isSelected, bool isFocused) {
+  Widget _buildTagListTile(
+    String tag,
+    int index,
+    Color tagColor,
+    bool isEditing,
+    bool isSelected,
+    bool isFocused,
+  ) {
     final theme = Theme.of(context);
     final isDesktop = _isDesktop;
 
@@ -3409,9 +3472,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               final position = renderBox.localToGlobal(Offset.zero);
               final size = renderBox.size;
               _registerTagPosition(
-                  tag,
-                  Rect.fromLTWH(
-                      position.dx, position.dy, size.width, size.height));
+                tag,
+                Rect.fromLTWH(
+                  position.dx,
+                  position.dy,
+                  size.width,
+                  size.height,
+                ),
+              );
             }
           }
         });
@@ -3427,19 +3495,21 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           child: GestureDetector(
             onSecondaryTapUp: isEditing
                 ? null
-                : (details) => _showTagOptions(tag,
-                    globalPosition: details.globalPosition),
+                : (details) => _showTagOptions(
+                    tag,
+                    globalPosition: details.globalPosition,
+                  ),
             child: ListTile(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16.0),
                 side: isEditing
                     ? BorderSide(color: theme.colorScheme.primary, width: 2)
                     : isSelected || isFocused
-                        ? BorderSide(
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.5),
-                            width: 1.5)
-                        : BorderSide.none,
+                    ? BorderSide(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                        width: 1.5,
+                      )
+                    : BorderSide.none,
               ),
               tileColor: isSelected || isFocused
                   ? theme.colorScheme.primary.withValues(alpha: 0.12)
@@ -3483,12 +3553,15 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                               if (isDesktop) ...[
                                 const SizedBox(width: 4),
                                 CbTooltip(
-                                  message: AppLocalizations.of(context)!
-                                      .doubleClickToRename,
-                                  child: Icon(PhosphorIconsLight.pencilSimple,
-                                      size: 14,
-                                      color: theme.colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.5)),
+                                  message: AppLocalizations.of(
+                                    context,
+                                  )!.doubleClickToRename,
+                                  child: Icon(
+                                    PhosphorIconsLight.pencilSimple,
+                                    size: 14,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.5),
+                                  ),
                                 ),
                               ],
                             ],
@@ -3503,11 +3576,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.pencilSimple,
-                        size: 20,
-                        color: isEditing
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                            : theme.colorScheme.onSurfaceVariant),
+                    icon: Icon(
+                      PhosphorIconsLight.pencilSimple,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                     onPressed: isEditing
                         ? null
                         : () {
@@ -3521,45 +3596,55 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.folder,
-                        size: 20,
-                        color: isEditing
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                            : theme.colorScheme.primary),
+                    icon: Icon(
+                      PhosphorIconsLight.folder,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.primary,
+                    ),
                     onPressed: isEditing ? null : () => _directTagSearch(tag),
                     tooltip: AppLocalizations.of(context)!.viewFilesWithTag,
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.palette,
-                        size: 20,
-                        color: isEditing
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                            : theme.colorScheme.onSurfaceVariant),
-                    onPressed:
-                        isEditing ? null : () => _showColorPickerDialog(tag),
+                    icon: Icon(
+                      PhosphorIconsLight.palette,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: isEditing
+                        ? null
+                        : () => _showColorPickerDialog(tag),
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.image,
-                        size: 20,
-                        color: isEditing
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                            : theme.colorScheme.onSurfaceVariant),
-                    onPressed:
-                        isEditing ? null : () => _showThumbnailPicker(tag),
+                    icon: Icon(
+                      PhosphorIconsLight.image,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: isEditing
+                        ? null
+                        : () => _showThumbnailPicker(tag),
                     tooltip: 'Set thumbnail',
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.treeStructure,
-                        size: 20,
-                        color: isEditing
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                            : (_tagHierarchyManager.isParent(tag) ||
+                    icon: Icon(
+                      PhosphorIconsLight.treeStructure,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : (_tagHierarchyManager.isParent(tag) ||
                                     _tagHierarchyManager.isChild(tag)
                                 ? theme.colorScheme.tertiary
-                                : theme.colorScheme.onSurfaceVariant)),
+                                : theme.colorScheme.onSurfaceVariant),
+                    ),
                     onPressed: isEditing
                         ? null
                         : () => _showManageHierarchyDialog(tag),
@@ -3567,11 +3652,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    icon: Icon(PhosphorIconsLight.trash,
-                        size: 20,
-                        color: isEditing
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
-                            : theme.colorScheme.error.withValues(alpha: 0.7)),
+                    icon: Icon(
+                      PhosphorIconsLight.trash,
+                      size: 20,
+                      color: isEditing
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
+                          : theme.colorScheme.error.withValues(alpha: 0.7),
+                    ),
                     onPressed: isEditing ? null : () => _confirmDeleteTag(tag),
                     visualDensity: VisualDensity.compact,
                   ),
@@ -3630,17 +3717,19 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     // child to an existing parent also invalidates the cache.
     final rootParents = _tagHierarchyManager.getRootParents();
     final hierarchyTree = _tagHierarchyManager.getHierarchyTree();
-    final hierarchySig = (hierarchyTree.entries.toList()
-          ..sort((a, b) => a.key.compareTo(b.key)))
-        .map((e) => '${e.key}>${e.value.join("+")}')
-        .join("|");
+    final hierarchySig =
+        (hierarchyTree.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))
+            .map((e) => '${e.key}>${e.value.join("+")}')
+            .join("|");
     final sig = '${_allTags.length}|$hierarchySig';
     if (sig != _treeRootsSignature) {
       _treeRootsSignature = sig;
       final standalone = _allTags
-          .where((t) =>
-              !_tagHierarchyManager.isParent(t) &&
-              !_tagHierarchyManager.isChild(t))
+          .where(
+            (t) =>
+                !_tagHierarchyManager.isParent(t) &&
+                !_tagHierarchyManager.isChild(t),
+          )
           .toList();
 
       // [tag] here is a NORMALIZED hierarchy name; nodes store the display
@@ -3717,10 +3806,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         // both open and select.
         onTap: (node) => _selectTag(node.data),
         onDoubleTap: (node) => _directTagSearch(node.data),
-        onSecondary: (node, globalPosition) => _showTagOptions(
-          node.data,
-          globalPosition: globalPosition,
-        ),
+        onSecondary: (node, globalPosition) =>
+            _showTagOptions(node.data, globalPosition: globalPosition),
         emptyState: Center(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -3789,10 +3876,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) =>
           _canDropTagOnParent(details.data, tag),
-      onAcceptWithDetails: (details) => _moveTagUnderParent(
-        childTag: details.data,
-        parentTag: tag,
-      ),
+      onAcceptWithDetails: (details) =>
+          _moveTagUnderParent(childTag: details.data, parentTag: tag),
       builder: (context, candidateData, rejectedData) {
         if (candidateData.isEmpty) return draggable;
         return DecoratedBox(
@@ -3841,9 +3926,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   if (focusedContext != null) {
                     final isEditableText =
                         focusedContext.widget is EditableText ||
-                            focusedContext.findAncestorWidgetOfExactType<
-                                    EditableText>() !=
-                                null;
+                        focusedContext
+                                .findAncestorWidgetOfExactType<
+                                  EditableText
+                                >() !=
+                            null;
                     if (isEditableText) {
                       return; // Don't start drag selection
                     }
@@ -3863,10 +3950,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               : null,
           behavior: HitTestBehavior.translucent,
           child: ListView.separated(
-            padding:
-                const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8),
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 8,
+              bottom: 8,
+            ),
             itemCount: _currentPageTags.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final tag = _currentPageTags[index];
               final tagColor = TagColorManager.instance.getTagColor(tag);
@@ -3875,7 +3966,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               final isFocused = _focusedTag == tag;
 
               return _buildTagListTile(
-                  tag, index, tagColor, isEditing, isSelected, isFocused);
+                tag,
+                index,
+                tagColor,
+                isEditing,
+                isSelected,
+                isFocused,
+              );
             },
           ),
         ),
@@ -3919,8 +4016,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }) {
     final l10n = AppLocalizations.of(context)!;
     final compact = maxWidth < 144;
-    final effectiveIconSize =
-        compact ? (iconSize - 2).clamp(14.0, 18.0) : iconSize;
+    final effectiveIconSize = compact
+        ? (iconSize - 2).clamp(14.0, 18.0)
+        : iconSize;
     final buttonPadding = compact ? 4.0 : 7.0;
     return Material(
       color: Colors.transparent,
@@ -4072,9 +4170,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   if (focusedContext != null) {
                     final isEditableText =
                         focusedContext.widget is EditableText ||
-                            focusedContext.findAncestorWidgetOfExactType<
-                                    EditableText>() !=
-                                null;
+                        focusedContext
+                                .findAncestorWidgetOfExactType<
+                                  EditableText
+                                >() !=
+                            null;
                     if (isEditableText) {
                       return; // Don't start drag selection
                     }
@@ -4125,9 +4225,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         final position = renderBox.localToGlobal(Offset.zero);
                         final size = renderBox.size;
                         _registerTagPosition(
-                            tag,
-                            Rect.fromLTWH(position.dx, position.dy, size.width,
-                                size.height));
+                          tag,
+                          Rect.fromLTWH(
+                            position.dx,
+                            position.dy,
+                            size.width,
+                            size.height,
+                          ),
+                        );
                       }
                     }
                   });
@@ -4149,22 +4254,25 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         // before reporting it. _handleTagTap does the
                         // double-click detection itself instead.
                         onTap: isEditing ? null : () => _handleTagTap(tag),
-                        onLongPress:
-                            isEditing ? null : () => _showTagOptions(tag),
+                        onLongPress: isEditing
+                            ? null
+                            : () => _showTagOptions(tag),
                         onSecondaryTapUp: isEditing
                             ? null
                             : (details) => _showTagOptions(
-                                  tag,
-                                  globalPosition: details.globalPosition,
-                                ),
+                                tag,
+                                globalPosition: details.globalPosition,
+                              ),
                         child: Stack(
                           children: [
                             Positioned.fill(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16.0),
                                 child: BackdropFilter(
-                                  filter:
-                                      ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                                  filter: ImageFilter.blur(
+                                    sigmaX: 14,
+                                    sigmaY: 14,
+                                  ),
                                   child: Container(
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
@@ -4182,7 +4290,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                     .withValues(alpha: 0.34),
                                                 Color.alphaBlend(
                                                   tagColor.withValues(
-                                                      alpha: 0.10),
+                                                    alpha: 0.10,
+                                                  ),
                                                   theme.colorScheme.surface
                                                       .withValues(alpha: 0.22),
                                                 ),
@@ -4193,20 +4302,22 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                         color: isEditing
                                             ? theme.colorScheme.primary
                                             : isSelected || isFocused
-                                                ? theme.colorScheme.primary
-                                                    .withValues(alpha: 0.55)
-                                                : Colors.white
-                                                    .withValues(alpha: 0.14),
+                                            ? theme.colorScheme.primary
+                                                  .withValues(alpha: 0.55)
+                                            : Colors.white.withValues(
+                                                alpha: 0.14,
+                                              ),
                                         width: isEditing
                                             ? 2
                                             : isSelected || isFocused
-                                                ? 1.5
-                                                : 1,
+                                            ? 1.5
+                                            : 1,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.08),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.08,
+                                          ),
                                           blurRadius: 18,
                                           offset: const Offset(0, 8),
                                         ),
@@ -4220,21 +4331,22 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                         Expanded(
                                           child: _HoverReveal(
                                             enabled: isDesktop && !isEditing,
-                                            builder: (context, hovering) =>
-                                                Stack(
+                                            builder: (context, hovering) => Stack(
                                               clipBehavior: Clip.none,
                                               children: [
                                                 Positioned.fill(
                                                   child: ClipRRect(
                                                     borderRadius:
-                                                        const BorderRadius
-                                                            .vertical(
-                                                      top:
-                                                          Radius.circular(16.0),
-                                                    ),
+                                                        const BorderRadius.vertical(
+                                                          top: Radius.circular(
+                                                            16.0,
+                                                          ),
+                                                        ),
                                                     child:
                                                         _buildTagCardThumbnailFill(
-                                                            tag, tagColor),
+                                                          tag,
+                                                          tagColor,
+                                                        ),
                                                   ),
                                                 ),
                                                 // Desktop: floating action toolbar
@@ -4249,14 +4361,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                     child: Center(
                                                       child: AnimatedSlide(
                                                         offset: Offset(
-                                                            0,
-                                                            hovering
-                                                                ? 0
-                                                                : 0.35),
+                                                          0,
+                                                          hovering ? 0 : 0.35,
+                                                        ),
                                                         duration:
                                                             const Duration(
-                                                                milliseconds:
-                                                                    160),
+                                                              milliseconds: 160,
+                                                            ),
                                                         curve:
                                                             Curves.easeOutCubic,
                                                         child: AnimatedOpacity(
@@ -4265,17 +4376,19 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                               : 0.0,
                                                           duration:
                                                               const Duration(
-                                                                  milliseconds:
-                                                                      160),
+                                                                milliseconds:
+                                                                    160,
+                                                              ),
                                                           child: IgnorePointer(
                                                             ignoring: !hovering,
                                                             child: _buildTagHoverToolbar(
-                                                                tag,
-                                                                theme,
-                                                                iconSize,
-                                                                maxWidth:
-                                                                    constraints
-                                                                        .maxWidth),
+                                                              tag,
+                                                              theme,
+                                                              iconSize,
+                                                              maxWidth:
+                                                                  constraints
+                                                                      .maxWidth,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
@@ -4288,7 +4401,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                     right: 4,
                                                     child:
                                                         _buildTagOverflowButton(
-                                                            tag, theme),
+                                                          tag,
+                                                          theme,
+                                                        ),
                                                   ),
                                               ],
                                             ),
@@ -4302,8 +4417,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                 .withValues(alpha: 0.28),
                                             border: Border(
                                               top: BorderSide(
-                                                color: Colors.white
-                                                    .withValues(alpha: 0.12),
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.12,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -4333,7 +4449,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                         fontSize: fontSize,
                                                         fontWeight:
                                                             FontWeight.w600,
-                                                        color: theme.colorScheme
+                                                        color: theme
+                                                            .colorScheme
                                                             .onSurface,
                                                       ),
                                                       textAlign:
@@ -4344,19 +4461,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                     ),
                                                     editorBuilder: (context) =>
                                                         _buildTagRenameField(
-                                                      tag,
-                                                      fontSize: fontSize,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      maxLines:
-                                                          cbInlineRenameMaxLines,
-                                                    ),
+                                                          tag,
+                                                          fontSize: fontSize,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          maxLines:
+                                                              cbInlineRenameMaxLines,
+                                                        ),
                                                   )
                                                 else
                                                   CbTooltip(
-                                                    message: _tagHierarchyManager
+                                                    message:
+                                                        _tagHierarchyManager
                                                             .isParent(tag)
                                                         ? 'Double click to open child tags'
                                                         : 'Double click to open files',
@@ -4365,14 +4483,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                         Text(
                                                           tag,
                                                           style: TextStyle(
-                                                              fontSize:
-                                                                  fontSize,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                              color: theme
-                                                                  .colorScheme
-                                                                  .onSurface),
+                                                            fontSize: fontSize,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: theme
+                                                                .colorScheme
+                                                                .onSurface,
+                                                          ),
                                                           textAlign:
                                                               TextAlign.center,
                                                           maxLines: 2,
@@ -4380,8 +4497,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                                                               .ellipsis,
                                                         ),
                                                         _buildHierarchyContext(
-                                                            tag, theme,
-                                                            centered: true),
+                                                          tag,
+                                                          theme,
+                                                          centered: true,
+                                                        ),
                                                       ],
                                                     ),
                                                   ),
@@ -4440,8 +4559,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              AppLocalizations.of(context)!
-                  .debugInfo(_selectedTagForFiles ?? 'none'),
+              AppLocalizations.of(
+                context,
+              )!.debugInfo(_selectedTagForFiles ?? 'none'),
               style: TextStyle(
                 fontSize: 13,
                 color: theme.colorScheme.onSurfaceVariant,
@@ -4458,8 +4578,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton.icon(
-                  icon:
-                      const Icon(PhosphorIconsLight.arrowsClockwise, size: 20),
+                  icon: const Icon(
+                    PhosphorIconsLight.arrowsClockwise,
+                    size: 20,
+                  ),
                   label: Text(AppLocalizations.of(context)!.tryAgain),
                   onPressed: _selectedTagForFiles != null
                       ? () => _directTagSearch(_selectedTagForFiles!)
@@ -4484,11 +4606,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             children: [
               if (_selectedTagForFiles != null)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: TagColorManager.instance
-                        .getTagColor(_selectedTagForFiles!),
+                    color: TagColorManager.instance.getTagColor(
+                      _selectedTagForFiles!,
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -4530,8 +4655,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         ),
         Expanded(
           child: ListView.builder(
-            padding:
-                const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 12.0,
+              horizontal: 16.0,
+            ),
             itemCount: _filesBySelectedTag.length,
             itemBuilder: (context, index) {
               final file = _filesBySelectedTag[index];
@@ -4551,12 +4678,15 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer
-                              .withValues(alpha: 0.5),
+                          color: theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.5,
+                          ),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -4592,9 +4722,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => FileDetailsScreen(
-                              file: File(path),
-                            ),
+                            builder: (context) =>
+                                FileDetailsScreen(file: File(path)),
                           ),
                         );
                       },
@@ -4624,11 +4753,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color:
-                      theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  color: theme.colorScheme.primaryContainer.withValues(
+                    alpha: 0.3,
+                  ),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4663,9 +4795,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => FileDetailsScreen(
-                        file: file,
-                      ),
+                      builder: (context) => FileDetailsScreen(file: file),
                     ),
                   );
                 },
@@ -4687,10 +4817,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => FileDetailsScreen(
-                        file: file,
-                        initialTab: 1,
-                      ),
+                      builder: (context) =>
+                          FileDetailsScreen(file: file, initialTab: 1),
                     ),
                   );
                 },
@@ -4725,10 +4853,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   helperMaxLines: 3,
                   helperStyle: TextStyle(
                     fontSize: 11,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant
-                        .withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                   ),
                 ),
                 autofocus: true,
@@ -4856,8 +4983,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     if (parentName.isEmpty || childrenPart.isEmpty) {
       if (mounted) {
-        AppToast.warning(context,
-            'Invalid format. Use parent:child or parent:child1,child2');
+        AppToast.warning(
+          context,
+          'Invalid format. Use parent:child or parent:child1,child2',
+        );
       }
       return;
     }
@@ -4877,8 +5006,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
     try {
       // Ensure parent tag exists
-      final parentExists =
-          _allTags.any((t) => t.toLowerCase() == parentName.toLowerCase());
+      final parentExists = _allTags.any(
+        (t) => t.toLowerCase() == parentName.toLowerCase(),
+      );
       if (!parentExists) {
         await TagManager.addStandaloneTag(parentName);
         _standaloneCreatedTags.add(parentName);
@@ -4887,8 +5017,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       // Create child tags and hierarchy relationships
       int createdCount = 0;
       for (final childName in childNames) {
-        final childExists =
-            _allTags.any((t) => t.toLowerCase() == childName.toLowerCase());
+        final childExists = _allTags.any(
+          (t) => t.toLowerCase() == childName.toLowerCase(),
+        );
         if (!childExists) {
           await TagManager.addStandaloneTag(childName);
           _standaloneCreatedTags.add(childName);
@@ -4899,8 +5030,10 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           createdCount++;
         } else {
           if (mounted) {
-            AppToast.warning(context,
-                'Could not create relationship: $parentName -> $childName (circular reference?)');
+            AppToast.warning(
+              context,
+              'Could not create relationship: $parentName -> $childName (circular reference?)',
+            );
           }
         }
       }
@@ -4925,14 +5058,18 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       });
 
       if (mounted) {
-        AppToast.success(context,
-            'Created hierarchy: $parentName -> ${childNames.join(", ")} ($createdCount relationships)');
+        AppToast.success(
+          context,
+          'Created hierarchy: $parentName -> ${childNames.join(", ")} ($createdCount relationships)',
+        );
       }
     } catch (e) {
       AppLogger.warning('Error creating hierarchy tag: $e');
       if (mounted) {
         AppToast.error(
-            context, AppLocalizations.of(context)!.saveTagFailed(e.toString()));
+          context,
+          AppLocalizations.of(context)!.saveTagFailed(e.toString()),
+        );
       }
     }
   }
@@ -5009,8 +5146,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           '${AppLocalizations.of(context)!.openingFolder}$folderPath',
         );
 
-        final bool isInTabContext = context.findAncestorWidgetOfExactType<
-                BlocProvider<TabManagerBloc>>() !=
+        final bool isInTabContext =
+            context
+                .findAncestorWidgetOfExactType<
+                  BlocProvider<TabManagerBloc>
+                >() !=
             null;
 
         if (isInTabContext) {
@@ -5027,11 +5167,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             } else {
               final folderName = pathlib.basename(folderPath);
               tabManagerBloc.add(
-                AddTab(
-                  path: folderPath,
-                  name: folderName,
-                  switchToTab: true,
-                ),
+                AddTab(path: folderPath, name: folderName, switchToTab: true),
               );
             }
             // ignore: empty_catches
@@ -5137,14 +5273,17 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     if (childName.trim().isEmpty) return;
 
     // Create tag if it doesn't exist
-    final exists =
-        widget.allTags.any((t) => t.toLowerCase() == childName.toLowerCase());
+    final exists = widget.allTags.any(
+      (t) => t.toLowerCase() == childName.toLowerCase(),
+    );
     if (!exists) {
       await TagManager.addStandaloneTag(childName.trim());
     }
 
-    final ok =
-        await widget.hierarchyManager.addChild(widget.tag, childName.trim());
+    final ok = await widget.hierarchyManager.addChild(
+      widget.tag,
+      childName.trim(),
+    );
     if (ok) {
       _addChildController.clear();
       _refresh();
@@ -5153,8 +5292,10 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                'Cannot add "$childName" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error')),
+          content: Text(
+            'Cannot add "$childName" ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error',
+          ),
+        ),
       );
     }
   }
@@ -5169,14 +5310,17 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
   Future<void> _addParent(String parentName) async {
     if (parentName.trim().isEmpty) return;
 
-    final exists =
-        widget.allTags.any((t) => t.toLowerCase() == parentName.toLowerCase());
+    final exists = widget.allTags.any(
+      (t) => t.toLowerCase() == parentName.toLowerCase(),
+    );
     if (!exists) {
       await TagManager.addStandaloneTag(parentName.trim());
     }
 
-    final ok =
-        await widget.hierarchyManager.addChild(parentName.trim(), widget.tag);
+    final ok = await widget.hierarchyManager.addChild(
+      parentName.trim(),
+      widget.tag,
+    );
     if (ok) {
       _setParentController.clear();
       _refresh();
@@ -5185,8 +5329,10 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                'Cannot set "$parentName" as parent ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error')),
+          content: Text(
+            'Cannot set "$parentName" as parent ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â circular reference or error',
+          ),
+        ),
       );
     }
   }
@@ -5205,12 +5351,17 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(PhosphorIconsLight.treeStructure,
-              size: 22, color: theme.colorScheme.primary),
+          Icon(
+            PhosphorIconsLight.treeStructure,
+            size: 22,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('Hierarchy: "${widget.tag}"',
-                style: const TextStyle(fontSize: 18)),
+            child: Text(
+              'Hierarchy: "${widget.tag}"',
+              style: const TextStyle(fontSize: 18),
+            ),
           ),
         ],
       ),
@@ -5222,41 +5373,55 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Parents section ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
-              Text('Parents',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.primary,
-                  )),
+              Text(
+                'Parents',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
               const SizedBox(height: 6),
               if (_parents.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('No parent tags',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                        fontStyle: FontStyle.italic,
-                      )),
+                  child: Text(
+                    'No parent tags',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
                 )
               else
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: _parents
-                      .map((parent) => Chip(
-                            avatar: Icon(PhosphorIconsLight.arrowBendUpLeft,
-                                size: 14, color: theme.colorScheme.primary),
-                            label: Text(parent,
-                                style: const TextStyle(fontSize: 13)),
-                            deleteIcon:
-                                const Icon(PhosphorIconsLight.x, size: 14),
-                            onDeleted: () => _removeParent(parent),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ))
+                      .map(
+                        (parent) => Chip(
+                          avatar: Icon(
+                            PhosphorIconsLight.arrowBendUpLeft,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          ),
+                          label: Text(
+                            parent,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          deleteIcon: const Icon(
+                            PhosphorIconsLight.x,
+                            size: 14,
+                          ),
+                          onDeleted: () => _removeParent(parent),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
                       .toList(),
                 ),
               const SizedBox(height: 6),
@@ -5271,46 +5436,60 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
 
               const SizedBox(height: 20),
               Divider(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
               const SizedBox(height: 12),
 
               // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ Children section ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬
-              Text('Children',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.tertiary,
-                  )),
+              Text(
+                'Children',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ),
               const SizedBox(height: 6),
               if (_children.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('No child tags',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                        fontStyle: FontStyle.italic,
-                      )),
+                  child: Text(
+                    'No child tags',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
                 )
               else
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: _children
-                      .map((child) => Chip(
-                            avatar: Icon(PhosphorIconsLight.treeStructure,
-                                size: 14, color: theme.colorScheme.tertiary),
-                            label: Text(child,
-                                style: const TextStyle(fontSize: 13)),
-                            deleteIcon:
-                                const Icon(PhosphorIconsLight.x, size: 14),
-                            onDeleted: () => _removeChild(child),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ))
+                      .map(
+                        (child) => Chip(
+                          avatar: Icon(
+                            PhosphorIconsLight.treeStructure,
+                            size: 14,
+                            color: theme.colorScheme.tertiary,
+                          ),
+                          label: Text(
+                            child,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          deleteIcon: const Icon(
+                            PhosphorIconsLight.x,
+                            size: 14,
+                          ),
+                          onDeleted: () => _removeChild(child),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
                       .toList(),
                 ),
               const SizedBox(height: 6),
@@ -5362,13 +5541,15 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
           decoration: InputDecoration(
             hintText: hint,
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
             ),
             suffixIcon: IconButton(
               icon: const Icon(PhosphorIconsLight.plus, size: 18),
@@ -5397,8 +5578,8 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               color: theme.colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
             ),
             child: ListView.builder(
               shrinkWrap: true,
@@ -5409,14 +5590,19 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                 return InkWell(
                   onTap: () => onSubmit(suggestion),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
-                        Icon(PhosphorIconsLight.tag,
-                            size: 14,
-                            color: TagColorManager.instance
-                                .getTagColor(suggestion)),
+                        Icon(
+                          PhosphorIconsLight.tag,
+                          size: 14,
+                          color: TagColorManager.instance.getTagColor(
+                            suggestion,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         Text(suggestion, style: const TextStyle(fontSize: 13)),
                       ],
@@ -5447,7 +5633,6 @@ class _TagTreeRowContent extends StatelessWidget {
   final Widget? renameField;
 
   const _TagTreeRowContent({
-    Key? key,
     required this.tag,
     required this.tagColor,
     required this.thumbnailSize,
@@ -5455,7 +5640,7 @@ class _TagTreeRowContent extends StatelessWidget {
     required this.spacing,
     required this.buildThumbnail,
     this.renameField,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -5465,7 +5650,8 @@ class _TagTreeRowContent extends StatelessWidget {
         buildThumbnail(thumbnailSize),
         SizedBox(width: spacing),
         Expanded(
-          child: renameField ??
+          child:
+              renameField ??
               Text(
                 tag,
                 style: TextStyle(
@@ -5492,11 +5678,7 @@ class _HoverReveal extends StatefulWidget {
   final bool enabled;
   final Widget Function(BuildContext context, bool hovering) builder;
 
-  const _HoverReveal({
-    Key? key,
-    required this.enabled,
-    required this.builder,
-  }) : super(key: key);
+  const _HoverReveal({required this.enabled, required this.builder});
 
   @override
   State<_HoverReveal> createState() => _HoverRevealState();

@@ -114,6 +114,5 @@ class E2ESandboxPaths extends PathProviderPlatform {
   @override
   Future<List<String>?> getExternalStoragePaths({
     StorageDirectory? type,
-  }) async =>
-      [await _sub('documents')];
+  }) async => [await _sub('documents')];
 }

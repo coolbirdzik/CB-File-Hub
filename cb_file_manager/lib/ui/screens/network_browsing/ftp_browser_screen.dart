@@ -20,10 +20,7 @@ class FTPBrowserScreen extends StatefulWidget {
   /// The tab ID this screen belongs to
   final String tabId;
 
-  const FTPBrowserScreen({
-    Key? key,
-    required this.tabId,
-  }) : super(key: key);
+  const FTPBrowserScreen({super.key, required this.tabId});
 
   @override
   State<FTPBrowserScreen> createState() => _FTPBrowserScreenState();
@@ -127,8 +124,9 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
 
   void _loadSavedCredentials() {
     try {
-      _savedCredentials =
-          _credentialsService.getCredentialsByServiceType('FTP');
+      _savedCredentials = _credentialsService.getCredentialsByServiceType(
+        'FTP',
+      );
     } catch (e) {
       debugPrint('${context.tr.loadCredentialsError}: $e');
     }
@@ -150,13 +148,15 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
       _pendingTabCredentialMap[credentials.host] = credentials.id;
     });
 
-    _networkBloc.add(NetworkConnectionRequested(
-      serviceName: 'FTP',
-      host: credentials.host,
-      username: credentials.username,
-      password: credentials.password,
-      port: credentials.port,
-    ));
+    _networkBloc.add(
+      NetworkConnectionRequested(
+        serviceName: 'FTP',
+        host: credentials.host,
+        username: credentials.username,
+        password: credentials.password,
+        port: credentials.port,
+      ),
+    );
   }
 
   void _openTabForConnection(String path, String name) {
@@ -202,9 +202,13 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
               if (activeConnections.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      vertical: 8.0, horizontal: 8.0),
-                  child: Text(context.tr.activeConnections,
-                      style: theme.textTheme.titleSmall),
+                    vertical: 8.0,
+                    horizontal: 8.0,
+                  ),
+                  child: Text(
+                    context.tr.activeConnections,
+                    style: theme.textTheme.titleSmall,
+                  ),
                 ),
                 ...activeConnections.map(_buildActiveConnectionItem),
                 const Divider(),
@@ -212,9 +216,13 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
               if (_savedCredentials.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      vertical: 8.0, horizontal: 8.0),
-                  child: Text(context.tr.savedConnections,
-                      style: theme.textTheme.titleSmall),
+                    vertical: 8.0,
+                    horizontal: 8.0,
+                  ),
+                  child: Text(
+                    context.tr.savedConnections,
+                    style: theme.textTheme.titleSmall,
+                  ),
                 ),
                 ..._savedCredentials.map(_buildSavedConnectionItem),
               ],
@@ -226,7 +234,8 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
   }
 
   Widget _buildActiveConnectionItem(
-      MapEntry<String, NetworkServiceBase> entry) {
+    MapEntry<String, NetworkServiceBase> entry,
+  ) {
     final theme = Theme.of(context);
     String host = context.tr.unknown;
     try {
@@ -234,8 +243,10 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
     } catch (_) {}
 
     return ListTile(
-      leading:
-          Icon(PhosphorIconsLight.desktop, color: theme.colorScheme.tertiary),
+      leading: Icon(
+        PhosphorIconsLight.desktop,
+        color: theme.colorScheme.tertiary,
+      ),
       title: Text(host),
       subtitle: Text(context.tr.connecting),
       onTap: () => _openTabForConnection(entry.key, host),
@@ -247,8 +258,10 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
     final theme = Theme.of(context);
 
     return ListTile(
-      leading: Icon(PhosphorIconsLight.cloudArrowUp,
-          color: theme.colorScheme.primary),
+      leading: Icon(
+        PhosphorIconsLight.cloudArrowUp,
+        color: theme.colorScheme.primary,
+      ),
       title: Text(credentials.host),
       subtitle: Text(credentials.username),
       trailing: IconButton(
@@ -256,16 +269,20 @@ class _FTPBrowserScreenState extends State<FTPBrowserScreen>
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2.0))
-            : Icon(PhosphorIconsLight.arrowCircleRight,
-                color: theme.colorScheme.tertiary),
+                child: CircularProgressIndicator(strokeWidth: 2.0),
+              )
+            : Icon(
+                PhosphorIconsLight.arrowCircleRight,
+                color: theme.colorScheme.tertiary,
+              ),
         onPressed: isConnecting
             ? null
             : () => _connectWithSavedCredentials(credentials),
         tooltip: context.tr.connect,
       ),
-      onTap:
-          isConnecting ? null : () => _connectWithSavedCredentials(credentials),
+      onTap: isConnecting
+          ? null
+          : () => _connectWithSavedCredentials(credentials),
     );
   }
 }

@@ -13,11 +13,11 @@ class StreamingPerformanceDialog extends StatefulWidget {
   final Stream<List<int>>? currentStream;
 
   const StreamingPerformanceDialog({
-    Key? key,
+    super.key,
     required this.smbService,
     this.currentFilePath,
     this.currentStream,
-  }) : super(key: key);
+  });
 
   @override
   State<StreamingPerformanceDialog> createState() =>
@@ -59,8 +59,9 @@ class _StreamingPerformanceDialogState
     });
 
     try {
-      final results =
-          await widget.smbService.benchmarkStreaming(widget.currentFilePath!);
+      final results = await widget.smbService.benchmarkStreaming(
+        widget.currentFilePath!,
+      );
       if (mounted) {
         setState(() {
           _benchmarkResults = results;
@@ -69,7 +70,9 @@ class _StreamingPerformanceDialogState
 
         if (results['error'] != null) {
           AppToast.error(
-              context, l10n.benchmarkError(results['error'].toString()));
+            context,
+            l10n.benchmarkError(results['error'].toString()),
+          );
         }
       }
     } catch (e) {
@@ -98,10 +101,7 @@ class _StreamingPerformanceDialogState
               children: [
                 const Text(
                   'Streaming Performance',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 IconButton(
                   onPressed: () => RouteUtils.safePopDialog(context),
@@ -212,22 +212,36 @@ class _StreamingPerformanceDialogState
             if (streaming != null) ...[
               _buildInfoRow('Chunk Size', streaming['chunkSize'] ?? 'Unknown'),
               _buildInfoRow(
-                  'Buffer Size', streaming['bufferSize'] ?? 'Unknown'),
+                'Buffer Size',
+                streaming['bufferSize'] ?? 'Unknown',
+              ),
               _buildInfoRow(
-                  'Prefetch Size', streaming['prefetchSize'] ?? 'Unknown'),
-              _buildInfoRow('Max Connections',
-                  '${streaming['maxConnections'] ?? 'Unknown'}'),
+                'Prefetch Size',
+                streaming['prefetchSize'] ?? 'Unknown',
+              ),
               _buildInfoRow(
-                  'Estimated Speed', streaming['estimatedSpeed'] ?? 'Unknown'),
+                'Max Connections',
+                '${streaming['maxConnections'] ?? 'Unknown'}',
+              ),
+              _buildInfoRow(
+                'Estimated Speed',
+                streaming['estimatedSpeed'] ?? 'Unknown',
+              ),
             ],
             if (prefetchController != null) ...[
               const SizedBox(height: 8),
-              _buildInfoRow('Cache Hit Rate',
-                  '${prefetchController['cacheHitRate'] ?? '0.0'}%'),
-              _buildInfoRow('Buffer Usage',
-                  '${prefetchController['bufferSize'] ?? 0} bytes'),
               _buildInfoRow(
-                  'Buffer Count', '${prefetchController['bufferCount'] ?? 0}'),
+                'Cache Hit Rate',
+                '${prefetchController['cacheHitRate'] ?? '0.0'}%',
+              ),
+              _buildInfoRow(
+                'Buffer Usage',
+                '${prefetchController['bufferSize'] ?? 0} bytes',
+              ),
+              _buildInfoRow(
+                'Buffer Count',
+                '${prefetchController['bufferCount'] ?? 0}',
+              ),
             ],
           ],
         ),
@@ -331,8 +345,10 @@ class _StreamingPerformanceDialogState
             ],
           ),
           const SizedBox(height: 8),
-          _buildInfoRow('Data Transferred',
-              '${(totalBytes / 1024 / 1024).toStringAsFixed(2)} MB'),
+          _buildInfoRow(
+            'Data Transferred',
+            '${(totalBytes / 1024 / 1024).toStringAsFixed(2)} MB',
+          ),
           _buildInfoRow('Chunks Processed', '$chunkCount'),
           _buildInfoRow('Test Duration', '${testDuration}ms'),
         ],
@@ -349,10 +365,7 @@ class _StreamingPerformanceDialogState
           Text(label, style: const TextStyle(fontSize: 14)),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ],
       ),

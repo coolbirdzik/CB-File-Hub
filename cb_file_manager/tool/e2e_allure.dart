@@ -42,7 +42,8 @@ Future<void> main(List<String> args) async {
       testFile = resolved;
     } else {
       print(
-          '[Allure E2E] WARNING: file not found "$resolved" — using default.');
+        '[Allure E2E] WARNING: file not found "$resolved" — using default.',
+      );
     }
   }
 
@@ -121,17 +122,13 @@ Future<void> main(List<String> args) async {
   // Step 4: Run Allure adapter (write Allure JSON results)
   print('[Allure E2E] Parsing results and generating Allure JSON...');
 
-  final adapterResult = await Process.run(
-    Platform.resolvedExecutable,
-    [
-      'run',
-      'tool/e2e_allure_adapter.dart',
-      'build/e2e_report.jsonl',
-      '--build-dir',
-      'build'
-    ],
-    workingDirectory: Directory.current.path,
-  );
+  final adapterResult = await Process.run(Platform.resolvedExecutable, [
+    'run',
+    'tool/e2e_allure_adapter.dart',
+    'build/e2e_report.jsonl',
+    '--build-dir',
+    'build',
+  ], workingDirectory: Directory.current.path);
 
   stdout.write(adapterResult.stdout);
   if (adapterResult.stderr.isNotEmpty) stderr.write(adapterResult.stderr);
@@ -147,11 +144,12 @@ Future<void> main(List<String> args) async {
   if (!skipGenerate) {
     print('[Allure E2E] Generating HTML dashboard...');
 
-    final dashResult = await Process.run(
-      Platform.resolvedExecutable,
-      ['run', 'tool/e2e_dashboard.dart', '--build-dir', 'build'],
-      workingDirectory: Directory.current.path,
-    );
+    final dashResult = await Process.run(Platform.resolvedExecutable, [
+      'run',
+      'tool/e2e_dashboard.dart',
+      '--build-dir',
+      'build',
+    ], workingDirectory: Directory.current.path);
 
     stdout.write(dashResult.stdout);
     if (dashResult.stderr.isNotEmpty) stderr.write(dashResult.stderr);
@@ -168,7 +166,8 @@ Future<void> main(List<String> args) async {
       exit(0);
     } else {
       print(
-          '[Allure E2E] Dashboard generation failed (exit ${dashResult.exitCode}).');
+        '[Allure E2E] Dashboard generation failed (exit ${dashResult.exitCode}).',
+      );
     }
   }
 
@@ -186,20 +185,22 @@ Future<void> _killAllTestProcesses() async {
 
   print('[Allure E2E] Cleaning up test processes...');
 
-  final r1 = await Process.run(
-    'taskkill',
-    <String>['/F', '/IM', 'cb_file_hub.exe', '/T'],
-    runInShell: false,
-  );
+  final r1 = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'cb_file_hub.exe',
+    '/T',
+  ], runInShell: false);
   if (r1.exitCode != 0 && r1.exitCode != 128) {
     // May not exist — fine
   }
 
-  final r2 = await Process.run(
-    'taskkill',
-    <String>['/F', '/IM', 'flutter_test.exe', '/T'],
-    runInShell: false,
-  );
+  final r2 = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'flutter_test.exe',
+    '/T',
+  ], runInShell: false);
   if (r2.exitCode != 0 && r2.exitCode != 128) {
     // May not exist — fine
   }
@@ -208,7 +209,10 @@ Future<void> _killAllTestProcesses() async {
 }
 
 Future<void> _drain(
-    Stream<List<int>> input, IOSink logSink, IOSink echoSink) async {
+  Stream<List<int>> input,
+  IOSink logSink,
+  IOSink echoSink,
+) async {
   await for (final chunk in input) {
     logSink.add(chunk);
     echoSink.add(chunk);
@@ -220,8 +224,12 @@ Future<void> _drain(
 Future<void> _openInBrowser(String filePath) async {
   try {
     if (Platform.isWindows) {
-      await Process.run('cmd', ['/c', 'start', '', filePath],
-          runInShell: false);
+      await Process.run('cmd', [
+        '/c',
+        'start',
+        '',
+        filePath,
+      ], runInShell: false);
     } else if (Platform.isMacOS) {
       await Process.run('open', [filePath]);
     } else {
@@ -238,9 +246,12 @@ Future<void> _openInBrowser(String filePath) async {
 
 Future<void> _killCbFileHubOnWindows() async {
   if (!Platform.isWindows) return;
-  final r = await Process.run(
-      'taskkill', <String>['/F', '/IM', 'cb_file_hub.exe', '/T'],
-      runInShell: false);
+  final r = await Process.run('taskkill', <String>[
+    '/F',
+    '/IM',
+    'cb_file_hub.exe',
+    '/T',
+  ], runInShell: false);
   if (r.exitCode != 0 && r.exitCode != 128) {
     stderr.writeln('[E2E] taskkill exit ${r.exitCode} (continuing)');
   }
@@ -270,7 +281,8 @@ Future<void> _saveFailedTestsFromJson(String logPath) async {
   } else {
     await outFile.writeAsString(failedNames.join('|'));
     print(
-        '[Allure E2E] Saved ${failedNames.length} failed test(s) → $_kFailedTestsFile');
+      '[Allure E2E] Saved ${failedNames.length} failed test(s) → $_kFailedTestsFile',
+    );
   }
 }
 
@@ -414,11 +426,14 @@ Future<void> _writeScreenshotResultsJson(String jsonlPath) async {
   }
   merged.addAll(strippedResults);
 
-  final entries =
-      merged.entries.map((e) => '  "${_esc(e.key)}": ${e.value}').join(',\n');
+  final entries = merged.entries
+      .map((e) => '  "${_esc(e.key)}": ${e.value}')
+      .join(',\n');
   await resultsFile.writeAsString('{\n$entries\n}');
-  print('[Allure E2E] Wrote ${merged.length} test results → results.json '
-      '(${strippedResults.length} fresh, ${merged.length - strippedResults.length} preserved)');
+  print(
+    '[Allure E2E] Wrote ${merged.length} test results → results.json '
+    '(${strippedResults.length} fresh, ${merged.length - strippedResults.length} preserved)',
+  );
 }
 
 String _esc(String s) => s
@@ -432,16 +447,21 @@ Future<void> _dryRun() async {
   print('[Dry run] E2E Allure runner');
   print('');
   print(
-      '  dart run tool/e2e_allure.dart              Run all tests + dashboard');
+    '  dart run tool/e2e_allure.dart              Run all tests + dashboard',
+  );
   print(
-      '  dart run tool/e2e_allure.dart --rerun-failed   Skip passed, rerun failed only');
+    '  dart run tool/e2e_allure.dart --rerun-failed   Skip passed, rerun failed only',
+  );
   print('  dart run tool/e2e_allure.dart --no-generate    Skip dashboard');
   print(
-      '  dart run tool/e2e_allure.dart --full-startup   Include production startup services');
+    '  dart run tool/e2e_allure.dart --full-startup   Include production startup services',
+  );
   print(
-      '  dart run tool/e2e_allure.dart --full-screenshots  Capture every E2E action');
+    '  dart run tool/e2e_allure.dart --full-screenshots  Capture every E2E action',
+  );
   print(
-      '  dart run tool/e2e_allure.dart --file video_thumbnails_e2e_test  Run by file name');
+    '  dart run tool/e2e_allure.dart --file video_thumbnails_e2e_test  Run by file name',
+  );
   print('  dart run tool/e2e_allure.dart --dry-run        This message');
   print('');
   final device = Platform.environment['E2E_DEVICE'] ?? 'windows';

@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 // CLI tool to seed tags for CB File Manager (SQLite)
 // Run with: dart run bin/seed_tags.dart [options]
 //
@@ -139,11 +140,7 @@ Future<List<String>> queryDb(
 
 /// Runs a parameterized SQLite statement.
 /// Parameters are safely escaped to prevent SQL injection.
-Future<void> runSql(
-  String dbPath,
-  String sql, [
-  List<Object?>? params,
-]) async {
+Future<void> runSql(String dbPath, String sql, [List<Object?>? params]) async {
   final args = _buildArgs(dbPath, sql, params);
   final result = await Process.run('sqlite3', args);
   if (result.exitCode != 0) {
@@ -170,8 +167,10 @@ String _escapeParam(Object? param) {
 }
 
 Future<void> listTags(String dbPath) async {
-  final tags =
-      await queryDb(dbPath, "SELECT DISTINCT tag FROM file_tags ORDER BY tag;");
+  final tags = await queryDb(
+    dbPath,
+    "SELECT DISTINCT tag FROM file_tags ORDER BY tag;",
+  );
 
   print('');
   print('=== Tags in database (${tags.length}) ===');
@@ -196,7 +195,9 @@ Future<void> clearTags(String dbPath) async {
 Future<void> addTag(String dbPath, String tag) async {
   // Get first file path
   final files = await queryDb(
-      dbPath, "SELECT DISTINCT file_path FROM file_tags LIMIT 1;");
+    dbPath,
+    "SELECT DISTINCT file_path FROM file_tags LIMIT 1;",
+  );
 
   String filePath;
   if (files.isEmpty) {
@@ -273,7 +274,9 @@ Future<void> seedTags(String dbPath, int count) async {
 
   // Get first file path or create placeholder
   var files = await queryDb(
-      dbPath, "SELECT DISTINCT file_path FROM file_tags LIMIT 1;");
+    dbPath,
+    "SELECT DISTINCT file_path FROM file_tags LIMIT 1;",
+  );
 
   String filePath;
   if (files.isEmpty) {

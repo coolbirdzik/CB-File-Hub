@@ -11,12 +11,12 @@ class FastSeekGestureOverlay extends StatelessWidget {
   final VoidCallback onForwardEnd;
 
   const FastSeekGestureOverlay({
-    Key? key,
+    super.key,
     required this.onRewindStart,
     required this.onRewindEnd,
     required this.onForwardStart,
     required this.onForwardEnd,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -56,11 +56,11 @@ class FastSeekIndicator extends StatelessWidget {
   final bool fastSeekingForward;
 
   const FastSeekIndicator({
-    Key? key,
+    super.key,
     required this.isFastSeeking,
     required this.fastSeekSeconds,
     required this.fastSeekingForward,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -71,8 +71,9 @@ class FastSeekIndicator extends StatelessWidget {
       final mins = fastSeekSeconds ~/ 60;
       speedText = fastSeekingForward ? '+${mins}m' : '-${mins}m';
     } else {
-      speedText =
-          fastSeekingForward ? '+${fastSeekSeconds}s' : '-${fastSeekSeconds}s';
+      speedText = fastSeekingForward
+          ? '+${fastSeekSeconds}s'
+          : '-${fastSeekSeconds}s';
     }
 
     return Positioned(

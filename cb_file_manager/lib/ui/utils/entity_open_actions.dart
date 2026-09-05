@@ -93,8 +93,10 @@ class EntityOpenActions {
     required String sourcePath,
     String? preferredTabName,
   }) {
-    final target =
-        _resolveTarget(sourcePath, preferredTabName: preferredTabName);
+    final target = _resolveTarget(
+      sourcePath,
+      preferredTabName: preferredTabName,
+    );
     if (target == null) return;
 
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
@@ -115,8 +117,10 @@ class EntityOpenActions {
     required String sourcePath,
     String? preferredTabName,
   }) {
-    final target =
-        _resolveTarget(sourcePath, preferredTabName: preferredTabName);
+    final target = _resolveTarget(
+      sourcePath,
+      preferredTabName: preferredTabName,
+    );
     if (target == null) return;
 
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
@@ -223,8 +227,10 @@ class EntityOpenActions {
 
   static String _nameFromPath(String path) {
     final normalized = path.replaceAll('\\', '/');
-    final parts =
-        normalized.split('/').where((part) => part.isNotEmpty).toList();
+    final parts = normalized
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return path;
     return parts.last;
   }

@@ -28,8 +28,9 @@ void main() {
       usage: AppUsageEvidence(
         lastOpenedAt: lastOpenedAt,
         source: lastOpenedAt == null ? null : AppUsageSource.userAssist,
-        confidence:
-            lastOpenedAt == null ? null : UsageEvidenceConfidence.medium,
+        confidence: lastOpenedAt == null
+            ? null
+            : UsageEvidenceConfidence.medium,
       ),
       entries: <AppStorageEntry>[
         AppStorageEntry(
@@ -45,32 +46,32 @@ void main() {
   }
 
   AppStorageReport report() => AppStorageReport(
-        drivePath: 'C:\\',
-        generatedAt: now,
-        apps: <AppStorageProfile>[
-          profile(
-            id: 'alpha',
-            name: 'Alpha Editor',
-            publisher: 'Acme',
-            sizeBytes: 2 * _gb,
-            lastOpenedAt: now.subtract(const Duration(days: 240)),
-          ),
-          profile(
-            id: 'beta',
-            name: 'Beta Player',
-            publisher: 'Media Corp',
-            installLocation: 'C:\\Special\\Beta',
-            sizeBytes: 600 * _mb,
-          ),
-          profile(
-            id: 'gamma',
-            name: 'Gamma Browser',
-            sizeBytes: 800 * _mb,
-            cleanable: true,
-            lastOpenedAt: now.subtract(const Duration(days: 10)),
-          ),
-        ],
-      );
+    drivePath: 'C:\\',
+    generatedAt: now,
+    apps: <AppStorageProfile>[
+      profile(
+        id: 'alpha',
+        name: 'Alpha Editor',
+        publisher: 'Acme',
+        sizeBytes: 2 * _gb,
+        lastOpenedAt: now.subtract(const Duration(days: 240)),
+      ),
+      profile(
+        id: 'beta',
+        name: 'Beta Player',
+        publisher: 'Media Corp',
+        installLocation: 'C:\\Special\\Beta',
+        sizeBytes: 600 * _mb,
+      ),
+      profile(
+        id: 'gamma',
+        name: 'Gamma Browser',
+        sizeBytes: 800 * _mb,
+        cleanable: true,
+        lastOpenedAt: now.subtract(const Duration(days: 10)),
+      ),
+    ],
+  );
 
   test('defaults to review-first with 1 GB and 180 day thresholds', () {
     final cubit = CleanerAppInsightsCubit(nowProvider: () => now);
@@ -81,10 +82,11 @@ void main() {
     expect(cubit.state.largeThresholdBytes, _gb);
     expect(cubit.state.staleThresholdDays, 180);
     expect(cubit.state.sort, CleanerAppSort.attentionDescending);
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['alpha', 'gamma', 'beta'],
-    );
+    expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+      'alpha',
+      'gamma',
+      'beta',
+    ]);
     expect(cubit.state.selectedAppId, 'alpha');
     expect(cubit.state.largeAppCount, 1);
     expect(cubit.state.staleAppCount, 1);
@@ -92,40 +94,38 @@ void main() {
     expect(cubit.state.attentionBytes, 2 * _gb);
   });
 
-  test('filters large, stale, and cleanable without treating unknown as stale',
-      () {
-    final cubit = CleanerAppInsightsCubit(nowProvider: () => now);
-    addTearDown(cubit.close);
-    cubit.setReport(report());
+  test(
+    'filters large, stale, and cleanable without treating unknown as stale',
+    () {
+      final cubit = CleanerAppInsightsCubit(nowProvider: () => now);
+      addTearDown(cubit.close);
+      cubit.setReport(report());
 
-    cubit.setFilter(CleanerAppFilter.large);
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['alpha'],
-    );
+      cubit.setFilter(CleanerAppFilter.large);
+      expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+        'alpha',
+      ]);
 
-    cubit.setFilter(CleanerAppFilter.stale);
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['alpha'],
-    );
-    expect(
-      cubit.state.visibleApps.any((profile) => profile.app.id == 'beta'),
-      isFalse,
-    );
+      cubit.setFilter(CleanerAppFilter.stale);
+      expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+        'alpha',
+      ]);
+      expect(
+        cubit.state.visibleApps.any((profile) => profile.app.id == 'beta'),
+        isFalse,
+      );
 
-    cubit.setFilter(CleanerAppFilter.attention);
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['alpha'],
-    );
+      cubit.setFilter(CleanerAppFilter.attention);
+      expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+        'alpha',
+      ]);
 
-    cubit.setFilter(CleanerAppFilter.cleanable);
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['gamma'],
-    );
-  });
+      cubit.setFilter(CleanerAppFilter.cleanable);
+      expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+        'gamma',
+      ]);
+    },
+  );
 
   test('searches metadata and paths and keeps selection visible', () {
     final cubit = CleanerAppInsightsCubit(nowProvider: () => now);
@@ -135,10 +135,9 @@ void main() {
 
     cubit.setSearchQuery('special\\beta');
 
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['beta'],
-    );
+    expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+      'beta',
+    ]);
     expect(cubit.state.selectedAppId, 'beta');
 
     cubit.setSearchQuery('missing');
@@ -157,10 +156,11 @@ void main() {
     expect(cubit.state.staleAppCount, 0);
 
     cubit.setSort(CleanerAppSort.lastOpenedOldest);
-    expect(
-      cubit.state.visibleApps.map((profile) => profile.app.id),
-      <String>['alpha', 'gamma', 'beta'],
-    );
+    expect(cubit.state.visibleApps.map((profile) => profile.app.id), <String>[
+      'alpha',
+      'gamma',
+      'beta',
+    ]);
   });
 
   test('exposes loading and failure states for screen-owned lifecycle', () {

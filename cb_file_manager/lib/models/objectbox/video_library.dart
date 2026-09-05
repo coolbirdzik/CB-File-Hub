@@ -17,8 +17,8 @@ class VideoLibrary {
     DateTime? modifiedAt,
     this.colorTheme,
     this.isSystemLibrary = false,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        modifiedAt = modifiedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       modifiedAt = modifiedAt ?? DateTime.now();
 
   factory VideoLibrary.fromDatabaseMap(Map<String, Object?> map) {
     return VideoLibrary(

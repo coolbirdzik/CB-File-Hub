@@ -51,13 +51,11 @@ import 'cleaner_utilities_shell.dart';
 ///
 /// 2-panel layout after scan: collapsible tree view (left) + pie chart (right).
 /// Junk categories are highlighted and tickable for deletion.
-typedef CleanerCachedResultLookup = FullDiskScanResult? Function(
-  String drivePath,
-);
+typedef CleanerCachedResultLookup =
+    FullDiskScanResult? Function(String drivePath);
 
-typedef CleanerFullDiskScanStarter = Future<FullDiskScanHandle> Function(
-  String drivePath,
-);
+typedef CleanerFullDiskScanStarter =
+    Future<FullDiskScanHandle> Function(String drivePath);
 
 /// Separates informational old-large evidence into independently ranked
 /// folder and file sections for the Cleaner results panel.
@@ -65,10 +63,7 @@ class OldLargeEvidenceSections {
   final List<FullDiskScanInsight> folders;
   final List<FullDiskScanInsight> files;
 
-  const OldLargeEvidenceSections({
-    required this.folders,
-    required this.files,
-  });
+  const OldLargeEvidenceSections({required this.folders, required this.files});
 
   int get totalCount => folders.length + files.length;
 }
@@ -126,8 +121,9 @@ DiskTreeNode? findNearestDisplayedTreeNodeForPath(
   final stack = <DiskTreeNode>[root];
   while (stack.isNotEmpty) {
     final node = stack.removeLast();
-    final normalizedNodePath =
-        AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
+    final normalizedNodePath = AppStorageAnalyzer.normalizeWindowsPath(
+      node.fullPath,
+    );
     if (normalizedNodePath.isNotEmpty &&
         normalizedNodePath.length > nearestPathLength &&
         AppStorageAnalyzer.isSameOrDescendant(
@@ -162,10 +158,9 @@ class CleanerScanCoordinator {
   final CleanerFullDiskScanStarter _startFullDiskScan;
 
   const CleanerScanCoordinator({
-    required CleanerCachedResultLookup cachedResultFor,
-    required CleanerFullDiskScanStarter startFullDiskScan,
-  })  : _cachedResultFor = cachedResultFor,
-        _startFullDiskScan = startFullDiskScan;
+    required this._cachedResultFor,
+    required this._startFullDiskScan,
+  });
 
   FullDiskScanResult? cachedSetupResult(String drivePath) {
     return _cachedResultFor(drivePath);
@@ -177,7 +172,7 @@ class CleanerScanCoordinator {
 }
 
 class CbAgentCleanerScreen extends StatefulWidget {
-  const CbAgentCleanerScreen({Key? key}) : super(key: key);
+  const CbAgentCleanerScreen({super.key});
 
   @override
   State<CbAgentCleanerScreen> createState() => _CbAgentCleanerScreenState();
@@ -293,8 +288,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   int _diskScanGeneration = 0;
   int _appInsightsGeneration = 0;
   Timer? _diskProgressContextTimer;
-  static const Duration _diskProgressContextThrottle =
-      Duration(milliseconds: 250);
+  static const Duration _diskProgressContextThrottle = Duration(
+    milliseconds: 250,
+  );
 
   // Cleanup progress
   bool _isCleaningJunk = false;
@@ -509,9 +505,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         _publishCleanerScanContext();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!
-                .diskCleanerAgentFoundJunk(
-                    event.itemsFound, _fmt(event.bytesFound))),
+            content: Text(
+              AppLocalizations.of(context)!.diskCleanerAgentFoundJunk(
+                event.itemsFound,
+                _fmt(event.bytesFound),
+              ),
+            ),
           ),
         );
         break;
@@ -522,9 +521,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           _agentCurrentPath = '';
         });
         _publishCleanerScanContext();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(event.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(event.message)));
         break;
     }
   }
@@ -558,8 +557,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _appInsightsDrive = _defaultDrivePath(_drives);
     await _loadLastScanSummaries();
     try {
-      final providers =
-          await GetIt.instance<AiProviderService>().getEnabledProviders();
+      final providers = await GetIt.instance<AiProviderService>()
+          .getEnabledProviders();
       _aiAvailable = providers.isNotEmpty;
     } catch (_) {}
     if (mounted) setState(() {});
@@ -823,10 +822,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       ],
     );
 
-    final scanResult = FullDiskScanResult(
-      root: root,
-      duration: Duration.zero,
-    );
+    final scanResult = FullDiskScanResult(root: root, duration: Duration.zero);
 
     setState(() {
       _phase = _Phase.results;
@@ -935,12 +931,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _phase = _Phase.results;
       _isScanningFullDisk = true;
       _isShowingCachedDiskScan = false;
-      _rootNode = cachedRoot ??
-          DiskTreeNode(
-            name: driveRoot,
-            fullPath: driveRoot,
-            isExpanded: true,
-          );
+      _rootNode =
+          cachedRoot ??
+          DiskTreeNode(name: driveRoot, fullPath: driveRoot, isExpanded: true);
       _selectedNode = _rootNode;
       _chartNode = _rootNode;
       _selectedTreeTargets.clear();
@@ -1037,8 +1030,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(AppLocalizations.of(context)!
-                  .diskCleanerScanFailedMsg('$e'))),
+            content: Text(
+              AppLocalizations.of(context)!.diskCleanerScanFailedMsg('$e'),
+            ),
+          ),
         );
         if (_activeSubFeature == _CleanerSubFeature.appInsights &&
             _appStorageReport == null &&
@@ -1102,7 +1097,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       await CleanerLastScanService(preferences).write(summary);
       if (!mounted) return;
       setState(
-          () => _lastScanSummaries[_normalizedDriveKey(drivePath)] = summary);
+        () => _lastScanSummaries[_normalizedDriveKey(drivePath)] = summary,
+      );
     } catch (error) {
       debugPrint('Unable to record Cleaner last scan summary: $error');
     }
@@ -1122,10 +1118,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   ) async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      final comparison =
-          await CleanerGrowthHistoryService(preferences).compareAndStore(
-        result,
-      );
+      final comparison = await CleanerGrowthHistoryService(
+        preferences,
+      ).compareAndStore(result);
       if (!mounted || diskScanGeneration != _diskScanGeneration) return;
       setState(() {
         _recentFolderGrowth = comparison.folders;
@@ -1183,10 +1178,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       progressiveDirty = false;
       try {
         final report = await _analyzeAppInsightsReport(
-          result: FullDiskScanResult(
-            root: snapshot,
-            duration: Duration.zero,
-          ),
+          result: FullDiskScanResult(root: snapshot, duration: Duration.zero),
           evidence: evidence,
           scanInProgress: true,
         );
@@ -1235,7 +1227,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
     try {
       var result = _lastDiskScanResult;
-      final canReuseDiskScan = !forceDiskScan &&
+      final canReuseDiskScan =
+          !forceDiskScan &&
           result != null &&
           _isSameDriveRoot(result.root.fullPath, scanDrive);
 
@@ -1323,10 +1316,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   bool _isSameDriveRoot(String left, String right) {
-    final normalizedLeft =
-        AppStorageAnalyzer.normalizeWindowsPath(left).toUpperCase();
-    final normalizedRight =
-        AppStorageAnalyzer.normalizeWindowsPath(right).toUpperCase();
+    final normalizedLeft = AppStorageAnalyzer.normalizeWindowsPath(
+      left,
+    ).toUpperCase();
+    final normalizedRight = AppStorageAnalyzer.normalizeWindowsPath(
+      right,
+    ).toUpperCase();
     return normalizedLeft == normalizedRight;
   }
 
@@ -1391,15 +1386,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   void _openAppStorageFolder(AppStorageEntry entry) {
-    EntityOpenActions.openInNewTab(
-      context,
-      sourcePath: entry.path,
-    );
+    EntityOpenActions.openInNewTab(context, sourcePath: entry.path);
   }
 
   Future<void> _manageInstalledApp(InstalledAppInfo app) async {
     final packageFamilyName = app.packageFamilyName?.trim();
-    final appUri = app.source == InstalledAppSource.msix &&
+    final appUri =
+        app.source == InstalledAppSource.msix &&
             packageFamilyName != null &&
             packageFamilyName.isNotEmpty
         ? Uri.parse(
@@ -1419,9 +1412,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${app.displayName}: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${app.displayName}: $error')));
     }
   }
 
@@ -1449,13 +1442,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           node.junkCategoryId != candidate.categoryId) {
         continue;
       }
-      final normalizedPath =
-          AppStorageAnalyzer.normalizeWindowsPath(candidate.path);
+      final normalizedPath = AppStorageAnalyzer.normalizeWindowsPath(
+        candidate.path,
+      );
       if (acceptedPaths.any(
-        (parent) => AppStorageAnalyzer.isSameOrDescendant(
-          normalizedPath,
-          parent,
-        ),
+        (parent) =>
+            AppStorageAnalyzer.isSameOrDescendant(normalizedPath, parent),
       )) {
         continue;
       }
@@ -1475,8 +1467,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (safeItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text(AppLocalizations.of(context)!.cleanerAppsNoStorageDetails),
+          content: Text(
+            AppLocalizations.of(context)!.cleanerAppsNoStorageDetails,
+          ),
         ),
       );
       return;
@@ -1513,10 +1506,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _enterReviewMode(exactCleanableItems: safeItems);
   }
 
-  DiskTreeNode? _findTreeNodeByExactPath(
-    DiskTreeNode root,
-    String path,
-  ) {
+  DiskTreeNode? _findTreeNodeByExactPath(DiskTreeNode root, String path) {
     final target = AppStorageAnalyzer.normalizeWindowsPath(path);
     final stack = <DiskTreeNode>[root];
     while (stack.isNotEmpty) {
@@ -1580,9 +1570,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     msg.writeln('${l10n.diskCleanerAiLabelFiles}: ${node.fileCount}');
     if (node.isJunk) {
       msg.writeln(
-        l10n.diskCleanerAiCategoryMarkedJunk(
-          node.junkCategoryId ?? 'unknown',
-        ),
+        l10n.diskCleanerAiCategoryMarkedJunk(node.junkCategoryId ?? 'unknown'),
       );
     } else {
       msg.writeln(l10n.diskCleanerAiNotMarkedAsJunk);
@@ -1608,8 +1596,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (controller == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.diskCleanerAiPanelUnavailable)),
+          content: Text(
+            AppLocalizations.of(context)!.diskCleanerAiPanelUnavailable,
+          ),
+        ),
       );
       return;
     }
@@ -1634,7 +1624,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (root == null) return 'Please scan my disk for junk files.';
     final buffer = StringBuffer();
     buffer.writeln(
-        'Please inspect the current CB Agent Cleaner scan. Call get_current_cleaner_scan first, then give cleanup recommendations.');
+      'Please inspect the current CB Agent Cleaner scan. Call get_current_cleaner_scan first, then give cleanup recommendations.',
+    );
     buffer.writeln();
     buffer.writeln('I scanned drive ${root.fullPath}:');
     buffer.writeln('Total: ${_fmt(root.sizeBytes)}, ${root.fileCount} files');
@@ -1805,8 +1796,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   void _setAllCleanableChecked(DiskTreeNode? node, bool checked) {
     if (node == null) return;
-    final selectedPaths =
-        DiskTreeSelection.setAllCleanableChecked(node, checked);
+    final selectedPaths = DiskTreeSelection.setAllCleanableChecked(
+      node,
+      checked,
+    );
     _selectedTreePaths
       ..clear()
       ..addAll(selectedPaths);
@@ -1881,7 +1874,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       final currentPath = current.fullPath.isEmpty
           ? ''
           : AppStorageAnalyzer.normalizeWindowsPath(current.fullPath);
-      final shouldExpand = expandedPaths.contains(currentPath) ||
+      final shouldExpand =
+          expandedPaths.contains(currentPath) ||
           (selectedDriveRoot != null && currentPath == selectedDriveRoot);
       current.isExpanded = shouldExpand;
 
@@ -1996,9 +1990,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               index: feature == _CleanerSubFeature.appInsights ? 1 : 0,
               children: [
                 RepaintBoundary(
-                  key: const ValueKey<String>(
-                    'cleaner-storage-results-pane',
-                  ),
+                  key: const ValueKey<String>('cleaner-storage-results-pane'),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: _buildPhase(theme, l),
@@ -2132,14 +2124,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(PhosphorIconsLight.hardDrive,
-                        size: 16, color: theme.colorScheme.primary),
+                    Icon(
+                      PhosphorIconsLight.hardDrive,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         label,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -2148,7 +2144,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: barColor.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(5),
@@ -2171,8 +2169,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   child: LinearProgressIndicator(
                     value: fraction,
                     minHeight: 6,
-                    backgroundColor:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.10),
+                    backgroundColor: theme.colorScheme.onSurface.withValues(
+                      alpha: 0.10,
+                    ),
                     valueColor: AlwaysStoppedAnimation<Color>(barColor),
                   ),
                 ),
@@ -2209,8 +2208,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.35,
+          ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
         ),
@@ -2220,8 +2220,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           children: [
             Row(
               children: [
-                Icon(PhosphorIconsLight.clockCounterClockwise,
-                    size: 16, color: theme.colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.clockCounterClockwise,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -2256,9 +2259,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(PhosphorIconsLight.broom, size: 16),
-                  label: Text(_isQuickCleaning
-                      ? l.diskCleanerQuickCleanScanning
-                      : l.diskCleanerQuickCleanButton),
+                  label: Text(
+                    _isQuickCleaning
+                        ? l.diskCleanerQuickCleanScanning
+                        : l.diskCleanerQuickCleanButton,
+                  ),
                 ),
               ],
             ),
@@ -2354,30 +2359,30 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (!mounted) return;
 
     final items = nodes
-        .map((node) => JunkItem(
-              path: node.fullPath,
-              sizeBytes: node.sizeBytes,
-              categoryId: node.junkCategoryId ?? 'selected_item',
-              isContainerOnly: false,
-              isUserSelected: true,
-            ))
+        .map(
+          (node) => JunkItem(
+            path: node.fullPath,
+            sizeBytes: node.sizeBytes,
+            categoryId: node.junkCategoryId ?? 'selected_item',
+            isContainerOnly: false,
+            isUserSelected: true,
+          ),
+        )
         .toList();
 
     setState(() {
       _pendingCleanItems = items;
       _pendingCleanBytes = totalBytes;
-      _selectedCleanMode =
-          permanent ? _CleanDeleteMode.permanent : _CleanDeleteMode.recycleBin;
+      _selectedCleanMode = permanent
+          ? _CleanDeleteMode.permanent
+          : _CleanDeleteMode.recycleBin;
       _reviewMode = false;
     });
 
     _service.pendingCleanupItems = items;
     _service.pendingCleanupBytes = totalBytes;
 
-    await _cleanJunk(
-      permanent: permanent,
-      showCleanedResult: false,
-    );
+    await _cleanJunk(permanent: permanent, showCleanedResult: false);
   }
 
   List<DiskTreeNode> _selectedTreeNodes() {
@@ -2436,13 +2441,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
   void _scheduleDiskProgressContextPublication() {
     if (!mounted || _diskProgressContextTimer?.isActive == true) return;
-    _diskProgressContextTimer = Timer(
-      _diskProgressContextThrottle,
-      () {
-        _diskProgressContextTimer = null;
-        if (mounted) _publishCleanerScanContext();
-      },
-    );
+    _diskProgressContextTimer = Timer(_diskProgressContextThrottle, () {
+      _diskProgressContextTimer = null;
+      if (mounted) _publishCleanerScanContext();
+    });
   }
 
   void _cancelDiskProgressContextPublication() {
@@ -2510,8 +2512,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       if (anchorIndex >= 0 && currentIndex >= 0) {
         final start = math.min(anchorIndex, currentIndex);
         final end = math.max(anchorIndex, currentIndex);
-        final range =
-            visibleRows.sublist(start, end + 1).map((row) => row.node);
+        final range = visibleRows
+            .sublist(start, end + 1)
+            .map((row) => row.node);
         _replaceTreeTargets(
           _canonicalTreeTargets(
             isCtrl ? <DiskTreeNode>[..._selectedTreeTargets, ...range] : range,
@@ -2564,7 +2567,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (!isKeyDown) return KeyEventResult.ignored;
 
     final key = event.logicalKey;
-    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+    final isCtrl =
+        HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
     final isShift = HardwareKeyboard.instance.isShiftPressed;
 
@@ -2592,10 +2596,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (key == LogicalKeyboardKey.space) {
       final focused = _selectedNode;
       if (focused != null && focused.fullPath.isNotEmpty) {
-        _toggleTreeTarget(
-          focused,
-          !_selectedTreeTargets.contains(focused),
-        );
+        _toggleTreeTarget(focused, !_selectedTreeTargets.contains(focused));
       }
       return KeyEventResult.handled;
     }
@@ -2811,11 +2812,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                         builder: (context, progress, child) {
                           final text = progress == null
                               ? selectedDrive == null
-                                  ? selectedDrivePath
-                                  : l.diskCleanerDriveFree(
-                                      _driveDisplayName(selectedDrive),
-                                      _fmt(selectedDrive.freeBytes),
-                                    )
+                                    ? selectedDrivePath
+                                    : l.diskCleanerDriveFree(
+                                        _driveDisplayName(selectedDrive),
+                                        _fmt(selectedDrive.freeBytes),
+                                      )
                               : l.diskCleanerScannedProgress(
                                   _fmt(progress.bytesScanned),
                                   progress.filesScanned,
@@ -2863,10 +2864,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   onPressed: _isScanningFullDisk
                       ? null
                       : _isScanningAppInsights
-                          ? _cancelAppInsightsScan
-                          : () => unawaited(
-                                _startAppInsightsScan(forceDiskScan: true),
-                              ),
+                      ? _cancelAppInsightsScan
+                      : () => unawaited(
+                          _startAppInsightsScan(forceDiskScan: true),
+                        ),
                   icon: _isScanningAppInsights
                       ? const Icon(Icons.stop_rounded, size: 16)
                       : const Icon(
@@ -2890,8 +2891,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               cubit: _appInsightsCubit,
               onOpenFolder: _openAppStorageFolder,
               onManageApp: _manageInstalledApp,
-              onReviewCleanable:
-                  _isScanningAppInsights ? null : _reviewAppCleanableData,
+              onReviewCleanable: _isScanningAppInsights
+                  ? null
+                  : _reviewAppCleanableData,
               onAskAgent: _askAgentAboutApp,
             ),
           ),
@@ -2919,23 +2921,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             child: Row(
               children: [
                 // Left: tree view (~65%)
-                Expanded(
-                  flex: 65,
-                  child: _buildTreePanel(theme, l, root),
-                ),
+                Expanded(flex: 65, child: _buildTreePanel(theme, l, root)),
                 const VerticalDivider(width: 1),
                 // Right: pie chart (~35%). Old-large evidence is full-width
                 // above this split so folder rows remain easy to discover.
-                Expanded(
-                  flex: 35,
-                  child: _buildPiePanel(theme, l, viewNode),
-                ),
+                Expanded(flex: 35, child: _buildPiePanel(theme, l, viewNode)),
               ],
             ),
           ),
           ValueListenableBuilder<Set<String>>(
             valueListenable: _selectedTreePathListenable,
-            builder: (context, _, __) => _buildBottomBar(theme, l),
+            builder: (context, _, _) => _buildBottomBar(theme, l),
           ),
         ],
       ),
@@ -2950,7 +2946,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     _ensureCleanerAggregates(root);
     final junkBytes = _cachedJunkBytes;
     final cleanableCount = _cachedCleanableCount;
-    final hasStatus = _isScanningFullDisk ||
+    final hasStatus =
+        _isScanningFullDisk ||
         _agentScanning ||
         _isShowingCachedDiskScan ||
         _lastDiskScanResult?.scanMode == FullDiskScanMode.incremental ||
@@ -2958,17 +2955,24 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
     Widget buildDriveInfo() {
       final driveSummary = l.diskCleanerDriveSummary(
-          root.fullPath, _fmt(root.sizeBytes), root.fileCount);
+        root.fullPath,
+        _fmt(root.sizeBytes),
+        root.fileCount,
+      );
       return Row(
         children: [
-          Icon(PhosphorIconsLight.hardDrive,
-              size: 18, color: theme.colorScheme.primary),
+          Icon(
+            PhosphorIconsLight.hardDrive,
+            size: 18,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               driveSummary,
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -2984,8 +2988,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         return Text(
           progress?.isIncremental == true
               ? (currentPath.isEmpty
-                  ? l.diskCleanerIncrementalScanTitle
-                  : '${l.diskCleanerIncrementalScanTitle} • $currentPath')
+                    ? l.diskCleanerIncrementalScanTitle
+                    : '${l.diskCleanerIncrementalScanTitle} • $currentPath')
               : (progress == null ? l.diskCleanerScanRunning : currentPath),
           key: const ValueKey<String>('cleaner-full-scan-status'),
           style: theme.textTheme.bodySmall?.copyWith(
@@ -2999,20 +3003,20 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       if (_agentScanning) {
         return Row(
           children: [
-            AppWaveLoader(
-              size: 22,
+            AppWaveLoader(size: 22, color: theme.colorScheme.tertiary),
+            const SizedBox(width: 6),
+            Icon(
+              PhosphorIconsLight.sparkle,
+              size: 14,
               color: theme.colorScheme.tertiary,
             ),
-            const SizedBox(width: 6),
-            Icon(PhosphorIconsLight.sparkle,
-                size: 14, color: theme.colorScheme.tertiary),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 _agentCurrentPath.isEmpty
                     ? (_agentStatus.isEmpty
-                        ? l.diskCleanerScanRunning
-                        : _agentStatus)
+                          ? l.diskCleanerScanRunning
+                          : _agentStatus)
                     : l.diskCleanerAgentPath(_agentCurrentPath),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.tertiary,
@@ -3026,7 +3030,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               Flexible(
                 child: Text(
                   l.diskCleanerItemsBytes(
-                      _agentItemsFound, _fmt(_agentBytesFound)),
+                    _agentItemsFound,
+                    _fmt(_agentBytesFound),
+                  ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -3054,9 +3060,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       final result = _lastDiskScanResult;
       if (result?.scanMode == FullDiskScanMode.incremental) {
         return Text(
-          l.diskCleanerIncrementalScanProgress(
-            result!.changedDirectoryCount,
-          ),
+          l.diskCleanerIncrementalScanProgress(result!.changedDirectoryCount),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -3261,7 +3265,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               children: [
                 ValueListenableBuilder<FullDiskScanProgress?>(
                   valueListenable: _diskProgressListenable,
-                  builder: (context, _, __) => Column(
+                  builder: (context, _, _) => Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       buildDriveInfo(),
@@ -3288,17 +3292,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             children: [
               ValueListenableBuilder<FullDiskScanProgress?>(
                 valueListenable: _diskProgressListenable,
-                builder: (context, _, __) => Row(
+                builder: (context, _, _) => Row(
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: buildDriveInfo(),
-                    ),
+                    Expanded(flex: 3, child: buildDriveInfo()),
                     const SizedBox(width: 16),
-                    Expanded(
-                      flex: 2,
-                      child: buildStatus(),
-                    ),
+                    Expanded(flex: 2, child: buildStatus()),
                   ],
                 ),
               ),
@@ -3326,7 +3324,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   bool _flatRowsValid = false;
 
   Widget _buildTreePanel(
-      ThemeData theme, AppLocalizations l, DiskTreeNode root) {
+    ThemeData theme,
+    AppLocalizations l,
+    DiskTreeNode root,
+  ) {
     // Re-flatten only when cache is invalid or the root object changed.
     if (!_flatRowsValid || _cachedFlatRows == null || _cachedFlatRoot != root) {
       // Every tree mutation invalidates the flat rows, so this is also the
@@ -3357,38 +3358,51 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       children: [
         // Column headers
         Container(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.4,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
               const SizedBox(width: 20), // expand arrow space
               Expanded(
                 flex: 4,
-                child: Text(l.diskCleanerColumnName,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(
+                  l.diskCleanerColumnName,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               SizedBox(
                 width: 80,
-                child: Text(l.diskCleanerColumnSize,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                    textAlign: TextAlign.right),
+                child: Text(
+                  l.diskCleanerColumnSize,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
               ),
               const SizedBox(width: 10),
               SizedBox(
                 width: 90,
-                child: Text(l.diskCleanerColumnPercentOfParent,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(
+                  l.diskCleanerColumnPercentOfParent,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               SizedBox(
                 width: 60,
-                child: Text(l.diskCleanerColumnFiles,
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                    textAlign: TextAlign.right),
+                child: Text(
+                  l.diskCleanerColumnFiles,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -3416,8 +3430,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                         if (progress != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            l.diskCleanerSizeFiles(_fmt(progress.bytesScanned),
-                                progress.filesScanned),
+                            l.diskCleanerSizeFiles(
+                              _fmt(progress.bytesScanned),
+                              progress.filesScanned,
+                            ),
                             key: const ValueKey<String>(
                               'cleaner-full-scan-tree-progress',
                             ),
@@ -3446,11 +3462,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                       onExpandToggle: row.node.isFile
                           ? null
                           : () => setState(() {
-                                row.node.isExpanded = !row.node.isExpanded;
-                                _flatRowsValid = false;
-                              }),
-                      onAskAi:
-                          _aiAvailable ? () => _askAiAboutNode(row.node) : null,
+                              row.node.isExpanded = !row.node.isExpanded;
+                              _flatRowsValid = false;
+                            }),
+                      onAskAi: _aiAvailable
+                          ? () => _askAiAboutNode(row.node)
+                          : null,
                       onShowContextMenu: _showNodeContextMenu,
                     );
                   },
@@ -3553,7 +3570,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   Widget _buildPiePanel(
-      ThemeData theme, AppLocalizations l, DiskTreeNode node) {
+    ThemeData theme,
+    AppLocalizations l,
+    DiskTreeNode node,
+  ) {
     if (_isScanningFullDisk) {
       return ValueListenableBuilder<FullDiskScanProgress?>(
         valueListenable: _diskProgressListenable,
@@ -3563,10 +3583,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppWaveLoader(
-                  size: 60,
-                  color: theme.colorScheme.primary,
-                ),
+                AppWaveLoader(size: 60, color: theme.colorScheme.primary),
                 const SizedBox(height: 18),
                 Text(
                   l.diskCleanerAnalyzingDisk,
@@ -3579,10 +3596,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   progress == null
                       ? l.diskCleanerPieChartPending
                       : l.diskCleanerScannedProgress(
-                          _fmt(progress.bytesScanned), progress.filesScanned),
-                  key: const ValueKey<String>(
-                    'cleaner-full-scan-pie-progress',
-                  ),
+                          _fmt(progress.bytesScanned),
+                          progress.filesScanned,
+                        ),
+                  key: const ValueKey<String>('cleaner-full-scan-pie-progress'),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -3637,13 +3654,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final segments = <_PieSegment>[];
     for (var i = 0; i < topChildren.length; i++) {
       final child = topChildren[i];
-      segments.add(_PieSegment(
-        value: child.sizeBytes.toDouble(),
-        color: child.isJunk || child.hasJunkChildren
-            ? Colors.orange
-            : _pieColor(i),
-        label: _displayName(l, child),
-      ));
+      segments.add(
+        _PieSegment(
+          value: child.sizeBytes.toDouble(),
+          color: child.isJunk || child.hasJunkChildren
+              ? Colors.orange
+              : _pieColor(i),
+          label: _displayName(l, child),
+        ),
+      );
     }
 
     return Padding(
@@ -3652,8 +3671,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         children: [
           Text(
             node.name,
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -3669,10 +3689,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final size = Size(
-                  constraints.maxWidth,
-                  constraints.maxHeight,
-                );
+                final size = Size(constraints.maxWidth, constraints.maxHeight);
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapUp: (details) {
@@ -3719,8 +3736,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   borderRadius: BorderRadius.circular(4),
                   onTap: () => _revealNodeInTree(c),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 3,
+                      horizontal: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isFocused
                           ? theme.colorScheme.primary.withValues(alpha: 0.10)
@@ -3784,8 +3803,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _lastDiskScanResult!.oldLargeItems,
       _oldLargeEvidenceFilter,
     );
-    final panelHeight =
-        _oldLargeEvidenceExpanded ? (items.isEmpty ? 142.0 : 288.0) : 64.0;
+    final panelHeight = _oldLargeEvidenceExpanded
+        ? (items.isEmpty ? 142.0 : 288.0)
+        : 64.0;
     final foldersSection = _OldLargeEvidenceSection(
       keySuffix: 'folders',
       title: l.diskCleanerOldLargeFolders,
@@ -3913,10 +3933,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 ),
                 padding: EdgeInsets.zero,
                 tooltip: item.isFile ? l.openContainingFolder : l.openInNewTab,
-                icon: const Icon(
-                  PhosphorIconsLight.folderOpen,
-                  size: 17,
-                ),
+                icon: const Icon(PhosphorIconsLight.folderOpen, size: 17),
                 onPressed: () {
                   EntityOpenActions.openInNewTab(
                     context,
@@ -4053,8 +4070,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.22),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.22,
+        ),
         border: Border.all(
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.65),
         ),
@@ -4170,7 +4188,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                     )
                   : LayoutBuilder(
                       builder: (context, constraints) {
-                        final showColumns = _oldLargeEvidenceFilter ==
+                        final showColumns =
+                            _oldLargeEvidenceFilter ==
                                 OldLargeEvidenceFilter.all &&
                             constraints.maxWidth >= 720;
                         if (showColumns) {
@@ -4230,9 +4249,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
-              border: Border(
-                top: BorderSide(color: theme.dividerColor),
-              ),
+              border: Border(top: BorderSide(color: theme.dividerColor)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4248,8 +4265,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
-                        child: Icon(PhosphorIconsLight.broom,
-                            size: 18, color: Colors.orange.shade700),
+                        child: Icon(
+                          PhosphorIconsLight.broom,
+                          size: 18,
+                          color: Colors.orange.shade700,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -4261,8 +4281,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                             isPreparing
                                 ? l.diskCleanerPreparingFiles
                                 : (snap.status.isEmpty
-                                    ? l.diskCleanerCleaning
-                                    : snap.status),
+                                      ? l.diskCleanerCleaning
+                                      : snap.status),
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -4271,12 +4291,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                           Text(
                             isPreparing
                                 ? (snap.currentPath.isEmpty
-                                    ? l.diskCleanerScanningSelectedDirs
-                                    : l.diskCleanerScanningPath(
-                                        snap.currentPath))
+                                      ? l.diskCleanerScanningSelectedDirs
+                                      : l.diskCleanerScanningPath(
+                                          snap.currentPath,
+                                        ))
                                 : (snap.currentPath.isEmpty
-                                    ? l.diskCleanerDeletingJunkHint
-                                    : snap.currentPath),
+                                      ? l.diskCleanerDeletingJunkHint
+                                      : snap.currentPath),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -4360,11 +4381,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final selectionStatus = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          PhosphorIconsLight.broom,
-          size: 18,
-          color: Colors.orange.shade700,
-        ),
+        Icon(PhosphorIconsLight.broom, size: 18, color: Colors.orange.shade700),
         const SizedBox(width: 8),
         Flexible(
           child: Text(
@@ -4429,8 +4446,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           side: WidgetStateProperty.resolveWith<BorderSide?>((states) {
             final color = states.contains(WidgetState.selected)
                 ? _selectedCleanMode == _CleanDeleteMode.permanent
-                    ? Colors.red.shade700
-                    : theme.colorScheme.primary
+                      ? Colors.red.shade700
+                      : theme.colorScheme.primary
                 : theme.colorScheme.outlineVariant;
             return BorderSide(color: color);
           }),
@@ -4468,9 +4485,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: theme.dividerColor),
-        ),
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: _reviewMode
           ? Column(
@@ -4496,9 +4511,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   style: FilledButton.styleFrom(shape: _cleanerButtonShape),
                   onPressed: selectedBytes > 0 ? _enterReviewMode : null,
                   icon: const Icon(PhosphorIconsLight.eye, size: 18),
-                  label: Text(
-                    l.diskCleanerReviewAndClean(_fmt(selectedBytes)),
-                  ),
+                  label: Text(l.diskCleanerReviewAndClean(_fmt(selectedBytes))),
                 ),
               ],
             ),
@@ -4515,9 +4528,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.7),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.7)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -4548,7 +4559,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     // Build pending items list from selected tree nodes so AI tool + cleanup
     // helpers have data ready. The tree itself is filtered via _reviewMode
     // flag — no separate page, no rebuild.
-    final items = exactCleanableItems ??
+    final items =
+        exactCleanableItems ??
         _selectedTreeNodes()
             .map(
               (node) => JunkItem(
@@ -4605,15 +4617,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     setState(() {
       _freeBytesAfterClean = free;
       _drives = _drives
-          .map((d) => d.path == _selectedDrive
-              ? DriveSpace(
-                  path: d.path,
-                  label: d.label,
-                  totalBytes: d.totalBytes,
-                  freeBytes: free,
-                  requiresAdmin: d.requiresAdmin,
-                )
-              : d)
+          .map(
+            (d) => d.path == _selectedDrive
+                ? DriveSpace(
+                    path: d.path,
+                    label: d.label,
+                    totalBytes: d.totalBytes,
+                    freeBytes: free,
+                    requiresAdmin: d.requiresAdmin,
+                  )
+                : d,
+          )
           .toList(growable: false);
     });
   }
@@ -4680,10 +4694,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   /// user auditing individual paths. Derived from the declarative category
   /// table so a new safe category is picked up automatically.
   static List<String> _quickCleanCategoryIds() => CleanerCategories.all()
-      .where((c) =>
-          c.safety == CleanerSafety.safe &&
-          c.defaultEnabled &&
-          !c.requiresAdmin)
+      .where(
+        (c) =>
+            c.safety == CleanerSafety.safe &&
+            c.defaultEnabled &&
+            !c.requiresAdmin,
+      )
       .map((c) => c.id)
       .toList(growable: false);
 
@@ -4721,8 +4737,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     if (items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text(AppLocalizations.of(context)!.diskCleanerQuickCleanNothing),
+          content: Text(
+            AppLocalizations.of(context)!.diskCleanerQuickCleanNothing,
+          ),
         ),
       );
       return;
@@ -4746,14 +4763,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   Future<bool?> _showQuickCleanPreviewDialog(ScanReport report) {
     final l = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final entries = report.itemsByCategory.entries
-        .where((e) => e.value.isNotEmpty)
-        .toList(growable: false)
-      ..sort((a, b) {
-        final aBytes = a.value.fold<int>(0, (s, i) => s + i.sizeBytes);
-        final bBytes = b.value.fold<int>(0, (s, i) => s + i.sizeBytes);
-        return bBytes.compareTo(aBytes);
-      });
+    final entries =
+        report.itemsByCategory.entries
+            .where((e) => e.value.isNotEmpty)
+            .toList(growable: false)
+          ..sort((a, b) {
+            final aBytes = a.value.fold<int>(0, (s, i) => s + i.sizeBytes);
+            final bBytes = b.value.fold<int>(0, (s, i) => s + i.sizeBytes);
+            return bBytes.compareTo(aBytes);
+          });
 
     return showDialog<bool>(
       context: context,
@@ -4777,11 +4795,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: entries.length,
-                  separatorBuilder: (_, __) => const Divider(height: 12),
+                  separatorBuilder: (_, _) => const Divider(height: 12),
                   itemBuilder: (_, index) {
                     final entry = entries[index];
-                    final bytes =
-                        entry.value.fold<int>(0, (s, i) => s + i.sizeBytes);
+                    final bytes = entry.value.fold<int>(
+                      0,
+                      (s, i) => s + i.sizeBytes,
+                    );
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -4791,8 +4811,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                             children: [
                               Text(
                                 _junkCategoryTitle(l, entry.key),
-                                style: theme.textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w600),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -4807,8 +4828,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                         const SizedBox(width: 12),
                         Text(
                           _fmt(bytes),
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     );
@@ -4818,8 +4840,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(PhosphorIconsLight.recycle,
-                      size: 15, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    PhosphorIconsLight.recycle,
+                    size: 15,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -4844,7 +4869,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             style: FilledButton.styleFrom(shape: _cleanerButtonShape),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-                l.diskCleanerMoveToRecycleBinButton(_fmt(report.totalBytes))),
+              l.diskCleanerMoveToRecycleBinButton(_fmt(report.totalBytes)),
+            ),
           ),
         ],
       ),
@@ -4865,7 +4891,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _flatRowsValid = false;
     });
     await _cleanJunk(
-        permanent: _selectedCleanMode == _CleanDeleteMode.permanent);
+      permanent: _selectedCleanMode == _CleanDeleteMode.permanent,
+    );
   }
 
   Future<void> _cleanJunk({
@@ -4926,8 +4953,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
       if (!mounted) return;
       final succeededSet = result.succeeded.toSet();
-      final cleanedItems =
-          items.where((i) => succeededSet.contains(i.path)).toList();
+      final cleanedItems = items
+          .where((i) => succeededSet.contains(i.path))
+          .toList();
 
       // Prune deleted paths from the in-memory tree so returning to the
       // results view shows the freed space without a re-scan.
@@ -4958,8 +4986,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         _isCleaningJunk = false;
         _pendingCleanItems = [];
         _pendingCleanBytes = 0;
-        _cleanedItems =
-            showCleanedResult && !permanent ? cleanedItems : const [];
+        _cleanedItems = showCleanedResult && !permanent
+            ? cleanedItems
+            : const [];
         _cleanedFreedBytes = result.freedBytes;
         _cleanedFailureCount = result.failureCount;
         _cleanedSkippedInUseCount = result.skippedInUseCount;
@@ -4977,8 +5006,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              AppLocalizations.of(context)!
-                  .diskCleanerSkippedInUseSnack(result.skippedInUseCount),
+              AppLocalizations.of(
+                context,
+              )!.diskCleanerSkippedInUseSnack(result.skippedInUseCount),
             ),
           ),
         );
@@ -4986,8 +5016,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              AppLocalizations.of(context)!.diskCleanerSkippedAfterFailureSnack(
-                  result.skippedByUserCount),
+              AppLocalizations.of(
+                context,
+              )!.diskCleanerSkippedAfterFailureSnack(result.skippedByUserCount),
             ),
           ),
         );
@@ -4999,8 +5030,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(AppLocalizations.of(context)!
-                .diskCleanerCleanupFailedMsg('$e'))),
+          content: Text(
+            AppLocalizations.of(context)!.diskCleanerCleanupFailedMsg('$e'),
+          ),
+        ),
       );
     }
   }
@@ -5032,8 +5065,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       );
       if (!mounted) return;
 
-      final originalPaths =
-          _cleanedItems.map((i) => i.path.toUpperCase()).toSet();
+      final originalPaths = _cleanedItems
+          .map((i) => i.path.toUpperCase())
+          .toSet();
       final toDelete = binReport.allItems.where((i) {
         final orig = (i.originalPath ?? '').toUpperCase();
         return originalPaths.contains(orig);
@@ -5070,19 +5104,30 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.skippedInUseCount > 0
-              ? AppLocalizations.of(context)!
-                  .diskCleanerPermanentDeletedWithInUse(result.successCount,
-                      _fmt(result.freedBytes), result.skippedInUseCount)
-              : result.skippedByUserCount > 0
-                  ? AppLocalizations.of(context)!
-                      .diskCleanerPermanentDeletedWithSkipped(
-                          result.successCount,
-                          _fmt(result.freedBytes),
-                          result.skippedByUserCount)
-                  : AppLocalizations.of(context)!
-                      .diskCleanerPermanentDeletedSuccess(
-                          result.successCount, _fmt(result.freedBytes))),
+          content: Text(
+            result.skippedInUseCount > 0
+                ? AppLocalizations.of(
+                    context,
+                  )!.diskCleanerPermanentDeletedWithInUse(
+                    result.successCount,
+                    _fmt(result.freedBytes),
+                    result.skippedInUseCount,
+                  )
+                : result.skippedByUserCount > 0
+                ? AppLocalizations.of(
+                    context,
+                  )!.diskCleanerPermanentDeletedWithSkipped(
+                    result.successCount,
+                    _fmt(result.freedBytes),
+                    result.skippedByUserCount,
+                  )
+                : AppLocalizations.of(
+                    context,
+                  )!.diskCleanerPermanentDeletedSuccess(
+                    result.successCount,
+                    _fmt(result.freedBytes),
+                  ),
+          ),
         ),
       );
     } catch (e) {
@@ -5092,8 +5137,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(AppLocalizations.of(context)!
-                .diskCleanerPermanentDeleteFailedMsg('$e'))),
+          content: Text(
+            AppLocalizations.of(
+              context,
+            )!.diskCleanerPermanentDeleteFailedMsg('$e'),
+          ),
+        ),
       );
     }
   }
@@ -5155,11 +5204,13 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
     final actionLabel = details.permanent
         ? l.diskCleanerPermanentDeleteLabel
         : l.diskCleanerRecycleBinLabel;
-    final reasonText =
-        details.isInUse ? l.diskCleanerFileInUse : details.reason;
+    final reasonText = details.isInUse
+        ? l.diskCleanerFileInUse
+        : details.reason;
 
     var skipAll = false;
-    final action = await showDialog<CleanFailureAction>(
+    final action =
+        await showDialog<CleanFailureAction>(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => StatefulBuilder(
@@ -5169,8 +5220,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(fileName,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    fileName,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   const SizedBox(height: 8),
                   SelectableText(
                     details.item.path,
@@ -5183,8 +5236,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                     Text(
                       l.diskCleanerRetryInUseHint,
                       style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                   if (details.blockedPath != null &&
@@ -5283,8 +5336,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.35,
+        ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
       ),
@@ -5295,8 +5349,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           if (hasFreeSpaceDelta) ...[
             Row(
               children: [
-                Icon(PhosphorIconsLight.hardDrive,
-                    size: 16, color: theme.colorScheme.primary),
+                Icon(
+                  PhosphorIconsLight.hardDrive,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -5304,8 +5361,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                       _fmt(before),
                       _fmt(after),
                     ),
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -5317,10 +5375,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                 child: LinearProgressIndicator(
                   value: _driveUsedFraction(driveSpace),
                   minHeight: 6,
-                  backgroundColor:
-                      theme.colorScheme.onSurface.withValues(alpha: 0.10),
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  backgroundColor: theme.colorScheme.onSurface.withValues(
+                    alpha: 0.10,
+                  ),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    theme.colorScheme.primary,
+                  ),
                 ),
               ),
             ],
@@ -5329,13 +5389,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           if (growth.isNotEmpty) ...[
             Row(
               children: [
-                Icon(PhosphorIconsLight.trendUp,
-                    size: 15, color: theme.colorScheme.tertiary),
+                Icon(
+                  PhosphorIconsLight.trendUp,
+                  size: 15,
+                  color: theme.colorScheme.tertiary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   l.diskCleanerGrowthWatchTitle,
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -5362,8 +5426,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   Widget _buildCleaned(ThemeData theme, AppLocalizations l) {
-    final successCount =
-        _lastCleanWasPermanent ? _lastCleanSuccessCount : _cleanedItems.length;
+    final successCount = _lastCleanWasPermanent
+        ? _lastCleanSuccessCount
+        : _cleanedItems.length;
     return Column(
       key: const ValueKey('cleaned'),
       children: [
@@ -5372,25 +5437,33 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              const Icon(PhosphorIconsLight.checkCircle,
-                  size: 20, color: Colors.green),
+              const Icon(
+                PhosphorIconsLight.checkCircle,
+                size: 20,
+                color: Colors.green,
+              ),
               const SizedBox(width: 10),
               Text(
                 l.diskCleanerCleanDone,
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(width: 12),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   l.diskCleanerFreedBadge(
-                      _fmt(_cleanedFreedBytes), successCount),
+                    _fmt(_cleanedFreedBytes),
+                    successCount,
+                  ),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -5401,8 +5474,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               if (_cleanedFailureCount > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -5416,24 +5491,30 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               if (_cleanedSkippedInUseCount > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     l.diskCleanerInUseBadge(_cleanedSkippedInUseCount),
-                    style:
-                        TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.orange.shade800,
+                    ),
                   ),
                 ),
               ],
               if (_cleanedSkippedByUserCount > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
@@ -5468,8 +5549,10 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                   });
                   _startScan(forceRefresh: true);
                 },
-                icon: const Icon(PhosphorIconsLight.arrowCounterClockwise,
-                    size: 16),
+                icon: const Icon(
+                  PhosphorIconsLight.arrowCounterClockwise,
+                  size: 16,
+                ),
                 label: Text(l.diskCleanerScanAgain),
               ),
             ],
@@ -5484,14 +5567,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             decoration: BoxDecoration(
               color: Colors.orange.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.orange.withValues(alpha: 0.25),
-              ),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [
-                Icon(PhosphorIconsLight.warning,
-                    size: 16, color: Colors.orange.shade800),
+                Icon(
+                  PhosphorIconsLight.warning,
+                  size: 16,
+                  color: Colors.orange.shade800,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -5517,13 +5601,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             ),
             child: Row(
               children: [
-                Icon(PhosphorIconsLight.arrowRight,
-                    size: 16, color: theme.colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.arrowRight,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     l.diskCleanerSkippedByUserBanner(
-                        _cleanedSkippedByUserCount),
+                      _cleanedSkippedByUserCount,
+                    ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
@@ -5541,8 +5629,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(PhosphorIconsLight.trash,
-                      size: 48, color: Colors.red.shade700),
+                  Icon(
+                    PhosphorIconsLight.trash,
+                    size: 48,
+                    color: Colors.red.shade700,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     l.diskCleanerDeletedPermanentlyBody(successCount),
@@ -5562,14 +5653,15 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: theme.dividerColor),
-              ),
+              border: Border(top: BorderSide(color: theme.dividerColor)),
             ),
             child: Row(
               children: [
-                Icon(PhosphorIconsLight.trash,
-                    size: 18, color: theme.colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.trash,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   l.diskCleanerPermanentDeleteFinished(successCount),
@@ -5581,36 +5673,49 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         ] else ...[
           // Column header
           Container(
-            color: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.4),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.4,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Expanded(
                   flex: 3,
-                  child: Text(l.diskCleanerColumnFileName,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    l.diskCleanerColumnFileName,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
                 Expanded(
                   flex: 4,
-                  child: Text(l.diskCleanerColumnPath,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    l.diskCleanerColumnPath,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
                 SizedBox(
                   width: 80,
-                  child: Text(l.diskCleanerColumnSize,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                      textAlign: TextAlign.right),
+                  child: Text(
+                    l.diskCleanerColumnSize,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 SizedBox(
                   width: 100,
-                  child: Text(l.diskCleanerColumnCategory,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  child: Text(
+                    l.diskCleanerColumnCategory,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -5623,11 +5728,16 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(PhosphorIconsLight.checkCircle,
-                            size: 48, color: Colors.green),
+                        const Icon(
+                          PhosphorIconsLight.checkCircle,
+                          size: 48,
+                          color: Colors.green,
+                        ),
                         const SizedBox(height: 12),
-                        Text(l.diskCleanerRecycleBinEmpty,
-                            style: theme.textTheme.titleSmall),
+                        Text(
+                          l.diskCleanerRecycleBinEmpty,
+                          style: theme.textTheme.titleSmall,
+                        ),
                       ],
                     ),
                   )
@@ -5644,7 +5754,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                         color: isEven
                             ? Colors.transparent
                             : theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.15),
+                                  .withValues(alpha: 0.15),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
@@ -5653,10 +5763,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                               flex: 3,
                               child: Row(
                                 children: [
-                                  Icon(PhosphorIconsLight.recycle,
-                                      size: 13,
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant),
+                                  Icon(
+                                    PhosphorIconsLight.recycle,
+                                    size: 13,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
@@ -5688,7 +5799,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                               child: Text(
                                 _fmt(item.sizeBytes),
                                 style: const TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.w500),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
@@ -5717,21 +5830,26 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: theme.dividerColor),
-              ),
+              border: Border(top: BorderSide(color: theme.dividerColor)),
             ),
             child: Row(
               children: [
-                Icon(PhosphorIconsLight.recycle,
-                    size: 18, color: theme.colorScheme.onSurfaceVariant),
+                Icon(
+                  PhosphorIconsLight.recycle,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   _isPermanentDeleting
                       ? l.diskCleanerPermanentDeletingProgress(
-                          _permanentDone, _permanentTotal)
+                          _permanentDone,
+                          _permanentTotal,
+                        )
                       : l.diskCleanerItemsInRecycleBin(
-                          _cleanedItems.length, _fmt(_cleanedFreedBytes)),
+                          _cleanedItems.length,
+                          _fmt(_cleanedFreedBytes),
+                        ),
                   style: theme.textTheme.bodyMedium,
                 ),
                 if (_isPermanentDeleting) ...[
@@ -5744,9 +5862,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                         value: _isPermanentDeleting && _permanentDone == 0
                             ? null
                             : _permanentTotal > 0
-                                ? (_permanentDone / _permanentTotal)
-                                    .clamp(0.0, 1.0)
-                                : null,
+                            ? (_permanentDone / _permanentTotal).clamp(0.0, 1.0)
+                            : null,
                         minHeight: 6,
                       ),
                     ),
@@ -5759,16 +5876,21 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
                       backgroundColor: Colors.red.shade700,
                       shape: _cleanerButtonShape,
                       padding: const EdgeInsets.symmetric(
-                          vertical: 10, horizontal: 16),
+                        vertical: 10,
+                        horizontal: 16,
+                      ),
                     ),
-                    onPressed:
-                        !_isPermanentDeleting ? _permanentDeleteCleaned : null,
+                    onPressed: !_isPermanentDeleting
+                        ? _permanentDeleteCleaned
+                        : null,
                     icon: _isPermanentDeleting
                         ? const AppWaveLoader(size: 22, color: Colors.white)
                         : const Icon(PhosphorIconsLight.trash, size: 16),
-                    label: Text(_isPermanentDeleting
-                        ? l.diskCleanerDeletingLabel
-                        : l.diskCleanerPermanentDeleteLabel),
+                    label: Text(
+                      _isPermanentDeleting
+                          ? l.diskCleanerDeletingLabel
+                          : l.diskCleanerPermanentDeleteLabel,
+                    ),
                   ),
               ],
             ),
@@ -5803,8 +5925,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
         child: Material(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
@@ -5896,9 +6019,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       _replaceTreeTargets(DiskTreeSelection.collectDeletionTargets(root));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Refresh failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Refresh failed: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -5997,9 +6120,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load properties: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load properties: $e')));
     }
   }
 
@@ -6032,7 +6155,8 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     final isImage = node.isFile && FileTypeUtils.isImageFile(node.fullPath);
     final isVideo = node.isFile && FileTypeUtils.isVideoFile(node.fullPath);
-    final canShowShellMenu = Platform.isWindows &&
+    final canShowShellMenu =
+        Platform.isWindows &&
         FileSystemEntity.typeSync(node.fullPath) !=
             FileSystemEntityType.notFound;
     final sections = <ContextMenuSection>[
@@ -6054,7 +6178,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               label: l10n.playVideo,
               icon: PhosphorIconsLight.playCircle,
               onSelected: (_) => ExternalAppHelper.openFileWithApp(
-                  node.fullPath, 'shell_open'),
+                node.fullPath,
+                'shell_open',
+              ),
             ),
           if (node.isFile && isImage)
             ContextMenuAction(
@@ -6062,7 +6188,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               label: l10n.viewImage,
               icon: PhosphorIconsLight.image,
               onSelected: (_) => ExternalAppHelper.openFileWithApp(
-                  node.fullPath, 'shell_open'),
+                node.fullPath,
+                'shell_open',
+              ),
             ),
           if (node.isFile)
             ContextMenuAction(
@@ -6070,7 +6198,9 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
               label: l10n.open,
               icon: PhosphorIconsLight.file,
               onSelected: (_) => ExternalAppHelper.openFileWithApp(
-                  node.fullPath, 'shell_open'),
+                node.fullPath,
+                'shell_open',
+              ),
             ),
           if (node.isFile && isDesktopPlatform)
             ContextMenuAction(
@@ -6144,14 +6274,18 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             label: l10n.copy,
             icon: PhosphorIconsLight.copy,
             onSelected: (_) => FileOperationsHandler.copyToClipboard(
-                context: context, entity: entity),
+              context: context,
+              entity: entity,
+            ),
           ),
           ContextMenuAction(
             id: 'cut',
             label: l10n.cut,
             icon: PhosphorIconsLight.scissors,
             onSelected: (_) => FileOperationsHandler.cutToClipboard(
-                context: context, entity: entity),
+              context: context,
+              entity: entity,
+            ),
           ),
           if (!node.isFile)
             ContextMenuAction(
@@ -6306,14 +6440,18 @@ class _TreeRowState extends State<_TreeRow> {
             },
             onSecondaryTapUp:
                 widget.onShowContextMenu == null || node.fullPath.isEmpty
-                    ? null
-                    : (d) => widget.onShowContextMenu!(node, d.globalPosition),
+                ? null
+                : (d) => widget.onShowContextMenu!(node, d.globalPosition),
             child: Container(
               color: isJunk
                   ? Colors.orange.withValues(alpha: 0.06)
                   : Colors.transparent,
               padding: EdgeInsets.only(
-                  left: 12 + indent, right: 12, top: 4, bottom: 4),
+                left: 12 + indent,
+                right: 12,
+                top: 4,
+                bottom: 4,
+              ),
               child: Row(
                 children: [
                   // Selection checkbox
@@ -6343,9 +6481,11 @@ class _TreeRowState extends State<_TreeRow> {
                         ? AnimatedRotation(
                             duration: const Duration(milliseconds: 150),
                             turns: node.isExpanded ? 0.25 : 0.0,
-                            child: Icon(PhosphorIconsLight.caretRight,
-                                size: 12,
-                                color: theme.colorScheme.onSurfaceVariant),
+                            child: Icon(
+                              PhosphorIconsLight.caretRight,
+                              size: 12,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           )
                         : const SizedBox.shrink(),
                   ),
@@ -6362,8 +6502,8 @@ class _TreeRowState extends State<_TreeRow> {
                           color: node.isJunk
                               ? Colors.orange
                               : node.isFile
-                                  ? theme.colorScheme.onSurfaceVariant
-                                  : theme.colorScheme.primary,
+                              ? theme.colorScheme.onSurfaceVariant
+                              : theme.colorScheme.primary,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -6394,7 +6534,9 @@ class _TreeRowState extends State<_TreeRow> {
                             child: Container(
                               margin: const EdgeInsets.only(left: 6),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.orange.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(3),
@@ -6417,8 +6559,9 @@ class _TreeRowState extends State<_TreeRow> {
                               borderRadius: BorderRadius.circular(10),
                               onTap: () => widget.onAskAi!(node),
                               child: CbTooltip(
-                                message: AppLocalizations.of(context)!
-                                    .diskCleanerAskAgentAboutThis,
+                                message: AppLocalizations.of(
+                                  context,
+                                )!.diskCleanerAskAgentAboutThis,
                                 child: Icon(
                                   PhosphorIconsLight.sparkle,
                                   size: 14,
@@ -6436,7 +6579,9 @@ class _TreeRowState extends State<_TreeRow> {
                     child: Text(
                       _CbAgentCleanerScreenState._fmt(node.sizeBytes),
                       style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w500),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                       textAlign: TextAlign.right,
                     ),
                   ),
@@ -6444,10 +6589,7 @@ class _TreeRowState extends State<_TreeRow> {
                   // % bar
                   SizedBox(
                     width: 90,
-                    child: _PercentBar(
-                      percent: percent,
-                      isJunk: node.isJunk,
-                    ),
+                    child: _PercentBar(percent: percent, isJunk: node.isJunk),
                   ),
                   // File count
                   SizedBox(
@@ -6483,34 +6625,39 @@ class _TreeRowState extends State<_TreeRow> {
     final hiddenCount = filtered.length - visible.length;
 
     final rows = visible
-        .map((child) => _TreeRow(
-              node: child,
-              depth: widget.depth + 1,
-              parentSize: node.sizeBytes,
-              theme: theme,
-              onSelect: widget.onSelect,
-              onToggleJunk: widget.onToggleJunk,
-              onAskAi: widget.onAskAi,
-              onShowContextMenu: widget.onShowContextMenu,
-              nodeFilter: widget.nodeFilter,
-            ))
+        .map(
+          (child) => _TreeRow(
+            node: child,
+            depth: widget.depth + 1,
+            parentSize: node.sizeBytes,
+            theme: theme,
+            onSelect: widget.onSelect,
+            onToggleJunk: widget.onToggleJunk,
+            onAskAi: widget.onAskAi,
+            onShowContextMenu: widget.onShowContextMenu,
+            nodeFilter: widget.nodeFilter,
+          ),
+        )
         .toList();
 
     if (hiddenCount > 0) {
-      rows.add(_TreeRow(
-        node: DiskTreeNode(
-          name: AppLocalizations.of(context)!
-              .diskCleanerAndMoreItems(hiddenCount),
-          fullPath: '',
-          isFile: true,
-          sizeBytes: 0,
+      rows.add(
+        _TreeRow(
+          node: DiskTreeNode(
+            name: AppLocalizations.of(
+              context,
+            )!.diskCleanerAndMoreItems(hiddenCount),
+            fullPath: '',
+            isFile: true,
+            sizeBytes: 0,
+          ),
+          depth: widget.depth + 1,
+          parentSize: node.sizeBytes,
+          theme: theme,
+          onSelect: (_) {},
+          onToggleJunk: (_, _) {},
         ),
-        depth: widget.depth + 1,
-        parentSize: node.sizeBytes,
-        theme: theme,
-        onSelect: (_) {},
-        onToggleJunk: (_, __) {},
-      ));
+      );
     }
 
     return rows;
@@ -6565,8 +6712,9 @@ class _PercentBar extends StatelessWidget {
             height: 12,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(2),
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.5,
+              ),
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
@@ -6739,7 +6887,8 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
     final path = widget.row.node.fullPath;
     final now = DateTime.now();
     final lastTapAt = _lastTapAt;
-    final isDoubleTap = _lastTapPath == path &&
+    final isDoubleTap =
+        _lastTapPath == path &&
         lastTapAt != null &&
         now.difference(lastTapAt) <= const Duration(milliseconds: 300);
 
@@ -6783,8 +6932,8 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => _handleTap(hasChildren),
-              onSecondaryTapUp: widget.onShowContextMenu == null ||
-                      node.fullPath.isEmpty
+              onSecondaryTapUp:
+                  widget.onShowContextMenu == null || node.fullPath.isEmpty
                   ? null
                   : (d) => widget.onShowContextMenu!(node, d.globalPosition),
               child: Container(
@@ -6794,14 +6943,14 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                 color: isSelected
                     ? theme.colorScheme.primary.withValues(alpha: 0.14)
                     : focusedPath == node.fullPath
-                        ? theme.colorScheme.primary.withValues(alpha: 0.06)
-                        : _hovering
-                            ? theme.colorScheme.primary.withValues(alpha: 0.06)
-                            : isJunk
-                                ? Colors.orange.withValues(alpha: 0.04)
-                                : growth != null
-                                    ? Colors.green.withValues(alpha: 0.06)
-                                    : Colors.transparent,
+                    ? theme.colorScheme.primary.withValues(alpha: 0.06)
+                    : _hovering
+                    ? theme.colorScheme.primary.withValues(alpha: 0.06)
+                    : isJunk
+                    ? Colors.orange.withValues(alpha: 0.04)
+                    : growth != null
+                    ? Colors.green.withValues(alpha: 0.06)
+                    : Colors.transparent,
                 padding: EdgeInsets.only(left: 12 + indent, right: 12),
                 child: Row(
                   children: [
@@ -6833,8 +6982,8 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                             color: node.isJunk
                                 ? Colors.orange
                                 : node.isFile
-                                    ? theme.colorScheme.onSurfaceVariant
-                                    : theme.colorScheme.primary,
+                                ? theme.colorScheme.onSurfaceVariant
+                                : theme.colorScheme.primary,
                           ),
                           const SizedBox(width: 5),
                           Expanded(
@@ -6854,8 +7003,8 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                                 color: node.isAggregate
                                     ? theme.colorScheme.onSurfaceVariant
                                     : node.isJunk
-                                        ? Colors.orange.shade800
-                                        : theme.colorScheme.onSurface,
+                                    ? Colors.orange.shade800
+                                    : theme.colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -6872,7 +7021,9 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                               child: Container(
                                 margin: const EdgeInsets.only(left: 4),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 1),
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.orange.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(3),
@@ -6938,7 +7089,9 @@ class _FlatTreeRowWidgetState extends State<_FlatTreeRowWidget> {
                       child: Text(
                         _CbAgentCleanerScreenState._fmt(node.sizeBytes),
                         style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w500),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
                         textAlign: TextAlign.right,
                       ),
                     ),

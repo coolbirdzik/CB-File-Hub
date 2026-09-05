@@ -48,12 +48,15 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
       }
 
       // Emit new state with updated selections and last selected path
-      emit(state.copyWith(
-        selectedFilePaths: selectedFiles,
-        selectedFolderPaths: selectedFolders,
-        lastSelectedPath: filePath,
-        isSelectionMode: selectedFiles.isNotEmpty || selectedFolders.isNotEmpty,
-      ));
+      emit(
+        state.copyWith(
+          selectedFilePaths: selectedFiles,
+          selectedFolderPaths: selectedFolders,
+          lastSelectedPath: filePath,
+          isSelectionMode:
+              selectedFiles.isNotEmpty || selectedFolders.isNotEmpty,
+        ),
+      );
     } else if (state.lastSelectedPath != null) {
       // SHIFT+CLICK RANGE SELECTION
       // This requires knowledge of all available file/folder paths in the current view
@@ -93,12 +96,15 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
       }
 
       // Emit new state with updated selections and last selected path
-      emit(state.copyWith(
-        selectedFilePaths: selectedFiles,
-        selectedFolderPaths: selectedFolders,
-        lastSelectedPath: folderPath,
-        isSelectionMode: selectedFiles.isNotEmpty || selectedFolders.isNotEmpty,
-      ));
+      emit(
+        state.copyWith(
+          selectedFilePaths: selectedFiles,
+          selectedFolderPaths: selectedFolders,
+          lastSelectedPath: folderPath,
+          isSelectionMode:
+              selectedFiles.isNotEmpty || selectedFolders.isNotEmpty,
+        ),
+      );
     } else if (state.lastSelectedPath != null) {
       // SHIFT+CLICK RANGE SELECTION
       // This requires knowledge of all available file/folder paths in the current view
@@ -107,16 +113,15 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
   }
 
   // Handler for clearing all selections
-  void _onClearSelection(
-    ClearSelection event,
-    Emitter<SelectionState> emit,
-  ) {
-    emit(state.copyWith(
-      selectedFilePaths: {},
-      selectedFolderPaths: {},
-      isSelectionMode: false,
-      clearLastSelectedPath: true,
-    ));
+  void _onClearSelection(ClearSelection event, Emitter<SelectionState> emit) {
+    emit(
+      state.copyWith(
+        selectedFilePaths: {},
+        selectedFolderPaths: {},
+        isSelectionMode: false,
+        clearLastSelectedPath: true,
+      ),
+    );
   }
 
   // Handler for toggling selection mode
@@ -128,12 +133,14 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
 
     // If turning off selection mode, clear selections too
     if (!newMode) {
-      emit(state.copyWith(
-        selectedFilePaths: {},
-        selectedFolderPaths: {},
-        isSelectionMode: false,
-        clearLastSelectedPath: true,
-      ));
+      emit(
+        state.copyWith(
+          selectedFilePaths: {},
+          selectedFolderPaths: {},
+          isSelectionMode: false,
+          clearLastSelectedPath: true,
+        ),
+      );
     } else {
       emit(state.copyWith(isSelectionMode: true));
     }
@@ -153,13 +160,13 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
       // Create new sets based on whether CTRL is pressed
       final Set<String> newSelectedFiles = event.isCtrlPressed
           ? {
-              ...state.selectedFilePaths
+              ...state.selectedFilePaths,
             } // Keep existing selections if CTRL is pressed
           : {}; // Clear selections if CTRL is not pressed
 
       final Set<String> newSelectedFolders = event.isCtrlPressed
           ? {
-              ...state.selectedFolderPaths
+              ...state.selectedFolderPaths,
             } // Keep existing selections if CTRL is pressed
           : {}; // Clear selections if CTRL is not pressed
 
@@ -171,18 +178,21 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
 
       // Save the explicit endpoint when available. Range selection from the
       // keyboard can end on either a file or folder, independent of set order.
-      final lastSelectedPath = event.lastSelectedPath ??
+      final lastSelectedPath =
+          event.lastSelectedPath ??
           (event.filePaths.isNotEmpty
               ? event.filePaths.last
               : (event.folderPaths.isNotEmpty ? event.folderPaths.last : null));
 
-      emit(state.copyWith(
-        selectedFilePaths: newSelectedFiles,
-        selectedFolderPaths: newSelectedFolders,
-        lastSelectedPath: lastSelectedPath ?? state.lastSelectedPath,
-        isSelectionMode:
-            newSelectedFiles.isNotEmpty || newSelectedFolders.isNotEmpty,
-      ));
+      emit(
+        state.copyWith(
+          selectedFilePaths: newSelectedFiles,
+          selectedFolderPaths: newSelectedFolders,
+          lastSelectedPath: lastSelectedPath ?? state.lastSelectedPath,
+          isSelectionMode:
+              newSelectedFiles.isNotEmpty || newSelectedFolders.isNotEmpty,
+        ),
+      );
     } else {
       // Handle CTRL or no modifier keys (regular drag selection)
       final Set<String> newSelectedFiles;
@@ -195,11 +205,13 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
         //
         // If a pre-drag snapshot was provided (rubber-band drag), use it as
         // the baseline. Otherwise fall back to the live state (Ctrl+click).
-        final baseFiles = event.preCtrlDragFiles.isNotEmpty ||
+        final baseFiles =
+            event.preCtrlDragFiles.isNotEmpty ||
                 event.preCtrlDragFolders.isNotEmpty
             ? event.preCtrlDragFiles
             : state.selectedFilePaths;
-        final baseFolders = event.preCtrlDragFiles.isNotEmpty ||
+        final baseFolders =
+            event.preCtrlDragFiles.isNotEmpty ||
                 event.preCtrlDragFolders.isNotEmpty
             ? event.preCtrlDragFolders
             : state.selectedFolderPaths;
@@ -229,33 +241,31 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
         newSelectedFolders = {...event.folderPaths};
       }
 
-      emit(state.copyWith(
-        selectedFilePaths: newSelectedFiles,
-        selectedFolderPaths: newSelectedFolders,
-        isSelectionMode:
-            newSelectedFiles.isNotEmpty || newSelectedFolders.isNotEmpty,
-      ));
+      emit(
+        state.copyWith(
+          selectedFilePaths: newSelectedFiles,
+          selectedFolderPaths: newSelectedFolders,
+          isSelectionMode:
+              newSelectedFiles.isNotEmpty || newSelectedFolders.isNotEmpty,
+        ),
+      );
     }
   }
 
   // Handler for selecting all items
-  void _onSelectAll(
-    SelectAll event,
-    Emitter<SelectionState> emit,
-  ) {
-    emit(state.copyWith(
-      selectedFilePaths: event.allFilePaths.toSet(),
-      selectedFolderPaths: event.allFolderPaths.toSet(),
-      isSelectionMode:
-          event.allFilePaths.isNotEmpty || event.allFolderPaths.isNotEmpty,
-    ));
+  void _onSelectAll(SelectAll event, Emitter<SelectionState> emit) {
+    emit(
+      state.copyWith(
+        selectedFilePaths: event.allFilePaths.toSet(),
+        selectedFolderPaths: event.allFolderPaths.toSet(),
+        isSelectionMode:
+            event.allFilePaths.isNotEmpty || event.allFolderPaths.isNotEmpty,
+      ),
+    );
   }
 
   // Handler for adding a tag to a file or folder
-  void _onAddTagToItem(
-    AddTagToItem event,
-    Emitter<SelectionState> emit,
-  ) {
+  void _onAddTagToItem(AddTagToItem event, Emitter<SelectionState> emit) {
     // Here you would typically call a service to save the tag in a database
     // For this implementation, we're just updating the UI
     // This is a placeholder - in a real app, this would save to a database
@@ -284,10 +294,7 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
   }
 
   // Handler for loading tags for a specific file or folder
-  void _onLoadTags(
-    LoadTags event,
-    Emitter<SelectionState> emit,
-  ) {
+  void _onLoadTags(LoadTags event, Emitter<SelectionState> emit) {
     // Here you would typically call a service to load tags from a database
     // For this implementation, we're just printing
     AppLogger.debug('Loading tags for item ${event.filePath}');
@@ -299,10 +306,7 @@ class SelectionBloc extends Bloc<SelectionEvent, SelectionState> {
   }
 
   // Handler for loading all available tags
-  void _onLoadAllTags(
-    LoadAllTags event,
-    Emitter<SelectionState> emit,
-  ) {
+  void _onLoadAllTags(LoadAllTags event, Emitter<SelectionState> emit) {
     // Here you would typically call a service to load all tags from a database
     // For this implementation, we're just printing
     AppLogger.debug('Loading all available tags');

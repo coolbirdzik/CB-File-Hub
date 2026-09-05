@@ -7,10 +7,10 @@ class StreamSpeedIndicator extends StatefulWidget {
   final String label;
 
   const StreamSpeedIndicator({
-    Key? key,
+    super.key,
     this.stream,
     this.label = 'Stream Speed',
-  }) : super(key: key);
+  });
 
   @override
   State<StreamSpeedIndicator> createState() => _StreamSpeedIndicatorState();
@@ -172,8 +172,9 @@ class _StreamSpeedIndicatorState extends State<StreamSpeedIndicator>
                             boxShadow: _isActive
                                 ? [
                                     BoxShadow(
-                                      color:
-                                          Colors.green.withValues(alpha: 0.5),
+                                      color: Colors.green.withValues(
+                                        alpha: 0.5,
+                                      ),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),
@@ -222,10 +223,7 @@ class _StreamSpeedIndicatorState extends State<StreamSpeedIndicator>
             children: [
               const Text(
                 'Speed:',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               Text(
                 _formatSpeed(_currentSpeed),
@@ -245,10 +243,7 @@ class _StreamSpeedIndicatorState extends State<StreamSpeedIndicator>
             children: [
               const Text(
                 'Total:',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               Text(
                 _formatBytes(_totalBytes),
@@ -320,8 +315,9 @@ class SpeedGraphPainter extends CustomPainter {
 
     for (int i = 0; i < speedHistory.length; i++) {
       final x = (i / (speedHistory.length - 1)) * size.width;
-      final normalizedSpeed =
-          range > 0 ? (speedHistory[i] - minSpeed) / range : 0.5;
+      final normalizedSpeed = range > 0
+          ? (speedHistory[i] - minSpeed) / range
+          : 0.5;
       final y = size.height - (normalizedSpeed * size.height);
 
       if (i == 0) {

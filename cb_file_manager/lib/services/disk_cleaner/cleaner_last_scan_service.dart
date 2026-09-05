@@ -30,14 +30,14 @@ class CleanerLastScanSummary {
   });
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'drivePath': drivePath,
-        'scannedAt': scannedAt.toIso8601String(),
-        'totalBytes': totalBytes,
-        'fileCount': fileCount,
-        'junkBytes': junkBytes,
-        'cleanableCount': cleanableCount,
-        'freeBytes': freeBytes,
-      };
+    'drivePath': drivePath,
+    'scannedAt': scannedAt.toIso8601String(),
+    'totalBytes': totalBytes,
+    'fileCount': fileCount,
+    'junkBytes': junkBytes,
+    'cleanableCount': cleanableCount,
+    'freeBytes': freeBytes,
+  };
 
   static CleanerLastScanSummary? fromJson(Map<String, dynamic> json) {
     final drivePath = json['drivePath'];

@@ -78,29 +78,27 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
     Duration? durationInfo,
     Duration? durationWarning,
     Duration? durationError,
-  }) =>
-      AppToastTheme(
-        iconBoxSize: iconBoxSize ?? this.iconBoxSize,
-        iconSize: iconSize ?? this.iconSize,
-        iconBoxRadius: iconBoxRadius ?? this.iconBoxRadius,
-        containerRadius: containerRadius ?? this.containerRadius,
-        hPadding: hPadding ?? this.hPadding,
-        vPadding: vPadding ?? this.vPadding,
-        maxWidth: maxWidth ?? this.maxWidth,
-        blurSigmaDesktopLight:
-            blurSigmaDesktopLight ?? this.blurSigmaDesktopLight,
-        blurSigmaDesktopDark: blurSigmaDesktopDark ?? this.blurSigmaDesktopDark,
-        blurSigmaMobile: blurSigmaMobile ?? this.blurSigmaMobile,
-        surfaceOpacity: surfaceOpacity ?? this.surfaceOpacity,
-        borderOpacity: borderOpacity ?? this.borderOpacity,
-        shadowOpacityLight: shadowOpacityLight ?? this.shadowOpacityLight,
-        shadowOpacityDark: shadowOpacityDark ?? this.shadowOpacityDark,
-        iconAccentOpacity: iconAccentOpacity ?? this.iconAccentOpacity,
-        durationSuccess: durationSuccess ?? this.durationSuccess,
-        durationInfo: durationInfo ?? this.durationInfo,
-        durationWarning: durationWarning ?? this.durationWarning,
-        durationError: durationError ?? this.durationError,
-      );
+  }) => AppToastTheme(
+    iconBoxSize: iconBoxSize ?? this.iconBoxSize,
+    iconSize: iconSize ?? this.iconSize,
+    iconBoxRadius: iconBoxRadius ?? this.iconBoxRadius,
+    containerRadius: containerRadius ?? this.containerRadius,
+    hPadding: hPadding ?? this.hPadding,
+    vPadding: vPadding ?? this.vPadding,
+    maxWidth: maxWidth ?? this.maxWidth,
+    blurSigmaDesktopLight: blurSigmaDesktopLight ?? this.blurSigmaDesktopLight,
+    blurSigmaDesktopDark: blurSigmaDesktopDark ?? this.blurSigmaDesktopDark,
+    blurSigmaMobile: blurSigmaMobile ?? this.blurSigmaMobile,
+    surfaceOpacity: surfaceOpacity ?? this.surfaceOpacity,
+    borderOpacity: borderOpacity ?? this.borderOpacity,
+    shadowOpacityLight: shadowOpacityLight ?? this.shadowOpacityLight,
+    shadowOpacityDark: shadowOpacityDark ?? this.shadowOpacityDark,
+    iconAccentOpacity: iconAccentOpacity ?? this.iconAccentOpacity,
+    durationSuccess: durationSuccess ?? this.durationSuccess,
+    durationInfo: durationInfo ?? this.durationInfo,
+    durationWarning: durationWarning ?? this.durationWarning,
+    durationError: durationError ?? this.durationError,
+  );
 
   @override
   AppToastTheme lerp(ThemeExtension<AppToastTheme>? other, double t) {
@@ -113,38 +111,61 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
       hPadding: lerpDouble(hPadding, other.hPadding, t)!,
       vPadding: lerpDouble(vPadding, other.vPadding, t)!,
       maxWidth: lerpDouble(maxWidth, other.maxWidth, t)!,
-      blurSigmaDesktopLight:
-          lerpDouble(blurSigmaDesktopLight, other.blurSigmaDesktopLight, t)!,
-      blurSigmaDesktopDark:
-          lerpDouble(blurSigmaDesktopDark, other.blurSigmaDesktopDark, t)!,
+      blurSigmaDesktopLight: lerpDouble(
+        blurSigmaDesktopLight,
+        other.blurSigmaDesktopLight,
+        t,
+      )!,
+      blurSigmaDesktopDark: lerpDouble(
+        blurSigmaDesktopDark,
+        other.blurSigmaDesktopDark,
+        t,
+      )!,
       blurSigmaMobile: lerpDouble(blurSigmaMobile, other.blurSigmaMobile, t)!,
       surfaceOpacity: lerpDouble(surfaceOpacity, other.surfaceOpacity, t)!,
       borderOpacity: lerpDouble(borderOpacity, other.borderOpacity, t)!,
-      shadowOpacityLight:
-          lerpDouble(shadowOpacityLight, other.shadowOpacityLight, t)!,
-      shadowOpacityDark:
-          lerpDouble(shadowOpacityDark, other.shadowOpacityDark, t)!,
-      iconAccentOpacity:
-          lerpDouble(iconAccentOpacity, other.iconAccentOpacity, t)!,
+      shadowOpacityLight: lerpDouble(
+        shadowOpacityLight,
+        other.shadowOpacityLight,
+        t,
+      )!,
+      shadowOpacityDark: lerpDouble(
+        shadowOpacityDark,
+        other.shadowOpacityDark,
+        t,
+      )!,
+      iconAccentOpacity: lerpDouble(
+        iconAccentOpacity,
+        other.iconAccentOpacity,
+        t,
+      )!,
       durationSuccess: Duration(
-        milliseconds: lerpDouble(durationSuccess.inMilliseconds,
-                other.durationSuccess.inMilliseconds, t)!
-            .round(),
+        milliseconds: lerpDouble(
+          durationSuccess.inMilliseconds,
+          other.durationSuccess.inMilliseconds,
+          t,
+        )!.round(),
       ),
       durationInfo: Duration(
-        milliseconds: lerpDouble(durationInfo.inMilliseconds,
-                other.durationInfo.inMilliseconds, t)!
-            .round(),
+        milliseconds: lerpDouble(
+          durationInfo.inMilliseconds,
+          other.durationInfo.inMilliseconds,
+          t,
+        )!.round(),
       ),
       durationWarning: Duration(
-        milliseconds: lerpDouble(durationWarning.inMilliseconds,
-                other.durationWarning.inMilliseconds, t)!
-            .round(),
+        milliseconds: lerpDouble(
+          durationWarning.inMilliseconds,
+          other.durationWarning.inMilliseconds,
+          t,
+        )!.round(),
       ),
       durationError: Duration(
-        milliseconds: lerpDouble(durationError.inMilliseconds,
-                other.durationError.inMilliseconds, t)!
-            .round(),
+        milliseconds: lerpDouble(
+          durationError.inMilliseconds,
+          other.durationError.inMilliseconds,
+          t,
+        )!.round(),
       ),
     );
   }

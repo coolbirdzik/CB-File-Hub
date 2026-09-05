@@ -47,8 +47,9 @@ class MobileSMBService implements ISmbService {
   Future<String?> getSmbDirectLink(String tabPath) async {
     try {
       final hostFromPath = _getHostFromTabPath(tabPath);
-      final targetHost =
-          _connectedHost.isNotEmpty ? _connectedHost : hostFromPath;
+      final targetHost = _connectedHost.isNotEmpty
+          ? _connectedHost
+          : hostFromPath;
       if (targetHost.isEmpty) {
         return null;
       }
@@ -59,8 +60,10 @@ class MobileSMBService implements ISmbService {
       String domain = '';
       NetworkCredentials? credentials;
       try {
-        credentials = NetworkCredentialsService()
-            .findCredentials(serviceType: 'SMB', host: targetHost);
+        credentials = NetworkCredentialsService().findCredentials(
+          serviceType: 'SMB',
+          host: targetHost,
+        );
       } catch (e) {
         credentials = null;
       }
@@ -82,21 +85,24 @@ class MobileSMBService implements ISmbService {
       final smbPath = _getSmbPathFromTabPath(tabPath);
       if (smbPath.isEmpty || smbPath == '/') {
         debugPrint(
-            'MobileSMBService: Could not determine a valid file path from $tabPath');
+          'MobileSMBService: Could not determine a valid file path from $tabPath',
+        );
         return null;
       }
 
       // The smbPath from _getSmbPathFromTabPath is like "/share/folder/file.txt"
       // We need to remove the leading slash for the URL
-      final pathComponent =
-          smbPath.startsWith('/') ? smbPath.substring(1) : smbPath;
+      final pathComponent = smbPath.startsWith('/')
+          ? smbPath.substring(1)
+          : smbPath;
 
       // 3. Construct the direct link; keep common SMB path characters intact
       final encodedPath = _encodeSmbPath(pathComponent);
       String link;
       if (username.isNotEmpty) {
-        final userWithDomain =
-            domain.isNotEmpty ? '$domain;$username' : username;
+        final userWithDomain = domain.isNotEmpty
+            ? '$domain;$username'
+            : username;
         final encodedUser = Uri.encodeComponent(userWithDomain);
         final encodedPass = Uri.encodeComponent(password);
         link = 'smb://$encodedUser:$encodedPass@$targetHost/$encodedPath';
@@ -124,8 +130,10 @@ class MobileSMBService implements ISmbService {
 
     // Remove the leading "#network/"
     final pathWithoutPrefix = tabPath.substring('#network/'.length);
-    final parts =
-        pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
+    final parts = pathWithoutPrefix
+        .split('/')
+        .where((p) => p.isNotEmpty)
+        .toList();
 
     // parts = ["smb", "host", "share", "folder"]
     if (parts.length < 2) {
@@ -148,8 +156,10 @@ class MobileSMBService implements ISmbService {
     // Extract path after share
     if (parts.length > 3) {
       final shareName = Uri.decodeComponent(parts[2]);
-      final folders =
-          parts.sublist(3).map((f) => Uri.decodeComponent(f)).toList();
+      final folders = parts
+          .sublist(3)
+          .map((f) => Uri.decodeComponent(f))
+          .toList();
       final p = '/$shareName/${folders.join('/')}';
       return endsWithSlash ? '$p/' : p;
     }
@@ -176,8 +186,10 @@ class MobileSMBService implements ISmbService {
     }
 
     final pathWithoutPrefix = tabPath.substring('#network/'.length);
-    final parts =
-        pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
+    final parts = pathWithoutPrefix
+        .split('/')
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.length < 2) {
       return '';
     }
@@ -293,8 +305,10 @@ class MobileSMBService implements ISmbService {
 
     if (username.isEmpty) {
       try {
-        final credentials = NetworkCredentialsService()
-            .findCredentials(serviceType: 'SMB', host: _connectedHost);
+        final credentials = NetworkCredentialsService().findCredentials(
+          serviceType: 'SMB',
+          host: _connectedHost,
+        );
         if (credentials != null) {
           username = credentials.username;
           password = credentials.password;
@@ -319,8 +333,9 @@ class MobileSMBService implements ISmbService {
     );
 
     try {
-      final ok =
-          await _smbClient.connect(config).timeout(const Duration(seconds: 6));
+      final ok = await _smbClient
+          .connect(config)
+          .timeout(const Duration(seconds: 6));
       _isConnected = ok;
       return ok;
     } catch (_) {
@@ -341,8 +356,10 @@ class MobileSMBService implements ISmbService {
     try {
       // Check if we're listing shares (server root)
       final pathWithoutPrefix = tabPath.substring('#network/'.length);
-      final parts =
-          pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
+      final parts = pathWithoutPrefix
+          .split('/')
+          .where((p) => p.isNotEmpty)
+          .toList();
 
       debugPrint(
         'MobileSMBService: Path parts: $parts, length: ${parts.length}',
@@ -411,10 +428,13 @@ class MobileSMBService implements ISmbService {
 
       // Extract server from tab path
       final pathWithoutPrefix = tabPath.substring('#network/'.length);
-      final parts =
-          pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
-      final server =
-          parts.length > 1 ? Uri.decodeComponent(parts[1]) : _connectedHost;
+      final parts = pathWithoutPrefix
+          .split('/')
+          .where((p) => p.isNotEmpty)
+          .toList();
+      final server = parts.length > 1
+          ? Uri.decodeComponent(parts[1])
+          : _connectedHost;
 
       debugPrint('MobileSMBService: Server extracted: $server');
 
@@ -567,32 +587,38 @@ class MobileSMBService implements ISmbService {
   Stream<List<int>>? openFileStream(String remotePath, {int startOffset = 0}) {
     try {
       debugPrint(
-          'MobileSmbService openFileStream: Starting for path: $remotePath');
+        'MobileSmbService openFileStream: Starting for path: $remotePath',
+      );
 
       if (!isConnected) {
         debugPrint(
-            'MobileSmbService openFileStream: Not connected to SMB server');
+          'MobileSmbService openFileStream: Not connected to SMB server',
+        );
         return null;
       }
 
       // Convert path to SMB format
       final smbPath = _getSmbPathFromTabPath(remotePath);
       debugPrint(
-          'MobileSmbService openFileStream: Converted SMB path: $smbPath');
+        'MobileSmbService openFileStream: Converted SMB path: $smbPath',
+      );
 
       // Use optimized streaming with larger chunk size for better performance
-      final stream = _smbClient.openFileStreamOptimized(smbPath,
-          chunkSize:
-              128 * 1024); // 128KB chunks for better streaming performance
+      final stream = _smbClient.openFileStreamOptimized(
+        smbPath,
+        chunkSize: 128 * 1024,
+      ); // 128KB chunks for better streaming performance
 
       if (stream == null) {
         debugPrint(
-            'MobileSmbService openFileStream: Failed to create optimized stream');
+          'MobileSmbService openFileStream: Failed to create optimized stream',
+        );
         return null;
       }
 
       debugPrint(
-          'MobileSmbService openFileStream: Successfully created optimized stream');
+        'MobileSmbService openFileStream: Successfully created optimized stream',
+      );
       return stream;
     } catch (e) {
       debugPrint('MobileSmbService openFileStream error: $e');
@@ -604,32 +630,39 @@ class MobileSMBService implements ISmbService {
   Stream<List<int>>? openFileStreamWithSeek(String remotePath, int offset) {
     try {
       debugPrint(
-          'MobileSmbService openFileStreamWithSeek: Starting for path: $remotePath at offset: $offset');
+        'MobileSmbService openFileStreamWithSeek: Starting for path: $remotePath at offset: $offset',
+      );
 
       if (!isConnected) {
         debugPrint(
-            'MobileSmbService openFileStreamWithSeek: Not connected to SMB server');
+          'MobileSmbService openFileStreamWithSeek: Not connected to SMB server',
+        );
         return null;
       }
 
       // Convert path to SMB format
       final smbPath = _getSmbPathFromTabPath(remotePath);
       debugPrint(
-          'MobileSmbService openFileStreamWithSeek: Converted SMB path: $smbPath');
+        'MobileSmbService openFileStreamWithSeek: Converted SMB path: $smbPath',
+      );
 
       // Use seek-optimized streaming with larger chunk size
-      final stream = _smbClient.seekFileStreamOptimized(smbPath, offset,
-          chunkSize:
-              128 * 1024); // 128KB chunks for better streaming performance
+      final stream = _smbClient.seekFileStreamOptimized(
+        smbPath,
+        offset,
+        chunkSize: 128 * 1024,
+      ); // 128KB chunks for better streaming performance
 
       if (stream == null) {
         debugPrint(
-            'MobileSmbService openFileStreamWithSeek: Failed to create seek stream');
+          'MobileSmbService openFileStreamWithSeek: Failed to create seek stream',
+        );
         return null;
       }
 
       debugPrint(
-          'MobileSmbService openFileStreamWithSeek: Successfully created seek stream');
+        'MobileSmbService openFileStreamWithSeek: Successfully created seek stream',
+      );
       return stream;
     } catch (e) {
       debugPrint('MobileSmbService openFileStreamWithSeek error: $e');
@@ -711,7 +744,8 @@ class MobileSMBService implements ISmbService {
     if (!isConnected) {
       debugPrint('MobileSMBService: ERROR - Not connected to SMB server');
       debugPrint(
-          'MobileSMBService: Server: $_connectedHost, Share: $_connectedShare');
+        'MobileSMBService: Server: $_connectedHost, Share: $_connectedShare',
+      );
       return null;
     }
 
@@ -732,11 +766,14 @@ class MobileSMBService implements ISmbService {
         debugPrint('MobileSMBService: SUCCESS - File data read');
         debugPrint('MobileSMBService: Data length: ${fileData.length} bytes');
         debugPrint(
-            'MobileSMBService: Data size: ${(fileData.length / 1024 / 1024).toStringAsFixed(2)} MB');
+          'MobileSMBService: Data size: ${(fileData.length / 1024 / 1024).toStringAsFixed(2)} MB',
+        );
         debugPrint(
-            'MobileSMBService: Native call duration: ${nativeDuration.inMilliseconds}ms');
+          'MobileSMBService: Native call duration: ${nativeDuration.inMilliseconds}ms',
+        );
         debugPrint(
-            'MobileSMBService: Transfer speed: ${(fileData.length / 1024 / 1024 / (nativeDuration.inMilliseconds / 1000)).toStringAsFixed(2)} MB/s');
+          'MobileSMBService: Transfer speed: ${(fileData.length / 1024 / 1024 / (nativeDuration.inMilliseconds / 1000)).toStringAsFixed(2)} MB/s',
+        );
 
         final preview = fileData
             .take(10)
@@ -747,9 +784,11 @@ class MobileSMBService implements ISmbService {
         return Uint8List.fromList(fileData);
       } else {
         debugPrint(
-            'MobileSMBService: ERROR - Received empty file data for $smbPath');
+          'MobileSMBService: ERROR - Received empty file data for $smbPath',
+        );
         debugPrint(
-            'MobileSMBService: Native call duration: ${nativeDuration.inMilliseconds}ms');
+          'MobileSMBService: Native call duration: ${nativeDuration.inMilliseconds}ms',
+        );
         return null;
       }
     } catch (e, stackTrace) {
@@ -763,7 +802,8 @@ class MobileSMBService implements ISmbService {
     } finally {
       final totalDuration = DateTime.now().difference(startTime);
       debugPrint(
-          'MobileSMBService: Total readFileData time: ${totalDuration.inMilliseconds}ms');
+        'MobileSMBService: Total readFileData time: ${totalDuration.inMilliseconds}ms',
+      );
       debugPrint('=== MobileSMBService.readFileData END ===');
     }
   }
@@ -787,8 +827,10 @@ class MobileSMBService implements ISmbService {
 
       // Ensure the native service is connected before generating thumbnail
       if (!smbService.isConnected) {
-        final credentials = NetworkCredentialsService()
-            .findCredentials(serviceType: 'SMB', host: _connectedHost);
+        final credentials = NetworkCredentialsService().findCredentials(
+          serviceType: 'SMB',
+          host: _connectedHost,
+        );
         if (credentials != null) {
           final config = SmbConnectionConfig(
             host: _connectedHost,

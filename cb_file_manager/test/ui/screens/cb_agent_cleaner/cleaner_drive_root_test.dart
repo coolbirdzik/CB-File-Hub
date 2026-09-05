@@ -27,15 +27,17 @@ void main() {
     }
   });
 
-  test('preserves non-root paths while normalizing separators and whitespace',
-      () {
-    expect(
-      normalizeCleanerDriveRoot(r' C:\Users\Cleaner '),
-      r'C:\Users\Cleaner',
-    );
-    expect(
-      normalizeCleanerDriveRoot('c:/Users/Cleaner'),
-      r'c:\Users\Cleaner',
-    );
-  });
+  test(
+    'preserves non-root paths while normalizing separators and whitespace',
+    () {
+      expect(
+        normalizeCleanerDriveRoot(r' C:\Users\Cleaner '),
+        r'C:\Users\Cleaner',
+      );
+      expect(
+        normalizeCleanerDriveRoot('c:/Users/Cleaner'),
+        r'c:\Users\Cleaner',
+      );
+    },
+  );
 }

@@ -7,12 +7,12 @@ class DrawerNavigationItem extends StatelessWidget {
   final Widget? trailing;
 
   const DrawerNavigationItem({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.onTap,
     this.trailing,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,15 +22,9 @@ class DrawerNavigationItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: ListTile(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-        leading: Icon(
-          icon,
-          size: 20,
-          color: cs.primary,
-        ),
+        leading: Icon(icon, size: 20, color: cs.primary),
         title: Text(
           title,
           style: TextStyle(

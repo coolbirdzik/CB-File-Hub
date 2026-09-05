@@ -61,10 +61,7 @@ class FluentSurfaceTokens {
     // steps down to the recessed neutral; dark mode derives a restrained
     // shade from the Home canvas instead of introducing a black panel.
     final chromeTint = isDark
-        ? Color.alphaBlend(
-            colors.scrim.withValues(alpha: 0.16),
-            colors.canvas,
-          )
+        ? Color.alphaBlend(colors.scrim.withValues(alpha: 0.16), colors.canvas)
         : colors.surfaceSunken;
     final toolbarTintAlpha = isDark ? 0.52 : 0.64;
     final drawerTintAlpha = isDark ? 0.60 : 0.72;

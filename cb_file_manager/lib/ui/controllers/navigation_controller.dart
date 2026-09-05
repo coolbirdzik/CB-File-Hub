@@ -155,9 +155,11 @@ class NavigationController {
       orElse: () => TabData(id: '', name: '', path: ''),
     );
     debugPrint(
-        'Navigation history after adding: ${updatedTab.navigationHistory}');
+      'Navigation history after adding: ${updatedTab.navigationHistory}',
+    );
     debugPrint(
-        'Navigation history length: ${updatedTab.navigationHistory.length}');
+      'Navigation history length: ${updatedTab.navigationHistory.length}',
+    );
 
     // Commit the visible path before the directory scan starts. The listing
     // can take time for large or slow folders, but the address bar and tab
@@ -177,8 +179,10 @@ class NavigationController {
       tabManagerBloc.add(UpdateTabName(tabId, l10n.drivesTab));
     } else {
       final pathParts = path.split(Platform.pathSeparator);
-      final lastPart = pathParts.lastWhere((part) => part.isNotEmpty,
-          orElse: () => l10n.rootFolder);
+      final lastPart = pathParts.lastWhere(
+        (part) => part.isNotEmpty,
+        orElse: () => l10n.rootFolder,
+      );
       final tabName = lastPart.isEmpty ? l10n.rootFolder : lastPart;
       tabManagerBloc.add(UpdateTabName(tabId, tabName));
     }
@@ -225,7 +229,9 @@ class NavigationController {
       } else {
         if (context.mounted) {
           AppToast.error(
-              context, AppLocalizations.of(context)!.pathNotAccessible);
+            context,
+            AppLocalizations.of(context)!.pathNotAccessible,
+          );
         }
         // Revert to current path
         pathController.text = (isDrivesPath(currentPath) || currentPath.isEmpty)
@@ -279,9 +285,11 @@ class NavigationController {
       debugPrint('Current tab path: ${currentTab.path}');
       debugPrint('Navigation history: ${currentTab.navigationHistory}');
       debugPrint(
-          'Navigation history length: ${currentTab.navigationHistory.length}');
+        'Navigation history length: ${currentTab.navigationHistory.length}',
+      );
       debugPrint(
-          'Can navigate back: ${tabManagerBloc.canTabNavigateBack(tabId)}');
+        'Can navigate back: ${tabManagerBloc.canTabNavigateBack(tabId)}',
+      );
 
       if (tabManagerBloc.canTabNavigateBack(tabId)) {
         final newPath = tabManagerBloc.backNavigationToPath(tabId);
@@ -297,7 +305,8 @@ class NavigationController {
           onPathChanged(newPath);
           pathController.text = newPath;
           if (newPath.startsWith('#search?tag=')) {
-            final tag = UriUtils.extractTagFromSearchPath(newPath) ??
+            final tag =
+                UriUtils.extractTagFromSearchPath(newPath) ??
                 newPath.substring('#search?tag='.length);
             folderListBloc.add(SearchByTagGlobally(tag));
           } else {
@@ -356,9 +365,7 @@ class NavigationController {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: Text(l10n.exit),
           ),
         ],
@@ -380,8 +387,8 @@ class NavigationController {
     pathController.text = (isDrivesPath(newPath) || newPath.isEmpty)
         ? ''
         : ArchivePathUtils.isArchiveBrowsePath(newPath)
-            ? ArchivePathUtils.displayPath(newPath)
-            : newPath;
+        ? ArchivePathUtils.displayPath(newPath)
+        : newPath;
 
     if (isDrivesPath(newPath) || newPath.isEmpty) {
       if (currentFilter != null || currentSearchTag != null) {
@@ -392,7 +399,8 @@ class NavigationController {
     }
 
     if (newPath.startsWith('#search?tag=')) {
-      final tag = UriUtils.extractTagFromSearchPath(newPath) ??
+      final tag =
+          UriUtils.extractTagFromSearchPath(newPath) ??
           newPath.substring('#search?tag='.length);
       if (folderListBloc.state.currentSearchTag != tag ||
           folderListBloc.state.searchResults.isEmpty) {
@@ -438,9 +446,12 @@ class NavigationController {
         debugPrint('Gallery returned openFolder request: $folderPath');
 
         final l10n = AppLocalizations.of(context)!;
-        final folderName = folderPath.split(RegExp(r'[\\\\/]+')).lastWhere(
-            (part) => part.isNotEmpty,
-            orElse: () => l10n.rootFolder);
+        final folderName = folderPath
+            .split(RegExp(r'[\\\\/]+'))
+            .lastWhere(
+              (part) => part.isNotEmpty,
+              orElse: () => l10n.rootFolder,
+            );
 
         // Open new tab with the folder - using TabNavigator utility
         // Note: This requires importing the tab navigator utility
@@ -491,7 +502,8 @@ class NavigationController {
       }
 
       if (actualPath.startsWith('#search?tag=')) {
-        final tag = UriUtils.extractTagFromSearchPath(actualPath) ??
+        final tag =
+            UriUtils.extractTagFromSearchPath(actualPath) ??
             actualPath.substring('#search?tag='.length);
         folderListBloc.add(SearchByTagGlobally(tag));
       } else {
@@ -522,7 +534,8 @@ class NavigationController {
       pathController.text = actualPath;
 
       if (actualPath.startsWith('#search?tag=')) {
-        final tag = UriUtils.extractTagFromSearchPath(actualPath) ??
+        final tag =
+            UriUtils.extractTagFromSearchPath(actualPath) ??
             actualPath.substring('#search?tag='.length);
         folderListBloc.add(SearchByTagGlobally(tag));
       } else {

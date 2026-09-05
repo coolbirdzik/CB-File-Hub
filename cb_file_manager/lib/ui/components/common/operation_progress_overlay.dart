@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class OperationProgressOverlay extends StatefulWidget {
-  const OperationProgressOverlay({Key? key}) : super(key: key);
+  const OperationProgressOverlay({super.key});
 
   static bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -55,7 +55,7 @@ class _OperationProgressOverlayState extends State<OperationProgressOverlay> {
 }
 
 class StatusCenterToolbarButton extends StatefulWidget {
-  const StatusCenterToolbarButton({Key? key}) : super(key: key);
+  const StatusCenterToolbarButton({super.key});
 
   @override
   State<StatusCenterToolbarButton> createState() =>
@@ -83,22 +83,21 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
       vsync: this,
       duration: const Duration(milliseconds: 520),
     );
-    _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.18), weight: 35),
-      TweenSequenceItem(tween: Tween(begin: 1.18, end: 0.96), weight: 30),
-      TweenSequenceItem(tween: Tween(begin: 0.96, end: 1.0), weight: 35),
-    ]).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeOutCubic,
-    ));
-    _turnAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.055), weight: 25),
-      TweenSequenceItem(tween: Tween(begin: -0.055, end: 0.055), weight: 45),
-      TweenSequenceItem(tween: Tween(begin: 0.055, end: 0.0), weight: 30),
-    ]).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeOut,
-    ));
+    _scaleAnimation =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.18), weight: 35),
+          TweenSequenceItem(tween: Tween(begin: 1.18, end: 0.96), weight: 30),
+          TweenSequenceItem(tween: Tween(begin: 0.96, end: 1.0), weight: 35),
+        ]).animate(
+          CurvedAnimation(parent: _pulseController, curve: Curves.easeOutCubic),
+        );
+    _turnAnimation = TweenSequence<double>(
+      [
+        TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.055), weight: 25),
+        TweenSequenceItem(tween: Tween(begin: -0.055, end: 0.055), weight: 45),
+        TweenSequenceItem(tween: Tween(begin: 0.055, end: 0.0), weight: 30),
+      ],
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -212,8 +211,9 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
                 height: radius * 2,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: theme.colorScheme.primary
-                      .withValues(alpha: opacity * 0.28),
+                  color: theme.colorScheme.primary.withValues(
+                    alpha: opacity * 0.28,
+                  ),
                 ),
               );
             },
@@ -278,8 +278,9 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final label = count > 99 ? '99+' : '$count';
-    final color =
-        isUnread ? theme.colorScheme.error : theme.colorScheme.primary;
+    final color = isUnread
+        ? theme.colorScheme.error
+        : theme.colorScheme.primary;
 
     return Container(
       constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
@@ -363,10 +364,10 @@ class AggregateProgressIndicator extends StatelessWidget {
   final double size;
 
   const AggregateProgressIndicator({
-    Key? key,
+    super.key,
     required this.controller,
     required this.size,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -405,9 +406,11 @@ class StatusCenterPanel extends StatefulWidget {
   final OperationProgressController controller;
   final Color? solidBackground;
 
-  const StatusCenterPanel(
-      {Key? key, required this.controller, this.solidBackground})
-      : super(key: key);
+  const StatusCenterPanel({
+    super.key,
+    required this.controller,
+    this.solidBackground,
+  });
 
   @override
   State<StatusCenterPanel> createState() => _StatusCenterPanelState();
@@ -437,7 +440,8 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
     final running = controller.runningEntries;
     final finished = controller.finishedEntries;
 
-    final bg = widget.solidBackground ??
+    final bg =
+        widget.solidBackground ??
         Color.alphaBlend(
           theme.colorScheme.surfaceContainer,
           theme.colorScheme.surface,

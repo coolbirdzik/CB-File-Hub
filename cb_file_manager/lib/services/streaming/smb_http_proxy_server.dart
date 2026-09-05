@@ -73,14 +73,16 @@ class SmbHttpProxyServer {
       }
       final filePath = _buildClientPath(info);
 
-      final ok = await reader.initialize(SmbConnectionConfig(
-        host: info.host,
-        port: 445,
-        username: info.username ?? '',
-        password: info.password ?? '',
-        shareName: info.share,
-        timeoutMs: 60000,
-      ));
+      final ok = await reader.initialize(
+        SmbConnectionConfig(
+          host: info.host,
+          port: 445,
+          username: info.username ?? '',
+          password: info.password ?? '',
+          shareName: info.share,
+          timeoutMs: 60000,
+        ),
+      );
       if (!ok) {
         return Response(502, body: 'Failed to connect SMB');
       }
@@ -105,16 +107,17 @@ class SmbHttpProxyServer {
 
       int statusCode = 200;
       if (fileSize != null) {
-        final effectiveEnd =
-            end == null ? (fileSize - 1) : end.clamp(0, fileSize - 1);
+        final effectiveEnd = end == null
+            ? (fileSize - 1)
+            : end.clamp(0, fileSize - 1);
         final length = (effectiveEnd - clampedStart + 1).clamp(0, fileSize);
         headers['Content-Length'] = '$length';
         headers['Content-Range'] =
             'bytes $clampedStart-$effectiveEnd/$fileSize';
         statusCode =
             (clampedStart == 0 && (end == null || effectiveEnd == fileSize - 1))
-                ? 200
-                : 206;
+            ? 200
+            : 206;
       }
 
       // Start pushing data
@@ -167,11 +170,12 @@ class SmbHttpProxyServer {
       final share = Uri.decodeComponent(segs.first);
       final path = '/${segs.skip(1).map(Uri.decodeComponent).join('/')}';
       return _SmbUrlInfo(
-          host: host,
-          share: share,
-          path: path,
-          username: username,
-          password: password);
+        host: host,
+        share: share,
+        path: path,
+        username: username,
+        password: password,
+      );
     } catch (_) {
       return null;
     }
@@ -205,10 +209,11 @@ class _SmbUrlInfo {
   final String path;
   final String? username;
   final String? password;
-  _SmbUrlInfo(
-      {required this.host,
-      required this.share,
-      required this.path,
-      this.username,
-      this.password});
+  _SmbUrlInfo({
+    required this.host,
+    required this.share,
+    required this.path,
+    this.username,
+    this.password,
+  });
 }

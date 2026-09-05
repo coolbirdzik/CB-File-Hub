@@ -29,10 +29,7 @@ class MobileTabView extends StatelessWidget {
   /// Callback khi nhấn vào nút thêm tab mới
   final VoidCallback onAddNewTab;
 
-  const MobileTabView({
-    Key? key,
-    required this.onAddNewTab,
-  }) : super(key: key);
+  const MobileTabView({super.key, required this.onAddNewTab});
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +97,9 @@ class MobileTabView extends StatelessWidget {
 
   /// Xây dựng thanh chrome style cho cả trường hợp có tab và không có tab
   Widget _buildEmptyOrNormalChromeBar(
-      BuildContext context, TabManagerState state) {
+    BuildContext context,
+    TabManagerState state,
+  ) {
     // Nếu không có tab, hiển thị thanh chrome style đơn giản hơn
     if (state.tabs.isEmpty) {
       return _buildEmptyChromeStyleAddressBar(context);
@@ -163,7 +162,9 @@ class MobileTabView extends StatelessWidget {
 
   /// Xây dựng thanh địa chỉ và nút tab kiểu Chrome
   Widget _buildChromeStyleAddressBar(
-      BuildContext context, TabManagerState state) {
+    BuildContext context,
+    TabManagerState state,
+  ) {
     // Lấy tab đang hoạt động
     final activeTab = state.activeTab;
     if (activeTab == null) return Container();
@@ -208,8 +209,9 @@ class MobileTabView extends StatelessWidget {
             icon: Icon(PhosphorIconsLight.plus, color: textColor),
             tooltip: localizations.create,
             onPressed: () {
-              final controller =
-                  MobileFileActionsController.forTab(state.activeTab!.id);
+              final controller = MobileFileActionsController.forTab(
+                state.activeTab!.id,
+              );
               controller.showCreateMenu(context);
             },
           ),
@@ -223,7 +225,10 @@ class MobileTabView extends StatelessWidget {
 
   /// Xây dựng nút hiển thị số lượng tab
   Widget _buildTabCountButton(
-      BuildContext context, TabManagerState state, Color textColor) {
+    BuildContext context,
+    TabManagerState state,
+    Color textColor,
+  ) {
     final theme = Theme.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -234,8 +239,9 @@ class MobileTabView extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         margin: const EdgeInsets.only(left: 8.0),
         decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -243,17 +249,10 @@ class MobileTabView extends StatelessWidget {
           children: [
             Text(
               '${state.tabs.length}',
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
             ),
             const SizedBox(width: 4),
-            Icon(
-              PhosphorIconsLight.file,
-              size: 16,
-              color: textColor,
-            ),
+            Icon(PhosphorIconsLight.file, size: 16, color: textColor),
           ],
         ),
       ),
@@ -277,7 +276,8 @@ class MobileTabView extends StatelessWidget {
       if (thumbnail != null && context.mounted) {
         tabManagerBloc.add(UpdateTabThumbnail(activeTab.id, thumbnail));
         debugPrint(
-            'Captured thumbnail for active tab: ${activeTab.name} (${thumbnail.length} bytes)');
+          'Captured thumbnail for active tab: ${activeTab.name} (${thumbnail.length} bytes)',
+        );
       }
     }
 
@@ -291,103 +291,108 @@ class MobileTabView extends StatelessWidget {
           child: Builder(
             builder: (newContext) =>
                 BlocBuilder<TabManagerBloc, TabManagerState>(
-              builder: (context, updatedState) {
-                final theme = Theme.of(context);
+                  builder: (context, updatedState) {
+                    final theme = Theme.of(context);
 
-                return Scaffold(
-                  backgroundColor: theme.scaffoldBackgroundColor,
-                  appBar: AppBar(
-                    elevation: 0,
-                    backgroundColor: theme.scaffoldBackgroundColor,
-                    leading: IconButton(
-                      icon: Icon(
-                        PhosphorIconsLight.x,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      tooltip: localizations.close,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    title: Text(
-                      localizations.tabManager,
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurface,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    actions: [
-                      PopupMenuButton<String>(
-                        icon: Icon(
-                          PhosphorIconsLight.dotsThree,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        tooltip: localizations.moreOptions,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        offset: const Offset(0, 48),
-                        itemBuilder: (context) => [
-                          PopupMenuItem<String>(
-                            value: 'add_tab',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  PhosphorIconsLight.plus,
-                                  size: 20,
-                                  color: theme.colorScheme.primary,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  localizations.addNewTab,
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onSurface,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    return Scaffold(
+                      backgroundColor: theme.scaffoldBackgroundColor,
+                      appBar: AppBar(
+                        elevation: 0,
+                        backgroundColor: theme.scaffoldBackgroundColor,
+                        leading: IconButton(
+                          icon: Icon(
+                            PhosphorIconsLight.x,
+                            color: theme.colorScheme.onSurface,
                           ),
-                          if (updatedState.tabs.isNotEmpty)
-                            PopupMenuItem<String>(
-                              value: 'close_all',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    PhosphorIconsLight.xCircle,
-                                    size: 20,
-                                    color: theme.colorScheme.error,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    localizations.closeAllTabs,
-                                    style: TextStyle(
-                                      color: theme.colorScheme.error,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          tooltip: localizations.close,
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        title: Text(
+                          localizations.tabManager,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        actions: [
+                          PopupMenuButton<String>(
+                            icon: Icon(
+                              PhosphorIconsLight.dotsThree,
+                              color: theme.colorScheme.onSurface,
                             ),
+                            tooltip: localizations.moreOptions,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            offset: const Offset(0, 48),
+                            itemBuilder: (context) => [
+                              PopupMenuItem<String>(
+                                value: 'add_tab',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      PhosphorIconsLight.plus,
+                                      size: 20,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      localizations.addNewTab,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onSurface,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (updatedState.tabs.isNotEmpty)
+                                PopupMenuItem<String>(
+                                  value: 'close_all',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        PhosphorIconsLight.xCircle,
+                                        size: 20,
+                                        color: theme.colorScheme.error,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        localizations.closeAllTabs,
+                                        style: TextStyle(
+                                          color: theme.colorScheme.error,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                            onSelected: (value) {
+                              if (value == 'add_tab') {
+                                Navigator.pop(context);
+                                onAddNewTab();
+                              } else if (value == 'close_all') {
+                                BlocProvider.of<TabManagerBloc>(
+                                  context,
+                                ).add(CloseAllTabs());
+                                Navigator.pop(context);
+                              }
+                            },
+                          ),
                         ],
-                        onSelected: (value) {
-                          if (value == 'add_tab') {
-                            Navigator.pop(context);
-                            onAddNewTab();
-                          } else if (value == 'close_all') {
-                            BlocProvider.of<TabManagerBloc>(context)
-                                .add(CloseAllTabs());
-                            Navigator.pop(context);
-                          }
-                        },
                       ),
-                    ],
-                  ),
-                  body: updatedState.tabs.isEmpty
-                      ? _buildEmptyTabsState(context, localizations)
-                      : _buildTabsGrid(context, updatedState, localizations),
-                );
-              },
-            ),
+                      body: updatedState.tabs.isEmpty
+                          ? _buildEmptyTabsState(context, localizations)
+                          : _buildTabsGrid(
+                              context,
+                              updatedState,
+                              localizations,
+                            ),
+                    );
+                  },
+                ),
           ),
         ),
       ),
@@ -395,7 +400,9 @@ class MobileTabView extends StatelessWidget {
   }
 
   Widget _buildEmptyTabsState(
-      BuildContext context, AppLocalizations localizations) {
+    BuildContext context,
+    AppLocalizations localizations,
+  ) {
     final theme = Theme.of(context);
 
     return Center(
@@ -407,8 +414,9 @@ class MobileTabView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(32.0),
               decoration: BoxDecoration(
-                color:
-                    theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                color: theme.colorScheme.primaryContainer.withValues(
+                  alpha: 0.2,
+                ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -443,8 +451,11 @@ class MobileTabView extends StatelessWidget {
     );
   }
 
-  Widget _buildTabsGrid(BuildContext context, TabManagerState state,
-      AppLocalizations localizations) {
+  Widget _buildTabsGrid(
+    BuildContext context,
+    TabManagerState state,
+    AppLocalizations localizations,
+  ) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -539,8 +550,9 @@ class MobileTabView extends StatelessWidget {
                   const SizedBox(width: 8),
                   InkWell(
                     onTap: () {
-                      BlocProvider.of<TabManagerBloc>(context)
-                          .add(CloseTab(tab.id));
+                      BlocProvider.of<TabManagerBloc>(
+                        context,
+                      ).add(CloseTab(tab.id));
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Padding(
@@ -560,8 +572,9 @@ class MobileTabView extends StatelessWidget {
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.3),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.3,
+                    ),
                     borderRadius: BorderRadius.circular(16.0),
                   ),
                   clipBehavior: Clip.antiAlias,
@@ -611,8 +624,10 @@ class MobileTabView extends StatelessWidget {
   }
 
   String _shortenPath(String p) {
-    final parts =
-        p.split(Platform.pathSeparator).where((e) => e.isNotEmpty).toList();
+    final parts = p
+        .split(Platform.pathSeparator)
+        .where((e) => e.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return p;
     if (parts.length == 1) return parts.first;
     return '${parts[parts.length - 2]}/${parts.last}';
@@ -698,8 +713,10 @@ class MobileTabView extends StatelessWidget {
         // Path for the dedicated SMB Browser Screen (discovery and connection management)
         return BlocProvider<NetworkBrowsingBloc>.value(
           key: ValueKey('${activeTab.id}_smb_browser_screen'),
-          value: context.read<
-              NetworkBrowsingBloc>(), // Use the shared BLoC from TabMainScreen
+          value: context
+              .read<
+                NetworkBrowsingBloc
+              >(), // Use the shared BLoC from TabMainScreen
           child: SMBBrowserScreen(
             tabId: activeTab.id,
             // SMBBrowserScreen uses SystemScreen which handles its own AppBar
@@ -712,7 +729,8 @@ class MobileTabView extends StatelessWidget {
             activeTab.path == '#network/') {
           return BlocProvider<NetworkBrowsingBloc>.value(
             key: ValueKey(
-                '${activeTab.id}_network_connection_fallback_incomplete_path'),
+              '${activeTab.id}_network_connection_fallback_incomplete_path',
+            ),
             value: context.read<NetworkBrowsingBloc>(),
             child: const NetworkConnectionScreen(),
           );
@@ -722,7 +740,8 @@ class MobileTabView extends StatelessWidget {
             null) {
           return BlocProvider<NetworkBrowsingBloc>.value(
             key: ValueKey(
-                '${activeTab.id}_network_connection_fallback_no_service'),
+              '${activeTab.id}_network_connection_fallback_no_service',
+            ),
             value: context.read<NetworkBrowsingBloc>(),
             child: const NetworkConnectionScreen(),
           );
@@ -730,7 +749,8 @@ class MobileTabView extends StatelessWidget {
 
         return BlocProvider<NetworkBrowsingBloc>.value(
           key: ValueKey(
-              '${activeTab.id}_network_browser_screen_${activeTab.path}'),
+            '${activeTab.id}_network_browser_screen_${activeTab.path}',
+          ),
           value: context.read<NetworkBrowsingBloc>(),
           child: NetworkBrowserScreen(
             path: activeTab.path,
@@ -756,18 +776,18 @@ class MobileTabView extends StatelessWidget {
 
         // Fallback to empty container if system path is not recognized
         return Container(
-          key:
-              ValueKey('${activeTab.id}_unknown_system_path_${activeTab.path}'),
-          child: Center(
-            child: Text('Unknown system path: ${activeTab.path}'),
+          key: ValueKey(
+            '${activeTab.id}_unknown_system_path_${activeTab.path}',
           ),
+          child: Center(child: Text('Unknown system path: ${activeTab.path}')),
         );
       }
     } else {
       // Local file system path
       return Container(
         key: ValueKey(
-            '${activeTab.id}_local_content_${activeTab.path}'), // Key includes path for local content
+          '${activeTab.id}_local_content_${activeTab.path}',
+        ), // Key includes path for local content
         child: Navigator(
           key: activeTab
               .navigatorKey, // This key should be stable for the tab's Navigator
@@ -799,7 +819,7 @@ class MobileTabView extends StatelessWidget {
     if (tab.path.startsWith(Platform.pathSeparator)) {
       pathParts = [
         Platform.pathSeparator,
-        ...pathParts.where((part) => part.isNotEmpty)
+        ...pathParts.where((part) => part.isNotEmpty),
       ];
     } else if (tab.path.isEmpty || isDrivesPath(tab.path)) {
       pathParts = ["Drives"];
@@ -812,240 +832,259 @@ class MobileTabView extends StatelessWidget {
       builder: (bottomSheetContext) =>
           // Wrap with BlocProvider.value to make the TabManagerBloc available inside the bottom sheet
           BlocProvider.value(
-        value: tabManagerBloc,
-        child: Builder(
-          builder: (newContext) => Container(
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.7,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Thanh kéo ở trên cùng
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+            value: tabManagerBloc,
+            child: Builder(
+              builder: (newContext) => Container(
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
                   ),
                 ),
-
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Chọn vị trí',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const Spacer(),
-                      // Nút đóng
-                      IconButton(
-                        icon: Icon(PhosphorIconsLight.x, color: textColor),
-                        onPressed: () => Navigator.pop(newContext),
-                      ),
-                    ],
-                  ),
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
                 ),
-
-                const Divider(height: 1),
-
-                // Hiển thị đường dẫn hiện tại
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(8.0),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(16.0),
-                    ),
-                    child: Text(
-                      tab.path.isEmpty || isDrivesPath(tab.path)
-                          ? 'Drives'
-                          : tab.path,
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Thanh kéo ở trên cùng
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: theme.dividerColor.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ),
-                ),
 
-                // Danh sách các phần của đường dẫn
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: pathParts.length,
-                    itemBuilder: (context, index) {
-                      // Tạo đường dẫn từ đầu đến phần hiện tại
-                      String currentPath;
-                      if (pathParts[0] == "Drives") {
-                        currentPath = index == 0
-                            ? kDrivesPath
-                            : pathParts
-                                .sublist(1, index + 1)
-                                .join(Platform.pathSeparator);
-                      } else {
-                        if (pathParts[0] == Platform.pathSeparator) {
-                          currentPath = index == 0
-                              ? Platform.pathSeparator
-                              : Platform.pathSeparator +
-                                  pathParts
-                                      .sublist(1, index + 1)
-                                      .join(Platform.pathSeparator);
-                        } else {
-                          currentPath = pathParts
-                              .sublist(0, index + 1)
-                              .join(Platform.pathSeparator);
-                        }
-                      }
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 16,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Chọn vị trí',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const Spacer(),
+                          // Nút đóng
+                          IconButton(
+                            icon: Icon(PhosphorIconsLight.x, color: textColor),
+                            onPressed: () => Navigator.pop(newContext),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                      return ListTile(
-                        leading: Icon(
-                          index == 0
-                              ? PhosphorIconsLight.desktop
-                              : PhosphorIconsLight.folder,
-                          color: theme.colorScheme.primary,
+                    const Divider(height: 1),
+
+                    // Hiển thị đường dẫn hiện tại
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(16.0),
                         ),
-                        title: Text(
-                          pathParts[index].isEmpty ? 'Root' : pathParts[index],
+                        child: Text(
+                          tab.path.isEmpty || isDrivesPath(tab.path)
+                              ? 'Drives'
+                              : tab.path,
                           style: TextStyle(
-                            fontWeight: index == pathParts.length - 1
-                                ? FontWeight.bold
-                                : null,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        onTap: () {
-                          Navigator.pop(newContext);
-                          // Use the new context to access the BlocProvider
-                          final tabBloc =
-                              BlocProvider.of<TabManagerBloc>(newContext);
-
-                          // Update the tab path (this will automatically handle navigation history)
-                          tabBloc.add(UpdateTabPath(tab.id, currentPath));
-
-                          // Update tab name
-                          final pathParts =
-                              currentPath.split(Platform.pathSeparator);
-                          final lastPart = pathParts.lastWhere(
-                              (part) => part.isNotEmpty,
-                              orElse: () => (currentPath.isEmpty ||
-                                      isDrivesPath(currentPath))
-                                  ? 'Drives'
-                                  : 'Root');
-                          final tabName = lastPart.isEmpty
-                              ? ((currentPath.isEmpty ||
-                                      isDrivesPath(currentPath))
-                                  ? 'Drives'
-                                  : 'Root')
-                              : lastPart;
-                          tabBloc.add(UpdateTabName(tab.id, tabName));
-                        },
-                      );
-                    },
-                  ),
-                ),
-
-                // Phần chân với lịch sử điều hướng
-                if (tab.navigationHistory.isNotEmpty) ...[
-                  const Divider(),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Lịch sử điều hướng:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
                       ),
                     ),
-                  ),
-                  Container(
-                    height: 60,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: tab.navigationHistory.length,
-                      itemBuilder: (context, index) {
-                        final historyPath = tab.navigationHistory[index];
-                        final isCurrentPath = historyPath == tab.path;
 
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: InkWell(
+                    // Danh sách các phần của đường dẫn
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: pathParts.length,
+                        itemBuilder: (context, index) {
+                          // Tạo đường dẫn từ đầu đến phần hiện tại
+                          String currentPath;
+                          if (pathParts[0] == "Drives") {
+                            currentPath = index == 0
+                                ? kDrivesPath
+                                : pathParts
+                                      .sublist(1, index + 1)
+                                      .join(Platform.pathSeparator);
+                          } else {
+                            if (pathParts[0] == Platform.pathSeparator) {
+                              currentPath = index == 0
+                                  ? Platform.pathSeparator
+                                  : Platform.pathSeparator +
+                                        pathParts
+                                            .sublist(1, index + 1)
+                                            .join(Platform.pathSeparator);
+                            } else {
+                              currentPath = pathParts
+                                  .sublist(0, index + 1)
+                                  .join(Platform.pathSeparator);
+                            }
+                          }
+
+                          return ListTile(
+                            leading: Icon(
+                              index == 0
+                                  ? PhosphorIconsLight.desktop
+                                  : PhosphorIconsLight.folder,
+                              color: theme.colorScheme.primary,
+                            ),
+                            title: Text(
+                              pathParts[index].isEmpty
+                                  ? 'Root'
+                                  : pathParts[index],
+                              style: TextStyle(
+                                fontWeight: index == pathParts.length - 1
+                                    ? FontWeight.bold
+                                    : null,
+                              ),
+                            ),
                             onTap: () {
                               Navigator.pop(newContext);
-                              if (!isCurrentPath) {
-                                // Use the new context to access the BlocProvider
-                                final tabBloc =
-                                    BlocProvider.of<TabManagerBloc>(newContext);
+                              // Use the new context to access the BlocProvider
+                              final tabBloc = BlocProvider.of<TabManagerBloc>(
+                                newContext,
+                              );
 
-                                // Update the tab path (this will automatically handle navigation history)
-                                tabBloc.add(UpdateTabPath(tab.id, historyPath));
-                              }
+                              // Update the tab path (this will automatically handle navigation history)
+                              tabBloc.add(UpdateTabPath(tab.id, currentPath));
+
+                              // Update tab name
+                              final pathParts = currentPath.split(
+                                Platform.pathSeparator,
+                              );
+                              final lastPart = pathParts.lastWhere(
+                                (part) => part.isNotEmpty,
+                                orElse: () =>
+                                    (currentPath.isEmpty ||
+                                        isDrivesPath(currentPath))
+                                    ? 'Drives'
+                                    : 'Root',
+                              );
+                              final tabName = lastPart.isEmpty
+                                  ? ((currentPath.isEmpty ||
+                                            isDrivesPath(currentPath))
+                                        ? 'Drives'
+                                        : 'Root')
+                                  : lastPart;
+                              tabBloc.add(UpdateTabName(tab.id, tabName));
                             },
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isCurrentPath
-                                    ? theme.colorScheme.primary
-                                        .withValues(alpha: 0.2)
-                                    : theme.colorScheme.surfaceContainerHighest
-                                        .withValues(alpha: 0.5),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Phần chân với lịch sử điều hướng
+                    if (tab.navigationHistory.isNotEmpty) ...[
+                      const Divider(),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Lịch sử điều hướng:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        height: 60,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: tab.navigationHistory.length,
+                          itemBuilder: (context, index) {
+                            final historyPath = tab.navigationHistory[index];
+                            final isCurrentPath = historyPath == tab.path;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.pop(newContext);
+                                  if (!isCurrentPath) {
+                                    // Use the new context to access the BlocProvider
+                                    final tabBloc =
+                                        BlocProvider.of<TabManagerBloc>(
+                                          newContext,
+                                        );
+
+                                    // Update the tab path (this will automatically handle navigation history)
+                                    tabBloc.add(
+                                      UpdateTabPath(tab.id, historyPath),
+                                    );
+                                  }
+                                },
                                 borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  historyPath.isEmpty ||
-                                          isDrivesPath(historyPath)
-                                      ? 'Drives'
-                                      : historyPath
-                                              .split(Platform.pathSeparator)
-                                              .last
-                                              .isEmpty
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isCurrentPath
+                                        ? theme.colorScheme.primary.withValues(
+                                            alpha: 0.2,
+                                          )
+                                        : theme
+                                              .colorScheme
+                                              .surfaceContainerHighest
+                                              .withValues(alpha: 0.5),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      historyPath.isEmpty ||
+                                              isDrivesPath(historyPath)
+                                          ? 'Drives'
+                                          : historyPath
+                                                .split(Platform.pathSeparator)
+                                                .last
+                                                .isEmpty
                                           ? Platform.pathSeparator
                                           : historyPath
-                                              .split(Platform.pathSeparator)
-                                              .last,
-                                  style: TextStyle(
-                                    color: isCurrentPath
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.onSurface,
-                                    fontWeight:
-                                        isCurrentPath ? FontWeight.bold : null,
+                                                .split(Platform.pathSeparator)
+                                                .last,
+                                      style: TextStyle(
+                                        color: isCurrentPath
+                                            ? theme.colorScheme.primary
+                                            : theme.colorScheme.onSurface,
+                                        fontWeight: isCurrentPath
+                                            ? FontWeight.bold
+                                            : null,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ],
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 }
@@ -1055,7 +1094,10 @@ extension MobileTabViewDynamicMenu on MobileTabView {
   /// Build mobile action buttons row for file management tools
   /// Now uses shared buildMobileActionBar from controller for consistency
   Widget _buildMobileActionButtons(
-      BuildContext context, String tabId, String path) {
+    BuildContext context,
+    String tabId,
+    String path,
+  ) {
     final controller = MobileFileActionsController.forTab(tabId);
     controller.actionBarProfile = isDrivesPath(path)
         ? MobileActionBarProfile.drivesMinimal
@@ -1133,8 +1175,10 @@ extension MobileTabViewDynamicMenu on MobileTabView {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(PhosphorIconsLight.folderPlus,
-                    color: Colors.blue),
+                leading: const Icon(
+                  PhosphorIconsLight.folderPlus,
+                  color: Colors.blue,
+                ),
                 title: Text(
                   localizations.createNewFolder,
                   style: const TextStyle(fontWeight: FontWeight.w500),
@@ -1145,8 +1189,10 @@ extension MobileTabViewDynamicMenu on MobileTabView {
                 },
               ),
               ListTile(
-                leading: const Icon(PhosphorIconsLight.filePlus,
-                    color: Colors.orange),
+                leading: const Icon(
+                  PhosphorIconsLight.filePlus,
+                  color: Colors.orange,
+                ),
                 title: Text(
                   localizations.createNewFile,
                   style: const TextStyle(fontWeight: FontWeight.w500),
@@ -1172,11 +1218,11 @@ class TabContentScreen extends StatelessWidget {
   final String? highlightedFileName;
 
   const TabContentScreen({
-    Key? key,
+    super.key,
     required this.path,
     required this.tabId,
     this.highlightedFileName,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1204,12 +1250,12 @@ class AddressBarWidget extends StatelessWidget {
   final bool isDarkMode;
 
   const AddressBarWidget({
-    Key? key,
+    super.key,
     required this.path,
     required this.name,
     required this.onTap,
     required this.isDarkMode,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1223,8 +1269,9 @@ class AddressBarWidget extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
         decoration: BoxDecoration(
           // Nền rõ ràng cho thanh địa chỉ (đồng nhất dark)
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
           borderRadius: BorderRadius.circular(16.0),
         ),
         child: Row(
@@ -1238,9 +1285,7 @@ class AddressBarWidget extends StatelessWidget {
             Expanded(
               child: Text(
                 name,
-                style: TextStyle(
-                  color: theme.colorScheme.onSurface,
-                ),
+                style: TextStyle(color: theme.colorScheme.onSurface),
                 overflow: TextOverflow.ellipsis,
               ),
             ),

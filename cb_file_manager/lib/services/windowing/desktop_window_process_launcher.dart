@@ -35,22 +35,25 @@ class DesktopWindowProcessLauncher {
       if (tabs.isNotEmpty) {
         final payload = <String, dynamic>{
           'tabs': tabs.map((t) => t.toJson()).toList(growable: false),
-          if (activeIndex != null) 'activeIndex': activeIndex,
+          'activeIndex': ?activeIndex,
         };
         env[WindowStartupPayload.envTabsKey] = jsonEncode(payload);
       }
 
       final lowerExecutable = executable.toLowerCase();
-      final isDartRuntime = lowerExecutable.endsWith(r'\dart.exe') ||
+      final isDartRuntime =
+          lowerExecutable.endsWith(r'\dart.exe') ||
           lowerExecutable.endsWith('/dart');
       final launchArgs = isDartRuntime
-          ? Platform.executableArguments.where((a) {
-              final al = a.toLowerCase();
-              return !(al.startsWith('--vm-service') ||
-                  al.startsWith('--observatory-port') ||
-                  al.startsWith('--dds-port') ||
-                  al.startsWith('--devtools-server-address'));
-            }).toList(growable: false)
+          ? Platform.executableArguments
+                .where((a) {
+                  final al = a.toLowerCase();
+                  return !(al.startsWith('--vm-service') ||
+                      al.startsWith('--observatory-port') ||
+                      al.startsWith('--dds-port') ||
+                      al.startsWith('--devtools-server-address'));
+                })
+                .toList(growable: false)
           : const <String>[];
 
       await Process.start(
@@ -62,8 +65,11 @@ class DesktopWindowProcessLauncher {
       );
       return true;
     } catch (e, st) {
-      AppLogger.warning('Failed to open a new window.',
-          error: e, stackTrace: st);
+      AppLogger.warning(
+        'Failed to open a new window.',
+        error: e,
+        stackTrace: st,
+      );
       return false;
     }
   }
@@ -93,20 +99,24 @@ class DesktopWindowProcessLauncher {
       env[WindowStartupPayload.envProgressIpcPortKey] = '$ipcPort';
       env[WindowStartupPayload.envProgressTitleKey] = title;
       env[WindowStartupPayload.envProgressTotalKey] = '$total';
-      env[WindowStartupPayload.envProgressIndeterminateKey] =
-          isIndeterminate ? '1' : '0';
+      env[WindowStartupPayload.envProgressIndeterminateKey] = isIndeterminate
+          ? '1'
+          : '0';
 
       final lowerExecutable = executable.toLowerCase();
-      final isDartRuntime = lowerExecutable.endsWith(r'\dart.exe') ||
+      final isDartRuntime =
+          lowerExecutable.endsWith(r'\dart.exe') ||
           lowerExecutable.endsWith('/dart');
       final launchArgs = isDartRuntime
-          ? Platform.executableArguments.where((a) {
-              final al = a.toLowerCase();
-              return !(al.startsWith('--vm-service') ||
-                  al.startsWith('--observatory-port') ||
-                  al.startsWith('--dds-port') ||
-                  al.startsWith('--devtools-server-address'));
-            }).toList(growable: false)
+          ? Platform.executableArguments
+                .where((a) {
+                  final al = a.toLowerCase();
+                  return !(al.startsWith('--vm-service') ||
+                      al.startsWith('--observatory-port') ||
+                      al.startsWith('--dds-port') ||
+                      al.startsWith('--devtools-server-address'));
+                })
+                .toList(growable: false)
           : const <String>[];
 
       await Process.start(
@@ -118,8 +128,11 @@ class DesktopWindowProcessLauncher {
       );
       return true;
     } catch (e, st) {
-      AppLogger.warning('Failed to open progress window.',
-          error: e, stackTrace: st);
+      AppLogger.warning(
+        'Failed to open progress window.',
+        error: e,
+        stackTrace: st,
+      );
       return false;
     }
   }

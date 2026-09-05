@@ -20,7 +20,7 @@ on:
         default: "completed"
 
 env:
-  FLUTTER_VERSION: "3.41.5"
+  FLUTTER_VERSION: "3.47.2"
   PROJECT_DIR: "cb_file_manager"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -35,7 +35,7 @@ jobs:
       version_tag: ${{ steps.version.outputs.version_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0 # Fetch all history for changelog
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -191,7 +191,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Upload release notes
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: release-notes
           path: release_notes.md
@@ -205,10 +205,10 @@ jobs:
       version_code: ${{ steps.android_version.outputs.version_code }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: "24"
 
@@ -229,7 +229,7 @@ jobs:
     needs: generate-release-notes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -271,7 +271,7 @@ jobs:
           fi
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: windows-build
           path: ${{ env.PROJECT_DIR }}/build/windows/portable/*.zip
@@ -282,7 +282,7 @@ jobs:
     needs: generate-release-notes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -330,7 +330,7 @@ jobs:
           fi
 
       - name: Upload MSI artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: windows-msi
           path: ${{ env.PROJECT_DIR }}/build/windows/installer/*.msi
@@ -342,7 +342,7 @@ jobs:
     environment: Production
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -351,7 +351,7 @@ jobs:
           channel: "stable"
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: "22"
 
@@ -413,7 +413,7 @@ jobs:
         run: MSIX_PUBLISHER="$MSIX_CERT_SUBJECT" MSIX_VERSION_OVERRIDE="$MSIX_VERSION" ./scripts/build.sh windows-msix
 
       - name: Upload MSIX artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: windows-msix
           path: ${{ env.PROJECT_DIR }}/build/windows/msix/*.msix
@@ -463,10 +463,10 @@ jobs:
       - resolve-android-version-code
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6.0.0
         with:
           distribution: "zulu"
           java-version: "17"
@@ -503,7 +503,7 @@ jobs:
           done
 
       - name: Upload APK artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: android-apk
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/*.apk
@@ -517,10 +517,10 @@ jobs:
     environment: Production
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6.0.0
         with:
           distribution: "zulu"
           java-version: "17"
@@ -587,7 +587,7 @@ jobs:
           mv app-release.aab "CBFileHub-$VERSION.aab"
 
       - name: Upload AAB artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: android-aab
           path: ${{ env.PROJECT_DIR }}/build/app/outputs/bundle/release/*.aab
@@ -616,7 +616,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8.0.1
         with:
           path: artifacts
 

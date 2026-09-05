@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../config/languages/app_localizations.dart';
 import '../../../../models/ai/ai_message.dart';
+import '../../../../services/ai/assistant_response_text.dart';
 import 'referenced_file_card.dart';
 
 /// A single chat message bubble (user or assistant).
@@ -17,21 +18,29 @@ class ChatMessageBubble extends StatefulWidget {
   final ValueChanged<String>? onEdit;
 
   const ChatMessageBubble({
-    Key? key,
+    super.key,
     required this.message,
     this.onRetry,
     this.onEdit,
-  }) : super(key: key);
+  });
 
   @override
   State<ChatMessageBubble> createState() => _ChatMessageBubbleState();
 }
 
 class _ChatMessageBubbleState extends State<ChatMessageBubble> {
+  String get _reasoning => widget.message.role == AiMessageRole.assistant
+      ? (widget.message.reasoning ??
+            extractAssistantReasoning(widget.message.content))
+      : '';
+  String get _displayContent => widget.message.role == AiMessageRole.assistant
+      ? stripAssistantReasoning(widget.message.content)
+      : widget.message.content;
   final _editController = TextEditingController();
   final _editFocusNode = FocusNode();
   bool _isEditing = false;
   bool _isHovering = false;
+  bool _reasoningExpanded = false;
 
   @override
   void dispose() {
@@ -43,6 +52,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
   @override
   void didUpdateWidget(ChatMessageBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.id != widget.message.id) _reasoningExpanded = false;
     if (oldWidget.message.id != widget.message.id ||
         oldWidget.message.content != widget.message.content) {
       _isEditing = false;
@@ -52,8 +62,11 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
 
   @override
   Widget build(BuildContext context) {
-    // Hide empty loading placeholder
-    if (widget.message.isLoading && widget.message.content.isEmpty) {
+    // Tool cards/results are rendered by the parent, without an empty bubble.
+    if (_displayContent.trim().isEmpty &&
+        _reasoning.isEmpty &&
+        widget.message.error == null &&
+        (widget.message.referencedFiles?.isEmpty ?? true)) {
       return const SizedBox.shrink();
     }
 
@@ -81,8 +94,9 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-                isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: isUser
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
             children: [
               Container(
                 padding: EdgeInsets.symmetric(
@@ -92,8 +106,9 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                 decoration: BoxDecoration(
                   color: isUser
                       ? colorScheme.primary
-                      : colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.55),
+                      : colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.55,
+                        ),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(isUser ? 18 : 6),
                     topRight: Radius.circular(isUser ? 6 : 18),
@@ -103,8 +118,9 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                   border: isUser
                       ? null
                       : Border.all(
-                          color: colorScheme.outlineVariant
-                              .withValues(alpha: 0.35),
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.35,
+                          ),
                         ),
                   boxShadow: isUser
                       ? [
@@ -119,6 +135,8 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_reasoning.isNotEmpty)
+                      _buildReasoning(context, colorScheme),
                     if (_isEditing)
                       _buildInlineEditor(context, colorScheme)
                     else if (widget.message.error != null)
@@ -126,11 +144,11 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                     else ...[
                       if (isUser)
                         _buildUserMessage(context, textColor)
-                      else
+                      else if (_displayContent.isNotEmpty)
                         _buildMarkdown(context, textColor, colorScheme),
                       // Streaming cursor
                       if (widget.message.isLoading &&
-                          widget.message.content.isNotEmpty)
+                          (_displayContent.isNotEmpty || _reasoning.isNotEmpty))
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: SizedBox(
@@ -143,7 +161,9 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                   ],
                 ),
               ),
-              if (!widget.message.isLoading && widget.message.error == null)
+              if (!widget.message.isLoading &&
+                  widget.message.error == null &&
+                  _displayContent.isNotEmpty)
                 _MessageActions(
                   canEdit: canEdit,
                   isVisible: showActions,
@@ -157,7 +177,8 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, left: 4, right: 48),
                   child: ReferencedFileCard(
-                      files: widget.message.referencedFiles!),
+                    files: widget.message.referencedFiles!,
+                  ),
                 ),
             ],
           ),
@@ -166,17 +187,59 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
     );
   }
 
-  Widget _buildUserMessage(
-    BuildContext context,
-    Color textColor,
-  ) {
+  Widget _buildReasoning(BuildContext context, ColorScheme colorScheme) {
+    final label = AppLocalizations.of(context)!.aiReasoning;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Semantics(
+          expanded: _reasoningExpanded,
+          child: TextButton(
+            key: const ValueKey('chat-reasoning-toggle'),
+            onPressed: () =>
+                setState(() => _reasoningExpanded = !_reasoningExpanded),
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.onSurfaceVariant,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _reasoningExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Text(label),
+              ],
+            ),
+          ),
+        ),
+        if (_reasoningExpanded)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4, bottom: 12),
+            child: SelectableText(
+              _reasoning,
+              key: const ValueKey('chat-reasoning-content'),
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+          ),
+        if (_displayContent.isNotEmpty) const SizedBox(height: 4),
+      ],
+    );
+  }
+
+  Widget _buildUserMessage(BuildContext context, Color textColor) {
     return SelectableText(
       widget.message.content,
-      style: TextStyle(
-        color: textColor,
-        fontSize: 14,
-        height: 1.4,
-      ),
+      style: TextStyle(color: textColor, fontSize: 14, height: 1.4),
     );
   }
 
@@ -208,8 +271,10 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
             ),
             textInputAction: TextInputAction.newline,
           ),
@@ -281,24 +346,36 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
   }
 
   void _copyMessage(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: widget.message.content));
+    Clipboard.setData(ClipboardData(text: _displayContent));
   }
 
   Widget _buildMarkdown(
-      BuildContext context, Color textColor, ColorScheme colorScheme) {
+    BuildContext context,
+    Color textColor,
+    ColorScheme colorScheme,
+  ) {
     return MarkdownBody(
-      data: widget.message.content,
+      data: _displayContent,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
         // Body text
         p: TextStyle(color: textColor, fontSize: 14, height: 1.5),
         // Headings
         h1: TextStyle(
-            color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
+          color: textColor,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
         h2: TextStyle(
-            color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+          color: textColor,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
         h3: TextStyle(
-            color: textColor, fontSize: 16, fontWeight: FontWeight.w600),
+          color: textColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
         // Bold / italic
         strong: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         em: TextStyle(color: textColor, fontStyle: FontStyle.italic),
@@ -370,10 +447,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
             Expanded(
               child: Text(
                 widget.message.error!,
-                style: TextStyle(
-                  color: colorScheme.error,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: colorScheme.error, fontSize: 13),
               ),
             ),
           ],
@@ -483,11 +557,7 @@ class _UserActionButtonState extends State<_UserActionButton> {
             child: SizedBox(
               width: 22,
               height: 22,
-              child: Icon(
-                widget.icon,
-                size: 15,
-                color: iconColor,
-              ),
+              child: Icon(widget.icon, size: 15, color: iconColor),
             ),
           ),
         ),

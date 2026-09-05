@@ -16,30 +16,25 @@ import 'package:win32/win32.dart';
 /// app lifetime and is released only when the process exits, which is exactly
 /// when kill-on-close should fire.
 ///
-/// win32 5.x exposes the Job Object *functions* but not the
-/// `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` struct or its constants, so the
-/// struct is written as a raw byte buffer: on x64 the `LimitFlags` DWORD sits
-/// at offset 16 inside the leading `JOBOBJECT_BASIC_LIMIT_INFORMATION`, and the
-/// full extended struct is 144 bytes. Zero-initialising the buffer and setting
-/// only `LimitFlags` is sufficient for a kill-on-close job.
+/// win32 exposes the Job Object *functions* but not the
+/// `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` struct, so the struct is written as a
+/// raw byte buffer: on x64 the `LimitFlags` DWORD sits at offset 16 inside the
+/// leading `JOBOBJECT_BASIC_LIMIT_INFORMATION`, and the full extended struct is
+/// 144 bytes. Zero-initialising the buffer and setting only `LimitFlags` is
+/// sufficient for a kill-on-close job.
 class WindowsProcessReaper {
   WindowsProcessReaper._();
 
   static final WindowsProcessReaper instance = WindowsProcessReaper._();
 
-  // JOBOBJECT_INFOCLASS.JobObjectExtendedLimitInformation
-  static const int _jobObjectExtendedLimitInformation = 9;
   // JOBOBJECT_BASIC_LIMIT_INFORMATION.LimitFlags value.
   static const int _jobObjectLimitKillOnJobClose = 0x2000;
   // Offset of LimitFlags within the extended struct (x64).
   static const int _limitFlagsOffset = 16;
   // sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION) on x64.
   static const int _extendedLimitInfoSize = 144;
-  // Access rights needed to assign a process to a job.
-  static const int _processSetQuota = 0x0100;
-  static const int _processTerminate = 0x0001;
 
-  int _jobHandle = 0;
+  HANDLE? _jobHandle;
   bool _initialized = false;
   bool _available = false;
 
@@ -49,24 +44,24 @@ class WindowsProcessReaper {
     if (_initialized) return _available;
     _initialized = true;
 
-    final job = CreateJobObject(nullptr, nullptr);
-    if (job == 0) {
+    final job = CreateJobObject(null, null).value;
+    if (!job.isValid) {
       _available = false;
       return false;
     }
 
     final info = calloc<Uint8>(_extendedLimitInfoSize);
     try {
-      (Pointer<Uint8>.fromAddress(info.address + _limitFlagsOffset))
-          .cast<Uint32>()
-          .value = _jobObjectLimitKillOnJobClose;
+      (Pointer<Uint8>.fromAddress(
+        info.address + _limitFlagsOffset,
+      )).cast<Uint32>().value = _jobObjectLimitKillOnJobClose;
       final ok = SetInformationJobObject(
         job,
-        _jobObjectExtendedLimitInformation,
+        JobObjectExtendedLimitInformation,
         info.cast(),
         _extendedLimitInfoSize,
-      );
-      if (ok == 0) {
+      ).value;
+      if (!ok) {
         CloseHandle(job);
         _available = false;
         return false;
@@ -86,10 +81,14 @@ class WindowsProcessReaper {
   void assignProcess(int pid) {
     if (!_ensureJob()) return;
 
-    final handle = OpenProcess(_processSetQuota | _processTerminate, 0, pid);
-    if (handle == 0) return;
+    final handle = OpenProcess(
+      PROCESS_SET_QUOTA | PROCESS_TERMINATE,
+      false,
+      pid,
+    ).value;
+    if (!handle.isValid) return;
     try {
-      AssignProcessToJobObject(_jobHandle, handle);
+      AssignProcessToJobObject(_jobHandle!, handle);
     } finally {
       CloseHandle(handle);
     }

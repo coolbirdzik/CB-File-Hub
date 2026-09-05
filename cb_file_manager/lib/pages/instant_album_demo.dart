@@ -9,7 +9,7 @@ import 'dart:async';
 import 'package:path/path.dart' as path;
 
 class InstantAlbumDemo extends StatefulWidget {
-  const InstantAlbumDemo({Key? key}) : super(key: key);
+  const InstantAlbumDemo({super.key});
 
   @override
   State<InstantAlbumDemo> createState() => _InstantAlbumDemoState();
@@ -23,9 +23,7 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Instant Album Demo'),
-      ),
+      appBar: AppBar(title: const Text('Instant Album Demo')),
       body: Column(
         children: [
           // Controls
@@ -81,8 +79,11 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(PhosphorIconsLight.imagesSquare,
-                            size: 64, color: Colors.grey),
+                        Icon(
+                          PhosphorIconsLight.imagesSquare,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
                         SizedBox(height: 16),
                         Text('Chọn thư mục để xem ảnh ngay lập tức'),
                       ],
@@ -92,11 +93,11 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
                     padding: const EdgeInsets.all(8.0),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 4,
-                      mainAxisSpacing: 4,
-                      childAspectRatio: 1,
-                    ),
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 4,
+                          mainAxisSpacing: 4,
+                          childAspectRatio: 1,
+                        ),
                     itemCount: _files.length,
                     itemBuilder: (context, index) {
                       final file = _files[index];
@@ -123,8 +124,10 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   color: Colors.grey[200],
-                  child: const Icon(PhosphorIconsLight.imageBroken,
-                      color: Colors.grey),
+                  child: const Icon(
+                    PhosphorIconsLight.imageBroken,
+                    color: Colors.grey,
+                  ),
                 );
               },
             )
@@ -147,7 +150,7 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.7)
+                    Colors.black.withValues(alpha: 0.7),
                   ],
                 ),
               ),
@@ -175,8 +178,11 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
                   color: Colors.green.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(PhosphorIconsLight.sparkle,
-                    color: Colors.white, size: 12),
+                child: const Icon(
+                  PhosphorIconsLight.sparkle,
+                  color: Colors.white,
+                  size: 12,
+                ),
               ),
             ),
         ],
@@ -185,7 +191,7 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
   }
 
   void _selectDirectory() async {
-    final selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    final selectedDirectory = await FilePicker.getDirectoryPath();
     if (selectedDirectory == null) return;
 
     setState(() {
@@ -206,36 +212,36 @@ class _InstantAlbumDemoState extends State<InstantAlbumDemo> {
         .cast<File>()
         .where((file) => _isImageFile(file.path))
         .listen(
-      (file) {
-        // Hiển thị ảnh ngay lập tức - tạo FileInfo tối thiểu
-        final fileName = path.basename(file.path);
-        final fileInfo = FileInfo(
-          path: file.path,
-          name: fileName,
-          size: 0, // Sẽ cập nhật sau
-          modifiedTime: DateTime.now(), // Sẽ cập nhật sau
-          isImage: true,
+          (file) {
+            // Hiển thị ảnh ngay lập tức - tạo FileInfo tối thiểu
+            final fileName = path.basename(file.path);
+            final fileInfo = FileInfo(
+              path: file.path,
+              name: fileName,
+              size: 0, // Sẽ cập nhật sau
+              modifiedTime: DateTime.now(), // Sẽ cập nhật sau
+              isImage: true,
+            );
+
+            // Thêm vào danh sách ngay lập tức
+            setState(() {
+              _files.add(fileInfo);
+            });
+
+            // Cập nhật thông tin chi tiết trong background (không chặn UI)
+            final index = _files.length - 1;
+            Future.microtask(() => _updateFileDetails(file, index));
+          },
+          onDone: () {
+            // Scan hoàn thành
+          },
+          onError: (error) {
+            if (mounted) {
+              final l10n = AppLocalizations.of(context)!;
+              AppToast.error(context, l10n.errorWithMessage(error.toString()));
+            }
+          },
         );
-
-        // Thêm vào danh sách ngay lập tức
-        setState(() {
-          _files.add(fileInfo);
-        });
-
-        // Cập nhật thông tin chi tiết trong background (không chặn UI)
-        final index = _files.length - 1;
-        Future.microtask(() => _updateFileDetails(file, index));
-      },
-      onDone: () {
-        // Scan hoàn thành
-      },
-      onError: (error) {
-        if (mounted) {
-          final l10n = AppLocalizations.of(context)!;
-          AppToast.error(context, l10n.errorWithMessage(error.toString()));
-        }
-      },
-    );
   }
 
   // Cập nhật thông tin file chi tiết trong background

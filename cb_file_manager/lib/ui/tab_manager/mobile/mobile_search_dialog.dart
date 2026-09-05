@@ -16,12 +16,12 @@ class MobileSearchDialog extends StatefulWidget {
   final VoidCallback? onClear;
 
   const MobileSearchDialog({
-    Key? key,
+    super.key,
     required this.currentPath,
     this.initialQuery,
     required this.onSearch,
     this.onClear,
-  }) : super(key: key);
+  });
 
   @override
   State<MobileSearchDialog> createState() => _MobileSearchDialogState();
@@ -120,9 +120,7 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
     return AlertDialog(
       backgroundColor: theme.scaffoldBackgroundColor,
       contentPadding: const EdgeInsets.all(20),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,8 +146,9 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
             decoration: InputDecoration(
               hintText: localizations.searchByNameOrTag,
               hintStyle: TextStyle(
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
               prefixIcon: Icon(
                 PhosphorIconsLight.magnifyingGlass,
@@ -254,7 +253,6 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
           //   const SizedBox(height: 12),
           //   Container(...),
           // ],
-
           const SizedBox(height: 16),
 
           // Action buttons
@@ -267,7 +265,9 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                   onPressed: _clearSearch,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     backgroundColor: theme.colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
@@ -290,8 +290,10 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   backgroundColor: theme.colorScheme.surfaceContainerHighest
                       .withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
@@ -314,8 +316,10 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
               FilledButton(
                 onPressed: _performSearch,
                 style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16.0),
                   ),

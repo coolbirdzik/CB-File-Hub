@@ -179,10 +179,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.sortAscending,
                     isChecked: currentSortOption == SortOption.nameAsc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.nameAsc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.nameAsc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -191,10 +193,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.sortDescending,
                     isChecked: currentSortOption == SortOption.nameDesc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.nameDesc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.nameDesc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -203,10 +207,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.calendarBlank,
                     isChecked: currentSortOption == SortOption.dateDesc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.dateDesc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.dateDesc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -215,10 +221,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.calendarBlank,
                     isChecked: currentSortOption == SortOption.dateAsc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.dateAsc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.dateAsc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -227,10 +235,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.arrowsOut,
                     isChecked: currentSortOption == SortOption.sizeDesc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.sizeDesc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.sizeDesc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -239,10 +249,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.arrowsIn,
                     isChecked: currentSortOption == SortOption.sizeAsc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.sizeAsc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.sizeAsc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -251,10 +263,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.textAa,
                     isChecked: currentSortOption == SortOption.typeAsc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.typeAsc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.typeAsc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                   ContextMenuAction(
@@ -263,10 +277,12 @@ class FolderContextMenu {
                     icon: PhosphorIconsLight.textAa,
                     isChecked: currentSortOption == SortOption.typeDesc,
                     onSelected: (_) {
-                      folderListBloc.add(SetSortOption(
-                        SortOption.typeDesc,
-                        folderPath: currentPath,
-                      ));
+                      folderListBloc.add(
+                        SetSortOption(
+                          SortOption.typeDesc,
+                          folderPath: currentPath,
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -364,11 +380,8 @@ class FolderContextMenu {
               id: 'new_folder',
               label: l10n.newFolder,
               icon: PhosphorIconsLight.folderPlus,
-              onSelected: (_) => _showCreateFolderDialog(
-                context,
-                currentPath,
-                onCreateFolder,
-              ),
+              onSelected: (_) =>
+                  _showCreateFolderDialog(context, currentPath, onCreateFolder),
             ),
             ContextMenuAction(
               id: 'new_file',
@@ -387,21 +400,19 @@ class FolderContextMenu {
       ];
     }
 
-    final desktopNewFileItems =
-        await DesktopNewFileService.instance.getAvailableItems();
-    final quickCreateItems =
-        await _resolveQuickCreateItems(desktopNewFileItems);
+    final desktopNewFileItems = await DesktopNewFileService.instance
+        .getAvailableItems();
+    final quickCreateItems = await _resolveQuickCreateItems(
+      desktopNewFileItems,
+    );
 
     final quickCreateActions = <ContextMenuAction>[
       ContextMenuAction(
         id: 'new_folder',
         label: l10n.newFolder,
         icon: PhosphorIconsLight.folderPlus,
-        onSelected: (_) => _showCreateFolderDialog(
-          context,
-          currentPath,
-          onCreateFolder,
-        ),
+        onSelected: (_) =>
+            _showCreateFolderDialog(context, currentPath, onCreateFolder),
       ),
     ];
 
@@ -647,13 +658,15 @@ class FolderContextMenu {
       }
     }
 
-    final remaining = items
-        .where((item) => !selectedIds.contains(item.id))
-        .toList(growable: false)
-      ..sort(
-        (a, b) => _desktopNewFileItemSortKey(a)
-            .compareTo(_desktopNewFileItemSortKey(b)),
-      );
+    final remaining =
+        items
+            .where((item) => !selectedIds.contains(item.id))
+            .toList(growable: false)
+          ..sort(
+            (a, b) => _desktopNewFileItemSortKey(
+              a,
+            ).compareTo(_desktopNewFileItemSortKey(b)),
+          );
 
     ordered.addAll(remaining);
     return ordered;
@@ -849,8 +862,8 @@ class FolderContextMenu {
 
       if (!context.mounted) return;
       final thumbnailService = FolderThumbnailService();
-      Future<String?> customThumbnailFuture =
-          thumbnailService.getCustomThumbnailPath(path);
+      Future<String?> customThumbnailFuture = thumbnailService
+          .getCustomThumbnailPath(path);
 
       final l10n = AppLocalizations.of(context)!;
       _showNoAnimationDialog(
@@ -910,22 +923,25 @@ class FolderContextMenu {
                         onPressed: () async {
                           final selectedPath =
                               await showFolderThumbnailPickerDialog(
-                            dialogContext,
-                            path,
-                          );
+                                dialogContext,
+                                path,
+                              );
                           if (selectedPath == null) {
                             return;
                           }
 
-                          final isImage =
-                              FileTypeUtils.isImageFile(selectedPath);
+                          final isImage = FileTypeUtils.isImageFile(
+                            selectedPath,
+                          );
                           final isVideo =
                               VideoThumbnailHelper.isSupportedVideoFormat(
-                                  selectedPath);
+                                selectedPath,
+                              );
                           if (!isImage && !isVideo) {
                             toast.warning(
-                              AppLocalizations.of(context)!
-                                  .invalidThumbnailFile,
+                              AppLocalizations.of(
+                                context,
+                              )!.invalidThumbnailFile,
                             );
                             return;
                           }
@@ -974,8 +990,9 @@ class FolderContextMenu {
       );
     } catch (e) {
       toast.error(
-        AppLocalizations.of(context)!
-            .errorGettingFolderProperties(e.toString()),
+        AppLocalizations.of(
+          context,
+        )!.errorGettingFolderProperties(e.toString()),
       );
     }
   }
@@ -1004,14 +1021,13 @@ class FolderContextMenu {
     return showGeneralDialog<T>(
       context: dialogContext,
       barrierDismissible: true,
-      barrierLabel:
-          MaterialLocalizations.of(dialogContext).modalBarrierDismissLabel,
+      barrierLabel: MaterialLocalizations.of(
+        dialogContext,
+      ).modalBarrierDismissLabel,
       barrierColor: Colors.black54,
       transitionDuration: Duration.zero,
       pageBuilder: (context, animation, secondaryAnimation) {
-        return SafeArea(
-          child: Builder(builder: builder),
-        );
+        return SafeArea(child: Builder(builder: builder));
       },
     );
   }
@@ -1079,10 +1095,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
           onPressed: () => Navigator.pop(context),
           child: Text(widget.cancelLabel),
         ),
-        TextButton(
-          onPressed: _submit,
-          child: Text(widget.createLabel),
-        ),
+        TextButton(onPressed: _submit, child: Text(widget.createLabel)),
       ],
     );
   }

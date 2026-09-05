@@ -20,7 +20,8 @@ class BrowserLikeFileSurface extends StatefulWidget {
   final Widget Function(
     BuildContext context,
     TabbedFolderKeyboardController keyboardController,
-  ) bodyBuilder;
+  )
+  bodyBuilder;
 
   final VoidCallback onClearSelection;
   final void Function(BuildContext) showRemoveTagsDialog;
@@ -45,7 +46,8 @@ class BrowserLikeFileSurface extends StatefulWidget {
   final FutureOr<void> Function(
     TabbedFolderKeyboardController keyboardController,
     bool permanent,
-  )? onDelete;
+  )?
+  onDelete;
   final FolderListState? keyboardFolderListState;
   final String? currentFilter;
   final int? gridCrossAxisCount;
@@ -57,24 +59,26 @@ class BrowserLikeFileSurface extends StatefulWidget {
     required Set<String> filePaths,
     required String lastSelectedPath,
     required bool ctrlSelect,
-  })? selectRange;
+  })?
+  selectRange;
   final void Function(FileSystemEntity entity)? activateEntity;
   final VoidCallback? onCopy;
   final VoidCallback? onCut;
   final VoidCallback? onPaste;
   final VoidCallback? onRename;
   final void Function(int index, int crossAxisCount, double itemMainAxisExtent)?
-      onScrollToIndex;
+  onScrollToIndex;
   final KeyEventResult Function(
     TabbedFolderKeyboardController keyboardController,
     KeyEvent event,
-  )? onKeyEvent;
+  )?
+  onKeyEvent;
 
   /// `Ctrl+F` — open / toggle the search bar.
   final VoidCallback? onSearch;
 
   const BrowserLikeFileSurface({
-    Key? key,
+    super.key,
     required this.selectionState,
     required this.viewMode,
     required this.isDesktop,
@@ -114,7 +118,7 @@ class BrowserLikeFileSurface extends StatefulWidget {
     this.onScrollToIndex,
     this.onKeyEvent,
     this.onSearch,
-  }) : super(key: key);
+  });
 
   @override
   State<BrowserLikeFileSurface> createState() => _BrowserLikeFileSurfaceState();
@@ -289,10 +293,10 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
                       widget.selectionState.selectedFilePaths.length,
                   selectedFolderCount:
                       widget.selectionState.selectedFolderPaths.length,
-                  selectedFilePaths:
-                      widget.selectionState.selectedFilePaths.toList(),
-                  selectedFolderPaths:
-                      widget.selectionState.selectedFolderPaths.toList(),
+                  selectedFilePaths: widget.selectionState.selectedFilePaths
+                      .toList(),
+                  selectedFolderPaths: widget.selectionState.selectedFolderPaths
+                      .toList(),
                 ),
               ),
           ],

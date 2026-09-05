@@ -7,7 +7,7 @@ import 'package:cb_file_manager/ui/screens/video_library/widgets/directory_list_
 
 /// Dialog for creating a new video library
 class CreateVideoLibraryDialog extends StatefulWidget {
-  const CreateVideoLibraryDialog({Key? key}) : super(key: key);
+  const CreateVideoLibraryDialog({super.key});
 
   @override
   State<CreateVideoLibraryDialog> createState() =>
@@ -75,11 +75,15 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
 
     if (library != null && mounted) {
       VideoLibraryHelpers.showSuccessMessage(
-          context, localizations.libraryCreatedSuccessfully);
+        context,
+        localizations.libraryCreatedSuccessfully,
+      );
       Navigator.of(context).pop(library);
     } else if (mounted) {
       VideoLibraryHelpers.showErrorMessage(
-          context, localizations.operationFailed);
+        context,
+        localizations.operationFailed,
+      );
     }
   }
 
@@ -153,8 +157,10 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                         ),
                       ),
                       child: isSelected
-                          ? const Icon(PhosphorIconsLight.check,
-                              color: Colors.white)
+                          ? const Icon(
+                              PhosphorIconsLight.check,
+                              color: Colors.white,
+                            )
                           : null,
                     ),
                   );

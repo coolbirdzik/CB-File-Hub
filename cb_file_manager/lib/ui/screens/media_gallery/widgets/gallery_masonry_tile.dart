@@ -19,7 +19,7 @@ class GalleryMasonryTile extends StatelessWidget {
   static final Map<String, double> _aspectRatioCache = {};
 
   const GalleryMasonryTile({
-    Key? key,
+    super.key,
     required this.file,
     required this.isSelected,
     required this.isSelectionMode,
@@ -28,7 +28,7 @@ class GalleryMasonryTile extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.getAspectRatio,
-  }) : super(key: key);
+  });
 
   /// Clear the aspect ratio cache (useful when switching directories)
   static void clearAspectRatioCache() {
@@ -73,8 +73,9 @@ class GalleryMasonryTile extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            color: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.2),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.2,
+            ),
             child: AspectRatio(
               aspectRatio: ratio,
               child: Hero(

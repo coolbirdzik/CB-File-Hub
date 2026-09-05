@@ -48,10 +48,7 @@ import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
 class AlbumDetailScreen extends StatefulWidget {
   final Album album;
 
-  const AlbumDetailScreen({
-    Key? key,
-    required this.album,
-  }) : super(key: key);
+  const AlbumDetailScreen({super.key, required this.album});
 
   @override
   State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
@@ -111,8 +108,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void initState() {
     super.initState();
     _selectionBloc = SelectionBloc();
-    _dragController =
-        AlbumDragSelectionController(selectionBloc: _selectionBloc);
+    _dragController = AlbumDragSelectionController(
+      selectionBloc: _selectionBloc,
+    );
     _preferences = UserPreferences.instance;
     _loadGridPreference();
     _initSmartStateAndLoad();
@@ -149,22 +147,26 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     bool ctrlSelect = false,
   }) {
     if (!shiftSelect) {
-      _selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
     // Shift+click: range selection over the visible _imageFiles list.
     final sel = _selectionBloc.state;
     if (sel.lastSelectedPath == null) {
-      _selectionBloc.add(ToggleFileSelection(
-        filePath,
-        shiftSelect: false,
-        ctrlSelect: ctrlSelect,
-      ));
+      _selectionBloc.add(
+        ToggleFileSelection(
+          filePath,
+          shiftSelect: false,
+          ctrlSelect: ctrlSelect,
+        ),
+      );
       return;
     }
 
@@ -175,22 +177,26 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (curIdx != -1 && lastIdx != -1) {
       final start = min(curIdx, lastIdx);
       final end = max(curIdx, lastIdx);
-      _selectionBloc.add(SelectItemsInRect(
-        folderPaths: const {},
-        filePaths: allPaths.sublist(start, end + 1).toSet(),
-        isCtrlPressed: ctrlSelect,
-        isShiftPressed: true,
-      ));
+      _selectionBloc.add(
+        SelectItemsInRect(
+          folderPaths: const {},
+          filePaths: allPaths.sublist(start, end + 1).toSet(),
+          isCtrlPressed: ctrlSelect,
+          isShiftPressed: true,
+        ),
+      );
     }
   }
 
   void _clearSelection() => _selectionBloc.add(ClearSelection());
 
   void _selectAll() {
-    _selectionBloc.add(SelectAll(
-      allFilePaths: _imageFiles.map((f) => f.path).toList(),
-      allFolderPaths: const [],
-    ));
+    _selectionBloc.add(
+      SelectAll(
+        allFilePaths: _imageFiles.map((f) => f.path).toList(),
+        allFolderPaths: const [],
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -205,9 +211,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       context: context,
       showDialogWithWidget: (dialogContext, dialog) =>
           RouteUtils.showAcrylicDialog<bool>(
-        context: dialogContext,
-        builder: (_) => dialog,
-      ),
+            context: dialogContext,
+            builder: (_) => dialog,
+          ),
       dialog: AlertDialog(
         title: Text('Remove $count ${count == 1 ? 'image' : 'images'}?'),
         content: const Text(
@@ -221,7 +227,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error),
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('Remove'),
           ),
         ],
@@ -231,10 +238,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (confirmed) {
       final successCount =
           await BrowserLikeActionHandlers.runBatchOperation<String>(
-        items: selectedPaths,
-        operation: (filePath) =>
-            _albumService.removeFileFromAlbum(widget.album.id, filePath),
-      );
+            items: selectedPaths,
+            operation: (filePath) =>
+                _albumService.removeFileFromAlbum(widget.album.id, filePath),
+          );
       _clearSelection();
       await _loadAlbumFiles();
 
@@ -252,9 +259,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       filePaths: selectedPaths.toList(),
       showDialogWithWidget: (dialogContext, dialog) =>
           RouteUtils.showAcrylicDialog<bool>(
-        context: dialogContext,
-        builder: (_) => dialog,
-      ),
+            context: dialogContext,
+            builder: (_) => dialog,
+          ),
       onMoved: (filePath) =>
           _albumService.removeFileFromAlbum(widget.album.id, filePath),
       onAfterSuccess: (_) async {
@@ -270,8 +277,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   Future<void> _initSmartStateAndLoad() async {
     try {
-      _isSmartAlbum =
-          await SmartAlbumService.instance.isSmartAlbum(widget.album.id);
+      _isSmartAlbum = await SmartAlbumService.instance.isSmartAlbum(
+        widget.album.id,
+      );
     } catch (_) {
       _isSmartAlbum = false;
     }
@@ -291,10 +299,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       final rules = allRules
           .where((r) => r.albumId == widget.album.id && r.isActive)
           .toList();
-      final roots =
-          await SmartAlbumService.instance.getScanRoots(widget.album.id);
-      final last =
-          await SmartAlbumService.instance.getLastScanTime(widget.album.id);
+      final roots = await SmartAlbumService.instance.getScanRoots(
+        widget.album.id,
+      );
+      final last = await SmartAlbumService.instance.getLastScanTime(
+        widget.album.id,
+      );
       if (mounted) {
         setState(() {
           _activeRulesCount = rules.length;
@@ -413,8 +423,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       });
     }
 
-    final roots =
-        await SmartAlbumService.instance.getScanRoots(widget.album.id);
+    final roots = await SmartAlbumService.instance.getScanRoots(
+      widget.album.id,
+    );
     if (roots.isEmpty) {
       if (mounted) {
         setState(() {
@@ -430,8 +441,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
     Future<void> scanDir(Directory dir) async {
       try {
-        await for (final entity
-            in dir.list(recursive: false, followLinks: false)) {
+        await for (final entity in dir.list(
+          recursive: false,
+          followLinks: false,
+        )) {
           if (_cancelSmartScan) return;
           if (entity is File) {
             processed++;
@@ -478,14 +491,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
     try {
       await SmartAlbumService.instance.setCachedFiles(
-          widget.album.id, _originalImageFiles.map((f) => f.path).toList());
+        widget.album.id,
+        _originalImageFiles.map((f) => f.path).toList(),
+      );
     } catch (_) {}
   }
 
   Future<void> _loadCachedSmartImages() async {
     try {
-      final cached =
-          await SmartAlbumService.instance.getCachedFiles(widget.album.id);
+      final cached = await SmartAlbumService.instance.getCachedFiles(
+        widget.album.id,
+      );
       if (cached.isNotEmpty && mounted) {
         final allRules = await AlbumAutoRuleService.instance.loadRules();
         final rules = allRules
@@ -547,8 +563,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       child: Text(
                         'No locations selected. Add folders to scan for this album.',
                         style: TextStyle(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   Flexible(
@@ -560,11 +576,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         return ListTile(
                           dense: true,
                           leading: const Icon(PhosphorIconsLight.folder),
-                          title: Text(p,
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          title: Text(
+                            p,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           trailing: IconButton(
-                            icon: Icon(PhosphorIconsLight.trash,
-                                color: Theme.of(context).colorScheme.error),
+                            icon: Icon(
+                              PhosphorIconsLight.trash,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
                             onPressed: () =>
                                 setState(() => localRoots.removeAt(index)),
                           ),
@@ -577,8 +598,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: () async {
-                        final dir =
-                            await FilePicker.platform.getDirectoryPath();
+                        final dir = await FilePicker.getDirectoryPath();
                         if (dir != null && dir.isNotEmpty) {
                           setState(() {
                             if (!localRoots.contains(dir)) localRoots.add(dir);
@@ -822,7 +842,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   /// items are selected), matching the file-browser pattern of not switching
   /// the AppBar on desktop selection mode.
   List<Widget> _buildNormalActions(
-      BuildContext context, SelectionState sel, bool isDesktop) {
+    BuildContext context,
+    SelectionState sel,
+    bool isDesktop,
+  ) {
     final hasSelection = sel.selectedFilePaths.isNotEmpty;
     return [
       // ── Album-specific: remove selected items ─────────────────────────────
@@ -932,44 +955,54 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         itemBuilder: (context) => [
           const PopupMenuItem(
             value: 'edit',
-            child: Row(children: [
-              Icon(PhosphorIconsLight.pencilSimple),
-              SizedBox(width: 8),
-              Text('Edit Album'),
-            ]),
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.pencilSimple),
+                SizedBox(width: 8),
+                Text('Edit Album'),
+              ],
+            ),
           ),
           const PopupMenuItem(
             value: 'select',
-            child: Row(children: [
-              Icon(PhosphorIconsLight.checks),
-              SizedBox(width: 8),
-              Text('Select Images'),
-            ]),
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.checks),
+                SizedBox(width: 8),
+                Text('Select Images'),
+              ],
+            ),
           ),
           const PopupMenuItem(
             value: 'shuffle',
-            child: Row(children: [
-              Icon(PhosphorIconsLight.shuffle),
-              SizedBox(width: 8),
-              Text('Shuffle'),
-            ]),
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.shuffle),
+                SizedBox(width: 8),
+                Text('Shuffle'),
+              ],
+            ),
           ),
           const PopupMenuItem(
             value: 'clear_search',
-            child: Row(children: [
-              Icon(PhosphorIconsLight.x),
-              SizedBox(width: 8),
-              Text('Clear Search'),
-            ]),
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.x),
+                SizedBox(width: 8),
+                Text('Clear Search'),
+              ],
+            ),
           ),
           if (_isSmartAlbum)
             const PopupMenuItem(
               value: 'manage_rules',
-              child: Row(children: [
-                Icon(PhosphorIconsLight.faders),
-                SizedBox(width: 8),
-                Text('Manage Rules'),
-              ]),
+              child: Row(
+                children: [
+                  Icon(PhosphorIconsLight.faders),
+                  SizedBox(width: 8),
+                  Text('Manage Rules'),
+                ],
+              ),
             ),
         ],
       ),
@@ -978,7 +1011,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   /// Mobile-only AppBar actions shown when in selection mode.
   List<Widget> _buildMobileSelectionActions(
-      BuildContext context, SelectionState sel) {
+    BuildContext context,
+    SelectionState sel,
+  ) {
     final count = sel.selectedFilePaths.length;
     final total = _imageFiles.length;
     return [
@@ -1041,8 +1076,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             title: useMobileSelectionBar
                 ? '$selectedCount selected'
                 : widget.album.name,
-            titleWidget:
-                useMobileSelectionBar ? null : _buildAddressBar(context),
+            titleWidget: useMobileSelectionBar
+                ? null
+                : _buildAddressBar(context),
             automaticallyImplyLeading: !useMobileSelectionBar,
             actions: useMobileSelectionBar
                 ? _buildMobileSelectionActions(context, sel)
@@ -1082,12 +1118,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                        'Smart Album (dynamic by rules)'),
+                                      'Smart Album (dynamic by rules)',
+                                    ),
                                     const SizedBox(height: 2),
-                                    Text(_smartStatusText(),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall),
+                                    Text(
+                                      _smartStatusText(),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1115,7 +1154,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   }
                                 },
                                 icon: const Icon(
-                                    PhosphorIconsLight.arrowsClockwise),
+                                  PhosphorIconsLight.arrowsClockwise,
+                                ),
                                 label: const Text('Rescan'),
                               ),
                               TextButton.icon(
@@ -1149,8 +1189,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(_progressStatus,
-                                  style: Theme.of(context).textTheme.bodySmall),
+                              Text(
+                                _progressStatus,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                               const SizedBox(height: 4),
                               AppProgressIndicator(
                                 value: _totalProgress > 0
@@ -1183,11 +1225,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               ? (d) {
                                   final focused =
                                       FocusManager.instance.primaryFocus;
-                                  final isText = focused?.context?.widget
+                                  final isText =
+                                      focused?.context?.widget
                                           is EditableText ||
                                       focused?.context
                                               ?.findAncestorWidgetOfExactType<
-                                                  EditableText>() !=
+                                                EditableText
+                                              >() !=
                                           null;
                                   if (!isText) {
                                     // isDragging becomes true → next build
@@ -1202,8 +1246,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           onPanUpdate: isDesktop
                               ? (d) => _dragController.update(d.localPosition)
                               : null,
-                          onPanEnd:
-                              isDesktop ? (_) => _dragController.end() : null,
+                          onPanEnd: isDesktop
+                              ? (_) => _dragController.end()
+                              : null,
                           child: _imageFiles.isEmpty && !_isLoading
                               ? _buildEmptyState()
                               : _buildGrid(context, sel, inSel, isDesktop),
@@ -1338,22 +1383,23 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         opaque: false,
                         barrierColor: Colors.black,
                         fullscreenDialog: true,
-                        pageBuilder: (_, __, ___) => ImageViewerScreen(
+                        pageBuilder: (_, _, _) => ImageViewerScreen(
                           file: file,
                           imageFiles: _imageFiles,
                           initialIndex: index,
                         ),
-                        transitionsBuilder: (_, animation, __, child) =>
+                        transitionsBuilder: (_, animation, _, child) =>
                             FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        ),
+                              opacity: CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOut,
+                              ),
+                              child: child,
+                            ),
                         transitionDuration: const Duration(milliseconds: 180),
-                        reverseTransitionDuration:
-                            const Duration(milliseconds: 150),
+                        reverseTransitionDuration: const Duration(
+                          milliseconds: 150,
+                        ),
                       ),
                     );
                   },

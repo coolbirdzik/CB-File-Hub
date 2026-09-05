@@ -203,8 +203,9 @@ class NetworkBrowsingBloc
 
       if (requestId != _activeDirectoryRequestId) return;
 
-      final validContents =
-          contents.where((item) => item.path.isNotEmpty).toList();
+      final validContents = contents
+          .where((item) => item.path.isNotEmpty)
+          .toList();
       final List<Directory> directories = <Directory>[];
       final List<File> files = <File>[];
 
@@ -225,9 +226,11 @@ class NetworkBrowsingBloc
 
         processedCount++;
 
-        final bool shouldEmitFirstBatch = processedCount == firstBatchSize &&
+        final bool shouldEmitFirstBatch =
+            processedCount == firstBatchSize &&
             processedCount < validContents.length;
-        final bool shouldEmitBatch = processedCount % batchSize == 0 &&
+        final bool shouldEmitBatch =
+            processedCount % batchSize == 0 &&
             processedCount < validContents.length;
 
         if (shouldEmitFirstBatch || shouldEmitBatch) {

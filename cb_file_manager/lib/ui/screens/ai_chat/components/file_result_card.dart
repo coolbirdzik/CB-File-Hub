@@ -21,12 +21,12 @@ class FileResultCard extends StatelessWidget {
   final VoidCallback? onOpenExternal;
 
   const FileResultCard({
-    Key? key,
+    super.key,
     required this.result,
     this.onTap,
     this.onOpenFolder,
     this.onOpenExternal,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -96,8 +96,9 @@ class FileResultCard extends StatelessWidget {
                         result.explanation,
                         style: TextStyle(
                           fontSize: 10,
-                          color: colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.7),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -131,8 +132,10 @@ class FileResultCard extends StatelessWidget {
                       onPressed: onOpenFolder,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                   // Open externally
                   if (onOpenExternal != null)
@@ -146,18 +149,23 @@ class FileResultCard extends StatelessWidget {
                       onPressed: onOpenExternal,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
 
                   // Relevance badge
                   if (result.relevance > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
-                        color: _relevanceColor(result.relevance)
-                            .withValues(alpha: 0.15),
+                        color: _relevanceColor(
+                          result.relevance,
+                        ).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -194,7 +202,7 @@ class FileResultCard extends StatelessWidget {
       '.bmp',
       '.webp',
       '.svg',
-      '.heic'
+      '.heic',
     };
     const videoExts = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.webm'};
     const audioExts = {'.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'};
@@ -208,7 +216,7 @@ class FileResultCard extends StatelessWidget {
       '.c',
       '.cpp',
       '.go',
-      '.rs'
+      '.rs',
     };
     const archiveExts = {'.zip', '.rar', '.7z', '.tar', '.gz'};
 

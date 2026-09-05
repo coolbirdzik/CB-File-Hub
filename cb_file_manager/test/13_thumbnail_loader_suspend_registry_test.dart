@@ -17,10 +17,14 @@ void main() {
     test('13.01 paths under a suspended prefix are reported suspended', () {
       ThumbnailLoader.suspendTab('tab1', '/home/user/folder');
 
-      expect(ThumbnailLoader.isPathSuspended('/home/user/folder/file.mp4'),
-          isTrue);
-      expect(ThumbnailLoader.isPathSuspended('/home/user/other/file.mp4'),
-          isFalse);
+      expect(
+        ThumbnailLoader.isPathSuspended('/home/user/folder/file.mp4'),
+        isTrue,
+      );
+      expect(
+        ThumbnailLoader.isPathSuspended('/home/user/other/file.mp4'),
+        isFalse,
+      );
     });
 
     test('13.02 resumeTab clears the suspend marker', () {
@@ -29,8 +33,10 @@ void main() {
 
       ThumbnailLoader.resumeTab('tab1');
       expect(ThumbnailLoader.debugSuspendedTabCount(), 0);
-      expect(ThumbnailLoader.isPathSuspended('/home/user/folder/file.mp4'),
-          isFalse);
+      expect(
+        ThumbnailLoader.isPathSuspended('/home/user/folder/file.mp4'),
+        isFalse,
+      );
     });
 
     test('13.03 multiple tabs can be suspended independently', () {
@@ -48,10 +54,14 @@ void main() {
 
     test('13.04 network paths use forward-slash prefix matching', () {
       ThumbnailLoader.suspendTab('tab1', '#network/host/share/folder');
-      expect(ThumbnailLoader.isPathSuspended('#network/host/share/folder/file'),
-          isTrue);
-      expect(ThumbnailLoader.isPathSuspended('#network/host/share/other/file'),
-          isFalse);
+      expect(
+        ThumbnailLoader.isPathSuspended('#network/host/share/folder/file'),
+        isTrue,
+      );
+      expect(
+        ThumbnailLoader.isPathSuspended('#network/host/share/other/file'),
+        isFalse,
+      );
     });
 
     test('13.05 suspending with empty path clears any existing entry', () {
@@ -63,11 +73,12 @@ void main() {
     });
 
     test(
-        '13.06 isPathSuspended returns false when registry is empty (fast path)',
-        () {
-      expect(ThumbnailLoader.debugSuspendedTabCount(), 0);
-      expect(ThumbnailLoader.isPathSuspended('anything'), isFalse);
-    });
+      '13.06 isPathSuspended returns false when registry is empty (fast path)',
+      () {
+        expect(ThumbnailLoader.debugSuspendedTabCount(), 0);
+        expect(ThumbnailLoader.isPathSuspended('anything'), isFalse);
+      },
+    );
 
     test('13.07 file thumbnails default to cover', () {
       const imageThumbnail = ThumbnailLoader(

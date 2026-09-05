@@ -99,8 +99,9 @@ bool qualifiesAsOldLargeDiskInsight(
   final activity = insight.lastActivity;
   if (activity == null) return false;
 
-  final threshold =
-      insight.isFile ? defaultOldLargeFileBytes : defaultOldLargeDirectoryBytes;
+  final threshold = insight.isFile
+      ? defaultOldLargeFileBytes
+      : defaultOldLargeDirectoryBytes;
   if (insight.sizeBytes < threshold) return false;
 
   final cutoff = (now ?? DateTime.now()).subtract(
@@ -110,10 +111,7 @@ bool qualifiesAsOldLargeDiskInsight(
 }
 
 /// Sorts old-large evidence by size, then path for deterministic presentation.
-int compareOldLargeDiskInsights(
-  FullDiskScanInsight a,
-  FullDiskScanInsight b,
-) {
+int compareOldLargeDiskInsights(FullDiskScanInsight a, FullDiskScanInsight b) {
   final sizeOrder = b.sizeBytes.compareTo(a.sizeBytes);
   return sizeOrder != 0 ? sizeOrder : a.path.compareTo(b.path);
 }
@@ -230,13 +228,15 @@ Future<FullDiskScanHandle> spawnFullDiskScan({
     try {
       if (msg is _ProgressMsg) {
         if (!handle._progress.isClosed) {
-          handle._progress.add(FullDiskScanProgress(
-            directoriesScanned: msg.dirs,
-            filesScanned: msg.files,
-            bytesScanned: msg.bytes,
-            currentPath: msg.currentPath,
-            isIncremental: msg.isIncremental,
-          ));
+          handle._progress.add(
+            FullDiskScanProgress(
+              directoriesScanned: msg.dirs,
+              filesScanned: msg.files,
+              bytesScanned: msg.bytes,
+              currentPath: msg.currentPath,
+              isIncremental: msg.isIncremental,
+            ),
+          );
         }
       } else if (msg is _TreeMsg) {
         if (!handle._treeSnapshots.isClosed) {
@@ -314,11 +314,10 @@ class FullDiskScanHandle {
   bool _terminal = false;
 
   FullDiskScanHandle._({
-    required Isolate isolate,
-    required ReceivePort receivePort,
+    required Isolate this._isolate,
+    required this._receivePort,
     required this.drivePath,
-  })  : _isolate = isolate,
-        _receivePort = receivePort;
+  });
 
   /// Creates a completed handle for a tracked snapshot with no dirty
   /// directories. This keeps the public stream/future contract while avoiding
@@ -326,8 +325,8 @@ class FullDiskScanHandle {
   FullDiskScanHandle.completed({
     required this.drivePath,
     required FullDiskScanResult result,
-  })  : _isolate = null,
-        _receivePort = ReceivePort() {
+  }) : _isolate = null,
+       _receivePort = ReceivePort() {
     _treeSnapshots.add(result.root);
     _treeSnapshots.close();
     _progress.close();
@@ -365,17 +364,19 @@ class FullDiskScanHandle {
     if (!_progress.isClosed) _progress.close();
     if (!_treeSnapshots.isClosed) _treeSnapshots.close();
     if (!_done.isCompleted) {
-      _done.complete(FullDiskScanResult(
-        root: DiskTreeNode(name: drivePath, fullPath: drivePath),
-        duration: DateTime.now().difference(_startedAt),
-        inaccessible: const ['cancelled'],
-        coverageIssues: <FullDiskScanCoverageIssue>[
-          FullDiskScanCoverageIssue(
-            path: drivePath,
-            reason: FullDiskScanCoverageIssueReason.cancelled,
-          ),
-        ],
-      ));
+      _done.complete(
+        FullDiskScanResult(
+          root: DiskTreeNode(name: drivePath, fullPath: drivePath),
+          duration: DateTime.now().difference(_startedAt),
+          inaccessible: const ['cancelled'],
+          coverageIssues: <FullDiskScanCoverageIssue>[
+            FullDiskScanCoverageIssue(
+              path: drivePath,
+              reason: FullDiskScanCoverageIssueReason.cancelled,
+            ),
+          ],
+        ),
+      );
     }
   }
 }
@@ -390,14 +391,13 @@ const int _fileAttributeDirectory = 0x10;
 /// FILE_ATTRIBUTE_REPARSE_POINT — junctions, symlinks.
 const int _fileAttributeReparsePoint = 0x400;
 
-/// INVALID_HANDLE_VALUE.
-const int _invalidHandleValue = -1;
-
 /// Converts a Windows FILETIME (100-nanosecond ticks since 1601 UTC) without
 /// issuing another filesystem query.
 DateTime? _fileTimeToDateTime(win32.FILETIME fileTime) {
   return _fileTimePartsToDateTime(
-      fileTime.dwLowDateTime, fileTime.dwHighDateTime);
+    fileTime.dwLowDateTime,
+    fileTime.dwHighDateTime,
+  );
 }
 
 DateTime? _fileTimePartsToDateTime(int low, int high) {
@@ -437,9 +437,9 @@ DiskTreeNode cloneDiskTreePreview(
         isExpanded: source.isExpanded,
         aggregatedItemCount: source.aggregatedItemCount,
       )..cacheJunkMetadata(
-          junkBytes: source.junkBytes,
-          hasJunkChildren: source.hasJunkChildren,
-        );
+        junkBytes: source.junkBytes,
+        hasJunkChildren: source.hasJunkChildren,
+      );
     }
     budget.remaining--;
 
@@ -488,24 +488,23 @@ class _PreviewNodeBudget {
 /// legacy API on an invalid Ex handle preserves the old coverage behavior; an
 /// inaccessible directory still reaches the existing coverage reporting path
 /// after both calls fail.
-int _findFirstFile(
+win32.HANDLE _findFirstFile(
   Pointer<Utf16> searchPath,
   Pointer<win32.WIN32_FIND_DATA> findData,
 ) {
   try {
     final handle = win32.FindFirstFileEx(
-      searchPath,
+      win32.PCWSTR(searchPath),
       win32.FindExInfoBasic,
       findData,
       win32.FindExSearchNameMatch,
-      nullptr,
       win32.FIND_FIRST_EX_LARGE_FETCH,
-    );
-    if (handle != _invalidHandleValue) return handle;
+    ).value;
+    if (handle.isValid) return handle;
   } catch (_) {
     // Older Windows/filesystem providers can reject FindFirstFileExW.
   }
-  return win32.FindFirstFile(searchPath, findData);
+  return win32.FindFirstFile(win32.PCWSTR(searchPath), findData).value;
 }
 
 void _fullDiskScanWorker(_FullScanArgs args) {
@@ -517,19 +516,23 @@ void _fullDiskScanWorker(_FullScanArgs args) {
   final scanStartedAt = DateTime.now();
   final wholeDirRules = args.junkRules
       .where((rule) => rule.includeGlobs.isEmpty)
-      .map((rule) => _WorkerWholeDirRule(
-            path: rule.basePath.toUpperCase(),
-            prefix: '${rule.basePath.toUpperCase()}\\',
-            categoryId: rule.categoryId,
-          ))
+      .map(
+        (rule) => _WorkerWholeDirRule(
+          path: rule.basePath.toUpperCase(),
+          prefix: '${rule.basePath.toUpperCase()}\\',
+          categoryId: rule.categoryId,
+        ),
+      )
       .toList(growable: false);
   final globRules = args.junkRules
       .where((rule) => rule.includeGlobs.isNotEmpty)
-      .map((rule) => _WorkerGlobRule(
-            basePath: rule.basePath.toUpperCase(),
-            categoryId: rule.categoryId,
-            globs: rule.includeGlobs.map(_globToRegex).toList(growable: false),
-          ))
+      .map(
+        (rule) => _WorkerGlobRule(
+          basePath: rule.basePath.toUpperCase(),
+          categoryId: rule.categoryId,
+          globs: rule.includeGlobs.map(_globToRegex).toList(growable: false),
+        ),
+      )
       .toList(growable: false);
   int totalDirs = 0;
   int totalFiles = 0;
@@ -538,8 +541,9 @@ void _fullDiskScanWorker(_FullScanArgs args) {
   DateTime lastTreeFlush = DateTime.now();
   DiskTreeNode? rootSnapshot;
   var incrementalScan = false;
-  final canReadJournalChanges =
-      DiskUsnJournalReader.canReadChanges(args.drivePath);
+  final canReadJournalChanges = DiskUsnJournalReader.canReadChanges(
+    args.drivePath,
+  );
   // Directory IDs are only needed when a caller explicitly requests a USN
   // refresh. The normal path uses the watcher started by DiskCleanerService;
   // avoiding a CreateFile/GetFileInformationByHandle pair for every folder
@@ -573,10 +577,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     return matches;
   }
 
-  String? globCategory(
-    String fileName,
-    List<_WorkerGlobRule>? directoryRules,
-  ) {
+  String? globCategory(String fileName, List<_WorkerGlobRule>? directoryRules) {
     if (directoryRules == null) return null;
     final upperFileName = fileName.toUpperCase();
     for (final rule in directoryRules) {
@@ -633,30 +634,34 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     final now = DateTime.now();
     if (now.difference(lastFlush).inMilliseconds >= 120) {
       lastFlush = now;
-      sendPort.send(_ProgressMsg(
-        dirs: totalDirs,
-        files: totalFiles,
-        bytes: totalBytes,
-        currentPath: path,
-        isIncremental: incrementalScan,
-      ));
+      sendPort.send(
+        _ProgressMsg(
+          dirs: totalDirs,
+          files: totalFiles,
+          bytes: totalBytes,
+          currentPath: path,
+          isIncremental: incrementalScan,
+        ),
+      );
     }
     // Send a bounded preview tree every ~1400ms so UI can expand/collapse what
     // has been scanned so far without copying the entire deep graph.
     final root = rootSnapshot;
     if (root != null && now.difference(lastTreeFlush).inMilliseconds >= 1400) {
       lastTreeFlush = now;
-      sendPort.send(_TreeMsg(
-        root: cloneDiskTreePreview(root),
-      ));
+      sendPort.send(_TreeMsg(root: cloneDiskTreePreview(root)));
     }
   }
 
   /// Scans a directory using Win32 FindFirstFileExW/FindNextFileW.
   /// Mutates [node] with children as they are discovered so partial snapshots
   /// can be streamed while the scan is still running.
-  void scanInto(DiskTreeNode node, int depth,
-      [String? inheritedJunkCategory, bool replaceExisting = false]) {
+  void scanInto(
+    DiskTreeNode node,
+    int depth, [
+    String? inheritedJunkCategory,
+    bool replaceExisting = false,
+  ]) {
     if (replaceExisting) {
       node.replaceChildren(const <DiskTreeNode>[]);
       node.sizeBytes = 0;
@@ -666,17 +671,20 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       node.junkCategoryId = inheritedJunkCategory;
     }
     final dirPath = node.fullPath;
-    final directoryGlobRules =
-        inheritedJunkCategory == null ? globRulesForDirectory(dirPath) : null;
+    final directoryGlobRules = inheritedJunkCategory == null
+        ? globRulesForDirectory(dirPath)
+        : null;
     totalDirs++;
     maybeFlush(dirPath);
 
     if (depth >= args.maxDepth) {
-      coverageIssues.add(FullDiskScanCoverageIssue(
-        path: dirPath,
-        reason: FullDiskScanCoverageIssueReason.maxDepthReached,
-        detail: 'Maximum scan depth ${args.maxDepth} reached.',
-      ));
+      coverageIssues.add(
+        FullDiskScanCoverageIssue(
+          path: dirPath,
+          reason: FullDiskScanCoverageIssueReason.maxDepthReached,
+          detail: 'Maximum scan depth ${args.maxDepth} reached.',
+        ),
+      );
       return;
     }
 
@@ -735,12 +743,14 @@ void _fullDiskScanWorker(_FullScanArgs args) {
 
     try {
       final hFind = _findFirstFile(lpFileName, findData);
-      if (hFind == _invalidHandleValue) {
+      if (!hFind.isValid) {
         inaccessible.add(dirPath);
-        coverageIssues.add(FullDiskScanCoverageIssue(
-          path: dirPath,
-          reason: FullDiskScanCoverageIssueReason.inaccessible,
-        ));
+        coverageIssues.add(
+          FullDiskScanCoverageIssue(
+            path: dirPath,
+            reason: FullDiskScanCoverageIssueReason.inaccessible,
+          ),
+        );
         return;
       }
 
@@ -758,10 +768,12 @@ void _fullDiskScanWorker(_FullScanArgs args) {
 
           // Skip reparse points (junctions/symlinks) to avoid infinite loops
           if (attrs & _fileAttributeReparsePoint != 0) {
-            coverageIssues.add(FullDiskScanCoverageIssue(
-              path: fullPath,
-              reason: FullDiskScanCoverageIssueReason.reparsePoint,
-            ));
+            coverageIssues.add(
+              FullDiskScanCoverageIssue(
+                path: fullPath,
+                reason: FullDiskScanCoverageIssueReason.reparsePoint,
+              ),
+            );
             continue;
           }
 
@@ -788,8 +800,8 @@ void _fullDiskScanWorker(_FullScanArgs args) {
               fullPath: fullPath,
               fileReferenceNumber:
                   collectDirectoryFileIds && canReadJournalChanges
-                      ? DiskUsnJournalReader.readFileReferenceNumber(fullPath)
-                      : null,
+                  ? DiskUsnJournalReader.readFileReferenceNumber(fullPath)
+                  : null,
               junkCategoryId: childJunkCategory,
             );
             node.addChild(child);
@@ -804,10 +816,14 @@ void _fullDiskScanWorker(_FullScanArgs args) {
                   path: fullPath,
                   isFile: false,
                   sizeBytes: child.sizeBytes,
-                  lastModified:
-                      _fileTimePartsToDateTime(lastWriteLow, lastWriteHigh),
-                  lastAccessed:
-                      _fileTimePartsToDateTime(lastAccessLow, lastAccessHigh),
+                  lastModified: _fileTimePartsToDateTime(
+                    lastWriteLow,
+                    lastWriteHigh,
+                  ),
+                  lastAccessed: _fileTimePartsToDateTime(
+                    lastAccessLow,
+                    lastAccessHigh,
+                  ),
                 ),
                 now: scanStartedAt,
               );
@@ -818,10 +834,12 @@ void _fullDiskScanWorker(_FullScanArgs args) {
             final sizeLow = findData.ref.nFileSizeLow;
             final fileSize = (sizeHigh << 32) | sizeLow;
             if (fileSize >= defaultOldLargeFileBytes) {
-              final lastModified =
-                  _fileTimeToDateTime(findData.ref.ftLastWriteTime);
-              final lastAccessed =
-                  _fileTimeToDateTime(findData.ref.ftLastAccessTime);
+              final lastModified = _fileTimeToDateTime(
+                findData.ref.ftLastWriteTime,
+              );
+              final lastAccessed = _fileTimeToDateTime(
+                findData.ref.ftLastAccessTime,
+              );
               retainOldLargeDiskInsight(
                 oldLargeFiles,
                 FullDiskScanInsight(
@@ -839,7 +857,8 @@ void _fullDiskScanWorker(_FullScanArgs args) {
             // so files only need the glob rules already selected for this
             // directory. This avoids uppercasing full paths and walking every
             // Cleaner rule for every file on the drive.
-            final fileJunkCategory = inheritedJunkCategory ??
+            final fileJunkCategory =
+                inheritedJunkCategory ??
                 globCategory(fileName, directoryGlobRules);
 
             if (fileSize < args.minDisplayEntryBytes ||
@@ -870,17 +889,19 @@ void _fullDiskScanWorker(_FullScanArgs args) {
             totalFiles++;
             totalBytes += fileSize;
           }
-        } while (win32.FindNextFile(hFind, findData) != 0);
+        } while (win32.FindNextFile(hFind, findData).value);
       } finally {
         win32.FindClose(hFind);
       }
     } catch (error) {
       inaccessible.add(dirPath);
-      coverageIssues.add(FullDiskScanCoverageIssue(
-        path: dirPath,
-        reason: FullDiskScanCoverageIssueReason.inaccessible,
-        detail: error.toString(),
-      ));
+      coverageIssues.add(
+        FullDiskScanCoverageIssue(
+          path: dirPath,
+          reason: FullDiskScanCoverageIssueReason.inaccessible,
+          detail: error.toString(),
+        ),
+      );
     } finally {
       calloc.free(findData);
       calloc.free(lpFileName);
@@ -909,8 +930,9 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     }
   }
 
-  final driveName =
-      args.drivePath.endsWith('\\') ? args.drivePath : '${args.drivePath}\\';
+  final driveName = args.drivePath.endsWith('\\')
+      ? args.drivePath
+      : '${args.drivePath}\\';
   FullDiskScanMode scanMode = FullDiskScanMode.full;
   var changedDirectoryCount = 0;
   String? incrementalFallbackReason;
@@ -930,7 +952,8 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     cacheDirectJunkMetadata(node);
   }
 
-  final incrementalRequested = args.baseRoot != null &&
+  final incrementalRequested =
+      args.baseRoot != null &&
       (args.journalCursor != null || args.hasTrackedChanges);
   if (incrementalRequested) {
     root = args.baseRoot!;
@@ -997,8 +1020,9 @@ void _fullDiskScanWorker(_FullScanArgs args) {
         ..sort((a, b) => a.length.compareTo(b.length));
       final dirtyDirectories = <String>[];
       for (final candidate in sortedCandidates) {
-        if (!dirtyDirectories
-            .any((ancestor) => _isWindowsPathWithin(candidate, ancestor))) {
+        if (!dirtyDirectories.any(
+          (ancestor) => _isWindowsPathWithin(candidate, ancestor),
+        )) {
           dirtyDirectories.add(candidate);
         }
       }
@@ -1006,17 +1030,21 @@ void _fullDiskScanWorker(_FullScanArgs args) {
       incrementalScan = true;
       scanMode = FullDiskScanMode.incremental;
       changedDirectoryCount = dirtyDirectories.length;
-      sendPort.send(const _ProgressMsg(
-        dirs: 0,
-        files: 0,
-        bytes: 0,
-        currentPath: '',
-        isIncremental: true,
-      ));
+      sendPort.send(
+        const _ProgressMsg(
+          dirs: 0,
+          files: 0,
+          bytes: 0,
+          currentPath: '',
+          isIncremental: true,
+        ),
+      );
 
       for (final insight in args.baseOldLargeItems) {
         if (!isOldLargeInsightInvalidatedByDirtyDirectories(
-            insight, dirtyDirectories)) {
+          insight,
+          dirtyDirectories,
+        )) {
           retainOldLargeDiskInsight(
             insight.isFile ? oldLargeFiles : oldLargeDirectories,
             insight,
@@ -1043,12 +1071,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
               parentByPath[_normalizeComparableWindowsPath(current.fullPath)];
         }
         final depth = chain.length - 1;
-        scanInto(
-          target,
-          depth,
-          target.junkCategoryId,
-          true,
-        );
+        scanInto(target, depth, target.junkCategoryId, true);
         for (var index = 1; index < chain.length; index++) {
           recalculateDirectory(chain[index]);
         }
@@ -1062,10 +1085,7 @@ void _fullDiskScanWorker(_FullScanArgs args) {
     inaccessible.clear();
     coverageIssues.clear();
     changedDirectoryCount = 0;
-    root = DiskTreeNode(
-      name: driveName,
-      fullPath: driveName,
-    );
+    root = DiskTreeNode(name: driveName, fullPath: driveName);
     rootSnapshot = root;
     // Every directory is sorted and its file tail is folded by `scanInto` as
     // it completes. All directory nodes remain in the final tree, while the
@@ -1131,53 +1151,53 @@ void _sendFinalTreeBatches({
 }) {
   final effectiveBatchSize = batchSize < 1 ? 1 : batchSize;
   final acknowledgements = ReceivePort();
-  final pending = <_FinalTreeVisit>[
-    _FinalTreeVisit(node: root, depth: 0),
-  ];
+  final pending = <_FinalTreeVisit>[_FinalTreeVisit(node: root, depth: 0)];
   var nextBatchIndex = 0;
   var awaitingBatchIndex = -1;
 
   void sendNextBatch() {
     if (pending.isEmpty) {
       acknowledgements.close();
-      sendPort.send(_DoneMsg(
-        nodeCount: nodeCount,
-        junkBytes: junkBytes,
-        cleanableCount: cleanableCount,
-        inaccessible: inaccessible,
-        coverageIssues: coverageIssues,
-        oldLargeItems: oldLargeItems,
-        scanMode: scanMode,
-        changedDirectoryCount: changedDirectoryCount,
-        journalCursor: journalCursor,
-        incrementalFallbackReason: incrementalFallbackReason,
-      ));
+      sendPort.send(
+        _DoneMsg(
+          nodeCount: nodeCount,
+          junkBytes: junkBytes,
+          cleanableCount: cleanableCount,
+          inaccessible: inaccessible,
+          coverageIssues: coverageIssues,
+          oldLargeItems: oldLargeItems,
+          scanMode: scanMode,
+          changedDirectoryCount: changedDirectoryCount,
+          journalCursor: journalCursor,
+          incrementalFallbackReason: incrementalFallbackReason,
+        ),
+      );
       return;
     }
 
     final records = <_FinalTreeNodeRecord>[];
     while (pending.isNotEmpty && records.length < effectiveBatchSize) {
       final visit = pending.removeLast();
-      records.add(_FinalTreeNodeRecord.fromNode(
-        visit.node,
-        depth: visit.depth,
-      ));
+      records.add(
+        _FinalTreeNodeRecord.fromNode(visit.node, depth: visit.depth),
+      );
       final children = visit.node.children;
       for (var index = children.length - 1; index >= 0; index--) {
-        pending.add(_FinalTreeVisit(
-          node: children[index],
-          depth: visit.depth + 1,
-        ));
+        pending.add(
+          _FinalTreeVisit(node: children[index], depth: visit.depth + 1),
+        );
       }
     }
 
     final batchIndex = nextBatchIndex++;
     awaitingBatchIndex = batchIndex;
-    sendPort.send(_FinalTreeBatchMsg(
-      index: batchIndex,
-      records: records,
-      ackPort: acknowledgements.sendPort,
-    ));
+    sendPort.send(
+      _FinalTreeBatchMsg(
+        index: batchIndex,
+        records: records,
+        ackPort: acknowledgements.sendPort,
+      ),
+    );
   }
 
   acknowledgements.listen((dynamic message) {
@@ -1516,9 +1536,7 @@ class _FinalTreeAssembler {
       }
 
       if (record.depth > _ancestors.length) {
-        throw StateError(
-          'The final disk scan sent a node without its parent.',
-        );
+        throw StateError('The final disk scan sent a node without its parent.');
       }
       if (_ancestors.length > record.depth) {
         _ancestors.length = record.depth;
@@ -1587,10 +1605,7 @@ int countNodesUpTo(DiskTreeNode root, int limit) {
 /// The largest branches are retained because the scan tree is already sorted
 /// by size. Dropped branches become non-actionable roll-up rows, preserving
 /// their byte/file totals and precomputed junk bytes.
-void trimTreeToNodeBudget(
-  DiskTreeNode node, {
-  required int maxNodes,
-}) {
+void trimTreeToNodeBudget(DiskTreeNode node, {required int maxNodes}) {
   if (maxNodes < 1) return;
 
   int trim(DiskTreeNode current, int budget) {

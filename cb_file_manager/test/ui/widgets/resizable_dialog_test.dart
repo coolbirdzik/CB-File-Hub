@@ -47,8 +47,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('sizes itself from the viewport factor and centers',
-      (tester) async {
+  testWidgets('sizes itself from the viewport factor and centers', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -59,8 +60,9 @@ void main() {
     expect(dialogTopLeft(tester), const Offset(250, 160));
   });
 
-  testWidgets('maximize fills the viewport, restore returns the old rect',
-      (tester) async {
+  testWidgets('maximize fills the viewport, restore returns the old rect', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -83,8 +85,9 @@ void main() {
     expect(dialogSize(tester), restored);
   });
 
-  testWidgets('dragging the bottom-right corner resizes the dialog',
-      (tester) async {
+  testWidgets('dragging the bottom-right corner resizes the dialog', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -103,8 +106,9 @@ void main() {
     expect(after.height, closeTo(before.height + 40, 0.5));
   });
 
-  testWidgets('resizing cannot shrink the dialog below its minimum size',
-      (tester) async {
+  testWidgets('resizing cannot shrink the dialog below its minimum size', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -136,8 +140,9 @@ void main() {
     expect(dialogSize(tester), beforeSize);
   });
 
-  testWidgets('the dialog is clamped inside the viewport when dragged out',
-      (tester) async {
+  testWidgets('the dialog is clamped inside the viewport when dragged out', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);

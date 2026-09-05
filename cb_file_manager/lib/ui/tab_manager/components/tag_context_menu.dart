@@ -244,8 +244,9 @@ Future<void> showTagColorPickerDialog(
                     enableAlpha: false,
                     displayThumbColor: true,
                     labelTypes: const [ColorLabelType.rgb, ColorLabelType.hsv],
-                    pickerAreaBorderRadius:
-                        const BorderRadius.all(Radius.circular(12)),
+                    pickerAreaBorderRadius: const BorderRadius.all(
+                      Radius.circular(12),
+                    ),
                   ),
                 ],
               ),
@@ -257,9 +258,10 @@ Future<void> showTagColorPickerDialog(
                 child: Text(l10n.cancel),
               ),
               ElevatedButton(
-                onPressed: () =>
-                    Navigator.of(dialogContext, rootNavigator: true)
-                        .pop(currentColor),
+                onPressed: () => Navigator.of(
+                  dialogContext,
+                  rootNavigator: true,
+                ).pop(currentColor),
                 child: Text(l10n.save),
               ),
             ],
@@ -301,12 +303,14 @@ Future<void> showTagThumbnailPicker(
               width: 160,
               height: 160,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.4),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.4,
+                ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.3,
+                  ),
                 ),
               ),
               child: currentThumbnail != null
@@ -317,18 +321,23 @@ Future<void> showTagThumbnailPicker(
                         width: 160,
                         height: 160,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Icon(PhosphorIconsLight.imageSquare,
-                              size: 48,
-                              color: theme.colorScheme.onSurfaceVariant),
+                        errorBuilder: (_, _, _) => Center(
+                          child: Icon(
+                            PhosphorIconsLight.imageSquare,
+                            size: 48,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     )
                   : Center(
-                      child: Icon(PhosphorIconsLight.image,
-                          size: 48,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.5)),
+                      child: Icon(
+                        PhosphorIconsLight.image,
+                        size: 48,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
                     ),
             ),
           ],
@@ -337,8 +346,10 @@ Future<void> showTagThumbnailPicker(
           if (currentThumbnail != null)
             TextButton(
               onPressed: () => Navigator.of(context).pop('remove'),
-              child: Text(l10n.delete,
-                  style: TextStyle(color: theme.colorScheme.error)),
+              child: Text(
+                l10n.delete,
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(null),
@@ -442,8 +453,10 @@ Future<void> confirmDeleteTagFromAllFiles(
               'This tag has ${children.length} child tag${children.length > 1 ? "s" : ""}: ${children.join(", ")}',
             ),
             const SizedBox(height: 16),
-            const Text('What would you like to do?',
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              'What would you like to do?',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ],
         ),
         actions: [
@@ -457,8 +470,10 @@ Future<void> confirmDeleteTagFromAllFiles(
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop('delete_all'),
-            child: Text('Delete parent and children',
-                style: TextStyle(color: theme.colorScheme.error)),
+            child: Text(
+              'Delete parent and children',
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -477,11 +492,16 @@ Future<void> confirmDeleteTagFromAllFiles(
         await TagHierarchyManager.instance.removeAllForTag(t);
       }
       for (final t in tagsToDelete) {
-        await _deleteTagGlobally(t, l10n, toast,
-            silent: tagsToDelete.length > 1);
+        await _deleteTagGlobally(
+          t,
+          l10n,
+          toast,
+          silent: tagsToDelete.length > 1,
+        );
       }
       toast.success(
-          'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}');
+        'Deleted ${tagsToDelete.length} tags: ${tagsToDelete.join(", ")}',
+      );
       onChanged?.call();
     }
     return;
@@ -499,8 +519,10 @@ Future<void> confirmDeleteTagFromAllFiles(
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: Text(l10n.delete,
-              style: TextStyle(color: theme.colorScheme.error)),
+          child: Text(
+            l10n.delete,
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
         ),
       ],
     ),
@@ -625,13 +647,16 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
 
   Future<void> _addChild(String childName) async {
     if (childName.trim().isEmpty) return;
-    final exists =
-        widget.allTags.any((t) => t.toLowerCase() == childName.toLowerCase());
+    final exists = widget.allTags.any(
+      (t) => t.toLowerCase() == childName.toLowerCase(),
+    );
     if (!exists) {
       await TagManager.addStandaloneTag(childName.trim());
     }
-    final ok =
-        await widget.hierarchyManager.addChild(widget.tag, childName.trim());
+    final ok = await widget.hierarchyManager.addChild(
+      widget.tag,
+      childName.trim(),
+    );
     if (ok) {
       _addChildController.clear();
       _refresh();
@@ -640,8 +665,10 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content:
-                Text('Cannot add "$childName" - circular reference or error')),
+          content: Text(
+            'Cannot add "$childName" - circular reference or error',
+          ),
+        ),
       );
     }
   }
@@ -655,13 +682,16 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
 
   Future<void> _addParent(String parentName) async {
     if (parentName.trim().isEmpty) return;
-    final exists =
-        widget.allTags.any((t) => t.toLowerCase() == parentName.toLowerCase());
+    final exists = widget.allTags.any(
+      (t) => t.toLowerCase() == parentName.toLowerCase(),
+    );
     if (!exists) {
       await TagManager.addStandaloneTag(parentName.trim());
     }
-    final ok =
-        await widget.hierarchyManager.addChild(parentName.trim(), widget.tag);
+    final ok = await widget.hierarchyManager.addChild(
+      parentName.trim(),
+      widget.tag,
+    );
     if (ok) {
       _setParentController.clear();
       _refresh();
@@ -670,8 +700,10 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                'Cannot set "$parentName" as parent - circular reference or error')),
+          content: Text(
+            'Cannot set "$parentName" as parent - circular reference or error',
+          ),
+        ),
       );
     }
   }
@@ -690,12 +722,17 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(PhosphorIconsLight.treeStructure,
-              size: 22, color: theme.colorScheme.primary),
+          Icon(
+            PhosphorIconsLight.treeStructure,
+            size: 22,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('Hierarchy: "${widget.tag}"',
-                style: const TextStyle(fontSize: 18)),
+            child: Text(
+              'Hierarchy: "${widget.tag}"',
+              style: const TextStyle(fontSize: 18),
+            ),
           ),
         ],
       ),
@@ -707,41 +744,55 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Parents
-              Text('Parents',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.primary,
-                  )),
+              Text(
+                'Parents',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
               const SizedBox(height: 6),
               if (_parents.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('No parent tags',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                        fontStyle: FontStyle.italic,
-                      )),
+                  child: Text(
+                    'No parent tags',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
                 )
               else
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: _parents
-                      .map((parent) => Chip(
-                            avatar: Icon(PhosphorIconsLight.arrowBendUpLeft,
-                                size: 14, color: theme.colorScheme.primary),
-                            label: Text(parent,
-                                style: const TextStyle(fontSize: 13)),
-                            deleteIcon:
-                                const Icon(PhosphorIconsLight.x, size: 14),
-                            onDeleted: () => _removeParent(parent),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ))
+                      .map(
+                        (parent) => Chip(
+                          avatar: Icon(
+                            PhosphorIconsLight.arrowBendUpLeft,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          ),
+                          label: Text(
+                            parent,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          deleteIcon: const Icon(
+                            PhosphorIconsLight.x,
+                            size: 14,
+                          ),
+                          onDeleted: () => _removeParent(parent),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
                       .toList(),
                 ),
               const SizedBox(height: 6),
@@ -754,45 +805,59 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               ),
               const SizedBox(height: 20),
               Divider(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
               const SizedBox(height: 12),
               // Children
-              Text('Children',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: theme.colorScheme.tertiary,
-                  )),
+              Text(
+                'Children',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ),
               const SizedBox(height: 6),
               if (_children.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('No child tags',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                        fontStyle: FontStyle.italic,
-                      )),
+                  child: Text(
+                    'No child tags',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
                 )
               else
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: _children
-                      .map((child) => Chip(
-                            avatar: Icon(PhosphorIconsLight.treeStructure,
-                                size: 14, color: theme.colorScheme.tertiary),
-                            label: Text(child,
-                                style: const TextStyle(fontSize: 13)),
-                            deleteIcon:
-                                const Icon(PhosphorIconsLight.x, size: 14),
-                            onDeleted: () => _removeChild(child),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ))
+                      .map(
+                        (child) => Chip(
+                          avatar: Icon(
+                            PhosphorIconsLight.treeStructure,
+                            size: 14,
+                            color: theme.colorScheme.tertiary,
+                          ),
+                          label: Text(
+                            child,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          deleteIcon: const Icon(
+                            PhosphorIconsLight.x,
+                            size: 14,
+                          ),
+                          onDeleted: () => _removeChild(child),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
                       .toList(),
                 ),
               const SizedBox(height: 6),
@@ -842,13 +907,15 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
           decoration: InputDecoration(
             hintText: hint,
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
             ),
             suffixIcon: IconButton(
               icon: const Icon(PhosphorIconsLight.plus, size: 18),
@@ -873,8 +940,8 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               color: theme.colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color:
-                      theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
             ),
             child: ListView.builder(
               shrinkWrap: true,
@@ -885,14 +952,19 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
                 return InkWell(
                   onTap: () => onSubmit(suggestion),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
-                        Icon(PhosphorIconsLight.tag,
-                            size: 14,
-                            color: TagColorManager.instance
-                                .getTagColor(suggestion)),
+                        Icon(
+                          PhosphorIconsLight.tag,
+                          size: 14,
+                          color: TagColorManager.instance.getTagColor(
+                            suggestion,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         Text(suggestion, style: const TextStyle(fontSize: 13)),
                       ],

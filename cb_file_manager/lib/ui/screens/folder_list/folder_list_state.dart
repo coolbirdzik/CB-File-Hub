@@ -20,7 +20,7 @@ enum SortOption {
   extensionAsc, // Added extension
   extensionDesc, // Added extension descending
   attributesAsc, // Added file attributes
-  attributesDesc // Added file attributes descending
+  attributesDesc, // Added file attributes descending
 }
 
 // Define column visibility options for details view
@@ -241,14 +241,14 @@ class FolderListState extends Equatable {
   final SortOption sortOption;
   final int gridZoomLevel;
   final Map<String, FileStat>
-      fileStatsCache; // Cache for file stats to improve performance
+  fileStatsCache; // Cache for file stats to improve performance
   final MediaType? currentMediaSearch; // For media searches
   final bool isSearchByName; // Flag for search by name operations
   final bool isSearchByMedia; // Flag for search by media type
   final bool isGlobalSearch; // Flag for global tag searches
   final bool searchRecursive; // Flag for recursive search operations
   final int
-      clipboardRevision; // Revision counter to trigger rebuild on clipboard changes
+  clipboardRevision; // Revision counter to trigger rebuild on clipboard changes
   final List<String> retryableElevatedDeletePaths;
 
   FolderListState(
@@ -279,14 +279,14 @@ class FolderListState extends Equatable {
     this.searchRecursive = false,
     this.clipboardRevision = 0,
     this.retryableElevatedDeletePaths = const [],
-  })  : currentPath = Directory(initialPath),
-        folders = folders ?? [],
-        files = files ?? [],
-        searchResults = searchResults ?? [],
-        filteredFiles = filteredFiles ?? [],
-        fileTags = fileTags ?? {},
-        allUniqueTags = allUniqueTags ?? {},
-        fileStatsCache = fileStatsCache ?? {};
+  }) : currentPath = Directory(initialPath),
+       folders = folders ?? [],
+       files = files ?? [],
+       searchResults = searchResults ?? [],
+       filteredFiles = filteredFiles ?? [],
+       fileTags = fileTags ?? {},
+       allUniqueTags = allUniqueTags ?? {},
+       fileStatsCache = fileStatsCache ?? {};
 
   // Helper getters
   List<String> get allTags => allUniqueTags.toList();
@@ -373,33 +373,33 @@ class FolderListState extends Equatable {
 
   @override
   List<Object?> get props => [
-        isLoading,
-        isRefreshing,
-        error,
-        currentPath.path,
-        folders,
-        files,
-        searchResults,
-        hasMoreSearchResults,
-        isLoadingMoreSearchResults,
-        searchResultsTotal,
-        filteredFiles,
-        fileTags,
-        allUniqueTags,
-        currentFilter,
-        currentSearchTag,
-        currentSearchQuery,
-        viewMode,
-        sortOption,
-        gridZoomLevel,
-        currentMediaSearch,
-        isSearchByName,
-        isSearchByMedia,
-        isGlobalSearch,
-        searchRecursive,
-        retryableElevatedDeletePaths,
-        // NOTE: clipboardRevision is intentionally excluded from props
-        // to prevent full rebuild when clipboard changes (copy/cut operations)
-        // Only items affected by cut should show visual feedback
-      ];
+    isLoading,
+    isRefreshing,
+    error,
+    currentPath.path,
+    folders,
+    files,
+    searchResults,
+    hasMoreSearchResults,
+    isLoadingMoreSearchResults,
+    searchResultsTotal,
+    filteredFiles,
+    fileTags,
+    allUniqueTags,
+    currentFilter,
+    currentSearchTag,
+    currentSearchQuery,
+    viewMode,
+    sortOption,
+    gridZoomLevel,
+    currentMediaSearch,
+    isSearchByName,
+    isSearchByMedia,
+    isGlobalSearch,
+    searchRecursive,
+    retryableElevatedDeletePaths,
+    // NOTE: clipboardRevision is intentionally excluded from props
+    // to prevent full rebuild when clipboard changes (copy/cut operations)
+    // Only items affected by cut should show visual feedback
+  ];
 }

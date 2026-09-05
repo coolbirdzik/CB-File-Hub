@@ -28,8 +28,8 @@ class VideoPlaybackLauncher {
     if (file != null && VideoWindowService.isSupported) {
       bool inNewWindow = true;
       try {
-        inNewWindow =
-            await locator<UserPreferences>().getOpenVideoInNewWindow();
+        inNewWindow = await locator<UserPreferences>()
+            .getOpenVideoInNewWindow();
       } catch (_) {
         inNewWindow = true;
       }
@@ -57,10 +57,8 @@ class VideoPlaybackLauncher {
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => VideoPlayerFullScreen(
-          file: file,
-          contentUri: contentUri,
-        ),
+        builder: (_) =>
+            VideoPlayerFullScreen(file: file, contentUri: contentUri),
       ),
     );
     onClosed?.call();

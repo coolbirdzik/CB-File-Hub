@@ -23,13 +23,13 @@ class FolderDetailsItem extends StatefulWidget {
   final bool isSelected;
   final ColumnVisibility columnVisibility;
   final Function(String, {bool shiftSelect, bool ctrlSelect})?
-      toggleFolderSelection;
+  toggleFolderSelection;
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
 
   const FolderDetailsItem({
-    Key? key,
+    super.key,
     required this.folder,
     this.onTap,
     this.isSelected = false,
@@ -38,7 +38,7 @@ class FolderDetailsItem extends StatefulWidget {
     this.isDesktopMode = false,
     this.lastSelectedPath,
     this.clearSelectionMode,
-  }) : super(key: key);
+  });
 
   @override
   State<FolderDetailsItem> createState() => _FolderDetailsItemState();
@@ -163,7 +163,8 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
       context: context,
       folder: widget.folder,
       onNavigate: widget.onTap,
-      folderTags: [], // Pass empty tags or fetch from database in real implementation
+      folderTags:
+          [], // Pass empty tags or fetch from database in real implementation
       globalPosition: globalPosition, // Pass position for desktop popup menu
     );
   }
@@ -182,12 +183,8 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
     );
 
     final BoxDecoration boxDecoration = _visuallySelected
-        ? BoxDecoration(
-            color: itemBackgroundColor,
-          )
-        : BoxDecoration(
-            color: itemBackgroundColor,
-          );
+        ? BoxDecoration(color: itemBackgroundColor)
+        : BoxDecoration(color: itemBackgroundColor);
 
     return Opacity(
       opacity: isBeingCut ? ItemInteractionStyle.cutOpacity : 1.0,
@@ -209,18 +206,19 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                       flex: 3,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0, vertical: 10.0),
+                          horizontal: 12.0,
+                          vertical: 10.0,
+                        ),
                         child: Row(
                           children: [
                             Icon(
-                                _tagName != null
-                                    ? PhosphorIconsLight.tag
-                                    : PhosphorIconsLight.folder,
-                                color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildNameWidget(context),
+                              _tagName != null
+                                  ? PhosphorIconsLight.tag
+                                  : PhosphorIconsLight.folder,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(child: _buildNameWidget(context)),
                           ],
                         ),
                       ),
@@ -232,7 +230,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _tagName != null
                                 ? AppLocalizations.of(context)!.tagPrefix
@@ -248,7 +248,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: FutureBuilder<int?>(
                             future: _folderSizeFuture,
                             builder: (context, snapshot) {
@@ -277,7 +279,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _fileStat != null
                                 ? _fileStat!.modified.toString().split('.')[0]
@@ -293,7 +297,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _fileStat != null
                                 ? _fileStat!.changed.toString().split('.')[0]
@@ -309,7 +315,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _getAttributes(_fileStat),
                             overflow: TextOverflow.ellipsis,
@@ -323,13 +331,15 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             _fileStat != null
                                 ? _fileStat!.accessed
-                                    .toString()
-                                    .split('.')
-                                    .first
+                                      .toString()
+                                      .split('.')
+                                      .first
                                 : 'Loading...',
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -342,7 +352,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: const Text(
                             '',
                             overflow: TextOverflow.ellipsis,
@@ -356,7 +368,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 3,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: Text(
                             widget.folder.path,
                             overflow: TextOverflow.ellipsis,
@@ -370,7 +384,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 2,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: const Text(
                             '',
                             overflow: TextOverflow.ellipsis,
@@ -384,7 +400,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: const Text(
                             '',
                             overflow: TextOverflow.ellipsis,
@@ -398,7 +416,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: const Text(
                             '',
                             overflow: TextOverflow.ellipsis,
@@ -412,9 +432,12 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
                         flex: 1,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0, vertical: 10.0),
+                            horizontal: 12.0,
+                            vertical: 10.0,
+                          ),
                           child: _AsyncItemCountCell(
-                              folderPath: widget.folder.path),
+                            folderPath: widget.folder.path,
+                          ),
                         ),
                       ),
                   ],
@@ -473,7 +496,8 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
   Widget _buildNameWidget(BuildContext context) {
     // Check if this item is being renamed inline (desktop only)
     final renameController = InlineRenameScope.maybeOf(context);
-    final isBeingRenamed = renameController != null &&
+    final isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.folder.path;
 
     final textWidget = Text(
@@ -493,8 +517,9 @@ class _FolderDetailsItemState extends State<FolderDetailsItem> {
               onCommit: () => renameController.commitRename(context),
               onCancel: () => renameController.cancelRename(),
               textStyle: TextStyle(
-                fontWeight:
-                    _visuallySelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: _visuallySelected
+                    ? FontWeight.bold
+                    : FontWeight.normal,
               ),
               textAlign: TextAlign.start,
               maxLines: 1,
@@ -621,9 +646,6 @@ class _AsyncItemCountCellState extends State<_AsyncItemCountCell> {
       return const Text('\u2014', overflow: TextOverflow.ellipsis);
     }
     final l10n = AppLocalizations.of(context)!;
-    return Text(
-      l10n.itemCountFormat(_count!),
-      overflow: TextOverflow.ellipsis,
-    );
+    return Text(l10n.itemCountFormat(_count!), overflow: TextOverflow.ellipsis);
   }
 }

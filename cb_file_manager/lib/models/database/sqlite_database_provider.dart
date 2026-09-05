@@ -78,8 +78,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   Future<Database> _openSharedDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final databaseDirectory =
-        Directory(path.join(documentsDirectory.path, 'CBFileHub_v2'));
+    final databaseDirectory = Directory(
+      path.join(documentsDirectory.path, 'CBFileHub_v2'),
+    );
 
     if (!await databaseDirectory.exists()) {
       await databaseDirectory.create(recursive: true);
@@ -363,7 +364,10 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   /// Runs incremental migrations when an existing database is opened with a
   /// higher [version] than it was originally created with.
   Future<void> _onUpgrade(
-      DatabaseExecutor db, int oldVersion, int newVersion) async {
+    DatabaseExecutor db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     if (oldVersion < 2) {
       // v2: tag_metadata (thumbnails) and tag_hierarchy (parent-child)
       // Drop first in case partially-created tables exist from development.
@@ -464,19 +468,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   }) async {
     try {
       final database = await getDatabase();
-      await database.insert(
-        'preferences',
-        <String, Object?>{
-          'key': key,
-          'type': type,
-          'string_value': stringValue,
-          'int_value': intValue,
-          'double_value': doubleValue,
-          'bool_value': boolValue == null ? null : (boolValue ? 1 : 0),
-          'timestamp': _now(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await database.insert('preferences', <String, Object?>{
+        'key': key,
+        'type': type,
+        'string_value': stringValue,
+        'int_value': intValue,
+        'double_value': doubleValue,
+        'bool_value': boolValue == null ? null : (boolValue ? 1 : 0),
+        'timestamp': _now(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       return true;
     } catch (error) {
       return false;
@@ -510,16 +510,12 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
     try {
       final database = await getDatabase();
-      await database.insert(
-        'file_tags',
-        <String, Object?>{
-          'file_path': filePath,
-          'tag': trimmedTag,
-          'normalized_tag': _normalizeTag(trimmedTag),
-          'created_at': _now(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await database.insert('file_tags', <String, Object?>{
+        'file_path': filePath,
+        'tag': trimmedTag,
+        'normalized_tag': _normalizeTag(trimmedTag),
+        'created_at': _now(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       return true;
     } catch (error) {
       return false;
@@ -581,15 +577,12 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         );
 
         for (final entry in uniqueTags.entries) {
-          await txn.insert(
-            'file_tags',
-            <String, Object?>{
-              'file_path': filePath,
-              'tag': entry.value,
-              'normalized_tag': entry.key,
-              'created_at': _now(),
-            },
-          );
+          await txn.insert('file_tags', <String, Object?>{
+            'file_path': filePath,
+            'tag': entry.value,
+            'normalized_tag': entry.key,
+            'created_at': _now(),
+          });
         }
       });
       return true;
@@ -630,14 +623,12 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   Future<Set<String>> getAllUniqueTags() async {
     try {
       final database = await getDatabase();
-      final rows = await database.rawQuery(
-        '''
+      final rows = await database.rawQuery('''
         SELECT tag
         FROM file_tags
         GROUP BY normalized_tag
         ORDER BY tag COLLATE NOCASE ASC
-        ''',
-      );
+        ''');
       return rows.map((row) => row['tag']).whereType<String>().toSet();
     } catch (error) {
       return <String>{};
@@ -679,14 +670,11 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         await txn.delete('standalone_tags');
 
         for (final entry in uniqueTags.entries) {
-          await txn.insert(
-            'standalone_tags',
-            <String, Object?>{
-              'tag': entry.value,
-              'normalized_tag': entry.key,
-              'created_at': _now(),
-            },
-          );
+          await txn.insert('standalone_tags', <String, Object?>{
+            'tag': entry.value,
+            'normalized_tag': entry.key,
+            'created_at': _now(),
+          });
         }
       });
       _lastErrorMessage = null;
@@ -703,19 +691,17 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> setTagThumbnail(
-      String normalizedTag, String thumbnailPath) async {
+    String normalizedTag,
+    String thumbnailPath,
+  ) async {
     try {
       final database = await getDatabase();
-      await database.insert(
-        'tag_metadata',
-        <String, Object?>{
-          'normalized_tag': normalizedTag,
-          'thumbnail_path': thumbnailPath,
-          'created_at': _now(),
-          'updated_at': _now(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await database.insert('tag_metadata', <String, Object?>{
+        'normalized_tag': normalizedTag,
+        'thumbnail_path': thumbnailPath,
+        'created_at': _now(),
+        'updated_at': _now(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       return true;
     } catch (_) {
       return false;
@@ -783,18 +769,16 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> setTagHierarchy(
-      String parentNormalizedTag, String childNormalizedTag) async {
+    String parentNormalizedTag,
+    String childNormalizedTag,
+  ) async {
     try {
       final database = await getDatabase();
-      await database.insert(
-        'tag_hierarchy',
-        <String, Object?>{
-          'parent_normalized_tag': parentNormalizedTag,
-          'child_normalized_tag': childNormalizedTag,
-          'created_at': _now(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+      await database.insert('tag_hierarchy', <String, Object?>{
+        'parent_normalized_tag': parentNormalizedTag,
+        'child_normalized_tag': childNormalizedTag,
+        'created_at': _now(),
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
       return true;
     } catch (_) {
       return false;
@@ -803,7 +787,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> removeTagHierarchy(
-      String parentNormalizedTag, String childNormalizedTag) async {
+    String parentNormalizedTag,
+    String childNormalizedTag,
+  ) async {
     try {
       final database = await getDatabase();
       await database.delete(
@@ -909,11 +895,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> saveStringPreference(String key, String value) {
-    return _savePreference(
-      key,
-      type: 'string',
-      stringValue: value,
-    );
+    return _savePreference(key, type: 'string', stringValue: value);
   }
 
   @override
@@ -927,11 +909,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> saveIntPreference(String key, int value) {
-    return _savePreference(
-      key,
-      type: 'integer',
-      intValue: value,
-    );
+    return _savePreference(key, type: 'integer', intValue: value);
   }
 
   @override
@@ -956,11 +934,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> saveDoublePreference(String key, double value) {
-    return _savePreference(
-      key,
-      type: 'double',
-      doubleValue: value,
-    );
+    return _savePreference(key, type: 'double', doubleValue: value);
   }
 
   @override
@@ -979,22 +953,14 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
 
   @override
   Future<bool> saveBoolPreference(String key, bool value) {
-    return _savePreference(
-      key,
-      type: 'boolean',
-      boolValue: value,
-    );
+    return _savePreference(key, type: 'boolean', boolValue: value);
   }
 
   @override
   Future<bool> deletePreference(String key) async {
     try {
       final database = await getDatabase();
-      await database.delete(
-        'preferences',
-        where: 'key = ?',
-        whereArgs: [key],
-      );
+      await database.delete('preferences', where: 'key = ?', whereArgs: [key]);
       return true;
     } catch (_) {
       return false;
@@ -1040,15 +1006,17 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         orderBy: 'key COLLATE NOCASE ASC',
       );
       return rows
-          .map((row) => <String, dynamic>{
-                'key': row['key'],
-                'type': row['type'],
-                'stringValue': row['string_value'],
-                'intValue': row['int_value'],
-                'doubleValue': row['double_value'],
-                'boolValue': row['bool_value'],
-                'timestamp': row['timestamp'],
-              })
+          .map(
+            (row) => <String, dynamic>{
+              'key': row['key'],
+              'type': row['type'],
+              'stringValue': row['string_value'],
+              'intValue': row['int_value'],
+              'doubleValue': row['double_value'],
+              'boolValue': row['bool_value'],
+              'timestamp': row['timestamp'],
+            },
+          )
           .toList(growable: false);
     } catch (_) {
       return <Map<String, dynamic>>[];
@@ -1069,15 +1037,17 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         limit: limit,
       );
       return rows
-          .map((row) => <String, dynamic>{
-                'key': row['key'],
-                'type': row['type'],
-                'stringValue': row['string_value'],
-                'intValue': row['int_value'],
-                'doubleValue': row['double_value'],
-                'boolValue': row['bool_value'],
-                'timestamp': row['timestamp'],
-              })
+          .map(
+            (row) => <String, dynamic>{
+              'key': row['key'],
+              'type': row['type'],
+              'stringValue': row['string_value'],
+              'intValue': row['int_value'],
+              'doubleValue': row['double_value'],
+              'boolValue': row['bool_value'],
+              'timestamp': row['timestamp'],
+            },
+          )
           .toList(growable: false);
     } catch (_) {
       return <Map<String, dynamic>>[];
@@ -1088,8 +1058,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   Future<int> getPreferencesRawCount() async {
     try {
       final database = await getDatabase();
-      final result =
-          await database.rawQuery('SELECT COUNT(*) AS count FROM preferences');
+      final result = await database.rawQuery(
+        'SELECT COUNT(*) AS count FROM preferences',
+      );
       return (result.first['count'] as int?) ?? 0;
     } catch (_) {
       return 0;
@@ -1105,13 +1076,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         orderBy: 'file_path COLLATE NOCASE ASC, tag COLLATE NOCASE ASC',
       );
       return rows
-          .map((row) => <String, dynamic>{
-                'id': row['id'],
-                'filePath': row['file_path'],
-                'tag': row['tag'],
-                'normalizedTag': row['normalized_tag'],
-                'createdAt': row['created_at'],
-              })
+          .map(
+            (row) => <String, dynamic>{
+              'id': row['id'],
+              'filePath': row['file_path'],
+              'tag': row['tag'],
+              'normalizedTag': row['normalized_tag'],
+              'createdAt': row['created_at'],
+            },
+          )
           .toList(growable: false);
     } catch (_) {
       return <Map<String, dynamic>>[];
@@ -1132,13 +1105,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         limit: limit,
       );
       return rows
-          .map((row) => <String, dynamic>{
-                'id': row['id'],
-                'filePath': row['file_path'],
-                'tag': row['tag'],
-                'normalizedTag': row['normalized_tag'],
-                'createdAt': row['created_at'],
-              })
+          .map(
+            (row) => <String, dynamic>{
+              'id': row['id'],
+              'filePath': row['file_path'],
+              'tag': row['tag'],
+              'normalizedTag': row['normalized_tag'],
+              'createdAt': row['created_at'],
+            },
+          )
           .toList(growable: false);
     } catch (_) {
       return <Map<String, dynamic>>[];
@@ -1149,8 +1124,9 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
   Future<int> getFileTagsRawCount() async {
     try {
       final database = await getDatabase();
-      final result =
-          await database.rawQuery('SELECT COUNT(*) AS count FROM file_tags');
+      final result = await database.rawQuery(
+        'SELECT COUNT(*) AS count FROM file_tags',
+      );
       return (result.first['count'] as int?) ?? 0;
     } catch (_) {
       return 0;

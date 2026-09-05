@@ -8,10 +8,10 @@ set(COOLBIRD_NUGET_SHA256 "04eb6c4fe4213907e2773e1be1bbbd730e9a655a3c9c58387ce8d
 option(COOLBIRD_FFMPEG_AUTO_DOWNLOAD "Download FFmpeg for Windows build when missing" ON)
 set(
   COOLBIRD_FFMPEG_DOWNLOAD_URL
-  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip"
-  CACHE STRING
-  "FFmpeg archive URL used when local FFmpeg is not available"
+  "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-31-13-27/ffmpeg-n8.1.2-50-g1a748fe2cd-win64-gpl-shared-8.1.zip"
 )
+# Month-end builds are retained for two years; daily builds expire in 14 days.
+set(COOLBIRD_FFMPEG_SHA256 "0a41f31caff48e3035b48f09f5d840bd8d1863008240fc43e457f15e589cf5b3")
 
 function(coolbird_ensure_nuget)
   if(DEFINED NUGET AND EXISTS "${NUGET}")
@@ -73,7 +73,13 @@ function(coolbird_resolve_ffmpeg_dir OUT_VAR)
   endif()
 
   set(_coolbird_repo_ffmpeg "${CMAKE_SOURCE_DIR}/ffmpeg")
-  if(EXISTS "${_coolbird_repo_ffmpeg}/include/libavcodec/avcodec.h")
+  set(_coolbird_repo_ffmpeg_version "")
+  if(EXISTS "${_coolbird_repo_ffmpeg}/.runtime-version")
+    file(READ "${_coolbird_repo_ffmpeg}/.runtime-version" _coolbird_repo_ffmpeg_version)
+    string(STRIP "${_coolbird_repo_ffmpeg_version}" _coolbird_repo_ffmpeg_version)
+  endif()
+  if(_coolbird_repo_ffmpeg_version STREQUAL COOLBIRD_FFMPEG_SHA256
+      AND EXISTS "${_coolbird_repo_ffmpeg}/include/libavcodec/avcodec.h")
     set(${OUT_VAR} "${_coolbird_repo_ffmpeg}" PARENT_SCOPE)
     message(STATUS "Using repository FFmpeg directory: ${_coolbird_repo_ffmpeg}")
     return()
@@ -84,8 +90,10 @@ function(coolbird_resolve_ffmpeg_dir OUT_VAR)
   endif()
 
   set(_coolbird_ffmpeg_deps_dir "${CMAKE_BINARY_DIR}/_deps")
-  set(_coolbird_ffmpeg_root "${_coolbird_ffmpeg_deps_dir}/ffmpeg")
-  set(_coolbird_ffmpeg_archive "${_coolbird_ffmpeg_deps_dir}/ffmpeg-windows-shared.zip")
+  # Key both archive and extraction cache by content, so a version bump cannot
+  # reuse the old headers/import libraries/DLLs from a previous configuration.
+  set(_coolbird_ffmpeg_root "${_coolbird_ffmpeg_deps_dir}/ffmpeg-${COOLBIRD_FFMPEG_SHA256}")
+  set(_coolbird_ffmpeg_archive "${_coolbird_ffmpeg_root}.zip")
   file(MAKE_DIRECTORY "${_coolbird_ffmpeg_deps_dir}")
 
   if(NOT EXISTS "${_coolbird_ffmpeg_archive}")
@@ -95,6 +103,7 @@ function(coolbird_resolve_ffmpeg_dir OUT_VAR)
         DOWNLOAD
         "${COOLBIRD_FFMPEG_DOWNLOAD_URL}"
         "${_coolbird_ffmpeg_archive}"
+        EXPECTED_HASH "SHA256=${COOLBIRD_FFMPEG_SHA256}"
         STATUS _coolbird_download_status
         SHOW_PROGRESS
         TLS_VERIFY ON
@@ -117,8 +126,12 @@ function(coolbird_resolve_ffmpeg_dir OUT_VAR)
     endif()
   endif()
 
+  file(SHA256 "${_coolbird_ffmpeg_archive}" _coolbird_ffmpeg_actual_hash)
+  if(NOT _coolbird_ffmpeg_actual_hash STREQUAL COOLBIRD_FFMPEG_SHA256)
+    message(FATAL_ERROR "Cached FFmpeg archive checksum mismatch: ${_coolbird_ffmpeg_archive}")
+  endif()
+
   if(NOT EXISTS "${_coolbird_ffmpeg_root}/.ready")
-    file(REMOVE_RECURSE "${_coolbird_ffmpeg_root}")
     file(MAKE_DIRECTORY "${_coolbird_ffmpeg_root}")
     execute_process(
       COMMAND "${CMAKE_COMMAND}" -E tar xf "${_coolbird_ffmpeg_archive}"

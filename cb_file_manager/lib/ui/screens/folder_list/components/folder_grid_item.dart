@@ -23,14 +23,14 @@ class FolderGridItem extends StatefulWidget {
   final Function(String) onNavigate;
   final bool isSelected;
   final Function(String, {bool shiftSelect, bool ctrlSelect})?
-      toggleFolderSelection;
+  toggleFolderSelection;
   final bool isDesktopMode;
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
   final ValueListenable<bool?>? immediateSelectionListenable;
 
   const FolderGridItem({
-    Key? key,
+    super.key,
     required this.folder,
     required this.onNavigate,
     this.isSelected = false,
@@ -39,7 +39,7 @@ class FolderGridItem extends StatefulWidget {
     this.lastSelectedPath,
     this.clearSelectionMode,
     this.immediateSelectionListenable,
-  }) : super(key: key);
+  });
 
   @override
   State<FolderGridItem> createState() => _FolderGridItemState();
@@ -70,8 +70,11 @@ class _FolderGridItemState extends State<FolderGridItem> {
     // Ctrl+click, so the old selection was never cleared.
     final bool shouldCtrlSelect = widget.isDesktopMode ? isCtrlPressed : true;
 
-    widget.toggleFolderSelection!(widget.folder.path,
-        shiftSelect: isShiftPressed, ctrlSelect: shouldCtrlSelect);
+    widget.toggleFolderSelection!(
+      widget.folder.path,
+      shiftSelect: isShiftPressed,
+      ctrlSelect: shouldCtrlSelect,
+    );
   }
 
   @override
@@ -96,13 +99,13 @@ class _FolderGridItemState extends State<FolderGridItem> {
     final Color borderColor = isVisuallySelected
         ? primary
         : _isHovering
-            ? primary.withValues(alpha: 0.55)
-            : primary.withValues(alpha: 0.35);
+        ? primary.withValues(alpha: 0.55)
+        : primary.withValues(alpha: 0.35);
     final Color tabColor = isVisuallySelected
         ? primary.withValues(alpha: 0.25)
         : _isHovering
-            ? primary.withValues(alpha: 0.12)
-            : primary.withValues(alpha: 0.08);
+        ? primary.withValues(alpha: 0.12)
+        : primary.withValues(alpha: 0.08);
     final Color bodyColor = isVisuallySelected
         ? primary.withValues(alpha: 0.08)
         : primary.withValues(alpha: 0.03);
@@ -152,9 +155,9 @@ class _FolderGridItemState extends State<FolderGridItem> {
                           }
                         : null,
                     onTertiaryTapUp: (_) {
-                      context
-                          .read<TabManagerBloc>()
-                          .add(AddTab(path: widget.folder.path));
+                      context.read<TabManagerBloc>().add(
+                        AddTab(path: widget.folder.path),
+                      );
                     },
                   ),
                 ),
@@ -162,8 +165,11 @@ class _FolderGridItemState extends State<FolderGridItem> {
               SizedBox(
                 height: nameAreaHeight,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                  padding: const EdgeInsets.only(
+                    top: 4.0,
+                    left: 4.0,
+                    right: 4.0,
+                  ),
                   child: Text(
                     _displayName,
                     textAlign: TextAlign.center,
@@ -232,9 +238,9 @@ class _FolderGridItemState extends State<FolderGridItem> {
                           }
                         : null,
                     onTertiaryTapUp: (_) {
-                      context
-                          .read<TabManagerBloc>()
-                          .add(AddTab(path: widget.folder.path));
+                      context.read<TabManagerBloc>().add(
+                        AddTab(path: widget.folder.path),
+                      );
                     },
                   ),
                 ),
@@ -242,8 +248,11 @@ class _FolderGridItemState extends State<FolderGridItem> {
               SizedBox(
                 height: nameAreaHeight,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                  padding: const EdgeInsets.only(
+                    top: 4.0,
+                    left: 4.0,
+                    right: 4.0,
+                  ),
                   child: _buildNameWidget(context, isVisuallySelected),
                 ),
               ),
@@ -359,13 +368,11 @@ class _FolderGridItemState extends State<FolderGridItem> {
     );
   }
 
-  Widget _buildNameWidget(
-    BuildContext context,
-    bool isVisuallySelected,
-  ) {
+  Widget _buildNameWidget(BuildContext context, bool isVisuallySelected) {
     // Check if this item is being renamed inline (desktop only)
     final renameController = InlineRenameScope.maybeOf(context);
-    final isBeingRenamed = renameController != null &&
+    final isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.folder.path;
 
     final textWidget = Text(

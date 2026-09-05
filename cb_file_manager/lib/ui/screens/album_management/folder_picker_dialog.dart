@@ -13,10 +13,10 @@ class FolderPickerDialog extends StatefulWidget {
   final String? initialPath;
 
   const FolderPickerDialog({
-    Key? key,
+    super.key,
     required this.albumId,
     this.initialPath,
-  }) : super(key: key);
+  });
 
   @override
   State<FolderPickerDialog> createState() => _FolderPickerDialogState();
@@ -51,10 +51,12 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
             .where((dir) => !path.basename(dir.path).startsWith('.'))
             .toList();
 
-        directories.sort((a, b) => path
-            .basename(a.path)
-            .toLowerCase()
-            .compareTo(path.basename(b.path).toLowerCase()));
+        directories.sort(
+          (a, b) => path
+              .basename(a.path)
+              .toLowerCase()
+              .compareTo(path.basename(b.path).toLowerCase()),
+        );
 
         if (mounted) {
           setState(() {
@@ -115,9 +117,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                     });
                   },
                 ),
-                const Expanded(
-                  child: Text('Include images from subfolders'),
-                ),
+                const Expanded(child: Text('Include images from subfolders')),
               ],
             ),
           ],
@@ -183,11 +183,7 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
         leading: const Icon(PhosphorIconsLight.folder, color: Colors.amber),
-        title: Text(
-          dirName,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(dirName, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: FutureBuilder<int>(
           future: _getImageCount(directory.path),
           builder: (context, snapshot) {
@@ -240,8 +236,10 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               ),
               child: Row(
                 children: [
-                  const Icon(PhosphorIconsLight.folderOpen,
-                      color: Colors.white),
+                  const Icon(
+                    PhosphorIconsLight.folderOpen,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -267,7 +265,8 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 border: Border(
                   bottom: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant),
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
               ),
               child: Column(
@@ -317,36 +316,36 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _directories.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                PhosphorIconsLight.folderOpen,
-                                size: 64,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No folders found',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            PhosphorIconsLight.folderOpen,
+                            size: 64,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: _directories.length,
-                          itemBuilder: (context, index) {
-                            return _buildDirectoryItem(_directories[index]);
-                          },
-                        ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No folders found',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _directories.length,
+                      itemBuilder: (context, index) {
+                        return _buildDirectoryItem(_directories[index]);
+                      },
+                    ),
             ),
             // Action buttons
             Container(
@@ -354,7 +353,8 @@ class _FolderPickerDialogState extends State<FolderPickerDialog> {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant),
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
               ),
               child: Row(

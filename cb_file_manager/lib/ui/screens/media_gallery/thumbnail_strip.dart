@@ -10,12 +10,12 @@ class ThumbnailStrip extends StatefulWidget {
   final Future<Uint8List?> Function(File) loadAndCacheImage;
 
   const ThumbnailStrip({
-    Key? key,
+    super.key,
     required this.images,
     required this.currentIndex,
     required this.onThumbnailTap,
     required this.loadAndCacheImage,
-  }) : super(key: key);
+  });
 
   @override
   State<ThumbnailStrip> createState() => _ThumbnailStripState();
@@ -58,7 +58,8 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
     const double thumbnailWidth = 54.0 + 8.0;
 
     // Vị trí để cuộn đến (đặt thumbnail hiện tại ở giữa)
-    final double targetPosition = widget.currentIndex * thumbnailWidth -
+    final double targetPosition =
+        widget.currentIndex * thumbnailWidth -
         (_scrollController.position.viewportDimension / 2) +
         (thumbnailWidth / 2);
 

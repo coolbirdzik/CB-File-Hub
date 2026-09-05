@@ -18,24 +18,24 @@ void main() {
     );
 
     expect(
-      filterOldLargeEvidence(
-        <FullDiskScanInsight>[file, folder],
-        OldLargeEvidenceFilter.all,
-      ),
+      filterOldLargeEvidence(<FullDiskScanInsight>[
+        file,
+        folder,
+      ], OldLargeEvidenceFilter.all),
       <FullDiskScanInsight>[folder, file],
     );
     expect(
-      filterOldLargeEvidence(
-        <FullDiskScanInsight>[file, folder],
-        OldLargeEvidenceFilter.folders,
-      ),
+      filterOldLargeEvidence(<FullDiskScanInsight>[
+        file,
+        folder,
+      ], OldLargeEvidenceFilter.folders),
       <FullDiskScanInsight>[folder],
     );
     expect(
-      filterOldLargeEvidence(
-        <FullDiskScanInsight>[file, folder],
-        OldLargeEvidenceFilter.files,
-      ),
+      filterOldLargeEvidence(<FullDiskScanInsight>[
+        file,
+        folder,
+      ], OldLargeEvidenceFilter.files),
       <FullDiskScanInsight>[file],
     );
   });
@@ -44,12 +44,7 @@ void main() {
     final archive = DiskTreeNode(
       name: 'Archive',
       fullPath: r'C:\Archive',
-      children: [
-        DiskTreeNode(
-          name: 'Images',
-          fullPath: r'C:\Archive\Images',
-        ),
-      ],
+      children: [DiskTreeNode(name: 'Images', fullPath: r'C:\Archive\Images')],
     );
     final root = DiskTreeNode(
       name: r'C:\',

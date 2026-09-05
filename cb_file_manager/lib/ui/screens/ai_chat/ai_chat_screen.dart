@@ -37,11 +37,7 @@ class AiChatScreen extends StatelessWidget {
   /// Initial directory path for file context building.
   final String initialPath;
 
-  const AiChatScreen({
-    Key? key,
-    required this.tabId,
-    this.initialPath = '',
-  }) : super(key: key);
+  const AiChatScreen({super.key, required this.tabId, this.initialPath = ''});
 
   @override
   Widget build(BuildContext context) {
@@ -67,10 +63,12 @@ class AiChatScreen extends StatelessWidget {
               waitingApproval: l.aiWaitingApproval,
               runningToolTemplate: l.aiRunningTool('{}'),
             );
-            bloc.add(InitializeAiAgent(
-              startFreshConversation: initialPath.isEmpty,
-              workspacePath: initialPath,
-            ));
+            bloc.add(
+              InitializeAiAgent(
+                startFreshConversation: initialPath.isEmpty,
+                workspacePath: initialPath,
+              ),
+            );
             if (initialPath.isNotEmpty) {
               bloc.add(UpdateCurrentPath(initialPath));
             }
@@ -145,8 +143,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
         // finishes laying out all items (important for large conversations).
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
-            _scrollController
-                .jumpTo(_scrollController.position.maxScrollExtent);
+            _scrollController.jumpTo(
+              _scrollController.position.maxScrollExtent,
+            );
           }
         });
       }
@@ -166,10 +165,12 @@ class _AiChatBodyState extends State<_AiChatBody> {
         // Also scroll when approval card appears so it's visible
         if (prev.pendingApproval != curr.pendingApproval) return true;
         if (!curr.isLoading) return false;
-        final prevLast =
-            prev.messages.isNotEmpty ? prev.messages.last.content : '';
-        final currLast =
-            curr.messages.isNotEmpty ? curr.messages.last.content : '';
+        final prevLast = prev.messages.isNotEmpty
+            ? prev.messages.last.content
+            : '';
+        final currLast = curr.messages.isNotEmpty
+            ? curr.messages.last.content
+            : '';
         return prevLast != currLast;
       },
       listener: (context, state) {
@@ -228,7 +229,8 @@ class _AiChatBodyState extends State<_AiChatBody> {
 
                         // Messages / empty state
                         Expanded(
-                          child: state.messages.isEmpty &&
+                          child:
+                              state.messages.isEmpty &&
                                   state.pendingApproval == null
                               ? _buildEmptyState(context, l, theme, state)
                               : _buildMessageList(context, state),
@@ -236,19 +238,27 @@ class _AiChatBodyState extends State<_AiChatBody> {
 
                         // Workspace indicator + Input bar
                         ChatInputBar(
-                          onStop: () => context
-                              .read<AiAgentBloc>()
-                              .add(const StopGeneration()),
+                          onStop: () => context.read<AiAgentBloc>().add(
+                            const StopGeneration(),
+                          ),
                           onSend: (text, files) {
-                            context
-                                .read<AiAgentBloc>()
-                                .add(SendMessage(text, referencedFiles: files));
+                            context.read<AiAgentBloc>().add(
+                              SendMessage(text, referencedFiles: files),
+                            );
                           },
                           isLoading: state.isLoading,
                           workspaceIndicator: _buildWorkspaceIndicator(
-                              context, l, theme, state),
-                          modelSelector:
-                              _buildModelSelector(context, l, theme, state),
+                            context,
+                            l,
+                            theme,
+                            state,
+                          ),
+                          modelSelector: _buildModelSelector(
+                            context,
+                            l,
+                            theme,
+                            state,
+                          ),
                         ),
                       ],
                     ),
@@ -262,8 +272,12 @@ class _AiChatBodyState extends State<_AiChatBody> {
     );
   }
 
-  Widget _buildWorkspaceIndicator(BuildContext context, AppLocalizations l,
-      ThemeData theme, AiAgentState state) {
+  Widget _buildWorkspaceIndicator(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     final isDark = theme.brightness == Brightness.dark;
     final hasPath = state.currentPath.isNotEmpty;
     // Derive display label from scope
@@ -334,8 +348,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
                 state.currentPath,
                 style: TextStyle(
                   fontSize: 11,
-                  color:
-                      theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.7,
+                  ),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -346,10 +361,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
           // Context size indicator
           if (state.messages.isNotEmpty) ...[
             const SizedBox(width: 8),
-            _ContextSizeIndicator(
-              contextInfo: contextInfo,
-              isDark: isDark,
-            ),
+            _ContextSizeIndicator(contextInfo: contextInfo, isDark: isDark),
             const SizedBox(width: 4),
             // Debug: view raw payload sent to provider
             IconButton(
@@ -366,8 +378,12 @@ class _AiChatBodyState extends State<_AiChatBody> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, AppLocalizations l, ThemeData theme,
-      AiAgentState state) {
+  Widget _buildHeader(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     final isDark = theme.brightness == Brightness.dark;
     // Borderless, compact toolbar — the chat content below provides the
     // visual separation, so a hairline rule here only adds noise.
@@ -404,8 +420,12 @@ class _AiChatBodyState extends State<_AiChatBody> {
 
   /// Model picker rendered inside the composer footer. Returns null when there
   /// is nothing to pick from yet.
-  Widget? _buildModelSelector(BuildContext context, AppLocalizations l,
-      ThemeData theme, AiAgentState state) {
+  Widget? _buildModelSelector(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     if (state.providerModelCatalogs.isEmpty && !state.isLoadingProviderModels) {
       return null;
     }
@@ -423,17 +443,21 @@ class _AiChatBodyState extends State<_AiChatBody> {
       noMatchesLabel: l.noModelsFound,
       onSelected: (value) {
         context.read<AiAgentBloc>().add(
-              SelectChatModel(
-                providerId: value.providerId,
-                modelName: value.modelName,
-              ),
-            );
+          SelectChatModel(
+            providerId: value.providerId,
+            modelName: value.modelName,
+          ),
+        );
       },
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, AppLocalizations l,
-      ThemeData theme, AiAgentState state) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -479,8 +503,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.45,
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.85,
+                ),
               ),
               textAlign: TextAlign.center,
             ),
@@ -493,10 +518,13 @@ class _AiChatBodyState extends State<_AiChatBody> {
                   onTap: () => _navigateToSettings(context),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer
-                          .withValues(alpha: 0.5),
+                      color: theme.colorScheme.errorContainer.withValues(
+                        alpha: 0.5,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
@@ -559,7 +587,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
   }
 
   Widget _buildErrorBanner(
-      BuildContext context, ThemeData theme, AiAgentState state) {
+    BuildContext context,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -575,8 +606,11 @@ class _AiChatBodyState extends State<_AiChatBody> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(PhosphorIconsLight.warningCircle,
-              size: 16, color: theme.colorScheme.error),
+          Icon(
+            PhosphorIconsLight.warningCircle,
+            size: 16,
+            color: theme.colorScheme.error,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -648,8 +682,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
                 }
 
                 // Thinking indicator (second to last if approval exists, otherwise last)
-                final thinkingIndex =
-                    hasApproval ? _itemCount(state) - 2 : _itemCount(state) - 1;
+                final thinkingIndex = hasApproval
+                    ? _itemCount(state) - 2
+                    : _itemCount(state) - 1;
                 if (hasThinking && index == thinkingIndex) {
                   return _buildThinkingBubble(context, state);
                 }
@@ -658,13 +693,16 @@ class _AiChatBodyState extends State<_AiChatBody> {
                 if (index < state.messages.length) {
                   final message = state.messages[index];
                   final isAssistant = message.role == AiMessageRole.assistant;
-                  final hasResults = isAssistant &&
+                  final hasResults =
+                      isAssistant &&
                       message.searchResults != null &&
                       message.searchResults!.isNotEmpty;
-                  final hasToolCalls = isAssistant &&
+                  final hasToolCalls =
+                      isAssistant &&
                       message.toolCalls != null &&
                       message.toolCalls!.isNotEmpty;
-                  final showToolLog = isAssistant &&
+                  final showToolLog =
+                      isAssistant &&
                       !state.isLoading &&
                       index == state.messages.length - 1 &&
                       state.toolActivity.isNotEmpty;
@@ -678,7 +716,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
                       if (hasToolCalls)
                         Padding(
                           padding: const EdgeInsets.only(
-                              left: 12, right: 12, bottom: 4),
+                            left: 12,
+                            right: 12,
+                            bottom: 4,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: message.toolCalls!
@@ -688,19 +729,20 @@ class _AiChatBodyState extends State<_AiChatBody> {
                         ),
                       ChatMessageBubble(
                         message: message,
-                        onEdit: !state.isLoading &&
+                        onEdit:
+                            !state.isLoading &&
                                 message.role == AiMessageRole.user
                             ? (content) => context.read<AiAgentBloc>().add(
-                                  EditMessage(
-                                    messageId: message.id,
-                                    content: content,
-                                  ),
-                                )
+                                EditMessage(
+                                  messageId: message.id,
+                                  content: content,
+                                ),
+                              )
                             : null,
                         onRetry: message.error != null
-                            ? () => context
-                                .read<AiAgentBloc>()
-                                .add(const RetryLastMessage())
+                            ? () => context.read<AiAgentBloc>().add(
+                                const RetryLastMessage(),
+                              )
                             : null,
                       ),
                       // File results inline below this assistant message
@@ -761,8 +803,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
   void _scrollByPage(int direction) {
     final position = _scrollController.position;
     final viewport = position.viewportDimension;
-    final target = (position.pixels + (viewport * direction))
-        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    final target = (position.pixels + (viewport * direction)).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
     _scrollController.animateTo(
       target.toDouble(),
       duration: const Duration(milliseconds: 160),
@@ -778,7 +822,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
   }
 
   Widget _buildInlineResults(
-      BuildContext context, List<AiSearchResult> results) {
+    BuildContext context,
+    List<AiSearchResult> results,
+  ) {
     final l = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
@@ -808,12 +854,14 @@ class _AiChatBodyState extends State<_AiChatBody> {
               ],
             ),
           ),
-          ...results.map((result) => FileResultCard(
-                result: result,
-                onTap: () => _openFileInTab(context, result.path),
-                onOpenFolder: () => _openFolderInTab(context, result.path),
-                onOpenExternal: () => _openFileExternal(context, result.path),
-              )),
+          ...results.map(
+            (result) => FileResultCard(
+              result: result,
+              onTap: () => _openFileInTab(context, result.path),
+              onOpenFolder: () => _openFolderInTab(context, result.path),
+              onOpenExternal: () => _openFileExternal(context, result.path),
+            ),
+          ),
         ],
       ),
     );
@@ -830,8 +878,9 @@ class _AiChatBodyState extends State<_AiChatBody> {
         margin: const EdgeInsets.only(bottom: 8, right: 48),
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
         decoration: BoxDecoration(
-          color:
-              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.55,
+          ),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(6),
             topRight: Radius.circular(18),
@@ -858,7 +907,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
   }
 
   Widget _buildApprovalCard(
-      BuildContext context, ThemeData theme, AiAgentState state) {
+    BuildContext context,
+    ThemeData theme,
+    AiAgentState state,
+  ) {
     final approval = state.pendingApproval!;
     return ApprovalCard(
       approval: approval,
@@ -879,11 +931,13 @@ class _AiChatBodyState extends State<_AiChatBody> {
     if (existingTab.id.isNotEmpty) {
       tabBloc.add(SwitchToTab(existingTab.id));
     } else {
-      tabBloc.add(AddTab(
-        path: kSettingsPath,
-        name: AppLocalizations.of(context)!.settings,
-        switchToTab: true,
-      ));
+      tabBloc.add(
+        AddTab(
+          path: kSettingsPath,
+          name: AppLocalizations.of(context)!.settings,
+          switchToTab: true,
+        ),
+      );
     }
   }
 
@@ -895,12 +949,14 @@ class _AiChatBodyState extends State<_AiChatBody> {
     final dirName = parentDir.split(Platform.pathSeparator).last;
 
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
-    tabBloc.add(AddTab(
-      path: parentDir,
-      name: dirName,
-      switchToTab: true,
-      highlightedFileName: fileName,
-    ));
+    tabBloc.add(
+      AddTab(
+        path: parentDir,
+        name: dirName,
+        switchToTab: true,
+        highlightedFileName: fileName,
+      ),
+    );
   }
 
   /// Opens the file's parent directory in a new tab (without file highlight).
@@ -910,22 +966,14 @@ class _AiChatBodyState extends State<_AiChatBody> {
     final dirName = parentDir.split(Platform.pathSeparator).last;
 
     final tabBloc = BlocProvider.of<TabManagerBloc>(context);
-    tabBloc.add(AddTab(
-      path: parentDir,
-      name: dirName,
-      switchToTab: true,
-    ));
+    tabBloc.add(AddTab(path: parentDir, name: dirName, switchToTab: true));
   }
 
   /// Opens the file with the OS default application.
   void _openFileExternal(BuildContext context, String filePath) {
     try {
       if (Platform.isWindows) {
-        Process.start(
-          'explorer',
-          [filePath],
-          mode: ProcessStartMode.detached,
-        );
+        Process.start('explorer', [filePath], mode: ProcessStartMode.detached);
       } else if (Platform.isMacOS) {
         Process.start('open', [filePath], mode: ProcessStartMode.detached);
       } else if (Platform.isLinux) {
@@ -976,13 +1024,13 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
 
     final bg = _pressed
         ? (widget.isDark
-            ? Colors.white.withValues(alpha: 0.14)
-            : Colors.black.withValues(alpha: 0.10))
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.black.withValues(alpha: 0.10))
         : (_hovered || widget.isActive)
-            ? (widget.isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06))
-            : Colors.transparent;
+        ? (widget.isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.06))
+        : Colors.transparent;
 
     final fg = widget.isActive
         ? theme.colorScheme.primary
@@ -1101,26 +1149,29 @@ class _ToolActivityLogState extends State<_ToolActivityLog> {
               margin: const EdgeInsets.only(left: 8, top: 2),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: widget.activity
-                    .map((line) => Padding(
-                          padding: const EdgeInsets.only(bottom: 1),
-                          child: Text(
-                            line,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontFamily: 'monospace',
-                              color: line.startsWith('>')
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
+                    .map(
+                      (line) => Padding(
+                        padding: const EdgeInsets.only(bottom: 1),
+                        child: Text(
+                          line,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            color: line.startsWith('>')
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
                           ),
-                        ))
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -1183,21 +1234,19 @@ class _ContextSizeIndicator extends StatelessWidget {
     } else if (ratio > 0.6) {
       indicatorColor = Colors.orange.withValues(alpha: 0.75);
     } else {
-      indicatorColor =
-          theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5);
+      indicatorColor = theme.colorScheme.onSurfaceVariant.withValues(
+        alpha: 0.5,
+      );
     }
 
     return Tooltip(
-      message: '${contextInfo.messageCount} messages · $chars chars\n'
+      message:
+          '${contextInfo.messageCount} messages · $chars chars\n'
           'Context trimming starts at ~24K chars',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            PhosphorIconsLight.database,
-            size: 10,
-            color: indicatorColor,
-          ),
+          Icon(PhosphorIconsLight.database, size: 10, color: indicatorColor),
           const SizedBox(width: 3),
           Text(
             label,

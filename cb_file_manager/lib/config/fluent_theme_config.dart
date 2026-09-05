@@ -24,8 +24,9 @@ class FluentThemeConfig {
     );
     final fluentAccentColor = _resolveAccentColor(accentColor);
     final isDark = materialTheme.brightness == Brightness.dark;
-    final double normalizedStrength =
-        acrylicStrength.clamp(0.0, 2.0).toDouble();
+    final double normalizedStrength = acrylicStrength
+        .clamp(0.0, 2.0)
+        .toDouble();
     double opacityByStrength({
       required double solidAtMin,
       required double glassAtMax,

@@ -45,8 +45,11 @@ class AppLogger {
   }
 
   /// Log a warning message
-  static void warning(dynamic message,
-      {Object? error, StackTrace? stackTrace}) {
+  static void warning(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     _logger.w(message, error: error, stackTrace: stackTrace);
     _record('WARN', message, error: error, stackTrace: stackTrace, level: 900);
   }
@@ -54,15 +57,25 @@ class AppLogger {
   /// Log an error message
   static void error(dynamic message, {Object? error, StackTrace? stackTrace}) {
     _logger.e(message, error: error, stackTrace: stackTrace);
-    _record('ERROR', message,
-        error: error, stackTrace: stackTrace, level: 1000);
+    _record(
+      'ERROR',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 1000,
+    );
   }
 
   /// Log a fatal error message
   static void fatal(dynamic message, {Object? error, StackTrace? stackTrace}) {
     _logger.f(message, error: error, stackTrace: stackTrace);
-    _record('FATAL', message,
-        error: error, stackTrace: stackTrace, level: 1200);
+    _record(
+      'FATAL',
+      message,
+      error: error,
+      stackTrace: stackTrace,
+      level: 1200,
+    );
   }
 
   /// Performance log helper — writes to logger and appends to a perf log file.
@@ -123,11 +136,15 @@ class AppLogger {
   static Future<void> _appendPerfLog(String message) async {
     try {
       final dir = await getTemporaryDirectory();
-      final file =
-          File('${dir.path}${Platform.pathSeparator}cb_file_manager_perf.log');
+      final file = File(
+        '${dir.path}${Platform.pathSeparator}cb_file_manager_perf.log',
+      );
       final ts = DateTime.now().toIso8601String();
-      await file.writeAsString('[$ts] $message\n',
-          mode: FileMode.append, flush: true);
+      await file.writeAsString(
+        '[$ts] $message\n',
+        mode: FileMode.append,
+        flush: true,
+      );
     } catch (_) {
       // ignore — logging must not crash the app
     }

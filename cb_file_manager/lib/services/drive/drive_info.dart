@@ -1,20 +1,7 @@
 /// Typed volume metadata for the drive manager UI.
-enum DriveKind {
-  fixed,
-  removable,
-  network,
-  optical,
-  ram,
-  internal,
-  unknown,
-}
+enum DriveKind { fixed, removable, network, optical, ram, internal, unknown }
 
-enum DriveGroup {
-  fixed,
-  removable,
-  network,
-  other,
-}
+enum DriveGroup { fixed, removable, network, other }
 
 class DriveSpaceInfo {
   final int totalBytes;
@@ -27,10 +14,7 @@ class DriveSpaceInfo {
     required this.usedBytes,
   });
 
-  const DriveSpaceInfo.empty()
-      : totalBytes = 0,
-        freeBytes = 0,
-        usedBytes = 0;
+  const DriveSpaceInfo.empty() : totalBytes = 0, freeBytes = 0, usedBytes = 0;
 
   bool get hasDetails => totalBytes > 0;
 

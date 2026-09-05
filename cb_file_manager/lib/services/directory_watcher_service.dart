@@ -3,12 +3,7 @@ import 'dart:io';
 import 'package:cb_file_manager/utils/app_logger.dart';
 
 /// Event types for file system changes
-enum FileChangeType {
-  create,
-  modify,
-  delete,
-  move,
-}
+enum FileChangeType { create, modify, delete, move }
 
 /// Represents a file system change event
 class FileChangeEvent {
@@ -92,7 +87,8 @@ class DirectoryWatcherService {
       final directory = Directory(path);
       if (!await directory.exists()) {
         AppLogger.warning(
-            'DirectoryWatcherService: Directory does not exist: $path');
+          'DirectoryWatcherService: Directory does not exist: $path',
+        );
         return;
       }
 
@@ -106,20 +102,25 @@ class DirectoryWatcherService {
       // a kernel handle immediately. If the directory is deleted concurrently
       // (e.g. another E2E test's teardown deleting the directory), this throws a
       // synchronous SocketException. The onError callback handles this silently.
-      _watchSubscription = directory.watch(recursive: false).listen(
-        _handleFileSystemEvent,
-        onError: (Object error) {
-          // Silently absorb — the watcher will recover on the next navigation.
-          stopWatching();
-        },
-        cancelOnError: false,
-      );
+      _watchSubscription = directory
+          .watch(recursive: false)
+          .listen(
+            _handleFileSystemEvent,
+            onError: (Object error) {
+              // Silently absorb — the watcher will recover on the next navigation.
+              stopWatching();
+            },
+            cancelOnError: false,
+          );
 
       AppLogger.info(
-          'DirectoryWatcherService: Started watching $path (non-recursive)');
+        'DirectoryWatcherService: Started watching $path (non-recursive)',
+      );
     } catch (e) {
-      AppLogger.error('DirectoryWatcherService: Failed to start watching $path',
-          error: e);
+      AppLogger.error(
+        'DirectoryWatcherService: Failed to start watching $path',
+        error: e,
+      );
     }
   }
 
@@ -181,14 +182,16 @@ class DirectoryWatcherService {
         if (suppressedUntil != null &&
             suppressedUntil.isAfter(DateTime.now())) {
           AppLogger.info(
-              'DirectoryWatcherService: Suppressed refresh for $_currentWatchPath');
+            'DirectoryWatcherService: Suppressed refresh for $_currentWatchPath',
+          );
           _pendingEvents.clear();
           return;
         }
 
         _suppressedRefreshUntil.remove(_currentWatchPath!);
         AppLogger.info(
-            'DirectoryWatcherService: Triggering refresh for $_currentWatchPath (${_pendingEvents.length} changes)');
+          'DirectoryWatcherService: Triggering refresh for $_currentWatchPath (${_pendingEvents.length} changes)',
+        );
         _refreshController.add(_currentWatchPath!);
         _pendingEvents.clear();
       }

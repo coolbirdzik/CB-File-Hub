@@ -6,11 +6,7 @@ class BufferInfoWidget extends StatefulWidget {
   final Stream<List<int>>? stream;
   final String label;
 
-  const BufferInfoWidget({
-    Key? key,
-    this.stream,
-    this.label = 'Buffer Info',
-  }) : super(key: key);
+  const BufferInfoWidget({super.key, this.stream, this.label = 'Buffer Info'});
 
   @override
   State<BufferInfoWidget> createState() => _BufferInfoWidgetState();
@@ -155,8 +151,9 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
                             boxShadow: _isActive
                                 ? [
                                     BoxShadow(
-                                      color: _getBufferColor()
-                                          .withValues(alpha: 0.5),
+                                      color: _getBufferColor().withValues(
+                                        alpha: 0.5,
+                                      ),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),
@@ -205,10 +202,7 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
             children: [
               const Text(
                 'Buffer:',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               Text(
                 _formatBytes(_totalBytes),
@@ -228,10 +222,7 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
             children: [
               const Text(
                 'Chunks:',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               Text(
                 '$_chunkCount',
@@ -251,10 +242,7 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
             children: [
               const Text(
                 'Avg Chunk:',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               Text(
                 _formatBytes(_getAverageChunkSize().round()),

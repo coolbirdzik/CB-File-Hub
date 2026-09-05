@@ -7,8 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 void main() {
-  testWidgets('04.01 drives action profile shows minimal mobile actions',
-      (tester) async {
+  testWidgets('04.01 drives action profile shows minimal mobile actions', (
+    tester,
+  ) async {
     MobileFileActionsController.clearAll();
     final controller = MobileFileActionsController.forTab('tab_drives');
     controller.actionBarProfile = MobileActionBarProfile.drivesMinimal;
@@ -28,10 +29,7 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('en'),
-          Locale('vi'),
-        ],
+        supportedLocales: const [Locale('en'), Locale('vi')],
         home: Scaffold(
           body: Builder(
             builder: (context) => controller.buildMobileActionBar(context),

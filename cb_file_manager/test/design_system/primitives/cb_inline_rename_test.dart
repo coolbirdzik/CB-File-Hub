@@ -11,36 +11,39 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ThemeData _theme() => CbThemeBuilder.build(
-      brightness: Brightness.light,
-      accent: const Color(0xFF0078D4),
-    );
+  brightness: Brightness.light,
+  accent: const Color(0xFF0078D4),
+);
 
 Widget _host(Widget child) => MaterialApp(
-      theme: _theme(),
-      home: Scaffold(body: Center(child: child)),
-    );
+  theme: _theme(),
+  home: Scaffold(body: Center(child: child)),
+);
 
 void main() {
   group('CbInlineRenameField', () {
-    testWidgets('renders the locked suffix without putting it in the field',
-        (tester) async {
+    testWidgets('renders the locked suffix without putting it in the field', (
+      tester,
+    ) async {
       final controller = TextEditingController(text: 'report');
       final focusNode = FocusNode();
       addTearDown(controller.dispose);
       addTearDown(focusNode.dispose);
 
-      await tester.pumpWidget(_host(
-        SizedBox(
-          width: 240,
-          child: CbInlineRenameField(
-            controller: controller,
-            focusNode: focusNode,
-            onCommit: () {},
-            onCancel: () {},
-            lockedSuffix: '.pdf',
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 240,
+            child: CbInlineRenameField(
+              controller: controller,
+              focusNode: focusNode,
+              onCommit: () {},
+              onCancel: () {},
+              lockedSuffix: '.pdf',
+            ),
           ),
         ),
-      ));
+      );
       await tester.pump();
 
       expect(find.text('.pdf'), findsOneWidget);
@@ -56,17 +59,19 @@ void main() {
       var commits = 0;
       var cancels = 0;
 
-      await tester.pumpWidget(_host(
-        SizedBox(
-          width: 240,
-          child: CbInlineRenameField(
-            controller: controller,
-            focusNode: focusNode,
-            onCommit: () => commits++,
-            onCancel: () => cancels++,
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 240,
+            child: CbInlineRenameField(
+              controller: controller,
+              focusNode: focusNode,
+              onCommit: () => commits++,
+              onCancel: () => cancels++,
+            ),
           ),
         ),
-      ));
+      );
       await tester.pump();
 
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -84,43 +89,48 @@ void main() {
       addTearDown(controller.dispose);
       addTearDown(focusNode.dispose);
 
-      await tester.pumpWidget(_host(
-        SizedBox(
-          width: 240,
-          child: CbInlineRenameField(
-            controller: controller,
-            focusNode: focusNode,
-            onCommit: () {},
-            onCancel: () {},
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 240,
+            child: CbInlineRenameField(
+              controller: controller,
+              focusNode: focusNode,
+              onCommit: () {},
+              onCancel: () {},
+            ),
           ),
         ),
-      ));
+      );
       await tester.pump();
 
       await tester.enterText(find.byType(TextField), 'in/valid:name?');
       expect(controller.text, 'invalidname');
     });
 
-    testWidgets('lets free-form labels through when unrestricted',
-        (tester) async {
+    testWidgets('lets free-form labels through when unrestricted', (
+      tester,
+    ) async {
       final controller = TextEditingController(text: 'work');
       final focusNode = FocusNode();
       addTearDown(controller.dispose);
       addTearDown(focusNode.dispose);
 
-      await tester.pumpWidget(_host(
-        SizedBox(
-          width: 240,
-          child: CbInlineRenameField(
-            controller: controller,
-            focusNode: focusNode,
-            onCommit: () {},
-            onCancel: () {},
-            // Tags are labels, not paths.
-            restrictToFilesystemSafeCharacters: false,
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 240,
+            child: CbInlineRenameField(
+              controller: controller,
+              focusNode: focusNode,
+              onCommit: () {},
+              onCancel: () {},
+              // Tags are labels, not paths.
+              restrictToFilesystemSafeCharacters: false,
+            ),
           ),
         ),
-      ));
+      );
       await tester.pump();
 
       await tester.enterText(find.byType(TextField), 'work/2026: q1');
@@ -134,18 +144,20 @@ void main() {
       addTearDown(focusNode.dispose);
 
       var blurs = 0;
-      await tester.pumpWidget(_host(
-        SizedBox(
-          width: 240,
-          child: CbInlineRenameField(
-            controller: controller,
-            focusNode: focusNode,
-            onCommit: () {},
-            onCancel: () {},
-            onBlur: () => blurs++,
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 240,
+            child: CbInlineRenameField(
+              controller: controller,
+              focusNode: focusNode,
+              onCommit: () {},
+              onCancel: () {},
+              onBlur: () => blurs++,
+            ),
           ),
         ),
-      ));
+      );
       await tester.pump();
       expect(focusNode.hasFocus, isTrue);
 
@@ -158,12 +170,16 @@ void main() {
   group('showCbInlineRename', () {
     testWidgets('returns the trimmed new name', (tester) async {
       late BuildContext hostContext;
-      await tester.pumpWidget(_host(Builder(
-        builder: (context) {
-          hostContext = context;
-          return const SizedBox.shrink();
-        },
-      )));
+      await tester.pumpWidget(
+        _host(
+          Builder(
+            builder: (context) {
+              hostContext = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
 
       final result = showCbInlineRename(
         context: hostContext,
@@ -185,12 +201,16 @@ void main() {
 
     testWidgets('blocks confirm while the name is invalid', (tester) async {
       late BuildContext hostContext;
-      await tester.pumpWidget(_host(Builder(
-        builder: (context) {
-          hostContext = context;
-          return const SizedBox.shrink();
-        },
-      )));
+      await tester.pumpWidget(
+        _host(
+          Builder(
+            builder: (context) {
+              hostContext = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
 
       final result = showCbInlineRename(
         context: hostContext,
@@ -222,12 +242,16 @@ void main() {
 
     testWidgets('an empty name cannot be committed', (tester) async {
       late BuildContext hostContext;
-      await tester.pumpWidget(_host(Builder(
-        builder: (context) {
-          hostContext = context;
-          return const SizedBox.shrink();
-        },
-      )));
+      await tester.pumpWidget(
+        _host(
+          Builder(
+            builder: (context) {
+              hostContext = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
 
       final result = showCbInlineRename(
         context: hostContext,

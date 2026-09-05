@@ -223,7 +223,7 @@ class VlcDirectSmbHelper {
       'xvid',
       'ogv',
       'dv',
-      'mxf'
+      'mxf',
     ];
   }
 
@@ -244,7 +244,7 @@ class VlcDirectSmbHelper {
       'au',
       'ra',
       'amr',
-      'awb'
+      'awb',
     ];
   }
 
@@ -279,7 +279,7 @@ class VlcDirectSmbHelper {
         'XviD',
         'WMV',
         'FLV',
-        'Theora'
+        'Theora',
       ],
       'supported_audio_codecs': [
         'AAC',
@@ -291,7 +291,7 @@ class VlcDirectSmbHelper {
         'DTS',
         'PCM',
         'WMA',
-        'ALAC'
+        'ALAC',
       ],
     };
   }

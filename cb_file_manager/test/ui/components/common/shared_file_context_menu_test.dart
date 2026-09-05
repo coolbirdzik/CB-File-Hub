@@ -8,8 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 void main() {
-  testWidgets('lazy submenu does not delay the root context menu',
-      (tester) async {
+  testWidgets('lazy submenu does not delay the root context menu', (
+    tester,
+  ) async {
     final childSections = Completer<List<ContextMenuSection>>();
     var loaderCalls = 0;
     var childSelected = false;
@@ -23,10 +24,7 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const <Locale>[
-          Locale('en'),
-          Locale('vi'),
-        ],
+        supportedLocales: const <Locale>[Locale('en'), Locale('vi')],
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
@@ -113,10 +111,7 @@ void main() {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const <Locale>[
-          Locale('en'),
-          Locale('vi'),
-        ],
+        supportedLocales: const <Locale>[Locale('en'), Locale('vi')],
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(

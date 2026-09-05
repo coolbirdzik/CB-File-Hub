@@ -14,13 +14,13 @@ class StreamingSpeedOverlay extends StatefulWidget {
   final Duration autoHideDuration;
 
   const StreamingSpeedOverlay({
-    Key? key,
+    super.key,
     this.showSpeedInfo = true,
     this.onToggleSpeedInfo,
     this.backgroundColor,
     this.textColor,
     this.autoHideDuration = const Duration(seconds: 5),
-  }) : super(key: key);
+  });
 
   @override
   State<StreamingSpeedOverlay> createState() => _StreamingSpeedOverlayState();
@@ -52,21 +52,14 @@ class _StreamingSpeedOverlayState extends State<StreamingSpeedOverlay>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(0, -1),
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeInOut,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: Offset.zero, end: const Offset(0, -1)).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeInOut),
+        );
 
     _startListening();
     _startAutoHideTimer();
@@ -187,11 +180,7 @@ class _StreamingSpeedOverlayState extends State<StreamingSpeedOverlay>
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                PhosphorIconsLight.speedometer,
-                color: textColor,
-                size: 16,
-              ),
+              Icon(PhosphorIconsLight.speedometer, color: textColor, size: 16),
               const SizedBox(width: 6),
               Text(
                 'Tốc độ Stream',
@@ -215,28 +204,42 @@ class _StreamingSpeedOverlayState extends State<StreamingSpeedOverlay>
           const SizedBox(height: 8),
           if (_currentSpeedInfo != null) ...[
             VideoPlayerUtils.buildLabelValueRow(
-                'Hiện tại:', _currentSpeedInfo!.formattedCurrentSpeed,
-                textColor: textColor),
+              'Hiện tại:',
+              _currentSpeedInfo!.formattedCurrentSpeed,
+              textColor: textColor,
+            ),
             const SizedBox(height: 4),
             VideoPlayerUtils.buildLabelValueRow(
-                'Trung bình:', _currentSpeedInfo!.formattedAverageSpeed,
-                textColor: textColor),
+              'Trung bình:',
+              _currentSpeedInfo!.formattedAverageSpeed,
+              textColor: textColor,
+            ),
             const SizedBox(height: 4),
             VideoPlayerUtils.buildLabelValueRow(
-                'Đã tải:', _currentSpeedInfo!.formattedTotalBytes,
-                textColor: textColor),
+              'Đã tải:',
+              _currentSpeedInfo!.formattedTotalBytes,
+              textColor: textColor,
+            ),
             const SizedBox(height: 4),
             VideoPlayerUtils.buildLabelValueRow(
-                'Thời gian:',
-                VideoPlayerUtils.formatDurationMmSs(
-                    _currentSpeedInfo!.elapsedTime),
-                textColor: textColor),
+              'Thời gian:',
+              VideoPlayerUtils.formatDurationMmSs(
+                _currentSpeedInfo!.elapsedTime,
+              ),
+              textColor: textColor,
+            ),
           ] else ...[
-            VideoPlayerUtils.buildLabelValueRow('Trạng thái:', 'Đang tải...',
-                textColor: textColor),
+            VideoPlayerUtils.buildLabelValueRow(
+              'Trạng thái:',
+              'Đang tải...',
+              textColor: textColor,
+            ),
             const SizedBox(height: 4),
-            VideoPlayerUtils.buildLabelValueRow('Tốc độ:', 'Chờ dữ liệu...',
-                textColor: textColor),
+            VideoPlayerUtils.buildLabelValueRow(
+              'Tốc độ:',
+              'Chờ dữ liệu...',
+              textColor: textColor,
+            ),
           ],
         ],
       ),
@@ -252,12 +255,12 @@ class StreamingSpeedToggleButton extends StatelessWidget {
   final Color? iconColor;
 
   const StreamingSpeedToggleButton({
-    Key? key,
+    super.key,
     required this.isVisible,
     required this.onToggle,
     this.backgroundColor,
     this.iconColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

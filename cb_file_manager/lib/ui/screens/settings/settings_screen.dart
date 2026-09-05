@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/files/save_location_picker.dart';
 import 'package:cb_file_manager/config/language_controller.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -33,7 +34,7 @@ import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -128,13 +129,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final showFileTags = await _preferences.getShowFileTags();
       final fileThumbnailFitMode = await _preferences.getFileThumbnailFitMode();
       final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
-      final rememberTabWorkspace =
-          await _preferences.getRememberTabWorkspaceEnabled();
-      final useSystemDefaultForVideo =
-          await _preferences.getUseSystemDefaultForVideo();
+      final rememberTabWorkspace = await _preferences
+          .getRememberTabWorkspaceEnabled();
+      final useSystemDefaultForVideo = await _preferences
+          .getUseSystemDefaultForVideo();
       final openVideoInNewWindow = await _preferences.getOpenVideoInNewWindow();
-      final tabInactiveMinutes =
-          await _preferences.getTabInactiveThresholdMinutes();
+      final tabInactiveMinutes = await _preferences
+          .getTabInactiveThresholdMinutes();
       _preferences.isUsingDatabaseStorage();
 
       if (mounted) {
@@ -187,10 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (mounted) {
       final l10n = AppLocalizations.of(context)!;
-      AppToast.success(
-        context,
-        '${l10n.thumbnailPositionUpdated}$percentage%',
-      );
+      AppToast.success(context, '${l10n.thumbnailPositionUpdated}$percentage%');
     }
   }
 
@@ -272,8 +270,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     await _preferences.setTabInactiveThresholdMinutes(clamped);
     if (locator.isRegistered<TabActivityManager>()) {
-      locator<TabActivityManager>()
-          .setInactiveThreshold(Duration(minutes: clamped));
+      locator<TabActivityManager>().setInactiveThreshold(
+        Duration(minutes: clamped),
+      );
     }
     if (mounted) {
       setState(() {
@@ -329,8 +328,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final tagThumbStats = await _directoryStats(tagThumbDir);
 
       // Video library cache stats
-      final videoLibDir =
-          await VideoLibraryCacheService.instance.getCacheDirectory();
+      final videoLibDir = await VideoLibraryCacheService.instance
+          .getCacheDirectory();
       final videoLibStats = await _directoryStats(videoLibDir);
 
       if (!mounted) return;
@@ -371,8 +370,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       int totalBytes = 0;
       int fileCount = 0;
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity in dir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is File) {
           try {
             totalBytes += await entity.length();
@@ -407,7 +408,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Text(
                     AppLocalizations.of(context)!.settings,
                     style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w500),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -428,57 +431,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildCacheManagementSection(),
                         const SizedBox(height: 24),
                         AiSettingsSection(
-                          buildSectionCard: ({
-                            required String title,
-                            required IconData icon,
-                            required List<Widget> children,
-                          }) =>
-                              _buildSectionCard(
-                            title: title,
-                            icon: icon,
-                            children: children,
-                          ),
-                          buildCompactSettingTile: ({
-                            required String title,
-                            required String subtitle,
-                            required IconData icon,
-                            Widget? trailing,
-                            VoidCallback? onTap,
-                          }) =>
-                              _buildCompactSettingTile(
-                            title: title,
-                            subtitle: subtitle,
-                            icon: icon,
-                            trailing: trailing,
-                            onTap: onTap,
-                          ),
+                          buildSectionCard:
+                              ({
+                                required String title,
+                                required IconData icon,
+                                required List<Widget> children,
+                              }) => _buildSectionCard(
+                                title: title,
+                                icon: icon,
+                                children: children,
+                              ),
+                          buildCompactSettingTile:
+                              ({
+                                required String title,
+                                required String subtitle,
+                                required IconData icon,
+                                Widget? trailing,
+                                VoidCallback? onTap,
+                              }) => _buildCompactSettingTile(
+                                title: title,
+                                subtitle: subtitle,
+                                icon: icon,
+                                trailing: trailing,
+                                onTap: onTap,
+                              ),
                         ),
                         const SizedBox(height: 24),
                         LocalAiAdvisorSettingsSection(
-                          buildSectionCard: ({
-                            required String title,
-                            required IconData icon,
-                            required List<Widget> children,
-                          }) =>
-                              _buildSectionCard(
-                            title: title,
-                            icon: icon,
-                            children: children,
-                          ),
-                          buildCompactSettingTile: ({
-                            required String title,
-                            required String subtitle,
-                            required IconData icon,
-                            Widget? trailing,
-                            VoidCallback? onTap,
-                          }) =>
-                              _buildCompactSettingTile(
-                            title: title,
-                            subtitle: subtitle,
-                            icon: icon,
-                            trailing: trailing,
-                            onTap: onTap,
-                          ),
+                          buildSectionCard:
+                              ({
+                                required String title,
+                                required IconData icon,
+                                required List<Widget> children,
+                              }) => _buildSectionCard(
+                                title: title,
+                                icon: icon,
+                                children: children,
+                              ),
+                          buildCompactSettingTile:
+                              ({
+                                required String title,
+                                required String subtitle,
+                                required IconData icon,
+                                Widget? trailing,
+                                VoidCallback? onTap,
+                              }) => _buildCompactSettingTile(
+                                title: title,
+                                subtitle: subtitle,
+                                icon: icon,
+                                trailing: trailing,
+                                onTap: onTap,
+                              ),
                         ),
                         const SizedBox(height: 24),
                         _buildDatabaseSection(),
@@ -570,8 +573,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.rememberTabWorkspace,
-          subtitle:
-              AppLocalizations.of(context)!.rememberTabWorkspaceDescription,
+          subtitle: AppLocalizations.of(
+            context,
+          )!.rememberTabWorkspaceDescription,
           icon: PhosphorIconsLight.clockCounterClockwise,
           trailing: Switch(
             value: _rememberTabWorkspace,
@@ -608,8 +612,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.useSystemDefaultForVideo,
-          subtitle:
-              AppLocalizations.of(context)!.useSystemDefaultForVideoDescription,
+          subtitle: AppLocalizations.of(
+            context,
+          )!.useSystemDefaultForVideoDescription,
           icon: PhosphorIconsLight.arrowSquareOut,
           trailing: Switch(
             value: _useSystemDefaultForVideo,
@@ -619,8 +624,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
           _buildCompactSettingTile(
             title: AppLocalizations.of(context)!.openVideoInNewWindow,
-            subtitle:
-                AppLocalizations.of(context)!.openVideoInNewWindowDescription,
+            subtitle: AppLocalizations.of(
+              context,
+            )!.openVideoInNewWindowDescription,
             icon: PhosphorIconsLight.appWindow,
             trailing: Switch(
               value: _openVideoInNewWindow,
@@ -643,8 +649,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: _buildModeCard(
                       title: AppLocalizations.of(context)!.thumbnailModeFast,
-                      description: AppLocalizations.of(context)!
-                          .thumbnailModeFastDescription,
+                      description: AppLocalizations.of(
+                        context,
+                      )!.thumbnailModeFastDescription,
                       icon: PhosphorIconsLight.lightning,
                       isSelected: _thumbnailMode == 'fast',
                       onTap: () => _updateThumbnailMode('fast'),
@@ -654,8 +661,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: _buildModeCard(
                       title: AppLocalizations.of(context)!.thumbnailModeCustom,
-                      description: AppLocalizations.of(context)!
-                          .thumbnailModeCustomDescription,
+                      description: AppLocalizations.of(
+                        context,
+                      )!.thumbnailModeCustomDescription,
                       icon: PhosphorIconsLight.gear,
                       isSelected: _thumbnailMode == 'custom',
                       onTap: () => _updateThumbnailMode('custom'),
@@ -682,12 +690,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.1),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -702,19 +711,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Slider(
-                  value: _videoThumbnailPercentage.toDouble(),
-                  min: UserPreferences.minVideoThumbnailPercentage.toDouble(),
-                  max: UserPreferences.maxVideoThumbnailPercentage.toDouble(),
-                  divisions: 20,
-                  onChanged: (value) {
-                    setState(() {
-                      _videoThumbnailPercentage = value.round();
-                    });
-                  },
-                  onChangeEnd: (value) {
-                    _updateVideoThumbnailPercentage(value.round());
-                  },
+                Semantics(
+                  container: true,
+                  child: Slider(
+                    value: _videoThumbnailPercentage.toDouble(),
+                    min: UserPreferences.minVideoThumbnailPercentage.toDouble(),
+                    max: UserPreferences.maxVideoThumbnailPercentage.toDouble(),
+                    divisions: 20,
+                    onChanged: (value) {
+                      setState(() {
+                        _videoThumbnailPercentage = value.round();
+                      });
+                    },
+                    onChangeEnd: (value) {
+                      _updateVideoThumbnailPercentage(value.round());
+                    },
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -741,13 +753,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.1),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -762,19 +775,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Slider(
-                value: _maxConcurrency.toDouble(),
-                min: UserPreferences.minThumbnailConcurrency.toDouble(),
-                max: UserPreferences.maxThumbnailConcurrency.toDouble(),
-                divisions: 31,
-                onChanged: (value) {
-                  setState(() {
-                    _maxConcurrency = value.round();
-                  });
-                },
-                onChangeEnd: (value) {
-                  _updateMaxConcurrency(value.round());
-                },
+              Semantics(
+                container: true,
+                child: Slider(
+                  value: _maxConcurrency.toDouble(),
+                  min: UserPreferences.minThumbnailConcurrency.toDouble(),
+                  max: UserPreferences.maxThumbnailConcurrency.toDouble(),
+                  divisions: 31,
+                  onChanged: (value) {
+                    setState(() {
+                      _maxConcurrency = value.round();
+                    });
+                  },
+                  onChangeEnd: (value) {
+                    _updateMaxConcurrency(value.round());
+                  },
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -806,8 +822,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.3),
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? theme.colorScheme.primary : Colors.transparent,
@@ -862,12 +879,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildCacheManagementSection() {
     final theme = Theme.of(context);
-    final totalBytes = (_networkThumbnailBytes ?? 0) +
+    final totalBytes =
+        (_networkThumbnailBytes ?? 0) +
         (_videoThumbnailBytes ?? 0) +
         (_videoLibraryBytes ?? 0) +
         (_tempFilesBytes ?? 0) +
         (_tagThumbnailBytes ?? 0);
-    final totalFiles = (_networkThumbnailFiles ?? 0) +
+    final totalFiles =
+        (_networkThumbnailFiles ?? 0) +
         (_videoThumbnailFiles ?? 0) +
         (_videoLibraryFiles ?? 0) +
         (_tempFilesCount ?? 0) +
@@ -900,8 +919,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.12),
+                            color: theme.colorScheme.primary.withValues(
+                              alpha: 0.12,
+                            ),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Icon(
@@ -923,8 +943,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                AppLocalizations.of(context)!
-                                    .appDataManagementDescription,
+                                AppLocalizations.of(
+                                  context,
+                                )!.appDataManagementDescription,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -988,8 +1009,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               await RouteUtils.showAcrylicDialog<void>(
                                 context: context,
                                 builder: (dialogContext) {
-                                  final mediaQuery =
-                                      MediaQuery.of(dialogContext);
+                                  final mediaQuery = MediaQuery.of(
+                                    dialogContext,
+                                  );
                                   final maxDialogWidth =
                                       mediaQuery.size.width * 0.88;
                                   final maxDialogHeight =
@@ -1003,10 +1025,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     clipBehavior: Clip.antiAlias,
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
-                                        maxWidth:
-                                            maxDialogWidth.clamp(560.0, 980.0),
-                                        maxHeight:
-                                            maxDialogHeight.clamp(420.0, 900.0),
+                                        maxWidth: maxDialogWidth.clamp(
+                                          560.0,
+                                          980.0,
+                                        ),
+                                        maxHeight: maxDialogHeight.clamp(
+                                          420.0,
+                                          900.0,
+                                        ),
                                       ),
                                       child: const CacheManagementScreen(
                                         embedded: true,
@@ -1044,9 +1070,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildDatabaseSection() {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1058,10 +1082,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -1100,8 +1123,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           // Quick actions (always visible)
           ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: const Icon(PhosphorIconsLight.uploadSimple, size: 20),
             title: Text(
               AppLocalizations.of(context)!.exportSettings,
@@ -1110,8 +1135,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(
               AppLocalizations.of(context)!.exportDescription,
               style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1119,8 +1145,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _exportDatabase(context),
           ),
           ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             leading: const Icon(PhosphorIconsLight.downloadSimple, size: 20),
             title: Text(
               AppLocalizations.of(context)!.importSettings,
@@ -1129,8 +1157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(
               AppLocalizations.of(context)!.importDescription,
               style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1183,8 +1212,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _isDatabaseSectionExpandedCloudSync = expanded;
                 });
               },
-              tilePadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 0,
+              ),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               leading: const Icon(PhosphorIconsLight.cloudArrowUp, size: 20),
               title: const Text(
@@ -1207,9 +1238,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1236,12 +1265,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       width: 14,
                                       height: 14,
                                       child: CircularProgressIndicator(
-                                          strokeWidth: 2),
+                                        strokeWidth: 2,
+                                      ),
                                     )
-                                  : const Icon(PhosphorIconsLight.cloudArrowUp,
-                                      size: 16),
-                              label: Text(AppLocalizations.of(context)!.upload,
-                                  style: const TextStyle(fontSize: 12)),
+                                  : const Icon(
+                                      PhosphorIconsLight.cloudArrowUp,
+                                      size: 16,
+                                    ),
+                              label: Text(
+                                AppLocalizations.of(context)!.upload,
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1251,11 +1285,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ? _syncFromCloud
                                   : null,
                               icon: const Icon(
-                                  PhosphorIconsLight.cloudArrowDown,
-                                  size: 16),
+                                PhosphorIconsLight.cloudArrowDown,
+                                size: 16,
+                              ),
                               label: Text(
-                                  AppLocalizations.of(context)!.download,
-                                  style: const TextStyle(fontSize: 12)),
+                                AppLocalizations.of(context)!.download,
+                                style: const TextStyle(fontSize: 12),
+                              ),
                             ),
                           ),
                         ],
@@ -1317,12 +1353,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: _popularTags.entries.map((entry) {
                           return Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.1),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -1332,17 +1369,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   entry.key,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 5, vertical: 1),
+                                    horizontal: 5,
+                                    vertical: 1,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
@@ -1350,9 +1391,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimary,
                                     ),
                                   ),
                                 ),
@@ -1373,7 +1414,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: _openAdvancedDatabaseSettings,
                   icon: const Icon(PhosphorIconsLight.gear, size: 16),
                   label: Text(
-                      AppLocalizations.of(context)!.advancedDatabaseSettings),
+                    AppLocalizations.of(context)!.advancedDatabaseSettings,
+                  ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 40),
                   ),
@@ -1394,10 +1436,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.3),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1463,9 +1504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _openAdvancedDatabaseSettings() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const DatabaseSettingsScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const DatabaseSettingsScreen()),
     );
   }
 
@@ -1499,8 +1538,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final success = await _databaseManager.syncToCloud();
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        AppToast.success(context,
-            success ? l10n.syncToCloudSuccess : l10n.syncToCloudFailed);
+        AppToast.success(
+          context,
+          success ? l10n.syncToCloudSuccess : l10n.syncToCloudFailed,
+        );
       }
     } catch (e) {
       debugPrint('Error syncing to cloud: $e');
@@ -1519,8 +1560,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
-        AppToast.success(context,
-            success ? l10n.syncFromCloudSuccess : l10n.syncFromCloudFailed);
+        AppToast.success(
+          context,
+          success ? l10n.syncFromCloudSuccess : l10n.syncFromCloudFailed,
+        );
       }
     } catch (e) {
       debugPrint('Error syncing from cloud: $e');
@@ -1534,8 +1577,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final toast = AppToast.capture(context);
 
+    PickedSaveLocation? picked;
     try {
-      String? saveLocation = await FilePicker.platform.saveFile(
+      picked = await pickSaveLocation(
         dialogTitle: l10n.saveDatabaseExport,
         fileName:
             'cb_file_hub_db_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json',
@@ -1543,21 +1587,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         allowedExtensions: ['json'],
       );
 
-      if (saveLocation != null) {
+      if (picked != null) {
         final dbManager = DatabaseManager.getInstance();
-        final filePath =
-            await dbManager.exportDatabase(customPath: saveLocation);
-        if (filePath != null) {
+        final exported = await dbManager.exportDatabase(
+          customPath: picked.scratchPath,
+        );
+        if (exported != null) {
+          final filePath = await picked.commit();
           if (mounted) {
             toast.success(l10n.exportSuccess + filePath);
           }
         } else {
+          await picked.discard();
           if (mounted) {
             toast.error(l10n.exportFailed);
           }
         }
       }
     } catch (e) {
+      await picked?.discard();
       if (mounted) {
         toast.error(l10n.errorExporting + e.toString());
       }
@@ -1570,13 +1618,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final toast = AppToast.capture(context);
 
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
 
-      if (result != null && result.files.single.path != null) {
-        final filePath = result.files.single.path!;
+      if (picked?.path != null) {
+        final filePath = picked!.path!;
 
         // Show loading dialog
         if (!mounted) return;
@@ -1626,7 +1674,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Clear the static cache in TagManager
               TagManager.clearCache();
               debugPrint(
-                  'SettingsScreen: Cleared TagManager cache after import');
+                'SettingsScreen: Cleared TagManager cache after import',
+              );
             } catch (e) {
               debugPrint('SettingsScreen: Error clearing cache: $e');
             }
@@ -1667,9 +1716,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1680,10 +1727,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -1727,12 +1773,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(
         subtitle,
         style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.onSurfaceVariant),
+          fontSize: 12,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: trailing ??
+      trailing:
+          trailing ??
           (onTap != null
               ? const Icon(PhosphorIconsLight.caretRight, size: 16)
               : null),
@@ -1830,8 +1878,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.24),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.24,
+        ),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1872,10 +1921,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return Theme(
           data: theme.copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
-            tilePadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            childrenPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
+            childrenPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
             initiallyExpanded: _isThemeExpanded,
             onExpansionChanged: (expanded) {
               setState(() {
@@ -1913,10 +1966,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // ignore: deprecated_member_use
                   groupValue: currentTheme,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  title: Text(
-                    title,
-                    style: const TextStyle(fontSize: 13),
-                  ),
+                  title: Text(title, style: const TextStyle(fontSize: 13)),
                   // ignore: deprecated_member_use
                   onChanged: (value) {
                     if (value == null) return;
@@ -1942,8 +1992,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final selectedAccent = themeProvider.currentAccentColor;
     final selectedAccentName =
         ThemeConfig.accentNames[selectedAccent] ?? selectedAccent.name;
-    final accents =
-        ThemeConfig.accentSeedColors.entries.toList(growable: false);
+    final accents = ThemeConfig.accentSeedColors.entries.toList(
+      growable: false,
+    );
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
@@ -1968,45 +2019,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: accents.map((entry) {
-              final accent = entry.key;
-              final color = entry.value;
-              final isSelected = accent == selectedAccent;
-              return Tooltip(
-                message: ThemeConfig.accentNames[accent] ?? accent.name,
-                child: InkWell(
-                  onTap: () => context.read<ThemeProvider>().setAccentColor(
-                        accent,
+            children: accents
+                .map((entry) {
+                  final accent = entry.key;
+                  final color = entry.value;
+                  final isSelected = accent == selectedAccent;
+                  return CbTooltip(
+                    message: ThemeConfig.accentNames[accent] ?? accent.name,
+                    child: InkWell(
+                      onTap: () =>
+                          context.read<ThemeProvider>().setAccentColor(accent),
+                      borderRadius: BorderRadius.circular(99),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? theme.colorScheme.onSurface
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.18),
+                                    blurRadius: 6,
+                                    spreadRadius: 0.2,
+                                  ),
+                                ]
+                              : null,
+                        ),
                       ),
-                  borderRadius: BorderRadius.circular(99),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected
-                            ? theme.colorScheme.onSurface
-                            : Colors.transparent,
-                        width: 2,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.18),
-                                blurRadius: 6,
-                                spreadRadius: 0.2,
-                              ),
-                            ]
-                          : null,
                     ),
-                  ),
-                ),
-              );
-            }).toList(growable: false),
+                  );
+                })
+                .toList(growable: false),
           ),
         ],
       ),
@@ -2043,59 +2095,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: fonts.map((fontColor) {
-              final isSelected = fontColor == selectedFont;
-              final letterColor = ThemeConfig.fontColorSwatch(
-                fontColor,
-                brightness: theme.brightness,
-                accentColor: currentAccent,
-                fallback: theme.colorScheme.onSurface,
-              );
-              return Tooltip(
-                message:
-                    ThemeConfig.fontColorNames[fontColor] ?? fontColor.name,
-                child: InkWell(
-                  onTap: () =>
-                      context.read<ThemeProvider>().setFontColor(fontColor),
-                  borderRadius: BorderRadius.circular(99),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline.withValues(alpha: 0.35),
-                        width: isSelected ? 2 : 1,
+            children: fonts
+                .map((fontColor) {
+                  final isSelected = fontColor == selectedFont;
+                  final letterColor = ThemeConfig.fontColorSwatch(
+                    fontColor,
+                    brightness: theme.brightness,
+                    accentColor: currentAccent,
+                    fallback: theme.colorScheme.onSurface,
+                  );
+                  return CbTooltip(
+                    message:
+                        ThemeConfig.fontColorNames[fontColor] ?? fontColor.name,
+                    child: InkWell(
+                      onTap: () =>
+                          context.read<ThemeProvider>().setFontColor(fontColor),
+                      borderRadius: BorderRadius.circular(99),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.outline.withValues(
+                                    alpha: 0.35,
+                                  ),
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.18),
+                                    blurRadius: 6,
+                                    spreadRadius: 0.2,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Text(
+                          'A',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: letterColor,
+                            height: 1,
+                          ),
+                        ),
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.18),
-                                blurRadius: 6,
-                                spreadRadius: 0.2,
-                              ),
-                            ]
-                          : null,
                     ),
-                    child: Text(
-                      'A',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: letterColor,
-                        height: 1,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(growable: false),
+                  );
+                })
+                .toList(growable: false),
           ),
         ],
       ),
@@ -2138,60 +2194,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: AppUiFont.values.map((font) {
-              final isSelected = font == selected;
-              final name = AppUiFontConfig.displayNames[font] ?? font.name;
-              return Tooltip(
-                message: name,
-                child: InkWell(
-                  onTap: () => context.read<ThemeProvider>().setUiFont(font),
-                  borderRadius: BorderRadius.circular(12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                          : theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.35),
+            children: AppUiFont.values
+                .map((font) {
+                  final isSelected = font == selected;
+                  final name = AppUiFontConfig.displayNames[font] ?? font.name;
+                  return CbTooltip(
+                    message: name,
+                    child: InkWell(
+                      onTap: () =>
+                          context.read<ThemeProvider>().setUiFont(font),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline.withValues(alpha: 0.28),
-                        width: isSelected ? 1.5 : 1,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.colorScheme.primary.withValues(
+                                  alpha: 0.12,
+                                )
+                              : theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.outline.withValues(
+                                    alpha: 0.28,
+                                  ),
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              name,
+                              style: AppUiFontConfig.previewStyle(font)
+                                  .copyWith(
+                                    color: theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              AppUiFontConfig.previewSample,
+                              style:
+                                  AppUiFontConfig.previewStyle(
+                                    font,
+                                    fontSize: 12,
+                                  ).copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          name,
-                          style: AppUiFontConfig.previewStyle(font).copyWith(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          AppUiFontConfig.previewSample,
-                          style: AppUiFontConfig.previewStyle(
-                            font,
-                            fontSize: 12,
-                          ).copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(growable: false),
+                  );
+                })
+                .toList(growable: false),
           ),
         ],
       ),
@@ -2238,8 +2303,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 label: l10n.backdropModeWallpaper,
                 icon: PhosphorIconsLight.image,
                 isSelected: mode == AcrylicBackdropMode.wallpaper,
-                onTap: () => themeProvider
-                    .setBackdropMode(AcrylicBackdropMode.wallpaper),
+                onTap: () => themeProvider.setBackdropMode(
+                  AcrylicBackdropMode.wallpaper,
+                ),
               ),
             ],
           ),
@@ -2264,10 +2330,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   height: 30,
                   child: OutlinedButton.icon(
                     onPressed: () => themeProvider.refreshSystemWallpaper(),
-                    icon: const Icon(PhosphorIconsLight.arrowsClockwise,
-                        size: 14),
-                    label: Text(l10n.refresh,
-                        style: const TextStyle(fontSize: 12)),
+                    icon: const Icon(
+                      PhosphorIconsLight.arrowsClockwise,
+                      size: 14,
+                    ),
+                    label: Text(
+                      l10n.refresh,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
@@ -2278,20 +2348,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   height: 30,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final result = await FilePicker.platform.pickFiles(
+                      final picked = await FilePicker.pickFile(
                         type: FileType.image,
-                        allowMultiple: false,
                       );
-                      if (result != null &&
-                          result.files.isNotEmpty &&
-                          result.files.first.path != null) {
-                        await themeProvider
-                            .setBackdropImagePath(result.files.first.path);
+                      if (picked?.path != null) {
+                        await themeProvider.setBackdropImagePath(picked!.path);
                       }
                     },
                     icon: const Icon(PhosphorIconsLight.folderOpen, size: 14),
-                    label: Text(l10n.customBackdropImage,
-                        style: const TextStyle(fontSize: 12)),
+                    label: Text(
+                      l10n.customBackdropImage,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
@@ -2309,7 +2377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Image.file(
                     File(imagePath),
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       color: theme.colorScheme.errorContainer,
                       alignment: Alignment.center,
                       child: Text(
@@ -2404,24 +2472,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          Slider(
-            min: 0,
-            max: 2,
-            divisions: 20,
-            value: value,
-            label: '$percentage%',
-            onChanged: (nextValue) {
-              context.read<ThemeProvider>().setDesktopAcrylicStrength(
-                    nextValue,
-                    persist: false,
-                  );
-            },
-            onChangeEnd: (nextValue) {
-              context.read<ThemeProvider>().setDesktopAcrylicStrength(
-                    nextValue,
-                    persist: true,
-                  );
-            },
+          Semantics(
+            container: true,
+            child: Slider(
+              min: 0,
+              max: 2,
+              divisions: 20,
+              value: value,
+              label: '$percentage%',
+              onChanged: (nextValue) {
+                context.read<ThemeProvider>().setDesktopAcrylicStrength(
+                  nextValue,
+                  persist: false,
+                );
+              },
+              onChangeEnd: (nextValue) {
+                context.read<ThemeProvider>().setDesktopAcrylicStrength(
+                  nextValue,
+                  persist: true,
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -2438,8 +2509,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       data: theme.copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 4,
+        ),
         initiallyExpanded: _isLanguageExpanded,
         onExpansionChanged: (expanded) {
           setState(() {
@@ -2494,10 +2567,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Text(flagEmoji),
           const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 13),
-          ),
+          Text(title, style: const TextStyle(fontSize: 13)),
         ],
       ),
       trailing: isSelected

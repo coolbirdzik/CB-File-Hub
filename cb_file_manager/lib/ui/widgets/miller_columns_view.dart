@@ -48,8 +48,9 @@ class _MillerColumnData {
       path: path,
       folders: folders ?? this.folders,
       files: files ?? this.files,
-      selectedPath:
-          clearSelectedPath ? null : (selectedPath ?? this.selectedPath),
+      selectedPath: clearSelectedPath
+          ? null
+          : (selectedPath ?? this.selectedPath),
       isLoading: isLoading ?? this.isLoading,
       loadError: clearLoadError ? null : (loadError ?? this.loadError),
     );
@@ -68,9 +69,9 @@ class MillerColumnsView extends StatefulWidget {
   final Function(String) onNavigateToPath;
   final Function(File, bool) onFileTap;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFolderSelection;
+  toggleFolderSelection;
   final VoidCallback clearSelection;
   final TabbedFolderDragSelectionController dragSelectionController;
   final bool showFileTags;
@@ -87,7 +88,7 @@ class MillerColumnsView extends StatefulWidget {
   static const double dividerWidth = 1.0;
 
   const MillerColumnsView({
-    Key? key,
+    super.key,
     required this.state,
     required this.selectionState,
     required this.isDesktopPlatform,
@@ -106,7 +107,7 @@ class MillerColumnsView extends StatefulWidget {
     required this.showContextMenu,
     this.scrollController,
     this.itemKeyForPath,
-  }) : super(key: key);
+  });
 
   @override
   State<MillerColumnsView> createState() => _MillerColumnsViewState();
@@ -170,12 +171,14 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
       // Keep columns up to and including the parent, then append a
       // placeholder column for the new selection.
       _columns = _columns.sublist(0, columnIndex + 1);
-      _columns.add(_MillerColumnData(
-        path: folderPath,
-        folders: const [],
-        files: const [],
-        isLoading: true,
-      ));
+      _columns.add(
+        _MillerColumnData(
+          path: folderPath,
+          folders: const [],
+          files: const [],
+          isLoading: true,
+        ),
+      );
     });
 
     // Auto-scroll to reveal the new (loading) column right away.
@@ -291,9 +294,9 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
                       VerticalDivider(
                         width: MillerColumnsView.dividerWidth,
                         thickness: 1,
-                        color: Theme.of(context)
-                            .dividerColor
-                            .withValues(alpha: 0.3),
+                        color: Theme.of(
+                          context,
+                        ).dividerColor.withValues(alpha: 0.3),
                       ),
                     _buildColumn(context, i),
                   ],
@@ -337,12 +340,10 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
                 child: Text(
                   'Empty folder',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.color
-                            ?.withValues(alpha: 0.5),
-                      ),
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             )
@@ -433,10 +434,10 @@ class _MillerFolderRow extends StatefulWidget {
   final VoidCallback onOpenColumn;
   final VoidCallback onNavigate;
   final Function(String, {bool shiftSelect, bool ctrlSelect})?
-      toggleFolderSelection;
+  toggleFolderSelection;
 
   const _MillerFolderRow({
-    Key? key,
+    super.key,
     required this.folder,
     required this.isSelected,
     required this.isColumnSelected,
@@ -444,7 +445,7 @@ class _MillerFolderRow extends StatefulWidget {
     required this.onOpenColumn,
     required this.onNavigate,
     required this.toggleFolderSelection,
-  }) : super(key: key);
+  });
 
   @override
   State<_MillerFolderRow> createState() => _MillerFolderRowState();
@@ -493,7 +494,8 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final renameController = InlineRenameScope.maybeOf(context);
-    final bool isBeingRenamed = renameController != null &&
+    final bool isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.folder.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.folder.path);
     final String name = FileTypeUtils.getFileName(widget.folder.path);
@@ -539,7 +541,8 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: isBeingRenamed &&
+                      child:
+                          isBeingRenamed &&
                               renameController.textController != null
                           ? InlineRenameField(
                               controller: renameController,
@@ -599,10 +602,10 @@ class _MillerFileRow extends StatefulWidget {
   final VoidCallback onTapFile;
   final VoidCallback onOpenFile;
   final Function(String, {bool shiftSelect, bool ctrlSelect})
-      toggleFileSelection;
+  toggleFileSelection;
 
   const _MillerFileRow({
-    Key? key,
+    super.key,
     required this.file,
     required this.isSelected,
     required this.lastSelectedPath,
@@ -611,7 +614,7 @@ class _MillerFileRow extends StatefulWidget {
     required this.onTapFile,
     required this.onOpenFile,
     required this.toggleFileSelection,
-  }) : super(key: key);
+  });
 
   @override
   State<_MillerFileRow> createState() => _MillerFileRowState();
@@ -734,7 +737,8 @@ class _MillerFileRowState extends State<_MillerFileRow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final renameController = InlineRenameScope.maybeOf(context);
-    final bool isBeingRenamed = renameController != null &&
+    final bool isBeingRenamed =
+        renameController != null &&
         renameController.renamingPath == widget.file.path;
     final bool isBeingCut = ItemInteractionStyle.isBeingCut(widget.file.path);
     final String name = FileTypeUtils.getFileName(widget.file.path);
@@ -772,7 +776,8 @@ class _MillerFileRowState extends State<_MillerFileRow> {
                     _buildLeadingIcon(theme),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: isBeingRenamed &&
+                      child:
+                          isBeingRenamed &&
                               renameController.textController != null
                           ? InlineRenameField(
                               controller: renameController,

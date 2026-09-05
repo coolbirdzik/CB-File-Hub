@@ -60,7 +60,7 @@ class CbSurface extends StatelessWidget {
   final bool clip;
 
   const CbSurface({
-    Key? key,
+    super.key,
     required this.child,
     this.level = CbSurfaceLevel.raised,
     this.radius,
@@ -72,7 +72,7 @@ class CbSurface extends StatelessWidget {
     this.width,
     this.height,
     this.clip = false,
-  }) : super(key: key);
+  });
 
   double _radiusFor(CbSurfaceLevel level) {
     switch (level) {
@@ -118,7 +118,8 @@ class CbSurface extends StatelessWidget {
         break;
     }
 
-    final bool showBorder = bordered ??
+    final bool showBorder =
+        bordered ??
         (level == CbSurfaceLevel.flat || level == CbSurfaceLevel.raised);
 
     return AnimatedContainer(

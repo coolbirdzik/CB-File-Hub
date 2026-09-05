@@ -7,17 +7,13 @@ import 'tree_row.dart';
 
 /// Builder signature for the user-supplied row content (everything except
 /// the indent column and expand chevron, which the tree owns).
-typedef TreeRowBuilder<T> = Widget Function(
-  BuildContext context,
-  TreeNode<T> node,
-  int depth,
-);
+typedef TreeRowBuilder<T> =
+    Widget Function(BuildContext context, TreeNode<T> node, int depth);
 
 /// Async children loader. Called the first time a node expands when
 /// `node.children == null`. The returned list is cached on the node.
-typedef TreeChildrenLoader<T> = Future<List<TreeNode<T>>> Function(
-  TreeNode<T> node,
-);
+typedef TreeChildrenLoader<T> =
+    Future<List<TreeNode<T>>> Function(TreeNode<T> node);
 
 /// A virtualised, generic tree view modelled after the disk-cleaner's
 /// flat-list pattern.
@@ -88,7 +84,7 @@ class GenericTreeView<T> extends StatefulWidget {
   final bool expandOnRowTap;
 
   const GenericTreeView({
-    Key? key,
+    super.key,
     required this.roots,
     required this.itemBuilder,
     this.childrenLoader,
@@ -104,7 +100,7 @@ class GenericTreeView<T> extends StatefulWidget {
     this.scrollController,
     this.emptyState,
     this.expandOnRowTap = false,
-  }) : super(key: key);
+  });
 
   @override
   State<GenericTreeView<T>> createState() => _GenericTreeViewState<T>();
@@ -263,29 +259,29 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
       if (widget.nodeFilter != null && !widget.nodeFilter!(node)) {
         return;
       }
-      out.add(FlatTreeRow<T>(
-        depth: depth,
-        kind: FlatRowKind.node,
-        node: node,
-      ));
+      out.add(FlatTreeRow<T>(depth: depth, kind: FlatRowKind.node, node: node));
       if (!node.isExpanded || node.isLeaf) return;
 
       // Children may be in one of three states: loading, error, or
       // available (possibly empty).
       if (node.isLoadingChildren) {
-        out.add(FlatTreeRow<T>(
-          depth: depth + 1,
-          kind: FlatRowKind.loading,
-          parent: node,
-        ));
+        out.add(
+          FlatTreeRow<T>(
+            depth: depth + 1,
+            kind: FlatRowKind.loading,
+            parent: node,
+          ),
+        );
         return;
       }
       if (node.loadError != null) {
-        out.add(FlatTreeRow<T>(
-          depth: depth + 1,
-          kind: FlatRowKind.error,
-          parent: node,
-        ));
+        out.add(
+          FlatTreeRow<T>(
+            depth: depth + 1,
+            kind: FlatRowKind.error,
+            parent: node,
+          ),
+        );
         return;
       }
       final children = node.children;
@@ -297,12 +293,14 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
         visit(children[i], depth + 1);
       }
       if (children.length > renderCount) {
-        out.add(FlatTreeRow<T>(
-          depth: depth + 1,
-          kind: FlatRowKind.truncated,
-          parent: node,
-          extraCount: children.length - renderCount,
-        ));
+        out.add(
+          FlatTreeRow<T>(
+            depth: depth + 1,
+            kind: FlatRowKind.truncated,
+            parent: node,
+            extraCount: children.length - renderCount,
+          ),
+        );
       }
     }
 
@@ -352,15 +350,14 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
             );
           case FlatRowKind.error:
             return KeyedSubtree(
-              key: ValueKey<String>(
-                'row-error-${row.parent?.id ?? index}',
-              ),
+              key: ValueKey<String>('row-error-${row.parent?.id ?? index}'),
               child: TreePlaceholderRow(
                 kind: row.kind,
                 depth: row.depth,
                 indentPerDepth: widget.indentPerDepth,
-                onTap:
-                    row.parent == null ? null : () => _retryLoad(row.parent!),
+                onTap: row.parent == null
+                    ? null
+                    : () => _retryLoad(row.parent!),
               ),
             );
           case FlatRowKind.truncated:
@@ -421,10 +418,7 @@ class _GenericTreeViewState<T> extends State<GenericTreeView<T>> {
                 child: shell,
               );
             }
-            return KeyedSubtree(
-              key: ValueKey('row-${node.id}'),
-              child: shell,
-            );
+            return KeyedSubtree(key: ValueKey('row-${node.id}'), child: shell);
         }
       },
     );
@@ -444,11 +438,11 @@ class _TreeRowEntrance extends StatefulWidget {
   final bool reverse;
 
   const _TreeRowEntrance({
-    Key? key,
+    super.key,
     required this.child,
     required this.duration,
     this.reverse = false,
-  }) : super(key: key);
+  });
 
   @override
   State<_TreeRowEntrance> createState() => _TreeRowEntranceState();
@@ -461,8 +455,10 @@ class _TreeRowEntranceState extends State<_TreeRowEntrance>
     duration: widget.duration,
     value: widget.reverse ? 1.0 : 0.0,
   );
-  late final Animation<double> _curved =
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+  late final Animation<double> _curved = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutCubic,
+  );
 
   @override
   void initState() {

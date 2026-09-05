@@ -37,8 +37,10 @@ void main() {
       final report = await handle.future;
 
       final cacheItems = report.itemsByCategory['cache']!;
-      expect(cacheItems.map((item) => p.basename(item.path)).toSet(),
-          <String>{'root.tmp', 'nested.tmp'});
+      expect(cacheItems.map((item) => p.basename(item.path)).toSet(), <String>{
+        'root.tmp',
+        'nested.tmp',
+      });
       expect(cacheItems.fold<int>(0, (sum, item) => sum + item.sizeBytes), 18);
 
       final reviewItems = report.itemsByCategory['review']!;
@@ -106,52 +108,54 @@ void main() {
     }
   });
 
-  test('ignores empty and missing rule roots without permission warnings',
-      () async {
-    final root = await Directory.systemTemp.createTemp('cb-cleaner-worker-');
-    try {
-      final empty = await Directory(p.join(root.path, 'empty')).create();
-      final missing = p.join(root.path, 'missing');
-      final handle = await spawnScanWithResolvedRules(
-        drivesScanned: <String>[root.path],
-        rules: <ResolvedRule>[
-          ResolvedRule(categoryId: 'empty', basePath: empty.path),
-          ResolvedRule(categoryId: 'missing', basePath: missing),
-        ],
-      );
-      final report = await handle.future;
+  test(
+    'ignores empty and missing rule roots without permission warnings',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cb-cleaner-worker-');
+      try {
+        final empty = await Directory(p.join(root.path, 'empty')).create();
+        final missing = p.join(root.path, 'missing');
+        final handle = await spawnScanWithResolvedRules(
+          drivesScanned: <String>[root.path],
+          rules: <ResolvedRule>[
+            ResolvedRule(categoryId: 'empty', basePath: empty.path),
+            ResolvedRule(categoryId: 'missing', basePath: missing),
+          ],
+        );
+        final report = await handle.future;
 
-      expect(report.itemsByCategory, isEmpty);
-      expect(report.warnings, isEmpty);
-    } finally {
-      await root.delete(recursive: true);
-    }
-  });
+        expect(report.itemsByCategory, isEmpty);
+        expect(report.warnings, isEmpty);
+      } finally {
+        await root.delete(recursive: true);
+      }
+    },
+  );
 
-  test('times out root opening with a per-category actionable warning',
-      () async {
-    final root = await Directory.systemTemp.createTemp('cb-cleaner-worker-');
-    try {
-      final handle = await spawnScanWithResolvedRules(
-        drivesScanned: <String>[root.path],
-        // Duration.zero is the documented deterministic seam for the
-        // first-entry timeout; the directory itself still exists.
-        rootOpenTimeout: Duration.zero,
-        rules: <ResolvedRule>[
-          ResolvedRule(categoryId: 'blocked_provider', basePath: root.path),
-        ],
-      );
-      final report = await handle.future.timeout(const Duration(seconds: 2));
+  test(
+    'times out root opening with a per-category actionable warning',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cb-cleaner-worker-');
+      try {
+        final handle = await spawnScanWithResolvedRules(
+          drivesScanned: <String>[root.path],
+          // Duration.zero is the documented deterministic seam for the
+          // first-entry timeout; the directory itself still exists.
+          rootOpenTimeout: Duration.zero,
+          rules: <ResolvedRule>[
+            ResolvedRule(categoryId: 'blocked_provider', basePath: root.path),
+          ],
+        );
+        final report = await handle.future.timeout(const Duration(seconds: 2));
 
-      expect(report.itemsByCategory, isEmpty);
-      expect(
-        report.warnings,
-        contains(
-          startsWith('blocked_provider: Permission probe timed out'),
-        ),
-      );
-    } finally {
-      await root.delete(recursive: true);
-    }
-  });
+        expect(report.itemsByCategory, isEmpty);
+        expect(
+          report.warnings,
+          contains(startsWith('blocked_provider: Permission probe timed out')),
+        );
+      } finally {
+        await root.delete(recursive: true);
+      }
+    },
+  );
 }

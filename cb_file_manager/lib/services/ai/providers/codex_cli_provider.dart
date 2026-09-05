@@ -114,26 +114,22 @@ class CodexCliProvider extends AiProvider {
     );
 
     try {
-      final process = await Process.start(
-        'codex',
-        [
-          'exec',
-          '--skip-git-repo-check',
-          '--ephemeral',
-          '--color',
-          'never',
-          '--sandbox',
-          'read-only',
-          '-c',
-          'approval_policy="never"',
-          '-m',
-          config.modelName,
-          '-o',
-          outputFile.path,
-          '-',
-        ],
-        runInShell: true,
-      );
+      final process = await Process.start('codex', [
+        'exec',
+        '--skip-git-repo-check',
+        '--ephemeral',
+        '--color',
+        'never',
+        '--sandbox',
+        'read-only',
+        '-c',
+        'approval_policy="never"',
+        '-m',
+        config.modelName,
+        '-o',
+        outputFile.path,
+        '-',
+      ], runInShell: true);
 
       final stdoutFuture = process.stdout.transform(utf8.decoder).join();
       final stderrFuture = process.stderr.transform(utf8.decoder).join();
@@ -205,10 +201,7 @@ class CodexCliProvider extends AiProvider {
   }
 
   @override
-  Stream<String> chatStream(
-    List<AiMessage> messages, {
-    String? systemPrompt,
-  }) {
+  Stream<String> chatStream(List<AiMessage> messages, {String? systemPrompt}) {
     throw const AiProviderException(
       message: 'Streaming is not supported for Codex OAuth providers.',
       type: AiProviderErrorType.unknown,
@@ -253,10 +246,7 @@ class CodexCliProvider extends AiProvider {
   @override
   void dispose() {}
 
-  String _buildPrompt(
-    List<AiMessage> messages, {
-    String? systemPrompt,
-  }) {
+  String _buildPrompt(List<AiMessage> messages, {String? systemPrompt}) {
     final buffer = StringBuffer();
 
     if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
@@ -308,10 +298,10 @@ class CodexCliProvider extends AiProvider {
   String _extractProcessError(ProcessResult result) {
     final stdoutText = result.stdout.toString().trim();
     final stderrText = result.stderr.toString().trim();
-    final combined = [stderrText, stdoutText]
-        .where((part) => part.isNotEmpty)
-        .join('\n')
-        .trim();
+    final combined = [
+      stderrText,
+      stdoutText,
+    ].where((part) => part.isNotEmpty).join('\n').trim();
     if (combined.isEmpty) {
       return 'Codex CLI exited with code ${result.exitCode}.';
     }
@@ -324,7 +314,8 @@ class CodexCliProvider extends AiProvider {
         lower.contains('auth') ||
         lower.contains('chatgpt account') ||
         lower.contains(
-            'not supported when using codex with a chatgpt account')) {
+          'not supported when using codex with a chatgpt account',
+        )) {
       return AiProviderErrorType.auth;
     }
     if (lower.contains('timed out')) {

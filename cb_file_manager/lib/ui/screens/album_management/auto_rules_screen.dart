@@ -12,8 +12,7 @@ class AutoRulesScreen extends StatefulWidget {
   final int? scopedAlbumId;
   final String? scopedAlbumName;
 
-  const AutoRulesScreen({Key? key, this.scopedAlbumId, this.scopedAlbumName})
-      : super(key: key);
+  const AutoRulesScreen({super.key, this.scopedAlbumId, this.scopedAlbumName});
 
   @override
   State<AutoRulesScreen> createState() => _AutoRulesScreenState();
@@ -54,8 +53,9 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
   Future<void> _showCreateRuleDialog() async {
     Album? fixedAlbum;
     if (widget.scopedAlbumId != null) {
-      fixedAlbum =
-          await AlbumService.instance.getAlbumById(widget.scopedAlbumId!);
+      fixedAlbum = await AlbumService.instance.getAlbumById(
+        widget.scopedAlbumId!,
+      );
     }
 
     if (mounted) {
@@ -107,8 +107,9 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Rule'),
-        content:
-            Text('Are you sure you want to delete the rule "${rule.name}"?'),
+        content: Text(
+          'Are you sure you want to delete the rule "${rule.name}"?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -116,8 +117,9 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style:
-                TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.error,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -147,8 +149,8 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _rules.isEmpty
-              ? _buildEmptyState(theme)
-              : _buildRulesList(theme),
+          ? _buildEmptyState(theme)
+          : _buildRulesList(theme),
     );
   }
 
@@ -222,49 +224,53 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        ...examples.map((example) => Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.2),
+        ...examples.map(
+          (example) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.3,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  example['icon'] as IconData,
+                  size: 24,
+                  color: theme.colorScheme.primary,
                 ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    example['icon'] as IconData,
-                    size: 24,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          example['title'] as String,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        example['title'] as String,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        example['description'] as String,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.7,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          example['description'] as String,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            )),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -352,8 +358,9 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -364,8 +371,9 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
                       Icon(
                         PhosphorIconsLight.funnelSimple,
                         size: 16,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -413,7 +421,11 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
   }
 
   Widget _buildStatChip(
-      ThemeData theme, String label, String value, IconData icon) {
+    ThemeData theme,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -425,10 +437,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
         children: [
           Icon(icon, size: 12),
           const SizedBox(width: 4),
-          Text(
-            '$label: $value',
-            style: theme.textTheme.labelSmall,
-          ),
+          Text('$label: $value', style: theme.textTheme.labelSmall),
         ],
       ),
     );
@@ -453,7 +462,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
 class CreateAutoRuleDialog extends StatefulWidget {
   final Album? fixedAlbum;
 
-  const CreateAutoRuleDialog({Key? key, this.fixedAlbum}) : super(key: key);
+  const CreateAutoRuleDialog({super.key, this.fixedAlbum});
 
   @override
   State<CreateAutoRuleDialog> createState() => _CreateAutoRuleDialogState();
@@ -545,8 +554,9 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
@@ -554,8 +564,10 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
               ),
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.sparkle,
-                      color: theme.colorScheme.primary),
+                  Icon(
+                    PhosphorIconsLight.sparkle,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 12),
                   const Text(
                     'Create Auto Rule',
@@ -600,8 +612,9 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.1),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.1,
+                ),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(16),
                   bottomRight: Radius.circular(16),
@@ -666,7 +679,8 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+          ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -693,15 +707,18 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
               ),
             ),
             const SizedBox(height: 4),
-            ...((template['examples'] as List<String>).take(2).map(
+            ...((template['examples'] as List<String>)
+                .take(2)
+                .map(
                   (example) => Padding(
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Text(
                       'â€¢ $example',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'monospace',
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                   ),
@@ -852,8 +869,9 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: theme.colorScheme.outline.withValues(alpha: 0.2),
@@ -892,8 +910,9 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                             fontFamily: 'monospace',
                             color: matches
                                 ? theme.colorScheme.onSurface
-                                : theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.5),
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.5,
+                                  ),
                           ),
                         ),
                       ),
@@ -967,7 +986,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
 class EditAutoRuleDialog extends StatefulWidget {
   final AlbumAutoRule rule;
 
-  const EditAutoRuleDialog({Key? key, required this.rule}) : super(key: key);
+  const EditAutoRuleDialog({super.key, required this.rule});
 
   @override
   State<EditAutoRuleDialog> createState() => _EditAutoRuleDialogState();
@@ -1032,8 +1051,9 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
@@ -1041,8 +1061,10 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
               ),
               child: Row(
                 children: [
-                  Icon(PhosphorIconsLight.pencilSimple,
-                      color: theme.colorScheme.primary),
+                  Icon(
+                    PhosphorIconsLight.pencilSimple,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 12),
                   const Text(
                     'Edit Auto Rule',
@@ -1085,8 +1107,9 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.1),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.1,
+                ),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(16),
                   bottomRight: Radius.circular(16),
@@ -1214,8 +1237,9 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: theme.colorScheme.outline.withValues(alpha: 0.2),
@@ -1254,8 +1278,9 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
                             fontFamily: 'monospace',
                             color: matches
                                 ? theme.colorScheme.onSurface
-                                : theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.5),
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.5,
+                                  ),
                           ),
                         ),
                       ),

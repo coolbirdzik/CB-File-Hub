@@ -27,14 +27,14 @@ class SystemScreen extends StatelessWidget {
 
   /// Constructor
   const SystemScreen({
-    Key? key,
+    super.key,
     required this.title,
     required this.systemId,
     required this.icon,
     required this.child,
     this.showAppBar = false,
     this.actions,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -53,10 +53,7 @@ class SystemScreen extends StatelessWidget {
               leading: Navigator.canPop(context) ? const BackButton() : null,
             )
           : null,
-      body: Container(
-        color: Colors.transparent,
-        child: child,
-      ),
+      body: Container(color: Colors.transparent, child: child),
     );
   }
 
@@ -80,13 +77,7 @@ class SystemScreen extends StatelessWidget {
       tabBloc.add(SwitchToTab(existingTab.id));
     } else {
       // Otherwise, create a new tab
-      tabBloc.add(
-        AddTab(
-          path: systemId,
-          name: title,
-          switchToTab: true,
-        ),
-      );
+      tabBloc.add(AddTab(path: systemId, name: title, switchToTab: true));
     }
   }
 }

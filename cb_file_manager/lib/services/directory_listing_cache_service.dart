@@ -78,8 +78,9 @@ class DirectoryListingCacheService {
     _touch(normalized);
     return ListingCacheEntry(
       files: entry.filePaths.map((p) => File(p)).toList(growable: false),
-      folders:
-          entry.folderPaths.map((p) => Directory(p)).toList(growable: false),
+      folders: entry.folderPaths
+          .map((p) => Directory(p))
+          .toList(growable: false),
       stats: entry.stats == null
           ? <String, FileStat>{}
           : Map<String, FileStat>.from(entry.stats!),

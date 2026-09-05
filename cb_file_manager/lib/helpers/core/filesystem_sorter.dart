@@ -37,7 +37,8 @@ class FileSystemSorter {
     // Build or use provided file stats cache
     final statsCache = fileStatsCache ?? await _buildStatsCache(entities);
     AppLogger.perf(
-        '⏱️ [PERF] FileSystemSorter._buildStatsCache for ${entities.length} items took: ${stopwatch.elapsedMilliseconds}ms');
+      '⏱️ [PERF] FileSystemSorter._buildStatsCache for ${entities.length} items took: ${stopwatch.elapsedMilliseconds}ms',
+    );
     stopwatch.reset();
     stopwatch.start();
 
@@ -47,7 +48,8 @@ class FileSystemSorter {
     // Sort the entities
     sortedEntities.sort(comparator);
     AppLogger.perf(
-        '⏱️ [PERF] FileSystemSorter.sort() for ${entities.length} items took: ${stopwatch.elapsedMilliseconds}ms');
+      '⏱️ [PERF] FileSystemSorter.sort() for ${entities.length} items took: ${stopwatch.elapsedMilliseconds}ms',
+    );
 
     return sortedEntities;
   }
@@ -60,8 +62,11 @@ class FileSystemSorter {
     SortOption sortOption, {
     Map<String, FileStat>? fileStatsCache,
   }) async {
-    final sorted =
-        await sortEntities(files, sortOption, fileStatsCache: fileStatsCache);
+    final sorted = await sortEntities(
+      files,
+      sortOption,
+      fileStatsCache: fileStatsCache,
+    );
     return sorted.cast<File>();
   }
 
@@ -73,8 +78,11 @@ class FileSystemSorter {
     SortOption sortOption, {
     Map<String, FileStat>? fileStatsCache,
   }) async {
-    final sorted = await sortEntities(directories, sortOption,
-        fileStatsCache: fileStatsCache);
+    final sorted = await sortEntities(
+      directories,
+      sortOption,
+      fileStatsCache: fileStatsCache,
+    );
     return sorted.cast<Directory>();
   }
 
@@ -135,24 +143,27 @@ class FileSystemSorter {
       case SortOption.attributesDesc:
         return (a, b) =>
             _compareByAttributes(a, b, fileStatsCache, ascending: false);
-
-      default:
-        return (a, b) => _compareByName(a, b, ascending: true);
     }
   }
 
   // Private helper methods for comparison
 
-  static int _compareByName(FileSystemEntity a, FileSystemEntity b,
-      {required bool ascending}) {
+  static int _compareByName(
+    FileSystemEntity a,
+    FileSystemEntity b, {
+    required bool ascending,
+  }) {
     final aName = pathlib.basename(a.path).toLowerCase();
     final bName = pathlib.basename(b.path).toLowerCase();
     return ascending ? aName.compareTo(bName) : bName.compareTo(aName);
   }
 
   static int _compareByDate(
-      FileSystemEntity a, FileSystemEntity b, Map<String, FileStat> statsCache,
-      {required bool ascending}) {
+    FileSystemEntity a,
+    FileSystemEntity b,
+    Map<String, FileStat> statsCache, {
+    required bool ascending,
+  }) {
     final aStat = statsCache[a.path];
     final bStat = statsCache[b.path];
 
@@ -165,8 +176,11 @@ class FileSystemSorter {
   }
 
   static int _compareBySize(
-      FileSystemEntity a, FileSystemEntity b, Map<String, FileStat> statsCache,
-      {required bool ascending}) {
+    FileSystemEntity a,
+    FileSystemEntity b,
+    Map<String, FileStat> statsCache, {
+    required bool ascending,
+  }) {
     final aStat = statsCache[a.path];
     final bStat = statsCache[b.path];
 
@@ -178,16 +192,22 @@ class FileSystemSorter {
     return ascending ? comparison : -comparison;
   }
 
-  static int _compareByType(FileSystemEntity a, FileSystemEntity b,
-      {required bool ascending}) {
+  static int _compareByType(
+    FileSystemEntity a,
+    FileSystemEntity b, {
+    required bool ascending,
+  }) {
     final aExt = pathlib.extension(a.path).toLowerCase();
     final bExt = pathlib.extension(b.path).toLowerCase();
     return ascending ? aExt.compareTo(bExt) : bExt.compareTo(aExt);
   }
 
   static int _compareByDateCreated(
-      FileSystemEntity a, FileSystemEntity b, Map<String, FileStat> statsCache,
-      {required bool ascending}) {
+    FileSystemEntity a,
+    FileSystemEntity b,
+    Map<String, FileStat> statsCache, {
+    required bool ascending,
+  }) {
     final aStat = statsCache[a.path];
     final bStat = statsCache[b.path];
 
@@ -204,16 +224,22 @@ class FileSystemSorter {
     return ascending ? comparison : -comparison;
   }
 
-  static int _compareByExtension(FileSystemEntity a, FileSystemEntity b,
-      {required bool ascending}) {
+  static int _compareByExtension(
+    FileSystemEntity a,
+    FileSystemEntity b, {
+    required bool ascending,
+  }) {
     final aExt = pathlib.extension(a.path).toLowerCase();
     final bExt = pathlib.extension(b.path).toLowerCase();
     return ascending ? aExt.compareTo(bExt) : bExt.compareTo(aExt);
   }
 
   static int _compareByAttributes(
-      FileSystemEntity a, FileSystemEntity b, Map<String, FileStat> statsCache,
-      {required bool ascending}) {
+    FileSystemEntity a,
+    FileSystemEntity b,
+    Map<String, FileStat> statsCache, {
+    required bool ascending,
+  }) {
     final aStat = statsCache[a.path];
     final bStat = statsCache[b.path];
 

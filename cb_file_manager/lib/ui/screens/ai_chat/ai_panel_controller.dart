@@ -142,8 +142,9 @@ class AiPanelController extends ChangeNotifier {
 
   /// Disposes blocs for tabs that no longer exist.
   void evictTabs(Set<String> activeTabIds) {
-    final stale =
-        _tabBlocs.keys.where((id) => !activeTabIds.contains(id)).toList();
+    final stale = _tabBlocs.keys
+        .where((id) => !activeTabIds.contains(id))
+        .toList();
     for (final id in stale) {
       _tabBlocs[id]?.close();
       _tabBlocs.remove(id);
@@ -195,10 +196,10 @@ class AiPanelScope extends InheritedWidget {
   final AiPanelController controller;
 
   const AiPanelScope({
-    Key? key,
+    super.key,
     required this.controller,
-    required Widget child,
-  }) : super(key: key, child: child);
+    required super.child,
+  });
 
   static AiPanelController? of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AiPanelScope>();
@@ -207,8 +208,8 @@ class AiPanelScope extends InheritedWidget {
 
   /// Non-dependency version (won't rebuild on changes).
   static AiPanelController? maybeOf(BuildContext context) {
-    final scope =
-        context.getElementForInheritedWidgetOfExactType<AiPanelScope>();
+    final scope = context
+        .getElementForInheritedWidgetOfExactType<AiPanelScope>();
     return (scope?.widget as AiPanelScope?)?.controller;
   }
 

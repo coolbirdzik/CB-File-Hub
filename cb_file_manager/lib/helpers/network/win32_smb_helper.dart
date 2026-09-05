@@ -44,10 +44,12 @@ class Win32SmbHelper {
   /// Convert a UNC path to a local temporary file
   /// This creates a temporary copy of the file for efficient access
   /// Returns the path to the temporary file
-  Future<String?> uncPathToTempFile(String uncPath,
-      {bool forceRefresh = false,
-      int? maxBytes,
-      bool highPriority = false}) async {
+  Future<String?> uncPathToTempFile(
+    String uncPath, {
+    bool forceRefresh = false,
+    int? maxBytes,
+    bool highPriority = false,
+  }) async {
     if (!_isWindows) return null;
 
     try {
@@ -64,13 +66,18 @@ class Win32SmbHelper {
       // Create temp directory bên trong cb_file_hub/temp_files
       final tempDir = await AppPathHelper.getTempFilesDir();
       final fileName = p.basename(uncPath);
-      final tempFilePath = p.join(tempDir.path,
-          'smb_temp_${DateTime.now().millisecondsSinceEpoch}_$fileName');
+      final tempFilePath = p.join(
+        tempDir.path,
+        'smb_temp_${DateTime.now().millisecondsSinceEpoch}_$fileName',
+      );
 
       // Use optimized file copy for high priority items (like visible thumbnails)
       if (highPriority) {
-        final result =
-            await _fastUncPathToTemp(uncPath, tempFilePath, maxBytes);
+        final result = await _fastUncPathToTemp(
+          uncPath,
+          tempFilePath,
+          maxBytes,
+        );
         if (result != null) {
           return result;
         }
@@ -79,17 +86,19 @@ class Win32SmbHelper {
 
       // Open the UNC file with Win32 API
       final uncPathPtr = uncPath.toNativeUtf16();
-      final hFile = CreateFile(
-          uncPathPtr,
-          GENERIC_READ,
-          FILE_SHARE_READ | FILE_SHARE_WRITE,
-          nullptr,
-          OPEN_EXISTING,
-          FILE_ATTRIBUTE_NORMAL,
-          NULL);
+      final opened = CreateFile(
+        PCWSTR(uncPathPtr),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        null,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        null,
+      );
+      final hFile = opened.value;
 
-      if (hFile == INVALID_HANDLE_VALUE) {
-        final error = GetLastError();
+      if (!hFile.isValid) {
+        final error = opened.error;
         debugPrint('Failed to open UNC file: $uncPath, error: $error');
         malloc.free(uncPathPtr);
         return null;
@@ -98,7 +107,7 @@ class Win32SmbHelper {
       try {
         // Get file size
         final fileSizeHigh = calloc<Uint32>();
-        final fileSizeLow = GetFileSize(hFile, fileSizeHigh);
+        final fileSizeLow = GetFileSize(hFile, fileSizeHigh).value;
         final fileSize = fileSizeLow + (fileSizeHigh.value << 32);
         calloc.free(fileSizeHigh);
 
@@ -111,7 +120,9 @@ class Win32SmbHelper {
         final bytesToCopy = maxBytes != null
             ? min(maxBytes, fileSize)
             : min(
-                fileSize, 4 * 1024 * 1024); // Limit max size to 4MB by default
+                fileSize,
+                4 * 1024 * 1024,
+              ); // Limit max size to 4MB by default
 
         // Create temp file
         final tempFile = File(tempFilePath);
@@ -128,14 +139,15 @@ class Win32SmbHelper {
 
           while (bytesRead < bytesToCopy && !readError) {
             final readResult = ReadFile(
-                hFile,
-                buffer,
-                min(bufferSize, bytesToCopy - bytesRead),
-                bytesReadPtr,
-                nullptr);
+              hFile,
+              buffer,
+              min(bufferSize, bytesToCopy - bytesRead),
+              bytesReadPtr,
+              nullptr,
+            );
 
-            if (readResult == 0) {
-              final error = GetLastError();
+            if (!readResult.value) {
+              final error = readResult.error;
               // Only log as error if it's not end of file
               if (error != ERROR_HANDLE_EOF) {
                 debugPrint('Error reading file: $uncPath, error: $error');
@@ -193,7 +205,10 @@ class Win32SmbHelper {
 
   /// Fast path optimization for reading UNC files (better for thumbnails)
   Future<String?> _fastUncPathToTemp(
-      String uncPath, String tempFilePath, int? maxBytes) async {
+    String uncPath,
+    String tempFilePath,
+    int? maxBytes,
+  ) async {
     try {
       // Kiểm tra xem đường dẫn có phải dạng UNC không
       if (!uncPath.startsWith('\\\\')) {
@@ -203,17 +218,19 @@ class Win32SmbHelper {
 
       // Thử mở file với quyền truy cập rộng hơn
       final uncPathPtr = uncPath.toNativeUtf16();
-      final hFile = CreateFile(
-          uncPathPtr,
-          GENERIC_READ,
-          FILE_SHARE_READ | FILE_SHARE_WRITE, // Cho phép chia sẻ đọc và ghi
-          nullptr,
-          OPEN_EXISTING,
-          FILE_FLAG_SEQUENTIAL_SCAN, // Optimize for sequential reading
-          NULL);
+      final opened = CreateFile(
+        PCWSTR(uncPathPtr),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE, // Cho phép chia sẻ đọc và ghi
+        null,
+        OPEN_EXISTING,
+        FILE_FLAG_SEQUENTIAL_SCAN, // Optimize for sequential reading
+        null,
+      );
+      final hFile = opened.value;
 
-      if (hFile == INVALID_HANDLE_VALUE) {
-        final error = GetLastError();
+      if (!hFile.isValid) {
+        final error = opened.error;
         debugPrint('Fast read failed for: $uncPath, error: $error');
         malloc.free(uncPathPtr);
 
@@ -223,7 +240,10 @@ class Win32SmbHelper {
           if (encodedPath != uncPath) {
             debugPrint('Trying with encoded path: $encodedPath');
             return await _fastUncPathToTemp(
-                encodedPath, tempFilePath, maxBytes);
+              encodedPath,
+              tempFilePath,
+              maxBytes,
+            );
           }
         } catch (e) {
           debugPrint('Error encoding path: $e');
@@ -235,7 +255,7 @@ class Win32SmbHelper {
       try {
         // Get file size
         final fileSizeHigh = calloc<Uint32>();
-        final fileSizeLow = GetFileSize(hFile, fileSizeHigh);
+        final fileSizeLow = GetFileSize(hFile, fileSizeHigh).value;
         final fileSize = fileSizeLow + (fileSizeHigh.value << 32);
         calloc.free(fileSizeHigh);
 
@@ -251,13 +271,19 @@ class Win32SmbHelper {
           final bytesReadPtr = calloc<Uint32>();
 
           try {
-            final readResult =
-                ReadFile(hFile, buffer, bytesToCopy, bytesReadPtr, nullptr);
-            if (readResult != 0 && bytesReadPtr.value > 0) {
+            final readResult = ReadFile(
+              hFile,
+              buffer,
+              bytesToCopy,
+              bytesReadPtr,
+              nullptr,
+            );
+            if (readResult.value && bytesReadPtr.value > 0) {
               // Write data to file at once
               final tempFile = File(tempFilePath);
-              await tempFile
-                  .writeAsBytes(buffer.asTypedList(bytesReadPtr.value));
+              await tempFile.writeAsBytes(
+                buffer.asTypedList(bytesReadPtr.value),
+              );
 
               // Cache the temp file path
               _tempFileCache[uncPath] = tempFilePath;
@@ -281,14 +307,15 @@ class Win32SmbHelper {
 
           while (bytesRead < bytesToCopy) {
             final readResult = ReadFile(
-                hFile,
-                buffer,
-                min(bufferSize, bytesToCopy - bytesRead),
-                bytesReadPtr,
-                nullptr);
+              hFile,
+              buffer,
+              min(bufferSize, bytesToCopy - bytesRead),
+              bytesReadPtr,
+              nullptr,
+            );
 
-            if (readResult == 0) {
-              final error = GetLastError();
+            if (!readResult.value) {
+              final error = readResult.error;
               debugPrint('Error in fast reading: $uncPath, error: $error');
               break;
             }
@@ -336,8 +363,11 @@ class Win32SmbHelper {
   /// Generate a thumbnail for a video file on SMB with improved quality
   /// Returns the thumbnail data as a Uint8List
   /// Set isPartialFile to true if the file is only partially downloaded/buffered
-  Future<Uint8List?> generateVideoThumbnail(String uncPath, int size,
-      {bool isPartialFile = false}) async {
+  Future<Uint8List?> generateVideoThumbnail(
+    String uncPath,
+    int size, {
+    bool isPartialFile = false,
+  }) async {
     if (!_isWindows) return null;
 
     // Normalize size to avoid too many cached variations
@@ -367,8 +397,10 @@ class Win32SmbHelper {
       // Method 1: First try using FcNativeVideoThumbnail directly with UNC path
       if (FcNativeVideoThumbnail.isSupportedFormat(uncPath)) {
         final tempDir = await AppPathHelper.getTempFilesDir();
-        final thumbnailPath = p.join(tempDir.path,
-            'smb_thumb_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        final thumbnailPath = p.join(
+          tempDir.path,
+          'smb_thumb_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
 
         final result = await FcNativeVideoThumbnail.generateThumbnail(
           videoPath: uncPath,
@@ -399,9 +431,11 @@ class Win32SmbHelper {
       // If direct approach failed or we're dealing with a partial file
       final localPath = isPartialFile
           ? uncPath // Use as is if it's already a partial file
-          : await uncPathToTempFile(uncPath,
+          : await uncPathToTempFile(
+              uncPath,
               maxBytes: 1024 * 1024, // 1MB should be enough for video header
-              highPriority: true);
+              highPriority: true,
+            );
 
       if (localPath == null) {
         debugPrint('Failed to create temporary file for $uncPath');
@@ -493,9 +527,11 @@ class Win32SmbHelper {
 
     try {
       // Create a local temp copy with high priority
-      final localPath = await uncPathToTempFile(uncPath,
-          highPriority: true,
-          maxBytes: 4 * 1024 * 1024); // Limit to 4MB for images
+      final localPath = await uncPathToTempFile(
+        uncPath,
+        highPriority: true,
+        maxBytes: 4 * 1024 * 1024,
+      ); // Limit to 4MB for images
 
       if (localPath == null) {
         _completePendingOperations(cacheKey, null);
@@ -607,18 +643,26 @@ class Win32SmbHelper {
   }
 
   /// Stream a file from SMB with efficient buffering
-  /// Returns a Stream<List<int>> for the file data
+  /// Returns a `Stream<List<int>>` for the file data
   Stream<List<int>> streamFile(String uncPath) async* {
     if (!_isWindows) {
       throw UnsupportedError('Win32 SMB streaming only supported on Windows');
     }
 
     final uncPathPtr = uncPath.toNativeUtf16();
-    final hFile = CreateFile(uncPathPtr, GENERIC_READ, FILE_SHARE_READ, nullptr,
-        OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    final opened = CreateFile(
+      PCWSTR(uncPathPtr),
+      GENERIC_READ,
+      FILE_SHARE_READ,
+      null,
+      OPEN_EXISTING,
+      FILE_FLAG_SEQUENTIAL_SCAN,
+      null,
+    );
+    final hFile = opened.value;
 
-    if (hFile == INVALID_HANDLE_VALUE) {
-      final error = GetLastError();
+    if (!hFile.isValid) {
+      final error = opened.error;
       debugPrint('Failed to open file for streaming: $uncPath, error: $error');
       malloc.free(uncPathPtr);
       throw Exception('Could not open file: error $error');
@@ -633,10 +677,15 @@ class Win32SmbHelper {
 
       try {
         while (true) {
-          final readResult =
-              ReadFile(hFile, buffer, bufferSize, bytesReadPtr, nullptr);
-          if (readResult == 0) {
-            final error = GetLastError();
+          final readResult = ReadFile(
+            hFile,
+            buffer,
+            bufferSize,
+            bytesReadPtr,
+            nullptr,
+          );
+          if (!readResult.value) {
+            final error = readResult.error;
             if (error != ERROR_SUCCESS) {
               debugPrint('Error reading file: error $error');
               throw Exception('Error reading file: $error');

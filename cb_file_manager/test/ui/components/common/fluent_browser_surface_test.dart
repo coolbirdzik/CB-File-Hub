@@ -62,52 +62,95 @@ ScreenScaffold _screenScaffold() {
 }
 
 void main() {
-  testWidgets('Fluent browser canvas and toolbar use bridged semantic surfaces',
+  for (final viaKeyboard in [false, true]) {
+    testWidgets(
+      'address bar accepts manual paths via ${viaKeyboard ? 'focus' : 'empty space'}',
       (tester) async {
-    for (final brightness in Brightness.values) {
-      await tester.pumpWidget(
-        _desktopFluentHost(
+        final controller = TextEditingController(text: r'C:\Users');
+        addTearDown(controller.dispose);
+        String? submitted;
+        await tester.pumpWidget(
+          _desktopFluentHost(
+            brightness: Brightness.light,
+            child: Center(
+              child: SizedBox(
+                width: 500,
+                child: BreadcrumbAddressBar(
+                  segments: const [BreadcrumbSegment(label: 'Users')],
+                  editController: controller,
+                  onPathSubmitted: (value) => submitted = value,
+                ),
+              ),
+            ),
+          ),
+        );
+        if (viaKeyboard) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        } else {
+          final rect = tester.getRect(find.byType(BreadcrumbAddressBar));
+          await tester.tapAt(Offset(rect.right - 10, rect.center.dy));
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(EditableText), findsOneWidget);
+        expect(
+          controller.selection,
+          TextSelection(baseOffset: 0, extentOffset: controller.text.length),
+        );
+        await tester.enterText(find.byType(EditableText), r'D:\Projects');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(submitted, r'D:\Projects');
+        expect(find.byType(EditableText), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'Fluent browser canvas and toolbar use bridged semantic surfaces',
+    (tester) async {
+      for (final brightness in Brightness.values) {
+        await tester.pumpWidget(
+          _desktopFluentHost(brightness: brightness, child: _screenScaffold()),
+        );
+
+        final baseTheme = brightness == Brightness.dark
+            ? ThemeConfig.getDarkTheme()
+            : ThemeConfig.getLightTheme();
+        final materialTheme = createDesktopAcrylicMaterialBridgeTheme(
+          baseTheme: baseTheme,
           brightness: brightness,
-          child: _screenScaffold(),
-        ),
-      );
+          strength: 1.25,
+          preferTransparentBackdrop: true,
+        );
+        final surfaces = FluentSurfaceTokens.fromTheme(materialTheme);
+        final canvas = tester.widget<ColoredBox>(
+          find.byKey(const ValueKey<String>('fluent-browser-canvas')),
+        );
+        final toolbar = tester.widget<FluentChromeSurface>(
+          find.byKey(const ValueKey<String>('fluent-browser-toolbar')),
+        );
 
-      final baseTheme = brightness == Brightness.dark
-          ? ThemeConfig.getDarkTheme()
-          : ThemeConfig.getLightTheme();
-      final materialTheme = createDesktopAcrylicMaterialBridgeTheme(
-        baseTheme: baseTheme,
-        brightness: brightness,
-        strength: 1.25,
-        preferTransparentBackdrop: true,
-      );
-      final surfaces = FluentSurfaceTokens.fromTheme(materialTheme);
-      final canvas = tester.widget<ColoredBox>(
-        find.byKey(const ValueKey<String>('fluent-browser-canvas')),
-      );
-      final toolbar = tester.widget<FluentChromeSurface>(
-        find.byKey(const ValueKey<String>('fluent-browser-toolbar')),
-      );
+        expect(canvas.color, materialTheme.scaffoldBackgroundColor);
+        expect(canvas.color, surfaces.canvas);
+        expect(toolbar.tint, surfaces.chromeTint);
+        expect(toolbar.tintAlpha, surfaces.toolbarTintAlpha);
+        expect(toolbar.blurSigma, surfaces.chromeBlur);
+        final compositedToolbar = Color.alphaBlend(
+          surfaces.toolbar,
+          surfaces.canvas,
+        );
+        expect(surfaces.toolbar.a, lessThan(1.0));
+        expect(
+          compositedToolbar.computeLuminance(),
+          lessThan(surfaces.canvas.computeLuminance()),
+        );
+      }
+    },
+  );
 
-      expect(canvas.color, materialTheme.scaffoldBackgroundColor);
-      expect(canvas.color, surfaces.canvas);
-      expect(toolbar.tint, surfaces.chromeTint);
-      expect(toolbar.tintAlpha, surfaces.toolbarTintAlpha);
-      expect(toolbar.blurSigma, surfaces.chromeBlur);
-      final compositedToolbar = Color.alphaBlend(
-        surfaces.toolbar,
-        surfaces.canvas,
-      );
-      expect(surfaces.toolbar.a, lessThan(1.0));
-      expect(
-        compositedToolbar.computeLuminance(),
-        lessThan(surfaces.canvas.computeLuminance()),
-      );
-    }
-  });
-
-  testWidgets('Fluent chrome explicitly composites toolbar and drawer alpha',
-      (tester) async {
+  testWidgets('Fluent chrome explicitly composites toolbar and drawer alpha', (
+    tester,
+  ) async {
     for (final brightness in Brightness.values) {
       final baseTheme = brightness == Brightness.dark
           ? ThemeConfig.getDarkTheme()
@@ -184,8 +227,9 @@ void main() {
 
       final renderedTintColors = tester
           .widgetList<DecoratedBox>(find.byType(DecoratedBox))
-          .map((decoratedBox) =>
-              (decoratedBox.decoration as BoxDecoration).color)
+          .map(
+            (decoratedBox) => (decoratedBox.decoration as BoxDecoration).color,
+          )
           .whereType<Color>()
           .toList();
       expect(renderedTintColors, hasLength(2));
@@ -213,8 +257,9 @@ void main() {
     }
   });
 
-  testWidgets('disabled Fluent navigation icons inherit disabled foreground',
-      (tester) async {
+  testWidgets('disabled Fluent navigation icons inherit disabled foreground', (
+    tester,
+  ) async {
     final materialTheme = ThemeConfig.getLightTheme();
     final surfaces = FluentSurfaceTokens.fromTheme(materialTheme);
     await tester.pumpWidget(
@@ -238,11 +283,14 @@ void main() {
     expect(tester.widget<Icon>(rightIcon).color, isNull);
     expect(IconTheme.of(tester.element(leftIcon)).color, surfaces.textDisabled);
     expect(
-        IconTheme.of(tester.element(rightIcon)).color, surfaces.textDisabled);
+      IconTheme.of(tester.element(rightIcon)).color,
+      surfaces.textDisabled,
+    );
   });
 
-  testWidgets('virtual routes keep navigation controls and friendly crumbs',
-      (tester) async {
+  testWidgets('virtual routes keep navigation controls and friendly crumbs', (
+    tester,
+  ) async {
     var backCount = 0;
     var upCount = 0;
 
@@ -285,8 +333,9 @@ void main() {
     expect(upCount, 1);
   });
 
-  testWidgets('Fluent breadcrumbs expose focus and keyboard activation',
-      (tester) async {
+  testWidgets('Fluent breadcrumbs expose focus and keyboard activation', (
+    tester,
+  ) async {
     var activations = 0;
     final surfaces = FluentSurfaceTokens.fromTheme(ThemeConfig.getDarkTheme());
     await tester.pumpWidget(
@@ -296,10 +345,7 @@ void main() {
           width: 420,
           child: BreadcrumbAddressBar(
             segments: [
-              BreadcrumbSegment(
-                label: 'Documents',
-                onTap: () => activations++,
-              ),
+              BreadcrumbSegment(label: 'Documents', onTap: () => activations++),
             ],
           ),
         ),
@@ -341,8 +387,9 @@ void main() {
     expect(activations, 3);
   });
 
-  testWidgets('deep Windows breadcrumbs stay within a narrow address bar',
-      (tester) async {
+  testWidgets('deep Windows breadcrumbs stay within a narrow address bar', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _desktopFluentHost(
         brightness: Brightness.light,
@@ -374,5 +421,37 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(tester.getSize(find.byType(BreadcrumbAddressBar)).width, 420);
     expect(find.text('batch_dest'), findsOneWidget);
+  });
+
+  testWidgets('short breadcrumbs stay packed at the start of the address bar', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _desktopFluentHost(
+        brightness: Brightness.light,
+        child: const Center(
+          child: SizedBox(
+            width: 420,
+            child: BreadcrumbAddressBar(
+              segments: [
+                BreadcrumbSegment(label: 'C:'),
+                BreadcrumbSegment(label: 'Users'),
+                BreadcrumbSegment(label: 'Photos'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    final drive = tester.getRect(find.text('C:'));
+    final users = tester.getRect(find.text('Users'));
+    final photos = tester.getRect(find.text('Photos'));
+
+    expect(users.left - drive.right, lessThan(40));
+    expect(photos.left - users.right, lessThan(40));
+    expect(tester.takeException(), isNull);
   });
 }

@@ -69,14 +69,14 @@ class FluentDrawerSection extends StatefulWidget {
   final Widget content;
 
   const FluentDrawerSection({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.selected,
     required this.expanded,
     required this.onStateChanged,
     required this.content,
-  }) : super(key: key);
+  });
 
   @override
   State<FluentDrawerSection> createState() => _FluentDrawerSectionState();
@@ -156,11 +156,7 @@ class _FluentDrawerSectionState extends State<FluentDrawerSection> {
       onStateChanged: _handleStateChanged,
       animationDuration: _FluentDrawerTokens.sectionTransition,
       headerBackgroundColor: WidgetStateColor.resolveWith(
-        (states) => _fluentDrawerStateFill(
-          theme,
-          states,
-          selected: selected,
-        ),
+        (states) => _fluentDrawerStateFill(theme, states, selected: selected),
       ),
       headerShape: (_) => RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(_FluentDrawerTokens.itemRadius),
@@ -193,9 +189,7 @@ Color _fluentDrawerStateFill(
   }
   if (selected) {
     return Color.alphaBlend(
-      accent.withValues(
-        alpha: theme.brightness == Brightness.dark ? 0.2 : 0.1,
-      ),
+      accent.withValues(alpha: theme.brightness == Brightness.dark ? 0.2 : 0.1),
       resources.solidBackgroundFillColorBase,
     );
   }
@@ -213,11 +207,11 @@ class CBDrawer extends StatelessWidget {
 
   const CBDrawer(
     this.parentContext, {
-    Key? key,
+    super.key,
     this.activeTabId,
     required this.isPinned,
     required this.onPinStateChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -237,12 +231,11 @@ class _CBDrawerContent extends StatefulWidget {
   final Function(bool) onPinStateChanged;
 
   const _CBDrawerContent({
-    Key? key,
     required this.parentContext,
     this.activeTabId,
     required this.isPinned,
     required this.onPinStateChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<_CBDrawerContent> createState() => _CBDrawerContentState();
@@ -271,7 +264,8 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     final bool isDesktopPlatform =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
-    final useFluentDesktopShell = isDesktopPlatform &&
+    final useFluentDesktopShell =
+        isDesktopPlatform &&
         DesignSystemConfig.enableFluentDesktopShell &&
         !DesignSystemConfig.enableLegacyMaterialDesktopShell;
     if (useFluentDesktopShell) {
@@ -285,10 +279,12 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       const Color(0xFFFFFFFF),
     );
     const Color windowsLightDrawerBottomBase = Color(0xFFFFFFFF);
-    final double topTintAlpha =
-        isDesktopPlatform ? (isDarkMode ? 0.84 : 0.70) : 1.0;
-    final double bottomTintAlpha =
-        isDesktopPlatform ? (isDarkMode ? 0.80 : 0.64) : 0.85;
+    final double topTintAlpha = isDesktopPlatform
+        ? (isDarkMode ? 0.84 : 0.70)
+        : 1.0;
+    final double bottomTintAlpha = isDesktopPlatform
+        ? (isDarkMode ? 0.80 : 0.64)
+        : 0.85;
     final bool usePinnedIntegratedStyle = widget.isPinned && isDesktopPlatform;
 
     return Drawer(
@@ -327,15 +323,19 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                     end: Alignment.bottomCenter,
                     colors: [
                       isDarkMode
-                          ? theme.colorScheme.surface
-                              .withValues(alpha: topTintAlpha)
+                          ? theme.colorScheme.surface.withValues(
+                              alpha: topTintAlpha,
+                            )
                           : windowsLightDrawerTopBase.withValues(
-                              alpha: topTintAlpha),
+                              alpha: topTintAlpha,
+                            ),
                       isDarkMode
-                          ? theme.colorScheme.surfaceContainerLowest
-                              .withValues(alpha: bottomTintAlpha)
+                          ? theme.colorScheme.surfaceContainerLowest.withValues(
+                              alpha: bottomTintAlpha,
+                            )
                           : windowsLightDrawerBottomBase.withValues(
-                              alpha: bottomTintAlpha),
+                              alpha: bottomTintAlpha,
+                            ),
                     ],
                   ),
                 ),
@@ -345,8 +345,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                 alignment: Alignment.centerRight,
                 child: Container(
                   width: 1,
-                  color: theme.colorScheme.outline
-                      .withValues(alpha: isDarkMode ? 0.12 : 0.08),
+                  color: theme.colorScheme.outline.withValues(
+                    alpha: isDarkMode ? 0.12 : 0.08,
+                  ),
                 ),
               ),
             Column(
@@ -361,7 +362,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 10, horizontal: 12),
+                      vertical: 10,
+                      horizontal: 12,
+                    ),
                     children: [
                       // Main navigation items
                       DrawerNavigationItem(
@@ -384,9 +387,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             ),
                             initialExpanded: drawerState.isPinnedExpanded,
                             onExpansionChanged: (isExpanded) {
-                              context
-                                  .read<DrawerCubit>()
-                                  .setPinnedExpanded(isExpanded);
+                              context.read<DrawerCubit>().setPinnedExpanded(
+                                isExpanded,
+                              );
                             },
                           );
                         },
@@ -409,9 +412,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                                 _navigateTo(context, '#trash', 'Trash'),
                             initialExpanded: drawerState.isStorageExpanded,
                             onExpansionChanged: (isExpanded) {
-                              context
-                                  .read<DrawerCubit>()
-                                  .setStorageExpanded(isExpanded);
+                              context.read<DrawerCubit>().setStorageExpanded(
+                                isExpanded,
+                              );
                             },
                           );
                         },
@@ -452,7 +455,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         icon: PhosphorIconsLight.wifiHigh,
                         title: context.tr.networksMenu,
                         onTap: () => _navigateTo(
-                            context, '#network', context.tr.networkTab),
+                          context,
+                          '#network',
+                          context.tr.networkTab,
+                        ),
                       ),
 
                       DrawerNavigationItem(
@@ -465,8 +471,11 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         DrawerNavigationItem(
                           icon: PhosphorIconsLight.broom,
                           title: context.tr.cbAgentCleanerTitle,
-                          onTap: () => _navigateTo(context, '#cb-agent-cleaner',
-                              context.tr.cbAgentCleanerTitle),
+                          onTap: () => _navigateTo(
+                            context,
+                            '#cb-agent-cleaner',
+                            context.tr.cbAgentCleanerTitle,
+                          ),
                         ),
 
                       Padding(
@@ -474,8 +483,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         child: Divider(
                           height: 1,
                           thickness: 1,
-                          color: theme.colorScheme.outlineVariant
-                              .withValues(alpha: 0.45),
+                          color: theme.colorScheme.outlineVariant.withValues(
+                            alpha: 0.45,
+                          ),
                         ),
                       ),
 
@@ -485,7 +495,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         title: context.tr.settings,
                         onTap: () {
                           _navigateTo(
-                              context, kSettingsPath, context.tr.settings);
+                            context,
+                            kSettingsPath,
+                            context.tr.settings,
+                          );
                         },
                       ),
                     ],
@@ -554,10 +567,8 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         (path) => _isFluentPathSelected(activePath, path),
                       );
                       final hasSelectedStoragePath = state.storageLocations.any(
-                        (storage) => _isFluentPathSelected(
-                          activePath,
-                          storage.path,
-                        ),
+                        (storage) =>
+                            _isFluentPathSelected(activePath, storage.path),
                       );
 
                       return ListView(
@@ -575,9 +586,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             onPressed: () =>
                                 _navigateTo(context, '#home', 'Home'),
                           ),
-                          const SizedBox(
-                            height: _FluentDrawerTokens.groupGap,
-                          ),
+                          const SizedBox(height: _FluentDrawerTokens.groupGap),
                           if (state.pinnedPaths.isNotEmpty)
                             _buildFluentSection(
                               context,
@@ -586,8 +595,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                               title: context.tr.pinnedSection,
                               selected: hasSelectedPinnedPath,
                               expanded: state.isPinnedExpanded,
-                              onStateChanged:
-                                  context.read<DrawerCubit>().setPinnedExpanded,
+                              onStateChanged: context
+                                  .read<DrawerCubit>()
+                                  .setPinnedExpanded,
                               content: Column(
                                 children: state.pinnedPaths
                                     .map(
@@ -631,9 +641,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                                     .toList(growable: false),
                               ),
                             ),
-                          const SizedBox(
-                            height: _FluentDrawerTokens.groupGap,
-                          ),
+                          const SizedBox(height: _FluentDrawerTokens.groupGap),
                           _buildFluentSection(
                             context,
                             key: const ValueKey<String>('fluent-storage'),
@@ -641,17 +649,16 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                             title: context.tr.drivesTab,
                             selected: hasSelectedStoragePath,
                             expanded: state.isStorageExpanded,
-                            onStateChanged:
-                                context.read<DrawerCubit>().setStorageExpanded,
+                            onStateChanged: context
+                                .read<DrawerCubit>()
+                                .setStorageExpanded,
                             content: _buildFluentStorageItems(
                               context,
                               state,
                               activePath: activePath,
                             ),
                           ),
-                          const SizedBox(
-                            height: _FluentDrawerTokens.groupGap,
-                          ),
+                          const SizedBox(height: _FluentDrawerTokens.groupGap),
                           _fluentNavigationItem(
                             context,
                             icon: PhosphorIconsLight.image,
@@ -682,9 +689,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                               context.tr.videoGallery,
                             ),
                           ),
-                          const SizedBox(
-                            height: _FluentDrawerTokens.groupGap,
-                          ),
+                          const SizedBox(height: _FluentDrawerTokens.groupGap),
                           _fluentNavigationItem(
                             context,
                             icon: PhosphorIconsLight.tag,
@@ -769,9 +774,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                     },
                   ),
                 ),
-                _buildFluentDrawerFooter(
-                  resources: resources,
-                ),
+                _buildFluentDrawerFooter(resources: resources),
               ],
             ),
           ),
@@ -785,8 +788,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     required fluent.ResourceDictionary resources,
     required Color accent,
   }) {
-    final pinLabel =
-        widget.isPinned ? context.tr.unpinMenu : context.tr.pinMenu;
+    final pinLabel = widget.isPinned
+        ? context.tr.unpinMenu
+        : context.tr.pinMenu;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -805,7 +809,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                 height: 32,
                 width: 32,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => DecoratedBox(
+                errorBuilder: (_, _, _) => DecoratedBox(
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.12),
                   ),
@@ -900,8 +904,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       onPressed: onPressed,
       builder: (context, states) {
         final isPressed = states.contains(WidgetState.pressed);
-        final iconColor =
-            selected || isPressed ? accent : resources.textFillColorSecondary;
+        final iconColor = selected || isPressed
+            ? accent
+            : resources.textFillColorSecondary;
 
         return Padding(
           padding: const EdgeInsets.symmetric(
@@ -955,15 +960,13 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                       style: TextStyle(
                         color: resources.textFillColorPrimary,
                         fontSize: 13.5,
-                        fontWeight:
-                            selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                       ),
                     ),
                   ),
-                  if (trailing != null) ...[
-                    const SizedBox(width: 4),
-                    trailing,
-                  ],
+                  if (trailing != null) ...[const SizedBox(width: 4), trailing],
                 ],
               ),
             ),
@@ -981,9 +984,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     if (state.isLoading) {
       return const Padding(
         padding: EdgeInsetsDirectional.only(top: 8, bottom: 12),
-        child: Center(
-          child: fluent.ProgressRing(strokeWidth: 2),
-        ),
+        child: Center(child: fluent.ProgressRing(strokeWidth: 2)),
       );
     }
     if (state.storageLocations.isEmpty) {
@@ -999,11 +1000,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     return Column(
       children: [
         for (final storage in state.storageLocations)
-          _buildFluentStorageItem(
-            context,
-            storage,
-            activePath: activePath,
-          ),
+          _buildFluentStorageItem(context, storage, activePath: activePath),
         _fluentNavigationItem(
           context,
           icon: PhosphorIconsLight.trash,
@@ -1024,8 +1021,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     final displayName = _fluentStorageName(storage);
     final requiresAdmin = storage.requiresAdmin;
     final adminLabel = context.tr.requiresAdminPrivileges;
-    final semanticLabel =
-        requiresAdmin ? '$displayName, $adminLabel' : displayName;
+    final semanticLabel = requiresAdmin
+        ? '$displayName, $adminLabel'
+        : displayName;
 
     return _fluentNavigationItem(
       context,
@@ -1043,21 +1041,12 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
           showStorageAdminAccessDialog(
             context,
             drive: storage,
-            onNavigate: (path, name) => _navigateTo(
-              context,
-              path,
-              name,
-              isStorage: true,
-            ),
+            onNavigate: (path, name) =>
+                _navigateTo(context, path, name, isStorage: true),
           );
           return;
         }
-        _navigateTo(
-          context,
-          storage.path,
-          displayName,
-          isStorage: true,
-        );
+        _navigateTo(context, storage.path, displayName, isStorage: true);
       },
     );
   }
@@ -1073,18 +1062,15 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
         message: label,
         child: Padding(
           padding: const EdgeInsetsDirectional.only(start: 2, end: 2),
-          child: Icon(
-            PhosphorIconsLight.lockSimple,
-            size: 15,
-            color: accent,
-          ),
+          child: Icon(PhosphorIconsLight.lockSimple, size: 15, color: accent),
         ),
       ),
     );
   }
 
-  Widget _buildFluentDrawerFooter(
-      {required fluent.ResourceDictionary resources}) {
+  Widget _buildFluentDrawerFooter({
+    required fluent.ResourceDictionary resources,
+  }) {
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border(
@@ -1131,8 +1117,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     if (targetPath.startsWith('#')) return activePath == targetPath;
 
     final current = _normalizeFluentPath(activePath);
-    final target =
-        _normalizeFluentPath(_normalizePinnedNavigationPath(targetPath));
+    final target = _normalizeFluentPath(
+      _normalizePinnedNavigationPath(targetPath),
+    );
     return current == target;
   }
 
@@ -1182,8 +1169,12 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     }
   }
 
-  void _navigateTo(BuildContext context, String path, String name,
-      {bool isStorage = false}) {
+  void _navigateTo(
+    BuildContext context,
+    String path,
+    String name, {
+    bool isStorage = false,
+  }) {
     if (!widget.isPinned) {
       RouteUtils.safePopDialog(context);
     }
@@ -1237,10 +1228,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
     final navigationPath = _normalizePinnedNavigationPath(path);
     final navigationName = navigationPath == path
         ? name
-        : navigationPath.split(Platform.pathSeparator).lastWhere(
-              (part) => part.isNotEmpty,
-              orElse: () => name,
-            );
+        : navigationPath
+              .split(Platform.pathSeparator)
+              .lastWhere((part) => part.isNotEmpty, orElse: () => name);
 
     TabManagerBloc? tabBloc;
     try {
@@ -1261,15 +1251,16 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       // Fallback navigation
       Navigator.of(context)
           .pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const TabMainScreen()),
-              (route) => false)
+            MaterialPageRoute(builder: (context) => const TabMainScreen()),
+            (route) => false,
+          )
           .then((_) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          // Note: context might be invalid here, but TabMainScreen.openPath handles it?
-          // Actually we should use navigator key or similar if possible, but this is legacy logic
-          // Keeping it simple for now
-        });
-      });
+            Future.delayed(const Duration(milliseconds: 100), () {
+              // Note: context might be invalid here, but TabMainScreen.openPath handles it?
+              // Actually we should use navigator key or similar if possible, but this is legacy logic
+              // Keeping it simple for now
+            });
+          });
     }
   }
 
@@ -1302,8 +1293,9 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
               return Text(
                 versionText,
                 style: TextStyle(
-                  color:
-                      theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                  color: theme.textTheme.bodySmall?.color?.withValues(
+                    alpha: 0.7,
+                  ),
                   fontSize: 12,
                 ),
               );

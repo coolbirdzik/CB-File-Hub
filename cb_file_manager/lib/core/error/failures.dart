@@ -12,11 +12,7 @@ abstract class Failure {
   /// Original error object if available
   final dynamic originalError;
 
-  const Failure({
-    required this.message,
-    this.code,
-    this.originalError,
-  });
+  const Failure({required this.message, this.code, this.originalError});
 
   @override
   String toString() => 'Failure(message: $message, code: $code)';
@@ -37,14 +33,10 @@ abstract class Failure {
 /// Examples: file not found, permission denied, disk full, etc.
 class FileSystemFailure extends Failure {
   const FileSystemFailure({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   @override
   String toString() => 'FileSystemFailure(message: $message, code: $code)';
@@ -55,14 +47,10 @@ class FileSystemFailure extends Failure {
 /// Examples: connection timeout, no internet, server error, etc.
 class NetworkFailure extends Failure {
   const NetworkFailure({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   @override
   String toString() => 'NetworkFailure(message: $message, code: $code)';
@@ -73,14 +61,10 @@ class NetworkFailure extends Failure {
 /// Examples: query failed, connection error, data corruption, etc.
 class DatabaseFailure extends Failure {
   const DatabaseFailure({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   @override
   String toString() => 'DatabaseFailure(message: $message, code: $code)';
@@ -91,14 +75,10 @@ class DatabaseFailure extends Failure {
 /// Examples: storage permission denied, camera permission denied, etc.
 class PermissionFailure extends Failure {
   const PermissionFailure({
-    required String message,
-    String? code,
-    dynamic originalError,
-  }) : super(
-          message: message,
-          code: code,
-          originalError: originalError,
-        );
+    required super.message,
+    super.code,
+    super.originalError,
+  });
 
   @override
   String toString() => 'PermissionFailure(message: $message, code: $code)';

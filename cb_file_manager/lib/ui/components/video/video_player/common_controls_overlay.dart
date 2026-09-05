@@ -19,7 +19,7 @@ class CommonVideoControlsOverlay extends StatelessWidget {
   final VoidCallback? onScreenshot;
 
   const CommonVideoControlsOverlay({
-    Key? key,
+    super.key,
     required this.position,
     required this.duration,
     required this.isPlaying,
@@ -33,14 +33,15 @@ class CommonVideoControlsOverlay extends StatelessWidget {
     this.onVolumeChange,
     this.onToggleFullscreen,
     this.onScreenshot,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final safeDuration =
-        duration.inMilliseconds > 0 ? duration : const Duration(seconds: 1);
-    final progress =
-        (position.inMilliseconds / safeDuration.inMilliseconds).clamp(0.0, 1.0);
+    final safeDuration = duration.inMilliseconds > 0
+        ? duration
+        : const Duration(seconds: 1);
+    final progress = (position.inMilliseconds / safeDuration.inMilliseconds)
+        .clamp(0.0, 1.0);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -60,8 +61,10 @@ class CommonVideoControlsOverlay extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(VideoPlayerUtils.formatDurationAlwaysHms(position),
-                  style: const TextStyle(color: Colors.white, fontSize: 12)),
+              Text(
+                VideoPlayerUtils.formatDurationAlwaysHms(position),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
               Expanded(
                 child: Semantics(
                   container: true,
@@ -73,51 +76,62 @@ class CommonVideoControlsOverlay extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(VideoPlayerUtils.formatDurationAlwaysHms(duration),
-                  style: const TextStyle(color: Colors.white, fontSize: 12)),
+              Text(
+                VideoPlayerUtils.formatDurationAlwaysHms(duration),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
             ],
           ),
           Row(
             children: [
               IconButton(
                 icon: Icon(
-                    hasPrev
-                        ? PhosphorIconsLight.skipBack
-                        : PhosphorIconsLight.skipBack,
-                    color: hasPrev ? Colors.white : Colors.white24,
-                    size: 26),
+                  hasPrev
+                      ? PhosphorIconsLight.skipBack
+                      : PhosphorIconsLight.skipBack,
+                  color: hasPrev ? Colors.white : Colors.white24,
+                  size: 26,
+                ),
                 onPressed: hasPrev ? onPrev : null,
               ),
               IconButton(
                 icon: Icon(
-                    isPlaying
-                        ? PhosphorIconsLight.pause
-                        : PhosphorIconsLight.play,
-                    color: Colors.white,
-                    size: 32),
+                  isPlaying
+                      ? PhosphorIconsLight.pause
+                      : PhosphorIconsLight.play,
+                  color: Colors.white,
+                  size: 32,
+                ),
                 onPressed: onPlayPause,
               ),
               IconButton(
                 icon: Icon(
-                    hasNext
-                        ? PhosphorIconsLight.skipForward
-                        : PhosphorIconsLight.skipForward,
-                    color: hasNext ? Colors.white : Colors.white24,
-                    size: 26),
+                  hasNext
+                      ? PhosphorIconsLight.skipForward
+                      : PhosphorIconsLight.skipForward,
+                  color: hasNext ? Colors.white : Colors.white24,
+                  size: 26,
+                ),
                 onPressed: hasNext ? onNext : null,
               ),
               const Spacer(),
               if (onScreenshot != null)
                 IconButton(
-                  icon: const Icon(PhosphorIconsLight.camera,
-                      color: Colors.white, size: 22),
+                  icon: const Icon(
+                    PhosphorIconsLight.camera,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                   onPressed: onScreenshot,
                 ),
               if (onVolumeChange != null)
                 Row(
                   children: [
-                    const Icon(PhosphorIconsLight.speakerHigh,
-                        color: Colors.white, size: 18),
+                    const Icon(
+                      PhosphorIconsLight.speakerHigh,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     SizedBox(
                       width: 100,
                       child: Semantics(
@@ -136,8 +150,11 @@ class CommonVideoControlsOverlay extends StatelessWidget {
                 ),
               if (onToggleFullscreen != null)
                 IconButton(
-                  icon: const Icon(PhosphorIconsLight.cornersOut,
-                      color: Colors.white, size: 22),
+                  icon: const Icon(
+                    PhosphorIconsLight.cornersOut,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                   onPressed: onToggleFullscreen,
                 ),
             ],

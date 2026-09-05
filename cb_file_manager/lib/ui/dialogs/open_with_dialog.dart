@@ -18,10 +18,10 @@ class OpenWithDialog extends StatefulWidget {
   final bool saveAsDefaultOnSelect;
 
   const OpenWithDialog({
-    Key? key,
+    super.key,
     required this.filePath,
     this.saveAsDefaultOnSelect = false,
-  }) : super(key: key);
+  });
 
   @override
   State<OpenWithDialog> createState() => _OpenWithDialogState();
@@ -59,9 +59,7 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
     await prefs.setUseSystemDefaultForVideo(false);
   }
 
-  Future<void> _selectBuiltInVideoPlayerAsDefault(
-    UserPreferences prefs,
-  ) async {
+  Future<void> _selectBuiltInVideoPlayerAsDefault(UserPreferences prefs) async {
     await prefs.clearPreferredVideoPlayerApp();
     await prefs.setUseSystemDefaultForVideo(false);
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -74,8 +72,9 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final screen = MediaQuery.of(context).size;
     final isNarrow = screen.width < 500;
-    final dialogWidth =
-        isNarrow ? (screen.width * 0.92).clamp(280.0, 400.0) : 420.0;
+    final dialogWidth = isNarrow
+        ? (screen.width * 0.92).clamp(280.0, 400.0)
+        : 420.0;
     final listMaxH = (screen.height * 0.48).clamp(320.0, 560.0);
 
     return Dialog(
@@ -88,8 +87,10 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
           children: [
             Row(
               children: [
-                Icon(PhosphorIconsLight.arrowSquareOut,
-                    color: isDarkMode ? Colors.white70 : Colors.black87),
+                Icon(
+                  PhosphorIconsLight.arrowSquareOut,
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Open with',
@@ -170,14 +171,17 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                               onTap: () async {
                                 // Pre-extract values that depend on BuildContext
                                 // before any async gap.
-                                final rootNavigator =
-                                    Navigator.of(context, rootNavigator: true);
+                                final rootNavigator = Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                );
                                 setState(() {
                                   _loadingIcons = true;
                                 });
 
                                 await _saveVideoDefaultIfNeeded(
-                                    app.packageName);
+                                  app.packageName,
+                                );
 
                                 if (!mounted) return;
 
@@ -203,10 +207,13 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                                   );
                                 } else if (app.packageName == 'shell_open') {
                                   await ExternalAppHelper.openWithSystemDefault(
-                                      widget.filePath);
+                                    widget.filePath,
+                                  );
                                 } else {
                                   await ExternalAppHelper.openFileWithApp(
-                                      widget.filePath, app.packageName);
+                                    widget.filePath,
+                                    app.packageName,
+                                  );
                                 }
 
                                 if (mounted) {
@@ -225,8 +232,9 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                         ListTile(
                           leading: const Icon(PhosphorIconsLight.videoCamera),
                           title: Text(
-                            AppLocalizations.of(context)!
-                                .setCoolBirdAsDefaultForVideos,
+                            AppLocalizations.of(
+                              context,
+                            )!.setCoolBirdAsDefaultForVideos,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: isDarkMode
@@ -244,23 +252,27 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                               final exe = Platform.resolvedExecutable;
                               final ok =
                                   await WindowsAppIcon.setSelfAsDefaultForVideo(
-                                      exe);
+                                    exe,
+                                  );
                               if (ok) {
                                 final prefs = UserPreferences.instance;
                                 await prefs.init();
                                 await _selectBuiltInVideoPlayerAsDefault(prefs);
                               }
                               try {
-                                toast.info(ok
-                                    ? 'CB File Hub is now the default for video files.'
-                                    : 'Could not set as default.');
+                                toast.info(
+                                  ok
+                                      ? 'CB File Hub is now the default for video files.'
+                                      : 'Could not set as default.',
+                                );
                                 navigator.pop();
                               } catch (_) {}
                             } else if (Platform.isAndroid) {
                               await ExternalAppHelper.openDefaultAppSettings();
                               try {
-                                toast.info(l10n
-                                    .setCoolBirdAsDefaultForVideosAndroidHint);
+                                toast.info(
+                                  l10n.setCoolBirdAsDefaultForVideosAndroidHint,
+                                );
                                 navigator.pop();
                               } catch (_) {}
                             }
@@ -274,8 +286,9 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                         ListTile(
                           leading: const Icon(PhosphorIconsLight.archive),
                           title: Text(
-                            AppLocalizations.of(context)!
-                                .setCoolBirdAsDefaultForArchives,
+                            AppLocalizations.of(
+                              context,
+                            )!.setCoolBirdAsDefaultForArchives,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: isDarkMode
@@ -289,19 +302,21 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                             // across await boundaries.
                             final toast = AppToast.capture(context);
                             final navigator = Navigator.of(context);
-                            final archivesSuccessL10n =
-                                AppLocalizations.of(context)!
-                                    .setCoolBirdAsDefaultForArchivesSuccess;
-                            final archivesFailedL10n =
-                                AppLocalizations.of(context)!
-                                    .setCoolBirdAsDefaultForArchivesFailed;
+                            final archivesSuccessL10n = AppLocalizations.of(
+                              context,
+                            )!.setCoolBirdAsDefaultForArchivesSuccess;
+                            final archivesFailedL10n = AppLocalizations.of(
+                              context,
+                            )!.setCoolBirdAsDefaultForArchivesFailed;
                             final exe = Platform.resolvedExecutable;
-                            final ok = await WindowsAppIcon
-                                .setSelfAsDefaultForArchives(exe);
+                            final ok =
+                                await WindowsAppIcon.setSelfAsDefaultForArchives(
+                                  exe,
+                                );
                             try {
-                              toast.info(ok
-                                  ? archivesSuccessL10n
-                                  : archivesFailedL10n);
+                              toast.info(
+                                ok ? archivesSuccessL10n : archivesFailedL10n,
+                              );
                               navigator.pop();
                             } catch (_) {}
                           },
@@ -312,32 +327,34 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
                       ListTile(
                         leading: const Icon(PhosphorIconsLight.dotsThree),
                         title: Text(
-                            AppLocalizations.of(context)!.chooseAnotherApp),
+                          AppLocalizations.of(context)!.chooseAnotherApp,
+                        ),
                         onTap: () async {
                           // Close the dialog
                           Navigator.pop(context);
 
                           // Use file_picker to select an executable
                           if (Platform.isWindows) {
-                            FilePickerResult? result =
-                                await FilePicker.platform.pickFiles(
+                            final picked = await FilePicker.pickFile(
                               type: FileType.custom,
                               allowedExtensions: ['exe'],
                               dialogTitle:
                                   'Select an application to open this file',
                             );
 
-                            if (result != null &&
-                                result.files.single.path != null) {
-                              final appPath = result.files.single.path!;
+                            if (picked?.path != null) {
+                              final appPath = picked!.path!;
                               await _saveVideoDefaultIfNeeded(appPath);
                               await ExternalAppHelper.openFileWithApp(
-                                  widget.filePath, appPath);
+                                widget.filePath,
+                                appPath,
+                              );
                             }
                           } else if (Platform.isAndroid) {
                             // On Android, we can use the system's app chooser
                             await ExternalAppHelper.openWithSystemChooser(
-                                widget.filePath);
+                              widget.filePath,
+                            );
                           }
                         },
                       ),

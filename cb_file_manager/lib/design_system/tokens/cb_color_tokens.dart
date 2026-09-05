@@ -12,7 +12,7 @@
 ///   * [CbColorTokens] is the *semantic* layer — `surface`, `textPrimary`,
 ///     `stroke`… Widgets should only ever read the semantic layer, so a ramp
 ///     can be retuned without touching call sites.
-library cb_color_tokens;
+library;
 
 import 'dart:math' as math;
 import 'dart:ui' show Brightness;
@@ -98,8 +98,8 @@ class CbAccentRamp {
     // dark neutrals.
     final HSLColor core = isDark
         ? hsl
-            .withLightness(_clamp(hsl.lightness + 0.10))
-            .withSaturation(_clamp(hsl.saturation * 0.88))
+              .withLightness(_clamp(hsl.lightness + 0.10))
+              .withSaturation(_clamp(hsl.saturation * 0.88))
         : hsl;
 
     Color at(double lightness, double saturationScale) => core
@@ -154,8 +154,11 @@ class CbAccentRamp {
   /// mid-lightness teal and a mid-lightness blue sit on opposite sides of the
   /// threshold. Stepping in small increments keeps the result as close to the
   /// chosen accent as legibility allows.
-  static Color _textOn(HSLColor accent, Color surface,
-      {required bool lighten}) {
+  static Color _textOn(
+    HSLColor accent,
+    Color surface, {
+    required bool lighten,
+  }) {
     const double target = 4.5;
     const double step = 0.02;
 
@@ -164,8 +167,9 @@ class CbAccentRamp {
       final color = candidate.toColor();
       if (_contrastRatio(color, surface) >= target) return color;
 
-      final double next =
-          lighten ? candidate.lightness + step : candidate.lightness - step;
+      final double next = lighten
+          ? candidate.lightness + step
+          : candidate.lightness - step;
       if (next <= 0.0 || next >= 1.0) break;
       candidate = candidate.withLightness(next);
     }

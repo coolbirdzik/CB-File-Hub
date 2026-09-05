@@ -12,10 +12,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 class ArchivePreview extends StatefulWidget {
   final String archivePath;
 
-  const ArchivePreview({
-    Key? key,
-    required this.archivePath,
-  }) : super(key: key);
+  const ArchivePreview({super.key, required this.archivePath});
 
   @override
   State<ArchivePreview> createState() => _ArchivePreviewState();
@@ -137,7 +134,7 @@ class _ArchivePreviewState extends State<ArchivePreview> {
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   itemCount: previewEntries.length + (hasMore ? 1 : 0),
-                  separatorBuilder: (_, __) => Divider(
+                  separatorBuilder: (_, _) => Divider(
                     height: 1,
                     color: theme.dividerColor.withValues(alpha: 0.35),
                   ),
@@ -147,7 +144,8 @@ class _ArchivePreviewState extends State<ArchivePreview> {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Text(
                           l10n.archivePreviewMore(
-                              _entries.length - previewEntries.length),
+                            _entries.length - previewEntries.length,
+                          ),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface.withValues(

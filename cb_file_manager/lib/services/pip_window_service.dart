@@ -24,13 +24,15 @@ class PipWindowService {
       // Forward only safe args (filter out debug service flags that can collide).
       final executable = Platform.resolvedExecutable;
       final workingDir = File(executable).parent.path;
-      final filteredArgs = Platform.executableArguments.where((a) {
-        final al = a.toLowerCase();
-        return !(al.startsWith('--vm-service') ||
-            al.startsWith('--observatory-port') ||
-            al.startsWith('--dds-port') ||
-            al.startsWith('--devtools-server-address'));
-      }).toList(growable: false);
+      final filteredArgs = Platform.executableArguments
+          .where((a) {
+            final al = a.toLowerCase();
+            return !(al.startsWith('--vm-service') ||
+                al.startsWith('--observatory-port') ||
+                al.startsWith('--dds-port') ||
+                al.startsWith('--devtools-server-address'));
+          })
+          .toList(growable: false);
 
       await Process.start(
         executable,
@@ -46,13 +48,15 @@ class PipWindowService {
       try {
         final executable = Platform.resolvedExecutable;
         final workingDir = File(executable).parent.path;
-        final filteredArgs = Platform.executableArguments.where((a) {
-          final al = a.toLowerCase();
-          return !(al.startsWith('--vm-service') ||
-              al.startsWith('--observatory-port') ||
-              al.startsWith('--dds-port') ||
-              al.startsWith('--devtools-server-address'));
-        }).toList(growable: false);
+        final filteredArgs = Platform.executableArguments
+            .where((a) {
+              final al = a.toLowerCase();
+              return !(al.startsWith('--vm-service') ||
+                  al.startsWith('--observatory-port') ||
+                  al.startsWith('--dds-port') ||
+                  al.startsWith('--devtools-server-address'));
+            })
+            .toList(growable: false);
         await Process.start(
           executable,
           filteredArgs,

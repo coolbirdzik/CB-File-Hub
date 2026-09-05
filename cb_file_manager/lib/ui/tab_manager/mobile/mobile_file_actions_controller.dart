@@ -10,10 +10,7 @@ import 'package:cb_file_manager/ui/tab_manager/components/folder_context_menu.da
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 
-enum MobileActionBarProfile {
-  full,
-  drivesMinimal,
-}
+enum MobileActionBarProfile { full, drivesMinimal }
 
 /// Controller to manage file actions from mobile action bar
 /// This allows the mobile action buttons to communicate with TabbedFolderListScreen
@@ -201,10 +198,7 @@ class MobileFileActionsController {
     final isSelected = currentSortOption == option;
 
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? theme.colorScheme.primary : null,
-      ),
+      leading: Icon(icon, color: isSelected ? theme.colorScheme.primary : null),
       title: Text(
         label,
         style: TextStyle(
@@ -299,14 +293,30 @@ class MobileFileActionsController {
                 const Divider(height: 1),
 
                 // View mode options
-                _buildViewModeOption(context, ViewMode.list,
-                    localizations.viewModeList, PhosphorIconsLight.listBullets),
-                _buildViewModeOption(context, ViewMode.grid,
-                    localizations.viewModeGrid, PhosphorIconsLight.squaresFour),
-                _buildViewModeOption(context, ViewMode.details,
-                    localizations.viewModeDetails, PhosphorIconsLight.rows),
-                _buildViewModeOption(context, ViewMode.tree,
-                    localizations.viewModeTree, PhosphorIconsLight.treeView),
+                _buildViewModeOption(
+                  context,
+                  ViewMode.list,
+                  localizations.viewModeList,
+                  PhosphorIconsLight.listBullets,
+                ),
+                _buildViewModeOption(
+                  context,
+                  ViewMode.grid,
+                  localizations.viewModeGrid,
+                  PhosphorIconsLight.squaresFour,
+                ),
+                _buildViewModeOption(
+                  context,
+                  ViewMode.details,
+                  localizations.viewModeDetails,
+                  PhosphorIconsLight.rows,
+                ),
+                _buildViewModeOption(
+                  context,
+                  ViewMode.tree,
+                  localizations.viewModeTree,
+                  PhosphorIconsLight.treeView,
+                ),
 
                 const SizedBox(height: 16),
               ],
@@ -318,15 +328,16 @@ class MobileFileActionsController {
   }
 
   Widget _buildViewModeOption(
-      BuildContext context, ViewMode mode, String label, IconData icon) {
+    BuildContext context,
+    ViewMode mode,
+    String label,
+    IconData icon,
+  ) {
     final theme = Theme.of(context);
     final isSelected = currentViewMode == mode;
 
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? theme.colorScheme.primary : null,
-      ),
+      leading: Icon(icon, color: isSelected ? theme.colorScheme.primary : null),
       title: Text(
         label,
         style: TextStyle(
@@ -436,8 +447,9 @@ class MobileFileActionsController {
                 onTap: () {
                   Navigator.pop(context);
                   allowFileExtensionRename = !allowFileExtensionRename;
-                  onAllowFileExtensionRenameChanged
-                      ?.call(allowFileExtensionRename);
+                  onAllowFileExtensionRenameChanged?.call(
+                    allowFileExtensionRename,
+                  );
                 },
               ),
 
@@ -451,8 +463,10 @@ class MobileFileActionsController {
               ),
               title: Text(localizations.masonryLayout),
               trailing: isMasonryLayout
-                  ? Icon(PhosphorIconsLight.check,
-                      color: theme.colorScheme.primary)
+                  ? Icon(
+                      PhosphorIconsLight.check,
+                      color: theme.colorScheme.primary,
+                    )
                   : null,
               onTap: () {
                 Navigator.pop(context);
@@ -476,7 +490,8 @@ class MobileFileActionsController {
   /// Build mobile action bar with 5 buttons
   Widget buildMobileActionBar(BuildContext context, {ViewMode? viewMode}) {
     debugPrint(
-        '📱 buildMobileActionBar called - tabId: $tabId, currentPath: $currentPath');
+      '📱 buildMobileActionBar called - tabId: $tabId, currentPath: $currentPath',
+    );
 
     final theme = Theme.of(context);
     final localizations = AppLocalizations.of(context)!;
@@ -500,35 +515,45 @@ class MobileFileActionsController {
                   icon: const Icon(PhosphorIconsLight.arrowLeft, size: 20),
                   tooltip: localizations.back,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: onBack,
                 ),
                 IconButton(
                   icon: const Icon(PhosphorIconsLight.arrowRight, size: 20),
                   tooltip: localizations.forward,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: onForward,
                 ),
                 IconButton(
                   icon: Icon(_viewModeIcon(effectiveViewMode), size: 20),
                   tooltip: localizations.viewModeTooltip,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     showViewModeDialog(context);
                   },
                 ),
                 IconButton(
-                  icon:
-                      const Icon(PhosphorIconsLight.arrowsClockwise, size: 20),
+                  icon: const Icon(
+                    PhosphorIconsLight.arrowsClockwise,
+                    size: 20,
+                  ),
                   tooltip: localizations.refresh,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     onRefresh?.call();
                   },
@@ -537,12 +562,16 @@ class MobileFileActionsController {
             : [
                 // Search button - opens simple inline search
                 IconButton(
-                  icon:
-                      const Icon(PhosphorIconsLight.magnifyingGlass, size: 20),
+                  icon: const Icon(
+                    PhosphorIconsLight.magnifyingGlass,
+                    size: 20,
+                  ),
                   tooltip: localizations.search,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () => showInlineSearch(context),
                 ),
 
@@ -551,8 +580,10 @@ class MobileFileActionsController {
                   icon: const Icon(PhosphorIconsLight.sortAscending, size: 20),
                   tooltip: localizations.sort,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     showSortDialog(context);
                   },
@@ -563,8 +594,10 @@ class MobileFileActionsController {
                   icon: Icon(_viewModeIcon(effectiveViewMode), size: 20),
                   tooltip: localizations.viewModeTooltip,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     showViewModeDialog(context);
                   },
@@ -575,8 +608,10 @@ class MobileFileActionsController {
                   icon: const Icon(PhosphorIconsLight.plus, size: 20),
                   tooltip: localizations.create,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     showCreateMenu(context);
                   },
@@ -584,12 +619,16 @@ class MobileFileActionsController {
 
                 // Refresh button
                 IconButton(
-                  icon:
-                      const Icon(PhosphorIconsLight.arrowsClockwise, size: 20),
+                  icon: const Icon(
+                    PhosphorIconsLight.arrowsClockwise,
+                    size: 20,
+                  ),
                   tooltip: localizations.refresh,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     onRefresh?.call();
                   },
@@ -597,12 +636,16 @@ class MobileFileActionsController {
 
                 // More options button
                 IconButton(
-                  icon: const Icon(PhosphorIconsLight.dotsThreeVertical,
-                      size: 20),
+                  icon: const Icon(
+                    PhosphorIconsLight.dotsThreeVertical,
+                    size: 20,
+                  ),
                   tooltip: localizations.moreOptions,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   onPressed: () {
                     showMoreOptionsMenu(context);
                   },
@@ -636,17 +679,23 @@ class MobileFileActionsController {
                 children: [
                   // Search bar
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
                         // Back button to close search
                         IconButton(
-                          icon: const Icon(PhosphorIconsLight.arrowLeft,
-                              size: 20),
+                          icon: const Icon(
+                            PhosphorIconsLight.arrowLeft,
+                            size: 20,
+                          ),
                           padding: EdgeInsets.zero,
-                          constraints:
-                              const BoxConstraints(minWidth: 40, minHeight: 40),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
                           onPressed: () {
                             searchController.clear();
                             currentSearchQuery = null;
@@ -689,7 +738,9 @@ class MobileFileActionsController {
                             icon: const Icon(PhosphorIconsLight.x, size: 18),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 32, minHeight: 32),
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
                             onPressed: () {
                               searchController.clear();
                               currentSearchQuery = null;

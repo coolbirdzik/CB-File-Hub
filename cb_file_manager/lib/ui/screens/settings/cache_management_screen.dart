@@ -20,10 +20,7 @@ import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
 class CacheManagementScreen extends StatefulWidget {
-  const CacheManagementScreen({
-    Key? key,
-    this.embedded = false,
-  }) : super(key: key);
+  const CacheManagementScreen({super.key, this.embedded = false});
 
   final bool embedded;
 
@@ -64,8 +61,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       final networkDir = await AppPathHelper.getNetworkCacheDir();
       final tempDir = await AppPathHelper.getTempFilesDir();
       final tagThumbDir = await AppPathHelper.getTagThumbnailDir();
-      final videoLibDir =
-          await VideoLibraryCacheService.instance.getCacheDirectory();
+      final videoLibDir = await VideoLibraryCacheService.instance
+          .getCacheDirectory();
       final networkStats = await NetworkThumbnailHelper().getCacheStats();
 
       final photoStats = await _directoryStats(photoDir);
@@ -132,7 +129,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
           key: 'tagThumbs',
           title:
               AppLocalizations.of(context)?.tagThumbnails ?? 'Tag thumbnails',
-          subtitle: AppLocalizations.of(context)?.tagThumbnailsDescription ??
+          subtitle:
+              AppLocalizations.of(context)?.tagThumbnailsDescription ??
               'Thumbnail images you chose for tags (stored in Documents)',
           icon: PhosphorIconsLight.tag,
           directory: tagThumbDir,
@@ -144,9 +142,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load cache info: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load cache info: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -168,12 +166,12 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
 
   /// Cache buckets (temp/cache root) — safe to clear, will be regenerated.
   List<_CacheEntry> get _entries => [
-        if (_photoThumbs != null) _photoThumbs!,
-        if (_videoThumbs != null) _videoThumbs!,
-        if (_networkThumbs != null) _networkThumbs!,
-        if (_videoLibrary != null) _videoLibrary!,
-        if (_tempFiles != null) _tempFiles!,
-      ];
+    ?_photoThumbs,
+    ?_videoThumbs,
+    ?_networkThumbs,
+    ?_videoLibrary,
+    ?_tempFiles,
+  ];
 
   Future<void> _browseInApp(Directory dir, String title) async {
     try {
@@ -189,7 +187,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Could not open folder in system explorer')),
+          content: Text('Could not open folder in system explorer'),
+        ),
       );
     }
   }
@@ -221,9 +220,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
           break;
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${entry.title} cleared')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${entry.title} cleared')));
       }
       await _load();
     } catch (e) {
@@ -247,16 +246,16 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       await VideoLibraryCacheService.instance.clearAll();
       await Win32SmbHelper().clearTempFileCache();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All cache cleared')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All cache cleared')));
       }
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to clear cache: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to clear cache: $e')));
     } finally {
       if (mounted) setState(() => _isClearingAll = false);
     }
@@ -278,8 +277,10 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       }
       int totalBytes = 0;
       int fileCount = 0;
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity in dir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is File) {
           fileCount++;
           try {
@@ -315,7 +316,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                 ),
                 _buildAcrylicIconButton(
                   theme: theme,
-                  tooltip: AppLocalizations.of(context)?.refreshCacheInfo ??
+                  tooltip:
+                      AppLocalizations.of(context)?.refreshCacheInfo ??
                       'Refresh',
                   onPressed: _isLoading ? null : _load,
                   icon: _isLoading
@@ -324,8 +326,10 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(PhosphorIconsLight.arrowsClockwise,
-                          size: 18),
+                      : const Icon(
+                          PhosphorIconsLight.arrowsClockwise,
+                          size: 18,
+                        ),
                 ),
                 const SizedBox(width: 8),
                 _buildAcrylicIconButton(
@@ -344,7 +348,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
     }
 
     return BaseScreen(
-      title: AppLocalizations.of(context)?.appDataManagement ??
+      title:
+          AppLocalizations.of(context)?.appDataManagement ??
           'App Data Management',
       actions: [
         IconButton(
@@ -411,7 +416,8 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
           theme,
           icon: PhosphorIconsLight.hardDrive,
           label: l10n?.documentsData ?? 'Stored data',
-          description: l10n?.documentsDataDescription ??
+          description:
+              l10n?.documentsDataDescription ??
               'Data kept in your Documents folder so it survives cache cleanup.',
         ),
         const SizedBox(height: 12),
@@ -426,16 +432,19 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
           theme,
           icon: PhosphorIconsLight.broom,
           label: l10n?.cacheManagement ?? 'Cache',
-          description: l10n?.cacheManagementDescription ??
+          description:
+              l10n?.cacheManagementDescription ??
               'Short-term cache used for thumbnails, library artifacts and temporary files.',
         ),
         const SizedBox(height: 12),
         _buildRootLocationCard(theme),
         const SizedBox(height: 12),
-        ..._entries.map((e) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildEntryCard(theme, e, totalBytes),
-            )),
+        ..._entries.map(
+          (e) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildEntryCard(theme, e, totalBytes),
+          ),
+        ),
         const SizedBox(height: 8),
         FilledButton.icon(
           onPressed: _isClearingAll ? null : _clearAll,
@@ -500,8 +509,11 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         children: [
           Row(
             children: [
-              Icon(PhosphorIconsLight.folderOpen,
-                  color: theme.colorScheme.primary, size: 18),
+              Icon(
+                PhosphorIconsLight.folderOpen,
+                color: theme.colorScheme.primary,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text(
                 l10n?.documentsRoot ?? 'Documents root',
@@ -526,8 +538,10 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
               OutlinedButton.icon(
                 onPressed: _documentsRootPath == null
                     ? null
-                    : () => _browseInApp(Directory(_documentsRootPath!),
-                        l10n?.documentsRoot ?? 'Documents root'),
+                    : () => _browseInApp(
+                        Directory(_documentsRootPath!),
+                        l10n?.documentsRoot ?? 'Documents root',
+                      ),
                 icon: const Icon(PhosphorIconsLight.folderSimplePlus, size: 16),
                 label: Text(l10n?.browse ?? 'Browse in app'),
               ),
@@ -580,8 +594,9 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      AppLocalizations.of(context)
-                              ?.appDataManagementDescription ??
+                      AppLocalizations.of(
+                            context,
+                          )?.appDataManagementDescription ??
                           'Manage stored data and temporary cache used by the app.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
@@ -598,7 +613,10 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
             runSpacing: 12,
             children: [
               _buildMetricChip(
-                  theme, 'Total size', FormatUtils.formatFileSize(_totalBytes)),
+                theme,
+                'Total size',
+                FormatUtils.formatFileSize(_totalBytes),
+              ),
               _buildMetricChip(theme, 'Files', _totalFiles.toString()),
               _buildMetricChip(theme, 'Buckets', _entries.length.toString()),
             ],
@@ -617,8 +635,11 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         children: [
           Row(
             children: [
-              Icon(PhosphorIconsLight.folderOpen,
-                  color: theme.colorScheme.primary, size: 18),
+              Icon(
+                PhosphorIconsLight.folderOpen,
+                color: theme.colorScheme.primary,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Text(
                 AppLocalizations.of(context)?.cacheFolder ?? 'Cache root',
@@ -648,17 +669,21 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
                     : () => _browseInApp(
                         Directory(_rootPath!),
                         AppLocalizations.of(context)?.cacheFolder ??
-                            'Cache Root'),
+                            'Cache Root',
+                      ),
                 icon: const Icon(PhosphorIconsLight.folderSimplePlus, size: 16),
                 label: Text(
-                    AppLocalizations.of(context)?.browse ?? 'Browse in app'),
+                  AppLocalizations.of(context)?.browse ?? 'Browse in app',
+                ),
               ),
               OutlinedButton.icon(
-                onPressed:
-                    _rootPath == null ? null : () => _openInSystem(_rootPath!),
+                onPressed: _rootPath == null
+                    ? null
+                    : () => _openInSystem(_rootPath!),
                 icon: const Icon(PhosphorIconsLight.arrowSquareOut, size: 16),
                 label: Text(
-                    AppLocalizations.of(context)?.openFolder ?? 'Open folder'),
+                  AppLocalizations.of(context)?.openFolder ?? 'Open folder',
+                ),
               ),
             ],
           ),

@@ -269,11 +269,7 @@ class AiProviderService {
   Future<void> deleteProvider(String id) async {
     _disposeProvider(id);
     final db = await _getDatabase();
-    await db.delete(
-      _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete(_tableName, where: 'id = ?', whereArgs: [id]);
     _healthCache.remove(id);
     await _refreshCache();
     AppLogger.info('[AI] Provider deleted: $id');
@@ -314,13 +310,17 @@ class AiProviderService {
     AiProviderException? lastError;
 
     for (final config in providers) {
-      final effectiveModelName =
-          config.id == preferredProviderId ? preferredModelName : null;
-      final health =
-          _healthCache.putIfAbsent(config.id, () => _ProviderHealth());
+      final effectiveModelName = config.id == preferredProviderId
+          ? preferredModelName
+          : null;
+      final health = _healthCache.putIfAbsent(
+        config.id,
+        () => _ProviderHealth(),
+      );
       if (health.isDown) {
         AppLogger.debug(
-            '[AI] Skipping down provider: ${config.name} (${config.id})');
+          '[AI] Skipping down provider: ${config.name} (${config.id})',
+        );
         continue;
       }
 
@@ -335,8 +335,10 @@ class AiProviderService {
             ? _createProvider(requestConfig)
             : _getOrCreateProvider(config);
         try {
-          final response =
-              await provider.chat(messages, systemPrompt: systemPrompt);
+          final response = await provider.chat(
+            messages,
+            systemPrompt: systemPrompt,
+          );
           health.recordSuccess();
           return AiChatResult(response: response, providerId: config.id);
         } finally {
@@ -390,10 +392,13 @@ class AiProviderService {
     AiProviderException? lastError;
 
     for (final config in providers) {
-      final effectiveModelName =
-          config.id == preferredProviderId ? preferredModelName : null;
-      final health =
-          _healthCache.putIfAbsent(config.id, () => _ProviderHealth());
+      final effectiveModelName = config.id == preferredProviderId
+          ? preferredModelName
+          : null;
+      final health = _healthCache.putIfAbsent(
+        config.id,
+        () => _ProviderHealth(),
+      );
       if (health.isDown) continue;
 
       try {
@@ -407,8 +412,10 @@ class AiProviderService {
             ? _createProvider(requestConfig)
             : _getOrCreateProvider(config);
         // Attempt to start the stream (throws before yielding on auth/network errors)
-        final rawStream =
-            provider.chatStream(messages, systemPrompt: systemPrompt);
+        final rawStream = provider.chatStream(
+          messages,
+          systemPrompt: systemPrompt,
+        );
         final stream = useTemporaryProvider
             ? _streamWithDispose(rawStream, provider)
             : rawStream;
@@ -542,8 +549,9 @@ class AiProviderService {
       return providers;
     }
 
-    final selected =
-        providers.where((p) => p.id == preferredProviderId).toList();
+    final selected = providers
+        .where((p) => p.id == preferredProviderId)
+        .toList();
     return selected;
   }
 
@@ -565,10 +573,7 @@ class AiProviderService {
 
   Future<void> _refreshCache() async {
     final db = await _getDatabase();
-    final rows = await db.query(
-      _tableName,
-      orderBy: 'priority ASC',
-    );
+    final rows = await db.query(_tableName, orderBy: 'priority ASC');
     _configsCache = rows.map((r) => AiProviderConfig.fromMap(r)).toList();
     _configsLoaded = true;
   }

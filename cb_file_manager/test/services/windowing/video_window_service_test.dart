@@ -14,15 +14,16 @@ void main() {
       reuseRequests.add(filePath);
       return playerExists;
     };
-    VideoWindowService.processLauncherForTesting = ({
-      required executable,
-      required arguments,
-      required environment,
-      required workingDirectory,
-    }) async {
-      launches.add(Map<String, String>.from(environment));
-      playerExists = true;
-    };
+    VideoWindowService.processLauncherForTesting =
+        ({
+          required executable,
+          required arguments,
+          required environment,
+          required workingDirectory,
+        }) async {
+          launches.add(Map<String, String>.from(environment));
+          playerExists = true;
+        };
 
     expect(
       await VideoWindowService.openVideoWindow(
@@ -31,21 +32,17 @@ void main() {
       ),
       isTrue,
     );
-    expect(await VideoWindowService.openVideoWindow('C:\\Videos\\two.mp4'),
-        isTrue);
+    expect(
+      await VideoWindowService.openVideoWindow('C:\\Videos\\two.mp4'),
+      isTrue,
+    );
 
-    expect(reuseRequests, <String>[
-      r'C:\Videos\one.mp4',
-      r'C:\Videos\two.mp4',
-    ]);
+    expect(reuseRequests, <String>[r'C:\Videos\one.mp4', r'C:\Videos\two.mp4']);
     expect(launches, hasLength(1));
     expect(
       jsonDecode(launches[0][VideoWindowService.envArgsKey]!)['path'],
       r'C:\Videos\one.mp4',
     );
-    expect(
-      launches.single[VideoWindowService.envInitiallyMaximizedKey],
-      '1',
-    );
+    expect(launches.single[VideoWindowService.envInitiallyMaximizedKey], '1');
   });
 }

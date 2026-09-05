@@ -25,12 +25,12 @@ class ImageViewerScreen extends StatefulWidget {
   final Uint8List? imageBytes; // Optional preloaded bytes for immediate display
 
   const ImageViewerScreen({
-    Key? key,
+    super.key,
     required this.file,
     this.imageFiles,
     this.initialIndex = 0,
     this.imageBytes,
-  }) : super(key: key);
+  });
 
   @override
   ImageViewerScreenState createState() => ImageViewerScreenState();
@@ -83,14 +83,15 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     _initImageList();
     _keyboardFocusNode = FocusNode();
     _transformationController = TransformationController();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    )..addListener(() {
-        if (_animation != null) {
-          _transformationController.value = _animation!.value;
-        }
-      });
+    _animationController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 300),
+        )..addListener(() {
+          if (_animation != null) {
+            _transformationController.value = _animation!.value;
+          }
+        });
 
     // Request keyboard focus once after the first frame so keyboard shortcuts work.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -112,12 +113,16 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     // Configure system UI
     if (_isMobile()) {
       // On mobile, show full UI (both status bar and nav bar)
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+      );
     } else {
       // On desktop, keep bottom nav visible
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: [SystemUiOverlay.bottom]);
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.bottom],
+      );
     }
   }
 
@@ -149,16 +154,18 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
         }).toList();
 
         // Sort images by name
-        images.sort((a, b) => pathlib
-            .basename(a.path)
-            .toLowerCase()
-            .compareTo(pathlib.basename(b.path).toLowerCase()));
+        images.sort(
+          (a, b) => pathlib
+              .basename(a.path)
+              .toLowerCase()
+              .compareTo(pathlib.basename(b.path).toLowerCase()),
+        );
 
         // Find current image index based on absolute path comparison
         final currentPath = widget.file.path;
         final index = images.indexWhere(
-            (file) => file.path == currentPath // Exact path matching
-            );
+          (file) => file.path == currentPath, // Exact path matching
+        );
 
         if (mounted) {
           setState(() {
@@ -170,7 +177,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                 // This keeps PageController at page 0 showing the correct image
                 if (widget.imageBytes != null && index != 0) {
                   debugPrint(
-                      '🔄 Reordering list - moving screenshot from index $index to 0');
+                    '🔄 Reordering list - moving screenshot from index $index to 0',
+                  );
                   final screenshot = images[index];
                   images.removeAt(index);
                   images.insert(0, screenshot);
@@ -188,7 +196,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
               } else {
                 // If we somehow can't find the image in the directory
                 debugPrint(
-                    'Warning: Could not find current image in directory. Path: $currentPath');
+                  'Warning: Could not find current image in directory. Path: $currentPath',
+                );
                 _allImages = [widget.file];
               }
             }
@@ -207,8 +216,10 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     _transformationController.dispose();
     _animationController.dispose();
     _keyboardFocusNode.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+    );
     super.dispose();
   }
 
@@ -217,13 +228,16 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
     if (_transformationController.value != Matrix4.identity()) {
       // Reset to identity if already zoomed in
-      _animation = Matrix4Tween(
-        begin: _transformationController.value,
-        end: Matrix4.identity(),
-      ).animate(CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ));
+      _animation =
+          Matrix4Tween(
+            begin: _transformationController.value,
+            end: Matrix4.identity(),
+          ).animate(
+            CurvedAnimation(
+              parent: _animationController,
+              curve: Curves.easeOut,
+            ),
+          );
     } else {
       // Zoom in around tap point
       final position = details.localPosition;
@@ -238,26 +252,29 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
         ..scaleByVector3(Vector3(scale, scale, 1))
         ..translateByVector3(Vector3(-position.dx, -position.dy, 0));
 
-      _animation = Matrix4Tween(
-        begin: _transformationController.value,
-        end: zoomed,
-      ).animate(CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ));
+      _animation =
+          Matrix4Tween(
+            begin: _transformationController.value,
+            end: zoomed,
+          ).animate(
+            CurvedAnimation(
+              parent: _animationController,
+              curve: Curves.easeOut,
+            ),
+          );
     }
 
     _animationController.forward(from: 0);
   }
 
   void _resetTransformation() {
-    _animation = Matrix4Tween(
-      begin: _transformationController.value,
-      end: Matrix4.identity(),
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    _animation =
+        Matrix4Tween(
+          begin: _transformationController.value,
+          end: Matrix4.identity(),
+        ).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
     _animationController.forward(from: 0);
   }
 
@@ -268,8 +285,10 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
     if (_isMobile()) {
       if (_controlsVisible) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }
@@ -282,8 +301,10 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
       if (_isFullscreen) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       } else {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-            overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom]);
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
       }
     });
   }
@@ -352,10 +373,14 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                     _infoRow('Size', fileSize),
                     const Divider(),
                     _infoRow(
-                        'Type', pathlib.extension(file.path).toUpperCase()),
+                      'Type',
+                      pathlib.extension(file.path).toUpperCase(),
+                    ),
                     const Divider(),
-                    _infoRow('Last modified',
-                        '${modified.day}/${modified.month}/${modified.year} ${modified.hour}:${modified.minute.toString().padLeft(2, '0')}'),
+                    _infoRow(
+                      'Last modified',
+                      '${modified.day}/${modified.month}/${modified.year} ${modified.hour}:${modified.minute.toString().padLeft(2, '0')}',
+                    ),
                   ],
                 ),
               ),
@@ -493,9 +518,11 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
           curve: Curves.easeInOut,
         );
       } else {
-        _pageController.animateToPage(0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut);
+        _pageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
     });
 
@@ -533,21 +560,18 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
 
     final Matrix4 target = zoomAroundCenter.multiplied(current);
 
-    _animation = Matrix4Tween(
-      begin: current,
-      end: target,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+    _animation = Matrix4Tween(begin: current, end: target).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
     _animationController.forward(from: 0);
   }
 
   void _shareImage() {
     final file = _allImages[_currentIndex];
     final xFile = XFile(file.path);
-    SharePlus.instance
-        .share(ShareParams(files: [xFile], text: 'Check out this image!'));
+    SharePlus.instance.share(
+      ShareParams(files: [xFile], text: 'Check out this image!'),
+    );
   }
 
   // Phương thức để tải và cache ảnh
@@ -642,9 +666,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
           return child;
         }
         return Center(
-          child: CircularProgressIndicator(
-            color: Colors.white.withAlpha(179),
-          ),
+          child: CircularProgressIndicator(color: Colors.white.withAlpha(179)),
         );
       },
       errorBuilder: (context, error, stackTrace) {
@@ -657,11 +679,16 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(PhosphorIconsLight.imageBroken,
-            size: 80, color: Colors.white.withAlpha(179)),
+        Icon(
+          PhosphorIconsLight.imageBroken,
+          size: 80,
+          color: Colors.white.withAlpha(179),
+        ),
         const SizedBox(height: 16),
-        Text('Failed to display image',
-            style: TextStyle(color: Colors.white.withAlpha(179))),
+        Text(
+          'Failed to display image',
+          style: TextStyle(color: Colors.white.withAlpha(179)),
+        ),
         const SizedBox(height: 8),
         Text(
           error.toString(),
@@ -675,11 +702,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
   @override
   Widget build(BuildContext context) {
     if (_allImages.isEmpty) {
-      return const Scaffold(
-        body: Center(
-          child: Text('No images to display'),
-        ),
-      );
+      return const Scaffold(body: Center(child: Text('No images to display')));
     }
 
     // If in normal viewing mode (not editing)
@@ -752,51 +775,57 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               return ClipRect(
-                                  child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                      maxWidth: constraints.maxWidth),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        pathlib.basename(
-                                            _allImages[_currentIndex].path),
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.white,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                        softWrap: false,
-                                      ),
-                                      if (_allImages.length > 1)
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: constraints.maxWidth,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
                                         Text(
-                                          '${_currentIndex + 1} / ${_allImages.length}',
+                                          pathlib.basename(
+                                            _allImages[_currentIndex].path,
+                                          ),
                                           style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.white70,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                           maxLines: 1,
                                           softWrap: false,
                                         ),
-                                    ],
+                                        if (_allImages.length > 1)
+                                          Text(
+                                            '${_currentIndex + 1} / ${_allImages.length}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white70,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                            softWrap: false,
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ));
+                              );
                             },
                           ),
                         ),
                         IconButton(
-                          icon:
-                              const Icon(PhosphorIconsLight.shareFat, size: 20),
+                          icon: const Icon(
+                            PhosphorIconsLight.shareFat,
+                            size: 20,
+                          ),
                           tooltip: 'Share',
                           color: Colors.white,
                           onPressed: _shareImage,
@@ -806,7 +835,9 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           tooltip: 'Info',
                           color: Colors.white,
                           onPressed: () => _showImageInfo(
-                              context, _allImages[_currentIndex]),
+                            context,
+                            _allImages[_currentIndex],
+                          ),
                         ),
                         PopupMenuButton<String>(
                           iconColor: Colors.white,
@@ -841,43 +872,59 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                           itemBuilder: (context) => const [
                             PopupMenuItem(
                               value: 'rotate_right',
-                              child: Text('Rotate right 90°',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Rotate right 90°',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'rotate_left',
-                              child: Text('Rotate left 90°',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Rotate left 90°',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'toggle_thumbs',
-                              child: Text('Toggle thumbnails',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Toggle thumbnails',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'edit',
-                              child: Text('Edit (brightness/contrast)',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Edit (brightness/contrast)',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'open_with',
-                              child: Text('Open with...',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Open with...',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'copy_path',
-                              child: Text('Copy file path',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Copy file path',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'fullscreen',
-                              child: Text('Toggle fullscreen',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Toggle fullscreen',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             PopupMenuItem(
                               value: 'delete',
-                              child: Text('Move to trash',
-                                  style: TextStyle(color: Colors.white)),
+                              child: Text(
+                                'Move to trash',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ],
                         ),
@@ -1007,16 +1054,18 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                               top: false,
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     if (_allImages.length > 1)
                                       IconButton(
                                         icon: const Icon(
-                                            PhosphorIconsLight.arrowLeft,
-                                            size: 22),
+                                          PhosphorIconsLight.arrowLeft,
+                                          size: 22,
+                                        ),
                                         tooltip: 'Previous',
                                         color: Colors.white,
                                         padding: const EdgeInsets.all(8),
@@ -1025,15 +1074,18 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                             ? () {
                                                 _pageController.previousPage(
                                                   duration: const Duration(
-                                                      milliseconds: 300),
+                                                    milliseconds: 300,
+                                                  ),
                                                   curve: Curves.easeInOut,
                                                 );
                                               }
                                             : null,
                                       ),
                                     IconButton(
-                                      icon: const Icon(PhosphorIconsLight.minus,
-                                          size: 22),
+                                      icon: const Icon(
+                                        PhosphorIconsLight.minus,
+                                        size: 22,
+                                      ),
                                       tooltip: 'Zoom out',
                                       color: Colors.white,
                                       padding: const EdgeInsets.all(8),
@@ -1042,8 +1094,9 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                     ),
                                     IconButton(
                                       icon: const Icon(
-                                          PhosphorIconsLight.arrowsClockwise,
-                                          size: 22),
+                                        PhosphorIconsLight.arrowsClockwise,
+                                        size: 22,
+                                      ),
                                       tooltip: 'Reset view',
                                       color: Colors.white,
                                       padding: const EdgeInsets.all(8),
@@ -1051,8 +1104,10 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                       onPressed: _zoomReset,
                                     ),
                                     IconButton(
-                                      icon: const Icon(PhosphorIconsLight.plus,
-                                          size: 22),
+                                      icon: const Icon(
+                                        PhosphorIconsLight.plus,
+                                        size: 22,
+                                      ),
                                       tooltip: 'Zoom in',
                                       color: Colors.white,
                                       padding: const EdgeInsets.all(8),
@@ -1060,19 +1115,24 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                       onPressed: _zoomIn,
                                     ),
                                     IconButton(
-                                      icon: const Icon(PhosphorIconsLight.info,
-                                          size: 22),
+                                      icon: const Icon(
+                                        PhosphorIconsLight.info,
+                                        size: 22,
+                                      ),
                                       tooltip: 'Info',
                                       color: Colors.white,
                                       padding: const EdgeInsets.all(8),
                                       constraints: const BoxConstraints(),
                                       onPressed: () => _showImageInfo(
-                                          context, _allImages[_currentIndex]),
+                                        context,
+                                        _allImages[_currentIndex],
+                                      ),
                                     ),
                                     IconButton(
                                       icon: const Icon(
-                                          PhosphorIconsLight.shareFat,
-                                          size: 22),
+                                        PhosphorIconsLight.shareFat,
+                                        size: 22,
+                                      ),
                                       tooltip: 'Share',
                                       color: Colors.white,
                                       padding: const EdgeInsets.all(8),
@@ -1080,8 +1140,10 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                       onPressed: _shareImage,
                                     ),
                                     IconButton(
-                                      icon: const Icon(PhosphorIconsLight.trash,
-                                          size: 22),
+                                      icon: const Icon(
+                                        PhosphorIconsLight.trash,
+                                        size: 22,
+                                      ),
                                       tooltip: 'Delete',
                                       color: Colors.white,
                                       padding: const EdgeInsets.all(8),
@@ -1121,18 +1183,21 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                     if (_allImages.length > 1)
                                       IconButton(
                                         icon: const Icon(
-                                            PhosphorIconsLight.arrowRight,
-                                            size: 22),
+                                          PhosphorIconsLight.arrowRight,
+                                          size: 22,
+                                        ),
                                         tooltip: 'Next',
                                         color: Colors.white,
                                         padding: const EdgeInsets.all(8),
                                         constraints: const BoxConstraints(),
-                                        onPressed: _currentIndex <
+                                        onPressed:
+                                            _currentIndex <
                                                 _allImages.length - 1
                                             ? () {
                                                 _pageController.nextPage(
                                                   duration: const Duration(
-                                                      milliseconds: 300),
+                                                    milliseconds: 300,
+                                                  ),
                                                   curve: Curves.easeInOut,
                                                 );
                                               }
@@ -1183,9 +1248,7 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                         return const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircularProgressIndicator(
-                              color: Colors.white70,
-                            ),
+                            CircularProgressIndicator(color: Colors.white70),
                             SizedBox(height: 16),
                             Text(
                               'Loading image for editing...',
@@ -1206,8 +1269,9 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                             const SizedBox(height: 16),
                             Text(
                               'Failed to load image',
-                              style:
-                                  TextStyle(color: Colors.white.withAlpha(179)),
+                              style: TextStyle(
+                                color: Colors.white.withAlpha(179),
+                              ),
                             ),
                           ],
                         );
@@ -1234,29 +1298,38 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
             ),
             Container(
               color: Colors.black.withAlpha(179),
-              padding:
-                  const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(
+                vertical: 16.0,
+                horizontal: 24.0,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Brightness slider
                   Row(
                     children: [
-                      const Icon(PhosphorIconsLight.sun,
-                          color: Colors.white, size: 20),
+                      const Icon(
+                        PhosphorIconsLight.sun,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Slider(
-                          value: _brightness,
-                          min: -1.0,
-                          max: 1.0,
-                          divisions: 20,
-                          label: 'Brightness: ${(_brightness * 100).round()}%',
-                          onChanged: (value) {
-                            setState(() {
-                              _brightness = value;
-                            });
-                          },
+                        child: Semantics(
+                          container: true,
+                          child: Slider(
+                            value: _brightness,
+                            min: -1.0,
+                            max: 1.0,
+                            divisions: 20,
+                            label:
+                                'Brightness: ${(_brightness * 100).round()}%',
+                            onChanged: (value) {
+                              setState(() {
+                                _brightness = value;
+                              });
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -1264,21 +1337,27 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                   // Contrast slider
                   Row(
                     children: [
-                      const Icon(PhosphorIconsLight.palette,
-                          color: Colors.white, size: 20),
+                      const Icon(
+                        PhosphorIconsLight.palette,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Slider(
-                          value: _contrast,
-                          min: -1.0,
-                          max: 1.0,
-                          divisions: 20,
-                          label: 'Contrast: ${(_contrast * 100).round()}%',
-                          onChanged: (value) {
-                            setState(() {
-                              _contrast = value;
-                            });
-                          },
+                        child: Semantics(
+                          container: true,
+                          child: Slider(
+                            value: _contrast,
+                            min: -1.0,
+                            max: 1.0,
+                            divisions: 20,
+                            label: 'Contrast: ${(_contrast * 100).round()}%',
+                            onChanged: (value) {
+                              setState(() {
+                                _contrast = value;
+                              });
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -1297,11 +1376,15 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).colorScheme.error,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           minimumSize: const Size(100, 36),
                         ),
-                        icon: const Icon(PhosphorIconsLight.arrowsClockwise,
-                            size: 18),
+                        icon: const Icon(
+                          PhosphorIconsLight.arrowsClockwise,
+                          size: 18,
+                        ),
                         label: const Text('Reset'),
                       ),
                       const SizedBox(width: 16),
@@ -1314,11 +1397,15 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade800,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           minimumSize: const Size(100, 36),
                         ),
-                        icon:
-                            const Icon(PhosphorIconsLight.floppyDisk, size: 18),
+                        icon: const Icon(
+                          PhosphorIconsLight.floppyDisk,
+                          size: 18,
+                        ),
                         label: const Text('Save Copy'),
                       ),
                     ],
@@ -1368,16 +1455,8 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$title: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Text('$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );

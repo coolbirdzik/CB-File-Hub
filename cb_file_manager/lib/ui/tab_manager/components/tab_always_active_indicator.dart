@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -21,10 +22,10 @@ class TabAlwaysActiveIndicator extends StatefulWidget {
   final double iconSize;
 
   const TabAlwaysActiveIndicator({
-    Key? key,
+    super.key,
     required this.tabId,
     this.iconSize = 14,
-  }) : super(key: key);
+  });
 
   @override
   State<TabAlwaysActiveIndicator> createState() =>
@@ -76,7 +77,7 @@ class _TabAlwaysActiveIndicatorState extends State<TabAlwaysActiveIndicator> {
 
     return Padding(
       padding: const EdgeInsets.only(right: 6),
-      child: Tooltip(
+      child: CbTooltip(
         message: context.tr.tabAlwaysActiveTooltip,
         waitDuration: const Duration(milliseconds: 350),
         child: Icon(

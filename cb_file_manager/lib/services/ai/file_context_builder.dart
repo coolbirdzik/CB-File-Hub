@@ -14,7 +14,7 @@ enum SearchScope {
   taggedFiles,
   allDrives,
   videoLibrary,
-  album
+  album,
 }
 
 String searchScopeDisplayName(SearchScope scope) {
@@ -73,7 +73,7 @@ class FileContextBuilder {
   final void Function(String step, int fileCount)? onProgress;
 
   FileContextBuilder({ContentReader? contentReader, this.onProgress})
-      : _contentReader = contentReader ?? ContentReader();
+    : _contentReader = contentReader ?? ContentReader();
 
   Future<String> buildContext({
     required String directoryPath,
@@ -81,7 +81,8 @@ class FileContextBuilder {
     bool includeContent = true,
   }) async {
     // If path is empty and scope is currentDirectory/recursive, auto-switch to allDrives
-    final effectiveScope = (directoryPath.isEmpty &&
+    final effectiveScope =
+        (directoryPath.isEmpty &&
             (scope == SearchScope.currentDirectory ||
                 scope == SearchScope.recursive))
         ? SearchScope.allDrives
@@ -191,17 +192,19 @@ class FileContextBuilder {
         final tags = await TagManager.getTags(entity.path);
         final content = contentMap[entity.path];
 
-        contexts.add(_FileContext(
-          path: entity.path,
-          name: name,
-          extension: ext,
-          sizeBytes: stat.size,
-          modified: stat.modified,
-          created: stat.changed != stat.modified ? stat.changed : null,
-          category: _categorize(ext),
-          tags: tags,
-          content: content,
-        ));
+        contexts.add(
+          _FileContext(
+            path: entity.path,
+            name: name,
+            extension: ext,
+            sizeBytes: stat.size,
+            modified: stat.modified,
+            created: stat.changed != stat.modified ? stat.changed : null,
+            category: _categorize(ext),
+            tags: tags,
+            content: content,
+          ),
+        );
       } catch (e) {
         // Skip files we can't stat
         continue;
@@ -244,7 +247,8 @@ class FileContextBuilder {
   }
 
   Future<List<_FileContext>> _buildTaggedFilesContext(
-      bool includeContent) async {
+    bool includeContent,
+  ) async {
     final allTags = await TagManager.getAllUniqueTags('');
     final seenPaths = <String>{};
     final contexts = <_FileContext>[];
@@ -271,17 +275,19 @@ class FileContextBuilder {
             content = await _contentReader.readFile(filePath);
           }
 
-          contexts.add(_FileContext(
-            path: filePath,
-            name: name,
-            extension: ext,
-            sizeBytes: stat.size,
-            modified: stat.modified,
-            created: stat.changed != stat.modified ? stat.changed : null,
-            category: _categorize(ext),
-            tags: tags,
-            content: content,
-          ));
+          contexts.add(
+            _FileContext(
+              path: filePath,
+              name: name,
+              extension: ext,
+              sizeBytes: stat.size,
+              modified: stat.modified,
+              created: stat.changed != stat.modified ? stat.changed : null,
+              category: _categorize(ext),
+              tags: tags,
+              content: content,
+            ),
+          );
         } catch (_) {
           continue;
         }
@@ -316,8 +322,10 @@ class FileContextBuilder {
         buffer.writeln('  Tags: ${file.tags.join(', ')}');
       }
       if (file.content != null && file.content!.text.isNotEmpty) {
-        buffer.writeln('  Content preview (${file.content!.text.length} chars'
-            '${file.content!.isTruncated ? ', truncated' : ''}):');
+        buffer.writeln(
+          '  Content preview (${file.content!.text.length} chars'
+          '${file.content!.isTruncated ? ', truncated' : ''}):',
+        );
         buffer.writeln('  ---');
         // Indent content lines
         for (final line in file.content!.text.split('\n').take(20)) {
@@ -353,7 +361,7 @@ class FileContextBuilder {
       '.tiff',
       '.tif',
       '.heic',
-      '.heif'
+      '.heif',
     };
     const videoExts = {
       '.mp4',
@@ -367,7 +375,7 @@ class FileContextBuilder {
       '.ts',
       '.mpg',
       '.mpeg',
-      '.3gp'
+      '.3gp',
     };
     const audioExts = {
       '.mp3',
@@ -377,7 +385,7 @@ class FileContextBuilder {
       '.ogg',
       '.wma',
       '.m4a',
-      '.opus'
+      '.opus',
     };
     const documentExts = {'.doc', '.docx', '.odt', '.rtf', '.pdf'};
     const spreadsheetExts = {'.xls', '.xlsx', '.ods', '.csv'};

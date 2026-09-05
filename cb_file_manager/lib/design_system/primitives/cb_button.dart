@@ -72,7 +72,7 @@ class CbButton extends StatelessWidget {
   final bool autofocus;
 
   const CbButton({
-    Key? key,
+    super.key,
     this.label,
     this.icon,
     this.trailingIcon,
@@ -84,14 +84,15 @@ class CbButton extends StatelessWidget {
     this.tooltip,
     this.focusNode,
     this.autofocus = false,
-  })  : assert(label != null || icon != null,
-            'A button needs a label, an icon, or both.'),
-        super(key: key);
+  }) : assert(
+         label != null || icon != null,
+         'A button needs a label, an icon, or both.',
+       );
 
   /// Icon-only button. Requires a [tooltip] so the action stays discoverable
   /// and screen readers have something to announce.
   const CbButton.icon({
-    Key? key,
+    super.key,
     required IconData this.icon,
     required this.onPressed,
     required String this.tooltip,
@@ -100,10 +101,9 @@ class CbButton extends StatelessWidget {
     this.loading = false,
     this.focusNode,
     this.autofocus = false,
-  })  : label = null,
-        trailingIcon = null,
-        expand = false,
-        super(key: key);
+  }) : label = null,
+       trailingIcon = null,
+       expand = false;
 
   double get _height {
     switch (size) {
@@ -161,13 +161,15 @@ class CbButton extends StatelessWidget {
 
   _CbButtonPaint _paint(CbColorTokens c, CbInteractionState s) {
     if (s.disabled) {
-      final bool solid = variant == CbButtonVariant.primary ||
+      final bool solid =
+          variant == CbButtonVariant.primary ||
           variant == CbButtonVariant.danger;
       return _CbButtonPaint(
         // A disabled solid button keeps its silhouette — a flat wash — so the
         // layout does not shift and the hierarchy stays readable.
         background: solid ? c.surfaceSunken : Colors.transparent,
-        border: variant == CbButtonVariant.secondary ||
+        border:
+            variant == CbButtonVariant.secondary ||
                 variant == CbButtonVariant.dangerOutline
             ? c.strokeSubtle
             : Colors.transparent,
@@ -181,8 +183,8 @@ class CbButton extends StatelessWidget {
           background: s.pressed
               ? c.accent.pressed
               : s.hovered
-                  ? c.accent.hover
-                  : c.accent.base,
+              ? c.accent.hover
+              : c.accent.base,
           border: Colors.transparent,
           foreground: c.accent.onBase,
         );
@@ -192,8 +194,8 @@ class CbButton extends StatelessWidget {
           background: s.pressed
               ? c.surfacePressed
               : s.hovered
-                  ? c.surfaceHover
-                  : Colors.transparent,
+              ? c.surfaceHover
+              : Colors.transparent,
           border: s.hovered ? c.strokeStrong : c.stroke,
           foreground: c.textPrimary,
         );
@@ -203,8 +205,8 @@ class CbButton extends StatelessWidget {
           background: s.pressed
               ? c.surfacePressed
               : s.hovered
-                  ? c.surfaceHover
-                  : c.surfaceSunken,
+              ? c.surfaceHover
+              : c.surfaceSunken,
           border: Colors.transparent,
           foreground: c.textPrimary,
         );
@@ -214,16 +216,17 @@ class CbButton extends StatelessWidget {
           background: s.pressed
               ? c.surfacePressed
               : s.hovered
-                  ? c.surfaceHover
-                  : Colors.transparent,
+              ? c.surfaceHover
+              : Colors.transparent,
           border: Colors.transparent,
           foreground: c.textSecondary,
         );
 
       case CbButtonVariant.danger:
         return _CbButtonPaint(
-          background:
-              s.pressed || s.hovered ? c.status.dangerHover : c.status.danger,
+          background: s.pressed || s.hovered
+              ? c.status.dangerHover
+              : c.status.danger,
           border: Colors.transparent,
           foreground: c.textInverse,
         );
@@ -264,10 +267,7 @@ class CbButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: paint.background,
             borderRadius: CbRadii.all(_radius),
-            border: Border.all(
-              color: paint.border,
-              width: CbStrokes.hairline,
-            ),
+            border: Border.all(color: paint.border, width: CbStrokes.hairline),
             // The focus ring sits outside the border rather than recolouring
             // it, so focus stays visible on every variant including filled.
             boxShadow: state.focused
@@ -293,14 +293,16 @@ class CbButton extends StatelessWidget {
     final children = <Widget>[];
 
     if (loading) {
-      children.add(SizedBox(
-        width: _iconSize,
-        height: _iconSize,
-        child: CircularProgressIndicator(
-          strokeWidth: CbStrokes.emphasis,
-          valueColor: AlwaysStoppedAnimation<Color>(foreground),
+      children.add(
+        SizedBox(
+          width: _iconSize,
+          height: _iconSize,
+          child: CircularProgressIndicator(
+            strokeWidth: CbStrokes.emphasis,
+            valueColor: AlwaysStoppedAnimation<Color>(foreground),
+          ),
         ),
-      ));
+      );
     } else if (icon != null) {
       children.add(Icon(icon, size: _iconSize, color: foreground));
     }
@@ -309,14 +311,16 @@ class CbButton extends StatelessWidget {
       if (children.isNotEmpty) {
         children.add(const SizedBox(width: CbSpacing.sm));
       }
-      children.add(Flexible(
-        child: Text(
-          label!,
-          style: _textStyle.copyWith(color: foreground),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+      children.add(
+        Flexible(
+          child: Text(
+            label!,
+            style: _textStyle.copyWith(color: foreground),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-      ));
+      );
     }
 
     if (trailingIcon != null) {

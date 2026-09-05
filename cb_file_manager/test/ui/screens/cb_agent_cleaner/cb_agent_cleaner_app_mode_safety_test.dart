@@ -94,15 +94,13 @@ void main() {
         findsOneWidget,
       );
       final drivePicker = tester.widget<DropdownButton<String>>(
-        find.byKey(
-          const ValueKey<String>('cleaner-apps-drive-picker'),
-        ),
+        find.byKey(const ValueKey<String>('cleaner-apps-drive-picker')),
       );
       expect(drivePicker.value, r'C:\');
-      expect(
-        drivePicker.items?.map((item) => item.value),
-        <String>[r'C:\', r'D:\'],
-      );
+      expect(drivePicker.items?.map((item) => item.value), <String>[
+        r'C:\',
+        r'D:\',
+      ]);
       expect(drivePicker.onChanged, isNotNull);
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -143,9 +141,7 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.byKey(
-                const ValueKey<String>('cleaner-review-and-clean'),
-              ),
+              find.byKey(const ValueKey<String>('cleaner-review-and-clean')),
             )
             .onPressed,
         isNotNull,
@@ -164,9 +160,7 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.byKey(
-                const ValueKey<String>('cleaner-review-and-clean'),
-              ),
+              find.byKey(const ValueKey<String>('cleaner-review-and-clean')),
             )
             .onPressed,
         isNull,
@@ -176,9 +170,7 @@ void main() {
       await _pumpUi(tester);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.tap(
-        find.byKey(
-          const ValueKey<String>('cleaner-tree-row-idle-C:\\Windows'),
-        ),
+        find.byKey(const ValueKey<String>('cleaner-tree-row-idle-C:\\Windows')),
       );
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await _pumpUi(tester);
@@ -199,9 +191,7 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.byKey(
-                const ValueKey<String>('cleaner-review-and-clean'),
-              ),
+              find.byKey(const ValueKey<String>('cleaner-review-and-clean')),
             )
             .onPressed,
         isNotNull,
@@ -211,18 +201,14 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.byKey(
-                const ValueKey<String>('cleaner-review-and-clean'),
-              ),
+              find.byKey(const ValueKey<String>('cleaner-review-and-clean')),
             )
             .onPressed,
         isNotNull,
       );
 
       await tester.tap(
-        find.byKey(
-          const ValueKey<String>('cleaner-tree-row-idle-C:\\Windows'),
-        ),
+        find.byKey(const ValueKey<String>('cleaner-tree-row-idle-C:\\Windows')),
       );
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.tap(find.text('Downloads').first);

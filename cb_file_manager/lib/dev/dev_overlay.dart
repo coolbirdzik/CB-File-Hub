@@ -21,7 +21,7 @@ bool get isDevOverlayEnabled => !kReleaseMode && _enableDevOverlayFlag;
 class DevOverlay extends StatefulWidget {
   final Widget child;
 
-  const DevOverlay({Key? key, required this.child}) : super(key: key);
+  const DevOverlay({super.key, required this.child});
 
   @override
   State<DevOverlay> createState() => _DevOverlayState();

@@ -56,8 +56,9 @@ class LazyAlbumScanner {
       _loadedFiles[albumId] = [];
 
       int totalProcessed = 0;
-      const delayBetweenBatches =
-          Duration(milliseconds: 10); // Very small delay
+      const delayBetweenBatches = Duration(
+        milliseconds: 10,
+      ); // Very small delay
 
       for (final dirPath in directories) {
         final dir = Directory(dirPath);
@@ -68,8 +69,11 @@ class LazyAlbumScanner {
           followLinks: false,
         )) {
           if (entity is File) {
-            final fileInfo =
-                await _processFile(entity, extensions, excludePatterns);
+            final fileInfo = await _processFile(
+              entity,
+              extensions,
+              excludePatterns,
+            );
             if (fileInfo != null) {
               totalProcessed++;
 
@@ -101,7 +105,10 @@ class LazyAlbumScanner {
 
   /// Add single file to album and notify listeners immediately
   void _addSingleFileToAlbum(
-      int albumId, FileInfo fileInfo, AlbumConfig config) {
+    int albumId,
+    FileInfo fileInfo,
+    AlbumConfig config,
+  ) {
     // Add to loaded files immediately - no sorting to be faster
     _loadedFiles[albumId]!.add(fileInfo);
 
@@ -113,7 +120,10 @@ class LazyAlbumScanner {
 
   /// Process a single file
   Future<FileInfo?> _processFile(
-      File file, List<String> extensions, List<String> excludePatterns) async {
+    File file,
+    List<String> extensions,
+    List<String> excludePatterns,
+  ) async {
     final fileName = path.basename(file.path);
     final extension = path.extension(file.path).toLowerCase();
 

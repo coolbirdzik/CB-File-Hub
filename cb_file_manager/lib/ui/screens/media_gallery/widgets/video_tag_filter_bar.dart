@@ -11,12 +11,12 @@ class VideoTagFilterBar extends StatefulWidget {
   final bool globalSearch;
 
   const VideoTagFilterBar({
-    Key? key,
+    super.key,
     required this.selectedTags,
     required this.onTagsChanged,
     this.libraryPath,
     this.globalSearch = false,
-  }) : super(key: key);
+  });
 
   @override
   State<VideoTagFilterBar> createState() => _VideoTagFilterBarState();
@@ -89,9 +89,7 @@ class _VideoTagFilterBarState extends State<VideoTagFilterBar> {
       height: 50,
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        border: Border(
-          bottom: BorderSide(color: theme.dividerColor),
-        ),
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         children: [

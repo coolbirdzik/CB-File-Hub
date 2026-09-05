@@ -127,11 +127,15 @@ abstract class IDatabaseProvider {
 
   /// Add a parent-child relationship between two tags
   Future<bool> setTagHierarchy(
-      String parentNormalizedTag, String childNormalizedTag);
+    String parentNormalizedTag,
+    String childNormalizedTag,
+  );
 
   /// Remove a parent-child relationship between two tags
   Future<bool> removeTagHierarchy(
-      String parentNormalizedTag, String childNormalizedTag);
+    String parentNormalizedTag,
+    String childNormalizedTag,
+  );
 
   /// Get all child tags of a parent tag
   Future<List<String>> getChildTags(String parentNormalizedTag);
@@ -158,6 +162,4 @@ class DatabaseProviderFactory {
 }
 
 /// Enum for database types
-enum DatabaseType {
-  sqlite,
-}
+enum DatabaseType { sqlite }

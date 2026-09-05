@@ -29,8 +29,9 @@ class SystemWallpaperService {
       final output = result.stdout as String;
       // Output format:
       //     Wallpaper    REG_SZ    C:\Users\...\wallpaper.jpg
-      final match =
-          RegExp(r'Wallpaper\s+REG_SZ\s+(.+)').firstMatch(output.trim());
+      final match = RegExp(
+        r'Wallpaper\s+REG_SZ\s+(.+)',
+      ).firstMatch(output.trim());
       if (match == null) return null;
       final path = match.group(1)?.trim();
       if (path == null || path.isEmpty) return null;

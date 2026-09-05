@@ -25,7 +25,7 @@ enum DiskCleanerAgentActivityType {
   scanStarted,
   scanProgress,
   scanDone,
-  scanFailed
+  scanFailed,
 }
 
 class DiskCleanerAgentActivity {
@@ -78,10 +78,7 @@ class _TrackedScanChanges {
   final int version;
   final List<String> directories;
 
-  const _TrackedScanChanges({
-    required this.version,
-    required this.directories,
-  });
+  const _TrackedScanChanges({required this.version, required this.directories});
 }
 
 class _FullScanChangeTracker {
@@ -94,7 +91,7 @@ class _FullScanChangeTracker {
   var _isReliable = true;
 
   _FullScanChangeTracker(String path)
-      : rootPath = _normalizeTrackedScanPath(path);
+    : rootPath = _normalizeTrackedScanPath(path);
 
   bool get isUsable => _isReliable && _subscription != null;
 
@@ -102,15 +99,17 @@ class _FullScanChangeTracker {
     if (isUsable) return;
     _isReliable = true;
     try {
-      _subscription = Directory(rootPath).watch(recursive: true).listen(
-        _recordEvent,
-        onError: (_) {
-          _isReliable = false;
-          unawaited(_subscription?.cancel() ?? Future<void>.value());
-          _subscription = null;
-        },
-        cancelOnError: false,
-      );
+      _subscription = Directory(rootPath)
+          .watch(recursive: true)
+          .listen(
+            _recordEvent,
+            onError: (_) {
+              _isReliable = false;
+              unawaited(_subscription?.cancel() ?? Future<void>.value());
+              _subscription = null;
+            },
+            cancelOnError: false,
+          );
     } catch (_) {
       _isReliable = false;
       _subscription = null;
@@ -118,14 +117,12 @@ class _FullScanChangeTracker {
   }
 
   _TrackedScanChanges snapshot() => _TrackedScanChanges(
-        version: _version,
-        directories: _dirtyDirectories.keys.toList(growable: false),
-      );
+    version: _version,
+    directories: _dirtyDirectories.keys.toList(growable: false),
+  );
 
   void acknowledge(_TrackedScanChanges snapshot) {
-    _dirtyDirectories.removeWhere(
-      (_, version) => version <= snapshot.version,
-    );
+    _dirtyDirectories.removeWhere((_, version) => version <= snapshot.version);
   }
 
   void _recordEvent(FileSystemEvent event) {
@@ -156,19 +153,20 @@ class _FullScanChangeTracker {
 /// Narrow seam for tests that need to exercise service cache lifecycle
 /// without traversing a real drive.
 @visibleForTesting
-typedef FullDiskScanSpawner = Future<FullDiskScanHandle> Function({
-  required String drivePath,
-  int maxDepth,
-  int minDisplayEntryBytes,
-  int maxChildrenPerDirectory,
-  List<FullDiskJunkRule> junkRules,
-  DiskTreeNode? baseRoot,
-  DiskScanJournalCursor? journalCursor,
-  List<FullDiskScanInsight> baseOldLargeItems,
-  List<String> trackedDirtyDirectories,
-  bool hasTrackedChanges,
-  void Function(FullDiskScanResult result)? onCompleted,
-});
+typedef FullDiskScanSpawner =
+    Future<FullDiskScanHandle> Function({
+      required String drivePath,
+      int maxDepth,
+      int minDisplayEntryBytes,
+      int maxChildrenPerDirectory,
+      List<FullDiskJunkRule> junkRules,
+      DiskTreeNode? baseRoot,
+      DiskScanJournalCursor? journalCursor,
+      List<FullDiskScanInsight> baseOldLargeItems,
+      List<String> trackedDirtyDirectories,
+      bool hasTrackedChanges,
+      void Function(FullDiskScanResult result)? onCompleted,
+    });
 
 String _normalizeTrackedScanPath(String path) {
   var normalized = path.trim().replaceAll('/', '\\').toUpperCase();
@@ -231,19 +229,19 @@ class _CompletedFullScan {
   });
 
   FullDiskScanResult toResult() => FullDiskScanResult(
-        root: root,
-        nodeCount: nodeCount,
-        junkBytes: junkBytes,
-        cleanableCount: cleanableCount,
-        duration: duration,
-        inaccessible: inaccessible,
-        coverageIssues: coverageIssues,
-        oldLargeItems: oldLargeItems,
-        scanMode: scanMode,
-        changedDirectoryCount: changedDirectoryCount,
-        journalCursor: journalCursor,
-        incrementalFallbackReason: incrementalFallbackReason,
-      );
+    root: root,
+    nodeCount: nodeCount,
+    junkBytes: junkBytes,
+    cleanableCount: cleanableCount,
+    duration: duration,
+    inaccessible: inaccessible,
+    coverageIssues: coverageIssues,
+    oldLargeItems: oldLargeItems,
+    scanMode: scanMode,
+    changedDirectoryCount: changedDirectoryCount,
+    journalCursor: journalCursor,
+    incrementalFallbackReason: incrementalFallbackReason,
+  );
 }
 
 int _countCleanableNodes(DiskTreeNode root) {
@@ -264,12 +262,10 @@ int _countCleanableNodes(DiskTreeNode root) {
 /// identical results from identical code paths.
 class DiskCleanerService {
   DiskCleanerService._({FullDiskScanSpawner? fullDiskScanSpawner})
-      : _fullDiskScanSpawner = fullDiskScanSpawner ?? spawnFullDiskScan;
+    : _fullDiskScanSpawner = fullDiskScanSpawner ?? spawnFullDiskScan;
 
   @visibleForTesting
-  DiskCleanerService.forTesting(
-      {required FullDiskScanSpawner fullDiskScanSpawner})
-      : _fullDiskScanSpawner = fullDiskScanSpawner;
+  DiskCleanerService.forTesting({required this._fullDiskScanSpawner});
 
   static final DiskCleanerService instance = DiskCleanerService._();
 
@@ -364,22 +360,26 @@ class DiskCleanerService {
       final requiresAdmin = dir.requiresAdmin;
       final info = _readDriveSpace(path);
       if (info == null) {
-        result.add(DriveSpace(
-          path: path,
-          label: label,
-          totalBytes: 0,
-          freeBytes: 0,
-          requiresAdmin: requiresAdmin,
-        ));
+        result.add(
+          DriveSpace(
+            path: path,
+            label: label,
+            totalBytes: 0,
+            freeBytes: 0,
+            requiresAdmin: requiresAdmin,
+          ),
+        );
         continue;
       }
-      result.add(DriveSpace(
-        path: path,
-        label: label,
-        totalBytes: info.totalBytes,
-        freeBytes: info.freeBytes,
-        requiresAdmin: requiresAdmin,
-      ));
+      result.add(
+        DriveSpace(
+          path: path,
+          label: label,
+          totalBytes: info.totalBytes,
+          freeBytes: info.freeBytes,
+          requiresAdmin: requiresAdmin,
+        ),
+      );
     }
     return result;
   }
@@ -401,15 +401,17 @@ class DiskCleanerService {
     void Function(ScanProgress)? onProgress,
   }) async {
     final handle = await _beginScan(drivePaths, categoryIds);
-    final progressSub =
-        onProgress == null ? null : handle.progress.listen(onProgress);
+    final progressSub = onProgress == null
+        ? null
+        : handle.progress.listen(onProgress);
     try {
       final report = await handle.future;
       if (categoryIds.isEmpty || categoryIds.contains('recycle_bin')) {
         final bin = await _scanRecycleBin();
         if (bin.isNotEmpty) {
-          final merged =
-              Map<String, List<JunkItem>>.from(report.itemsByCategory);
+          final merged = Map<String, List<JunkItem>>.from(
+            report.itemsByCategory,
+          );
           merged['recycle_bin'] = bin;
           return ScanReport(
             drivesScanned: report.drivesScanned,
@@ -437,33 +439,38 @@ class DiskCleanerService {
     final handle = await _beginScan(drivePaths, categoryIds);
     final completer = Completer<ScanReport>();
 
-    handle.future.then((report) async {
-      try {
-        if (categoryIds.isEmpty || categoryIds.contains('recycle_bin')) {
-          final bin = await _scanRecycleBin();
-          if (bin.isNotEmpty) {
-            final merged =
-                Map<String, List<JunkItem>>.from(report.itemsByCategory);
-            merged['recycle_bin'] = bin;
-            completer.complete(ScanReport(
-              drivesScanned: report.drivesScanned,
-              itemsByCategory: merged,
-              warnings: report.warnings,
-              scannedAt: report.scannedAt,
-            ));
-            return;
+    handle.future
+        .then((report) async {
+          try {
+            if (categoryIds.isEmpty || categoryIds.contains('recycle_bin')) {
+              final bin = await _scanRecycleBin();
+              if (bin.isNotEmpty) {
+                final merged = Map<String, List<JunkItem>>.from(
+                  report.itemsByCategory,
+                );
+                merged['recycle_bin'] = bin;
+                completer.complete(
+                  ScanReport(
+                    drivesScanned: report.drivesScanned,
+                    itemsByCategory: merged,
+                    warnings: report.warnings,
+                    scannedAt: report.scannedAt,
+                  ),
+                );
+                return;
+              }
+            }
+            completer.complete(report);
+          } catch (e, st) {
+            if (!completer.isCompleted) completer.completeError(e, st);
+          } finally {
+            _activeScan = null;
           }
-        }
-        completer.complete(report);
-      } catch (e, st) {
-        if (!completer.isCompleted) completer.completeError(e, st);
-      } finally {
-        _activeScan = null;
-      }
-    }).catchError((Object e, StackTrace st) {
-      if (!completer.isCompleted) completer.completeError(e, st);
-      _activeScan = null;
-    });
+        })
+        .catchError((Object e, StackTrace st) {
+          if (!completer.isCompleted) completer.completeError(e, st);
+          _activeScan = null;
+        });
 
     return CleanerScanController._(
       progress: handle.progress,
@@ -471,12 +478,14 @@ class DiskCleanerService {
       onCancel: () {
         handle.cancel();
         if (!completer.isCompleted) {
-          completer.complete(ScanReport(
-            drivesScanned: handle.drivesScanned,
-            itemsByCategory: const {},
-            warnings: const ['cancelled'],
-            scannedAt: DateTime.now(),
-          ));
+          completer.complete(
+            ScanReport(
+              drivesScanned: handle.drivesScanned,
+              itemsByCategory: const {},
+              warnings: const ['cancelled'],
+              scannedAt: DateTime.now(),
+            ),
+          );
         }
         _activeScan = null;
       },
@@ -506,7 +515,7 @@ class DiskCleanerService {
     required bool permanent,
     void Function(int done, int total, String? currentPath)? onProgress,
     Future<CleanFailureAction> Function(CleanFailureDetails details)?
-        onDeleteFailure,
+    onDeleteFailure,
   }) async {
     final receivePort = ReceivePort();
     final errorPort = ReceivePort();
@@ -578,15 +587,19 @@ class DiskCleanerService {
     errorSub = errorPort.listen((dynamic err) {
       if (!completer.isCompleted) {
         completer.completeError(
-            err is List && err.length >= 2 ? err[0] : err.toString());
+          err is List && err.length >= 2 ? err[0] : err.toString(),
+        );
       }
       closePorts();
     });
 
     exitSub = exitPort.listen((_) {
       if (!completer.isCompleted) {
-        completer.completeError(StateError(
-            '[DiskCleaner] Worker isolate exited before sending result'));
+        completer.completeError(
+          StateError(
+            '[DiskCleaner] Worker isolate exited before sending result',
+          ),
+        );
       }
       closePorts();
     });
@@ -615,7 +628,7 @@ class DiskCleanerService {
     required bool permanent,
     void Function(int done, int total, String? currentPath)? onProgress,
     Future<CleanFailureAction> Function(CleanFailureDetails details)?
-        onDeleteFailure,
+    onDeleteFailure,
   }) async {
     final succeeded = <String>[];
     final failed = <String, String>{};
@@ -673,11 +686,7 @@ class DiskCleanerService {
     int done = skippedUnsafe.length;
     onProgress?.call(done, total, null);
 
-    void recordSuccess(
-      JunkItem item, {
-      String? actionLabel,
-      bool log = true,
-    }) {
+    void recordSuccess(JunkItem item, {String? actionLabel, bool log = true}) {
       succeeded.add(item.path);
       freed += item.sizeBytes;
       if (!log) return;
@@ -774,18 +783,19 @@ class DiskCleanerService {
                 blockedPath: item.path,
               )
             : onDeleteFailure == null
-                ? await _classifyDeleteFailure(item.path, permanent)
-                : _DeleteFailureClassification(
-                    isInUse: false,
-                    reason: lastReason ??
-                        (permanent
-                            ? 'Failed to delete'
-                            : 'Failed to move to Recycle Bin'),
-                  );
+            ? await _classifyDeleteFailure(item.path, permanent)
+            : _DeleteFailureClassification(
+                isInUse: false,
+                reason:
+                    lastReason ??
+                    (permanent
+                        ? 'Failed to delete'
+                        : 'Failed to move to Recycle Bin'),
+              );
         final effectiveReason =
             classification.isInUse || lastReason == null || lastReason.isEmpty
-                ? classification.reason
-                : lastReason;
+            ? classification.reason
+            : lastReason;
 
         if (onDeleteFailure == null) {
           if (classification.isInUse) {
@@ -803,13 +813,15 @@ class DiskCleanerService {
           return;
         }
 
-        final action = await onDeleteFailure(CleanFailureDetails(
-          item: item,
-          reason: effectiveReason,
-          isInUse: classification.isInUse,
-          blockedPath: classification.blockedPath,
-          permanent: permanent,
-        ));
+        final action = await onDeleteFailure(
+          CleanFailureDetails(
+            item: item,
+            reason: effectiveReason,
+            isInUse: classification.isInUse,
+            blockedPath: classification.blockedPath,
+            permanent: permanent,
+          ),
+        );
 
         if (action == CleanFailureAction.skip ||
             action == CleanFailureAction.skipAll) {
@@ -919,8 +931,9 @@ class DiskCleanerService {
             } else {
               await resolveFailedItem(
                 item,
-                actionLabel:
-                    permanent ? 'permanent delete' : 'recycle-bin move',
+                actionLabel: permanent
+                    ? 'permanent delete'
+                    : 'recycle-bin move',
                 knownInUse: true,
               );
               done++;
@@ -950,8 +963,9 @@ class DiskCleanerService {
           continue;
         }
 
-        final paths =
-            batchedDeletes.map((item) => item.path).toList(growable: false);
+        final paths = batchedDeletes
+            .map((item) => item.path)
+            .toList(growable: false);
         onProgress?.call(done, total, paths.first);
 
         try {
@@ -985,8 +999,9 @@ class DiskCleanerService {
               recordSkippedByUserMany(
                 remaining,
                 reason: 'Skipped after user selected Skip all',
-                actionLabel:
-                    permanent ? 'permanent delete' : 'recycle-bin move',
+                actionLabel: permanent
+                    ? 'permanent delete'
+                    : 'recycle-bin move',
                 log: false,
               );
               done += remaining.length;
@@ -1016,8 +1031,9 @@ class DiskCleanerService {
               recordSkippedByUserMany(
                 remaining,
                 reason: 'Skipped after user selected Skip all',
-                actionLabel:
-                    permanent ? 'permanent delete' : 'recycle-bin move',
+                actionLabel: permanent
+                    ? 'permanent delete'
+                    : 'recycle-bin move',
                 log: false,
               );
               done += remaining.length;
@@ -1113,10 +1129,13 @@ class DiskCleanerService {
       onPreparing?.call(item.path);
       var childCount = 0;
       try {
-        await for (final entity
-            in Directory(item.path).list(recursive: true, followLinks: false)) {
-          final childType =
-              FileSystemEntity.typeSync(entity.path, followLinks: false);
+        await for (final entity in Directory(
+          item.path,
+        ).list(recursive: true, followLinks: false)) {
+          final childType = FileSystemEntity.typeSync(
+            entity.path,
+            followLinks: false,
+          );
           if (childType != FileSystemEntityType.file) {
             continue;
           }
@@ -1129,12 +1148,14 @@ class DiskCleanerService {
             modified = stat.modified;
           } catch (_) {}
 
-          expanded.add(JunkItem(
-            path: entity.path,
-            sizeBytes: size,
-            lastModified: modified,
-            categoryId: item.categoryId,
-          ));
+          expanded.add(
+            JunkItem(
+              path: entity.path,
+              sizeBytes: size,
+              lastModified: modified,
+              categoryId: item.categoryId,
+            ),
+          );
           childCount++;
 
           // Yield periodically so the UI can repaint and the user sees the
@@ -1222,8 +1243,9 @@ class DiskCleanerService {
       // Non-recursive first pass — most "in use" hits are top-level (e.g.
       // an open log file directly inside a category folder). Cheap and
       // deterministic.
-      await for (final entity
-          in Directory(path).list(recursive: false, followLinks: false)) {
+      await for (final entity in Directory(
+        path,
+      ).list(recursive: false, followLinks: false)) {
         if (probed >= _classifyMaxDescendants ||
             DateTime.now().isAfter(deadline)) {
           return null;
@@ -1246,8 +1268,9 @@ class DiskCleanerService {
     }
 
     try {
-      await for (final entity
-          in Directory(path).list(recursive: true, followLinks: false)) {
+      await for (final entity in Directory(
+        path,
+      ).list(recursive: true, followLinks: false)) {
         if (probed >= _classifyMaxDescendants ||
             DateTime.now().isAfter(deadline)) {
           return null;
@@ -1269,9 +1292,9 @@ class DiskCleanerService {
       return false;
     }
 
-    final nativePath = path.toNativeUtf16();
+    final nativePath = win32.PCWSTR(path.toNativeUtf16());
     try {
-      final attributes = win32.GetFileAttributes(nativePath);
+      final attributes = win32.GetFileAttributes(nativePath).value;
       if (attributes == 0xFFFFFFFF) {
         return false;
       }
@@ -1280,21 +1303,23 @@ class DiskCleanerService {
       // Fast "is another process holding this path" probe. Asking for zero
       // share is intentionally conservative: if someone else has the file open,
       // skip it here instead of letting a recycle-bin batch stall on it.
-      final handle = win32.CreateFile(
+      final opened = win32.CreateFile(
         nativePath,
         win32.FILE_READ_ATTRIBUTES,
-        0,
-        nullptr,
+        win32.FILE_SHARE_NONE,
+        null,
         win32.OPEN_EXISTING,
-        isDirectory ? win32.FILE_FLAG_BACKUP_SEMANTICS : 0,
-        win32.NULL,
+        isDirectory
+            ? win32.FILE_FLAG_BACKUP_SEMANTICS
+            : const win32.FILE_FLAGS_AND_ATTRIBUTES(0),
+        null,
       );
-      if (handle != win32.INVALID_HANDLE_VALUE) {
-        win32.CloseHandle(handle);
+      if (opened.value.isValid) {
+        win32.CloseHandle(opened.value);
         return false;
       }
 
-      final error = win32.GetLastError();
+      final error = opened.error;
       return error == win32.ERROR_SHARING_VIOLATION ||
           error == win32.ERROR_LOCK_VIOLATION ||
           error == win32.ERROR_USER_MAPPED_FILE ||
@@ -1341,7 +1366,8 @@ class DiskCleanerService {
     // holder, but Windows IFileOperation can still block indefinitely while
     // trying to move the file to Recycle Bin. Treat them as volatile/in-use and
     // skip them instead of letting a single live log stall the cleaner.
-    final isBrowserRuntimeCache = lowerPath.contains(r'\code cache\') ||
+    final isBrowserRuntimeCache =
+        lowerPath.contains(r'\code cache\') ||
         lowerPath.contains(r'\gpucache\') ||
         lowerPath.contains(r'\cache_data\') ||
         lowerPath.contains(r'\shadercache\') ||
@@ -1352,7 +1378,8 @@ class DiskCleanerService {
       return true;
     }
 
-    final isLiveDatabaseOrLog = lowerPath.endsWith('.log') ||
+    final isLiveDatabaseOrLog =
+        lowerPath.endsWith('.log') ||
         lowerPath.endsWith('.ldb') ||
         lowerPath.endsWith('.sqlite') ||
         lowerPath.endsWith('.sqlite-wal') ||
@@ -1380,8 +1407,11 @@ class DiskCleanerService {
     Pointer<Pointer<Utf16>>? fileListPtr;
 
     try {
-      final startResult =
-          bindings.startSession(sessionHandle, 0, sessionKey.cast());
+      final startResult = bindings.startSession(
+        sessionHandle,
+        0,
+        sessionKey.cast(),
+      );
       if (startResult != win32.ERROR_SUCCESS) {
         return false;
       }
@@ -1499,7 +1529,8 @@ class DiskCleanerService {
   }) async {
     if (_activeFullScan != null) {
       throw StateError(
-          'A full disk scan is already in progress; cancel it first.');
+        'A full disk scan is already in progress; cancel it first.',
+      );
     }
     if (!Platform.isWindows) {
       throw StateError('Full disk scan is only supported on Windows.');
@@ -1509,17 +1540,20 @@ class DiskCleanerService {
     final cacheKey = cacheEligible ? _fullScanKey(drivePath) : '';
     final previous = cacheEligible ? _completedFullScans[cacheKey] : null;
     final trackedChanges = previous?.changeTracker.snapshot();
-    final canReuseSettings = previous != null &&
+    final canReuseSettings =
+        previous != null &&
         previous.maxDepth == maxDepth &&
         previous.minDisplayEntryBytes == minDisplayEntryBytes &&
         previous.maxChildrenPerDirectory == maxChildrenPerDirectory;
     final useTrackedChanges =
         previous?.changeTracker.isUsable == true && canReuseSettings;
-    final useJournal = !useTrackedChanges &&
+    final useJournal =
+        !useTrackedChanges &&
         previous?.journalCursor != null &&
         canReuseSettings;
-    final trackedDirectories =
-        trackedChanges == null ? const <String>[] : trackedChanges.directories;
+    final trackedDirectories = trackedChanges == null
+        ? const <String>[]
+        : trackedChanges.directories;
 
     // A reliable watcher snapshot with no dirty directories is already the
     // completed result. Return it directly instead of spawning a worker whose
@@ -1553,7 +1587,8 @@ class DiskCleanerService {
     }
 
     void cacheCompletedResult(FullDiskScanResult result) {
-      final cached = previous ??
+      final cached =
+          previous ??
           _CompletedFullScan(
             root: result.root,
             nodeCount: result.nodeCount,
@@ -1607,8 +1642,9 @@ class DiskCleanerService {
       baseOldLargeItems: (useTrackedChanges || useJournal)
           ? previous.oldLargeItems
           : const <FullDiskScanInsight>[],
-      trackedDirtyDirectories:
-          useTrackedChanges ? trackedDirectories : const <String>[],
+      trackedDirtyDirectories: useTrackedChanges
+          ? trackedDirectories
+          : const <String>[],
       hasTrackedChanges: useTrackedChanges,
       onCompleted: cacheEligible ? cacheCompletedResult : null,
     );
@@ -1661,11 +1697,13 @@ class DiskCleanerService {
           wholeDirJunk[resolved.toUpperCase()] = cat.id;
         } else {
           // Has glob filter → only matching files are junk
-          globFilteredJunk.add(_GlobRule(
-            basePath: resolved.toUpperCase(),
-            categoryId: cat.id,
-            globs: rule.includeGlobs!.map((g) => _globToRegex(g)).toList(),
-          ));
+          globFilteredJunk.add(
+            _GlobRule(
+              basePath: resolved.toUpperCase(),
+              categoryId: cat.id,
+              globs: rule.includeGlobs!.map((g) => _globToRegex(g)).toList(),
+            ),
+          );
         }
       }
     }
@@ -1675,7 +1713,10 @@ class DiskCleanerService {
     final wholeDirRules = <_WholeDirRule>[
       for (final entry in wholeDirJunk.entries)
         _WholeDirRule(
-            path: entry.key, prefix: '${entry.key}\\', categoryId: entry.value),
+          path: entry.key,
+          prefix: '${entry.key}\\',
+          categoryId: entry.value,
+        ),
     ];
 
     _markJunkRecursive(root, wholeDirRules, globFilteredJunk);
@@ -1688,11 +1729,13 @@ class DiskCleanerService {
         if (rule.source.kind == PathSourceKind.recycleBin) continue;
         final resolved = WindowsKnownFolders.resolve(rule.source);
         if (resolved == null || resolved.isEmpty) continue;
-        rules.add(FullDiskJunkRule(
-          basePath: resolved,
-          categoryId: category.id,
-          includeGlobs: rule.includeGlobs ?? const <String>[],
-        ));
+        rules.add(
+          FullDiskJunkRule(
+            basePath: resolved,
+            categoryId: category.id,
+            includeGlobs: rule.includeGlobs ?? const <String>[],
+          ),
+        );
       }
     }
     return rules;
@@ -1813,7 +1856,8 @@ class DiskCleanerService {
   ) async {
     if (_activeScan != null) {
       throw StateError(
-          'A disk scan is already in progress; call cancelActiveScan first.');
+        'A disk scan is already in progress; call cancelActiveScan first.',
+      );
     }
     if (!Platform.isWindows) {
       throw StateError('DiskCleanerService is only supported on Windows.');
@@ -1826,15 +1870,17 @@ class DiskCleanerService {
         if (rule.source.kind == PathSourceKind.recycleBin) continue;
         final base = WindowsKnownFolders.resolve(rule.source);
         if (base == null || base.isEmpty) continue;
-        resolvedRules.add(ResolvedRule(
-          categoryId: cat.id,
-          basePath: base,
-          includeGlobs: rule.includeGlobs,
-          excludeGlobs: rule.excludeGlobs,
-          minAge: rule.minAge,
-          emptyOnly: rule.emptyOnly,
-          recursive: rule.recursive,
-        ));
+        resolvedRules.add(
+          ResolvedRule(
+            categoryId: cat.id,
+            basePath: base,
+            includeGlobs: rule.includeGlobs,
+            excludeGlobs: rule.excludeGlobs,
+            minAge: rule.minAge,
+            emptyOnly: rule.emptyOnly,
+            recursive: rule.recursive,
+          ),
+        );
       }
     }
 
@@ -1889,12 +1935,12 @@ class DiskCleanerService {
     final lpTotalFree = calloc<Uint64>();
     try {
       final ok = win32.GetDiskFreeSpaceEx(
-        drive.toNativeUtf16(),
+        win32.PCWSTR(drive.toNativeUtf16()),
         lpFree,
         lpTotal,
         lpTotalFree,
-      );
-      if (ok == 0) return null;
+      ).value;
+      if (!ok) return null;
       return _DriveSpaceRaw(lpTotal.value, lpFree.value);
     } catch (_) {
       return null;
@@ -1966,50 +2012,48 @@ class _DeleteFailureClassification {
   });
 }
 
-typedef _RmStartSessionNative = Int32 Function(
-  Pointer<Uint32>,
-  Uint32,
-  Pointer<Utf16>,
-);
-typedef _RmStartSessionDart = int Function(
-  Pointer<Uint32>,
-  int,
-  Pointer<Utf16>,
-);
+typedef _RmStartSessionNative =
+    Int32 Function(Pointer<Uint32>, Uint32, Pointer<Utf16>);
+typedef _RmStartSessionDart =
+    int Function(Pointer<Uint32>, int, Pointer<Utf16>);
 
-typedef _RmRegisterResourcesNative = Int32 Function(
-  Uint32,
-  Uint32,
-  Pointer<Pointer<Utf16>>,
-  Uint32,
-  Pointer<Void>,
-  Uint32,
-  Pointer<Pointer<Utf16>>,
-);
-typedef _RmRegisterResourcesDart = int Function(
-  int,
-  int,
-  Pointer<Pointer<Utf16>>,
-  int,
-  Pointer<Void>,
-  int,
-  Pointer<Pointer<Utf16>>,
-);
+typedef _RmRegisterResourcesNative =
+    Int32 Function(
+      Uint32,
+      Uint32,
+      Pointer<Pointer<Utf16>>,
+      Uint32,
+      Pointer<Void>,
+      Uint32,
+      Pointer<Pointer<Utf16>>,
+    );
+typedef _RmRegisterResourcesDart =
+    int Function(
+      int,
+      int,
+      Pointer<Pointer<Utf16>>,
+      int,
+      Pointer<Void>,
+      int,
+      Pointer<Pointer<Utf16>>,
+    );
 
-typedef _RmGetListNative = Int32 Function(
-  Uint32,
-  Pointer<Uint32>,
-  Pointer<Uint32>,
-  Pointer<Void>,
-  Pointer<Uint32>,
-);
-typedef _RmGetListDart = int Function(
-  int,
-  Pointer<Uint32>,
-  Pointer<Uint32>,
-  Pointer<Void>,
-  Pointer<Uint32>,
-);
+typedef _RmGetListNative =
+    Int32 Function(
+      Uint32,
+      Pointer<Uint32>,
+      Pointer<Uint32>,
+      Pointer<Void>,
+      Pointer<Uint32>,
+    );
+typedef _RmGetListDart =
+    int Function(
+      int,
+      Pointer<Uint32>,
+      Pointer<Uint32>,
+      Pointer<Void>,
+      Pointer<Uint32>,
+    );
 
 typedef _RmEndSessionNative = Int32 Function(Uint32);
 typedef _RmEndSessionDart = int Function(int);
@@ -2020,16 +2064,18 @@ class _RestartManagerBindings {
 
   final DynamicLibrary _lib = DynamicLibrary.open('Rstrtmgr.dll');
 
-  late final _RmStartSessionDart startSession =
-      _lib.lookupFunction<_RmStartSessionNative, _RmStartSessionDart>(
-          'RmStartSession');
+  late final _RmStartSessionDart startSession = _lib
+      .lookupFunction<_RmStartSessionNative, _RmStartSessionDart>(
+        'RmStartSession',
+      );
 
-  late final _RmRegisterResourcesDart registerResources =
-      _lib.lookupFunction<_RmRegisterResourcesNative, _RmRegisterResourcesDart>(
-          'RmRegisterResources');
+  late final _RmRegisterResourcesDart registerResources = _lib
+      .lookupFunction<_RmRegisterResourcesNative, _RmRegisterResourcesDart>(
+        'RmRegisterResources',
+      );
 
-  late final _RmGetListDart getList =
-      _lib.lookupFunction<_RmGetListNative, _RmGetListDart>('RmGetList');
+  late final _RmGetListDart getList = _lib
+      .lookupFunction<_RmGetListNative, _RmGetListDart>('RmGetList');
 
   late final _RmEndSessionDart endSession = _lib
       .lookupFunction<_RmEndSessionNative, _RmEndSessionDart>('RmEndSession');

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io' as io;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/files/save_location_picker.dart';
 import 'package:cb_file_manager/ui/utils/base_screen.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:file_picker/file_picker.dart';
@@ -18,7 +18,7 @@ import 'package:cb_file_manager/ui/utils/route.dart';
 
 /// A screen for managing database settings
 class DatabaseSettingsScreen extends StatefulWidget {
-  const DatabaseSettingsScreen({Key? key}) : super(key: key);
+  const DatabaseSettingsScreen({super.key});
 
   @override
   State<DatabaseSettingsScreen> createState() => _DatabaseSettingsScreenState();
@@ -252,16 +252,17 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
   }
 
   Future<void> _exportSqlite() async {
+    PickedSaveLocation? picked;
     try {
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final saveLocation = await FilePicker.platform.saveFile(
+      picked = await pickSaveLocation(
         dialogTitle: context.tr.saveBackup,
         fileName: 'cb_file_hub_backup_$timestamp.db',
         type: FileType.custom,
         allowedExtensions: ['db'],
       );
 
-      if (saveLocation == null) return;
+      if (picked == null) return;
 
       if (!mounted) return;
       showDialog(
@@ -279,14 +280,15 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
       );
 
       final prefs = _preferences.getAllSettings();
-      final filePath = await _databaseManager.exportAsSqlite(
+      final exported = await _databaseManager.exportAsSqlite(
         preferences: prefs,
-        customPath: saveLocation,
+        customPath: picked.scratchPath,
       );
 
       if (mounted) Navigator.pop(context);
 
-      if (filePath != null) {
+      if (exported != null) {
+        final filePath = await picked.commit();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -296,6 +298,7 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
           );
         }
       } else {
+        await picked.discard();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -307,6 +310,7 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
         }
       }
     } catch (e) {
+      await picked?.discard();
       if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -323,18 +327,21 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
   Future<void> _exportPreferencesJson() async {
     try {
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final saveLocation = await FilePicker.platform.saveFile(
+      final prefs = _preferences.getAllSettings();
+      final jsonString = const JsonEncoder.withIndent('  ').convert(prefs);
+      final saved = await FilePicker.saveFile(
         dialogTitle: context.tr.exportPreferencesAsJson,
         fileName: 'cb_file_hub_preferences_$timestamp.json',
+        bytes: Uint8List.fromList(utf8.encode(jsonString)),
+        mimeType: 'application/json',
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
 
-      if (saveLocation == null) return;
-
-      final prefs = _preferences.getAllSettings();
-      final jsonString = const JsonEncoder.withIndent('  ').convert(prefs);
-      await io.File(saveLocation).writeAsString(jsonString);
+      if (saved == null) return;
+      final saveLocation = saved.isScheme('file')
+          ? saved.toFilePath()
+          : saved.toString();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -359,12 +366,12 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
 
   Future<void> _importUnified() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['db', 'json'],
       );
 
-      if (result == null || result.files.single.path == null) return;
+      if (picked?.path == null) return;
 
       if (!mounted) return;
       showDialog(
@@ -382,7 +389,7 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
       );
 
       final summary = await _databaseManager.importUnified(
-        filePath: result.files.single.path!,
+        filePath: picked!.path!,
         skipFileExistenceCheck: true,
         onRestorePreferences: (prefs) async {
           await _preferences.restoreAllFrom(prefs);
@@ -398,10 +405,12 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
         await _loadStatistics();
 
         if (mounted) {
-          final tagMsg =
-              context.tr.tagsImported(summary['importedTagCount'] as int);
-          final prefMsg =
-              context.tr.settingsRestored(summary['preferencesCount'] as int);
+          final tagMsg = context.tr.tagsImported(
+            summary['importedTagCount'] as int,
+          );
+          final prefMsg = context.tr.settingsRestored(
+            summary['preferencesCount'] as int,
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('$tagMsg, $prefMsg.'),
@@ -474,10 +483,7 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
               context.tr.popularTags,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
           _popularTags.isEmpty
@@ -493,13 +499,13 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
                     children: _popularTags.entries.map((entry) {
                       return Chip(
                         label: Text(entry.key),
-                        backgroundColor: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.2),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.2),
                         avatar: CircleAvatar(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
                           child: Text(
                             '${entry.value}',
                             style: TextStyle(
@@ -572,7 +578,9 @@ class _DatabaseSettingsScreenState extends State<DatabaseSettingsScreen> {
             subtitle: Text(context.tr.rawDataPreferences),
             leading: const Icon(PhosphorIconsLight.gear),
             onTap: () => _showRawDataDialog(
-                context.tr.rawDataPreferences, 'preferences'),
+              context.tr.rawDataPreferences,
+              'preferences',
+            ),
           ),
           ListTile(
             title: Text(context.tr.rawDataTags),
@@ -690,9 +698,9 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
     if (mounted) setState(() => _isClearing = false);
@@ -727,15 +735,15 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
       await prefs.remove(key);
       await _loadPrefs();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.tr.deletedKey + key)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.tr.deletedKey + key)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -777,14 +785,14 @@ class _SharedPreferencesDialogState extends State<_SharedPreferencesDialog> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _prefs.isEmpty
-                ? const Center(child: Text('No preferences stored.'))
-                : ListView.builder(
-                    itemCount: sortedEntries.length,
-                    itemBuilder: (ctx, i) {
-                      final entry = sortedEntries[i];
-                      return _buildPrefTile(entry.key, entry.value);
-                    },
-                  ),
+            ? const Center(child: Text('No preferences stored.'))
+            : ListView.builder(
+                itemCount: sortedEntries.length,
+                itemBuilder: (ctx, i) {
+                  final entry = sortedEntries[i];
+                  return _buildPrefTile(entry.key, entry.value);
+                },
+              ),
       ),
       actions: [
         Text(
@@ -992,9 +1000,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
                       ClipboardData(text: _encodeJson(data)),
                     );
                     if (!mounted) return;
-                    messenger.showSnackBar(
-                      SnackBar(content: Text(copiedMsg)),
-                    );
+                    messenger.showSnackBar(SnackBar(content: Text(copiedMsg)));
                   },
             tooltip: context.tr.copyJson,
           ),
@@ -1020,8 +1026,8 @@ class _RawDataDialogState extends State<_RawDataDialog> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _totalRows == 0
-                ? Center(child: Text(context.tr.noDataFound))
-                : _buildDataTable(context),
+            ? Center(child: Text(context.tr.noDataFound))
+            : _buildDataTable(context),
       ),
       actions: [
         Padding(
@@ -1060,10 +1066,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const Spacer(),
-            Text(
-              'Rows per page',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Text('Rows per page', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(width: 8),
             CbSelect.fromValues<int>(
               size: CbSelectSize.sm,
@@ -1102,8 +1105,9 @@ class _RawDataDialogState extends State<_RawDataDialog> {
                         ),
                         child: DataTable(
                           headingRowColor: WidgetStatePropertyAll(
-                            colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.6),
+                            colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.6,
+                            ),
                           ),
                           columnSpacing: 20,
                           horizontalMargin: 16,
@@ -1153,8 +1157,11 @@ class _RawDataDialogState extends State<_RawDataDialog> {
             IconButton(
               onPressed: _canGoToPreviousPage() && !_isPageLoading
                   ? () => _loadPage(
-                      offset:
-                          math.max(0, _currentOffset - effectiveRowsPerPage))
+                      offset: math.max(
+                        0,
+                        _currentOffset - effectiveRowsPerPage,
+                      ),
+                    )
                   : null,
               icon: const Icon(Icons.chevron_left),
               tooltip: context.tr.previousPage,
@@ -1166,7 +1173,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
             IconButton(
               onPressed: _canGoToNextPage() && !_isPageLoading
                   ? () =>
-                      _loadPage(offset: _currentOffset + effectiveRowsPerPage)
+                        _loadPage(offset: _currentOffset + effectiveRowsPerPage)
                   : null,
               icon: const Icon(Icons.chevron_right),
               tooltip: 'Next page',
@@ -1174,7 +1181,8 @@ class _RawDataDialogState extends State<_RawDataDialog> {
             IconButton(
               onPressed: _canGoToNextPage() && !_isPageLoading
                   ? () => _loadPage(
-                      offset: (_totalPages() - 1) * effectiveRowsPerPage)
+                      offset: (_totalPages() - 1) * effectiveRowsPerPage,
+                    )
                   : null,
               icon: const Icon(Icons.last_page),
               tooltip: 'Last page',
@@ -1214,13 +1222,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
           'timestamp',
         ];
       case 'tags':
-        return <String>[
-          'id',
-          'filePath',
-          'tag',
-          'normalizedTag',
-          'createdAt',
-        ];
+        return <String>['id', 'filePath', 'tag', 'normalizedTag', 'createdAt'];
       default:
         return <String>[];
     }
@@ -1391,10 +1393,7 @@ class _RawDataDialogState extends State<_RawDataDialog> {
           child: SingleChildScrollView(
             child: SelectableText(
               jsonText,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-              ),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             ),
           ),
         ),

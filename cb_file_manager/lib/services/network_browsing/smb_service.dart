@@ -21,8 +21,11 @@ class SMBFileStream extends Stream<List<int>> {
   final int _chunkSize;
   bool _closed = false;
 
-  SMBFileStream(this._bindings, this._handle,
-      [this._chunkSize = 8192 * 1024]); // 8MB chunks for video streaming
+  SMBFileStream(
+    this._bindings,
+    this._handle, [
+    this._chunkSize = 8192 * 1024,
+  ]); // 8MB chunks for video streaming
 
   @override
   StreamSubscription<List<int>> listen(
@@ -56,8 +59,9 @@ class SMBFileStream extends Stream<List<int>> {
         final result = _bindings.readFileChunk(_handle, _chunkSize);
         if (result.bytesRead > 0) {
           // Copy the bytes into Dart-managed memory BEFORE freeing the native buffer
-          final chunkData =
-              Uint8List.fromList(result.data.asTypedList(result.bytesRead));
+          final chunkData = Uint8List.fromList(
+            result.data.asTypedList(result.bytesRead),
+          );
           _bindings.freeReadResultData(result.data);
 
           if (!controller.isClosed) {
@@ -148,8 +152,10 @@ class SMBService implements ISmbService {
     // parts regardless of original case.
     final pathWithoutPrefix = tabPath.substring('#network/'.length);
 
-    final parts =
-        pathWithoutPrefix.split('/').where((p) => p.isNotEmpty).toList();
+    final parts = pathWithoutPrefix
+        .split('/')
+        .where((p) => p.isNotEmpty)
+        .toList();
     // parts = ["smb", "host", "share", "folder"]
     if (parts.length < 2) {
       debugPrint('Tab path has too few parts: $tabPath');
@@ -204,15 +210,18 @@ class SMBService implements ISmbService {
   }) async {
     if (!isAvailable()) {
       return ConnectionResult(
-          success: false,
-          errorMessage: 'SMB Native is only available on Windows.');
+        success: false,
+        errorMessage: 'SMB Native is only available on Windows.',
+      );
     }
     await disconnect();
 
     final serverHost = host.trim().split('/').first.replaceAll('\\', '');
     if (serverHost.isEmpty) {
       return ConnectionResult(
-          success: false, errorMessage: 'Server address cannot be empty.');
+        success: false,
+        errorMessage: 'Server address cannot be empty.',
+      );
     }
 
     final uncPath = '\\\\$serverHost';
@@ -231,11 +240,14 @@ class SMBService implements ISmbService {
         // At this point we are connected to the server, but not a specific share.
         // The share will be determined when listing directories.
         return ConnectionResult(
-            success: true, connectedPath: '$_smbScheme://$_connectedHost');
+          success: true,
+          connectedPath: '$_smbScheme://$_connectedHost',
+        );
       } else {
         return ConnectionResult(
-            success: false,
-            errorMessage: 'SMB Connection failed with error code: $result');
+          success: false,
+          errorMessage: 'SMB Connection failed with error code: $result',
+        );
       }
     } finally {
       malloc.free(uncPathPtr);
@@ -288,8 +300,9 @@ class SMBService implements ISmbService {
     // Normal directory listing
     debugPrint('Calling native listDirectory for UNC path: $uncPath');
     final uncPathPtr = uncPath.toNativeUtf16();
-    final Pointer<NativeFileList> nativeListPtr =
-        _bindings.listDirectory(uncPathPtr);
+    final Pointer<NativeFileList> nativeListPtr = _bindings.listDirectory(
+      uncPathPtr,
+    );
     malloc.free(uncPathPtr);
 
     if (nativeListPtr == nullptr) {
@@ -297,7 +310,8 @@ class SMBService implements ISmbService {
       debugPrint('ListDirectory returned null for path: $uncPath');
       stopwatch.stop();
       debugPrint(
-          'SMB listDirectory completed in ${stopwatch.elapsedMilliseconds}ms (empty)');
+        'SMB listDirectory completed in ${stopwatch.elapsedMilliseconds}ms (empty)',
+      );
       return [];
     }
 
@@ -325,7 +339,8 @@ class SMBService implements ISmbService {
 
       stopwatch.stop();
       debugPrint(
-          'SMB listDirectory completed in ${stopwatch.elapsedMilliseconds}ms (${entities.length} items)');
+        'SMB listDirectory completed in ${stopwatch.elapsedMilliseconds}ms (${entities.length} items)',
+      );
       return entities;
     } finally {
       _bindings.freeFileList(nativeListPtr);
@@ -334,15 +349,18 @@ class SMBService implements ISmbService {
 
   // Helper method to list shares on a server
   Future<List<FileSystemEntity>> _listShares(
-      String uncPath, String tabPath) async {
+    String uncPath,
+    String tabPath,
+  ) async {
     // Extract server name from UNC path
     final server = uncPath.replaceAll('\\\\', '');
     final List<FileSystemEntity> shares = [];
 
     // Use the native function to enumerate shares
     final serverPtr = server.toNativeUtf16();
-    final Pointer<NativeShareList> nativeListPtr =
-        _bindings.enumerateShares(serverPtr);
+    final Pointer<NativeShareList> nativeListPtr = _bindings.enumerateShares(
+      serverPtr,
+    );
     malloc.free(serverPtr);
 
     if (nativeListPtr == nullptr) {
@@ -379,7 +397,7 @@ class SMBService implements ISmbService {
       'Pictures',
       'Music',
       'Videos',
-      'Downloads'
+      'Downloads',
     ];
     final List<FileSystemEntity> shares = [];
 
@@ -413,11 +431,14 @@ class SMBService implements ISmbService {
     try {
       while (true) {
         final result = _bindings.readFileChunk(
-            handle, 8192 * 1024); // 8MB chunks for video streaming performance
+          handle,
+          8192 * 1024,
+        ); // 8MB chunks for video streaming performance
         if (result.bytesRead > 0) {
           // Copy the bytes into Dart-managed memory BEFORE freeing the native buffer
-          final chunkData =
-              Uint8List.fromList(result.data.asTypedList(result.bytesRead));
+          final chunkData = Uint8List.fromList(
+            result.data.asTypedList(result.bytesRead),
+          );
           _bindings.freeReadResultData(result.data);
 
           sink.add(chunkData);
@@ -456,8 +477,11 @@ class SMBService implements ISmbService {
       await for (final chunk in stream) {
         final chunkPtr = calloc<Uint8>(chunk.length);
         chunkPtr.asTypedList(chunk.length).setAll(0, chunk);
-        final success =
-            _bindings.writeFileChunk(handle, chunkPtr, chunk.length);
+        final success = _bindings.writeFileChunk(
+          handle,
+          chunkPtr,
+          chunk.length,
+        );
         calloc.free(chunkPtr);
         if (!success) {
           _bindings.closeFile(handle); // Close file on error
@@ -498,7 +522,8 @@ class SMBService implements ISmbService {
     // A true recursive delete would require listing and deleting contents first.
     if (recursive) {
       debugPrint(
-          "Warning: Recursive delete on native SMB is not implemented. Directory must be empty.");
+        "Warning: Recursive delete on native SMB is not implemented. Directory must be empty.",
+      );
     }
     final uncPath = _getUncPathFromTabPath(tabPath);
     final uncPathPtr = uncPath.toNativeUtf16();
@@ -549,8 +574,11 @@ class SMBService implements ISmbService {
   }
 
   @override
-  Future<File> getFileWithProgress(String remotePath, String localPath,
-      void Function(double progress)? onProgress) async {
+  Future<File> getFileWithProgress(
+    String remotePath,
+    String localPath,
+    void Function(double progress)? onProgress,
+  ) async {
     final sink = File(localPath).openWrite();
     final uncPath = _getUncPathFromTabPath(remotePath);
     final uncPathPtr = uncPath.toNativeUtf16();
@@ -577,8 +605,11 @@ class SMBService implements ISmbService {
   }
 
   @override
-  Future<bool> putFileWithProgress(String localPath, String remotePath,
-      void Function(double progress)? onProgress) async {
+  Future<bool> putFileWithProgress(
+    String localPath,
+    String remotePath,
+    void Function(double progress)? onProgress,
+  ) async {
     final localFile = File(localPath);
     final totalSize = await localFile.length();
     var bytesWritten = 0;
@@ -601,8 +632,11 @@ class SMBService implements ISmbService {
         final chunkPtr = calloc<Uint8>(chunk.length);
         chunkPtr.asTypedList(chunk.length).setAll(0, chunk);
 
-        final success =
-            _bindings.writeFileChunk(handle, chunkPtr, chunk.length);
+        final success = _bindings.writeFileChunk(
+          handle,
+          chunkPtr,
+          chunk.length,
+        );
         calloc.free(chunkPtr);
 
         if (!success) {
@@ -661,8 +695,10 @@ class SMBService implements ISmbService {
 
       // For videos, use native thumbnail directly if available
       if (isVideo) {
-        final nativeThumbnail = await _getNativeThumbnail(uncPath, size)
-            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+        final nativeThumbnail = await _getNativeThumbnail(
+          uncPath,
+          size,
+        ).timeout(const Duration(seconds: 3), onTimeout: () => null);
 
         if (nativeThumbnail != null) {
           _thumbnailCache[cacheKey] = nativeThumbnail;
@@ -673,8 +709,10 @@ class SMBService implements ISmbService {
       }
 
       // For images: try native thumbnail first, then fallback
-      final nativeThumbnail = await _getNativeThumbnail(uncPath, size)
-          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      final nativeThumbnail = await _getNativeThumbnail(
+        uncPath,
+        size,
+      ).timeout(const Duration(seconds: 3), onTimeout: () => null);
 
       if (nativeThumbnail != null) {
         _thumbnailCache[cacheKey] = nativeThumbnail;
@@ -682,8 +720,10 @@ class SMBService implements ISmbService {
       }
 
       // Fallback: try downloading and processing the image
-      final fallbackThumbnail = await _getFallbackThumbnail(tabPath, size)
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      final fallbackThumbnail = await _getFallbackThumbnail(
+        tabPath,
+        size,
+      ).timeout(const Duration(seconds: 4), onTimeout: () => null);
 
       if (fallbackThumbnail != null) {
         _thumbnailCache[cacheKey] = fallbackThumbnail;
@@ -741,8 +781,9 @@ class SMBService implements ISmbService {
 
       if (result.data != nullptr && result.size > 0) {
         // Copy thumbnail data to Dart memory
-        final thumbnailData =
-            Uint8List.fromList(result.data.asTypedList(result.size));
+        final thumbnailData = Uint8List.fromList(
+          result.data.asTypedList(result.size),
+        );
 
         // Free native memory
         _bindings.freeThumbnailResult(result);

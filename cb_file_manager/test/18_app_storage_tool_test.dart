@@ -44,56 +44,57 @@ void main() {
     );
   }
 
-  test('App Insights tool requires explicit sharing from the Apps view',
-      () async {
-    service.publishCleanerScanContext(
-      ownerTabId: tabId,
-      root: DiskTreeNode(name: r'C:\', fullPath: r'C:\'),
-      appStorageReport: buildReport(),
-    );
+  test(
+    'App Insights tool requires explicit sharing from the Apps view',
+    () async {
+      service.publishCleanerScanContext(
+        ownerTabId: tabId,
+        root: DiskTreeNode(name: r'C:\', fullPath: r'C:\'),
+        appStorageReport: buildReport(),
+      );
 
-    final result = await ToolExecutor(ownerTabId: tabId).execute(
-      const ToolCall(name: 'get_current_app_storage', arguments: {}),
-    );
+      final result = await ToolExecutor(
+        ownerTabId: tabId,
+      ).execute(const ToolCall(name: 'get_current_app_storage', arguments: {}));
 
-    expect(result.success, isTrue);
-    expect(result.output, contains('has not been shared'));
-    expect(result.output, isNot(contains('Large App')));
-  });
+      expect(result.success, isTrue);
+      expect(result.output, contains('has not been shared'));
+      expect(result.output, isNot(contains('Large App')));
+    },
+  );
 
-  test('App Insights tool redacts paths unless the selected app is requested',
-      () async {
-    service.publishCleanerScanContext(
-      ownerTabId: tabId,
-      root: DiskTreeNode(name: r'C:\', fullPath: r'C:\'),
-      appStorageReport: buildReport(),
-      selectedAppId: 'win32:large-app',
-      appInsightsSharedWithAgent: true,
-    );
-    final executor = ToolExecutor(ownerTabId: tabId);
+  test(
+    'App Insights tool redacts paths unless the selected app is requested',
+    () async {
+      service.publishCleanerScanContext(
+        ownerTabId: tabId,
+        root: DiskTreeNode(name: r'C:\', fullPath: r'C:\'),
+        appStorageReport: buildReport(),
+        selectedAppId: 'win32:large-app',
+        appInsightsSharedWithAgent: true,
+      );
+      final executor = ToolExecutor(ownerTabId: tabId);
 
-    final summary = await executor.execute(
-      const ToolCall(
-        name: 'get_current_app_storage',
-        arguments: {'filter': 'large', 'include_paths': true},
-      ),
-    );
-    expect(summary.output, contains('Large App'));
-    expect(summary.output, isNot(contains(r'C:\Program Files\Large App')));
-    expect(summary.output, contains('days ago'));
-    expect(summary.output, isNot(contains('2025-01-01')));
-    expect(summary.output, isNot(contains('Example Publisher')));
-    expect(summary.output, isNot(contains('9.8.7')));
+      final summary = await executor.execute(
+        const ToolCall(
+          name: 'get_current_app_storage',
+          arguments: {'filter': 'large', 'include_paths': true},
+        ),
+      );
+      expect(summary.output, contains('Large App'));
+      expect(summary.output, isNot(contains(r'C:\Program Files\Large App')));
+      expect(summary.output, contains('days ago'));
+      expect(summary.output, isNot(contains('2025-01-01')));
+      expect(summary.output, isNot(contains('Example Publisher')));
+      expect(summary.output, isNot(contains('9.8.7')));
 
-    final detail = await executor.execute(
-      const ToolCall(
-        name: 'get_current_app_storage',
-        arguments: {
-          'app_id': 'win32:large-app',
-          'include_paths': true,
-        },
-      ),
-    );
-    expect(detail.output, contains(r'C:\Program Files\Large App'));
-  });
+      final detail = await executor.execute(
+        const ToolCall(
+          name: 'get_current_app_storage',
+          arguments: {'app_id': 'win32:large-app', 'include_paths': true},
+        ),
+      );
+      expect(detail.output, contains(r'C:\Program Files\Large App'));
+    },
+  );
 }

@@ -55,7 +55,7 @@ class CbTextField extends StatefulWidget {
   final bool mono;
 
   const CbTextField({
-    Key? key,
+    super.key,
     this.controller,
     this.focusNode,
     this.label,
@@ -77,7 +77,7 @@ class CbTextField extends StatefulWidget {
     this.inputFormatters,
     this.textAlign = TextAlign.start,
     this.mono = false,
-  }) : super(key: key);
+  });
 
   @override
   State<CbTextField> createState() => _CbTextFieldState();
@@ -130,20 +130,20 @@ class _CbTextFieldState extends State<CbTextField> {
     final Color borderColor = !isEnabled
         ? c.strokeSubtle
         : hasError
-            ? c.status.danger
-            : (_focused || _hovered)
-                ? c.strokeStrong
-                : c.stroke;
+        ? c.status.danger
+        : (_focused || _hovered)
+        ? c.strokeStrong
+        : c.stroke;
     final Color fillColor = !isEnabled
         ? c.surfaceSunken.withValues(alpha: 0.5)
         : _focused
-            ? c.surfaceRaised
-            : c.surfaceSunken;
+        ? c.surfaceRaised
+        : c.surfaceSunken;
 
     final TextStyle textStyle =
         (widget.mono ? CbTypography.mono : CbTypography.body).copyWith(
-      color: isEnabled ? c.textPrimary : c.textDisabled,
-    );
+          color: isEnabled ? c.textPrimary : c.textDisabled,
+        );
 
     final field = TextField(
       controller: widget.controller,
@@ -166,14 +166,15 @@ class _CbTextFieldState extends State<CbTextField> {
       cursorRadius: const Radius.circular(CbRadii.xs),
       // `collapsed` is the point of this widget: it strips the Material
       // decorator entirely, leaving the container below to do the drawing.
-      decoration: InputDecoration.collapsed(
-        hintText: widget.placeholder,
-        hintStyle: CbTypography.body.copyWith(color: c.textTertiary),
-      ).copyWith(
-        counterText: '',
-        isDense: true,
-        contentPadding: EdgeInsets.zero,
-      ),
+      decoration:
+          InputDecoration.collapsed(
+            hintText: widget.placeholder,
+            hintStyle: CbTypography.body.copyWith(color: c.textTertiary),
+          ).copyWith(
+            counterText: '',
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
     );
 
     return Column(
@@ -190,8 +191,9 @@ class _CbTextFieldState extends State<CbTextField> {
           const SizedBox(height: CbSpacing.xs + 2),
         ],
         MouseRegion(
-          cursor:
-              isEnabled ? SystemMouseCursors.text : SystemMouseCursors.basic,
+          cursor: isEnabled
+              ? SystemMouseCursors.text
+              : SystemMouseCursors.basic,
           onEnter: (_) => setState(() => _hovered = true),
           onExit: (_) => setState(() => _hovered = false),
           child: AnimatedContainer(

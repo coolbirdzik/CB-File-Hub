@@ -77,8 +77,11 @@ class AllureAttachment {
   final String source; // relative filename in allure-results directory
   const AllureAttachment(this.name, this.type, this.source);
 
-  Map<String, dynamic> toJson() =>
-      {'name': name, 'type': type, 'source': source};
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'type': type,
+    'source': source,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -86,8 +89,10 @@ class AllureAttachment {
 // ---------------------------------------------------------------------------
 
 /// Parses flutter `--reporter json` lines and produces AllureTestResult list.
-List<AllureTestResult> parseFlutterJsonLog(String logContent,
-    {String? buildDir}) {
+List<AllureTestResult> parseFlutterJsonLog(
+  String logContent, {
+  String? buildDir,
+}) {
   final results = <AllureTestResult>[];
   final idToName = <int, String>{};
   final idToStartTime = <int, DateTime>{};
@@ -173,29 +178,34 @@ List<AllureTestResult> parseFlutterJsonLog(String logContent,
 
     // Find matching screenshot if available
     final attachments = <AllureAttachment>[];
-    final screenshotName =
-        _screenshotForTest(name, buildDir ?? _kScreenshotsDir);
+    final screenshotName = _screenshotForTest(
+      name,
+      buildDir ?? _kScreenshotsDir,
+    );
     if (screenshotName != null) {
       attachments.add(
-          AllureAttachment('Failure screenshot', 'image/png', screenshotName));
+        AllureAttachment('Failure screenshot', 'image/png', screenshotName),
+      );
     }
 
-    results.add(AllureTestResult(
-      uuid: _uuidForTest(name, testID),
-      name: name,
-      status: status,
-      duration: durationMs,
-      message: error?.message,
-      trace: error?.trace,
-      labels: [
-        const AllureLabel('package', 'cb_file_manager.e2e'),
-        AllureLabel('testClass', suiteLabel),
-        AllureLabel('suite', suiteLabel),
-        AllureLabel('feature', suiteLabel),
-        const AllureLabel('severity', 'critical'),
-      ],
-      attachments: attachments,
-    ));
+    results.add(
+      AllureTestResult(
+        uuid: _uuidForTest(name, testID),
+        name: name,
+        status: status,
+        duration: durationMs,
+        message: error?.message,
+        trace: error?.trace,
+        labels: [
+          const AllureLabel('package', 'cb_file_manager.e2e'),
+          AllureLabel('testClass', suiteLabel),
+          AllureLabel('suite', suiteLabel),
+          AllureLabel('feature', suiteLabel),
+          const AllureLabel('severity', 'critical'),
+        ],
+        attachments: attachments,
+      ),
+    );
   }
 
   return results;
@@ -304,10 +314,7 @@ String? _screenshotForTest(String name, String buildDir) {
       .replaceAll('failure', 'failure'); // keep failure suffix as-is
 
   // Try both the exact name and the failure-suffixed variant
-  final candidates = [
-    '$candidateBase.png',
-    '${candidateBase}_failure.png',
-  ];
+  final candidates = ['$candidateBase.png', '${candidateBase}_failure.png'];
 
   // Also try common suffixes that E2E tests use
   final knownSuffixes = ['_failure', '_error', ''];
@@ -333,7 +340,9 @@ String? _screenshotForTest(String name, String buildDir) {
 // ---------------------------------------------------------------------------
 
 Future<void> writeAllureResults(
-    List<AllureTestResult> results, String resultsDir) async {
+  List<AllureTestResult> results,
+  String resultsDir,
+) async {
   final dir = Directory(resultsDir);
   if (!await dir.exists()) {
     await dir.create(recursive: true);
@@ -372,9 +381,11 @@ Future<void> main(List<String> args) async {
 
   if (logPath == null) {
     print(
-        'Usage: dart run tool/e2e_allure_adapter.dart <jsonl-log> [--build-dir <build-dir>]');
+      'Usage: dart run tool/e2e_allure_adapter.dart <jsonl-log> [--build-dir <build-dir>]',
+    );
     print(
-        '  <jsonl-log>   Path to flutter --reporter json output (e.g. build/e2e_report.jsonl)');
+      '  <jsonl-log>   Path to flutter --reporter json output (e.g. build/e2e_report.jsonl)',
+    );
     print('  --build-dir   Directory containing screenshots (default: build)');
     exit(1);
   }
@@ -393,8 +404,10 @@ Future<void> main(List<String> args) async {
   }
 
   print('[Allure adapter] Parsing $logPath...');
-  final results =
-      parseFlutterJsonLog(logContent, buildDir: buildDir ?? 'build');
+  final results = parseFlutterJsonLog(
+    logContent,
+    buildDir: buildDir ?? 'build',
+  );
 
   if (results.isEmpty) {
     print('[Allure adapter] WARNING: No test results parsed from log.');
@@ -426,7 +439,8 @@ Future<void> main(List<String> args) async {
   print('[Allure] Results written to $resultsDir/');
   print('[Allure] To generate HTML report:');
   print(
-      "         npx allure generate $resultsDir --clean -o build/allure-report");
+    "         npx allure generate $resultsDir --clean -o build/allure-report",
+  );
   print('[Allure] To serve report:');
   print("         npx allure serve $resultsDir");
   print('');

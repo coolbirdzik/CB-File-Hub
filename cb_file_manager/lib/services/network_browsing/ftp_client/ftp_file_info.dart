@@ -53,13 +53,16 @@ class FtpFileInfo implements FileSystemEntity {
   /// Example format:
   /// drwxr-xr-x 2 user group 4096 Jan 1 2022 dirname
   /// -rw-r--r-- 1 user group 1234 Jan 1 2022 filename.txt
-  static List<FtpFileInfo> parseDirectoryListing(String listing,
-      [String currentPath = '/']) {
+  static List<FtpFileInfo> parseDirectoryListing(
+    String listing, [
+    String currentPath = '/',
+  ]) {
     final List<FtpFileInfo> result = [];
     final lines = listing.split('\n');
 
     debugPrint(
-        "FTPFileInfo: Parsing ${lines.length} lines from directory listing");
+      "FTPFileInfo: Parsing ${lines.length} lines from directory listing",
+    );
 
     // Detect the format (Unix, DOS/Windows, etc.)
     bool isUnixFormat = false;
@@ -83,7 +86,8 @@ class FtpFileInfo implements FileSystemEntity {
     }
 
     debugPrint(
-        "FTPFileInfo: Detected format - Unix: $isUnixFormat, Windows: $isWindowsFormat, MSDOS: $isMSDOSFormat");
+      "FTPFileInfo: Detected format - Unix: $isUnixFormat, Windows: $isWindowsFormat, MSDOS: $isMSDOSFormat",
+    );
 
     for (final line in lines) {
       final trimmedLine = line.trim();
@@ -151,7 +155,8 @@ class FtpFileInfo implements FileSystemEntity {
         if (fileInfo != null) {
           result.add(fileInfo);
           debugPrint(
-              "FTPFileInfo: Added ${fileInfo.isDirectory ? "directory" : "file"}: ${fileInfo.name}");
+            "FTPFileInfo: Added ${fileInfo.isDirectory ? "directory" : "file"}: ${fileInfo.name}",
+          );
         }
       } catch (e) {
         debugPrint("FTPFileInfo: Error parsing listing line: $e");
@@ -206,7 +211,7 @@ class FtpFileInfo implements FileSystemEntity {
         'Sep': 9,
         'Oct': 10,
         'Nov': 11,
-        'Dec': 12
+        'Dec': 12,
       };
 
       final monthNum = months[month] ?? 1;
@@ -251,7 +256,8 @@ class FtpFileInfo implements FileSystemEntity {
       }
 
       // Parse time (might be in 12-hour format)
-      final hasAmPm = time.toLowerCase().contains('am') ||
+      final hasAmPm =
+          time.toLowerCase().contains('am') ||
           time.toLowerCase().contains('pm');
       final isPm = time.toLowerCase().contains('pm');
 
@@ -262,8 +268,9 @@ class FtpFileInfo implements FileSystemEntity {
 
       final timeParts = timeStr.split(':');
       var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute =
-          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final minute = timeParts.length > 1
+          ? (int.tryParse(timeParts[1]) ?? 0)
+          : 0;
 
       // Adjust for PM
       if (isPm && hour < 12) {
@@ -468,25 +475,29 @@ class FtpFileInfo implements FileSystemEntity {
   @override
   Future<FileSystemEntity> delete({bool recursive = false}) {
     throw UnsupportedError(
-        'Delete operation not supported directly on FtpFileInfo');
+      'Delete operation not supported directly on FtpFileInfo',
+    );
   }
 
   @override
   void deleteSync({bool recursive = false}) {
     throw UnsupportedError(
-        'Delete operation not supported directly on FtpFileInfo');
+      'Delete operation not supported directly on FtpFileInfo',
+    );
   }
 
   @override
   Future<FileSystemEntity> rename(String newPath) {
     throw UnsupportedError(
-        'Rename operation not supported directly on FtpFileInfo');
+      'Rename operation not supported directly on FtpFileInfo',
+    );
   }
 
   @override
   FileSystemEntity renameSync(String newPath) {
     throw UnsupportedError(
-        'Rename operation not supported directly on FtpFileInfo');
+      'Rename operation not supported directly on FtpFileInfo',
+    );
   }
 
   @override

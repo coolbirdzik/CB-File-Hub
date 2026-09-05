@@ -14,11 +14,11 @@ class JunkTreeView extends StatefulWidget {
   final int categoryTotalBytes;
 
   const JunkTreeView({
-    Key? key,
+    super.key,
     required this.items,
     required this.categoryName,
     required this.categoryTotalBytes,
-  }) : super(key: key);
+  });
 
   @override
   State<JunkTreeView> createState() => _JunkTreeViewState();
@@ -105,13 +105,15 @@ _TreeNode _buildTree(List<JunkItem> items, String rootName) {
 
       if (isLast) {
         // Leaf file node
-        current.children.add(_TreeNode(
-          name: segment,
-          fullPath: item.path,
-          isFile: true,
-          totalBytes: item.sizeBytes,
-          fileCount: 1,
-        ));
+        current.children.add(
+          _TreeNode(
+            name: segment,
+            fullPath: item.path,
+            isFile: true,
+            totalBytes: item.sizeBytes,
+            fileCount: 1,
+          ),
+        );
       } else {
         // Find or create directory node
         var found = false;
@@ -123,10 +125,7 @@ _TreeNode _buildTree(List<JunkItem> items, String rootName) {
           }
         }
         if (!found) {
-          final newNode = _TreeNode(
-            name: segment,
-            fullPath: partialPath,
-          );
+          final newNode = _TreeNode(name: segment, fullPath: partialPath);
           current.children.add(newNode);
           current = newNode;
         }
@@ -247,11 +246,16 @@ class _TreeNodeTileState extends State<_TreeNodeTile> {
       children: [
         // Node row
         InkWell(
-          onTap:
-              hasChildren ? () => setState(() => _expanded = !_expanded) : null,
+          onTap: hasChildren
+              ? () => setState(() => _expanded = !_expanded)
+              : null,
           child: Padding(
             padding: EdgeInsets.only(
-                left: 12 + indent, right: 12, top: 4, bottom: 4),
+              left: 12 + indent,
+              right: 12,
+              top: 4,
+              bottom: 4,
+            ),
             child: Row(
               children: [
                 // Expand/collapse arrow or spacer
@@ -287,8 +291,9 @@ class _TreeNodeTileState extends State<_TreeNodeTile> {
                     node.name,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight:
-                          node.isFile ? FontWeight.normal : FontWeight.w500,
+                      fontWeight: node.isFile
+                          ? FontWeight.normal
+                          : FontWeight.w500,
                       color: theme.colorScheme.onSurface,
                     ),
                     maxLines: 1,
@@ -397,10 +402,9 @@ class _PercentBar extends StatelessWidget {
       height: 14,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(2),
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       child: FractionallySizedBox(
         alignment: Alignment.centerLeft,

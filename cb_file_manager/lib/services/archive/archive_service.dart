@@ -13,10 +13,7 @@ class ArchiveDirectoryListing {
   final List<Directory> folders;
   final List<File> files;
 
-  const ArchiveDirectoryListing({
-    required this.folders,
-    required this.files,
-  });
+  const ArchiveDirectoryListing({required this.folders, required this.files});
 }
 
 typedef ArchiveProgressCallback = void Function(int completed, int total);
@@ -266,14 +263,13 @@ class ArchiveService {
       if (workingFormat == ArchiveFormat.gzip ||
           workingFormat == ArchiveFormat.bzip2) {
         final baseName = p.basenameWithoutExtension(archivePath);
-        return Archive()
-          ..add(
-            ArchiveFile(
-              baseName.isEmpty ? p.basename(archivePath) : baseName,
-              File(archivePath).lengthSync(),
-              Uint8List(0),
-            ),
-          );
+        return Archive()..add(
+          ArchiveFile(
+            baseName.isEmpty ? p.basename(archivePath) : baseName,
+            File(archivePath).lengthSync(),
+            Uint8List(0),
+          ),
+        );
       }
 
       final input = archive_io.InputFileStream(workingPath);
@@ -319,11 +315,11 @@ class ArchiveService {
       );
     }
 
-    final result = await Process.run(
-      executable,
-      ['l', '-ba', archivePath],
-      runInShell: false,
-    );
+    final result = await Process.run(executable, [
+      'l',
+      '-ba',
+      archivePath,
+    ], runInShell: false);
     if (result.exitCode != 0) {
       throw StateError(
         'Failed to list archive (${result.exitCode}): ${result.stderr}',
@@ -387,11 +383,12 @@ class ArchiveService {
     Directory(destinationDir).createSync(recursive: true);
     onProgress?.call(0, 1);
 
-    final result = await Process.run(
-      executable,
-      ['x', archivePath, '-o$destinationDir', '-y'],
-      runInShell: false,
-    );
+    final result = await Process.run(executable, [
+      'x',
+      archivePath,
+      '-o$destinationDir',
+      '-y',
+    ], runInShell: false);
     if (result.exitCode != 0) {
       throw StateError(
         'Failed to extract archive (${result.exitCode}): ${result.stderr}',
@@ -414,11 +411,13 @@ class ArchiveService {
     }
 
     Directory(destinationDir).createSync(recursive: true);
-    final result = await Process.run(
-      executable,
-      ['e', archivePath, entryName, '-o$destinationDir', '-y'],
-      runInShell: false,
-    );
+    final result = await Process.run(executable, [
+      'e',
+      archivePath,
+      entryName,
+      '-o$destinationDir',
+      '-y',
+    ], runInShell: false);
     if (result.exitCode != 0) {
       throw StateError(
         'Failed to extract entry (${result.exitCode}): ${result.stderr}',
@@ -439,7 +438,8 @@ class ArchiveService {
       required String innerPath,
       required String entryName,
       required bool isDirectory,
-    }) buildVirtualPath,
+    })
+    buildVirtualPath,
   }) async {
     final normalizedInner = _normalizeInnerPrefix(innerPath);
     final entries = await listEntries(archiveFilePath);
@@ -459,8 +459,10 @@ class ArchiveService {
       relative = relative.replaceAll(RegExp(r'^/+'), '');
       if (relative.isEmpty) continue;
 
-      final parts =
-          relative.split('/').where((part) => part.isNotEmpty).toList();
+      final parts = relative
+          .split('/')
+          .where((part) => part.isNotEmpty)
+          .toList();
       if (parts.isEmpty) continue;
 
       if (parts.length == 1) {
@@ -527,8 +529,9 @@ class ArchiveService {
       }
     }
 
-    final tempDir =
-        await Directory.systemTemp.createTemp('cb_archive_entry_preview_');
+    final tempDir = await Directory.systemTemp.createTemp(
+      'cb_archive_entry_preview_',
+    );
     await extractEntry(
       archivePath: archiveFilePath,
       entryName: entryInnerPath,

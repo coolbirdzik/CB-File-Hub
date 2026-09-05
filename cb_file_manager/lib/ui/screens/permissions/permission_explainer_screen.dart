@@ -8,7 +8,7 @@ import '../../../config/languages/app_localizations.dart';
 import '../../../services/permission_state_service.dart';
 
 class PermissionExplainerScreen extends StatefulWidget {
-  const PermissionExplainerScreen({Key? key}) : super(key: key);
+  const PermissionExplainerScreen({super.key});
 
   @override
   State<PermissionExplainerScreen> createState() =>
@@ -112,8 +112,9 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
   }
 
   Future<void> _openSettings() async {
-    final uri =
-        Platform.isIOS ? Uri.parse('app-settings:') : Uri.parse('package:');
+    final uri = Platform.isIOS
+        ? Uri.parse('app-settings:')
+        : Uri.parse('package:');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
@@ -176,7 +177,7 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
                   Expanded(
                     child: ListView.separated(
                       itemCount: cards.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (_, i) => cards[i],
                     ),
                   ),
@@ -192,13 +193,16 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(PhosphorIconsLight.shieldCheck),
-                      label: Text(_checking
-                          ? l10n.grantingPermissions
-                          : l10n.grantAllPermissions),
+                      label: Text(
+                        _checking
+                            ? l10n.grantingPermissions
+                            : l10n.grantAllPermissions,
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -222,7 +226,7 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
                         ),
                       ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -237,12 +241,11 @@ class _PermissionCard extends StatelessWidget {
   final VoidCallback onRequest;
 
   const _PermissionCard({
-    Key? key,
     required this.title,
     required this.description,
     required this.granted,
     required this.onRequest,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +279,7 @@ class _PermissionCard extends StatelessWidget {
             ElevatedButton(
               onPressed: onRequest,
               child: Text(granted ? l10n.granted : l10n.grantPermission),
-            )
+            ),
           ],
         ),
       ),

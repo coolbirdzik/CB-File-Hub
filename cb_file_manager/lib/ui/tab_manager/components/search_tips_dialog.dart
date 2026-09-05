@@ -68,9 +68,7 @@ Future<void> showSearchTipsDialog(BuildContext context) async {
         ),
       ],
       backgroundColor: isDark ? Colors.grey[850] : theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
   );
 }

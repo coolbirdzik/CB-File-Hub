@@ -13,8 +13,7 @@ void main() {
     service.clearCleanerScanContext(tabId);
   });
 
-  test('junk scan output ranks evidence and does not invite immediate cleanup',
-      () {
+  test('junk scan output ranks evidence and does not invite immediate cleanup', () {
     final report = ScanReport(
       drivesScanned: const [r'C:\'],
       itemsByCategory: {
@@ -50,99 +49,106 @@ void main() {
     expect(output, isNot(contains('To clean: call clean_disk_junk')));
   });
 
-  test('current scan reports large files separately from cleanup candidates',
-      () async {
-    final installer = DiskTreeNode(
-      name: 'installer.iso',
-      fullPath: r'C:\Users\Tester\Downloads\installer.iso',
-      isFile: true,
-      sizeBytes: 3 * 1024 * 1024 * 1024,
-      fileCount: 1,
-    );
-    final downloads = DiskTreeNode(
-      name: 'Downloads',
-      fullPath: r'C:\Users\Tester\Downloads',
-      sizeBytes: installer.sizeBytes,
-      fileCount: 1,
-      children: [installer],
-    );
-    final cacheFile = DiskTreeNode(
-      name: 'data.bin',
-      fullPath:
-          r'C:\Users\Tester\AppData\Local\Google\Chrome\User Data\Default\Cache\data.bin',
-      isFile: true,
-      sizeBytes: 700 * 1024 * 1024,
-      fileCount: 1,
-      junkCategoryId: 'browser_cache',
-    );
-    final cache = DiskTreeNode(
-      name: 'Cache',
-      fullPath:
-          r'C:\Users\Tester\AppData\Local\Google\Chrome\User Data\Default\Cache',
-      sizeBytes: cacheFile.sizeBytes,
-      fileCount: 1,
-      children: [cacheFile],
-      junkCategoryId: 'browser_cache',
-    );
-    final root = DiskTreeNode(
-      name: r'C:\',
-      fullPath: r'C:\',
-      sizeBytes: downloads.sizeBytes + cache.sizeBytes,
-      fileCount: 2,
-      children: [downloads, cache],
-    );
-    service.publishCleanerScanContext(ownerTabId: tabId, root: root);
-    expect(
-      service.getCleanerScanContext(ownerTabId: tabId)?.isCached,
-      isFalse,
-    );
+  test(
+    'current scan reports large files separately from cleanup candidates',
+    () async {
+      final installer = DiskTreeNode(
+        name: 'installer.iso',
+        fullPath: r'C:\Users\Tester\Downloads\installer.iso',
+        isFile: true,
+        sizeBytes: 3 * 1024 * 1024 * 1024,
+        fileCount: 1,
+      );
+      final downloads = DiskTreeNode(
+        name: 'Downloads',
+        fullPath: r'C:\Users\Tester\Downloads',
+        sizeBytes: installer.sizeBytes,
+        fileCount: 1,
+        children: [installer],
+      );
+      final cacheFile = DiskTreeNode(
+        name: 'data.bin',
+        fullPath:
+            r'C:\Users\Tester\AppData\Local\Google\Chrome\User Data\Default\Cache\data.bin',
+        isFile: true,
+        sizeBytes: 700 * 1024 * 1024,
+        fileCount: 1,
+        junkCategoryId: 'browser_cache',
+      );
+      final cache = DiskTreeNode(
+        name: 'Cache',
+        fullPath:
+            r'C:\Users\Tester\AppData\Local\Google\Chrome\User Data\Default\Cache',
+        sizeBytes: cacheFile.sizeBytes,
+        fileCount: 1,
+        children: [cacheFile],
+        junkCategoryId: 'browser_cache',
+      );
+      final root = DiskTreeNode(
+        name: r'C:\',
+        fullPath: r'C:\',
+        sizeBytes: downloads.sizeBytes + cache.sizeBytes,
+        fileCount: 2,
+        children: [downloads, cache],
+      );
+      service.publishCleanerScanContext(ownerTabId: tabId, root: root);
+      expect(
+        service.getCleanerScanContext(ownerTabId: tabId)?.isCached,
+        isFalse,
+      );
 
-    final result = await ToolExecutor(ownerTabId: tabId).execute(
-      const ToolCall(
-        name: 'get_current_cleaner_scan',
-        arguments: {'max_items': 5},
-      ),
-    );
+      final result = await ToolExecutor(ownerTabId: tabId).execute(
+        const ToolCall(
+          name: 'get_current_cleaner_scan',
+          arguments: {'max_items': 5},
+        ),
+      );
 
-    expect(result.output, contains('Largest folders'));
-    expect(result.output, contains('Largest files'));
-    expect(result.output, contains(r'installer.iso'));
-    expect(result.output, contains('owner=User Downloads'));
-    expect(result.output, contains('REVIEW: Large size alone'));
-    expect(result.output, contains('Rule-backed cleanup candidates'));
-    expect(result.output, contains('category=Browser caches (browser_cache)'));
-    expect(result.output, contains('owner=Google Chrome'));
-    expect(result.output, contains('CLEAN:'));
-    expect(result.output, contains('not JSON'));
-  });
+      expect(result.output, contains('Largest folders'));
+      expect(result.output, contains('Largest files'));
+      expect(result.output, contains(r'installer.iso'));
+      expect(result.output, contains('owner=User Downloads'));
+      expect(result.output, contains('REVIEW: Large size alone'));
+      expect(result.output, contains('Rule-backed cleanup candidates'));
+      expect(
+        result.output,
+        contains('category=Browser caches (browser_cache)'),
+      );
+      expect(result.output, contains('owner=Google Chrome'));
+      expect(result.output, contains('CLEAN:'));
+      expect(result.output, contains('not JSON'));
+    },
+  );
 
-  test('cached scan advice identifies stale data and asks for a refresh',
-      () async {
-    final root = DiskTreeNode(
-      name: r'C:\',
-      fullPath: r'C:\',
-      sizeBytes: 1024,
-      fileCount: 1,
-    );
-    service.publishCleanerScanContext(
-      ownerTabId: tabId,
-      root: root,
-      isCached: true,
-    );
+  test(
+    'cached scan advice identifies stale data and asks for a refresh',
+    () async {
+      final root = DiskTreeNode(
+        name: r'C:\',
+        fullPath: r'C:\',
+        sizeBytes: 1024,
+        fileCount: 1,
+      );
+      service.publishCleanerScanContext(
+        ownerTabId: tabId,
+        root: root,
+        isCached: true,
+      );
 
-    final result = await ToolExecutor(ownerTabId: tabId).execute(
-      const ToolCall(
-        name: 'get_current_cleaner_scan',
-        arguments: <String, dynamic>{},
-      ),
-    );
+      final result = await ToolExecutor(ownerTabId: tabId).execute(
+        const ToolCall(
+          name: 'get_current_cleaner_scan',
+          arguments: <String, dynamic>{},
+        ),
+      );
 
-    expect(result.output, contains('PREVIOUS CACHED CLEANER SCAN'));
-    expect(result.output, contains('previous cached result'));
-    expect(result.output, contains('this is not a current scan'));
-    expect(result.output, contains('Use Scan again to refresh'));
-    expect(result.output, isNot(contains('CURRENT CLEANER SCAN')));
-  });
+      expect(result.output, contains('PREVIOUS CACHED CLEANER SCAN'));
+      expect(result.output, contains('previous cached result'));
+      expect(result.output, contains('this is not a current scan'));
+      expect(result.output, contains('Use Scan again to refresh'));
+      expect(result.output, isNot(contains('CURRENT CLEANER SCAN')));
+    },
+  );
 
   test('cleaner skill keeps recommendation requests read-only', () {
     expect(

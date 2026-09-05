@@ -105,10 +105,7 @@ class AppBusyCursor {
 /// per-item cursors (rows use [SystemMouseCursors.click]), and is declared
 /// non-opaque so hover highlights and taps still reach the widgets underneath.
 class AppBusyCursorOverlay extends StatelessWidget {
-  const AppBusyCursorOverlay({
-    Key? key,
-    required this.child,
-  }) : super(key: key);
+  const AppBusyCursorOverlay({super.key, required this.child});
 
   final Widget child;
 

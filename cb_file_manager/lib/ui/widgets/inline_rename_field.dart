@@ -19,14 +19,14 @@ class InlineRenameField extends StatelessWidget {
   final int maxLines;
 
   const InlineRenameField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onCommit,
     required this.onCancel,
     this.textStyle,
     this.textAlign = TextAlign.center,
     this.maxLines = 1,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

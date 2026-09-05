@@ -71,9 +71,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     on<ClearSearchAndFilters>(_onClearSearchAndFilters);
     on<FolderListDeleteFiles>(_onDeleteFiles);
     on<FolderListDeleteItems>(_onDeleteItems);
-    on<FolderListRetryDeleteAsAdministrator>(
-      _onRetryDeleteAsAdministrator,
-    );
+    on<FolderListRetryDeleteAsAdministrator>(_onRetryDeleteAsAdministrator);
     on<FolderListReloadCurrentFolder>(_onReloadCurrentFolder);
     on<FolderListDeleteTagGlobally>(_onDeleteTagGlobally);
     on<CopyFile>(_onCopyFile);
@@ -98,8 +96,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     _tagSubscription = _tagSearchBloc.stream.listen(_onTagStateChanged);
 
     // ── External subscriptions ────────────────────────────────────
-    _tagChangeSubscription =
-        TagManager.onTagChanged.listen(_onExternalTagChanged);
+    _tagChangeSubscription = TagManager.onTagChanged.listen(
+      _onExternalTagChanged,
+    );
   }
 
   @override
@@ -136,7 +135,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   Future<void> _onLoad(
-      FolderListLoad event, Emitter<FolderListState> emit) async {
+    FolderListLoad event,
+    Emitter<FolderListState> emit,
+  ) async {
     final path = event.path;
     if (ArchivePathUtils.isArchiveBrowsePath(path)) {
       await _loadArchiveBrowsePath(path, emit);
@@ -159,10 +160,7 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     final location = ArchivePathUtils.parse(path);
     if (location == null) {
       _archiveBrowsePath = null;
-      emit(state.copyWith(
-        isLoading: false,
-        error: 'Invalid archive path',
-      ));
+      emit(state.copyWith(isLoading: false, error: 'Invalid archive path'));
       return;
     }
 
@@ -175,59 +173,66 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     // request it) must not blank the list that is already on screen.
     final isSameLocation = state.currentPath.path == path;
 
-    emit(state.copyWith(
-      isLoading: true,
-      isRefreshing: false,
-      error: null,
-      currentPath: Directory(path),
-      folders: isSameLocation ? null : const [],
-      files: isSameLocation ? null : const [],
-      filteredFiles: const [],
-      searchResults: const [],
-      currentFilter: null,
-      currentSearchQuery: null,
-      currentSearchTag: null,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        isRefreshing: false,
+        error: null,
+        currentPath: Directory(path),
+        folders: isSameLocation ? null : const [],
+        files: isSameLocation ? null : const [],
+        filteredFiles: const [],
+        searchResults: const [],
+        currentFilter: null,
+        currentSearchQuery: null,
+        currentSearchTag: null,
+      ),
+    );
 
     try {
       final listing = await locator<ArchiveService>().listDirectory(
         archiveFilePath: location.archiveFile,
         innerPath: location.innerPath,
-        buildVirtualPath: ({
-          required archiveFile,
-          required innerPath,
-          required entryName,
-          required isDirectory,
-        }) {
-          return ArchivePathUtils.build(
-            archiveFile: archiveFile,
-            innerPath: innerPath,
-          );
-        },
+        buildVirtualPath:
+            ({
+              required archiveFile,
+              required innerPath,
+              required entryName,
+              required isDirectory,
+            }) {
+              return ArchivePathUtils.build(
+                archiveFile: archiveFile,
+                innerPath: innerPath,
+              );
+            },
       );
 
       // Drop the result if the user already navigated elsewhere while the
       // archive was being read.
       if (isClosed || _archiveBrowsePath != path) return;
-      emit(state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        error: null,
-        currentPath: Directory(path),
-        folders: listing.folders,
-        files: listing.files,
-        filteredFiles: const [],
-        searchResults: const [],
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          error: null,
+          currentPath: Directory(path),
+          folders: listing.folders,
+          files: listing.files,
+          filteredFiles: const [],
+          searchResults: const [],
+        ),
+      );
     } catch (e) {
       if (isClosed || _archiveBrowsePath != path) return;
-      emit(state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        error: e.toString(),
-        folders: const [],
-        files: const [],
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          error: e.toString(),
+          folders: const [],
+          files: const [],
+        ),
+      );
     }
   }
 
@@ -236,10 +241,12 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       add(FolderListLoad(event.path));
       return;
     }
-    _navigationBloc.add(nav.FileNavigationRefresh(
-      event.path,
-      forceRegenerateThumbnails: event.forceRegenerateThumbnails,
-    ));
+    _navigationBloc.add(
+      nav.FileNavigationRefresh(
+        event.path,
+        forceRegenerateThumbnails: event.forceRegenerateThumbnails,
+      ),
+    );
   }
 
   void _onReloadCurrentFolder(
@@ -283,21 +290,22 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     FolderListDeleteFiles event,
     Emitter<FolderListState> emit,
   ) {
-    _operationsBloc.add(ops.FileOperationsDeleteFiles(
-      event.filePaths,
-      permanent: false,
-    ));
+    _operationsBloc.add(
+      ops.FileOperationsDeleteFiles(event.filePaths, permanent: false),
+    );
   }
 
   void _onDeleteItems(
     FolderListDeleteItems event,
     Emitter<FolderListState> emit,
   ) {
-    _operationsBloc.add(ops.FileOperationsDeleteItems(
-      filePaths: event.filePaths,
-      folderPaths: event.folderPaths,
-      permanent: event.permanent,
-    ));
+    _operationsBloc.add(
+      ops.FileOperationsDeleteItems(
+        filePaths: event.filePaths,
+        folderPaths: event.folderPaths,
+        permanent: event.permanent,
+      ),
+    );
   }
 
   void _onRetryDeleteAsAdministrator(
@@ -353,10 +361,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     FolderListDeleteTagGlobally event,
     Emitter<FolderListState> emit,
   ) {
-    _tagSearchBloc.add(tag.TagSearchDeleteTagGlobally(
-      event.tag,
-      state.currentPath.path,
-    ));
+    _tagSearchBloc.add(
+      tag.TagSearchDeleteTagGlobally(event.tag, state.currentPath.path),
+    );
   }
 
   // ── Search ──────────────────────────────────────────────────────
@@ -365,11 +372,13 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     SearchByFileName event,
     Emitter<FolderListState> emit,
   ) {
-    _navigationBloc.add(nav.FileNavigationSearchByFileName(
-      event.query,
-      recursive: event.recursive,
-      useRegex: event.useRegex,
-    ));
+    _navigationBloc.add(
+      nav.FileNavigationSearchByFileName(
+        event.query,
+        recursive: event.recursive,
+        useRegex: event.useRegex,
+      ),
+    );
   }
 
   void _onSearchByTag(SearchByTag event, Emitter<FolderListState> emit) {
@@ -387,10 +396,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     SearchByMultipleTags event,
     Emitter<FolderListState> emit,
   ) {
-    _tagSearchBloc.add(tag.TagSearchByMultipleTags(
-      event.tags,
-      state.currentPath.path,
-    ));
+    _tagSearchBloc.add(
+      tag.TagSearchByMultipleTags(event.tags, state.currentPath.path),
+    );
   }
 
   void _onSearchByMultipleTagsGlobally(
@@ -404,11 +412,13 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     SetTagSearchResults event,
     Emitter<FolderListState> emit,
   ) {
-    _tagSearchBloc.add(tag.TagSearchSetResults(
-      resultPaths: event.results.map((e) => e.path).toList(),
-      tagName: event.tagName,
-      total: event.results.length,
-    ));
+    _tagSearchBloc.add(
+      tag.TagSearchSetResults(
+        resultPaths: event.results.map((e) => e.path).toList(),
+        tagName: event.tagName,
+        total: event.results.length,
+      ),
+    );
   }
 
   void _onAddTagSearchResults(
@@ -426,11 +436,13 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   }
 
   void _onSetSortOption(SetSortOption event, Emitter<FolderListState> emit) {
-    _navigationBloc.add(nav.FileNavigationSetSortOption(
-      event.sortOption,
-      persist: event.persist,
-      folderPath: event.folderPath,
-    ));
+    _navigationBloc.add(
+      nav.FileNavigationSetSortOption(
+        event.sortOption,
+        persist: event.persist,
+        folderPath: event.folderPath,
+      ),
+    );
   }
 
   // ── External tag change listener ────────────────────────────────
@@ -452,48 +464,54 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     // Only display preferences may flow through from the navigation bloc.
     if (_archiveBrowsePath != null) {
       // ignore: invalid_use_of_visible_for_testing_member
-      emit(state.copyWith(
-        viewMode: navState.viewMode,
-        sortOption: navState.sortOption,
-        gridZoomLevel: navState.gridZoomLevel,
-      ));
+      emit(
+        state.copyWith(
+          viewMode: navState.viewMode,
+          sortOption: navState.sortOption,
+          gridZoomLevel: navState.gridZoomLevel,
+        ),
+      );
       return;
     }
 
     final hasActiveTagSearch = state.currentSearchTag != null;
 
     // ignore: invalid_use_of_visible_for_testing_member
-    emit(state.copyWith(
-      isLoading: navState.isLoading,
-      isRefreshing: navState.isRefreshing,
-      error: navState.error,
-      currentPath: navState.currentPath,
-      folders: navState.folders,
-      files: navState.files,
-      searchResults:
-          hasActiveTagSearch ? state.searchResults : navState.searchResults,
-      hasMoreSearchResults: hasActiveTagSearch
-          ? state.hasMoreSearchResults
-          : navState.hasMoreSearchResults,
-      isLoadingMoreSearchResults: hasActiveTagSearch
-          ? state.isLoadingMoreSearchResults
-          : navState.isLoadingMoreSearchResults,
-      searchResultsTotal: hasActiveTagSearch
-          ? state.searchResultsTotal
-          : navState.searchResultsTotal,
-      filteredFiles: navState.filteredFiles,
-      currentFilter: navState.currentFilter,
-      currentSearchQuery: hasActiveTagSearch
-          ? state.currentSearchQuery
-          : navState.currentSearchQuery,
-      viewMode: navState.viewMode,
-      sortOption: navState.sortOption,
-      gridZoomLevel: navState.gridZoomLevel,
-      fileStatsCache: navState.fileStatsCache,
-      isSearchByName:
-          hasActiveTagSearch ? state.isSearchByName : navState.isSearchByName,
-      searchRecursive: navState.searchRecursive,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: navState.isLoading,
+        isRefreshing: navState.isRefreshing,
+        error: navState.error,
+        currentPath: navState.currentPath,
+        folders: navState.folders,
+        files: navState.files,
+        searchResults: hasActiveTagSearch
+            ? state.searchResults
+            : navState.searchResults,
+        hasMoreSearchResults: hasActiveTagSearch
+            ? state.hasMoreSearchResults
+            : navState.hasMoreSearchResults,
+        isLoadingMoreSearchResults: hasActiveTagSearch
+            ? state.isLoadingMoreSearchResults
+            : navState.isLoadingMoreSearchResults,
+        searchResultsTotal: hasActiveTagSearch
+            ? state.searchResultsTotal
+            : navState.searchResultsTotal,
+        filteredFiles: navState.filteredFiles,
+        currentFilter: navState.currentFilter,
+        currentSearchQuery: hasActiveTagSearch
+            ? state.currentSearchQuery
+            : navState.currentSearchQuery,
+        viewMode: navState.viewMode,
+        sortOption: navState.sortOption,
+        gridZoomLevel: navState.gridZoomLevel,
+        fileStatsCache: navState.fileStatsCache,
+        isSearchByName: hasActiveTagSearch
+            ? state.isSearchByName
+            : navState.isSearchByName,
+        searchRecursive: navState.searchRecursive,
+      ),
+    );
 
     // Pre-warm extension icon cache when file listing arrives
     if (!navState.isLoading && navState.files.isNotEmpty) {
@@ -508,11 +526,13 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   void _onOpsStateChanged(FileOperationsState opsState) {
     if (isClosed) return;
     // ignore: invalid_use_of_visible_for_testing_member
-    emit(state.copyWith(
-      error: opsState.error,
-      clipboardRevision: opsState.clipboardRevision,
-      retryableElevatedDeletePaths: opsState.retryableElevatedDeletePaths,
-    ));
+    emit(
+      state.copyWith(
+        error: opsState.error,
+        clipboardRevision: opsState.clipboardRevision,
+        retryableElevatedDeletePaths: opsState.retryableElevatedDeletePaths,
+      ),
+    );
   }
 
   void _onTagStateChanged(TagSearchState tagState) {
@@ -522,10 +542,12 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     // flags would hide or replace the virtual listing.
     if (_archiveBrowsePath != null) {
       // ignore: invalid_use_of_visible_for_testing_member
-      emit(state.copyWith(
-        fileTags: tagState.fileTags,
-        allUniqueTags: tagState.allUniqueTags,
-      ));
+      emit(
+        state.copyWith(
+          fileTags: tagState.fileTags,
+          allUniqueTags: tagState.allUniqueTags,
+        ),
+      );
       return;
     }
 
@@ -535,8 +557,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     final childTagFolders = <FileSystemEntity>[];
     final currentTag = tagState.currentSearchTag;
     if (currentTag != null && currentTag.isNotEmpty) {
-      for (final child
-          in TagHierarchyManager.instance.getChildren(currentTag)) {
+      for (final child in TagHierarchyManager.instance.getChildren(
+        currentTag,
+      )) {
         childTagFolders.add(Directory(UriUtils.buildTagSearchPath(child)));
       }
     }
@@ -551,15 +574,17 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     ];
 
     // ignore: invalid_use_of_visible_for_testing_member
-    emit(state.copyWith(
-      isLoading: tagState.isLoading,
-      error: tagState.error,
-      searchResults: searchResults,
-      searchResultsTotal: tagState.searchResultsTotal,
-      currentSearchTag: tagState.currentSearchTag,
-      isGlobalSearch: tagState.isGlobalSearch,
-      fileTags: tagState.fileTags,
-      allUniqueTags: tagState.allUniqueTags,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: tagState.isLoading,
+        error: tagState.error,
+        searchResults: searchResults,
+        searchResultsTotal: tagState.searchResultsTotal,
+        currentSearchTag: tagState.currentSearchTag,
+        isGlobalSearch: tagState.isGlobalSearch,
+        fileTags: tagState.fileTags,
+        allUniqueTags: tagState.allUniqueTags,
+      ),
+    );
   }
 }

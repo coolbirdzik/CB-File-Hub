@@ -43,7 +43,7 @@ import 'widgets/widgets.dart';
 /// This is essentially a file browsing screen with different data source and actions.
 class TrashBinScreen extends StatefulWidget {
   final String tabId;
-  const TrashBinScreen({Key? key, required this.tabId}) : super(key: key);
+  const TrashBinScreen({super.key, required this.tabId});
 
   @override
   State<TrashBinScreen> createState() => _TrashBinScreenState();
@@ -249,7 +249,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         setState(() {
           _trashItems = snapshot;
           _recomputeDisplayItems();
-          _showSystemOptions = Platform.isWindows &&
+          _showSystemOptions =
+              Platform.isWindows &&
               snapshot.any((item) => item.isSystemTrashItem);
         });
         _updateThumbnailDisplayIndex();
@@ -306,8 +307,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       bool success = false;
 
       if (item.isSystemTrashItem && Platform.isWindows) {
-        success = await _trashManager
-            .restoreFromWindowsRecycleBin(item.trashFileName);
+        success = await _trashManager.restoreFromWindowsRecycleBin(
+          item.trashFileName,
+        );
       } else {
         success = await _trashManager.restoreFromTrash(item.trashFileName);
       }
@@ -510,11 +512,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
 
     if (!isShiftPressed) {
       _selectionBloc.add(
-        ToggleFileSelection(
-          key,
-          shiftSelect: false,
-          ctrlSelect: isCtrlPressed,
-        ),
+        ToggleFileSelection(key, shiftSelect: false, ctrlSelect: isCtrlPressed),
       );
       return;
     }
@@ -522,17 +520,14 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     final selectionState = _selectionState;
     if (selectionState.lastSelectedPath == null) {
       _selectionBloc.add(
-        ToggleFileSelection(
-          key,
-          shiftSelect: false,
-          ctrlSelect: isCtrlPressed,
-        ),
+        ToggleFileSelection(key, shiftSelect: false, ctrlSelect: isCtrlPressed),
       );
       return;
     }
 
-    final visiblePaths =
-        _displayItems.map((item) => item.trashFileName).toList();
+    final visiblePaths = _displayItems
+        .map((item) => item.trashFileName)
+        .toList();
     final currentIndex = visiblePaths.indexOf(key);
     final lastIndex = visiblePaths.indexOf(selectionState.lastSelectedPath!);
     if (currentIndex == -1 || lastIndex == -1) return;
@@ -593,18 +588,18 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     try {
       final successCount =
           await BrowserLikeActionHandlers.runBatchOperation<String>(
-        items: keys,
-        operation: (key) async {
-          final item = _trashItems.firstWhere(
-            (entry) => entry.trashFileName == key,
-            orElse: () => throw StateError('not found'),
+            items: keys,
+            operation: (key) async {
+              final item = _trashItems.firstWhere(
+                (entry) => entry.trashFileName == key,
+                orElse: () => throw StateError('not found'),
+              );
+              if (item.isSystemTrashItem && Platform.isWindows) {
+                return _trashManager.deleteFromWindowsRecycleBin(key);
+              }
+              return _trashManager.deleteFromTrash(key);
+            },
           );
-          if (item.isSystemTrashItem && Platform.isWindows) {
-            return _trashManager.deleteFromWindowsRecycleBin(key);
-          }
-          return _trashManager.deleteFromTrash(key);
-        },
-      );
 
       if (mounted) {
         AppToast.success(
@@ -635,8 +630,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       _dragCurrentPosition = localPosition;
       _preDragSelectedPaths =
           keyboard.isControlPressed || keyboard.isMetaPressed
-              ? Set<String>.from(_selectedPaths)
-              : const <String>{};
+          ? Set<String>.from(_selectedPaths)
+          : const <String>{};
     });
   }
 
@@ -696,17 +691,18 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         _dragCurrentPosition == null) {
       return const SizedBox.shrink();
     }
-    final selectionRect =
-        Rect.fromPoints(_dragStartPosition!, _dragCurrentPosition!);
+    final selectionRect = Rect.fromPoints(
+      _dragStartPosition!,
+      _dragCurrentPosition!,
+    );
     return Positioned.fill(
       child: IgnorePointer(
         child: CustomPaint(
           painter: SelectionRectanglePainter(
             selectionRect: selectionRect,
-            fillColor: Theme.of(context)
-                .colorScheme
-                .primaryContainer
-                .withValues(alpha: 0.4),
+            fillColor: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.4),
             borderColor: Theme.of(context).primaryColor,
           ),
         ),
@@ -724,9 +720,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   VoidCallback _onEnterSelection(String key) => () {
-        _selectionBloc.add(const ToggleSelectionMode(forceValue: true));
-        _toggleItemSelection(key);
-      };
+    _selectionBloc.add(const ToggleSelectionMode(forceValue: true));
+    _toggleItemSelection(key);
+  };
 
   // ---------------------------------------------------------------------------
   // App bar
@@ -843,8 +839,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         hintText: l10n.search,
         border: InputBorder.none,
         hintStyle: TextStyle(
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
         suffixIcon: _searchController.text.isEmpty
             ? null
             : IconButton(
@@ -903,8 +899,11 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
               child: _buildBody(),
             ),
             if (_isDesktop)
-              BlocSelector<SelectionBloc, SelectionState,
-                  _TrashSelectionSummaryData>(
+              BlocSelector<
+                SelectionBloc,
+                SelectionState,
+                _TrashSelectionSummaryData
+              >(
                 selector: (state) => _TrashSelectionSummaryData(
                   paths: state.selectedFilePaths.toList(),
                   visible: state.selectedFilePaths.length > 1,
@@ -1048,10 +1047,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
             const SizedBox(height: 16),
             Text(
               l10n.trashIsEmpty,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1078,8 +1074,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         child: Text(
           l10n.noFilesFoundQuery({'query': _searchQuery}),
           textAlign: TextAlign.center,
-          style:
-              TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -1103,8 +1100,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       context,
       mode: GridSizeMode.columns,
     );
-    final crossAxisCount =
-        _gridZoomLevel.clamp(UserPreferences.minGridZoomLevel, maxZoom).toInt();
+    final crossAxisCount = _gridZoomLevel
+        .clamp(UserPreferences.minGridZoomLevel, maxZoom)
+        .toInt();
 
     return BrowserLikeCollectionView<TrashItem>(
       viewMode: _viewMode,
@@ -1165,8 +1163,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         isSelectionMode: selection.isSelectionMode,
         isDesktop: _isDesktop,
         onTap: item.isFolder && !_isDesktop ? () => _openFolder(item) : null,
-        onDoubleTap:
-            item.isFolder && _isDesktop ? () => _openFolder(item) : null,
+        onDoubleTap: item.isFolder && _isDesktop
+            ? () => _openFolder(item)
+            : null,
         onToggleSelection: () => _toggleItemSelection(item.trashFileName),
         onEnterSelectionMode: _onEnterSelection(item.trashFileName),
         onContextMenu: (pos) => _showContextMenu(itemContext, item, pos),
@@ -1193,8 +1192,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         isSelectionMode: selection.isSelectionMode,
         isDesktop: _isDesktop,
         onTap: item.isFolder && !_isDesktop ? () => _openFolder(item) : null,
-        onDoubleTap:
-            item.isFolder && _isDesktop ? () => _openFolder(item) : null,
+        onDoubleTap: item.isFolder && _isDesktop
+            ? () => _openFolder(item)
+            : null,
         onToggleSelection: () => _toggleItemSelection(item.trashFileName),
         onEnterSelectionMode: _onEnterSelection(item.trashFileName),
         onContextMenu: (pos) => _showContextMenu(itemContext, item, pos),
@@ -1221,8 +1221,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         isSelectionMode: selection.isSelectionMode,
         isDesktop: _isDesktop,
         onTap: item.isFolder && !_isDesktop ? () => _openFolder(item) : null,
-        onDoubleTap:
-            item.isFolder && _isDesktop ? () => _openFolder(item) : null,
+        onDoubleTap: item.isFolder && _isDesktop
+            ? () => _openFolder(item)
+            : null,
         onToggleSelection: () => _toggleItemSelection(item.trashFileName),
         onEnterSelectionMode: _onEnterSelection(item.trashFileName),
         onContextMenu: (pos) => _showContextMenu(itemContext, item, pos),
@@ -1321,14 +1322,18 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     // Sort items
     switch (_sortOption) {
       case SortOption.nameAsc:
-        items.sort((a, b) => a.displayNameValue
-            .toLowerCase()
-            .compareTo(b.displayNameValue.toLowerCase()));
+        items.sort(
+          (a, b) => a.displayNameValue.toLowerCase().compareTo(
+            b.displayNameValue.toLowerCase(),
+          ),
+        );
         break;
       case SortOption.nameDesc:
-        items.sort((a, b) => b.displayNameValue
-            .toLowerCase()
-            .compareTo(a.displayNameValue.toLowerCase()));
+        items.sort(
+          (a, b) => b.displayNameValue.toLowerCase().compareTo(
+            a.displayNameValue.toLowerCase(),
+          ),
+        );
         break;
       case SortOption.dateAsc:
         items.sort((a, b) => a.trashedDate.compareTo(b.trashedDate));
@@ -1343,12 +1348,18 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
         items.sort((a, b) => b.size.compareTo(a.size));
         break;
       case SortOption.typeAsc:
-        items.sort((a, b) => _getExtension(a.displayNameValue)
-            .compareTo(_getExtension(b.displayNameValue)));
+        items.sort(
+          (a, b) => _getExtension(
+            a.displayNameValue,
+          ).compareTo(_getExtension(b.displayNameValue)),
+        );
         break;
       case SortOption.typeDesc:
-        items.sort((a, b) => _getExtension(b.displayNameValue)
-            .compareTo(_getExtension(a.displayNameValue)));
+        items.sort(
+          (a, b) => _getExtension(
+            b.displayNameValue,
+          ).compareTo(_getExtension(a.displayNameValue)),
+        );
         break;
       default:
         items.sort((a, b) => b.trashedDate.compareTo(a.trashedDate));
@@ -1460,7 +1471,8 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isDesktopPlatform =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final canShowShellMenu = Platform.isWindows &&
+    final canShowShellMenu =
+        Platform.isWindows &&
         FileSystemEntity.typeSync(item.actualFilePath) !=
             FileSystemEntityType.notFound;
     final entity = item.isFolder
@@ -1480,7 +1492,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
               label: l10n.playVideo,
               icon: PhosphorIconsLight.playCircle,
               onSelected: (_) => ExternalAppHelper.openFileWithApp(
-                  item.actualFilePath, 'shell_open'),
+                item.actualFilePath,
+                'shell_open',
+              ),
             ),
           if (!item.isFolder && isImage)
             ContextMenuAction(
@@ -1488,7 +1502,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
               label: l10n.viewImage,
               icon: PhosphorIconsLight.image,
               onSelected: (_) => ExternalAppHelper.openFileWithApp(
-                  item.actualFilePath, 'shell_open'),
+                item.actualFilePath,
+                'shell_open',
+              ),
             ),
           if (!item.isFolder)
             ContextMenuAction(
@@ -1496,7 +1512,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
               label: l10n.open,
               icon: PhosphorIconsLight.file,
               onSelected: (_) => ExternalAppHelper.openFileWithApp(
-                  item.actualFilePath, 'shell_open'),
+                item.actualFilePath,
+                'shell_open',
+              ),
             ),
           if (!item.isFolder && isDesktopPlatform)
             ContextMenuAction(
@@ -1571,14 +1589,18 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
             label: l10n.copy,
             icon: PhosphorIconsLight.copy,
             onSelected: (_) => FileOperationsHandler.copyToClipboard(
-                context: context, entity: entity),
+              context: context,
+              entity: entity,
+            ),
           ),
           ContextMenuAction(
             id: 'cut',
             label: l10n.cut,
             icon: PhosphorIconsLight.scissors,
             onSelected: (_) => FileOperationsHandler.cutToClipboard(
-                context: context, entity: entity),
+              context: context,
+              entity: entity,
+            ),
           ),
           if (item.isFolder)
             ContextMenuAction(
@@ -1604,7 +1626,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
             label: l10n.manageTags,
             icon: PhosphorIconsLight.tag,
             onSelected: (_) => tag_dialogs.showAddTagToFileDialog(
-                context, item.actualFilePath),
+              context,
+              item.actualFilePath,
+            ),
           ),
         ],
       ),
@@ -1662,8 +1686,9 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
       await showContextMenuSheet(
         context: context,
         title: item.displayNameValue,
-        icon:
-            item.isFolder ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
+        icon: item.isFolder
+            ? PhosphorIconsLight.folder
+            : PhosphorIconsLight.file,
         subtitle: item.originalPath,
         sections: sections,
       );

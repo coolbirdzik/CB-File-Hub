@@ -68,10 +68,7 @@ class AnthropicProvider extends AiProvider {
   }
 
   @override
-  Stream<String> chatStream(
-    List<AiMessage> messages, {
-    String? systemPrompt,
-  }) {
+  Stream<String> chatStream(List<AiMessage> messages, {String? systemPrompt}) {
     final controller = StreamController<String>();
     _startStream(controller, messages, systemPrompt: systemPrompt);
     return controller.stream;
@@ -131,11 +128,13 @@ class AnthropicProvider extends AiProvider {
         } catch (_) {
           errorMessage = errorBody;
         }
-        controller.addError(AiProviderException(
-          message: errorMessage,
-          type: errorType,
-          statusCode: response.statusCode,
-        ));
+        controller.addError(
+          AiProviderException(
+            message: errorMessage,
+            type: errorType,
+            statusCode: response.statusCode,
+          ),
+        );
         await controller.close();
         return;
       }
@@ -183,22 +182,28 @@ class AnthropicProvider extends AiProvider {
       controller.addError(e);
       await controller.close();
     } on SocketException catch (e) {
-      controller.addError(AiProviderException(
-        message: 'Network error: ${e.message}',
-        type: AiProviderErrorType.network,
-      ));
+      controller.addError(
+        AiProviderException(
+          message: 'Network error: ${e.message}',
+          type: AiProviderErrorType.network,
+        ),
+      );
       await controller.close();
     } on TimeoutException catch (_) {
-      controller.addError(AiProviderException(
-        message: 'Request timed out after ${config.timeoutSeconds}s',
-        type: AiProviderErrorType.network,
-      ));
+      controller.addError(
+        AiProviderException(
+          message: 'Request timed out after ${config.timeoutSeconds}s',
+          type: AiProviderErrorType.network,
+        ),
+      );
       await controller.close();
     } catch (e) {
-      controller.addError(AiProviderException(
-        message: 'Stream error: $e',
-        type: AiProviderErrorType.unknown,
-      ));
+      controller.addError(
+        AiProviderException(
+          message: 'Stream error: $e',
+          type: AiProviderErrorType.unknown,
+        ),
+      );
       await controller.close();
     }
   }
@@ -210,7 +215,7 @@ class AnthropicProvider extends AiProvider {
       final body = jsonEncode({
         'model': config.modelName,
         'messages': [
-          {'role': 'user', 'content': 'Hello'}
+          {'role': 'user', 'content': 'Hello'},
         ],
         'max_tokens': 5,
       });

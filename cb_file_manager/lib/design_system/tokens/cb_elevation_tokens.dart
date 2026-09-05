@@ -18,57 +18,57 @@ class CbElevation {
 
   /// Resting card or list row.
   static List<BoxShadow> level1(Color shadow, {bool isDark = false}) => [
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.40 : 0.05),
-          blurRadius: 2,
-          offset: const Offset(0, 1),
-        ),
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.24 : 0.04),
-          blurRadius: 6,
-          offset: const Offset(0, 2),
-        ),
-      ];
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.40 : 0.05),
+      blurRadius: 2,
+      offset: const Offset(0, 1),
+    ),
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.24 : 0.04),
+      blurRadius: 6,
+      offset: const Offset(0, 2),
+    ),
+  ];
 
   /// Hovered/lifted card, sticky headers.
   static List<BoxShadow> level2(Color shadow, {bool isDark = false}) => [
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.46 : 0.06),
-          blurRadius: 3,
-          offset: const Offset(0, 1),
-        ),
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.30 : 0.05),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        ),
-      ];
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.46 : 0.06),
+      blurRadius: 3,
+      offset: const Offset(0, 1),
+    ),
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.30 : 0.05),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
+    ),
+  ];
 
   /// Menus, popovers, dropdowns, toasts.
   static List<BoxShadow> level3(Color shadow, {bool isDark = false}) => [
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.52 : 0.08),
-          blurRadius: 4,
-          offset: const Offset(0, 2),
-        ),
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.38 : 0.07),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ];
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.52 : 0.08),
+      blurRadius: 4,
+      offset: const Offset(0, 2),
+    ),
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.38 : 0.07),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    ),
+  ];
 
   /// Dialogs and modal sheets — the top of the stack.
   static List<BoxShadow> level4(Color shadow, {bool isDark = false}) => [
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.60 : 0.10),
-          blurRadius: 6,
-          offset: const Offset(0, 4),
-        ),
-        BoxShadow(
-          color: shadow.withValues(alpha: isDark ? 0.46 : 0.09),
-          blurRadius: 48,
-          offset: const Offset(0, 16),
-        ),
-      ];
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.60 : 0.10),
+      blurRadius: 6,
+      offset: const Offset(0, 4),
+    ),
+    BoxShadow(
+      color: shadow.withValues(alpha: isDark ? 0.46 : 0.09),
+      blurRadius: 48,
+      offset: const Offset(0, 16),
+    ),
+  ];
 }

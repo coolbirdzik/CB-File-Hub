@@ -5,10 +5,8 @@ class CleanerScanEntry {
   final String? ownerTabId;
   final DateTime cachedAt;
 
-  CleanerScanEntry({
-    required this.report,
-    required this.ownerTabId,
-  }) : cachedAt = DateTime.now();
+  CleanerScanEntry({required this.report, required this.ownerTabId})
+    : cachedAt = DateTime.now();
 }
 
 class CleanerScanRegistry {
@@ -19,29 +17,19 @@ class CleanerScanRegistry {
 
   CleanerScanEntry? operator [](String scanId) => _entries[scanId];
 
-  void store(
-    String scanId,
-    ScanReport report, {
-    required String? ownerTabId,
-  }) {
+  void store(String scanId, ScanReport report, {required String? ownerTabId}) {
     _entries.remove(scanId);
     while (_entries.length >= maxEntries && _entries.isNotEmpty) {
       _entries.remove(_entries.keys.first);
     }
-    _entries[scanId] = CleanerScanEntry(
-      report: report,
-      ownerTabId: ownerTabId,
-    );
+    _entries[scanId] = CleanerScanEntry(report: report, ownerTabId: ownerTabId);
   }
 
   void remove(String scanId) {
     _entries.remove(scanId);
   }
 
-  String? resolveId(
-    Object? requestedScanId, {
-    required String? ownerTabId,
-  }) {
+  String? resolveId(Object? requestedScanId, {required String? ownerTabId}) {
     final requested = requestedScanId?.toString().trim() ?? '';
     final exact = _entries[requested];
     if (exact != null && exact.ownerTabId == ownerTabId) {
@@ -61,8 +49,10 @@ class CleanerScanRegistry {
   }
 
   static bool isPlaceholder(String scanId) {
-    final normalized =
-        scanId.trim().toUpperCase().replaceAll(RegExp(r'[\s-]+'), '_');
+    final normalized = scanId.trim().toUpperCase().replaceAll(
+      RegExp(r'[\s-]+'),
+      '_',
+    );
     if (normalized.isEmpty) return true;
     if (normalized.contains('PLACEHOLDER')) return true;
     return normalized == 'SCAN_ID' ||

@@ -7,7 +7,7 @@ class VideoLibraryHelpers {
   /// Pick a directory using FilePicker
   static Future<String?> pickDirectory() async {
     try {
-      return await FilePicker.platform.getDirectoryPath();
+      return await FilePicker.getDirectoryPath();
     } catch (e) {
       debugPrint('Error picking directory: $e');
       return null;

@@ -13,10 +13,7 @@ class TagManagementTab extends StatelessWidget {
   final String tabId;
 
   /// Constructor
-  const TagManagementTab({
-    Key? key,
-    required this.tabId,
-  }) : super(key: key);
+  const TagManagementTab({super.key, required this.tabId});
 
   @override
   Widget build(BuildContext context) {

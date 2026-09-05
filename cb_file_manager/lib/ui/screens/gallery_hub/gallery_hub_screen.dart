@@ -12,7 +12,7 @@ import 'package:cb_file_manager/ui/screens/settings/featured_albums_settings_scr
 import 'dart:io';
 
 class GalleryHubScreen extends StatefulWidget {
-  const GalleryHubScreen({Key? key}) : super(key: key);
+  const GalleryHubScreen({super.key});
 
   @override
   State<GalleryHubScreen> createState() => _GalleryHubScreenState();
@@ -46,11 +46,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -146,14 +145,17 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
     final double desktopLightAlpha = isDesktopPlatform ? 0.42 : 1.0;
     final backgroundGradientColors = isLightMode
         ? <Color>[
-            theme.colorScheme.surfaceContainerLowest
-                .withValues(alpha: desktopLightAlpha),
-            theme.colorScheme.surfaceContainerLow
-                .withValues(alpha: desktopLightAlpha),
+            theme.colorScheme.surfaceContainerLowest.withValues(
+              alpha: desktopLightAlpha,
+            ),
+            theme.colorScheme.surfaceContainerLow.withValues(
+              alpha: desktopLightAlpha,
+            ),
             Color.alphaBlend(
               theme.colorScheme.primary.withValues(alpha: 0.02),
-              theme.colorScheme.surfaceContainer
-                  .withValues(alpha: desktopLightAlpha),
+              theme.colorScheme.surfaceContainer.withValues(
+                alpha: desktopLightAlpha,
+              ),
             ).withValues(alpha: desktopLightAlpha),
           ]
         : <Color>[];
@@ -165,22 +167,20 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
       backgroundColor: isDesktopPlatform
           ? Colors.transparent
           : (isLightMode
-              ? theme.colorScheme.surfaceContainerLowest
-              : theme.scaffoldBackgroundColor),
+                ? theme.colorScheme.surfaceContainerLowest
+                : theme.scaffoldBackgroundColor),
       body: Container(
         decoration: isDesktopPlatform
             ? const BoxDecoration(color: Colors.transparent)
             : (isLightMode
-                ? BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: backgroundGradientColors,
-                    ),
-                  )
-                : BoxDecoration(
-                    color: darkBackgroundColor,
-                  )),
+                  ? BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: backgroundGradientColors,
+                      ),
+                    )
+                  : BoxDecoration(color: darkBackgroundColor)),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
@@ -196,7 +196,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                       vertical: 24,
                     ),
                     child: _buildWelcomeSection(
-                        theme, isLightMode, isDesktopPlatform),
+                      theme,
+                      isLightMode,
+                      isDesktopPlatform,
+                    ),
                   ),
 
                   // Gallery actions
@@ -234,7 +237,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
   }
 
   Widget _buildWelcomeSection(
-      ThemeData theme, bool isLightMode, bool isDesktopPlatform) {
+    ThemeData theme,
+    bool isLightMode,
+    bool isDesktopPlatform,
+  ) {
     final cs = theme.colorScheme;
     final welcomeGradientColors = isLightMode
         ? <Color>[
@@ -271,11 +277,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
         children: [
           Row(
             children: [
-              Icon(
-                PhosphorIconsLight.images,
-                color: cs.primary,
-                size: 32,
-              ),
+              Icon(PhosphorIconsLight.images, color: cs.primary, size: 32),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
@@ -425,7 +427,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                   PhosphorIconsLight.image,
                   [
                     theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7)
+                    theme.colorScheme.primary.withValues(alpha: 0.7),
                   ],
                   () => _navigateToAllImages(),
                 ),
@@ -436,7 +438,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                   PhosphorIconsLight.folder,
                   [
                     theme.colorScheme.tertiary,
-                    theme.colorScheme.tertiary.withValues(alpha: 0.7)
+                    theme.colorScheme.tertiary.withValues(alpha: 0.7),
                   ],
                   () => _navigateToAlbums(),
                 ),
@@ -449,7 +451,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                   PhosphorIconsLight.camera,
                   [
                     theme.colorScheme.tertiary,
-                    theme.colorScheme.tertiary.withValues(alpha: 0.7)
+                    theme.colorScheme.tertiary.withValues(alpha: 0.7),
                   ],
                   () => _navigateToCamera(),
                 ),
@@ -462,7 +464,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                   PhosphorIconsLight.downloadSimple,
                   [
                     theme.colorScheme.secondary,
-                    theme.colorScheme.secondary.withValues(alpha: 0.7)
+                    theme.colorScheme.secondary.withValues(alpha: 0.7),
                   ],
                   () => _navigateToDownloads(),
                 ),
@@ -506,11 +508,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    icon,
-                    size: iconSize + 4,
-                    color: gradientColors[0],
-                  ),
+                  Icon(icon, size: iconSize + 4, color: gradientColors[0]),
                   SizedBox(height: spacing),
                   Flexible(
                     child: Text(
@@ -529,8 +527,9 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                     child: Text(
                       description,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.7,
+                        ),
                         fontSize: isMobile ? 11 : null,
                       ),
                       textAlign: TextAlign.center,
@@ -743,8 +742,9 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
                       Text(
                         album.description!,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -788,9 +788,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
           ),
           const SizedBox(height: 20),
           if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
-            )
+            const Center(child: CircularProgressIndicator())
           else
             Row(
               children: [
@@ -838,11 +836,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
         children: [
           Row(
             children: [
-              Icon(
-                icon,
-                color: color,
-                size: 20,
-              ),
+              Icon(icon, color: color, size: 20),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -880,11 +874,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
       tabBloc.add(UpdateTabName(activeTab.id, displayName));
     } else {
       // Fallback: if no active tab exists, create one
-      tabBloc.add(AddTab(
-        path: path,
-        name: displayName,
-        switchToTab: true,
-      ));
+      tabBloc.add(AddTab(path: path, name: displayName, switchToTab: true));
     }
   }
 
@@ -897,11 +887,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
       tabBloc.add(UpdateTabName(activeTab.id, 'Albums'));
     } else {
       // Fallback: if no active tab exists, create one
-      tabBloc.add(AddTab(
-        path: '#albums',
-        name: 'Albums',
-        switchToTab: true,
-      ));
+      tabBloc.add(AddTab(path: '#albums', name: 'Albums', switchToTab: true));
     }
   }
 
@@ -917,11 +903,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
       tabBloc.add(UpdateTabName(activeTab.id, displayName));
     } else {
       // Fallback: if no active tab exists, create one
-      tabBloc.add(AddTab(
-        path: path,
-        name: displayName,
-        switchToTab: true,
-      ));
+      tabBloc.add(AddTab(path: path, name: displayName, switchToTab: true));
     }
   }
 
@@ -937,11 +919,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
       tabBloc.add(UpdateTabName(activeTab.id, displayName));
     } else {
       // Fallback: if no active tab exists, create one
-      tabBloc.add(AddTab(
-        path: path,
-        name: displayName,
-        switchToTab: true,
-      ));
+      tabBloc.add(AddTab(path: path, name: displayName, switchToTab: true));
     }
   }
 
@@ -955,17 +933,14 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
       tabBloc.add(UpdateTabName(activeTab.id, album.name));
     } else {
       // Fallback: no active tab, open as new tab
-      tabBloc.add(AddTab(
-        path: path,
-        name: album.name,
-        switchToTab: true,
-      ));
+      tabBloc.add(AddTab(path: path, name: album.name, switchToTab: true));
     }
   }
 
   void _removeFromFeatured(Album album) async {
-    final success =
-        await FeaturedAlbumsService.instance.removeFromFeatured(album.id);
+    final success = await FeaturedAlbumsService.instance.removeFromFeatured(
+      album.id,
+    );
     if (success && mounted) {
       // Reload featured albums
       _loadFeaturedAlbums();

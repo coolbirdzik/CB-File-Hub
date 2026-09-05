@@ -20,11 +20,7 @@ class FileDetailsScreen extends StatefulWidget {
   /// Tab index to show initially (0 = default details tab)
   final int initialTab;
 
-  const FileDetailsScreen({
-    Key? key,
-    required this.file,
-    this.initialTab = 0,
-  }) : super(key: key);
+  const FileDetailsScreen({super.key, required this.file, this.initialTab = 0});
 
   @override
   State<FileDetailsScreen> createState() => _FileDetailsScreenState();
@@ -131,9 +127,7 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                 if (isImage || isAudio)
                   Container(
                     width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: Colors.black,
-                    ),
+                    decoration: const BoxDecoration(color: Colors.black),
                     child: Column(
                       children: [
                         if (isImage) _buildImagePreview(),
@@ -218,8 +212,9 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                               ),
                             ),
@@ -245,45 +240,64 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                       child: Column(
                         children: [
                           ListTile(
-                            leading: Icon(PhosphorIconsLight.arrowSquareOut,
-                                color: textColor),
-                            title: Text(localizations.openWith,
-                                style: TextStyle(color: textColor)),
+                            leading: Icon(
+                              PhosphorIconsLight.arrowSquareOut,
+                              color: textColor,
+                            ),
+                            title: Text(
+                              localizations.openWith,
+                              style: TextStyle(color: textColor),
+                            ),
                             onTap: () => _showOpenWithDialog(),
                           ),
                           const Divider(height: 1),
                           ListTile(
-                            leading: Icon(PhosphorIconsLight.squaresFour,
-                                color: textColor),
-                            title: Text(localizations.chooseDefaultApp,
-                                style: TextStyle(color: textColor)),
+                            leading: Icon(
+                              PhosphorIconsLight.squaresFour,
+                              color: textColor,
+                            ),
+                            title: Text(
+                              localizations.chooseDefaultApp,
+                              style: TextStyle(color: textColor),
+                            ),
                             onTap: () => _showOpenWithDialog(
                               saveAsDefaultOnSelect: true,
                             ),
                           ),
                           const Divider(height: 1),
                           ListTile(
-                            leading: Icon(PhosphorIconsLight.fileText,
-                                color: textColor),
-                            title: Text(localizations.createCopy,
-                                style: TextStyle(color: textColor)),
+                            leading: Icon(
+                              PhosphorIconsLight.fileText,
+                              color: textColor,
+                            ),
+                            title: Text(
+                              localizations.createCopy,
+                              style: TextStyle(color: textColor),
+                            ),
                             onTap: () {
                               // Make a copy functionality
                               AppToast.error(
-                                  context, localizations.operationFailed);
+                                context,
+                                localizations.operationFailed,
+                              );
                             },
                           ),
                           const Divider(height: 1),
                           ListTile(
-                            leading: Icon(PhosphorIconsLight.trash,
-                                color: theme.colorScheme.error),
-                            title: Text(localizations.deleteFile,
-                                style:
-                                    TextStyle(color: theme.colorScheme.error)),
+                            leading: Icon(
+                              PhosphorIconsLight.trash,
+                              color: theme.colorScheme.error,
+                            ),
+                            title: Text(
+                              localizations.deleteFile,
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
                             onTap: () {
                               // Delete functionality
                               AppToast.error(
-                                  context, localizations.operationFailed);
+                                context,
+                                localizations.operationFailed,
+                              );
                             },
                           ),
                         ],
@@ -337,11 +351,7 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
             color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(
-            fileIcon,
-            size: 28,
-            color: iconColor,
-          ),
+          child: Icon(fileIcon, size: 28, color: iconColor),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -389,8 +399,11 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(PhosphorIconsLight.imageBroken,
-                      size: 64, color: Colors.white54),
+                  const Icon(
+                    PhosphorIconsLight.imageBroken,
+                    size: 64,
+                    color: Colors.white54,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     localizations.errorLoadingImage,
@@ -420,8 +433,11 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
               color: theme.colorScheme.tertiary.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(PhosphorIconsLight.musicNotes,
-                size: 64, color: theme.colorScheme.tertiary),
+            child: Icon(
+              PhosphorIconsLight.musicNotes,
+              size: 64,
+              color: theme.colorScheme.tertiary,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -434,8 +450,10 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                icon: const Icon(PhosphorIconsLight.skipBack,
-                    color: Colors.white),
+                icon: const Icon(
+                  PhosphorIconsLight.skipBack,
+                  color: Colors.white,
+                ),
                 iconSize: 36,
                 onPressed: () {},
               ),
@@ -453,8 +471,10 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
               ),
               const SizedBox(width: 16),
               IconButton(
-                icon: const Icon(PhosphorIconsLight.skipForward,
-                    color: Colors.white),
+                icon: const Icon(
+                  PhosphorIconsLight.skipForward,
+                  color: Colors.white,
+                ),
                 iconSize: 36,
                 onPressed: () {},
               ),
@@ -492,8 +512,10 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
         final fileSize = FormatUtils.formatFileSizeExact(stat.size);
         final formattedDate = stat.modified.toString().split('.')[0];
         final extension = FileTypeUtils.getFileExtension(widget.file.path);
-        final localizedFileType =
-            FileTypeUtils.getFileTypeLabel(context, extension);
+        final localizedFileType = FileTypeUtils.getFileTypeLabel(
+          context,
+          extension,
+        );
         final extensionLabel = extension.isEmpty
             ? ''
             : ' (${extension.substring(1).toUpperCase()})';
@@ -501,46 +523,65 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
         return Column(
           children: [
             _buildDetailRow(
-                localizations.fileName,
-                pathlib.basename(widget.file.path),
-                PhosphorIconsLight.fileText,
-                textColor,
-                secondaryTextColor),
+              localizations.fileName,
+              pathlib.basename(widget.file.path),
+              PhosphorIconsLight.fileText,
+              textColor,
+              secondaryTextColor,
+            ),
             const Divider(height: 24),
             _buildDetailRow(
-                localizations.fileType,
-                '$localizedFileType$extensionLabel',
-                PhosphorIconsLight.tag,
-                textColor,
-                secondaryTextColor),
-            const Divider(height: 24),
-            _buildDetailRow(localizations.fileSize, fileSize,
-                PhosphorIconsLight.hardDrives, textColor, secondaryTextColor),
+              localizations.fileType,
+              '$localizedFileType$extensionLabel',
+              PhosphorIconsLight.tag,
+              textColor,
+              secondaryTextColor,
+            ),
             const Divider(height: 24),
             _buildDetailRow(
-                localizations.fileLocation,
-                pathlib.dirname(widget.file.path),
-                PhosphorIconsLight.folder,
-                textColor,
-                secondaryTextColor),
+              localizations.fileSize,
+              fileSize,
+              PhosphorIconsLight.hardDrives,
+              textColor,
+              secondaryTextColor,
+            ),
             const Divider(height: 24),
             _buildDetailRow(
-                localizations.fileCreated,
-                stat.changed.toString().split('.')[0],
-                PhosphorIconsLight.calendarBlank,
-                textColor,
-                secondaryTextColor),
+              localizations.fileLocation,
+              pathlib.dirname(widget.file.path),
+              PhosphorIconsLight.folder,
+              textColor,
+              secondaryTextColor,
+            ),
             const Divider(height: 24),
-            _buildDetailRow(localizations.fileModified, formattedDate,
-                PhosphorIconsLight.pencilSimple, textColor, secondaryTextColor),
+            _buildDetailRow(
+              localizations.fileCreated,
+              stat.changed.toString().split('.')[0],
+              PhosphorIconsLight.calendarBlank,
+              textColor,
+              secondaryTextColor,
+            ),
+            const Divider(height: 24),
+            _buildDetailRow(
+              localizations.fileModified,
+              formattedDate,
+              PhosphorIconsLight.pencilSimple,
+              textColor,
+              secondaryTextColor,
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon,
-      Color textColor, Color secondaryTextColor) {
+  Widget _buildDetailRow(
+    String label,
+    String value,
+    IconData icon,
+    Color textColor,
+    Color secondaryTextColor,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -551,19 +592,10 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
           children: [
             Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                color: secondaryTextColor,
-              ),
+              style: TextStyle(fontSize: 14, color: secondaryTextColor),
             ),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                color: textColor,
-              ),
-            ),
+            Text(value, style: TextStyle(fontSize: 16, color: textColor)),
           ],
         ),
       ],

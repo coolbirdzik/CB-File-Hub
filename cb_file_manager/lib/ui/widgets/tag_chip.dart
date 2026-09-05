@@ -11,13 +11,13 @@ class TagChip extends StatelessWidget {
   final Color? customColor;
 
   const TagChip({
-    Key? key,
+    super.key,
     required this.tag,
     this.onTap,
     this.onDeleted,
     this.isCompact = false,
     this.customColor,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -47,11 +47,7 @@ class TagChip extends StatelessWidget {
           color: foregroundColor,
           fontWeight: FontWeight.w500,
         ),
-        label: Text(
-          tag,
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
+        label: Text(tag, overflow: TextOverflow.ellipsis, maxLines: 1),
         backgroundColor: displayColor,
         visualDensity: isCompact ? VisualDensity.compact : null,
         padding: isCompact ? const EdgeInsets.all(1) : const EdgeInsets.all(2),

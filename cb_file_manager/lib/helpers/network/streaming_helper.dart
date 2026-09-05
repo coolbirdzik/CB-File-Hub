@@ -94,14 +94,17 @@ class StreamingHelper {
         if (actualRemotePath != null) {
           remotePath = actualRemotePath;
           debugPrint(
-              'StreamingHelper: Converted local path $filePath to remote path $remotePath');
+            'StreamingHelper: Converted local path $filePath to remote path $remotePath',
+          );
         } else {
           debugPrint(
-              'StreamingHelper: No remote path mapping found for $filePath');
+            'StreamingHelper: No remote path mapping found for $filePath',
+          );
         }
       } else {
         debugPrint(
-            'StreamingHelper: getRemotePathFromLocal method not available');
+          'StreamingHelper: getRemotePathFromLocal method not available',
+        );
       }
     }
     try {
@@ -172,10 +175,14 @@ class StreamingHelper {
       if (fileType == FileCategory.unknown ||
           (!canStreamFile(remotePath) && !isDocumentFile(remotePath))) {
         debugPrint(
-            'StreamingHelper: Unsupported file type detected, downloading and opening with system app');
+          'StreamingHelper: Unsupported file type detected, downloading and opening with system app',
+        );
         await _downloadAndOpen(context, remotePath);
         return FileOpenResult(
-            success: true, viewerLaunched: true, fileType: fileType);
+          success: true,
+          viewerLaunched: true,
+          fileType: fileType,
+        );
       }
 
       // Handle FTP by downloading to a temp file and opening with system default app
@@ -183,22 +190,21 @@ class StreamingHelper {
         try {
           final tempDir = Directory.systemTemp;
           final fileName = p.basename(remotePath);
-          final tempPath = p.join(tempDir.path,
-              'ftp_${DateTime.now().millisecondsSinceEpoch}_$fileName');
+          final tempPath = p.join(
+            tempDir.path,
+            'ftp_${DateTime.now().millisecondsSinceEpoch}_$fileName',
+          );
           debugPrint('StreamingHelper: FTP - downloading to temp: $tempPath');
 
-          await service.getFileWithProgress(
-            remotePath,
-            tempPath,
-            (progress) {
-              if (progress >= 0) {
-                debugPrint(
-                    'StreamingHelper: FTP download ${(progress * 100).toStringAsFixed(1)}%');
-              } else {
-                debugPrint('StreamingHelper: FTP downloading (indeterminate)');
-              }
-            },
-          );
+          await service.getFileWithProgress(remotePath, tempPath, (progress) {
+            if (progress >= 0) {
+              debugPrint(
+                'StreamingHelper: FTP download ${(progress * 100).toStringAsFixed(1)}%',
+              );
+            } else {
+              debugPrint('StreamingHelper: FTP downloading (indeterminate)');
+            }
+          });
 
           // Open with system default app
           await OpenFilex.open(tempPath);
@@ -212,21 +218,24 @@ class StreamingHelper {
 
       // Priority 1: Attempt Native VLC Direct streaming (highest priority)
       debugPrint(
-          'StreamingHelper: Checking for Native VLC Direct streaming...');
+        'StreamingHelper: Checking for Native VLC Direct streaming...',
+      );
       debugPrint(
-          'StreamingHelper: NativeVlcDirectHelper.canStreamDirectly($fileType): ${NativeVlcDirectHelper.canStreamDirectly(fileType)}');
+        'StreamingHelper: NativeVlcDirectHelper.canStreamDirectly($fileType): ${NativeVlcDirectHelper.canStreamDirectly(fileType)}',
+      );
       if (service is ISmbService &&
           NativeVlcDirectHelper.canStreamDirectly(fileType)) {
         try {
           final canUseNative =
               await NativeVlcDirectHelper.canUseNativeVlcDirect(
-            fileType: fileType,
-            smbService: service,
-          );
+                fileType: fileType,
+                smbService: service,
+              );
 
           if (canUseNative) {
             debugPrint(
-                'StreamingHelper: ✅ Attempting Native VLC Direct streaming');
+              'StreamingHelper: ✅ Attempting Native VLC Direct streaming',
+            );
             if (context.mounted) {
               await NativeVlcDirectHelper.openMediaWithNativeVlcDirect(
                 context: context,
@@ -239,11 +248,13 @@ class StreamingHelper {
             return FileOpenResult(success: true, viewerLaunched: true);
           } else {
             debugPrint(
-                'StreamingHelper: ❌ Native VLC Direct not available, trying LibSMB2');
+              'StreamingHelper: ❌ Native VLC Direct not available, trying LibSMB2',
+            );
           }
         } catch (e) {
           debugPrint(
-              'StreamingHelper: ❌ Native VLC Direct streaming failed: $e. Trying LibSMB2 fallback.');
+            'StreamingHelper: ❌ Native VLC Direct streaming failed: $e. Trying LibSMB2 fallback.',
+          );
         }
       }
 
@@ -252,12 +263,14 @@ class StreamingHelper {
       // Priority 3: Fallback to VLC Direct SMB streaming for other SMB services
       debugPrint('StreamingHelper: Checking for VLC Direct SMB fallback...');
       debugPrint(
-          'StreamingHelper: VlcDirectSmbHelper.canStreamDirectly($fileType): ${VlcDirectSmbHelper.canStreamDirectly(fileType)}');
+        'StreamingHelper: VlcDirectSmbHelper.canStreamDirectly($fileType): ${VlcDirectSmbHelper.canStreamDirectly(fileType)}',
+      );
       if (service is ISmbService &&
           VlcDirectSmbHelper.canStreamDirectly(fileType)) {
         try {
           debugPrint(
-              'StreamingHelper: ✅ Attempting VLC Direct SMB streaming (fallback)');
+            'StreamingHelper: ✅ Attempting VLC Direct SMB streaming (fallback)',
+          );
           if (context.mounted) {
             await VlcDirectSmbHelper.openMediaWithVlcDirectSmb(
               context: context,
@@ -271,7 +284,8 @@ class StreamingHelper {
           return FileOpenResult(success: true, viewerLaunched: true);
         } catch (e) {
           debugPrint(
-              'StreamingHelper: ❌ VLC Direct SMB failed: $e. Proceeding to other fallbacks.');
+            'StreamingHelper: ❌ VLC Direct SMB failed: $e. Proceeding to other fallbacks.',
+          );
           // If it fails, we just log it and continue with other methods
         }
       }
@@ -307,7 +321,8 @@ class StreamingHelper {
       if (service.serviceName == 'WebDAV' &&
           (fileType != FileCategory.video && fileType != FileCategory.audio)) {
         debugPrint(
-            'StreamingHelper: Using readFileData for WebDAV non-media file');
+          'StreamingHelper: Using readFileData for WebDAV non-media file',
+        );
         debugPrint('StreamingHelper: remotePath for readFileData: $remotePath');
 
         try {
@@ -323,7 +338,8 @@ class StreamingHelper {
             );
           } else {
             debugPrint(
-                'StreamingHelper: WebDAV readFileData returned null or empty data');
+              'StreamingHelper: WebDAV readFileData returned null or empty data',
+            );
           }
         } catch (e) {
           debugPrint('StreamingHelper: WebDAV readFileData failed: $e');
@@ -332,7 +348,8 @@ class StreamingHelper {
 
       // Priority 5: Try openFileStream for other cases
       debugPrint(
-          'StreamingHelper: DECISION - Using openFileStream method (optimized)');
+        'StreamingHelper: DECISION - Using openFileStream method (optimized)',
+      );
       debugPrint('StreamingHelper: Calling service.openFileStream...');
       debugPrint('StreamingHelper: remotePath for openFileStream: $remotePath');
 
@@ -342,7 +359,8 @@ class StreamingHelper {
       if (sourceStream != null) {
         debugPrint('StreamingHelper: openFileStream SUCCESS');
         debugPrint(
-            'StreamingHelper: Stream creation time: ${DateTime.now().difference(streamStartTime).inMilliseconds}ms');
+          'StreamingHelper: Stream creation time: ${DateTime.now().difference(streamStartTime).inMilliseconds}ms',
+        );
 
         // For media files (video/audio), use caching to improve performance
         if (fileType == FileCategory.video || fileType == FileCategory.audio) {
@@ -353,7 +371,10 @@ class StreamingHelper {
 
           // Use NetworkFileCacheService to buffer and forward the stream
           cacheService.bufferStreamAndForward(
-              remotePath, sourceStream, controller);
+            remotePath,
+            sourceStream,
+            controller,
+          );
 
           return FileOpenResult(
             success: true,
@@ -376,7 +397,8 @@ class StreamingHelper {
       if (service is MobileSMBService &&
           (fileType != FileCategory.video && fileType != FileCategory.audio)) {
         debugPrint(
-            'StreamingHelper: openFileStream failed, trying readFileData fallback for non-media file');
+          'StreamingHelper: openFileStream failed, trying readFileData fallback for non-media file',
+        );
 
         // Get file size for small file check
         int? fileSize;
@@ -391,7 +413,8 @@ class StreamingHelper {
         const int smallFileThreshold = 10 * 1024 * 1024; // 10MB
         if (fileSize != null && fileSize <= smallFileThreshold) {
           debugPrint(
-              'StreamingHelper: Using readFileData for small non-media file');
+            'StreamingHelper: Using readFileData for small non-media file',
+          );
           try {
             final fileData = await service.readFileData(remotePath);
             if (fileData != null && fileData.isNotEmpty) {
@@ -409,18 +432,23 @@ class StreamingHelper {
           }
         } else {
           debugPrint(
-              'StreamingHelper: File too large for readFileData fallback (${fileSize != null ? (fileSize / 1024 / 1024).toStringAsFixed(1) : "unknown"} MB)');
+            'StreamingHelper: File too large for readFileData fallback (${fileSize != null ? (fileSize / 1024 / 1024).toStringAsFixed(1) : "unknown"} MB)',
+          );
         }
       }
 
       // If streaming failed for a non-media file, fall back to download + open.
       if (fileType != FileCategory.video && fileType != FileCategory.audio) {
         debugPrint(
-            'StreamingHelper: All streaming methods failed for non-media file, downloading and opening with system app');
+          'StreamingHelper: All streaming methods failed for non-media file, downloading and opening with system app',
+        );
         // ignore: use_build_context_synchronously
         await _downloadAndOpen(context, remotePath);
         return FileOpenResult(
-            success: true, viewerLaunched: true, fileType: fileType);
+          success: true,
+          viewerLaunched: true,
+          fileType: fileType,
+        );
       }
 
       // All methods failed
@@ -448,7 +476,8 @@ class StreamingHelper {
     } finally {
       final totalDuration = DateTime.now().difference(startTime);
       debugPrint(
-          'StreamingHelper: Total execution time: ${totalDuration.inMilliseconds}ms');
+        'StreamingHelper: Total execution time: ${totalDuration.inMilliseconds}ms',
+      );
       debugPrint('=== StreamingHelper._openFileDirectly END (Optimized) ===');
     }
   }
@@ -461,7 +490,8 @@ class StreamingHelper {
 
     try {
       debugPrint(
-          'StreamingHelper: Starting download from $filePath to $destinationPath');
+        'StreamingHelper: Starting download from $filePath to $destinationPath',
+      );
       final svc = _currentNetworkService!;
       // Resolve remote path if the service uses local-temp mapping (WebDAV)
       String remotePath = filePath;
@@ -476,18 +506,15 @@ class StreamingHelper {
       debugPrint('StreamingHelper: Resolved remote path: $remotePath');
 
       // Prefer progress-enabled download when available
-      await svc.getFileWithProgress(
-        remotePath,
-        destinationPath,
-        (progress) {
-          if (progress >= 0) {
-            debugPrint(
-                'StreamingHelper: Download ${(progress * 100).toStringAsFixed(1)}%');
-          } else {
-            debugPrint('StreamingHelper: Downloading (indeterminate)');
-          }
-        },
-      );
+      await svc.getFileWithProgress(remotePath, destinationPath, (progress) {
+        if (progress >= 0) {
+          debugPrint(
+            'StreamingHelper: Download ${(progress * 100).toStringAsFixed(1)}%',
+          );
+        } else {
+          debugPrint('StreamingHelper: Downloading (indeterminate)');
+        }
+      });
 
       debugPrint('StreamingHelper: Download completed successfully');
     } catch (e) {
@@ -524,7 +551,8 @@ class StreamingHelper {
     // If an external viewer was launched (e.g., VLC), we don't need to do anything else.
     if (result.viewerLaunched) {
       debugPrint(
-          "StreamingHelper: Viewer already launched, skipping internal player.");
+        "StreamingHelper: Viewer already launched, skipping internal player.",
+      );
       return;
     }
 
@@ -581,13 +609,13 @@ class StreamingHelper {
                     fileName: fileName,
                   )
                 : result.streamingUrl != null
-                    ? StreamingImageViewer.fromUrl(
-                        streamingUrl: result.streamingUrl!,
-                        fileName: fileName,
-                      )
-                    : throw Exception(
-                        'Neither fileStream nor streamingUrl available',
-                      ),
+                ? StreamingImageViewer.fromUrl(
+                    streamingUrl: result.streamingUrl!,
+                    fileName: fileName,
+                  )
+                : throw Exception(
+                    'Neither fileStream nor streamingUrl available',
+                  ),
           ),
         );
       }
@@ -596,11 +624,13 @@ class StreamingHelper {
       // Debug thông tin trước khi kiểm tra VLC Direct SMB
       debugPrint('StreamingHelper: Processing video/audio file');
       debugPrint(
-          'StreamingHelper: _currentNetworkService type: ${_currentNetworkService.runtimeType}');
+        'StreamingHelper: _currentNetworkService type: ${_currentNetworkService.runtimeType}',
+      );
 
       debugPrint('StreamingHelper: File type: ${result.fileType}');
       debugPrint(
-          'StreamingHelper: Can stream directly: ${VlcDirectSmbHelper.canStreamDirectly(result.fileType!)}');
+        'StreamingHelper: Can stream directly: ${VlcDirectSmbHelper.canStreamDirectly(result.fileType!)}',
+      );
 
       // LibSMB2 streaming removed - now using flutter_vlc_player for SMB
 
@@ -610,7 +640,8 @@ class StreamingHelper {
           VlcDirectSmbHelper.canStreamDirectly(result.fileType!)) {
         try {
           debugPrint(
-              'StreamingHelper: ✅ Attempting VLC Direct SMB streaming (fallback)');
+            'StreamingHelper: ✅ Attempting VLC Direct SMB streaming (fallback)',
+          );
           debugPrint('StreamingHelper: Using remotePath: $remotePath');
           await VlcDirectSmbHelper.openMediaWithVlcDirectSmb(
             context: context,
@@ -626,7 +657,8 @@ class StreamingHelper {
         }
       } else {
         debugPrint(
-            'StreamingHelper: ❌ Direct streaming conditions not met, using other fallbacks');
+          'StreamingHelper: ❌ Direct streaming conditions not met, using other fallbacks',
+        );
       }
 
       // Fallback: Mở media player với các phương thức khác
@@ -656,14 +688,12 @@ class StreamingHelper {
                         fileType: result.fileType!,
                       )
                     : result.streamingUrl != null
-                        ? VideoPlayer.url(
-                            streamingUrl: result.streamingUrl!,
-                            fileName: fileName,
-                            fileType: result.fileType!,
-                          )
-                        : throw Exception(
-                            'No streaming data available',
-                          ),
+                    ? VideoPlayer.url(
+                        streamingUrl: result.streamingUrl!,
+                        fileName: fileName,
+                        fileType: result.fileType!,
+                      )
+                    : throw Exception('No streaming data available'),
               ),
             ),
           ),
@@ -672,18 +702,21 @@ class StreamingHelper {
     } else {
       // Handle other file types (text, documents, etc.)
       debugPrint(
-          'StreamingHelper: Processing other file type: ${result.fileType}');
+        'StreamingHelper: Processing other file type: ${result.fileType}',
+      );
 
       // For text files and other non-media files, save to temp and open with system default app
       if (result.fileStream != null) {
         try {
           debugPrint(
-              'StreamingHelper: result.fileStream is not null, attempting to read');
+            'StreamingHelper: result.fileStream is not null, attempting to read',
+          );
 
           // Create temporary file
           final tempDir = Directory.systemTemp;
           final tempFile = File(
-              '${tempDir.path}/webdav_${DateTime.now().millisecondsSinceEpoch}_$fileName');
+            '${tempDir.path}/webdav_${DateTime.now().millisecondsSinceEpoch}_$fileName',
+          );
 
           debugPrint('StreamingHelper: Creating temp file: ${tempFile.path}');
 
@@ -694,12 +727,14 @@ class StreamingHelper {
             sink.add(chunk);
             totalBytes += chunk.length;
             debugPrint(
-                'StreamingHelper: Read chunk: ${chunk.length} bytes, total: $totalBytes');
+              'StreamingHelper: Read chunk: ${chunk.length} bytes, total: $totalBytes',
+            );
           }
           await sink.close();
 
           debugPrint(
-              'StreamingHelper: Temp file created successfully: ${await tempFile.length()} bytes');
+            'StreamingHelper: Temp file created successfully: ${await tempFile.length()} bytes',
+          );
 
           // Open with the system handler (works on Android/iOS/desktop via open_filex).
           final openResult = await OpenFilex.open(tempFile.path);
@@ -783,7 +818,9 @@ class StreamingHelper {
     if (_currentNetworkService == null) {
       if (context.mounted) {
         await _handleOpenError(
-            context, AppLocalizations.of(context)!.networkServiceNotAvailable);
+          context,
+          AppLocalizations.of(context)!.networkServiceNotAvailable,
+        );
       }
       return;
     }
@@ -832,7 +869,8 @@ class StreamingHelper {
         opened = openResult.type.toString().contains('done');
         if (!opened) {
           debugPrint(
-              'StreamingHelper: OpenFilex failed: ${openResult.type} - ${openResult.message}');
+            'StreamingHelper: OpenFilex failed: ${openResult.type} - ${openResult.message}',
+          );
           openErrorMessage = openResult.message;
         }
       } catch (e) {
@@ -856,8 +894,10 @@ class StreamingHelper {
         RouteUtils.safePopDialog(context); // Đóng loading
       }
       if (context.mounted) {
-        await _handleOpenError(context,
-            '${AppLocalizations.of(context)!.errorDownloadingFile}: $e');
+        await _handleOpenError(
+          context,
+          '${AppLocalizations.of(context)!.errorDownloadingFile}: $e',
+        );
       }
     }
   }

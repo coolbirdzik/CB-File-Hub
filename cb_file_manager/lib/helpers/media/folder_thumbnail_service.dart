@@ -220,10 +220,7 @@ class FolderThumbnailService {
       return null;
     }
 
-    final migrated = _StoredThumbnailRow(
-      custom: customValue,
-      auto: autoValue,
-    );
+    final migrated = _StoredThumbnailRow(custom: customValue, auto: autoValue);
     await _persistRow(pathKey, migrated);
     return migrated;
   }
@@ -256,16 +253,12 @@ class FolderThumbnailService {
       return;
     }
 
-    await database.insert(
-      _tableName,
-      <String, Object?>{
-        'path': pathKey,
-        'custom_thumbnail': row.custom,
-        'auto_thumbnail': row.auto,
-        'updated_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await database.insert(_tableName, <String, Object?>{
+      'path': pathKey,
+      'custom_thumbnail': row.custom,
+      'auto_thumbnail': row.auto,
+      'updated_at': DateTime.now().millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   void _notifyThumbnailChanged(String folderPath) {
@@ -509,7 +502,8 @@ class FolderThumbnailService {
 
   // Get all media files in a folder for thumbnail selection
   Future<List<File>> getMediaFilesForThumbnailSelection(
-      String folderPath) async {
+    String folderPath,
+  ) async {
     final directory = Directory(folderPath);
     final List<File> mediaFiles = [];
 
@@ -531,7 +525,8 @@ class FolderThumbnailService {
       }
 
       debugPrint(
-          'Found ${mediaFiles.length} media files in folder $folderPath');
+        'Found ${mediaFiles.length} media files in folder $folderPath',
+      );
     } catch (e) {
       debugPrint('Error getting media files: $e');
     }
@@ -566,9 +561,11 @@ class FolderThumbnailService {
     final normalized = path.normalize(dirPath);
     // Drop in-memory cache for this directory and any direct child entries.
     final keysToDrop = _thumbnailCache.keys
-        .where((k) =>
-            path.normalize(k) == normalized ||
-            path.isWithin(normalized, path.normalize(k)))
+        .where(
+          (k) =>
+              path.normalize(k) == normalized ||
+              path.isWithin(normalized, path.normalize(k)),
+        )
         .toList();
     for (final k in keysToDrop) {
       _removeFromCache(k);
@@ -577,9 +574,11 @@ class FolderThumbnailService {
     // Drop cached rows as well so a clean re-read after refocus reflects
     // any user-facing changes made while the tab was inactive.
     final rowKeysToDrop = _rowCache.keys
-        .where((k) =>
-            path.normalize(k) == normalized ||
-            path.isWithin(normalized, path.normalize(k)))
+        .where(
+          (k) =>
+              path.normalize(k) == normalized ||
+              path.isWithin(normalized, path.normalize(k)),
+        )
         .toList();
     for (final k in rowKeysToDrop) {
       _rowCache.remove(k);

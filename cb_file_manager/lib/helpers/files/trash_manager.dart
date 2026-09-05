@@ -88,8 +88,10 @@ class TrashManager {
     // Native first: ~10-50x faster than PowerShell because it avoids
     // process spawn, JSON serialization, and runs the COM enumeration
     // in-process on a worker thread.
-    final native =
-        await _getRecycleBinItemsNative(offset: offset ?? 0, limit: limit);
+    final native = await _getRecycleBinItemsNative(
+      offset: offset ?? 0,
+      limit: limit,
+    );
     if (native != null) {
       return native.items;
     }
@@ -99,13 +101,17 @@ class TrashManager {
   /// Returns the slice + the total bin size so callers can drive a paged
   /// load. Falls back to PowerShell (with a [total] inferred from the
   /// returned slice) when the native plugin is unavailable.
-  Future<RecycleBinPage> getWindowsRecycleBinItemsPage(
-      {int offset = 0, int? limit}) async {
+  Future<RecycleBinPage> getWindowsRecycleBinItemsPage({
+    int offset = 0,
+    int? limit,
+  }) async {
     if (!Platform.isWindows) {
       return const RecycleBinPage(items: [], total: 0);
     }
-    final native =
-        await _getRecycleBinItemsNative(offset: offset, limit: limit);
+    final native = await _getRecycleBinItemsNative(
+      offset: offset,
+      limit: limit,
+    );
     if (native != null) {
       return native;
     }
@@ -113,8 +119,10 @@ class TrashManager {
     return RecycleBinPage(items: fallback, total: fallback.length);
   }
 
-  Future<RecycleBinPage?> _getRecycleBinItemsNative(
-      {int offset = 0, int? limit}) async {
+  Future<RecycleBinPage?> _getRecycleBinItemsNative({
+    int offset = 0,
+    int? limit,
+  }) async {
     try {
       final raw = await WindowsFileOperations.enumerateRecycleBin(
         offset: offset,
@@ -125,20 +133,23 @@ class TrashManager {
       final items = <SystemTrashItem>[];
       for (final entry in raw.items) {
         final size = entry['size'];
-        items.add(SystemTrashItem(
-          name: (entry['name'] as String?) ?? 'Unknown',
-          recycleBinPath: (entry['path'] as String?) ?? '',
-          originalPath: (entry['originalPath'] as String?) ?? 'Unknown',
-          size: size is int
-              ? size
-              : size is num
-                  ? size.toInt()
-                  : 0,
-          trashedDate: _parseRecycleBinDate(entry['deletedDate'] as String?) ??
-              DateTime.now(),
-          isSystemItem: true,
-          isFolder: entry['isFolder'] == true,
-        ));
+        items.add(
+          SystemTrashItem(
+            name: (entry['name'] as String?) ?? 'Unknown',
+            recycleBinPath: (entry['path'] as String?) ?? '',
+            originalPath: (entry['originalPath'] as String?) ?? 'Unknown',
+            size: size is int
+                ? size
+                : size is num
+                ? size.toInt()
+                : 0,
+            trashedDate:
+                _parseRecycleBinDate(entry['deletedDate'] as String?) ??
+                DateTime.now(),
+            isSystemItem: true,
+            isFolder: entry['isFolder'] == true,
+          ),
+        );
       }
       return RecycleBinPage(items: items, total: raw.total);
     } catch (e, st) {
@@ -211,7 +222,7 @@ class TrashManager {
         }
 
         ConvertTo-Json -InputObject $items -Compress
-        '''
+        ''',
       ]);
 
       if (result.exitCode != 0) {
@@ -230,7 +241,8 @@ class TrashManager {
                 item['DeletedDate'].toString().isNotEmpty) {
               String dateStr = item['DeletedDate'].toString().trim();
               if (dateStr.contains('/') || dateStr.contains('-')) {
-                deletedDate = DateTime.tryParse(dateStr) ??
+                deletedDate =
+                    DateTime.tryParse(dateStr) ??
                     DateTime.now().subtract(const Duration(days: 1));
               } else {
                 deletedDate = DateTime.now().subtract(const Duration(days: 1));
@@ -256,14 +268,17 @@ class TrashManager {
             debugPrint('Error parsing size: $e');
           }
 
-          recycleBinItems.add(SystemTrashItem(
+          recycleBinItems.add(
+            SystemTrashItem(
               name: item['Name'] ?? 'Unknown',
               recycleBinPath: item['Path'] ?? '',
               originalPath: item['OriginalPath'] ?? 'Unknown',
               size: size,
               trashedDate: deletedDate ?? DateTime.now(),
               isSystemItem: true,
-              isFolder: item['IsFolder'] == true));
+              isFolder: item['IsFolder'] == true,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -280,8 +295,9 @@ class TrashManager {
     }
 
     try {
-      final result = await Process.run(
-          'explorer.exe', ['::{645FF040-5081-101B-9F08-00AA002F954E}']);
+      final result = await Process.run('explorer.exe', [
+        '::{645FF040-5081-101B-9F08-00AA002F954E}',
+      ]);
       return result.exitCode == 0;
     } catch (e) {
       debugPrint('Error opening Windows Recycle Bin: $e');
@@ -296,8 +312,10 @@ class TrashManager {
     }
 
     try {
-      final result = await Process.run(
-          'powershell.exe', ['-Command', 'Clear-RecycleBin -Force']);
+      final result = await Process.run('powershell.exe', [
+        '-Command',
+        'Clear-RecycleBin -Force',
+      ]);
 
       return result.exitCode == 0;
     } catch (e) {
@@ -330,7 +348,7 @@ class TrashManager {
         
         Write-Error "Item not found in Recycle Bin"
         exit 1
-        '''
+        ''',
       ]);
 
       return result.exitCode == 0;
@@ -363,7 +381,7 @@ class TrashManager {
         
         Write-Error "Item not found in Recycle Bin"
         exit 1
-        '''
+        ''',
       ]);
 
       return result.exitCode == 0;
@@ -413,7 +431,7 @@ class TrashManager {
           '''
           Add-Type -AssemblyName Microsoft.VisualBasic
           [Microsoft.VisualBasic.FileIO.FileSystem]::$method('$escapedPath', [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin, [Microsoft.VisualBasic.FileIO.UICancelOption]::ThrowException)
-          '''
+          ''',
         ]);
 
         if (result.exitCode == 0) {
@@ -434,7 +452,7 @@ class TrashManager {
       try {
         final result = await Process.run('osascript', [
           '-e',
-          'tell application "Finder" to delete POSIX file "$filePath"'
+          'tell application "Finder" to delete POSIX file "$filePath"',
         ]);
 
         if (result.exitCode == 0) {
@@ -534,8 +552,10 @@ class TrashManager {
   Future<void> _copyDirectory(Directory source, Directory destination) async {
     await destination.create(recursive: true);
     await for (final entity in source.list(recursive: false)) {
-      final newPath =
-          pathlib.join(destination.path, pathlib.basename(entity.path));
+      final newPath = pathlib.join(
+        destination.path,
+        pathlib.basename(entity.path),
+      );
       if (entity is File) {
         await entity.copy(newPath);
       } else if (entity is Directory) {
@@ -605,8 +625,9 @@ class TrashManager {
     final succeeded = <String>{};
     var nextIndex = 0;
     var done = 0;
-    final concurrency =
-        chunkSize.clamp(1, defaultPermanentDeleteConcurrency).toInt();
+    final concurrency = chunkSize
+        .clamp(1, defaultPermanentDeleteConcurrency)
+        .toInt();
 
     Future<void> worker() async {
       while (nextIndex < filePaths.length) {
@@ -698,9 +719,11 @@ class TrashManager {
     final succeeded = <String>{};
     final total = filePaths.length;
     final size = chunkSize <= 0 ? total : chunkSize;
-    final batchTimeout = timeoutOverride ??
+    final batchTimeout =
+        timeoutOverride ??
         (permanent ? const Duration(seconds: 20) : const Duration(seconds: 2));
-    final singleTimeout = timeoutOverride ??
+    final singleTimeout =
+        timeoutOverride ??
         (permanent ? const Duration(seconds: 10) : const Duration(seconds: 1));
 
     for (int start = 0; start < total; start += size) {
@@ -865,11 +888,14 @@ class TrashManager {
         if (await originalFile.exists()) {
           // Generate a new name with (recovered) suffix
           final extension = pathlib.extension(originalPath);
-          final nameWithoutExtension =
-              pathlib.basenameWithoutExtension(originalPath);
+          final nameWithoutExtension = pathlib.basenameWithoutExtension(
+            originalPath,
+          );
           final directory = pathlib.dirname(originalPath);
           targetPath = pathlib.join(
-              directory, '$nameWithoutExtension (recovered)$extension');
+            directory,
+            '$nameWithoutExtension (recovered)$extension',
+          );
         }
         // Restore the file
         await trashFile.copy(targetPath);
@@ -970,24 +996,27 @@ class TrashManager {
         Future.value(<SystemTrashItem>[]),
     ]);
 
-    final List<TrashItem> allTrashItems =
-        List.from(results[0] as List<TrashItem>);
+    final List<TrashItem> allTrashItems = List.from(
+      results[0] as List<TrashItem>,
+    );
 
     // Convert SystemTrashItems to TrashItems
     if (Platform.isWindows) {
       final recycleBinItems = results[1] as List<SystemTrashItem>;
       for (final item in recycleBinItems) {
-        allTrashItems.add(TrashItem(
-          trashFileName: item.recycleBinPath,
-          originalPath: item.originalPath,
-          actualFilePath:
-              item.recycleBinPath, // For system trash, use the recycle bin path
-          size: item.size,
-          trashedDate: item.trashedDate,
-          isSystemTrashItem: true,
-          displayName: item.name,
-          isFolder: item.isFolder,
-        ));
+        allTrashItems.add(
+          TrashItem(
+            trashFileName: item.recycleBinPath,
+            originalPath: item.originalPath,
+            actualFilePath: item
+                .recycleBinPath, // For system trash, use the recycle bin path
+            size: item.size,
+            trashedDate: item.trashedDate,
+            isSystemTrashItem: true,
+            displayName: item.name,
+            isFolder: item.isFolder,
+          ),
+        );
       }
     }
 
@@ -1042,8 +1071,8 @@ class TrashManager {
           final flushAt = emittedCount == 0
               ? firstPageSize
               : (emittedCount < firstPageSize * 8
-                  ? firstPageSize * 2
-                  : pageSize);
+                    ? firstPageSize * 2
+                    : pageSize);
           if (buffer.length >= flushAt) {
             yield _convertSystemTrashItems(buffer);
             emittedCount += buffer.length;
@@ -1159,16 +1188,19 @@ class TrashManager {
         final fileName = pathlib.basename(entity.path);
         final originalPath = metadata[fileName] ?? 'Unknown';
 
-        items.add(TrashItem(
-          trashFileName: fileName,
-          originalPath: originalPath,
-          actualFilePath: entity.path, // The actual path in trash directory
-          size: fileStat.size,
-          trashedDate: DateTime.fromMillisecondsSinceEpoch(
-              int.tryParse(fileName.split('_').first) ?? 0),
-          isSystemTrashItem: false,
-          isFolder: entity is Directory,
-        ));
+        items.add(
+          TrashItem(
+            trashFileName: fileName,
+            originalPath: originalPath,
+            actualFilePath: entity.path, // The actual path in trash directory
+            size: fileStat.size,
+            trashedDate: DateTime.fromMillisecondsSinceEpoch(
+              int.tryParse(fileName.split('_').first) ?? 0,
+            ),
+            isSystemTrashItem: false,
+            isFolder: entity is Directory,
+          ),
+        );
       }
 
       return items;
@@ -1207,15 +1239,15 @@ class RecycleBinPage {
 /// Represents a file in the trash (either internal or system trash)
 class TrashItem {
   final String
-      trashFileName; // Identifier for the file (filename for internal, full path for system)
+  trashFileName; // Identifier for the file (filename for internal, full path for system)
   final String originalPath;
   final String
-      actualFilePath; // The actual path to the file in trash (for thumbnail generation)
+  actualFilePath; // The actual path to the file in trash (for thumbnail generation)
   final int size;
   final DateTime trashedDate;
   final bool isSystemTrashItem; // Whether this item is from the system trash
   final String?
-      displayName; // Optional display name, used for system trash items
+  displayName; // Optional display name, used for system trash items
   final bool isFolder; // Whether this item is a folder/directory
 
   TrashItem({

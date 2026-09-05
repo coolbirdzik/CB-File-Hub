@@ -3,10 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 
-enum GridSizeMode {
-  columns,
-  referenceWidth,
-}
+enum GridSizeMode { columns, referenceWidth }
 
 class GridZoomConstraints {
   static const double defaultGridSpacing = 8.0;
@@ -41,19 +38,24 @@ class GridZoomConstraints {
   /// [FileListViewBuilder._gridItemWidthForZoom].
   static double itemWidthForZoom(int zoomLevel) {
     final clamped = zoomLevel.clamp(
-        UserPreferences.minGridZoomLevel, UserPreferences.maxGridZoomLevel);
+      UserPreferences.minGridZoomLevel,
+      UserPreferences.maxGridZoomLevel,
+    );
     final totalSpacing = fileGridSpacing * (clamped - 1);
-    return math.max(fileGridMinItemWidth,
-        (fileGridReferenceWidth - totalSpacing) / clamped);
+    return math.max(
+      fileGridMinItemWidth,
+      (fileGridReferenceWidth - totalSpacing) / clamped,
+    );
   }
 
   /// Returns the actual column count for [zoomLevel] at [availableWidth],
   /// matching the layout produced by [FileListViewBuilder].
   static int columnCountForZoom(int zoomLevel, double availableWidth) {
     final itemWidth = itemWidthForZoom(zoomLevel);
-    final raw = ((math.max(0.0, availableWidth) + fileGridSpacing) /
-            (itemWidth + fileGridSpacing))
-        .floor();
+    final raw =
+        ((math.max(0.0, availableWidth) + fileGridSpacing) /
+                (itemWidth + fileGridSpacing))
+            .floor();
     return math.max(1, raw);
   }
 
@@ -68,8 +70,8 @@ class GridZoomConstraints {
     int maxValue = UserPreferences.maxGridZoomLevel,
   }) {
     final safeWidth = math.max(0.0, availableWidth - (spacing * 2));
-    final maxColumns =
-        ((safeWidth + spacing) / (minItemWidth + spacing)).floor();
+    final maxColumns = ((safeWidth + spacing) / (minItemWidth + spacing))
+        .floor();
     final cappedColumns = maxColumns.clamp(minValue, maxValue).toInt();
     if (mode == GridSizeMode.columns) {
       return cappedColumns;

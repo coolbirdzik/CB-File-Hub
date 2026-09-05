@@ -88,9 +88,5 @@ Future<String?> showThumbnailBrowserDialog(
   }
 
   // Offer a crop step so the stored thumbnail can be framed exactly.
-  return showImageCropDialog(
-    context,
-    pickedPath,
-    aspectRatio: cropAspectRatio,
-  );
+  return showImageCropDialog(context, pickedPath, aspectRatio: cropAspectRatio);
 }

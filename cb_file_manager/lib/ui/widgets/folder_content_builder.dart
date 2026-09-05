@@ -25,9 +25,9 @@ class FolderContentBuilder {
     required String? currentSearchTag,
     required Function(File, bool) onFileTap,
     required Function(String, {bool shiftSelect, bool ctrlSelect})
-        toggleFileSelection,
+    toggleFileSelection,
     required Function(String, {bool shiftSelect, bool ctrlSelect})
-        toggleFolderSelection,
+    toggleFolderSelection,
     required VoidCallback toggleSelectionMode,
     required Function(BuildContext, String, List<String>) showDeleteTagDialog,
     required Function(BuildContext, String) showAddTagToFileDialog,
@@ -41,12 +41,15 @@ class FolderContentBuilder {
     if (folderListState.error != null) {
       debugPrint('🔴 [FolderContentBuilder] ERROR STATE DETECTED!');
       debugPrint(
-          '🔴 [FolderContentBuilder] Error message: ${folderListState.error}');
+        '🔴 [FolderContentBuilder] Error message: ${folderListState.error}',
+      );
       debugPrint('🔴 [FolderContentBuilder] Current path: $currentPath');
       debugPrint(
-          '🔴 [FolderContentBuilder] Is loading: ${folderListState.isLoading}');
+        '🔴 [FolderContentBuilder] Is loading: ${folderListState.isLoading}',
+      );
       debugPrint(
-          '🔴 [FolderContentBuilder] Stack trace: ${StackTrace.current}');
+        '🔴 [FolderContentBuilder] Stack trace: ${StackTrace.current}',
+      );
 
       return _buildErrorView(
         context: context,
@@ -132,7 +135,9 @@ class FolderContentBuilder {
 
   /// Builds the empty folder view
   static Widget _buildEmptyFolder(
-      BuildContext context, bool isDesktopPlatform) {
+    BuildContext context,
+    bool isDesktopPlatform,
+  ) {
     // An empty folder simply shows nothing — no "empty folder" label.
     return const SizedBox.shrink();
   }

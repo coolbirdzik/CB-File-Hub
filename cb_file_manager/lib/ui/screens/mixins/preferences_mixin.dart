@@ -28,8 +28,9 @@ mixin PreferencesMixin<T extends StatefulWidget> on State<T> {
       await preferences.init();
 
       final viewMode = await preferences.getViewMode();
-      final effectiveViewMode =
-          viewMode == ViewMode.gridPreview ? ViewMode.grid : viewMode;
+      final effectiveViewMode = viewMode == ViewMode.gridPreview
+          ? ViewMode.grid
+          : viewMode;
       final sortOption = await preferences.getSortOption();
       final gridZoomLevel = await preferences.getGridZoomLevel();
       final columnVisibility = await preferences.getColumnVisibility();

@@ -8,7 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../utils/route.dart';
 
 class FtpConnectionForm extends StatefulWidget {
-  const FtpConnectionForm({Key? key}) : super(key: key);
+  const FtpConnectionForm({super.key});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -18,12 +18,15 @@ class FtpConnectionForm extends StatefulWidget {
 class _FtpConnectionFormState extends State<FtpConnectionForm> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _hostController = TextEditingController();
-  final TextEditingController _portController =
-      TextEditingController(text: '21');
-  final TextEditingController _usernameController =
-      TextEditingController(text: 'anonymous');
-  final TextEditingController _passwordController =
-      TextEditingController(text: 'anonymous@');
+  final TextEditingController _portController = TextEditingController(
+    text: '21',
+  );
+  final TextEditingController _usernameController = TextEditingController(
+    text: 'anonymous',
+  );
+  final TextEditingController _passwordController = TextEditingController(
+    text: 'anonymous@',
+  );
 
   bool _isLoading = false;
   bool _usePassiveMode = true; // Default to passive mode
@@ -73,7 +76,8 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
       try {
         final files = await ftpClient.listDirectory();
         debugPrint(
-            'FTP: Successfully listed ${files.length} files/directories');
+          'FTP: Successfully listed ${files.length} files/directories',
+        );
       } catch (e) {
         debugPrint('FTP: Error listing directory: $e');
         // If listing fails, try toggling passive mode
@@ -83,7 +87,8 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
         try {
           final files = await ftpClient.listDirectory();
           debugPrint(
-              'FTP: Successfully listed ${files.length} files/directories after toggling passive mode');
+            'FTP: Successfully listed ${files.length} files/directories after toggling passive mode',
+          );
           // Update passive mode to match what worked
           setState(() {
             _usePassiveMode = !_usePassiveMode;
@@ -103,17 +108,16 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
           username: username,
           password: password,
           port: port,
-          additionalOptions: {
-            'usePassiveMode': _usePassiveMode,
-          },
+          additionalOptions: {'usePassiveMode': _usePassiveMode},
         ),
       );
       // ignore: use_build_context_synchronously
       RouteUtils.safePopDialog(context);
     } catch (e) {
       setState(() {
-        _connectionError =
-            AppLocalizations.of(context)!.connectionFailed(e.toString());
+        _connectionError = AppLocalizations.of(
+          context,
+        )!.connectionFailed(e.toString());
       });
     } finally {
       if (mounted) {
@@ -148,10 +152,7 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _portController,
-            decoration: InputDecoration(
-              labelText: l10n.port,
-              hintText: '21',
-            ),
+            decoration: InputDecoration(labelText: l10n.port, hintText: '21'),
             keyboardType: TextInputType.number,
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -241,8 +242,9 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed:
-                    _isLoading ? null : () => RouteUtils.safePopDialog(context),
+                onPressed: _isLoading
+                    ? null
+                    : () => RouteUtils.safePopDialog(context),
                 child: Text(l10n.cancel),
               ),
               const SizedBox(width: 8),
@@ -252,9 +254,7 @@ class _FtpConnectionFormState extends State<FtpConnectionForm> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(l10n.connect),
               ),

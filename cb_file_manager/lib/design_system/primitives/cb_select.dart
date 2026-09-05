@@ -106,7 +106,7 @@ class CbSelect<T> extends StatefulWidget {
   final FocusNode? focusNode;
 
   const CbSelect({
-    Key? key,
+    super.key,
     required this.items,
     required this.value,
     required this.onChanged,
@@ -121,7 +121,7 @@ class CbSelect<T> extends StatefulWidget {
     this.width,
     this.tooltip,
     this.focusNode,
-  }) : super(key: key);
+  });
 
   /// Convenience constructor for a plain list of values labelled by
   /// [labelBuilder], for call sites that have nothing but the values.
@@ -209,26 +209,32 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
         navigator.overlay?.context.findRenderObject() as RenderBox?;
     if (anchorBox == null || !anchorBox.hasSize || overlayBox == null) return;
 
-    final Offset origin =
-        anchorBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final Offset origin = anchorBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
     final Rect anchor = origin & anchorBox.size;
     final Rect rect = _menuRect(anchor, overlayBox.size);
 
     setState(() => _isOpen = true);
-    await navigator.push(_CbSelectRoute<T>(
-      rect: rect,
-      openedBelow: rect.top >= anchor.bottom,
-      capturedThemes:
-          InheritedTheme.capture(from: context, to: navigator.context),
-      menu: _CbSelectMenu<T>(
-        items: widget.items,
-        value: widget.value,
-        rowHeight: _height,
-        textStyle: _textStyle,
-        iconSize: _iconSize,
-        onSelected: (item) => widget.onChanged?.call(item.value),
+    await navigator.push(
+      _CbSelectRoute<T>(
+        rect: rect,
+        openedBelow: rect.top >= anchor.bottom,
+        capturedThemes: InheritedTheme.capture(
+          from: context,
+          to: navigator.context,
+        ),
+        menu: _CbSelectMenu<T>(
+          items: widget.items,
+          value: widget.value,
+          rowHeight: _height,
+          textStyle: _textStyle,
+          iconSize: _iconSize,
+          onSelected: (item) => widget.onChanged?.call(item.value),
+        ),
       ),
-    ));
+    );
     if (mounted) setState(() => _isOpen = false);
   }
 
@@ -251,11 +257,15 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
 
     final bool below = contentHeight <= spaceBelow || spaceBelow >= spaceAbove;
     final double available = below ? spaceBelow : spaceAbove;
-    final double height =
-        math.max(math.min(math.min(contentHeight, maxHeight), available), 0);
+    final double height = math.max(
+      math.min(math.min(contentHeight, maxHeight), available),
+      0,
+    );
 
-    final double left = anchor.left
-        .clamp(margin, math.max(screen.width - width - margin, margin));
+    final double left = anchor.left.clamp(
+      margin,
+      math.max(screen.width - width - margin, margin),
+    );
     final double top = below ? anchor.bottom + gap : anchor.top - gap - height;
 
     return Rect.fromLTWH(left, top, width, height);
@@ -280,7 +290,8 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
 
     // Row insets, the icon column when one is in use, and breathing room past
     // the longest label so the list never looks packed against its edge.
-    final double chrome = CbSpacing.md * 2 +
+    final double chrome =
+        CbSpacing.md * 2 +
         (hasIcons ? _iconSize + CbSpacing.sm : 0) +
         CbSpacing.md;
 
@@ -308,13 +319,13 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
           background: active
               ? c.surfaceRaised
               : s.hovered
-                  ? c.surfaceHover
-                  : c.surfaceSunken,
+              ? c.surfaceHover
+              : c.surfaceSunken,
           border: hasError
               ? c.status.danger
               : (active || s.hovered)
-                  ? c.strokeStrong
-                  : c.stroke,
+              ? c.strokeStrong
+              : c.stroke,
           foreground: c.textPrimary,
           chevron: c.iconSubtle,
         );
@@ -324,8 +335,8 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
           background: active
               ? c.surfacePressed
               : s.hovered
-                  ? c.surfaceHover
-                  : Colors.transparent,
+              ? c.surfaceHover
+              : Colors.transparent,
           border: Colors.transparent,
           foreground: c.textPrimary,
           chevron: c.iconSubtle,
@@ -548,8 +559,9 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
   ) {
     // `drive` rather than a `CurvedAnimation`, which the route would have to
     // own and dispose.
-    final Animation<double> curved =
-        animation.drive(CurveTween(curve: CbCurves.standard));
+    final Animation<double> curved = animation.drive(
+      CurveTween(curve: CbCurves.standard),
+    );
 
     return Stack(
       children: [
@@ -583,8 +595,7 @@ class _CbSelectRoute<T> extends PopupRoute<void> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
     Widget child,
-  ) =>
-      child;
+  ) => child;
 }
 
 class _CbSelectMenu<T> extends StatefulWidget {
@@ -616,13 +627,15 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
   @override
   void initState() {
     super.initState();
-    _highlighted =
-        widget.items.indexWhere((item) => item.value == widget.value);
+    _highlighted = widget.items.indexWhere(
+      (item) => item.value == widget.value,
+    );
     // Open with the selected row already in view, so a long list does not
     // start at the top with the current value somewhere off-screen.
     _scrollController = ScrollController(
-      initialScrollOffset:
-          _highlighted > 0 ? _highlighted * widget.rowHeight : 0,
+      initialScrollOffset: _highlighted > 0
+          ? _highlighted * widget.rowHeight
+          : 0,
     );
   }
 
@@ -744,17 +757,18 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
     final Color background = isActive
         ? c.surfaceHover
         : isSelected
-            ? c.surfaceSelected
-            : Colors.transparent;
+        ? c.surfaceSelected
+        : Colors.transparent;
     final Color foreground = !item.enabled
         ? c.textDisabled
         : isSelected
-            ? c.textPrimary
-            : c.textSecondary;
+        ? c.textPrimary
+        : c.textSecondary;
 
     return MouseRegion(
-      onEnter:
-          item.enabled ? (_) => setState(() => _highlighted = index) : null,
+      onEnter: item.enabled
+          ? (_) => setState(() => _highlighted = index)
+          : null,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: item.enabled ? () => _select(item) : null,

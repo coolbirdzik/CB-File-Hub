@@ -233,10 +233,7 @@ class DiskScanJournalCursor {
   final int journalId;
   final int nextUsn;
 
-  const DiskScanJournalCursor({
-    required this.journalId,
-    required this.nextUsn,
-  });
+  const DiskScanJournalCursor({required this.journalId, required this.nextUsn});
 }
 
 enum FullDiskScanMode { full, incremental }

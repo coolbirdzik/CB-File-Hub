@@ -57,7 +57,7 @@ class CbPressable extends StatefulWidget {
   final String? tooltip;
 
   const CbPressable({
-    Key? key,
+    super.key,
     required this.builder,
     this.onPressed,
     this.onLongPress,
@@ -69,7 +69,7 @@ class CbPressable extends StatefulWidget {
     this.canRequestFocus = true,
     this.semanticLabel,
     this.tooltip,
-  }) : super(key: key);
+  });
 
   @override
   State<CbPressable> createState() => _CbPressableState();

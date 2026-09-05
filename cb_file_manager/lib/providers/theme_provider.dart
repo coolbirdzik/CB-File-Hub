@@ -42,19 +42,19 @@ class ThemeProvider extends ChangeNotifier {
   String? get backdropImagePath => _backdropImagePath;
   bool get isWallpaperMode => _backdropMode == AcrylicBackdropMode.wallpaper;
   ThemeData get themeData => ThemeConfig.getTheme(
-        _currentTheme,
-        accentColor: _currentAccentColor,
-        fontColor: _currentFontColor,
-        uiFont: _currentUiFont,
-      );
+    _currentTheme,
+    accentColor: _currentAccentColor,
+    fontColor: _currentFontColor,
+    uiFont: _currentUiFont,
+  );
   fluent.FluentThemeData get fluentThemeData => FluentThemeConfig.getTheme(
-        _currentTheme,
-        accentColor: _currentAccentColor,
-        fontColor: _currentFontColor,
-        uiFont: _currentUiFont,
-        acrylicStrength: _desktopAcrylicStrength,
-        preferTransparentBackdrop: _backdropMode == AcrylicBackdropMode.dynamic,
-      );
+    _currentTheme,
+    accentColor: _currentAccentColor,
+    fontColor: _currentFontColor,
+    uiFont: _currentUiFont,
+    acrylicStrength: _desktopAcrylicStrength,
+    preferTransparentBackdrop: _backdropMode == AcrylicBackdropMode.dynamic,
+  );
 
   // For backward compatibility
   ThemeMode get themeMode {
@@ -96,7 +96,8 @@ class ThemeProvider extends ChangeNotifier {
         prefs.getString(_fontColorKey) ?? ThemeConfig.defaultFontColor.name;
     final uiFontString =
         prefs.getString(_uiFontKey) ?? ThemeConfig.defaultUiFont.name;
-    final acrylicStrength = prefs.getDouble(_desktopAcrylicStrengthKey) ??
+    final acrylicStrength =
+        prefs.getDouble(_desktopAcrylicStrengthKey) ??
         _defaultDesktopAcrylicStrength;
     final backdropModeStr = prefs.getString(_backdropModeKey);
     final backdropImagePath = prefs.getString(_backdropImagePathKey);
@@ -114,8 +115,9 @@ class ThemeProvider extends ChangeNotifier {
       (uiFont) => uiFont.name == uiFontString,
       orElse: () => ThemeConfig.defaultUiFont,
     );
-    _desktopAcrylicStrength =
-        acrylicStrength.clamp(_minimumDesktopAcrylicStrength, 2.0).toDouble();
+    _desktopAcrylicStrength = acrylicStrength
+        .clamp(_minimumDesktopAcrylicStrength, 2.0)
+        .toDouble();
     _backdropMode = backdropModeStr == AcrylicBackdropMode.wallpaper.name
         ? AcrylicBackdropMode.wallpaper
         : AcrylicBackdropMode.dynamic;
@@ -164,10 +166,7 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setString(_fontColorKey, fontColor.name);
   }
 
-  Future<void> setUiFont(
-    AppUiFont uiFont, {
-    bool persist = true,
-  }) async {
+  Future<void> setUiFont(AppUiFont uiFont, {bool persist = true}) async {
     if (_currentUiFont == uiFont) return;
     _currentUiFont = uiFont;
     notifyListeners();
@@ -204,8 +203,9 @@ class ThemeProvider extends ChangeNotifier {
     double strength, {
     bool persist = true,
   }) async {
-    final normalized =
-        strength.clamp(_minimumDesktopAcrylicStrength, 2.0).toDouble();
+    final normalized = strength
+        .clamp(_minimumDesktopAcrylicStrength, 2.0)
+        .toDouble();
     if (_desktopAcrylicStrength == normalized) return;
 
     _desktopAcrylicStrength = normalized;

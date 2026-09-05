@@ -22,13 +22,13 @@ class DeleteConfirmationDialog extends StatefulWidget {
   final List<String> previewPaths;
 
   const DeleteConfirmationDialog({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     required this.confirmText,
     required this.cancelText,
     this.previewPaths = const [],
-  }) : super(key: key);
+  });
 
   @override
   State<DeleteConfirmationDialog> createState() =>
@@ -170,7 +170,9 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                                   : null,
                               side: isFocused
                                   ? BorderSide(
-                                      color: colorScheme.primary, width: 2)
+                                      color: colorScheme.primary,
+                                      width: 2,
+                                    )
                                   : null,
                             ),
                             child: Text(widget.cancelText),
@@ -192,7 +194,9 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                                   : null,
                               side: isFocused
                                   ? const BorderSide(
-                                      color: Colors.red, width: 2)
+                                      color: Colors.red,
+                                      width: 2,
+                                    )
                                   : null,
                             ),
                             child: Text(
@@ -229,9 +233,7 @@ class _DeletePreviewStrip extends StatelessWidget {
     final count = paths.length;
     // Single item: larger centered preview
     if (count == 1) {
-      return Center(
-        child: _PreviewTile(path: paths.first, size: 96),
-      );
+      return Center(child: _PreviewTile(path: paths.first, size: 96));
     }
     // Multiple: row of tiles
     return Row(
@@ -296,8 +298,9 @@ class _PreviewTileState extends State<_PreviewTile> {
     final category = FileTypeRegistry.getCategory(ext);
     final isImage = category == FileCategory.image;
     final isVideo = category == FileCategory.video;
-    final fallbackIcon =
-        isDir ? PhosphorIconsLight.folder : FileTypeRegistry.getIcon(ext);
+    final fallbackIcon = isDir
+        ? PhosphorIconsLight.folder
+        : FileTypeRegistry.getIcon(ext);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),

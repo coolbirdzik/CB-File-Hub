@@ -46,11 +46,12 @@ class _Entry {
   final String step;
   final String filename;
   final DateTime ts;
-  _Entry(
-      {required this.testName,
-      required this.step,
-      required this.filename,
-      required this.ts});
+  _Entry({
+    required this.testName,
+    required this.step,
+    required this.filename,
+    required this.ts,
+  });
 }
 
 /// Upper bound for every settle performed by this reporter.
@@ -160,12 +161,14 @@ Future<void> captureE2EScreenshot(
       final file = File(p.join(_screenshotsDir!.path, filename));
       await file.writeAsBytes(bytes);
 
-      _log.add(_Entry(
-        testName: testName,
-        step: step,
-        filename: filename,
-        ts: DateTime.now(),
-      ));
+      _log.add(
+        _Entry(
+          testName: testName,
+          step: step,
+          filename: filename,
+          ts: DateTime.now(),
+        ),
+      );
 
       // Persist manifest every 5 screenshots so a crash mid-run still leaves
       // a usable artifact behind. Cheap relative to the screenshot capture
@@ -174,18 +177,21 @@ Future<void> captureE2EScreenshot(
 
       if (kDebugMode) {
         debugPrint(
-            '[E2E Report] Screenshot saved: $filename  →  ${_screenshotsDir!.path}');
+          '[E2E Report] Screenshot saved: $filename  →  ${_screenshotsDir!.path}',
+        );
       }
     } else {
       if (kDebugMode) {
         debugPrint(
-            '[E2E Report] No bytes captured for "$slug" — screenshot skipped');
+          '[E2E Report] No bytes captured for "$slug" — screenshot skipped',
+        );
       }
     }
   } catch (e, st) {
     if (kDebugMode) {
       debugPrint(
-          '[E2E Report] captureE2EScreenshot failed (non-fatal): $e\n$st');
+        '[E2E Report] captureE2EScreenshot failed (non-fatal): $e\n$st',
+      );
     }
   }
 }
@@ -307,8 +313,11 @@ class E2ETester {
   }
 
   /// Runs [fn] then captures a screenshot.  Never throws.
-  Future<void> _act(String action, Future<void> Function() fn,
-      [String? detail]) async {
+  Future<void> _act(
+    String action,
+    Future<void> Function() fn, [
+    String? detail,
+  ]) async {
     await fn();
     if (kCbE2EFullScreenshots) {
       await captureE2EScreenshot(tester, _label, _seq(action, detail));
@@ -334,39 +343,30 @@ class E2ETester {
   // -------------------------------------------------------------------------
 
   /// See [WidgetTester.tap].
-  Future<void> tap(Finder finder, {String? detail}) => _act(
-        'tap',
-        () async => await tester.tap(finder),
-        detail,
-      );
+  Future<void> tap(Finder finder, {String? detail}) =>
+      _act('tap', () async => await tester.tap(finder), detail);
 
   /// See [WidgetTester.longPress].
-  Future<void> longPress(Finder finder, {String? detail}) => _act(
-        'long_press',
-        () async => await tester.longPress(finder),
-        detail,
-      );
+  Future<void> longPress(Finder finder, {String? detail}) =>
+      _act('long_press', () async => await tester.longPress(finder), detail);
 
   /// See [WidgetTester.enterText].
   Future<void> enterText(Finder finder, String text, {String? detail}) => _act(
-        'enter_text',
-        () async => await tester.enterText(finder, text),
-        detail ?? text,
-      );
+    'enter_text',
+    () async => await tester.enterText(finder, text),
+    detail ?? text,
+  );
 
   /// See [WidgetTester.drag].
-  Future<void> drag(Finder finder, Offset offset, {String? detail}) => _act(
-        'drag',
-        () async => await tester.drag(finder, offset),
-        detail,
-      );
+  Future<void> drag(Finder finder, Offset offset, {String? detail}) =>
+      _act('drag', () async => await tester.drag(finder, offset), detail);
 
   /// See [WidgetTester.fling].
   Future<void> fling(Finder finder, Offset offset, {String? detail}) => _act(
-        'fling',
-        () async => await tester.fling(finder, offset, 3000),
-        detail,
-      );
+    'fling',
+    () async => await tester.fling(finder, offset, 3000),
+    detail,
+  );
 
   /// Scrolls [scrollable] by [distance] until [target] is visible.
   /// Signature matches Flutter SDK 2.x: scrollUntilVisible(scrollable, distance).
@@ -376,15 +376,10 @@ class E2ETester {
     Finder scrollable,
     double distance, {
     String? detail,
-  }) =>
-      _act(
-        'scroll',
-        () async {
-          await tester.ensureVisible(target);
-          await tester.scrollUntilVisible(scrollable, distance);
-        },
-        detail,
-      );
+  }) => _act('scroll', () async {
+    await tester.ensureVisible(target);
+    await tester.scrollUntilVisible(scrollable, distance);
+  }, detail);
 
   /// See [WidgetTester.ensureVisible].
   Future<void> ensureVisible(Finder finder) async {
@@ -481,62 +476,63 @@ class E2ETester {
 
   /// Single-tap a file row (grid or list). Auto-screenshots after.
   Future<void> tapFileRow(String path, {String? detail}) => _act(
-        'tap_file',
-        () => keys.tapFileRow(tester, path),
-        detail ?? _lastName(path),
-      );
+    'tap_file',
+    () => keys.tapFileRow(tester, path),
+    detail ?? _lastName(path),
+  );
 
   /// Double-tap a folder row to navigate into it. Auto-screenshots after.
   Future<void> tapFolderRow(String path, {String? detail}) => _act(
-        'tap_folder',
-        () => keys.tapFolderRow(tester, path),
-        detail ?? _lastName(path),
-      );
+    'tap_folder',
+    () => keys.tapFolderRow(tester, path),
+    detail ?? _lastName(path),
+  );
 
   /// Single-tap a folder row to select it (no navigation). Auto-screenshots after.
   Future<void> selectFolderRow(String path, {String? detail}) => _act(
-        'select_folder',
-        () => keys.selectFolderRow(tester, path),
-        detail ?? _lastName(path),
-      );
+    'select_folder',
+    () => keys.selectFolderRow(tester, path),
+    detail ?? _lastName(path),
+  );
 
   /// Ctrl+click to add a file to the multi-selection. Auto-screenshots after.
   Future<void> selectFileWithCtrl(String path, {String? detail}) => _act(
-        'ctrl_select',
-        () => keys.selectFileWithCtrl(tester, path),
-        detail ?? _lastName(path),
-      );
+    'ctrl_select',
+    () => keys.selectFileWithCtrl(tester, path),
+    detail ?? _lastName(path),
+  );
 
   /// Right-click a file row to open its context menu. Auto-screenshots after.
   Future<void> rightClickFileRow(String path, {String? detail}) => _act(
-        'right_click_file',
-        () => keys.rightClickFileRow(tester, path),
-        detail ?? _lastName(path),
-      );
+    'right_click_file',
+    () => keys.rightClickFileRow(tester, path),
+    detail ?? _lastName(path),
+  );
 
   /// Right-click a folder row to open its context menu. Auto-screenshots after.
   Future<void> rightClickFolderRow(String path, {String? detail}) => _act(
-        'right_click_folder',
-        () => keys.rightClickFolderRow(tester, path),
-        detail ?? _lastName(path),
-      );
+    'right_click_folder',
+    () => keys.rightClickFolderRow(tester, path),
+    detail ?? _lastName(path),
+  );
 
   /// Tap a context menu item by its action id. Auto-screenshots after.
   Future<void> tapContextMenuItem(String actionId, {String? detail}) => _act(
-        'menu',
-        () => keys.tapContextMenuItem(tester, actionId),
-        detail ?? actionId,
-      );
+    'menu',
+    () => keys.tapContextMenuItem(tester, actionId),
+    detail ?? actionId,
+  );
 
   /// Right-click on the background (empty area) to open the background context menu.
   /// Auto-screenshots after.
-  Future<void> openBackgroundContextMenu(
-          {Offset? tapPosition, String? detail}) =>
-      _act(
-        'bg_menu',
-        () => keys.openBackgroundContextMenu(tester, tapPosition: tapPosition),
-        detail,
-      );
+  Future<void> openBackgroundContextMenu({
+    Offset? tapPosition,
+    String? detail,
+  }) => _act(
+    'bg_menu',
+    () => keys.openBackgroundContextMenu(tester, tapPosition: tapPosition),
+    detail,
+  );
 
   /// Send a keyboard shortcut (modifiers + key). Auto-screenshots after.
   Future<void> sendKeyboardShortcut({
@@ -545,32 +541,31 @@ class E2ETester {
     bool shift = false,
     bool alt = false,
     String? detail,
-  }) =>
-      _act(
-        'shortcut',
-        () => keys.sendKeyboardShortcut(
-          tester,
-          key: key,
-          ctrl: ctrl,
-          shift: shift,
-          alt: alt,
-        ),
-        detail,
-      );
+  }) => _act(
+    'shortcut',
+    () => keys.sendKeyboardShortcut(
+      tester,
+      key: key,
+      ctrl: ctrl,
+      shift: shift,
+      alt: alt,
+    ),
+    detail,
+  );
 
   /// Type text into the currently focused TextField. Auto-screenshots after.
   Future<void> typeIntoFocusedField(String text, {String? detail}) => _act(
-        'type',
-        () => keys.typeIntoFocusedField(tester, text),
-        detail ?? text,
-      );
+    'type',
+    () => keys.typeIntoFocusedField(tester, text),
+    detail ?? text,
+  );
 
   /// Tap the dialog confirm button. Auto-screenshots after.
   Future<void> tapDialogConfirm({String? buttonText, String? detail}) => _act(
-        'confirm',
-        () => keys.tapDialogConfirm(tester, buttonText: buttonText),
-        detail ?? buttonText ?? 'confirm',
-      );
+    'confirm',
+    () => keys.tapDialogConfirm(tester, buttonText: buttonText),
+    detail ?? buttonText ?? 'confirm',
+  );
 
   /// Returns the last path segment — used as a concise screenshot label.
   static String _lastName(String path) {
@@ -609,18 +604,16 @@ Future<Uint8List?> _capturePngBytes(WidgetTester tester, String slug) async {
   // --- Layer 2: direct render-tree capture via flutter_test's captureImage ---
   // captureImage(Element) is a top-level function exported by flutter_test.
   // It walks up to the nearest RenderRepaintBoundary and calls toImage().
-  final finders = <Finder>[
-    find.byType(MaterialApp),
-    find.byType(WidgetsApp),
-  ];
+  final finders = <Finder>[find.byType(MaterialApp), find.byType(WidgetsApp)];
 
   for (final finder in finders) {
     if (finder.evaluate().isEmpty) continue;
     try {
       final Element element = finder.evaluate().first;
       final ui.Image image = await captureImage(element);
-      final ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      final ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       image.dispose();
       if (byteData != null && byteData.lengthInBytes > 0) {
         return byteData.buffer.asUint8List();
@@ -639,8 +632,9 @@ Future<Uint8List?> _capturePngBytes(WidgetTester tester, String slug) async {
 
 Future<void> _ensureReportDir() async {
   if (_reportDir != null) return;
-  _reportDir =
-      Directory(p.join(await _reportRootPath(), 'build', 'e2e_report'));
+  _reportDir = Directory(
+    p.join(await _reportRootPath(), 'build', 'e2e_report'),
+  );
   _screenshotsDir = Directory(p.join(_reportDir!.path, 'screenshots'));
   await _screenshotsDir!.create(recursive: true);
   if (kDebugMode) {
@@ -667,8 +661,8 @@ Future<String> _reportRootPath() async {
   // the framework — a fresh install leaves it absent, and the app cannot mkdir
   // it itself under scoped storage.
   try {
-    final external =
-        await E2ESandboxPaths.platformProvider.getExternalStoragePath();
+    final external = await E2ESandboxPaths.platformProvider
+        .getExternalStoragePath();
     if (external != null && external.isNotEmpty) {
       final root = Directory(p.join(external, 'cb_e2e'));
       root.createSync(recursive: true);
@@ -726,14 +720,16 @@ Future<void> _loadManifest() async {
         final fname = e['filename'] as String?;
         final ts = e['ts'] as String?;
         if (tn == null || step == null || fname == null) continue;
-        _log.add(_Entry(
-          testName: tn,
-          step: step,
-          filename: fname,
-          ts: ts != null
-              ? (DateTime.tryParse(ts) ?? DateTime.now())
-              : DateTime.now(),
-        ));
+        _log.add(
+          _Entry(
+            testName: tn,
+            step: step,
+            filename: fname,
+            ts: ts != null
+                ? (DateTime.tryParse(ts) ?? DateTime.now())
+                : DateTime.now(),
+          ),
+        );
       }
     }
 
@@ -750,8 +746,10 @@ Future<void> _loadManifest() async {
     if (counter is int && counter > _counter) _counter = counter;
 
     if (kDebugMode) {
-      debugPrint('[E2E Report] Manifest loaded: ${_log.length} screenshot(s), '
-          '${_testResults.length} test result(s)');
+      debugPrint(
+        '[E2E Report] Manifest loaded: ${_log.length} screenshot(s), '
+        '${_testResults.length} test result(s)',
+      );
     }
   } catch (_) {}
 }
@@ -761,12 +759,14 @@ Future<void> _saveManifest() async {
   if (f == null) return;
   try {
     final entries = _log
-        .map((e) => {
-              'testName': e.testName,
-              'step': e.step,
-              'filename': e.filename,
-              'ts': e.ts.toIso8601String(),
-            })
+        .map(
+          (e) => {
+            'testName': e.testName,
+            'step': e.step,
+            'filename': e.filename,
+            'ts': e.ts.toIso8601String(),
+          },
+        )
         .toList();
     final body = {
       'entries': entries,
@@ -804,7 +804,8 @@ Future<void> _clearTestEntries(String testName) async {
 
   if (kDebugMode) {
     debugPrint(
-        '[E2E Report] Cleared ${stale.length} stale screenshot(s) for "$testName"');
+      '[E2E Report] Cleared ${stale.length} stale screenshot(s) for "$testName"',
+    );
   }
 }
 

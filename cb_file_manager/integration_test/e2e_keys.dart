@@ -16,7 +16,8 @@ void expectFileRowVisible(String absolutePath) {
   expect(
     _hasKey(grid) || _hasKey(list),
     isTrue,
-    reason: 'Expected file row for path (grid or list). path=$absolutePath '
+    reason:
+        'Expected file row for path (grid or list). path=$absolutePath '
         'gridCount=${grid.evaluate().length} listCount=${list.evaluate().length}',
   );
 }
@@ -43,7 +44,8 @@ void expectFolderRowVisible(String absolutePath) {
   expect(
     _hasKey(grid) || _hasKey(list),
     isTrue,
-    reason: 'Expected folder row for path (grid or list). path=$absolutePath '
+    reason:
+        'Expected folder row for path (grid or list). path=$absolutePath '
         'gridCount=${grid.evaluate().length} listCount=${list.evaluate().length}',
   );
 }
@@ -120,8 +122,11 @@ Future<void> tapFolderRow(WidgetTester tester, String absolutePath) async {
 
 /// Returns the center [Offset] of a file or folder row (grid or list).
 /// Throws if the row is not found.
-Offset getFileOrFolderCenter(WidgetTester tester, String absolutePath,
-    {bool isFolder = false}) {
+Offset getFileOrFolderCenter(
+  WidgetTester tester,
+  String absolutePath, {
+  bool isFolder = false,
+}) {
   final gridPrefix = isFolder ? 'folder-grid-item' : 'file-grid-item';
   final listPrefix = isFolder ? 'folder-item' : 'file-item';
   final finder = _resolveFileOrFolderFinder(
@@ -169,7 +174,9 @@ Future<void> tapFileRow(WidgetTester tester, String absolutePath) async {
 /// Performs Ctrl+click to add [absolutePath] to the current multi-selection.
 /// Works in both grid and list view modes.
 Future<void> selectFileWithCtrl(
-    WidgetTester tester, String absolutePath) async {
+  WidgetTester tester,
+  String absolutePath,
+) async {
   final finder = _resolveFileOrFolderFinder(
     absolutePath,
     gridKeyPrefix: 'file-grid-item',
@@ -231,10 +238,7 @@ Future<void> rightClickFileRow(WidgetTester tester, String absolutePath) async {
 /// Example usage:
 ///   await tapContextMenuItem(tester, 'copy');      // Copy file
 ///   await tapContextMenuItem(tester, 'new_folder'); // Works on Windows & non-Windows
-Future<void> tapContextMenuItem(
-  WidgetTester tester,
-  String actionId,
-) async {
+Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
   if (kDebugMode) {
     debugPrint('[E2E] tapContextMenuItem: tapping id="$actionId"');
   }
@@ -254,7 +258,8 @@ Future<void> tapContextMenuItem(
   final keyedCount = keyedFinder?.evaluate().length ?? 0;
   if (kDebugMode) {
     debugPrint(
-        '[E2E] tapContextMenuItem: keyed action match found $keyedCount item(s)');
+      '[E2E] tapContextMenuItem: keyed action match found $keyedCount item(s)',
+    );
   }
   if (keyedFinder != null && keyedCount > 0) {
     await tester.tap(keyedFinder.first, warnIfMissed: false);
@@ -265,9 +270,7 @@ Future<void> tapContextMenuItem(
   // Step 2: direct PopupMenuItem<String> value match (top-level non-submenu items).
   var foundCount = 0;
   final allMenuItems = tester
-      .widgetList<PopupMenuItem<String>>(
-        find.byType(PopupMenuItem<String>),
-      )
+      .widgetList<PopupMenuItem<String>>(find.byType(PopupMenuItem<String>))
       .toList();
   for (final item in allMenuItems) {
     if (actionIds.contains(item.value)) {
@@ -276,7 +279,8 @@ Future<void> tapContextMenuItem(
   }
   if (kDebugMode) {
     debugPrint(
-        '[E2E] tapContextMenuItem: direct value match found $foundCount item(s)');
+      '[E2E] tapContextMenuItem: direct value match found $foundCount item(s)',
+    );
   }
   if (foundCount > 0) {
     await tester.tap(
@@ -294,7 +298,8 @@ Future<void> tapContextMenuItem(
   final textCount = textFinder?.evaluate().length ?? 0;
   if (kDebugMode) {
     debugPrint(
-        '[E2E] tapContextMenuItem: label candidates ${labels.join(" | ")} found $textCount time(s)');
+      '[E2E] tapContextMenuItem: label candidates ${labels.join(" | ")} found $textCount time(s)',
+    );
   }
   if (textFinder != null && textCount > 0) {
     await tester.tap(textFinder.first, warnIfMissed: false);
@@ -317,7 +322,8 @@ Future<void> tapContextMenuItem(
   final triggerCount = submenuTriggerFinder.evaluate().length;
   if (kDebugMode) {
     debugPrint(
-        '[E2E] tapContextMenuItem: found $triggerCount submenu trigger(s)');
+      '[E2E] tapContextMenuItem: found $triggerCount submenu trigger(s)',
+    );
   }
   for (var i = 0; i < triggerCount; i++) {
     final trigger = submenuTriggerFinder.at(i);
@@ -331,7 +337,8 @@ Future<void> tapContextMenuItem(
     if (retryKeyedFinder != null && retryKeyedFinder.evaluate().isNotEmpty) {
       if (kDebugMode) {
         debugPrint(
-            '[E2E] tapContextMenuItem: found $actionId via keyed submenu #$i');
+          '[E2E] tapContextMenuItem: found $actionId via keyed submenu #$i',
+        );
       }
       await tester.tap(retryKeyedFinder.first, warnIfMissed: false);
       await tester.pumpAndSettle(const Duration(seconds: 3));
@@ -342,7 +349,8 @@ Future<void> tapContextMenuItem(
     if (retryFinder != null && retryFinder.evaluate().isNotEmpty) {
       if (kDebugMode) {
         debugPrint(
-            '[E2E] tapContextMenuItem: found ${labels.join(" | ")} via submenu #$i');
+          '[E2E] tapContextMenuItem: found ${labels.join(" | ")} via submenu #$i',
+        );
       }
       await tester.tap(retryFinder.first, warnIfMissed: false);
       await tester.pumpAndSettle(const Duration(seconds: 3));
@@ -482,8 +490,11 @@ Future<void> openBackgroundContextMenu(
       // Fallback: Scaffold (top-level, always present but won't open file context menu)
       target = find.byType(Scaffold);
     }
-    expect(target, findsAtLeastNWidgets(1),
-        reason: 'ListView/GridView/Scaffold not found — app did not render');
+    expect(
+      target,
+      findsAtLeastNWidgets(1),
+      reason: 'ListView/GridView/Scaffold not found — app did not render',
+    );
     final r = tester.getRect(target.first);
     // Tap center of the widget (safe for empty list — no file rows there)
     position = Offset(r.center.dx, r.center.dy);
@@ -508,8 +519,11 @@ Future<void> tapDialogCancel(WidgetTester tester) async {
   }
   // Find and tap Cancel (case-insensitive match via text contains)
   final cancelFinder = find.widgetWithText(TextButton, 'Cancel');
-  expect(cancelFinder, findsOneWidget,
-      reason: 'Cancel button not found in dialog');
+  expect(
+    cancelFinder,
+    findsOneWidget,
+    reason: 'Cancel button not found in dialog',
+  );
   await tester.tap(cancelFinder);
   await tester.pumpAndSettle(const Duration(seconds: 2));
 }
@@ -518,8 +532,10 @@ Future<void> tapDialogCancel(WidgetTester tester) async {
 /// Pass the button text to disambiguate when multiple TextButtons are present.
 Future<void> tapDialogConfirm(WidgetTester tester, {String? buttonText}) async {
   if (kDebugMode) {
-    debugPrint('[E2E] tapDialogConfirm: tapping confirm button '
-        '${buttonText != null ? '"$buttonText"' : '(last button)'}');
+    debugPrint(
+      '[E2E] tapDialogConfirm: tapping confirm button '
+      '${buttonText != null ? '"$buttonText"' : '(last button)'}',
+    );
   }
   final Finder confirmFinder;
   if (buttonText != null) {
@@ -536,10 +552,7 @@ Future<void> tapDialogConfirm(WidgetTester tester, {String? buttonText}) async {
       'ok': ['đồng ý'],
       'cancel': ['hủy', 'huỷ'],
     };
-    final candidates = <String>{
-      buttonText,
-      ...?viAliases[wantedLower],
-    };
+    final candidates = <String>{buttonText, ...?viAliases[wantedLower]};
     confirmFinder = find.byWidgetPredicate((widget) {
       if (widget is! ButtonStyleButton) return false;
       final child = widget.child;
@@ -590,7 +603,9 @@ Future<void> selectFolderRow(WidgetTester tester, String absolutePath) async {
 /// Right-click a folder row to open its context menu.
 /// Works in both grid and list view modes.
 Future<void> rightClickFolderRow(
-    WidgetTester tester, String absolutePath) async {
+  WidgetTester tester,
+  String absolutePath,
+) async {
   final finder = _resolveFileOrFolderFinder(
     absolutePath,
     gridKeyPrefix: 'folder-grid-item',
@@ -631,7 +646,8 @@ Future<void> createFolderViaContextMenu(
 ) async {
   if (kDebugMode) {
     debugPrint(
-        '[E2E] createFolderViaContextMenu: opening background menu, new folder');
+      '[E2E] createFolderViaContextMenu: opening background menu, new folder',
+    );
   }
   await openBackgroundContextMenu(tester);
   await tester.pumpAndSettle(const Duration(seconds: 2));

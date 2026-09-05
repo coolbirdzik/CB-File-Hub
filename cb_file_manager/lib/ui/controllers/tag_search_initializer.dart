@@ -32,7 +32,8 @@ class TagSearchInitializer {
     // Handle tag search initialization
     if (searchTag != null) {
       debugPrint(
-          'TabbedFolderListScreen: Initializing with tag search for "$searchTag"');
+        'TabbedFolderListScreen: Initializing with tag search for "$searchTag"',
+      );
       debugPrint('Global search mode: $globalTagSearch');
 
       // Initialize with tag search
@@ -47,8 +48,9 @@ class TagSearchInitializer {
         // Local tag search within current directory
         Future.delayed(const Duration(milliseconds: 500), () {
           if (isMounted && !folderListBloc.isClosed) {
-            folderListBloc
-                .add(FolderListLoad(path)); // First load the directory
+            folderListBloc.add(
+              FolderListLoad(path),
+            ); // First load the directory
             folderListBloc.add(SearchByTag(searchTag)); // Then search within it
           }
         });
@@ -58,7 +60,8 @@ class TagSearchInitializer {
       }
     } else if (path.startsWith('#search?tag=')) {
       // Handle search path with tag parameter
-      final tag = UriUtils.extractTagFromSearchPath(path) ??
+      final tag =
+          UriUtils.extractTagFromSearchPath(path) ??
           path.substring('#search?tag='.length);
       debugPrint('TabbedFolderListScreen: Handling search path with tag: $tag');
 

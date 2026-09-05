@@ -8,8 +8,9 @@ import 'thumbnail_queue_manager.dart';
 /// A Flutter plugin to access Windows native video thumbnail generation
 /// This uses the Windows thumbnail cache system for efficient thumbnail extraction
 class FcNativeVideoThumbnail {
-  static const MethodChannel _channel =
-      MethodChannel('fc_native_video_thumbnail');
+  static const MethodChannel _channel = MethodChannel(
+    'fc_native_video_thumbnail',
+  );
 
   /// Flag to indicate if this is running on Windows
   static bool get isWindows => Platform.isWindows;
@@ -28,14 +29,16 @@ class FcNativeVideoThumbnail {
     try {
       if (!isWindows) {
         debugPrint(
-            'FcNativeVideoThumbnail: Not running on Windows, initialization skipped');
+          'FcNativeVideoThumbnail: Not running on Windows, initialization skipped',
+        );
         return false;
       }
 
       // Nothing to initialize for now, but we could add version checking or capability testing here
       _initialized = true;
       debugPrint(
-          'FcNativeVideoThumbnail: Native Windows thumbnail provider initialized');
+        'FcNativeVideoThumbnail: Native Windows thumbnail provider initialized',
+      );
       return true;
     } catch (e) {
       debugPrint('FcNativeVideoThumbnail: Failed to initialize: $e');
@@ -63,7 +66,8 @@ class FcNativeVideoThumbnail {
   }) async {
     if (!isWindows) {
       debugPrint(
-          'FcNativeVideoThumbnail: Not running on Windows, cannot generate native thumbnail');
+        'FcNativeVideoThumbnail: Not running on Windows, cannot generate native thumbnail',
+      );
       return null;
     }
 
@@ -84,14 +88,16 @@ class FcNativeVideoThumbnail {
       final videoFile = File(videoPath);
       if (!await videoFile.exists()) {
         debugPrint(
-            'FcNativeVideoThumbnail: Video file does not exist: $videoPath');
+          'FcNativeVideoThumbnail: Video file does not exist: $videoPath',
+        );
         return null;
       }
 
       // Check for unsupported format by examining the file extension
       if (!isSupportedFormat(videoPath)) {
         debugPrint(
-            'FcNativeVideoThumbnail: Potentially unsupported format: $videoPath');
+          'FcNativeVideoThumbnail: Potentially unsupported format: $videoPath',
+        );
         // Still try but with lower expectations of success
       }
 
@@ -106,26 +112,34 @@ class FcNativeVideoThumbnail {
       bool? result;
       try {
         // Wrap platform channel call in try-catch to handle BackgroundIsolateBinaryMessenger errors
-        result = await _channel.invokeMethod<bool>('getVideoThumbnail', {
-          'srcFile': videoPath,
-          'destFile': outputPath,
-          'width': width,
-          'format': format.toLowerCase() == 'png' ? 'png' : 'jpg',
-          'timeSeconds': timeSeconds, // Pass the timestamp to native code
-          'quality': quality, // Pass quality setting for JPEG format
-        }).timeout(_operationTimeout, onTimeout: () {
-          debugPrint(
-              'FcNativeVideoThumbnail: Native operation timed out for $videoPath');
-          return false;
-        });
+        result = await _channel
+            .invokeMethod<bool>('getVideoThumbnail', {
+              'srcFile': videoPath,
+              'destFile': outputPath,
+              'width': width,
+              'format': format.toLowerCase() == 'png' ? 'png' : 'jpg',
+              'timeSeconds': timeSeconds, // Pass the timestamp to native code
+              'quality': quality, // Pass quality setting for JPEG format
+            })
+            .timeout(
+              _operationTimeout,
+              onTimeout: () {
+                debugPrint(
+                  'FcNativeVideoThumbnail: Native operation timed out for $videoPath',
+                );
+                return false;
+              },
+            );
       } on MissingPluginException catch (e) {
         debugPrint(
-            'FcNativeVideoThumbnail: Plugin not available: ${e.message}');
+          'FcNativeVideoThumbnail: Plugin not available: ${e.message}',
+        );
         return null;
       } on PlatformException catch (e) {
         // Handle specific platform exception
         debugPrint(
-            'FcNativeVideoThumbnail: Platform error for $videoPath: ${e.message}');
+          'FcNativeVideoThumbnail: Platform error for $videoPath: ${e.message}',
+        );
         return null;
       } catch (e) {
         // Handle any other exceptions from the platform channel
@@ -145,11 +159,13 @@ class FcNativeVideoThumbnail {
         if (await outputFile.exists() && await outputFile.length() > 0) {
           // Use async exists() and length()
           debugPrint(
-              'FcNativeVideoThumbnail: Successfully generated thumbnail at $outputPath');
+            'FcNativeVideoThumbnail: Successfully generated thumbnail at $outputPath',
+          );
           return outputPath;
         } else {
           debugPrint(
-              'FcNativeVideoThumbnail: File reported as created but doesn\'t exist or is empty at $outputPath');
+            'FcNativeVideoThumbnail: File reported as created but doesn\'t exist or is empty at $outputPath',
+          );
           // Attempt to delete potentially corrupt file
           try {
             if (await outputFile.exists()) await outputFile.delete();
@@ -159,13 +175,15 @@ class FcNativeVideoThumbnail {
       } else {
         // Failed extraction but not an error - common with some video files
         debugPrint(
-            'FcNativeVideoThumbnail: Could not extract thumbnail from video $videoPath (native call returned false)');
+          'FcNativeVideoThumbnail: Could not extract thumbnail from video $videoPath (native call returned false)',
+        );
         return null;
       }
     } catch (e, stack) {
       // Catch any remaining exceptions
       debugPrint(
-          'FcNativeVideoThumbnail: Unhandled error generating thumbnail for $videoPath: $e\n$stack');
+        'FcNativeVideoThumbnail: Unhandled error generating thumbnail for $videoPath: $e\n$stack',
+      );
       return null;
     }
   }
@@ -186,7 +204,7 @@ class FcNativeVideoThumbnail {
       '.mpg',
       '.mpeg',
       '.m4v',
-      '.ts'
+      '.ts',
     ];
 
     return supportedExtensions.contains(extension);
@@ -293,10 +311,9 @@ class FcNativeVideoThumbnail {
     }
 
     try {
-      final result = await _channel.invokeMethod<double>(
-        'getVideoDuration',
-        {'srcFile': videoPath},
-      );
+      final result = await _channel.invokeMethod<double>('getVideoDuration', {
+        'srcFile': videoPath,
+      });
       return result ?? -1.0;
     } catch (e) {
       debugPrint('FcNativeVideoThumbnail: Error getting video duration: $e');
@@ -331,7 +348,8 @@ class FcNativeVideoThumbnail {
   }) async {
     if (!isWindows) {
       debugPrint(
-          'FcNativeVideoThumbnail: Not running on Windows, cannot generate native thumbnail');
+        'FcNativeVideoThumbnail: Not running on Windows, cannot generate native thumbnail',
+      );
       return null;
     }
 
@@ -352,7 +370,8 @@ class FcNativeVideoThumbnail {
       final videoFile = File(videoPath);
       if (!await videoFile.exists()) {
         debugPrint(
-            'FcNativeVideoThumbnail: Video file does not exist: $videoPath');
+          'FcNativeVideoThumbnail: Video file does not exist: $videoPath',
+        );
         return null;
       }
 
@@ -363,28 +382,33 @@ class FcNativeVideoThumbnail {
       // Call the optimized native method
       String? result;
       try {
-        result = await _channel.invokeMethod<String>(
-          'generateThumbnailAtPercentage',
-          {
-            'srcFile': videoPath,
-            'destFile': outputPath,
-            'width': width,
-            'format': format.toLowerCase() == 'png' ? 'png' : 'jpg',
-            'percentage': percentage,
-            'quality': quality,
-          },
-        ).timeout(_operationTimeout, onTimeout: () {
-          debugPrint(
-              'FcNativeVideoThumbnail: Optimized operation timed out for $videoPath');
-          return null;
-        });
+        result = await _channel
+            .invokeMethod<String>('generateThumbnailAtPercentage', {
+              'srcFile': videoPath,
+              'destFile': outputPath,
+              'width': width,
+              'format': format.toLowerCase() == 'png' ? 'png' : 'jpg',
+              'percentage': percentage,
+              'quality': quality,
+            })
+            .timeout(
+              _operationTimeout,
+              onTimeout: () {
+                debugPrint(
+                  'FcNativeVideoThumbnail: Optimized operation timed out for $videoPath',
+                );
+                return null;
+              },
+            );
       } on MissingPluginException catch (e) {
         debugPrint(
-            'FcNativeVideoThumbnail: Plugin not available: ${e.message}');
+          'FcNativeVideoThumbnail: Plugin not available: ${e.message}',
+        );
         return null;
       } on PlatformException catch (e) {
         debugPrint(
-            'FcNativeVideoThumbnail: FFmpeg/custom error for $videoPath: ${e.code} ${e.message}');
+          'FcNativeVideoThumbnail: FFmpeg/custom error for $videoPath: ${e.code} ${e.message}',
+        );
         return null;
       } catch (e) {
         debugPrint('FcNativeVideoThumbnail: Channel error: $e');
@@ -398,16 +422,19 @@ class FcNativeVideoThumbnail {
           return result;
         }
         debugPrint(
-            'FcNativeVideoThumbnail: FFmpeg reported success but output missing/empty: $result');
+          'FcNativeVideoThumbnail: FFmpeg reported success but output missing/empty: $result',
+        );
       } else {
         debugPrint(
-            'FcNativeVideoThumbnail: FFmpeg returned empty result for $videoPath');
+          'FcNativeVideoThumbnail: FFmpeg returned empty result for $videoPath',
+        );
       }
 
       return null;
     } catch (e, stack) {
       debugPrint(
-          'FcNativeVideoThumbnail: Error generating thumbnail at percentage for $videoPath: $e\n$stack');
+        'FcNativeVideoThumbnail: Error generating thumbnail at percentage for $videoPath: $e\n$stack',
+      );
       return null;
     }
   }

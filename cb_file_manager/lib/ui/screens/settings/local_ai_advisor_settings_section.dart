@@ -20,7 +20,8 @@ class LocalAiAdvisorSettingsSection extends StatefulWidget {
     required String title,
     required IconData icon,
     required List<Widget> children,
-  }) buildSectionCard;
+  })
+  buildSectionCard;
 
   /// Compact setting tile builder from the parent settings screen.
   final Widget Function({
@@ -29,13 +30,14 @@ class LocalAiAdvisorSettingsSection extends StatefulWidget {
     required IconData icon,
     Widget? trailing,
     VoidCallback? onTap,
-  }) buildCompactSettingTile;
+  })
+  buildCompactSettingTile;
 
   const LocalAiAdvisorSettingsSection({
-    Key? key,
+    super.key,
     required this.buildSectionCard,
     required this.buildCompactSettingTile,
-  }) : super(key: key);
+  });
 
   @override
   State<LocalAiAdvisorSettingsSection> createState() =>
@@ -143,8 +145,10 @@ class _LocalAiAdvisorSettingsSectionState
             children: [
               Expanded(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
@@ -183,7 +187,9 @@ class _LocalAiAdvisorSettingsSectionState
   }
 
   Widget _buildInstalledModelsSection(
-      BuildContext context, AppLocalizations l) {
+    BuildContext context,
+    AppLocalizations l,
+  ) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -213,12 +219,14 @@ class _LocalAiAdvisorSettingsSectionState
               ),
             )
           else
-            ..._installed.map((model) => _buildInstalledModelTile(
-                  context,
-                  l,
-                  model,
-                  isActive: _selectedModel?.catalogId == model.catalogId,
-                )),
+            ..._installed.map(
+              (model) => _buildInstalledModelTile(
+                context,
+                l,
+                model,
+                isActive: _selectedModel?.catalogId == model.catalogId,
+              ),
+            ),
         ],
       ),
     );
@@ -340,8 +348,9 @@ class _LocalAiAdvisorSettingsSectionState
                       model.displayName,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: isActive
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -401,8 +410,10 @@ class _LocalAiAdvisorSettingsSectionState
                   icon: const Icon(PhosphorIconsLight.folderOpen, size: 14),
                   label: Text(l.openLocation),
                   style: TextButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -455,12 +466,16 @@ class _LocalAiAdvisorSettingsSectionState
                 const SizedBox(height: 6),
                 FilledButton.tonalIcon(
                   onPressed: () => _reinstallCompatibleModel(model),
-                  icon:
-                      const Icon(PhosphorIconsLight.arrowsClockwise, size: 14),
+                  icon: const Icon(
+                    PhosphorIconsLight.arrowsClockwise,
+                    size: 14,
+                  ),
                   label: Text(l.localAiReinstallCompatible),
                   style: FilledButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                   ),
                 ),
@@ -537,7 +552,8 @@ class _LocalAiAdvisorSettingsSectionState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(AppLocalizations.of(context)!.modelUninstalled)),
+            content: Text(AppLocalizations.of(context)!.modelUninstalled),
+          ),
         );
       }
     }
@@ -572,10 +588,7 @@ class _LocalAiAdvisorSettingsSectionState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _InstallProgressDialog(
-        service: _service,
-        entry: entry,
-      ),
+      builder: (ctx) => _InstallProgressDialog(service: _service, entry: entry),
     ).then((_) async {
       // Refresh state after dialog closes
       if (mounted) {
@@ -594,9 +607,9 @@ class _LocalAiAdvisorSettingsSectionState
       TabMainScreen.openPath(context, directory);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open location: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to open location: $e')));
       }
     }
   }
@@ -700,8 +713,10 @@ class _ModelCatalogTile extends StatelessWidget {
               ),
               if (isInstalled)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -721,8 +736,10 @@ class _ModelCatalogTile extends StatelessWidget {
                   icon: const Icon(PhosphorIconsLight.warningCircle, size: 14),
                   label: const Text('Runtime pending'),
                   style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                   ),
                 )
@@ -732,8 +749,10 @@ class _ModelCatalogTile extends StatelessWidget {
                   icon: const Icon(PhosphorIconsLight.download, size: 14),
                   label: Text(l.installModel),
                   style: FilledButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                   ),
                 ),
@@ -771,10 +790,9 @@ class _ModelCatalogTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -796,10 +814,7 @@ class _InstallProgressDialog extends StatefulWidget {
   final LocalAiAdvisorService service;
   final HuggingFaceModelEntry entry;
 
-  const _InstallProgressDialog({
-    required this.service,
-    required this.entry,
-  });
+  const _InstallProgressDialog({required this.service, required this.entry});
 
   @override
   State<_InstallProgressDialog> createState() => _InstallProgressDialogState();
@@ -831,8 +846,10 @@ class _InstallProgressDialogState extends State<_InstallProgressDialog> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content:
-                            Text(AppLocalizations.of(context)!.modelInstalled)),
+                      content: Text(
+                        AppLocalizations.of(context)!.modelInstalled,
+                      ),
+                    ),
                   );
                   Navigator.of(context).pop();
                 }

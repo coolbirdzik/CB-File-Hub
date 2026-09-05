@@ -12,7 +12,9 @@ void main() {
   Widget host(Widget child, {Alignment alignment = Alignment.center}) {
     return MaterialApp(
       theme: ThemeConfig.getLightTheme(),
-      home: Scaffold(body: Align(alignment: alignment, child: child)),
+      home: Scaffold(
+        body: Align(alignment: alignment, child: child),
+      ),
     );
   }
 
@@ -23,36 +25,44 @@ void main() {
   ];
 
   testWidgets('shows the selected label and no Material dropdown', (t) async {
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'contain',
-      onChanged: (_) {},
-    )));
+    await t.pumpWidget(
+      host(CbSelect<String>(items: items, value: 'contain', onChanged: (_) {})),
+    );
 
     expect(find.text('Contain'), findsOneWidget);
     expect(find.byType(DropdownButton<String>), findsNothing);
   });
 
-  testWidgets('falls back to the placeholder when the value matches nothing',
-      (t) async {
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'stretch',
-      placeholder: 'Choose a fit',
-      onChanged: (_) {},
-    )));
+  testWidgets('falls back to the placeholder when the value matches nothing', (
+    t,
+  ) async {
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'stretch',
+          placeholder: 'Choose a fit',
+          onChanged: (_) {},
+        ),
+      ),
+    );
 
     expect(find.text('Choose a fit'), findsOneWidget);
   });
 
-  testWidgets('tapping opens the popover and picking reports the value',
-      (t) async {
+  testWidgets('tapping opens the popover and picking reports the value', (
+    t,
+  ) async {
     String? picked;
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'cover',
-      onChanged: (value) => picked = value,
-    )));
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'cover',
+          onChanged: (value) => picked = value,
+        ),
+      ),
+    );
 
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
@@ -71,11 +81,15 @@ void main() {
 
   testWidgets('arrow keys move the highlight and Enter commits it', (t) async {
     String? picked;
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'cover',
-      onChanged: (value) => picked = value,
-    )));
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'cover',
+          onChanged: (value) => picked = value,
+        ),
+      ),
+    );
 
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
@@ -90,11 +104,15 @@ void main() {
 
   testWidgets('Escape dismisses without reporting a value', (t) async {
     String? picked;
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'cover',
-      onChanged: (value) => picked = value,
-    )));
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'cover',
+          onChanged: (value) => picked = value,
+        ),
+      ),
+    );
 
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
@@ -107,11 +125,15 @@ void main() {
 
   testWidgets('tapping outside dismisses without reporting a value', (t) async {
     String? picked;
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'cover',
-      onChanged: (value) => picked = value,
-    )));
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'cover',
+          onChanged: (value) => picked = value,
+        ),
+      ),
+    );
 
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
@@ -123,12 +145,16 @@ void main() {
   });
 
   testWidgets('a disabled select does not open', (t) async {
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'cover',
-      enabled: false,
-      onChanged: (_) {},
-    )));
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'cover',
+          enabled: false,
+          onChanged: (_) {},
+        ),
+      ),
+    );
 
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
@@ -137,11 +163,11 @@ void main() {
   });
 
   testWidgets('a null onChanged leaves the control inert', (t) async {
-    await t.pumpWidget(host(const CbSelect<String>(
-      items: items,
-      value: 'cover',
-      onChanged: null,
-    )));
+    await t.pumpWidget(
+      host(
+        const CbSelect<String>(items: items, value: 'cover', onChanged: null),
+      ),
+    );
 
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
@@ -149,15 +175,20 @@ void main() {
     expect(find.text('Contain'), findsNothing);
   });
 
-  testWidgets('the popover anchors to the trigger, not to the label above it',
-      (t) async {
-    await t.pumpWidget(host(CbSelect<String>(
-      items: items,
-      value: 'cover',
-      label: 'Thumbnail fit',
-      helperText: 'How thumbnails fill their tile',
-      onChanged: (_) {},
-    )));
+  testWidgets('the popover anchors to the trigger, not to the label above it', (
+    t,
+  ) async {
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(
+          items: items,
+          value: 'cover',
+          label: 'Thumbnail fit',
+          helperText: 'How thumbnails fill their tile',
+          onChanged: (_) {},
+        ),
+      ),
+    );
 
     final Rect trigger = t.getRect(find.byType(CbPressable));
     await t.tap(find.text('Cover'));
@@ -171,29 +202,37 @@ void main() {
   });
 
   testWidgets('flips above the trigger when there is no room below', (t) async {
-    await t.pumpWidget(host(
-      CbSelect<String>(items: items, value: 'cover', onChanged: (_) {}),
-      alignment: Alignment.bottomCenter,
-    ));
+    await t.pumpWidget(
+      host(
+        CbSelect<String>(items: items, value: 'cover', onChanged: (_) {}),
+        alignment: Alignment.bottomCenter,
+      ),
+    );
 
     final Rect trigger = t.getRect(find.byType(CbPressable));
     await t.tap(find.text('Cover'));
     await t.pumpAndSettle();
 
-    expect(t.getRect(find.byType(ListView)).bottom,
-        lessThanOrEqualTo(trigger.top));
+    expect(
+      t.getRect(find.byType(ListView)).bottom,
+      lessThanOrEqualTo(trigger.top),
+    );
   });
 
   testWidgets('survives the unbounded width a Row or Wrap hands it', (t) async {
     // A `Row`/`Wrap` lays out a non-flex child with unbounded width, which is
     // an error for anything flexible inside the trigger.
-    await t.pumpWidget(host(Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text('Sort'),
-        CbSelect<String>(items: items, value: 'cover', onChanged: (_) {}),
-      ],
-    )));
+    await t.pumpWidget(
+      host(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Sort'),
+            CbSelect<String>(items: items, value: 'cover', onChanged: (_) {}),
+          ],
+        ),
+      ),
+    );
 
     expect(t.takeException(), isNull);
     expect(find.text('Cover'), findsOneWidget);
@@ -204,38 +243,49 @@ void main() {
   });
 
   testWidgets('ellipsises its label when the width is too small', (t) async {
-    await t.pumpWidget(host(const SizedBox(
-      width: 70,
-      child: CbSelect<String>(
-        items: [CbSelectItem(value: 'x', label: 'A very long option label')],
-        value: 'x',
-        onChanged: _ignore,
+    await t.pumpWidget(
+      host(
+        const SizedBox(
+          width: 70,
+          child: CbSelect<String>(
+            items: [
+              CbSelectItem(value: 'x', label: 'A very long option label'),
+            ],
+            value: 'x',
+            onChanged: _ignore,
+          ),
+        ),
       ),
-    )));
+    );
 
     expect(t.takeException(), isNull);
     final Text label = t.widget<Text>(find.text('A very long option label'));
     expect(label.overflow, TextOverflow.ellipsis);
   });
 
-  testWidgets('triggerLabel shortens the trigger but not the menu row',
-      (t) async {
-    await t.pumpWidget(host(const CbSelect<String>(
-      items: [
-        CbSelectItem(
+  testWidgets('triggerLabel shortens the trigger but not the menu row', (
+    t,
+  ) async {
+    await t.pumpWidget(
+      host(
+        const CbSelect<String>(
+          items: [
+            CbSelectItem(
+              value: 'c',
+              label: 'C: (128 GB free)',
+              triggerLabel: 'C:',
+            ),
+            CbSelectItem(
+              value: 'd',
+              label: 'D: (412 GB free)',
+              triggerLabel: 'D:',
+            ),
+          ],
           value: 'c',
-          label: 'C: (128 GB free)',
-          triggerLabel: 'C:',
+          onChanged: _ignore,
         ),
-        CbSelectItem(
-          value: 'd',
-          label: 'D: (412 GB free)',
-          triggerLabel: 'D:',
-        ),
-      ],
-      value: 'c',
-      onChanged: _ignore,
-    )));
+      ),
+    );
 
     expect(find.text('C:'), findsOneWidget);
     expect(find.text('C: (128 GB free)'), findsNothing);
@@ -249,12 +299,16 @@ void main() {
 
   testWidgets('fromValues labels each value', (t) async {
     int? picked;
-    await t.pumpWidget(host(CbSelect.fromValues<int>(
-      values: const [5, 15, 30],
-      value: 15,
-      labelBuilder: (v) => '$v minutes',
-      onChanged: (v) => picked = v,
-    )));
+    await t.pumpWidget(
+      host(
+        CbSelect.fromValues<int>(
+          values: const [5, 15, 30],
+          value: 15,
+          labelBuilder: (v) => '$v minutes',
+          onChanged: (v) => picked = v,
+        ),
+      ),
+    );
 
     expect(find.text('15 minutes'), findsOneWidget);
 

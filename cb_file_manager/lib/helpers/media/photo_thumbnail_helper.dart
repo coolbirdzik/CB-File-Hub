@@ -15,7 +15,8 @@ import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 
 /// Decode, resize and encode a photo thumbnail inside an isolate.
 Future<String?> _generatePhotoThumbnailIsolate(
-    Map<String, dynamic> args) async {
+  Map<String, dynamic> args,
+) async {
   final String sourcePath = args['sourcePath'] as String;
   final String destPath = args['destPath'] as String;
   final int maxSize = args['maxSize'] as int;
@@ -54,8 +55,9 @@ Future<String?> _generatePhotoThumbnailIsolate(
 /// Persist the index map to disk inside an isolate.
 Future<void> _savePhotoIndexIsolate(Map<String, dynamic> args) async {
   final String filePath = args['filePath'] as String;
-  final Map<String, String> cacheData =
-      Map<String, String>.from(args['cacheData'] as Map);
+  final Map<String, String> cacheData = Map<String, String>.from(
+    args['cacheData'] as Map,
+  );
   try {
     await File(filePath).writeAsString(jsonEncode(cacheData));
   } catch (_) {}
@@ -349,8 +351,10 @@ class PhotoThumbnailHelper {
       final cacheDir = await AppPathHelper.getPhotoCacheDir();
       final liveValues = {..._fileCache.values, ..._inMemoryCache.values};
 
-      await for (final entity
-          in cacheDir.list(recursive: false, followLinks: false)) {
+      await for (final entity in cacheDir.list(
+        recursive: false,
+        followLinks: false,
+      )) {
         if (entity is! File) continue;
         if (!path.basename(entity.path).startsWith('photo_thumb_')) continue;
         // Keep entries that are still referenced in memory.

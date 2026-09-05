@@ -37,8 +37,10 @@ class VideoLibraryNavigationBloc
   VideoLibraryNavigationBloc({
     required this.libraryId,
     FileNavigationState? initialState,
-  }) : super(initialState ??
-            FileNavigationState.initial('#video-library/$libraryId')) {
+  }) : super(
+         initialState ??
+             FileNavigationState.initial('#video-library/$libraryId'),
+       ) {
     on<FileNavigationLoad>(_onLoad);
     on<FileNavigationRefresh>(_onRefresh);
     on<FileNavigationSetViewMode>(_onSetViewMode);
@@ -51,20 +53,16 @@ class VideoLibraryNavigationBloc
 
   /// Trigger loading of the library's files.
   void loadLibrary() {
-    add(FileNavigationLoad(
-      '#video-library/$libraryId',
-      isVirtualPath: true,
-    ));
+    add(FileNavigationLoad('#video-library/$libraryId', isVirtualPath: true));
   }
 
   /// Refresh the library's files — forces disk re-scan and clears disk cache.
   void refreshLibrary() {
     // Invalidate disk cache so we get fresh data
     _cacheService.invalidateLibrary(libraryId);
-    add(FileNavigationRefresh(
-      '#video-library/$libraryId',
-      isVirtualPath: true,
-    ));
+    add(
+      FileNavigationRefresh('#video-library/$libraryId', isVirtualPath: true),
+    );
   }
 
   /// Invalidate both memory and disk cache for a specific library.
@@ -96,13 +94,15 @@ class VideoLibraryNavigationBloc
         memCached,
         state.sortOption,
       );
-      emit(state.copyWith(
-        isLoading: false,
-        files: sorted,
-        folders: const [],
-        currentPath: Directory(event.path),
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          files: sorted,
+          folders: const [],
+          currentPath: Directory(event.path),
+          error: null,
+        ),
+      );
       _prefetchThumbnails(sorted, event.path);
       return;
     }
@@ -113,26 +113,22 @@ class VideoLibraryNavigationBloc
       AppLogger.perf('Video library disk cache hit for libraryId=$libraryId');
       final files = diskCached.map((p) => File(p)).toList();
       _memoryCache[libraryId] = files; // promote to memory
-      final sorted = await FileSystemSorter.sortFiles(
-        files,
-        state.sortOption,
+      final sorted = await FileSystemSorter.sortFiles(files, state.sortOption);
+      emit(
+        state.copyWith(
+          isLoading: false,
+          files: sorted,
+          folders: const [],
+          currentPath: Directory(event.path),
+          error: null,
+        ),
       );
-      emit(state.copyWith(
-        isLoading: false,
-        files: sorted,
-        folders: const [],
-        currentPath: Directory(event.path),
-        error: null,
-      ));
       _prefetchThumbnails(sorted, event.path);
       return;
     }
 
     // 3. Cache miss — scan from disk
-    emit(state.copyWith(
-      isLoading: true,
-      currentPath: Directory(event.path),
-    ));
+    emit(state.copyWith(isLoading: true, currentPath: Directory(event.path)));
 
     try {
       // Stream files so UI updates progressively as each directory is scanned.
@@ -161,11 +157,9 @@ class VideoLibraryNavigationBloc
                 )
               : _fastSortFiles(files, state.sortOption);
 
-          emit(state.copyWith(
-            isLoading: true,
-            files: sorted,
-            folders: const [],
-          ));
+          emit(
+            state.copyWith(isLoading: true, files: sorted, folders: const []),
+          );
 
           // Increase batch size as list grows: 50 → 200 → 500 → 1000
           if (files.length < 200) {
@@ -185,17 +179,21 @@ class VideoLibraryNavigationBloc
       );
 
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoading: false,
-        files: sortedFiles,
-        folders: const [],
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          files: sortedFiles,
+          folders: const [],
+          error: null,
+        ),
+      );
 
       // Save to memory + disk cache for future re-opens
       _memoryCache[libraryId] = files;
       await _cacheService.saveFiles(
-          libraryId, files.map((f) => f.path).toList());
+        libraryId,
+        files.map((f) => f.path).toList(),
+      );
 
       // Persist file count to config table so VideoHubScreen can show
       // cached counts instantly without a second filesystem scan.
@@ -209,10 +207,7 @@ class VideoLibraryNavigationBloc
       AppLogger.perf('Complete total=${totalSw.elapsedMilliseconds}ms');
     } catch (e) {
       AppLogger.error('VideoLibraryNavigationBloc._onLoad failed', error: e);
-      emit(state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      ));
+      emit(state.copyWith(isLoading: false, error: e.toString()));
     }
   }
 
@@ -242,11 +237,9 @@ class VideoLibraryNavigationBloc
                 )
               : _fastSortFiles(files, state.sortOption);
 
-          emit(state.copyWith(
-            isLoading: true,
-            files: sorted,
-            folders: const [],
-          ));
+          emit(
+            state.copyWith(isLoading: true, files: sorted, folders: const []),
+          );
 
           // Increase batch size as list grows
           if (files.length < 200) {
@@ -265,17 +258,21 @@ class VideoLibraryNavigationBloc
       );
 
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoading: false,
-        files: sortedFiles,
-        folders: const [],
-        error: null,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          files: sortedFiles,
+          folders: const [],
+          error: null,
+        ),
+      );
 
       // Save refreshed results and count for future fast loads.
       _memoryCache[libraryId] = files;
       await _cacheService.saveFiles(
-          libraryId, files.map((f) => f.path).toList());
+        libraryId,
+        files.map((f) => f.path).toList(),
+      );
       _libraryService.updateCachedLibraryVideoCount(libraryId, files.length);
 
       // Thumbnail prefetch
@@ -286,10 +283,7 @@ class VideoLibraryNavigationBloc
       }
     } catch (e) {
       AppLogger.error('VideoLibraryNavigationBloc._onRefresh failed', error: e);
-      emit(state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      ));
+      emit(state.copyWith(isLoading: false, error: e.toString()));
     }
   }
 
@@ -318,11 +312,13 @@ class VideoLibraryNavigationBloc
       event.sortOption,
     );
 
-    emit(state.copyWith(
-      isLoading: false,
-      files: sortedFiles,
-      sortOption: event.sortOption,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: false,
+        files: sortedFiles,
+        sortOption: event.sortOption,
+      ),
+    );
   }
 
   void _onFilter(
@@ -339,26 +335,31 @@ class VideoLibraryNavigationBloc
     Emitter<FileNavigationState> emit,
   ) {
     final query = event.query.toLowerCase();
-    final results =
-        state.files.where((f) => f.path.toLowerCase().contains(query)).toList();
-    emit(state.copyWith(
-      searchResults: results,
-      currentSearchQuery: event.query,
-      isSearchByName: true,
-      searchRecursive: event.recursive,
-    ));
+    final results = state.files
+        .where((f) => f.path.toLowerCase().contains(query))
+        .toList();
+    emit(
+      state.copyWith(
+        searchResults: results,
+        currentSearchQuery: event.query,
+        isSearchByName: true,
+        searchRecursive: event.recursive,
+      ),
+    );
   }
 
   void _onClearSearchAndFilters(
     FileNavigationClearSearchAndFilters event,
     Emitter<FileNavigationState> emit,
   ) {
-    emit(state.copyWith(
-      searchResults: const [],
-      currentSearchQuery: null,
-      currentFilter: null,
-      isSearchByName: false,
-    ));
+    emit(
+      state.copyWith(
+        searchResults: const [],
+        currentSearchQuery: null,
+        currentFilter: null,
+        isSearchByName: false,
+      ),
+    );
   }
 
   void _prefetchThumbnails(List<FileSystemEntity> files, String dirPath) {
@@ -406,32 +407,39 @@ class VideoLibraryNavigationBloc
     switch (sortOption) {
       case SortOption.nameAsc:
         sorted.sort(
-            (a, b) => path.basename(a.path).compareTo(path.basename(b.path)));
+          (a, b) => path.basename(a.path).compareTo(path.basename(b.path)),
+        );
         break;
       case SortOption.nameDesc:
         sorted.sort(
-            (a, b) => path.basename(b.path).compareTo(path.basename(a.path)));
+          (a, b) => path.basename(b.path).compareTo(path.basename(a.path)),
+        );
         break;
       case SortOption.typeAsc:
         sorted.sort(
-            (a, b) => path.extension(a.path).compareTo(path.extension(b.path)));
+          (a, b) => path.extension(a.path).compareTo(path.extension(b.path)),
+        );
         break;
       case SortOption.typeDesc:
         sorted.sort(
-            (a, b) => path.extension(b.path).compareTo(path.extension(a.path)));
+          (a, b) => path.extension(b.path).compareTo(path.extension(a.path)),
+        );
         break;
       case SortOption.extensionAsc:
         sorted.sort(
-            (a, b) => path.extension(a.path).compareTo(path.extension(b.path)));
+          (a, b) => path.extension(a.path).compareTo(path.extension(b.path)),
+        );
         break;
       case SortOption.extensionDesc:
         sorted.sort(
-            (a, b) => path.extension(b.path).compareTo(path.extension(a.path)));
+          (a, b) => path.extension(b.path).compareTo(path.extension(a.path)),
+        );
         break;
       default:
         // Fallback: sort by name ascending for unknown/default options
         sorted.sort(
-            (a, b) => path.basename(a.path).compareTo(path.basename(b.path)));
+          (a, b) => path.basename(a.path).compareTo(path.basename(b.path)),
+        );
         break;
     }
     return sorted;

@@ -109,28 +109,29 @@ class AppUiFontConfig {
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style:
-            (theme.elevatedButtonTheme.style ?? const ButtonStyle()).copyWith(
-          textStyle: WidgetStatePropertyAll(
-            mapStyle(theme.textTheme.labelLarge) ?? textTheme.labelLarge,
-          ),
-        ),
+        style: (theme.elevatedButtonTheme.style ?? const ButtonStyle())
+            .copyWith(
+              textStyle: WidgetStatePropertyAll(
+                mapStyle(theme.textTheme.labelLarge) ?? textTheme.labelLarge,
+              ),
+            ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style:
-            (theme.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
-          textStyle: WidgetStatePropertyAll(
-            mapStyle(theme.textTheme.labelLarge) ?? textTheme.labelLarge,
-          ),
-        ),
+        style: (theme.outlinedButtonTheme.style ?? const ButtonStyle())
+            .copyWith(
+              textStyle: WidgetStatePropertyAll(
+                mapStyle(theme.textTheme.labelLarge) ?? textTheme.labelLarge,
+              ),
+            ),
       ),
       inputDecorationTheme: theme.inputDecorationTheme.copyWith(
         hintStyle: mapStyle(theme.inputDecorationTheme.hintStyle),
         labelStyle: mapStyle(theme.inputDecorationTheme.labelStyle),
         helperStyle: mapStyle(theme.inputDecorationTheme.helperStyle),
         errorStyle: mapStyle(theme.inputDecorationTheme.errorStyle),
-        floatingLabelStyle:
-            mapStyle(theme.inputDecorationTheme.floatingLabelStyle),
+        floatingLabelStyle: mapStyle(
+          theme.inputDecorationTheme.floatingLabelStyle,
+        ),
       ),
       listTileTheme: theme.listTileTheme.copyWith(
         titleTextStyle: mapStyle(theme.listTileTheme.titleTextStyle),

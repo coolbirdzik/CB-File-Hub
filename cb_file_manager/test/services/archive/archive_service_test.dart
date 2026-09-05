@@ -54,10 +54,7 @@ void main() {
 
       final entries = await service.listEntries(archivePath);
       expect(entries, isNotEmpty);
-      expect(
-        entries.any((e) => p.basename(e.name) == 'hello.txt'),
-        isTrue,
-      );
+      expect(entries.any((e) => p.basename(e.name) == 'hello.txt'), isTrue);
 
       final dest = p.join(tempDir.path, 'out');
       await service.extractAll(archivePath: archivePath, destinationDir: dest);
@@ -90,8 +87,7 @@ void main() {
         required String innerPath,
         required String entryName,
         required bool isDirectory,
-      }) =>
-          innerPath;
+      }) => innerPath;
 
       final root = await service.listDirectory(
         archiveFilePath: archivePath,

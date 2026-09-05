@@ -177,10 +177,7 @@ class FileTypeUtils {
   /// Get human-readable file type label with i18n support
   /// Requires BuildContext to access localization
   /// Returns localized file type labels in English or Vietnamese
-  static String getFileTypeLabel(
-    BuildContext context,
-    String extension,
-  ) {
+  static String getFileTypeLabel(BuildContext context, String extension) {
     if (extension.isEmpty) {
       return AppLocalizations.of(context)!.fileTypeGeneric;
     }

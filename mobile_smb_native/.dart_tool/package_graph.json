@@ -18,7 +18,7 @@
     },
     {
       "name": "flutter_lints",
-      "version": "2.0.3",
+      "version": "6.0.0",
       "dependencies": [
         "lints"
       ]
@@ -66,16 +66,16 @@
       ]
     },
     {
-      "name": "lints",
-      "version": "2.1.1",
-      "dependencies": []
-    },
-    {
       "name": "stream_channel",
       "version": "2.1.4",
       "dependencies": [
         "async"
       ]
+    },
+    {
+      "name": "meta",
+      "version": "1.19.0",
+      "dependencies": []
     },
     {
       "name": "collection",
@@ -229,8 +229,8 @@
       "dependencies": []
     },
     {
-      "name": "meta",
-      "version": "1.19.0",
+      "name": "lints",
+      "version": "6.1.0",
       "dependencies": []
     }
   ],

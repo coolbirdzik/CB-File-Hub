@@ -21,11 +21,10 @@ class WindowTabPayload {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'path': path,
-        if (name != null) 'name': name,
-        if (highlightedFileName != null)
-          'highlightedFileName': highlightedFileName,
-      };
+    'path': path,
+    if (name != null) 'name': name,
+    if (highlightedFileName != null) 'highlightedFileName': highlightedFileName,
+  };
 }
 
 class WindowStartupPayload {
@@ -46,10 +45,7 @@ class WindowStartupPayload {
   final List<WindowTabPayload> tabs;
   final int? activeIndex;
 
-  const WindowStartupPayload({
-    required this.tabs,
-    this.activeIndex,
-  });
+  const WindowStartupPayload({required this.tabs, this.activeIndex});
 
   bool get isEmpty => tabs.isEmpty;
 

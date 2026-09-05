@@ -13,12 +13,12 @@ import '../../screens/folder_list/file_details_screen.dart';
 import '../../screens/media_gallery/image_viewer_screen.dart';
 import '../../dialogs/open_with_dialog.dart';
 import '../../../helpers/files/external_app_helper.dart';
+import '../../../helpers/files/save_location_picker.dart';
 import 'package:path/path.dart' as pathlib;
 import '../../tab_manager/components/tag_dialogs.dart' as tag_dialogs;
 import '../../../services/network_browsing/webdav_service.dart';
 import '../../../helpers/network/streaming_helper.dart';
 import '../../../services/network_browsing/ftp_service.dart';
-import 'package:file_picker/file_picker.dart';
 import '../../../config/languages/app_localizations.dart';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import '../../../helpers/media/folder_thumbnail_service.dart';
@@ -42,12 +42,7 @@ import '../../utils/video_playback_launcher.dart';
 import '../../../utils/app_logger.dart';
 import '../../screens/settings/context_menu_layout_settings_screen.dart';
 
-enum ContextMenuTargetType {
-  file,
-  folder,
-  multiSelection,
-  background,
-}
+enum ContextMenuTargetType { file, folder, multiSelection, background }
 
 class ContextMenuAction {
   final String id;
@@ -60,7 +55,7 @@ class ContextMenuAction {
   final String? group;
   final List<ContextMenuSection>? childSections;
   final Future<List<ContextMenuSection>> Function(BuildContext context)?
-      loadChildSections;
+  loadChildSections;
   final FutureOr<void> Function(BuildContext context)? onSelected;
 
   const ContextMenuAction({
@@ -82,10 +77,7 @@ class ContextMenuSection {
   final String? title;
   final List<ContextMenuAction> actions;
 
-  const ContextMenuSection({
-    this.title,
-    required this.actions,
-  });
+  const ContextMenuSection({this.title, required this.actions});
 }
 
 bool _isMobileContextMenuPlatform() => Platform.isAndroid || Platform.isIOS;
@@ -94,10 +86,7 @@ class _ContextSubmenuOverlayEntry {
   final OverlayEntry entry;
   final Object owner;
 
-  const _ContextSubmenuOverlayEntry({
-    required this.entry,
-    required this.owner,
-  });
+  const _ContextSubmenuOverlayEntry({required this.entry, required this.owner});
 }
 
 final List<_ContextSubmenuOverlayEntry> _submenuOverlayEntries =
@@ -173,10 +162,7 @@ class _WindowsShellMenuLoader {
   bool _disposed = false;
   String? _leasedSessionId;
 
-  _WindowsShellMenuLoader({
-    required this.context,
-    required this.paths,
-  });
+  _WindowsShellMenuLoader({required this.context, required this.paths});
 
   Future<List<ContextMenuSection>> load(BuildContext _) async {
     if (_disposed) {
@@ -229,8 +215,9 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
     return null;
   }
 
-  final session =
-      await WindowsShellContextMenu.loadThirdPartyMenu(paths: paths);
+  final session = await WindowsShellContextMenu.loadThirdPartyMenu(
+    paths: paths,
+  );
   if (session == null) {
     return null;
   }
@@ -240,9 +227,7 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
   }
 
   var generatedId = 0;
-  List<ContextMenuSection> convertEntries(
-    List<WindowsShellMenuEntry> entries,
-  ) {
+  List<ContextMenuSection> convertEntries(List<WindowsShellMenuEntry> entries) {
     final sections = <ContextMenuSection>[];
     var actions = <ContextMenuAction>[];
 
@@ -268,8 +253,8 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
       final submenuId = entry.submenuId;
       final actionId = commandId == null
           ? submenuId == null
-              ? 'shell_submenu_${session.id}_${generatedId++}'
-              : 'shell_submenu_${session.id}_$submenuId'
+                ? 'shell_submenu_${session.id}_${generatedId++}'
+                : 'shell_submenu_${session.id}_$submenuId'
           : 'shell_command_${session.id}_$commandId';
 
       actions.add(
@@ -278,7 +263,8 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
           label: label,
           icon: PhosphorIconsLight.appWindow,
           iconBytes: entry.iconBytes,
-          isEnabled: entry.isEnabled &&
+          isEnabled:
+              entry.isEnabled &&
               (children.isNotEmpty || submenuId != null || commandId != null),
           isChecked: entry.isChecked,
           childSections: children.isEmpty ? null : children,
@@ -287,9 +273,9 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
               : (_) async {
                   final childEntries =
                       await WindowsShellContextMenu.loadThirdPartySubmenu(
-                    sessionId: session.id,
-                    submenuId: submenuId,
-                  );
+                        sessionId: session.id,
+                        submenuId: submenuId,
+                      );
                   return convertEntries(childEntries);
                 },
           onSelected: commandId == null
@@ -313,10 +299,7 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
     return null;
   }
 
-  return _LoadedWindowsShellMenu(
-    session: session,
-    sections: shellSections,
-  );
+  return _LoadedWindowsShellMenu(session: session, sections: shellSections);
 }
 
 Future<void> _showAppContextMenu({
@@ -332,12 +315,9 @@ Future<void> _showAppContextMenu({
   }
   final shellMenuLoader =
       layout.hiddenIds.contains(contextMenuThirdPartyAppsId) ||
-              !_canOfferWindowsShellMenu(paths)
-          ? null
-          : _WindowsShellMenuLoader(
-              context: context,
-              paths: paths,
-            );
+          !_canOfferWindowsShellMenu(paths)
+      ? null
+      : _WindowsShellMenuLoader(context: context, paths: paths);
 
   final mergedSections = _applyContextMenuLayout(
     context: context,
@@ -374,7 +354,7 @@ List<ContextMenuSection> _applyContextMenuLayout({
   required BuildContext context,
   required List<ContextMenuSection> sections,
   required Future<List<ContextMenuSection>> Function(BuildContext context)?
-      loadShellSections,
+  loadShellSections,
   required ContextMenuLayoutPreference layout,
   required ContextMenuLayoutTarget layoutTarget,
 }) {
@@ -405,10 +385,7 @@ List<ContextMenuSection> _applyContextMenuLayout({
   void flushPendingActions() {
     if (pendingActions.isEmpty) return;
     result.add(
-      ContextMenuSection(
-        title: pendingSectionTitle,
-        actions: pendingActions,
-      ),
+      ContextMenuSection(title: pendingSectionTitle, actions: pendingActions),
     );
     pendingActions = <ContextMenuAction>[];
     pendingSectionIndex = null;
@@ -507,9 +484,9 @@ Future<void> showContextMenuPopup({
           child: Text(
             section.title!,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                ),
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
           ),
         ),
       );
@@ -534,11 +511,7 @@ Future<void> showContextMenuPopup({
           PopupMenuItem<String>(
             value: action.id,
             enabled: action.isEnabled,
-            child: _buildContextMenuActionRow(
-              context,
-              action,
-              forPopup: true,
-            ),
+            child: _buildContextMenuActionRow(context, action, forPopup: true),
           ),
         );
       }
@@ -612,8 +585,8 @@ Widget _buildContextMenuActionRow(
   final Color color = !action.isEnabled
       ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
       : isDestructive
-          ? theme.colorScheme.error
-          : theme.colorScheme.onSurface;
+      ? theme.colorScheme.error
+      : theme.colorScheme.onSurface;
 
   final iconSize = forPopup ? 18.0 : 20.0;
   final Widget icon;
@@ -623,18 +596,11 @@ Widget _buildContextMenuActionRow(
       width: iconSize,
       height: iconSize,
       filterQuality: FilterQuality.medium,
-      errorBuilder: (_, __, ___) => Icon(
-        action.icon,
-        size: iconSize,
-        color: color,
-      ),
+      errorBuilder: (_, _, _) =>
+          Icon(action.icon, size: iconSize, color: color),
     );
   } else {
-    icon = Icon(
-      action.icon,
-      size: iconSize,
-      color: color,
-    );
+    icon = Icon(action.icon, size: iconSize, color: color);
   }
   final text = Text(
     action.label,
@@ -667,7 +633,7 @@ Widget _buildContextMenuActionRow(
         icon,
         const SizedBox(width: 12),
         Expanded(child: text),
-        if (trailing != null) trailing,
+        ?trailing,
       ],
     ),
   );
@@ -699,13 +665,19 @@ _ContextSubmenuGeometry _contextSubmenuGeometry({
   required Offset anchorPosition,
   required double itemWidth,
 }) {
-  final availableWidth =
-      math.max(0.0, overlaySize.width - _contextSubmenuWindowPadding * 2);
+  final availableWidth = math.max(
+    0.0,
+    overlaySize.width - _contextSubmenuWindowPadding * 2,
+  );
   final submenuWidth = math.min(_contextSubmenuPreferredWidth, availableWidth);
-  final availableHeight =
-      math.max(0.0, overlaySize.height - _contextSubmenuWindowPadding * 2);
-  final submenuMaxHeight =
-      math.min(_contextSubmenuPreferredMaxHeight, availableHeight);
+  final availableHeight = math.max(
+    0.0,
+    overlaySize.height - _contextSubmenuWindowPadding * 2,
+  );
+  final submenuMaxHeight = math.min(
+    _contextSubmenuPreferredMaxHeight,
+    availableHeight,
+  );
 
   double dx = anchorPosition.dx + itemWidth;
   if (dx + submenuWidth > overlaySize.width) {
@@ -759,7 +731,8 @@ class _ContextMenuPopupSubmenuTriggerState
         actions: <ContextMenuAction>[
           ContextMenuAction(
             id: '${widget.action.id}_loading',
-            label: AppLocalizations.of(widget.actionContext)?.loading ??
+            label:
+                AppLocalizations.of(widget.actionContext)?.loading ??
                 'Loading...',
             icon: PhosphorIconsLight.hourglass,
             isEnabled: false,
@@ -937,9 +910,7 @@ class _ContextSubmenuPanel extends StatelessWidget {
       child: Material(
         color: Theme.of(actionContext).colorScheme.surface.withAlpha(255),
         elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxHeight),
@@ -949,9 +920,11 @@ class _ContextSubmenuPanel extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (var sectionIndex = 0;
-                      sectionIndex < sections.length;
-                      sectionIndex++) ...[
+                  for (
+                    var sectionIndex = 0;
+                    sectionIndex < sections.length;
+                    sectionIndex++
+                  ) ...[
                     if (sectionIndex > 0) const Divider(height: 1),
                     if (sections[sectionIndex].title != null &&
                         sections[sectionIndex].title!.isNotEmpty)
@@ -959,9 +932,7 @@ class _ContextSubmenuPanel extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                         child: Text(
                           sections[sectionIndex].title!,
-                          style: Theme.of(actionContext)
-                              .textTheme
-                              .labelSmall
+                          style: Theme.of(actionContext).textTheme.labelSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.4,
@@ -1021,7 +992,8 @@ class _ContextSubmenuActionRowState extends State<_ContextSubmenuActionRow> {
         actions: <ContextMenuAction>[
           ContextMenuAction(
             id: '${widget.action.id}_loading',
-            label: AppLocalizations.of(widget.actionContext)?.loading ??
+            label:
+                AppLocalizations.of(widget.actionContext)?.loading ??
                 'Loading...',
             icon: PhosphorIconsLight.hourglass,
             isEnabled: false,
@@ -1143,15 +1115,10 @@ class _ContextSubmenuActionRowState extends State<_ContextSubmenuActionRow> {
         }
       },
       child: InkWell(
-        key: ValueKey<String>(
-          'context-menu-action-tap-${widget.action.id}',
-        ),
+        key: ValueKey<String>('context-menu-action-tap-${widget.action.id}'),
         onTap: widget.action.isEnabled ? _selectAction : null,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: _buildContextMenuActionRow(
             widget.actionContext,
             widget.action,
@@ -1296,8 +1263,8 @@ class _ContextMenuSheetActionTile extends StatelessWidget {
     final Color color = !action.isEnabled
         ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
         : isDestructive
-            ? theme.colorScheme.error
-            : theme.colorScheme.onSurface;
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurface;
 
     return ListTile(
       key: ValueKey<String>('context-menu-action-tap-${action.id}'),
@@ -1313,16 +1280,10 @@ class _ContextMenuSheetActionTile extends StatelessWidget {
         ),
       ),
       trailing: action.childSections != null && action.childSections!.isNotEmpty
-          ? Icon(
-              PhosphorIconsLight.caretRight,
-              color: color,
-            )
+          ? Icon(PhosphorIconsLight.caretRight, color: color)
           : action.isChecked
-              ? Icon(
-                  PhosphorIconsLight.check,
-                  color: theme.colorScheme.primary,
-                )
-              : null,
+          ? Icon(PhosphorIconsLight.check, color: theme.colorScheme.primary)
+          : null,
       onTap: !action.isEnabled
           ? null
           : () async {
@@ -1366,7 +1327,7 @@ class SharedFileContextMenu extends StatelessWidget {
   final bool showOpenFileLocation;
 
   const SharedFileContextMenu({
-    Key? key,
+    super.key,
     required this.file,
     required this.fileTags,
     required this.isVideo,
@@ -1376,7 +1337,7 @@ class SharedFileContextMenu extends StatelessWidget {
     this.showAddTagToFileDialog,
     this.onDeleteFile,
     this.showOpenFileLocation = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1470,8 +1431,8 @@ class SharedFileContextMenu extends StatelessWidget {
       icon: isVideo
           ? PhosphorIconsLight.videoCamera
           : isImage
-              ? PhosphorIconsLight.image
-              : PhosphorIconsLight.file,
+          ? PhosphorIconsLight.image
+          : PhosphorIconsLight.file,
       headerContent: headerContent,
       sections: _buildFileContextMenuSections(
         context: context,
@@ -1505,14 +1466,14 @@ class SharedFolderContextMenu extends StatelessWidget {
   final Function(BuildContext, String)? showAddTagToFileDialog;
 
   const SharedFolderContextMenu({
-    Key? key,
+    super.key,
     required this.folder,
     this.onNavigate,
     this.folderTags = const [],
     this.folderListBloc,
     this.actionContext,
     this.showAddTagToFileDialog,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1564,11 +1525,12 @@ List<ContextMenuSection> _buildFileContextMenuSections({
   final currentService = StreamingHelper.instance.currentNetworkService;
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-  final canShowShellMenu = Platform.isWindows &&
+  final canShowShellMenu =
+      Platform.isWindows &&
       FileSystemEntity.typeSync(file.path) != FileSystemEntityType.notFound;
   final canDownloadRemote =
       (currentService is WebDAVService || currentService is FTPService) &&
-          remotePath != null;
+      remotePath != null;
   final isArchive = FileTypeUtils.isArchiveFile(file.path);
   final isTextOrPdf =
       FileTypeUtils.isTextFile(file.path) || FileTypeUtils.isPdfFile(file.path);
@@ -1663,10 +1625,8 @@ List<ContextMenuSection> _buildFileContextMenuSections({
             id: 'open_in_new_tab',
             label: l10n.openInNewTab,
             icon: PhosphorIconsLight.squaresFour,
-            onSelected: (_) => EntityOpenActions.openInNewTab(
-              context,
-              sourcePath: file.path,
-            ),
+            onSelected: (_) =>
+                EntityOpenActions.openInNewTab(context, sourcePath: file.path),
           ),
         if (isDesktopPlatform)
           ContextMenuAction(
@@ -1720,14 +1680,18 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           label: l10n.copy,
           icon: PhosphorIconsLight.copy,
           onSelected: (_) => FileOperationsHandler.copyToClipboard(
-              context: context, entity: file),
+            context: context,
+            entity: file,
+          ),
         ),
         ContextMenuAction(
           id: 'cut',
           label: l10n.cut,
           icon: PhosphorIconsLight.scissors,
           onSelected: (_) => FileOperationsHandler.cutToClipboard(
-              context: context, entity: file),
+            context: context,
+            entity: file,
+          ),
         ),
         ContextMenuAction(
           id: 'rename',
@@ -1771,9 +1735,7 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           icon: PhosphorIconsLight.info,
           onSelected: (_) => Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => FileDetailsScreen(file: file),
-            ),
+            MaterialPageRoute(builder: (_) => FileDetailsScreen(file: file)),
           ),
         ),
         ContextMenuAction(
@@ -1846,7 +1808,7 @@ Future<T?> _showNoAnimationDialog<T>({
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black54,
     transitionDuration: Duration.zero,
-    pageBuilder: (dialogContext, _, __) => builder(dialogContext),
+    pageBuilder: (dialogContext, _, _) => builder(dialogContext),
     transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
       return child;
     },
@@ -1940,18 +1902,22 @@ Future<void> _downloadRemoteFile({
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final toast = AppToast.capture(context);
+  PickedSaveLocation? picked;
   try {
     final fileName = remoteFileName ?? pathlib.basename(file.path);
-    final String? saveLocation = await FilePicker.platform.saveFile(
+    picked = await pickSaveLocation(
       dialogTitle: 'Save "$fileName" as...',
       fileName: fileName,
     );
-    if (saveLocation == null) {
+    if (picked == null) {
       return;
     }
-    await StreamingHelper.instance.downloadFile(file.path, saveLocation);
-    toast.success(l10n.downloadedTo(saveLocation));
+    // Stream into the scratch file so a download that dies halfway never
+    // leaves a truncated file sitting at the destination.
+    await StreamingHelper.instance.downloadFile(file.path, picked.scratchPath);
+    toast.success(l10n.downloadedTo(await picked.commit()));
   } catch (error) {
+    await picked?.discard();
     toast.error(l10n.downloadFailed(error.toString()));
   }
 }
@@ -2018,7 +1984,8 @@ bool _tryStartInlineRename(BuildContext context, FileSystemEntity entity) {
       return null;
     }
   }();
-  final bool supportsInlineRename = viewMode == ViewMode.grid ||
+  final bool supportsInlineRename =
+      viewMode == ViewMode.grid ||
       viewMode == ViewMode.details ||
       viewMode == ViewMode.columns ||
       viewMode == ViewMode.tiles;
@@ -2041,14 +2008,15 @@ Future<void> _openVideoWithUserPreference(
 ) async {
   final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
 
-  final openedPreferred =
-      await ExternalAppHelper.openWithPreferredVideoApp(file.path);
+  final openedPreferred = await ExternalAppHelper.openWithPreferredVideoApp(
+    file.path,
+  );
   if (openedPreferred) return;
 
   bool useSystemDefault = false;
   try {
-    useSystemDefault =
-        await locator<UserPreferences>().getUseSystemDefaultForVideo();
+    useSystemDefault = await locator<UserPreferences>()
+        .getUseSystemDefaultForVideo();
   } catch (_) {
     useSystemDefault = false;
   }
@@ -2139,7 +2107,8 @@ List<ContextMenuSection> _buildFolderContextMenuSections({
   final l10n = AppLocalizations.of(context)!;
   final isDesktopPlatform =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-  final canShowShellMenu = Platform.isWindows &&
+  final canShowShellMenu =
+      Platform.isWindows &&
       FileSystemEntity.typeSync(folder.path) != FileSystemEntityType.notFound;
 
   return [
@@ -2207,14 +2176,18 @@ List<ContextMenuSection> _buildFolderContextMenuSections({
           label: l10n.copy,
           icon: PhosphorIconsLight.copy,
           onSelected: (_) => FileOperationsHandler.copyToClipboard(
-              context: context, entity: folder),
+            context: context,
+            entity: folder,
+          ),
         ),
         ContextMenuAction(
           id: 'cut',
           label: l10n.cut,
           icon: PhosphorIconsLight.scissors,
           onSelected: (_) => FileOperationsHandler.cutToClipboard(
-              context: context, entity: folder),
+            context: context,
+            entity: folder,
+          ),
         ),
         ContextMenuAction(
           id: 'paste',
@@ -2291,126 +2264,140 @@ void _showFolderPropertiesDialog(BuildContext context, Directory folder) {
   final l10n = AppLocalizations.of(context)!;
   final thumbnailService = FolderThumbnailService();
   final toast = AppToast.capture(context);
-  Future<String?> customThumbnailFuture =
-      thumbnailService.getCustomThumbnailPath(folder.path);
+  Future<String?> customThumbnailFuture = thumbnailService
+      .getCustomThumbnailPath(folder.path);
 
-  folder.stat().then((stat) {
-    if (!context.mounted) return;
+  folder
+      .stat()
+      .then((stat) {
+        if (!context.mounted) return;
 
-    _showNoAnimationDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setState) => AlertDialog(
-          title: Text(l10n.properties),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _propertyRow(l10n.fileName, folderName),
-                const Divider(),
-                _propertyRow(l10n.filePath, folder.path),
-                const Divider(),
-                _propertyRow(
-                    l10n.fileModified, stat.modified.toString().split('.')[0]),
-                const Divider(),
-                _propertyRow(
-                    l10n.fileAccessed, stat.accessed.toString().split('.')[0]),
-                const Divider(),
-                Text(
-                  l10n.folderThumbnail,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                FutureBuilder<String?>(
-                  future: customThumbnailFuture,
-                  builder: (context, snapshot) {
-                    final value = snapshot.data;
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Text(l10n.loadingThumbnails);
-                    }
-
-                    if (value == null || value.isEmpty) {
-                      return Text(l10n.thumbnailAuto);
-                    }
-
-                    final displayValue = value.startsWith('video::')
-                        ? value.substring(7)
-                        : value;
-                    return Text(displayValue);
-                  },
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+        _showNoAnimationDialog(
+          context: context,
+          builder: (dialogContext) => StatefulBuilder(
+            builder: (dialogContext, setState) => AlertDialog(
+              title: Text(l10n.properties),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextButton(
-                      onPressed: () async {
-                        final selectedPath =
-                            await showFolderThumbnailPickerDialog(
-                          dialogContext,
-                          folder.path,
-                        );
-                        if (selectedPath == null) {
-                          return;
-                        }
-
-                        final isImage = FileTypeUtils.isImageFile(selectedPath);
-                        final isVideo =
-                            VideoThumbnailHelper.isSupportedVideoFormat(
-                                selectedPath);
-                        if (!isImage && !isVideo) {
-                          toast.warning(l10n.invalidThumbnailFile);
-                          return;
-                        }
-
-                        await thumbnailService.setCustomThumbnail(
-                          folder.path,
-                          selectedPath,
-                          isVideo: isVideo,
-                        );
-                        if (dialogContext.mounted) {
-                          setState(() {
-                            customThumbnailFuture = Future.value(isVideo
-                                ? 'video::$selectedPath'
-                                : selectedPath);
-                          });
-                        }
-                        toast.success(l10n.folderThumbnailSet);
-                      },
-                      child: Text(l10n.chooseThumbnail.toUpperCase()),
+                    _propertyRow(l10n.fileName, folderName),
+                    const Divider(),
+                    _propertyRow(l10n.filePath, folder.path),
+                    const Divider(),
+                    _propertyRow(
+                      l10n.fileModified,
+                      stat.modified.toString().split('.')[0],
                     ),
-                    TextButton(
-                      onPressed: () async {
-                        await thumbnailService
-                            .clearCustomThumbnail(folder.path);
-                        if (dialogContext.mounted) {
-                          setState(() {
-                            customThumbnailFuture = Future.value(null);
-                          });
+                    const Divider(),
+                    _propertyRow(
+                      l10n.fileAccessed,
+                      stat.accessed.toString().split('.')[0],
+                    ),
+                    const Divider(),
+                    Text(
+                      l10n.folderThumbnail,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    FutureBuilder<String?>(
+                      future: customThumbnailFuture,
+                      builder: (context, snapshot) {
+                        final value = snapshot.data;
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Text(l10n.loadingThumbnails);
                         }
-                        toast.success(l10n.folderThumbnailCleared);
+
+                        if (value == null || value.isEmpty) {
+                          return Text(l10n.thumbnailAuto);
+                        }
+
+                        final displayValue = value.startsWith('video::')
+                            ? value.substring(7)
+                            : value;
+                        return Text(displayValue);
                       },
-                      child: Text(l10n.clearThumbnail.toUpperCase()),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () async {
+                            final selectedPath =
+                                await showFolderThumbnailPickerDialog(
+                                  dialogContext,
+                                  folder.path,
+                                );
+                            if (selectedPath == null) {
+                              return;
+                            }
+
+                            final isImage = FileTypeUtils.isImageFile(
+                              selectedPath,
+                            );
+                            final isVideo =
+                                VideoThumbnailHelper.isSupportedVideoFormat(
+                                  selectedPath,
+                                );
+                            if (!isImage && !isVideo) {
+                              toast.warning(l10n.invalidThumbnailFile);
+                              return;
+                            }
+
+                            await thumbnailService.setCustomThumbnail(
+                              folder.path,
+                              selectedPath,
+                              isVideo: isVideo,
+                            );
+                            if (dialogContext.mounted) {
+                              setState(() {
+                                customThumbnailFuture = Future.value(
+                                  isVideo
+                                      ? 'video::$selectedPath'
+                                      : selectedPath,
+                                );
+                              });
+                            }
+                            toast.success(l10n.folderThumbnailSet);
+                          },
+                          child: Text(l10n.chooseThumbnail.toUpperCase()),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await thumbnailService.clearCustomThumbnail(
+                              folder.path,
+                            );
+                            if (dialogContext.mounted) {
+                              setState(() {
+                                customThumbnailFuture = Future.value(null);
+                              });
+                            }
+                            toast.success(l10n.folderThumbnailCleared);
+                          },
+                          child: Text(l10n.clearThumbnail.toUpperCase()),
+                        ),
+                      ],
                     ),
                   ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(l10n.close.toUpperCase()),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(l10n.close.toUpperCase()),
-            ),
-          ],
-        ),
-      ),
-    );
-  }).catchError((error) {
-    toast.error(l10n.errorGettingFolderProperties(error.toString()));
-  });
+        );
+      })
+      .catchError((error) {
+        toast.error(l10n.errorGettingFolderProperties(error.toString()));
+      });
 }
 
 Widget _propertyRow(String label, String value) {
@@ -2497,10 +2484,13 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
   final bloc = folderListBloc;
   final l10n = AppLocalizations.of(context)!;
   final count = selectedPaths.length;
-  final canShowShellMenu = Platform.isWindows &&
+  final canShowShellMenu =
+      Platform.isWindows &&
       selectedPaths.isNotEmpty &&
-      selectedPaths.every((path) =>
-          FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound);
+      selectedPaths.every(
+        (path) =>
+            FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound,
+      );
 
   final entitiesList = <FileSystemEntity>[];
   final files = <String>[];
@@ -2542,10 +2532,7 @@ List<ContextMenuSection> _buildMultiSelectionContextMenuSections({
           onSelected: (_) {
             if (bloc == null) return;
             bloc.add(CutFiles(entitiesList));
-            AppToast.info(
-              context,
-              l10n.cutToClipboard(l10n.itemsCount(count)),
-            );
+            AppToast.info(context, l10n.cutToClipboard(l10n.itemsCount(count)));
           },
         ),
         ContextMenuAction(

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// of a screen via [Positioned].  Used by the album detail screen and the
 /// folder list screen so all loading indicators are visually consistent.
 class SlimProgressBar extends StatelessWidget {
-  const SlimProgressBar({Key? key}) : super(key: key);
+  const SlimProgressBar({super.key});
 
   @override
   Widget build(BuildContext context) {

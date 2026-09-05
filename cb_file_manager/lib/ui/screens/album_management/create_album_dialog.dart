@@ -10,10 +10,7 @@ import 'package:cb_file_manager/services/smart_album_service.dart';
 class CreateAlbumDialog extends StatefulWidget {
   final Album? editingAlbum;
 
-  const CreateAlbumDialog({
-    Key? key,
-    this.editingAlbum,
-  }) : super(key: key);
+  const CreateAlbumDialog({super.key, this.editingAlbum});
 
   @override
   State<CreateAlbumDialog> createState() => _CreateAlbumDialogState();
@@ -63,8 +60,9 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
   Future<void> _loadSmartFlag() async {
     try {
       if (widget.editingAlbum != null) {
-        final isSmart = await SmartAlbumService.instance
-            .isSmartAlbum(widget.editingAlbum!.id);
+        final isSmart = await SmartAlbumService.instance.isSmartAlbum(
+          widget.editingAlbum!.id,
+        );
         if (mounted) setState(() => _isSmartAlbum = isSmart);
       }
     } catch (_) {}
@@ -118,8 +116,10 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       if (result != null) {
         // Persist smart flag mapping
         try {
-          await SmartAlbumService.instance
-              .setSmartAlbum(result.id, _isSmartAlbum);
+          await SmartAlbumService.instance.setSmartAlbum(
+            result.id,
+            _isSmartAlbum,
+          );
         } catch (_) {}
         if (mounted) {
           Navigator.of(context).pop(result);
@@ -220,7 +220,7 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                       : null,
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ],
@@ -230,8 +230,9 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title:
-          Text(widget.editingAlbum != null ? 'Edit Album' : 'Create New Album'),
+      title: Text(
+        widget.editingAlbum != null ? 'Edit Album' : 'Create New Album',
+      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -281,7 +282,8 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
               SwitchListTile(
                 title: const Text('Dynamic (Smart) Album'),
                 subtitle: const Text(
-                    'Content is defined by Auto Rules. No files are stored explicitly.'),
+                  'Content is defined by Auto Rules. No files are stored explicitly.',
+                ),
                 value: _isSmartAlbum,
                 onChanged: (val) {
                   setState(() => _isSmartAlbum = val);
@@ -293,8 +295,9 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       ),
       actions: [
         TextButton(
-          onPressed:
-              _isLoading ? null : () => RouteUtils.safePopDialog(context),
+          onPressed: _isLoading
+              ? null
+              : () => RouteUtils.safePopDialog(context),
           child: Text(AppLocalizations.of(context)!.cancel),
         ),
         ElevatedButton(

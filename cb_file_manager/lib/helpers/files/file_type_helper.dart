@@ -16,7 +16,7 @@ enum FileType {
   presentation,
   text,
   apk,
-  unknown
+  unknown,
 }
 
 /// Helper class for file type operations.
