@@ -57,6 +57,25 @@ class WindowsShellMenuEntry {
     this.children = const [],
   });
 
+  /// A command may omit its own bitmap while its app submenu supplies one.
+  WindowsShellMenuEntry withInheritedIcon(Uint8List? parentIcon) {
+    final effectiveIcon = iconBytes?.isNotEmpty == true
+        ? iconBytes
+        : parentIcon;
+    return WindowsShellMenuEntry(
+      type: type,
+      commandId: commandId,
+      submenuId: submenuId,
+      label: label,
+      isEnabled: isEnabled,
+      isChecked: isChecked,
+      iconBytes: effectiveIcon,
+      children: children
+          .map((child) => child.withInheritedIcon(effectiveIcon))
+          .toList(growable: false),
+    );
+  }
+
   factory WindowsShellMenuEntry.fromMap(Map<Object?, Object?> map) {
     final rawChildren = map['children'];
     return WindowsShellMenuEntry(

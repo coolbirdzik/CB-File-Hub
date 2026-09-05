@@ -19,6 +19,8 @@ class TabbedFolderKeyboardController {
   final Map<String, GlobalKey> _itemKeys = <String, GlobalKey>{};
 
   String? focusedPath;
+  double itemMainAxisExtent = 40.0;
+  double _navigationItemExtent = 48.0;
   final Map<String, ValueNotifier<bool?>> _immediateSelectionNotifiers =
       <String, ValueNotifier<bool?>>{};
   Set<String>? _immediateSelectionPaths;
@@ -197,9 +199,14 @@ class TabbedFolderKeyboardController {
       final viewport = scrollable.context.findRenderObject() as RenderBox?;
       if (viewport == null) return;
 
-      final itemTop = box.localToGlobal(Offset.zero, ancestor: viewport).dy;
-      final itemBottom = itemTop + box.size.height;
-      final viewportHeight = viewport.size.height;
+      final horizontal = scrollable.position.axis == Axis.horizontal;
+      final offset = box.localToGlobal(Offset.zero, ancestor: viewport);
+      final itemTop = horizontal ? offset.dx : offset.dy;
+      final itemBottom =
+          itemTop + (horizontal ? box.size.width : box.size.height);
+      final viewportHeight = horizontal
+          ? viewport.size.width
+          : viewport.size.height;
 
       // If item is fully within [0, viewportHeight], no scroll needed
       if (itemTop >= 0 && itemBottom <= viewportHeight) {
@@ -216,6 +223,8 @@ class TabbedFolderKeyboardController {
             : ScrollPositionAlignmentPolicy.keepVisibleAtStart,
       );
     });
+    // Type-ahead/highlight requests can arrive without a widget rebuild.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void clearFocus() {
@@ -269,6 +278,9 @@ class TabbedFolderKeyboardController {
     KeyEvent? event,
   }) {
     if (!isDesktop || event == null) return KeyEventResult.ignored;
+    _navigationItemExtent = folderListState.viewMode == ViewMode.list
+        ? itemMainAxisExtent
+        : 48.0;
 
     final bool isKeyPress = event is KeyDownEvent || event is KeyRepeatEvent;
     if (!isKeyPress) return KeyEventResult.ignored;
@@ -359,9 +371,14 @@ class TabbedFolderKeyboardController {
 
     final bool isGridLayout =
         ViewModeUtils.isGridLike(folderListState.viewMode) ||
-        folderListState.viewMode == ViewMode.tiles;
+        folderListState.viewMode == ViewMode.tiles ||
+        folderListState.viewMode == ViewMode.list;
     final int crossAxisCount = isGridLayout
-        ? (gridCrossAxisCount ?? folderListState.gridZoomLevel).clamp(1, 999)
+        ? (gridCrossAxisCount ??
+                  (folderListState.viewMode == ViewMode.list
+                      ? 1
+                      : folderListState.gridZoomLevel))
+              .clamp(1, 999)
         : 1;
 
     int currentIndex = -1;
@@ -383,14 +400,17 @@ class TabbedFolderKeyboardController {
         focusedPath != null || selectionState.lastSelectedPath != null;
     int targetIndex;
 
+    final isColumnList = folderListState.viewMode == ViewMode.list;
+    final verticalStep = isColumnList ? 1 : crossAxisCount;
+    final horizontalStep = isColumnList ? crossAxisCount : 1;
     if (key == LogicalKeyboardKey.arrowDown) {
-      targetIndex = currentIndex + crossAxisCount;
+      targetIndex = currentIndex + verticalStep;
     } else if (key == LogicalKeyboardKey.arrowUp) {
-      targetIndex = currentIndex - crossAxisCount;
+      targetIndex = currentIndex - verticalStep;
     } else if (key == LogicalKeyboardKey.arrowRight) {
-      targetIndex = currentIndex + 1;
+      targetIndex = currentIndex + horizontalStep;
     } else if (key == LogicalKeyboardKey.arrowLeft) {
-      targetIndex = currentIndex - 1;
+      targetIndex = currentIndex - horizontalStep;
     } else if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       if (!hasExistingFocus) {
@@ -419,6 +439,7 @@ class TabbedFolderKeyboardController {
           !HardwareKeyboard.instance.isMetaPressed) {
         return _performTypeAheadSearch(
           char: event.character!,
+          crossAxisCount: crossAxisCount,
           folderListState: folderListState,
           currentFilter: currentFilter,
           focusFolderPath: focusFolderPath,
@@ -501,7 +522,7 @@ class TabbedFolderKeyboardController {
       forward: previousIndex == -1 || index >= previousIndex,
       index: index,
       crossAxisCount: crossAxisCount,
-      itemHeight: 48.0,
+      itemHeight: _navigationItemExtent,
     );
   }
 
@@ -567,12 +588,13 @@ class TabbedFolderKeyboardController {
       forward: targetIndex >= currentIndex,
       index: targetIndex,
       crossAxisCount: crossAxisCount,
-      itemHeight: 48.0,
+      itemHeight: _navigationItemExtent,
     );
   }
 
   KeyEventResult _performTypeAheadSearch({
     required String char,
+    required int crossAxisCount,
     required FolderListState folderListState,
     required String? currentFilter,
     required void Function(String folderPath) focusFolderPath,
@@ -633,7 +655,7 @@ class TabbedFolderKeyboardController {
         focusFolderPath: focusFolderPath,
         focusFilePath: focusFilePath,
         onScrollToIndex: onScrollToIndex,
-        crossAxisCount: 1,
+        crossAxisCount: crossAxisCount,
       );
       return KeyEventResult.handled;
     }

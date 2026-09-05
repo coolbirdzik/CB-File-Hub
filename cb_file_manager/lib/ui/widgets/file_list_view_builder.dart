@@ -27,6 +27,7 @@ import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/miller_columns_view.dart';
 import 'package:cb_file_manager/ui/widgets/file_tree_view.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
+import 'adaptive_file_list.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
@@ -327,6 +328,8 @@ class FileListViewBuilder {
         onMoveItemsToFolder: onMoveItemsToFolder,
         scrollController: scrollController,
         itemKeyForPath: itemKeyForPath,
+        onGridCrossAxisCountChanged: onGridCrossAxisCountChanged,
+        onGridItemMainAxisExtentChanged: onGridItemMainAxisExtentChanged,
       );
     }
 
@@ -853,6 +856,8 @@ class FileListViewBuilder {
     onMoveItemsToFolder,
     ScrollController? scrollController,
     GlobalKey Function(String path)? itemKeyForPath,
+    ValueChanged<int?>? onGridCrossAxisCountChanged,
+    ValueChanged<double?>? onGridItemMainAxisExtentChanged,
   }) {
     final itemSelectionMode =
         selectionState.isSelectionMode && !isDesktopPlatform;
@@ -917,15 +922,12 @@ class FileListViewBuilder {
                     : null,
                 behavior: HitTestBehavior.translucent,
                 child: RepaintBoundary(
-                  child: ListView.builder(
+                  child: AdaptiveFileList(
+                    isDesktop: isDesktopPlatform,
                     controller: scrollController,
-                    physics: const ClampingScrollPhysics(),
-                    cacheExtent: 800,
-                    addAutomaticKeepAlives: true,
-                    addRepaintBoundaries: true,
-                    addSemanticIndexes: false,
-                    // Extra bottom padding so users can drag-select in empty space below items
-                    padding: const EdgeInsets.only(bottom: 200.0),
+                    onCrossAxisCountChanged: onGridCrossAxisCountChanged,
+                    onItemMainAxisExtentChanged:
+                        onGridItemMainAxisExtentChanged,
                     itemCount: state.folders.length + state.files.length,
                     itemBuilder: (context, index) {
                       final String itemPath = index < state.folders.length
@@ -1006,6 +1008,7 @@ class FileListViewBuilder {
                                                 lastSelectedPath: selectionState
                                                     .lastSelectedPath,
                                                 showItemBackground: false,
+                                                compact: isDesktopPlatform,
                                               ),
                                         ),
                                       ),
@@ -1058,6 +1061,7 @@ class FileListViewBuilder {
                                                     .lastSelectedPath,
                                                 showFileTags: showFileTags,
                                                 showItemBackground: false,
+                                                compact: isDesktopPlatform,
                                               ),
                                         ),
                                       ),

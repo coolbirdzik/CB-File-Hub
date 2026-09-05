@@ -24,27 +24,55 @@ void main() {
       );
     });
 
-    test('14.01 fetches curated mobile tool-call models by default', () async {
-      final catalog = await service.fetchModelCatalog();
-      expect(catalog, isNotEmpty);
-      expect(
-        catalog.first.id,
-        'litert-community/functiongemma-270m-ft-mobile-actions',
-      );
-      expect(
-        catalog.first.artifactFileName,
-        'mobile_actions_q8_ekv1024.litertlm',
-      );
-      expect(catalog.first.compatible, isTrue);
-      expect(catalog.any((entry) => entry.id.contains('gemma-4')), isFalse);
-      expect(
-        catalog.any(
-          (entry) =>
-              entry.id == 'unsloth/Qwen3-0.6B-GGUF' && entry.compatible == true,
-        ),
-        isTrue,
-      );
-    });
+    test(
+      '14.01 offers small agent models and preserves existing selections',
+      () async {
+        const selectedId = 'ggml-org/Qwen3-1.7B-GGUF';
+        await prefs.setString('local_ai_selected_model_id', selectedId);
+        // An old cached entry must not override the current curated recommendation.
+        await prefs.setString(
+          'local_ai_catalog_cache',
+          jsonEncode([
+            const HuggingFaceModelEntry(
+              id: 'unsloth/Qwen3.5-2B-GGUF',
+              displayName: 'Stale name',
+              artifactFileName: 'old.gguf',
+            ).toJson(),
+          ]),
+        );
+        final catalog = await service.fetchModelCatalog();
+        expect(catalog.first.id, 'unsloth/Qwen3.5-4B-GGUF');
+        expect(catalog.first.artifactFileName, 'Qwen3.5-4B-Q4_K_M.gguf');
+        expect(
+          catalog.map((entry) => entry.id).toSet(),
+          hasLength(catalog.length),
+        );
+        expect(catalog, hasLength(6));
+        expect(catalog.every((entry) => entry.compatible), isTrue);
+        expect(
+          catalog.take(3).every((entry) => entry.sizeBytes! < 2800000000),
+          isTrue,
+        );
+        expect(catalog.any((entry) => entry.id == selectedId), isTrue);
+        expect(
+          catalog.any((entry) => entry.id == 'unsloth/Qwen3-0.6B-GGUF'),
+          isTrue,
+        );
+        expect(prefs.getString('local_ai_selected_model_id'), selectedId);
+        expect(
+          service.pinnedModel.artifactFileName.endsWith(
+            Platform.isWindows ? '.gguf' : '.litertlm',
+          ),
+          isTrue,
+        );
+        for (final entry in catalog) {
+          expect(
+            service.catalogEntryFor(entry.id)?.artifactFileName,
+            entry.artifactFileName,
+          );
+        }
+      },
+    );
 
     test('14.02 returns empty installed models list initially', () {
       final installed = service.getInstalledModels();

@@ -943,9 +943,14 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     }
 
     final isGridLayout =
-        state.viewMode == ViewMode.grid || state.viewMode == ViewMode.tiles;
+        state.viewMode == ViewMode.grid ||
+        state.viewMode == ViewMode.tiles ||
+        (state.viewMode == ViewMode.list && isDesktopPlatform);
     final crossAxisCount = isGridLayout
-        ? (_gridCrossAxisCount ?? state.gridZoomLevel).clamp(1, 999).toInt()
+        ? (_gridCrossAxisCount ??
+                  (state.viewMode == ViewMode.list ? 1 : state.gridZoomLevel))
+              .clamp(1, 999)
+              .toInt()
         : 1;
 
     _scrollToHighlightedTarget(
@@ -994,6 +999,9 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     FolderListState state,
     int crossAxisCount,
   ) {
+    if (state.viewMode == ViewMode.list && isDesktopPlatform) {
+      return _gridItemMainAxisExtent ?? 40.0;
+    }
     if (state.viewMode != ViewMode.grid) {
       if (state.viewMode == ViewMode.tiles) {
         return 84.0;
@@ -1949,6 +1957,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                       return;
                     }
                     _gridItemMainAxisExtent = extent;
+                    _keyboardController.itemMainAxisExtent = extent;
                     if (_pendingHighlightedFileName != null) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (mounted) {

@@ -139,6 +139,7 @@ class GgufLlamaCppLocalAiChatRuntime
         ...messages,
       ],
       maxResponseTokens: nPredict,
+      catalogId: model.catalogId,
     );
   }
 

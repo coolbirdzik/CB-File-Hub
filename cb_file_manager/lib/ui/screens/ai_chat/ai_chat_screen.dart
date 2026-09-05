@@ -666,8 +666,8 @@ class _AiChatBodyState extends State<_AiChatBody> {
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) => _messageListFocusNode.requestFocus(),
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 820),
+          child: SizedBox(
+            width: double.infinity,
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),

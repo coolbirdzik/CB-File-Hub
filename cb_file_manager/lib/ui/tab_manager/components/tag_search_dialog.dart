@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import '../../utils/route.dart';
 
@@ -35,7 +36,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
   Future<void> _loadAvailableTags() async {
     final tags = await TagManager.getAllUniqueTags(widget.currentPath);
     setState(() {
-      _availableTags = tags.toList()..sort();
+      _availableTags = tags.toList()..sort(TextUtils.compareAlphabetically);
     });
   }
 

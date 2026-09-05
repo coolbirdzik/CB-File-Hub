@@ -124,8 +124,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 780),
+          child: SizedBox(
+            width: double.infinity,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,

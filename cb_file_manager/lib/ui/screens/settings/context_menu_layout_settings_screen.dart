@@ -334,11 +334,6 @@ List<_ContextMenuCommandDescriptor> _descriptorsFor(
           icon: PhosphorIconsLight.appWindow,
         ),
         _ContextMenuCommandDescriptor(
-          id: 'choose_default_app',
-          label: l10n.chooseDefaultApp,
-          icon: PhosphorIconsLight.checkCircle,
-        ),
-        _ContextMenuCommandDescriptor(
           id: 'download',
           label: l10n.download,
           icon: PhosphorIconsLight.downloadSimple,

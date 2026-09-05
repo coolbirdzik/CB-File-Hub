@@ -7,6 +7,49 @@ import 'package:cb_file_manager/services/ai/assistant_response_text.dart';
 import 'package:cb_file_manager/services/ai/tool_executor.dart';
 
 void main() {
+  for (final profile in [
+    ('unsloth/Qwen3.5-2B-GGUF', 0.7, 20, 0.8, false),
+    ('unsloth/Qwen3.5-4B-GGUF', 1.0, 20, 0.95, true),
+    ('unsloth/Qwen3-4B-Instruct-2507-GGUF', 0.7, 20, 0.8, false),
+  ]) {
+    test('uses publisher generation settings for ${profile.$1}', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final http = HttpClient();
+      addTearDown(() async {
+        http.close(force: true);
+        await server.close(force: true);
+      });
+      final served = server.first.then((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        expect(body['temperature'], profile.$2);
+        expect(body['top_k'], profile.$3);
+        expect(body['top_p'], profile.$4);
+        expect(body['chat_template_kwargs']?['enable_thinking'], profile.$5);
+        if (profile.$1.contains('Qwen3.5')) {
+          expect(body['presence_penalty'], 1.5);
+        }
+        request.response.write(
+          'data: {"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}\n\n',
+        );
+        await request.response.close();
+      });
+      expect(
+        await LlamaCppChatClient(http)
+            .stream(
+              baseUri: Uri.parse('http://127.0.0.1:${server.port}'),
+              messages: [
+                {'role': 'user', 'content': 'Hi'},
+              ],
+              maxResponseTokens: 100,
+              catalogId: profile.$1,
+            )
+            .join(),
+        'OK',
+      );
+      await served;
+    });
+  }
+
   test('chat template receives roles; reasoning never reaches content', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final http = HttpClient();

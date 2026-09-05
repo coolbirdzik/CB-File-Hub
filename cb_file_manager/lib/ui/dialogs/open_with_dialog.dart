@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:path/path.dart' as path;
+import 'package:cb_file_manager/ui/widgets/resizable_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/files/external_app_helper.dart';
 import 'package:cb_file_manager/helpers/files/windows_app_icon.dart';
@@ -29,16 +31,20 @@ class OpenWithDialog extends StatefulWidget {
 
 class _OpenWithDialogState extends State<OpenWithDialog> {
   late Future<List<AppInfo>> _appsFuture;
-  bool _loadingIcons = false;
+  late bool _saveAsDefault;
+  bool _opening = false;
+  AppInfo? _selectedApp;
+  AppInfo? _customApp;
 
   @override
   void initState() {
     super.initState();
+    _saveAsDefault = widget.saveAsDefaultOnSelect;
     _appsFuture = ExternalAppHelper.getInstalledAppsForFile(widget.filePath);
   }
 
   Future<void> _saveVideoDefaultIfNeeded(String appIdentifier) async {
-    if (!widget.saveAsDefaultOnSelect) return;
+    if (!_saveAsDefault) return;
     if (!FileTypeUtils.isVideoFile(widget.filePath)) return;
 
     final prefs = UserPreferences.instance;
@@ -67,312 +73,388 @@ class _OpenWithDialogState extends State<OpenWithDialog> {
     }
   }
 
+  Future<void> _openSelectedApp() async {
+    final app = _selectedApp;
+    if (app == null || _opening) return;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final toast = AppToast.capture(context);
+    final errorLabel = AppLocalizations.of(context)!.errorTitle;
+    setState(() => _opening = true);
+    try {
+      await _saveVideoDefaultIfNeeded(app.packageName);
+      if (!mounted) return;
+      if (app.packageName == '__cb_archive_browse__') {
+        ArchiveNavigation.openBrowse(context, archiveFilePath: widget.filePath);
+        navigator.pop();
+        return;
+      }
+      navigator.pop();
+      if (app.packageName == '__cb_video_player__') {
+        await VideoPlaybackLauncher.open(
+          navigator.context,
+          file: File(widget.filePath),
+        );
+      } else if (app.packageName == 'shell_open') {
+        await ExternalAppHelper.openWithSystemDefault(widget.filePath);
+      } else {
+        await ExternalAppHelper.openFileWithApp(
+          widget.filePath,
+          app.packageName,
+        );
+      }
+    } catch (_) {
+      toast.info(errorLabel);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _chooseAnotherApp() async {
+    if (_opening) return;
+    if (Platform.isWindows) {
+      final picked = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['exe'],
+        dialogTitle: AppLocalizations.of(context)!.chooseAnotherApp,
+      );
+      if (!mounted || picked?.path == null) return;
+      final appPath = picked!.path!;
+      setState(() {
+        _customApp = AppInfo(
+          packageName: appPath,
+          appName: path.basenameWithoutExtension(appPath),
+          icon: const Icon(PhosphorIconsLight.appWindow, size: 32),
+        );
+        _selectedApp = _customApp;
+      });
+    } else if (Platform.isAndroid) {
+      Navigator.pop(context);
+      await ExternalAppHelper.openWithSystemChooser(widget.filePath);
+    }
+  }
+
+  Future<void> _setVideoSystemDefault() async {
+    // Pre-extract context-dependent values before async gap
+    final toast = AppToast.capture(context);
+    final navigator = Navigator.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    if (Platform.isWindows) {
+      final exe = Platform.resolvedExecutable;
+      final ok = await WindowsAppIcon.setSelfAsDefaultForVideo(exe);
+      if (ok) {
+        final prefs = UserPreferences.instance;
+        await prefs.init();
+        await _selectBuiltInVideoPlayerAsDefault(prefs);
+      }
+      try {
+        toast.info(
+          ok
+              ? 'CB File Hub is now the default for video files.'
+              : 'Could not set as default.',
+        );
+        navigator.pop();
+      } catch (_) {}
+    } else if (Platform.isAndroid) {
+      await ExternalAppHelper.openDefaultAppSettings();
+      try {
+        toast.info(l10n.setCoolBirdAsDefaultForVideosAndroidHint);
+        navigator.pop();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _setArchiveSystemDefault() async {
+    // Pre-extract context-dependent values before
+    // any async gap so we don't use BuildContext
+    // across await boundaries.
+    final toast = AppToast.capture(context);
+    final navigator = Navigator.of(context);
+    final archivesSuccessL10n = AppLocalizations.of(
+      context,
+    )!.setCoolBirdAsDefaultForArchivesSuccess;
+    final archivesFailedL10n = AppLocalizations.of(
+      context,
+    )!.setCoolBirdAsDefaultForArchivesFailed;
+    final exe = Platform.resolvedExecutable;
+    final ok = await WindowsAppIcon.setSelfAsDefaultForArchives(exe);
+    try {
+      toast.info(ok ? archivesSuccessL10n : archivesFailedL10n);
+      navigator.pop();
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final screen = MediaQuery.of(context).size;
-    final isNarrow = screen.width < 500;
-    final dialogWidth = isNarrow
-        ? (screen.width * 0.92).clamp(280.0, 400.0)
-        : 420.0;
-    final listMaxH = (screen.height * 0.48).clamp(320.0, 560.0);
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isVideo = FileTypeUtils.isVideoFile(widget.filePath);
+    final canChooseApp = Platform.isWindows || Platform.isAndroid;
 
-    return Dialog(
-      child: Container(
-        width: dialogWidth,
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  PhosphorIconsLight.arrowSquareOut,
-                  color: isDarkMode ? Colors.white70 : Colors.black87,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Open with',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black87,
-                  ),
-                ),
-                if (_loadingIcons) ...[
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: isDarkMode ? Colors.white70 : Colors.blue,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 16),
-            FutureBuilder<List<AppInfo>>(
-              future: _appsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Text(
-                        'Error loading applications',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.red[300] : Colors.red,
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                final apps = snapshot.data ?? [];
-
-                if (apps.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        'No applications found for this file type',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
-
-                return Container(
-                  constraints: BoxConstraints(maxHeight: listMaxH),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: apps.length,
-                          itemBuilder: (context, index) {
-                            final app = apps[index];
-                            return ListTile(
-                              leading: app.icon,
-                              title: Text(app.appName),
-                              onTap: () async {
-                                // Pre-extract values that depend on BuildContext
-                                // before any async gap.
-                                final rootNavigator = Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                );
-                                setState(() {
-                                  _loadingIcons = true;
-                                });
-
-                                await _saveVideoDefaultIfNeeded(
-                                  app.packageName,
-                                );
-
-                                if (!mounted) return;
-
-                                if (app.packageName ==
-                                    '__cb_archive_browse__') {
-                                  if (!context.mounted) return;
-                                  ArchiveNavigation.openBrowse(
-                                    context,
-                                    archiveFilePath: widget.filePath,
-                                  );
-                                  rootNavigator.pop();
-                                  return;
-                                }
-
-                                rootNavigator.pop();
-
-                                if (app.packageName == '__cb_video_player__') {
-                                  unawaited(
-                                    VideoPlaybackLauncher.open(
-                                      rootNavigator.context,
-                                      file: File(widget.filePath),
-                                    ),
-                                  );
-                                } else if (app.packageName == 'shell_open') {
-                                  await ExternalAppHelper.openWithSystemDefault(
-                                    widget.filePath,
-                                  );
-                                } else {
-                                  await ExternalAppHelper.openFileWithApp(
-                                    widget.filePath,
-                                    app.packageName,
-                                  );
-                                }
-
-                                if (mounted) {
-                                  setState(() {
-                                    _loadingIcons = false;
-                                  });
-                                }
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      const Divider(),
-                      if ((Platform.isWindows || Platform.isAndroid) &&
-                          FileTypeUtils.isVideoFile(widget.filePath))
-                        ListTile(
-                          leading: const Icon(PhosphorIconsLight.videoCamera),
-                          title: Text(
-                            AppLocalizations.of(
-                              context,
-                            )!.setCoolBirdAsDefaultForVideos,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: isDarkMode
-                                  ? Colors.blue[200]
-                                  : Colors.blue[700],
-                            ),
-                          ),
-                          onTap: () async {
-                            // Pre-extract context-dependent values before async gap
-                            final toast = AppToast.capture(context);
-                            final navigator = Navigator.of(context);
-                            final l10n = AppLocalizations.of(context)!;
-
-                            if (Platform.isWindows) {
-                              final exe = Platform.resolvedExecutable;
-                              final ok =
-                                  await WindowsAppIcon.setSelfAsDefaultForVideo(
-                                    exe,
-                                  );
-                              if (ok) {
-                                final prefs = UserPreferences.instance;
-                                await prefs.init();
-                                await _selectBuiltInVideoPlayerAsDefault(prefs);
-                              }
-                              try {
-                                toast.info(
-                                  ok
-                                      ? 'CB File Hub is now the default for video files.'
-                                      : 'Could not set as default.',
-                                );
-                                navigator.pop();
-                              } catch (_) {}
-                            } else if (Platform.isAndroid) {
-                              await ExternalAppHelper.openDefaultAppSettings();
-                              try {
-                                toast.info(
-                                  l10n.setCoolBirdAsDefaultForVideosAndroidHint,
-                                );
-                                navigator.pop();
-                              } catch (_) {}
-                            }
-                          },
-                        ),
-                      if ((Platform.isWindows || Platform.isAndroid) &&
-                          FileTypeUtils.isVideoFile(widget.filePath))
-                        const Divider(),
-                      if (Platform.isWindows &&
-                          FileTypeUtils.isArchiveFile(widget.filePath))
-                        ListTile(
-                          leading: const Icon(PhosphorIconsLight.archive),
-                          title: Text(
-                            AppLocalizations.of(
-                              context,
-                            )!.setCoolBirdAsDefaultForArchives,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: isDarkMode
-                                  ? Colors.blue[200]
-                                  : Colors.blue[700],
-                            ),
-                          ),
-                          onTap: () async {
-                            // Pre-extract context-dependent values before
-                            // any async gap so we don't use BuildContext
-                            // across await boundaries.
-                            final toast = AppToast.capture(context);
-                            final navigator = Navigator.of(context);
-                            final archivesSuccessL10n = AppLocalizations.of(
-                              context,
-                            )!.setCoolBirdAsDefaultForArchivesSuccess;
-                            final archivesFailedL10n = AppLocalizations.of(
-                              context,
-                            )!.setCoolBirdAsDefaultForArchivesFailed;
-                            final exe = Platform.resolvedExecutable;
-                            final ok =
-                                await WindowsAppIcon.setSelfAsDefaultForArchives(
-                                  exe,
-                                );
-                            try {
-                              toast.info(
-                                ok ? archivesSuccessL10n : archivesFailedL10n,
-                              );
-                              navigator.pop();
-                            } catch (_) {}
-                          },
-                        ),
-                      if (Platform.isWindows &&
-                          FileTypeUtils.isArchiveFile(widget.filePath))
-                        const Divider(),
-                      ListTile(
-                        leading: const Icon(PhosphorIconsLight.dotsThree),
-                        title: Text(
-                          AppLocalizations.of(context)!.chooseAnotherApp,
-                        ),
-                        onTap: () async {
-                          // Close the dialog
-                          Navigator.pop(context);
-
-                          // Use file_picker to select an executable
-                          if (Platform.isWindows) {
-                            final picked = await FilePicker.pickFile(
-                              type: FileType.custom,
-                              allowedExtensions: ['exe'],
-                              dialogTitle:
-                                  'Select an application to open this file',
-                            );
-
-                            if (picked?.path != null) {
-                              final appPath = picked!.path!;
-                              await _saveVideoDefaultIfNeeded(appPath);
-                              await ExternalAppHelper.openFileWithApp(
-                                widget.filePath,
-                                appPath,
-                              );
-                            }
-                          } else if (Platform.isAndroid) {
-                            // On Android, we can use the system's app chooser
-                            await ExternalAppHelper.openWithSystemChooser(
-                              widget.filePath,
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: Text(AppLocalizations.of(context)!.cancel),
+    return ResizableDialog(
+      prefsKeyPrefix: 'open_with_dialog',
+      initialSizeFactor: const Size(0.5, 0.75),
+      minSize: const Size(460, 420),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.openWith,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.24,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
               ),
             ),
+            child: Row(
+              children: [
+                Icon(
+                  PhosphorIconsLight.file,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Tooltip(
+                    message: widget.filePath,
+                    child: Text(
+                      widget.filePath,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      contentBuilder: (context, dialogSize) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.32,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.35,
+                  ),
+                ),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FutureBuilder<List<AppInfo>>(
+                      future: _appsFuture,
+                      builder: (context, snapshot) {
+                        final apps = snapshot.data ?? <AppInfo>[];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 32),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else if (snapshot.hasError || apps.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Text(
+                                  snapshot.hasError
+                                      ? l10n.applicationsLoadError
+                                      : l10n.noApplicationsFound,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              )
+                            else
+                              for (final app in apps) ...[
+                                _buildAppRow(app),
+                                const SizedBox(height: 4),
+                              ],
+                            if (_customApp != null &&
+                                !apps.any(
+                                  (app) =>
+                                      app.packageName ==
+                                      _customApp!.packageName,
+                                ))
+                              _buildAppRow(_customApp!),
+                            if (canChooseApp) ...[
+                              const SizedBox(height: 8),
+                              _buildActionRow(
+                                icon: PhosphorIconsLight.folderOpen,
+                                label: l10n.chooseAnotherApp,
+                                onPressed: _chooseAnotherApp,
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                    if ((canChooseApp && isVideo) ||
+                        (Platform.isWindows &&
+                            FileTypeUtils.isArchiveFile(widget.filePath))) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(
+                          height: 1,
+                          color: theme.colorScheme.outlineVariant.withValues(
+                            alpha: 0.35,
+                          ),
+                        ),
+                      ),
+                      _buildActionRow(
+                        icon: isVideo
+                            ? PhosphorIconsLight.videoCamera
+                            : PhosphorIconsLight.archive,
+                        label: isVideo
+                            ? l10n.setCoolBirdAsDefaultForVideos
+                            : l10n.setCoolBirdAsDefaultForArchives,
+                        onPressed: isVideo
+                            ? _setVideoSystemDefault
+                            : _setArchiveSystemDefault,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (isVideo) ...[
+            const SizedBox(height: 12),
+            CheckboxListTile(
+              key: const ValueKey('open-with-default'),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(
+                l10n.useSelectedAppAsVideoDefault,
+                style: const TextStyle(fontSize: 14),
+              ),
+              value: _saveAsDefault,
+              onChanged: _opening
+                  ? null
+                  : (value) => setState(() => _saveAsDefault = value ?? false),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _opening ? null : () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            textStyle: const TextStyle(fontSize: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          child: Text(l10n.cancel.toUpperCase()),
+        ),
+        ElevatedButton(
+          key: const ValueKey('open-with-confirm'),
+          onPressed: _opening || _selectedApp == null ? null : _openSelectedApp,
+          style: ElevatedButton.styleFrom(
+            textStyle: const TextStyle(fontSize: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+          child: _opening
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l10n.open.toUpperCase()),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppRow(AppInfo app) {
+    final selected = _selectedApp?.packageName == app.packageName;
+    final theme = Theme.of(context);
+    return Semantics(
+      selected: selected,
+      child: Material(
+        color: selected
+            ? theme.colorScheme.primary.withValues(alpha: 0.14)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          key: ValueKey('open-with-app-${app.packageName}'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: _opening ? null : () => setState(() => _selectedApp = app),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 64),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                SizedBox(width: 36, height: 36, child: Center(child: app.icon)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    app.appName,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 20,
+                  child: selected
+                      ? Icon(
+                          PhosphorIconsLight.check,
+                          size: 20,
+                          color: theme.colorScheme.primary,
+                        )
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionRow({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: _opening ? null : onPressed,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
           ],
         ),
       ),

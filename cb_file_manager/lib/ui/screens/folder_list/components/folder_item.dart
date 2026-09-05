@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +32,7 @@ class FolderItem extends StatefulWidget {
   final String? lastSelectedPath;
   final Function()? clearSelectionMode;
   final bool showItemBackground;
+  final bool compact;
 
   const FolderItem({
     super.key,
@@ -42,6 +44,7 @@ class FolderItem extends StatefulWidget {
     this.lastSelectedPath,
     this.clearSelectionMode,
     this.showItemBackground = true,
+    this.compact = false,
   });
 
   @override
@@ -53,8 +56,8 @@ class _FolderItemState extends State<FolderItem> {
   final ValueNotifier<bool> _isHovering = ValueNotifier<bool>(false);
 
   // Lazy, cached folder stat to avoid I/O during fast scrolls
-  late Future<FileStat> _folderStatFuture;
-  late Future<int?> _folderSizeFuture;
+  Future<FileStat>? _folderStatFuture;
+  Future<int?>? _folderSizeFuture;
   int _folderSizeGeneration = 0;
   static final Map<String, FileStat> _folderStatCache = <String, FileStat>{};
   static const int _maxCacheSize = 100;
@@ -66,8 +69,10 @@ class _FolderItemState extends State<FolderItem> {
   @override
   void initState() {
     super.initState();
-    _folderStatFuture = _getFolderStatLazy();
-    _folderSizeFuture = _getFolderSizeLazy();
+    if (!widget.compact) {
+      _folderStatFuture = _getFolderStatLazy();
+      _folderSizeFuture = _getFolderSizeLazy();
+    }
   }
 
   @override
@@ -80,10 +85,13 @@ class _FolderItemState extends State<FolderItem> {
   @override
   void didUpdateWidget(FolderItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.folder.path != widget.folder.path) {
+    if (oldWidget.folder.path != widget.folder.path ||
+        oldWidget.compact != widget.compact) {
       _folderSizeGeneration++;
-      _folderStatFuture = _getFolderStatLazy();
-      _folderSizeFuture = _getFolderSizeLazy();
+      if (!widget.compact) {
+        _folderStatFuture = _getFolderStatLazy();
+        _folderSizeFuture = _getFolderSizeLazy();
+      }
     }
   }
 
@@ -273,7 +281,9 @@ class _FolderItemState extends State<FolderItem> {
           isSelected: widget.isSelected,
           isHovering: isHovering,
         );
-        final Color effectiveBackgroundColor = widget.showItemBackground
+        final Color effectiveBackgroundColor =
+            widget.showItemBackground ||
+                (widget.compact && (widget.isSelected || isHovering))
             ? backgroundColor
             : Colors.transparent;
 
@@ -304,100 +314,127 @@ class _FolderItemState extends State<FolderItem> {
                 ),
                 child: Stack(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12.0,
-                        horizontal: 16.0,
-                      ),
-                      child: Row(
-                        children: [
-                          _buildLeadingIcon(context),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                isBeingRenamed &&
-                                        renameController.textController != null
-                                    ? InlineRenameField(
-                                        controller: renameController,
-                                        onCommit: () => renameController
-                                            .commitRename(context),
-                                        onCancel: () =>
-                                            renameController.cancelRename(),
-                                        textStyle: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                        textAlign: TextAlign.start,
-                                        maxLines: 1,
-                                      )
-                                    : Text(
-                                        _tagName ?? widget.folder.basename(),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                const SizedBox(height: 4),
-                                if (_tagName != null)
-                                  Text(
-                                    AppLocalizations.of(context)!.tagPrefix,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.7),
+                    if (widget.compact)
+                      CompactFileListContent(
+                        path: widget.folder.path,
+                        isFolder: true,
+                        displayName: _tagName ?? widget.folder.basename(),
+                        isTag: _tagName != null,
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12.0,
+                          horizontal: 16.0,
+                        ),
+                        child: Row(
+                          children: [
+                            _buildLeadingIcon(context),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  isBeingRenamed &&
+                                          renameController.textController !=
+                                              null
+                                      ? InlineRenameField(
+                                          controller: renameController,
+                                          onCommit: () => renameController
+                                              .commitRename(context),
+                                          onCancel: () =>
+                                              renameController.cancelRename(),
+                                          textStyle: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                          textAlign: TextAlign.start,
+                                          maxLines: 1,
+                                        )
+                                      : Text(
+                                          _tagName ?? widget.folder.basename(),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                  )
-                                else
-                                  FutureBuilder<FileStat>(
-                                    future: _folderStatFuture,
-                                    builder: (context, snapshot) {
-                                      if (snapshot.hasData) {
-                                        return FutureBuilder<int?>(
-                                          future: _folderSizeFuture,
-                                          builder: (context, sizeSnapshot) {
-                                            final modified = snapshot
-                                                .data!
-                                                .modified
-                                                .toString()
-                                                .split('.')[0];
-                                            final size = sizeSnapshot.data;
-                                            final suffix =
-                                                sizeSnapshot.connectionState ==
-                                                    ConnectionState.waiting
-                                                ? '  •  Calculating size...'
-                                                : size == null
-                                                ? ''
-                                                : '  •  ${FormatUtils.formatFileSize(size)}';
-                                            return Text(
-                                              '$modified$suffix',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurface
-                                                        .withValues(alpha: 0.7),
-                                                  ),
-                                            );
-                                          },
-                                        );
-                                      } else if (snapshot.hasError) {
-                                        // For network folders or stat errors
+                                  const SizedBox(height: 4),
+                                  if (_tagName != null)
+                                    Text(
+                                      AppLocalizations.of(context)!.tagPrefix,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.7),
+                                          ),
+                                    )
+                                  else
+                                    FutureBuilder<FileStat>(
+                                      future: _folderStatFuture,
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData) {
+                                          return FutureBuilder<int?>(
+                                            future: _folderSizeFuture,
+                                            builder: (context, sizeSnapshot) {
+                                              final modified = snapshot
+                                                  .data!
+                                                  .modified
+                                                  .toString()
+                                                  .split('.')[0];
+                                              final size = sizeSnapshot.data;
+                                              final suffix =
+                                                  sizeSnapshot
+                                                          .connectionState ==
+                                                      ConnectionState.waiting
+                                                  ? '  •  Calculating size...'
+                                                  : size == null
+                                                  ? ''
+                                                  : '  •  ${FormatUtils.formatFileSize(size)}';
+                                              return Text(
+                                                '$modified$suffix',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.7,
+                                                          ),
+                                                    ),
+                                              );
+                                            },
+                                          );
+                                        } else if (snapshot.hasError) {
+                                          // For network folders or stat errors
+                                          return Text(
+                                            '—',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurface
+                                                      .withValues(alpha: 0.5),
+                                                ),
+                                          );
+                                        }
                                         return Text(
-                                          '—',
+                                          'Loading...',
                                           style: Theme.of(context)
                                               .textTheme
                                               .bodySmall
@@ -408,33 +445,20 @@ class _FolderItemState extends State<FolderItem> {
                                                     .withValues(alpha: 0.5),
                                               ),
                                         );
-                                      }
-                                      return Text(
-                                        'Loading...',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.5),
-                                            ),
-                                      );
-                                    },
-                                  ),
-                              ],
+                                      },
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                     // Interactive layer cho icon (select)
                     Positioned(
                       left: 0,
                       top: 0,
                       bottom: 0,
-                      width: 80, // Vùng icon + padding
+                      width: widget.compact ? 36 : 80, // Vùng icon + padding
                       child: OptimizedInteractionLayer(
                         onTap: () {
                           // Click vào icon sẽ select item
@@ -442,6 +466,9 @@ class _FolderItemState extends State<FolderItem> {
                             _handleFolderSelection();
                           }
                         },
+                        onDoubleTap: widget.compact && widget.isDesktopMode
+                            ? () => widget.onTap?.call(widget.folder.path)
+                            : null,
                         onLongPress: !widget.isDesktopMode
                             ? () {
                                 if (widget.toggleFolderSelection != null) {
@@ -460,7 +487,7 @@ class _FolderItemState extends State<FolderItem> {
                     if (!isBeingRenamed)
                       Positioned(
                         key: const ValueKey('name-hit-area'),
-                        left: 80,
+                        left: widget.compact ? 36 : 80,
                         top: 0,
                         right: 0,
                         bottom: 0,

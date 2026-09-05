@@ -59,6 +59,53 @@ void main() {
     );
   });
 
+  test(
+    'submenu commands inherit app icons without overriding their own icons',
+    () {
+      final appIcon = Uint8List.fromList([1, 2, 3]);
+      final commandIcon = Uint8List.fromList([4, 5, 6]);
+      final entry = WindowsShellMenuEntry(
+        type: 'submenu',
+        iconBytes: appIcon,
+        submenuId: 12,
+        children: [
+          const WindowsShellMenuEntry(type: 'item', commandId: 17),
+          WindowsShellMenuEntry(
+            type: 'item',
+            commandId: 18,
+            iconBytes: commandIcon,
+          ),
+          WindowsShellMenuEntry(
+            type: 'submenu',
+            submenuId: 19,
+            iconBytes: Uint8List(0),
+            children: const [
+              WindowsShellMenuEntry(type: 'item', commandId: 20),
+            ],
+          ),
+        ],
+      ).withInheritedIcon(null);
+      expect(entry.children[0].iconBytes, same(appIcon));
+      expect(entry.children[1].iconBytes, same(commandIcon));
+      expect(entry.children[2].children.single.iconBytes, same(appIcon));
+      expect(entry.children[2].children.single.commandId, 20);
+      expect(
+        const WindowsShellMenuEntry(
+          type: 'item',
+        ).withInheritedIcon(null).iconBytes,
+        isNull,
+      );
+      // The same fallback applies to separately loaded, lazy native submenus.
+      expect(
+        const WindowsShellMenuEntry(
+          type: 'item',
+          commandId: 21,
+        ).withInheritedIcon(appIcon).iconBytes,
+        same(appIcon),
+      );
+    },
+  );
+
   test('loads each native submenu once per cached Shell session', () async {
     var submenuLoadCalls = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

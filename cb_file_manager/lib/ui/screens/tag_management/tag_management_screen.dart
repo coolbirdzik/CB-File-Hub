@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' show ImageFilter;
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -563,9 +564,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           if (mounted) {
             setState(() {
               _allTags = tags.toList();
-              _allTags.sort(
-                (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
-              );
+              _allTags.sort(TextUtils.compareAlphabetically);
               _filterTags();
               _isInitialLoading = false;
             });
@@ -725,14 +724,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   /// Sort the filtered tags based on the current sort criteria.
-  /// For 'name' sort: alphabetical (case-insensitive).
+  /// For 'name' sort: alphabetical (case- and accent-insensitive).
   /// For 'popularity' and 'recent' sorts: loads counts/timestamps asynchronously
   /// and re-sorts the list once data is available, then updates the UI.
   void _sortTags() {
     switch (_sortCriteria) {
       case 'name':
         _filteredTags.sort((a, b) {
-          final result = a.toLowerCase().compareTo(b.toLowerCase());
+          final result = TextUtils.compareAlphabetically(a, b);
           return _sortAscending ? result : -result;
         });
         break;
@@ -3721,7 +3720,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         (hierarchyTree.entries.toList()..sort((a, b) => a.key.compareTo(b.key)))
             .map((e) => '${e.key}>${e.value.join("+")}')
             .join("|");
-    final sig = '${_allTags.length}|$hierarchySig';
+    final sig =
+        '${_allTags.join("|")}|$hierarchySig|$_sortCriteria|$_sortAscending';
+    int compareTreeNames(String a, String b) {
+      final result = TextUtils.compareAlphabetically(a, b);
+      return _sortCriteria == 'name' && !_sortAscending ? -result : result;
+    }
+
     if (sig != _treeRootsSignature) {
       _treeRootsSignature = sig;
       final standalone = _allTags
@@ -3735,10 +3740,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       // [tag] here is a NORMALIZED hierarchy name; nodes store the display
       // form so selection/filtering line up with _allTags / _filteredTags.
       TreeNode<String> buildTagNode(String tag, Set<String> ancestry) {
-        final children = _tagHierarchyManager
-            .getChildren(tag)
-            .where((c) => !ancestry.contains(c))
-            .toList();
+        final children =
+            _tagHierarchyManager
+                .getChildren(tag)
+                .where((c) => !ancestry.contains(c))
+                .toList()
+              ..sort((a, b) => compareTreeNames(displayOf(a), displayOf(b)));
         final nextAncestry = {...ancestry, tag};
         return TreeNode<String>(
           id: displayOf(tag),
@@ -3758,7 +3765,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             children: const <TreeNode<String>>[],
           ),
         ),
-      ];
+      ]..sort((a, b) => compareTreeNames(a.data, b.data));
     }
 
     // Compute the "should show" set: any node whose data is in

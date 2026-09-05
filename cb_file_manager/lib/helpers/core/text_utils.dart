@@ -2,6 +2,26 @@ import 'package:diacritic/diacritic.dart';
 
 /// Utility functions for text processing
 class TextUtils {
+  static final RegExp _combiningDiacritics = RegExp(
+    r'[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]',
+    unicode: true,
+  );
+
+  /// A-Z ordering that groups accented Latin names with their base letters.
+  /// Handles both precomposed accents and combining diacritics without changing
+  /// display names. Other scripts retain their Unicode ordering; this is not
+  /// locale-specific collation. Original spelling breaks ties consistently.
+  static int compareAlphabetically(String a, String b) {
+    String sortKey(String value) => removeDiacritics(
+      value.toLowerCase(),
+    ).replaceAll(_combiningDiacritics, '');
+
+    final result = sortKey(a).compareTo(sortKey(b));
+    if (result != 0) return result;
+    final spelling = a.toLowerCase().compareTo(b.toLowerCase());
+    return spelling != 0 ? spelling : a.compareTo(b);
+  }
+
   /// Fuzzy search with diacritic normalization for all languages
   /// Supports partial matching, word order independence, and special characters
   ///

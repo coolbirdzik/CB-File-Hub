@@ -85,13 +85,11 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.78,
+            maxWidth: isUser
+                ? MediaQuery.of(context).size.width * 0.78
+                : double.infinity,
           ),
-          margin: EdgeInsets.only(
-            left: isUser ? 48 : 0,
-            right: isUser ? 0 : 48,
-            bottom: 8,
-          ),
+          margin: EdgeInsets.only(left: isUser ? 48 : 0, bottom: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: isUser

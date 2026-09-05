@@ -40,6 +40,9 @@ abstract class AppLocalizations {
   String get properties;
   String get openWith;
   String get chooseDefaultApp;
+  String get useSelectedAppAsVideoDefault;
+  String get applicationsLoadError;
+  String get noApplicationsFound;
   String get setCoolBirdAsDefaultForVideos;
   String get setCoolBirdAsDefaultForVideosAndroidHint;
   String get setCoolBirdAsDefaultForArchives;

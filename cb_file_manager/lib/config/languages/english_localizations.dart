@@ -68,6 +68,14 @@ class EnglishLocalizations implements AppLocalizations {
   String get openWith => 'Open with';
   @override
   String get chooseDefaultApp => 'Choose default app';
+
+  @override
+  String get useSelectedAppAsVideoDefault =>
+      'Use the selected app by default for videos in CB File Hub';
+  @override
+  String get applicationsLoadError => 'Could not load applications.';
+  @override
+  String get noApplicationsFound => 'No applications found for this file type.';
   @override
   String get setCoolBirdAsDefaultForVideos =>
       'Set CB File Hub as default for video files';

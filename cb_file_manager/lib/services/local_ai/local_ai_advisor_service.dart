@@ -43,6 +43,38 @@ class LocalAiAdvisorService {
   final LocalAiChatRuntime _ggufChatRuntime;
 
   static const List<HuggingFaceModelEntry> _curatedModels = [
+    // Artifact names/sizes verified against HF on 2026-09-06. Selection notes:
+    // docs/research/2026-09-06-small-local-agent-models.md (workspace root).
+    HuggingFaceModelEntry(
+      id: 'unsloth/Qwen3.5-4B-GGUF',
+      displayName: 'Qwen3.5 4B · Q4_K_M',
+      description:
+          'Recommended for file tools and Vietnamese chat. '
+          'Thinking enabled; needs more memory than 2B. Text only in this app.',
+      sizeBytes: 2740937888,
+      license: 'Apache 2.0',
+      artifactFileName: 'Qwen3.5-4B-Q4_K_M.gguf',
+    ),
+    HuggingFaceModelEntry(
+      id: 'unsloth/Qwen3.5-2B-GGUF',
+      displayName: 'Qwen3.5 2B · Q4_K_M',
+      description:
+          'Compact, direct-answer option for simple file tasks. Download: 1.28 GB. '
+          'Tag lookup and multi-step tool requests can be less reliable than 4B.',
+      sizeBytes: 1280835840,
+      license: 'Apache 2.0',
+      artifactFileName: 'Qwen3.5-2B-Q4_K_M.gguf',
+    ),
+    HuggingFaceModelEntry(
+      id: 'unsloth/Qwen3-4B-Instruct-2507-GGUF',
+      displayName: 'Qwen3 4B Instruct 2507 · Q4_K_M',
+      description:
+          'Direct answers without a thinking phase. A multilingual option for '
+          'instruction following and file tools when you prefer less waiting.',
+      sizeBytes: 2497281120,
+      license: 'Apache 2.0',
+      artifactFileName: 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
+    ),
     HuggingFaceModelEntry(
       id: 'litert-community/functiongemma-270m-ft-mobile-actions',
       displayName: 'FunctionGemma 270M Mobile Actions',
@@ -57,7 +89,8 @@ class LocalAiAdvisorService {
       id: 'unsloth/Qwen3-0.6B-GGUF',
       displayName: 'Qwen3 0.6B GGUF Q4_K_M',
       description:
-          'Lightweight Qwen3 tool-use/chat model. Runs via llama.cpp on CPU.',
+          'Smallest Qwen download for basic chat. Complex tool workflows are '
+          'better suited to the recommended 4B model.',
       sizeBytes: 396705472,
       license: 'Apache 2.0',
       compatible: true,
@@ -67,7 +100,8 @@ class LocalAiAdvisorService {
       id: 'ggml-org/Qwen3-1.7B-GGUF',
       displayName: 'Qwen3 1.7B GGUF Q4_K_M',
       description:
-          'Better agent/tool-call quality than 0.6B while still lightweight when quantized. Runs via llama.cpp on CPU.',
+          'Previous lightweight Qwen option with thinking and multilingual chat. '
+          'Qwen3.5 2B offers direct answers at a similar download size; choose 4B for tools.',
       sizeBytes: 1282439264,
       license: 'Apache 2.0',
       compatible: true,
@@ -89,9 +123,14 @@ class LocalAiAdvisorService {
        _documentsDirectoryProvider =
            documentsDirectoryProvider ?? getApplicationDocumentsDirectory;
 
-  /// The recommended model that can run in the current LiteRT-LM runtime.
-  HuggingFaceModelEntry get pinnedModel =>
-      _curatedModels.firstWhere((model) => model.compatible);
+  /// Windows uses bundled llama.cpp; retain the LiteRT recommendation elsewhere.
+  HuggingFaceModelEntry get pinnedModel => _curatedModels.firstWhere(
+    (model) =>
+        model.compatible &&
+        model.artifactFileName.endsWith(
+          Platform.isWindows ? '.gguf' : '.litertlm',
+        ),
+  );
 
   /// Returns the catalog entry matching [catalogId], or the pinned entry's
   /// match, falling back to null when unknown.
@@ -146,7 +185,7 @@ class LocalAiAdvisorService {
 
   /// Fetches the model catalog from Hugging Face API, or returns cached results.
   ///
-  /// Always includes curated mobile/tool-call recommendations at the top.
+  /// Always includes curated local agent recommendations at the top.
   /// For public models, API token is optional.
   Future<List<HuggingFaceModelEntry>> fetchModelCatalog({
     bool forceRefresh = false,

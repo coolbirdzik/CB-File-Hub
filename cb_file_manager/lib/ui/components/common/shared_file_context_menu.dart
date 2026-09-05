@@ -56,6 +56,9 @@ class ContextMenuAction {
   final List<ContextMenuSection>? childSections;
   final Future<List<ContextMenuSection>> Function(BuildContext context)?
   loadChildSections;
+
+  /// Begin optional discovery after the root popup has painted.
+  final bool preloadChildren;
   final FutureOr<void> Function(BuildContext context)? onSelected;
 
   const ContextMenuAction({
@@ -69,6 +72,7 @@ class ContextMenuAction {
     this.group,
     this.childSections,
     this.loadChildSections,
+    this.preloadChildren = false,
     this.onSelected,
   });
 }
@@ -86,7 +90,13 @@ class _ContextSubmenuOverlayEntry {
   final OverlayEntry entry;
   final Object owner;
 
-  const _ContextSubmenuOverlayEntry({required this.entry, required this.owner});
+  List<ContextMenuSection> sections;
+
+  _ContextSubmenuOverlayEntry({
+    required this.entry,
+    required this.owner,
+    required this.sections,
+  });
 }
 
 final List<_ContextSubmenuOverlayEntry> _submenuOverlayEntries =
@@ -113,7 +123,7 @@ void _removeContextSubmenu() {
 void _scheduleContextSubmenuRemoval() {
   _submenuCloseTimer?.cancel();
   _submenuCloseTimer = Timer(
-    const Duration(milliseconds: 120),
+    const Duration(milliseconds: 300),
     _removeContextSubmenu,
   );
 }
@@ -207,11 +217,11 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
 }) async {
   // Integration tests interact with Flutter PopupMenuItem widgets. A native
   // Shell session is outside the widget tree, so skip discovery in E2E mode.
-  if (!_canOfferWindowsShellMenu(paths) ||
-      paths.any(
-        (path) =>
-            FileSystemEntity.typeSync(path) == FileSystemEntityType.notFound,
-      )) {
+  if (!_canOfferWindowsShellMenu(paths)) {
+    return null;
+  }
+  final types = await Future.wait(paths.map(FileSystemEntity.type));
+  if (!context.mounted || types.contains(FileSystemEntityType.notFound)) {
     return null;
   }
 
@@ -227,7 +237,10 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
   }
 
   var generatedId = 0;
-  List<ContextMenuSection> convertEntries(List<WindowsShellMenuEntry> entries) {
+  List<ContextMenuSection> convertEntries(
+    List<WindowsShellMenuEntry> entries, {
+    Uint8List? parentIcon,
+  }) {
     final sections = <ContextMenuSection>[];
     var actions = <ContextMenuAction>[];
 
@@ -237,7 +250,8 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
       actions = <ContextMenuAction>[];
     }
 
-    for (final entry in entries) {
+    for (final rawEntry in entries) {
+      final entry = rawEntry.withInheritedIcon(parentIcon);
       if (entry.type == 'separator') {
         flushSection();
         continue;
@@ -276,7 +290,10 @@ Future<_LoadedWindowsShellMenu?> _loadWindowsShellMenu({
                         sessionId: session.id,
                         submenuId: submenuId,
                       );
-                  return convertEntries(childEntries);
+                  return convertEntries(
+                    childEntries,
+                    parentIcon: entry.iconBytes,
+                  );
                 },
           onSelected: commandId == null
               ? null
@@ -407,6 +424,7 @@ List<ContextMenuSection> _applyContextMenuLayout({
                 label: AppLocalizations.of(context)!.thirdPartyApps,
                 icon: PhosphorIconsLight.appWindow,
                 loadChildSections: loadShellSections,
+                preloadChildren: true,
               ),
             ],
           ),
@@ -458,12 +476,18 @@ Future<void> showContextMenuPopup({
   required List<ContextMenuSection> sections,
   required Offset globalPosition,
 }) async {
-  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  // showMenu pushes a route onto this Navigator. TabContentOverlay is closer
+  // to the file row, but sits below that route's modal barrier.
+  final overlay =
+      Navigator.of(context).overlay?.context.findRenderObject() as RenderBox?;
   if (overlay == null) return;
   _removeContextSubmenu();
 
   final RelativeRect position = RelativeRect.fromRect(
-    Rect.fromPoints(globalPosition, globalPosition),
+    Rect.fromPoints(
+      overlay.globalToLocal(globalPosition),
+      overlay.globalToLocal(globalPosition),
+    ),
     Offset.zero & overlay.size,
   );
   final menuColor = Theme.of(context).colorScheme.surface.withAlpha(255);
@@ -511,7 +535,14 @@ Future<void> showContextMenuPopup({
           PopupMenuItem<String>(
             value: action.id,
             enabled: action.isEnabled,
-            child: _buildContextMenuActionRow(context, action, forPopup: true),
+            child: MouseRegion(
+              onEnter: (_) => _scheduleContextSubmenuRemoval(),
+              child: _buildContextMenuActionRow(
+                context,
+                action,
+                forPopup: true,
+              ),
+            ),
           ),
         );
       }
@@ -664,6 +695,7 @@ _ContextSubmenuGeometry _contextSubmenuGeometry({
   required Size overlaySize,
   required Offset anchorPosition,
   required double itemWidth,
+  required double submenuHeight,
 }) {
   final availableWidth = math.max(
     0.0,
@@ -674,10 +706,7 @@ _ContextSubmenuGeometry _contextSubmenuGeometry({
     0.0,
     overlaySize.height - _contextSubmenuWindowPadding * 2,
   );
-  final submenuMaxHeight = math.min(
-    _contextSubmenuPreferredMaxHeight,
-    availableHeight,
-  );
+  final submenuMaxHeight = math.min(submenuHeight, availableHeight);
 
   double dx = anchorPosition.dx + itemWidth;
   if (dx + submenuWidth > overlaySize.width) {
@@ -724,6 +753,26 @@ class _ContextMenuPopupSubmenuTriggerState
   final Object _submenuOwner = Object();
   Future<List<ContextMenuSection>>? _sectionsFuture;
   List<ContextMenuSection>? _resolvedSections;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.action.preloadChildren) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.actionContext.mounted) _startLoading();
+      });
+    }
+  }
+
+  void _startLoading() {
+    final loader = widget.action.loadChildSections;
+    if (_sectionsFuture != null || loader == null) return;
+    final future = Future<List<ContextMenuSection>>.sync(
+      () => loader(widget.actionContext),
+    );
+    _sectionsFuture = future;
+    unawaited(_replaceLoadingSubmenu(future));
+  }
 
   List<ContextMenuSection> _loadingSections() {
     return <ContextMenuSection>[
@@ -815,11 +864,7 @@ class _ContextMenuPopupSubmenuTriggerState
     }
 
     _showSections(_loadingSections());
-    if (_sectionsFuture == null) {
-      final sectionsFuture = loader(widget.actionContext);
-      _sectionsFuture = sectionsFuture;
-      unawaited(_replaceLoadingSubmenu(sectionsFuture));
-    }
+    _startLoading();
   }
 
   @override
@@ -827,7 +872,6 @@ class _ContextMenuPopupSubmenuTriggerState
     return MouseRegion(
       key: _itemKey,
       onEnter: (_) => _openSubmenu(),
-      onExit: (_) => _scheduleContextSubmenuRemoval(),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _openSubmenu,
@@ -844,6 +888,46 @@ class _ContextMenuPopupSubmenuTriggerState
   }
 }
 
+class _ContextSubmenuLayoutDelegate extends SingleChildLayoutDelegate {
+  final Offset anchorPosition;
+  final double itemWidth;
+
+  _ContextSubmenuLayoutDelegate({
+    required this.anchorPosition,
+    required this.itemWidth,
+  });
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final width = math.min(
+      _contextSubmenuPreferredWidth,
+      math.max(0.0, constraints.maxWidth - 16),
+    );
+    return BoxConstraints(
+      minWidth: width,
+      maxWidth: width,
+      maxHeight: math.min(
+        _contextSubmenuPreferredMaxHeight,
+        math.max(0.0, constraints.maxHeight - 16),
+      ),
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) =>
+      _contextSubmenuGeometry(
+        overlaySize: size,
+        anchorPosition: anchorPosition,
+        itemWidth: itemWidth,
+        submenuHeight: childSize.height,
+      ).position;
+
+  @override
+  bool shouldRelayout(_ContextSubmenuLayoutDelegate oldDelegate) =>
+      anchorPosition != oldDelegate.anchorPosition ||
+      itemWidth != oldDelegate.itemWidth;
+}
+
 void _showContextSubmenuOverlay({
   required BuildContext actionContext,
   required BuildContext rootMenuContext,
@@ -853,36 +937,47 @@ void _showContextSubmenuOverlay({
   required int depth,
   required Object owner,
 }) {
+  if (_isContextSubmenuOwnerActive(depth, owner)) {
+    final active = _submenuOverlayEntries[depth];
+    if (!identical(active.sections, sections)) {
+      active.sections = sections;
+      active.entry.markNeedsBuild();
+    }
+    return;
+  }
   final anchorPosition = anchorBox.localToGlobal(
     Offset.zero,
     ancestor: overlayBox,
   );
-  final geometry = _contextSubmenuGeometry(
-    overlaySize: overlayBox.size,
-    anchorPosition: anchorPosition,
-    itemWidth: anchorBox.size.width,
-  );
-
+  final itemWidth = anchorBox.size.width;
   _removeContextSubmenusFrom(depth);
+  late final _ContextSubmenuOverlayEntry active;
   final entry = OverlayEntry(
-    builder: (_) => Positioned(
-      left: geometry.position.dx,
-      top: geometry.position.dy,
-      width: geometry.width,
-      child: _ContextSubmenuPanel(
-        actionContext: actionContext,
-        rootMenuContext: rootMenuContext,
-        overlayBox: overlayBox,
-        sections: sections,
-        depth: depth,
-        maxHeight: geometry.maxHeight,
+    builder: (_) => Positioned.fill(
+      child: CustomSingleChildLayout(
+        delegate: _ContextSubmenuLayoutDelegate(
+          anchorPosition: anchorPosition,
+          itemWidth: itemWidth,
+        ),
+        child: _ContextSubmenuPanel(
+          actionContext: actionContext,
+          rootMenuContext: rootMenuContext,
+          overlayBox: overlayBox,
+          sections: active.sections,
+          depth: depth,
+          maxHeight: _contextSubmenuPreferredMaxHeight,
+        ),
       ),
     ),
   );
-  _submenuOverlayEntries.add(
-    _ContextSubmenuOverlayEntry(entry: entry, owner: owner),
+  active = _ContextSubmenuOverlayEntry(
+    entry: entry,
+    owner: owner,
+    sections: sections,
   );
-  Overlay.of(actionContext).insert(entry);
+  _submenuOverlayEntries.add(active);
+  // Keep every submenu above the same barrier as its owning popup route.
+  Navigator.of(rootMenuContext).overlay!.insert(entry);
 }
 
 class _ContextSubmenuPanel extends StatelessWidget {
@@ -906,7 +1001,6 @@ class _ContextSubmenuPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return MouseRegion(
       onEnter: (_) => _cancelContextSubmenuRemoval(),
-      onExit: (_) => _scheduleContextSubmenuRemoval(),
       child: Material(
         color: Theme.of(actionContext).colorScheme.surface.withAlpha(255),
         elevation: 4,
@@ -941,6 +1035,7 @@ class _ContextSubmenuPanel extends StatelessWidget {
                       ),
                     for (final childAction in sections[sectionIndex].actions)
                       _ContextSubmenuActionRow(
+                        key: ValueKey(childAction.id),
                         actionContext: actionContext,
                         rootMenuContext: rootMenuContext,
                         overlayBox: overlayBox,
@@ -966,6 +1061,7 @@ class _ContextSubmenuActionRow extends StatefulWidget {
   final int depth;
 
   const _ContextSubmenuActionRow({
+    super.key,
     required this.actionContext,
     required this.rootMenuContext,
     required this.overlayBox,
@@ -1645,18 +1741,6 @@ List<ContextMenuSection> _buildFileContextMenuSections({
           onSelected: (_) => RouteUtils.showAcrylicDialog(
             context: context,
             builder: (_) => OpenWithDialog(filePath: file.path),
-          ),
-        ),
-        ContextMenuAction(
-          id: 'choose_default_app',
-          label: l10n.chooseDefaultApp,
-          icon: PhosphorIconsLight.appWindow,
-          onSelected: (_) => RouteUtils.showAcrylicDialog(
-            context: context,
-            builder: (_) => OpenWithDialog(
-              filePath: file.path,
-              saveAsDefaultOnSelect: true,
-            ),
           ),
         ),
         if (canDownloadRemote)

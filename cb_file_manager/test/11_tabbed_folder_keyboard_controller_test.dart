@@ -9,6 +9,60 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
 
 void main() {
+  testWidgets('List arrow navigation follows responsive columns and resize', (
+    tester,
+  ) async {
+    final controller = TabbedFolderKeyboardController();
+    addTearDown(controller.dispose);
+    final files = List.generate(12, (i) => File('C:/list/file$i.txt'));
+    final state = FolderListState(
+      'C:/list',
+      files: files,
+      viewMode: ViewMode.list,
+    );
+    controller.focusedPath = files.first.path;
+    int rows = 4;
+    void press(LogicalKeyboardKey key, PhysicalKeyboardKey physical) {
+      controller.handleKeyEvent(
+        isDesktop: true,
+        folderListState: state,
+        selectionState: const SelectionState(),
+        currentFilter: null,
+        gridCrossAxisCount: rows,
+        onBackInTabHistory: () {},
+        focusFolderPath: (_) {},
+        focusFilePath: (_) {},
+        selectRange:
+            ({
+              required Set<String> folderPaths,
+              required Set<String> filePaths,
+              required String lastSelectedPath,
+              required bool ctrlSelect,
+            }) {},
+        activateEntity: (_) {},
+        onDelete: (_) {},
+        event: KeyDownEvent(
+          logicalKey: key,
+          physicalKey: physical,
+          timeStamp: Duration.zero,
+        ),
+      );
+    }
+
+    press(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+    expect(controller.focusedPath, files[1].path);
+    press(LogicalKeyboardKey.arrowRight, PhysicalKeyboardKey.arrowRight);
+    expect(controller.focusedPath, files[5].path);
+    rows = 2;
+    press(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+    expect(controller.focusedPath, files[6].path);
+    press(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
+    expect(controller.focusedPath, files[5].path);
+    press(LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft);
+    expect(controller.focusedPath, files[3].path);
+    await tester.pump();
+  });
+
   testWidgets('11.01 Shift+arrow extends selection from the original anchor', (
     tester,
   ) async {

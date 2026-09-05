@@ -68,6 +68,14 @@ class VietnameseLocalizations implements AppLocalizations {
   String get openWith => 'Mở bằng';
   @override
   String get chooseDefaultApp => 'Chọn ứng dụng mặc định';
+
+  @override
+  String get useSelectedAppAsVideoDefault =>
+      'Dùng ứng dụng được chọn làm mặc định cho video trong CB File Hub';
+  @override
+  String get applicationsLoadError => 'Không thể tải danh sách ứng dụng.';
+  @override
+  String get noApplicationsFound => 'Không tìm thấy ứng dụng cho loại tệp này.';
   @override
   String get setCoolBirdAsDefaultForVideos =>
       'Đặt CB File Hub làm mặc định cho file video';

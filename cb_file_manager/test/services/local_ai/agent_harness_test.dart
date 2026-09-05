@@ -42,7 +42,8 @@ void main() {
   Future<AiAgentBloc> local(_Runtime runtime) async {
     final prefs = await SharedPreferences.getInstance();
     final model = InstalledLocalModel(
-      catalogId: 'test/qwen',
+      catalogId:
+          Platform.environment['CB_LOCAL_CHAT_TEST_MODEL'] ?? 'test/qwen',
       displayName: 'Qwen3',
       localPath: 'test.gguf',
       sizeBytes: 1,
@@ -220,7 +221,7 @@ void main() {
   final liveUrl = Platform.environment['CB_LOCAL_CHAT_TEST_URL'];
   for (final scenario in ['files', 'tags', 'read', 'manage']) {
     test(
-      'live Qwen common workflow: $scenario',
+      'live local model common workflow: $scenario',
       () async {
         final runtime = _Runtime([], liveUrl: liveUrl);
         final bloc = await local(runtime);
@@ -337,6 +338,7 @@ class _Runtime extends LocalAiChatRuntime
           ...messages,
         ],
         maxResponseTokens: 2048,
+        catalogId: model.catalogId,
       );
     }
     return Stream.value(responses[requests.length - 1]);

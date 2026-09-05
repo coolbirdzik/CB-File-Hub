@@ -11,6 +11,7 @@ class LlamaCppChatClient {
     required Uri baseUri,
     required List<Map<String, String>> messages,
     required int maxResponseTokens,
+    String catalogId = '',
   }) async* {
     final request = await httpClient.postUrl(
       baseUri.resolve('/v1/chat/completions'),
@@ -23,13 +24,9 @@ class LlamaCppChatClient {
           'max_tokens': maxResponseTokens,
           'stream': true,
           'cache_prompt': true,
-          'chat_template_kwargs': {'enable_thinking': true},
           // Keep reasoning separate so it can be displayed in a disclosure.
           'reasoning_format': 'auto',
-          'temperature': 0.6,
-          'top_k': 20,
-          'top_p': 0.95,
-          'min_p': 0.0,
+          ..._generationParameters(catalogId),
         }),
       ),
     );
@@ -102,5 +99,24 @@ class LlamaCppChatClient {
     if (!hasContent) {
       throw StateError('The local model returned no answer. Please retry.');
     }
+  }
+
+  /// Publisher sampling recommendations for the curated model families.
+  /// Existing Qwen3/unknown models retain the original thinking configuration.
+  static Map<String, dynamic> _generationParameters(String catalogId) {
+    final name = catalogId.split('/').last.toLowerCase();
+    final instructOnly = name.startsWith('qwen3-4b-instruct-2507');
+    final qwen35 = name.startsWith('qwen3.5-');
+    // The 2B release defaults to non-thinking; reserve explicit reasoning for 4B.
+    final direct = instructOnly || name.startsWith('qwen3.5-2b-');
+    return {
+      'chat_template_kwargs': {'enable_thinking': !direct},
+      'temperature': direct ? 0.7 : (qwen35 ? 1.0 : 0.6),
+      'top_k': 20,
+      'top_p': direct ? 0.8 : 0.95,
+      'min_p': 0.0,
+      if (qwen35) 'presence_penalty': 1.5,
+      if (qwen35) 'repeat_penalty': 1.0,
+    };
   }
 }

@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <wrl/client.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -612,6 +613,89 @@ std::vector<uint8_t> EncodeMenuBitmap(HBITMAP bitmap) {
   return encoded;
 }
 
+// Some extensions expose HBMMENU_CALLBACK instead of an HBITMAP. Ask the
+// existing Shell handler to paint just that icon; never owner-draw an entire
+// text row into the icon slot. Two backgrounds recover transparency for GDI.
+std::vector<uint8_t> EncodeCallbackMenuIcon(
+    HMENU menu, const MENUITEMINFOW& item, LoadedShellMenuSession& session) {
+  if (item.hbmpItem != HBMMENU_CALLBACK || (item.fType & MFT_OWNERDRAW) != 0 ||
+      (!session.shell.state.menu3 && !session.shell.state.menu2)) {
+    return {};
+  }
+  auto send = [&](UINT message, LPARAM data) {
+    if (session.shell.state.menu3) {
+      LRESULT result = 0;
+      return SUCCEEDED(session.shell.state.menu3->HandleMenuMsg2(
+          message, 0, data, &result));
+    }
+    return SUCCEEDED(session.shell.state.menu2->HandleMenuMsg(message, 0, data));
+  };
+  MEASUREITEMSTRUCT measure{};
+  measure.CtlType = ODT_MENU;
+  measure.itemID = item.wID;
+  measure.itemData = item.dwItemData;
+  measure.itemWidth = GetSystemMetrics(SM_CXSMICON);
+  measure.itemHeight = GetSystemMetrics(SM_CYSMICON);
+  send(WM_MEASUREITEM, reinterpret_cast<LPARAM>(&measure));
+  if (measure.itemWidth == 0 || measure.itemHeight == 0 ||
+      measure.itemWidth > 64 || measure.itemHeight > 64) return {};
+  const int width = static_cast<int>(measure.itemWidth);
+  const int height = static_cast<int>(measure.itemHeight);
+  BITMAPINFO info{};
+  info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  info.bmiHeader.biWidth = width;
+  info.bmiHeader.biHeight = -height;
+  info.bmiHeader.biPlanes = 1;
+  info.bmiHeader.biBitCount = 32;
+  info.bmiHeader.biCompression = BI_RGB;
+  void* bits = nullptr;
+  HDC dc = CreateCompatibleDC(nullptr);
+  if (!dc) return {};
+  HBITMAP bitmap = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+  if (!bitmap || !bits) {
+    if (bitmap) DeleteObject(bitmap);
+    DeleteDC(dc);
+    return {};
+  }
+  HGDIOBJ previous = SelectObject(dc, bitmap);
+  DRAWITEMSTRUCT draw{};
+  draw.CtlType = ODT_MENU;
+  draw.itemID = item.wID;
+  draw.itemAction = ODA_DRAWENTIRE;
+  draw.itemState = (item.fState & MFS_DISABLED) ? ODS_DISABLED : 0;
+  draw.hwndItem = reinterpret_cast<HWND>(menu);
+  draw.hDC = dc;
+  draw.rcItem = RECT{0, 0, width, height};
+  draw.itemData = item.dwItemData;
+  const size_t size = static_cast<size_t>(width) * height * 4;
+  std::memset(bits, 0, size);
+  const bool painted = send(WM_DRAWITEM, reinterpret_cast<LPARAM>(&draw));
+  GdiFlush();
+  std::vector<uint8_t> black(static_cast<uint8_t*>(bits), static_cast<uint8_t*>(bits) + size);
+  std::memset(bits, 255, size);
+  const bool painted_white = send(WM_DRAWITEM, reinterpret_cast<LPARAM>(&draw));
+  GdiFlush();
+  auto* pixels = static_cast<uint8_t*>(bits);
+  bool visible = false;
+  for (size_t i = 0; i < size; i += 4) {
+    int difference = 0;
+    for (size_t c = 0; c < 3; ++c) {
+      difference = (std::max)(difference, static_cast<int>(pixels[i + c]) - black[i + c]);
+    }
+    const int alpha = 255 - difference;
+    for (size_t c = 0; c < 3; ++c) {
+      pixels[i + c] = alpha == 0 ? 0 : static_cast<uint8_t>((std::min)(255, black[i + c] * 255 / alpha));
+    }
+    pixels[i + 3] = static_cast<uint8_t>(alpha);
+    visible = visible || alpha > 0;
+  }
+  SelectObject(dc, previous);
+  auto encoded = painted && painted_white && visible ? EncodeMenuBitmap(bitmap) : std::vector<uint8_t>{};
+  DeleteObject(bitmap);
+  DeleteDC(dc);
+  return encoded;
+}
+
 constexpr UINT kLoadedShellCommandFirst = 1;
 constexpr UINT kLoadedShellCommandLast = 0x7FFF;
 
@@ -630,7 +714,8 @@ flutter::EncodableList EncodeShellMenuEntries(
     MENUITEMINFOW mii{};
     mii.cbSize = sizeof(mii);
     mii.fMask =
-        MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_BITMAP;
+        MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_BITMAP |
+        MIIM_CHECKMARKS | MIIM_DATA;
     if (!GetMenuItemInfoW(menu, static_cast<UINT>(i), TRUE, &mii)) {
       continue;
     }
@@ -656,6 +741,12 @@ flutter::EncodableList EncodeShellMenuEntries(
     entry[flutter::EncodableValue("checked")] =
         flutter::EncodableValue((mii.fState & MFS_CHECKED) != 0);
     std::vector<uint8_t> icon_bytes = EncodeMenuBitmap(mii.hbmpItem);
+    if (icon_bytes.empty()) {
+      icon_bytes = EncodeCallbackMenuIcon(menu, mii, session);
+    }
+    if (icon_bytes.empty()) {
+      icon_bytes = EncodeMenuBitmap(mii.hbmpUnchecked);
+    }
     if (!icon_bytes.empty()) {
       entry[flutter::EncodableValue("iconBytes")] =
           flutter::EncodableValue(icon_bytes);

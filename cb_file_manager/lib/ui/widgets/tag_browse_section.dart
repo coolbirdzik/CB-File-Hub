@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -281,9 +282,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   }
 
   int _compareDisplay(Map<String, String> display, String a, String b) {
-    final aName = (display[a] ?? a).toLowerCase();
-    final bName = (display[b] ?? b).toLowerCase();
-    return aName.compareTo(bName);
+    return TextUtils.compareAlphabetically(display[a] ?? a, display[b] ?? b);
   }
 
   String _nameOf(String normalized) => _display[normalized] ?? normalized;

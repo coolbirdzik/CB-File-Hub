@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/compact_file_list_content.dart';
 import 'dart:io';
 import 'dart:async'; // Thêm import cho StreamSubscription
 // For lerpDouble
@@ -85,6 +86,7 @@ class FileItem extends StatefulWidget {
   lastSelectedPath; // Add parameter to track last selected file for shift-selection
   final bool showFileTags; // Add parameter to control tag display
   final bool showItemBackground;
+  final bool compact;
 
   const FileItem({
     super.key,
@@ -102,6 +104,7 @@ class FileItem extends StatefulWidget {
     this.lastSelectedPath,
     this.showFileTags = true, // Default to showing tags
     this.showItemBackground = true,
+    this.compact = false,
   });
 
   @override
@@ -466,30 +469,41 @@ class _FileItemState extends State<FileItem> {
                         // File content that doesn't need to rebuild on selection changes
                         RepaintBoundary(
                           key: ValueKey('content_${widget.file.path}'),
-                          child: _FileItemContent(
-                            file: widget.file,
-                            fileTags: _fileTags,
-                            state: widget.state,
-                            showDeleteTagDialog: widget.showDeleteTagDialog,
-                            showAddTagToFileDialog:
-                                widget.showAddTagToFileDialog,
-                            removeTagDirectly: _removeTagDirectly,
-                            showFileTags: widget.showFileTags,
-                            renameController: renameController,
-                            isBeingRenamed: isBeingRenamed,
-                          ),
+                          child: widget.compact
+                              ? CompactFileListContent(path: widget.file.path)
+                              : _FileItemContent(
+                                  file: widget.file,
+                                  fileTags: _fileTags,
+                                  state: widget.state,
+                                  showDeleteTagDialog:
+                                      widget.showDeleteTagDialog,
+                                  showAddTagToFileDialog:
+                                      widget.showAddTagToFileDialog,
+                                  removeTagDirectly: _removeTagDirectly,
+                                  showFileTags: widget.showFileTags,
+                                  renameController: renameController,
+                                  isBeingRenamed: isBeingRenamed,
+                                ),
                         ),
                         // Interactive layer cho icon (select)
                         Positioned(
                           left: 0,
                           top: 0,
                           bottom: 0,
-                          width: 80, // Vùng icon + padding
+                          width: widget.compact
+                              ? 36
+                              : 80, // Vùng icon + padding
                           child: OptimizedInteractionLayer(
                             onTap: () {
                               // Click vào icon sẽ select item
                               _handleSelection();
                             },
+                            onDoubleTap: widget.compact && widget.isDesktopMode
+                                ? () {
+                                    _handleSelection();
+                                    _openFile(isVideo, isImage);
+                                  }
+                                : null,
                             onLongPress: !widget.isDesktopMode
                                 ? () {
                                     if (!widget.isSelectionMode) {
@@ -507,7 +521,7 @@ class _FileItemState extends State<FileItem> {
                         if (!isBeingRenamed)
                           Positioned(
                             key: const ValueKey('name-hit-area'),
-                            left: 80,
+                            left: widget.compact ? 36 : 80,
                             top: 0,
                             right: 0,
                             bottom: 0,

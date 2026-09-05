@@ -14,7 +14,6 @@ const List<String> defaultFileContextMenuLayout = <String>[
   'open_in_new_tab',
   'open_in_new_window',
   'open_with',
-  'choose_default_app',
   'download',
   'copy',
   'cut',
