@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/inline_rename_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 /// A tile at the default grid zoom, and the band inside it once both grid
 /// items have applied their 4px inset.
@@ -33,7 +34,11 @@ const String _longName =
 InlineRenameController _renaming(String name) {
   final controller = InlineRenameController();
   addTearDown(controller.dispose);
-  controller.startRename('C:\\photos\\$name');
+  // The controller parses the path with the host platform's rules, so the
+  // path must be built in the host's own separator style. A hard-coded
+  // "C:\..." path parses as one segment on Linux, and the whole path would
+  // become the name being edited.
+  controller.startRename(p.join('photos', name));
   return controller;
 }
 

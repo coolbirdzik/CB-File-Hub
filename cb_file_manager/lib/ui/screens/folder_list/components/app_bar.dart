@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/tab_manager/components/tag_dialogs.dart';
-import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:path/path.dart' as path;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -208,15 +206,6 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
               case 'manage_tags':
                 showManageTagsDialog(context, allTags, currentPath);
                 break;
-              case 'debug_apk':
-                await FileIconHelper.debugApkIcons();
-                if (context.mounted) {
-                  AppToast.info(
-                    context,
-                    'APK icon cache cleared. Check console for debug info.',
-                  );
-                }
-                break;
             }
           },
           itemBuilder: (context) => [
@@ -259,20 +248,6 @@ class FolderListAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   const SizedBox(width: 12),
                   const Text('Manage Tags'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'debug_apk',
-              child: Row(
-                children: [
-                  Icon(
-                    PhosphorIconsLight.gear,
-                    size: 20,
-                    color: theme.iconTheme.color,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Debug APK Icons'),
                 ],
               ),
             ),
