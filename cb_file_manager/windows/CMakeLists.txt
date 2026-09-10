@@ -23,11 +23,6 @@ if(POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)  # Allow deprecated FetchContent_Populate
 endif()
 
-# Additional policy for modern CMake compatibility
-if(POLICY CMP0146)
-    cmake_policy(SET CMP0146 OLD)  # Allow legacy file handling
-endif()
-
 # Suppress developer warnings globally for this project
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS TRUE CACHE BOOL "Suppress CMake developer warnings")
 
