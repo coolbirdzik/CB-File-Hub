@@ -42,6 +42,9 @@ const _kAllGroups = [
   '10 Edge Cases & Error Handling',
   '11 Extended File Operations',
   'Video Thumbnails',
+  'Media Kit Playback',
+  'FFmpeg Thumbnails',
+  'File Drag Drop',
 ];
 
 const _kWorkersDir = 'build/e2e_workers';
@@ -53,6 +56,15 @@ const _kAppE2ETestFile = 'integration_test/app_e2e_test.dart';
 const _kVideoThumbnailsE2ETestFile =
     'integration_test/video_thumbnails_e2e_test.dart';
 const _kVideoThumbnailsGroup = 'Video Thumbnails';
+const _kMediaKitPlaybackE2ETestFile =
+    'integration_test/media_kit_playback_e2e_test.dart';
+const _kMediaKitPlaybackGroup = 'Media Kit Playback';
+const _kFfmpegThumbnailE2ETestFile =
+    'integration_test/ffmpeg_thumbnail_e2e_test.dart';
+const _kFfmpegThumbnailGroup = 'FFmpeg Thumbnails';
+const _kFileDragDropE2ETestFile =
+    'integration_test/file_drag_drop_e2e_test.dart';
+const _kFileDragDropGroup = 'File Drag Drop';
 
 Future<void> main(List<String> args) async {
   // ---- Parse args ----
@@ -510,9 +522,18 @@ Future<_WorkerResult> _runWorker(
 }
 
 String _testFileForGroup(String group) {
-  return group == _kVideoThumbnailsGroup
-      ? _kVideoThumbnailsE2ETestFile
-      : _kAppE2ETestFile;
+  switch (group) {
+    case _kVideoThumbnailsGroup:
+      return _kVideoThumbnailsE2ETestFile;
+    case _kMediaKitPlaybackGroup:
+      return _kMediaKitPlaybackE2ETestFile;
+    case _kFfmpegThumbnailGroup:
+      return _kFfmpegThumbnailE2ETestFile;
+    case _kFileDragDropGroup:
+      return _kFileDragDropE2ETestFile;
+    default:
+      return _kAppE2ETestFile;
+  }
 }
 
 Future<void> _drain(Stream<List<int>> input, List<IOSink> sinks) async {

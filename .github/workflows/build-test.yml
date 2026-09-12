@@ -127,6 +127,36 @@ jobs:
           cd ${{ env.PROJECT_DIR }}
           flutter test integration_test/video_thumbnails_e2e_test.dart -d windows --dart-define=CB_E2E=true
 
+      - name: Stop stray cb_file_hub.exe (after video_thumbnails_e2e_test)
+        if: always()
+        shell: cmd
+        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+
+      - name: Run integration tests - media_kit_playback_e2e_test
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter test integration_test/media_kit_playback_e2e_test.dart -d windows
+
+      - name: Stop stray cb_file_hub.exe (after media_kit_playback_e2e_test)
+        if: always()
+        shell: cmd
+        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+
+      - name: Run integration tests - ffmpeg_thumbnail_e2e_test
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter test integration_test/ffmpeg_thumbnail_e2e_test.dart -d windows
+
+      - name: Stop stray cb_file_hub.exe (after ffmpeg_thumbnail_e2e_test)
+        if: always()
+        shell: cmd
+        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+
+      - name: Run integration tests - file_drag_drop_e2e_test
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter test integration_test/file_drag_drop_e2e_test.dart -d windows
+
       - name: Stop stray cb_file_hub.exe (cleanup)
         if: always()
         shell: cmd
