@@ -130,7 +130,7 @@ dashboard: _open-dashboard
 e2e-list:
     @echo "Available E2E test cases (use as: just e2e \"<name>\"):"
     @echo ""
-    @grep -hE "^[[:space:]]*(group\\(|testWidgets\\()'" {{project_dir}}/integration_test/app_e2e_test.dart {{project_dir}}/integration_test/video_thumbnails_e2e_test.dart {{project_dir}}/integration_test/media_kit_playback_e2e_test.dart {{project_dir}}/integration_test/ffmpeg_thumbnail_e2e_test.dart {{project_dir}}/integration_test/file_drag_drop_e2e_test.dart 2>/dev/null | sed -E -e "s|^[[:space:]]*group\\('([^']+)'.*|\\n[\\1]|" -e "s|^[[:space:]]*testWidgets\\('([^']+)'.*|  - \\1|"
+    @grep -hE "^[[:space:]]*(group\\(|testWidgets\\()'" {{project_dir}}/integration_test/app_e2e_test.dart {{project_dir}}/integration_test/video_thumbnails_e2e_test.dart {{project_dir}}/integration_test/media_kit_playback_e2e_test.dart {{project_dir}}/integration_test/ffmpeg_thumbnail_e2e_test.dart {{project_dir}}/integration_test/file_drag_drop_e2e_test.dart {{project_dir}}/integration_test/breadcrumb_address_bar_overflow_e2e_test.dart 2>/dev/null | sed -E -e "s|^[[:space:]]*group\\('([^']+)'.*|\\n[\\1]|" -e "s|^[[:space:]]*testWidgets\\('([^']+)'.*|  - \\1|"
 
 # Internal: open dashboard in default browser
 [private]

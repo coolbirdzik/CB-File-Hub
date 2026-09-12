@@ -191,6 +191,10 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
 
   double _estimatedNaturalWidth(BuildContext context) {
     final textScaler = MediaQuery.textScalerOf(context);
+    // Match the font actual chip labels inherit (the user can pick among
+    // several UI fonts in settings; a bare TextStyle here would measure with
+    // Flutter's default font instead and under-count non-default choices).
+    final fontFamily = DefaultTextStyle.of(context).style.fontFamily;
     double width = (widget.segments.length - 1).clamp(0, 100000) * 15.0;
 
     for (int i = 0; i < widget.segments.length; i++) {
@@ -199,6 +203,7 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
       width += _measureTextWidth(
         segment.label,
         TextStyle(
+          fontFamily: fontFamily,
           fontSize: 13,
           fontWeight: i == widget.segments.length - 1
               ? FontWeight.w500
@@ -212,12 +217,16 @@ class _BreadcrumbAddressBarState extends State<BreadcrumbAddressBar> {
             6 +
             _measureTextWidth(
               segment.badge!,
-              const TextStyle(fontSize: 11),
+              TextStyle(fontFamily: fontFamily, fontSize: 11),
               textScaler,
             );
       }
     }
-    return width;
+    // Defensive margin: text shaping/hinting still varies a few px across
+    // platforms even with a matched font family, and a RenderFlex overflow
+    // here is a hard failure (not a cosmetic nit) — so err toward the
+    // (harmless) compact/Flexible layout rather than risk overflowing.
+    return width + 16.0;
   }
 
   double _measureTextWidth(

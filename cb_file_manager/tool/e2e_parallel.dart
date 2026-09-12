@@ -45,6 +45,7 @@ const _kAllGroups = [
   'Media Kit Playback',
   'FFmpeg Thumbnails',
   'File Drag Drop',
+  'Breadcrumb Overflow',
 ];
 
 const _kWorkersDir = 'build/e2e_workers';
@@ -65,6 +66,9 @@ const _kFfmpegThumbnailGroup = 'FFmpeg Thumbnails';
 const _kFileDragDropE2ETestFile =
     'integration_test/file_drag_drop_e2e_test.dart';
 const _kFileDragDropGroup = 'File Drag Drop';
+const _kBreadcrumbOverflowE2ETestFile =
+    'integration_test/breadcrumb_address_bar_overflow_e2e_test.dart';
+const _kBreadcrumbOverflowGroup = 'Breadcrumb Overflow';
 
 Future<void> main(List<String> args) async {
   // ---- Parse args ----
@@ -531,6 +535,8 @@ String _testFileForGroup(String group) {
       return _kFfmpegThumbnailE2ETestFile;
     case _kFileDragDropGroup:
       return _kFileDragDropE2ETestFile;
+    case _kBreadcrumbOverflowGroup:
+      return _kBreadcrumbOverflowE2ETestFile;
     default:
       return _kAppE2ETestFile;
   }

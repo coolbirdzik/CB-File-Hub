@@ -157,6 +157,16 @@ jobs:
           cd ${{ env.PROJECT_DIR }}
           flutter test integration_test/file_drag_drop_e2e_test.dart -d windows
 
+      - name: Stop stray cb_file_hub.exe (after file_drag_drop_e2e_test)
+        if: always()
+        shell: cmd
+        run: taskkill /F /IM cb_file_hub.exe /T 2>nul & exit /b 0
+
+      - name: Run integration tests - breadcrumb_address_bar_overflow_e2e_test
+        run: |
+          cd ${{ env.PROJECT_DIR }}
+          flutter test integration_test/breadcrumb_address_bar_overflow_e2e_test.dart -d windows
+
       - name: Stop stray cb_file_hub.exe (cleanup)
         if: always()
         shell: cmd

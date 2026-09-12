@@ -45,10 +45,21 @@ Set<String> _failuresFromExpanded(List<String> allLines) {
   return failed;
 }
 
+/// Matches the placeholder flutter_test's own default exception reporter
+/// substitutes for an uncaught FlutterError (e.g. a RenderFlex overflow
+/// during layout). The real error text isn't lost — FlutterError.
+/// dumpErrorToConsole prints it separately as plain "print" events — but
+/// the structured "error" field only ever contains this generic sentence,
+/// so a naive reader of the JSONL sees nothing useful. See
+/// package:flutter_test/src/test_exception_reporter.dart.
+bool _isGenericFlutterErrorPlaceholder(String diagnostic) =>
+    diagnostic.startsWith('Test failed. See exception logs above.');
+
 _JsonFailureSummary _failuresFromJson(List<String> allLines) {
   final idToName = <int, String>{};
   final failed = <String>{};
   final diagnosticsByTestId = <int, List<String>>{};
+  final printsByTestId = <int, List<String>>{};
   for (final line in allLines) {
     final t = line.trim();
     if (t.isEmpty || !t.startsWith('{')) {
@@ -72,6 +83,12 @@ _JsonFailureSummary _failuresFromJson(List<String> allLines) {
           idToName[id] = name;
         }
       }
+    } else if (type == 'print') {
+      final testID = j['testID'];
+      final message = j['message'];
+      if (testID is int && message is String) {
+        printsByTestId.putIfAbsent(testID, () => []).add(message);
+      }
     } else if (type == 'error') {
       final testID = j['testID'];
       if (testID is! int) continue;
@@ -80,6 +97,12 @@ _JsonFailureSummary _failuresFromJson(List<String> allLines) {
       final diagnostics = diagnosticsByTestId.putIfAbsent(testID, () => []);
       if (error is String && error.trim().isNotEmpty) {
         diagnostics.add(error.trim());
+        if (_isGenericFlutterErrorPlaceholder(error.trim())) {
+          final block = _extractFlutterErrorBlock(
+            printsByTestId[testID] ?? const [],
+          );
+          if (block != null) diagnostics.add(block);
+        }
       }
       if (stackTrace is String && stackTrace.trim().isNotEmpty) {
         diagnostics.add(stackTrace.trim());
@@ -104,6 +127,31 @@ _JsonFailureSummary _failuresFromJson(List<String> allLines) {
     failedNames: failed,
     diagnosticsByTest: diagnosticsByTest,
   );
+}
+
+/// Recovers the real FlutterError text for a test whose structured "error"
+/// field is only the generic placeholder. `FlutterError.dumpErrorToConsole`
+/// prints the actual box (`══╡ EXCEPTION CAUGHT BY ... ╞══`, the assertion,
+/// the offending widget) as plain lines tagged with the same testID, so it's
+/// recoverable from the test's own print stream — just not from the "error"
+/// field flutter_test itself populates.
+String? _extractFlutterErrorBlock(List<String> prints) {
+  final start = prints.lastIndexWhere((m) => m.contains('EXCEPTION CAUGHT BY'));
+  if (start == -1) return null;
+  const maxLines = 40;
+  final block = <String>[];
+  for (var i = start; i < prints.length && block.length < maxLines; i++) {
+    block.add(prints[i]);
+    // The box closes with a full-width line of '═' — stop there rather than
+    // spilling into whatever the test printed next.
+    if (i > start &&
+        prints[i].trim().isNotEmpty &&
+        prints[i].trim().split('').toSet().length == 1 &&
+        prints[i].contains('═')) {
+      break;
+    }
+  }
+  return block.join('\n');
 }
 
 void _printBox(
