@@ -22,6 +22,7 @@ import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/soft_checkbox.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/widgets/drag_selection_geometry.dart';
 import 'package:cb_file_manager/ui/widgets/selection_rectangle_painter.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
@@ -197,8 +198,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   // Drag selection state (with rectangle selection - like Windows Explorer)
   bool _isDraggingRect = false;
   Offset? _dragStartPosition;
-  Offset? _dragCurrentPosition;
-  final Map<String, Rect> _tagItemPositions = {};
+  final ValueNotifier<Rect?> _dragSelectionRect = ValueNotifier<Rect?>(null);
+  final Map<String, BuildContext> _tagItemContexts = {};
+  final GlobalKey _tagSelectionStackKey = GlobalKey(
+    debugLabel: 'tag-selection-stack',
+  );
 
   @override
   void initState() {
@@ -523,6 +527,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     _searchController.removeQueryListener(_filterTags);
     _searchController.dispose();
     _addressController.dispose();
+    _dragSelectionRect.dispose();
     _editingTagController?.dispose();
     _editingTagFocusNode?.dispose();
     super.dispose();
@@ -606,7 +611,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   void _filterTags() {
     if (!mounted) return;
 
-    final String query = _searchController.text.toLowerCase().trim();
+    final String query = _searchController.text.trim();
 
     setState(() {
       // Step 1: Text search
@@ -623,7 +628,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         // Searching ignores the drill scope and matches across the whole
         // hierarchy so children are always findable.
         result = _allTags
-            .where((tag) => tag.toLowerCase().contains(query))
+            .where((tag) => TextUtils.matchesSearch(tag, query))
             .toList();
       }
 
@@ -1010,58 +1015,74 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     });
   }
 
-  /// Register tag item position for rectangle selection
-  void _registerTagPosition(String tag, Rect position) {
-    _tagItemPositions[tag] = position;
+  /// Register the live item context used for rectangle-selection hit testing.
+  /// Resolving its bounds at hit-test time keeps positions correct after a
+  /// scroll and avoids a post-frame callback for every visible tag.
+  void _registerTagContext(String tag, BuildContext itemContext) {
+    _tagItemContexts[tag] = itemContext;
   }
 
-  /// Clear all registered tag positions
-  void _clearTagPositions() {
-    _tagItemPositions.clear();
+  /// Clear all registered tag item contexts.
+  void _clearTagContexts() {
+    _tagItemContexts.clear();
   }
 
   /// Start drag selection with rectangle (like Windows Explorer)
   void _startRectDragSelection(Offset position) {
     if (_isDraggingRect) return;
-    setState(() {
-      _isDraggingRect = true;
-      _dragStartPosition = position;
-      _dragCurrentPosition = position;
-      _selectedTags.clear();
-    });
+    _isDraggingRect = true;
+    _dragStartPosition = position;
+    _dragSelectionRect.value = Rect.fromPoints(position, position);
+
+    if (_selectedTags.isNotEmpty) {
+      setState(_selectedTags.clear);
+    }
   }
 
   /// Update drag selection rectangle
   void _updateRectDragSelection(Offset position) {
     if (!_isDraggingRect) return;
-    setState(() {
-      _dragCurrentPosition = position;
-      _selectTagsInRect();
-    });
+    final startPosition = _dragStartPosition;
+    if (startPosition == null) return;
+
+    final selectionRect = Rect.fromPoints(startPosition, position);
+    _dragSelectionRect.value = selectionRect;
+    _selectTagsInRect(selectionRect);
   }
 
   /// End drag selection
   void _endRectDragSelection() {
-    setState(() {
-      _isDraggingRect = false;
-      _dragStartPosition = null;
-      _dragCurrentPosition = null;
-    });
+    _isDraggingRect = false;
+    _dragStartPosition = null;
+    _dragSelectionRect.value = null;
   }
 
   /// Select all tags that intersect with the selection rectangle
-  void _selectTagsInRect() {
-    if (_dragStartPosition == null || _dragCurrentPosition == null) return;
-
-    final selectionRect = Rect.fromPoints(
-      _dragStartPosition!,
-      _dragCurrentPosition!,
+  void _selectTagsInRect(Rect localSelectionRect) {
+    // Pointer positions are local to the Stack, while tag bounds are stored
+    // in global coordinates. Compare them in the same coordinate space so a
+    // visibly covered tag is not skipped (most noticeable in Grid mode).
+    final RenderBox? stackBox =
+        _tagSelectionStackKey.currentContext?.findRenderObject() as RenderBox?;
+    final globalSelectionRect = dragSelectionRectToGlobal(
+      localSelectionRect,
+      stackBox,
     );
 
     // Check which tags intersect with the selection rectangle
     final Set<String> newlySelected = {};
-    _tagItemPositions.forEach((tag, itemRect) {
-      if (selectionRect.overlaps(itemRect)) {
+    _tagItemContexts.forEach((tag, itemContext) {
+      if (!itemContext.mounted) return;
+      final renderObject = itemContext.findRenderObject();
+      if (renderObject is! RenderBox ||
+          !renderObject.attached ||
+          !renderObject.hasSize) {
+        return;
+      }
+
+      final itemRect =
+          renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      if (globalSelectionRect.overlaps(itemRect)) {
         newlySelected.add(tag);
       }
     });
@@ -1071,47 +1092,53 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final bool isCtrlPressed = keyboard.isControlPressed;
     final bool isShiftPressed = keyboard.isShiftPressed;
 
+    final Set<String> nextSelection;
+    if (isCtrlPressed || (isShiftPressed && _focusedTag != null)) {
+      nextSelection = {..._selectedTags, ...newlySelected};
+    } else {
+      nextSelection = newlySelected;
+    }
+
+    // Pointer events arrive far more often than the rectangle crosses a tag.
+    // Rebuilding the full grid when the selected set did not change made the
+    // overlay feel sticky, especially with thumbnails. Let only the overlay
+    // repaint for those intermediate pointer updates.
+    if (_selectedTags.length == nextSelection.length &&
+        _selectedTags.containsAll(nextSelection)) {
+      return;
+    }
+
     setState(() {
-      if (isCtrlPressed) {
-        // Ctrl: add to existing selection
-        _selectedTags.addAll(newlySelected);
-      } else if (isShiftPressed && _focusedTag != null) {
-        // Shift: extend from focused tag
-        _selectedTags.addAll(newlySelected);
-      } else {
-        // Normal: replace selection
-        _selectedTags.clear();
-        _selectedTags.addAll(newlySelected);
-      }
+      _selectedTags
+        ..clear()
+        ..addAll(nextSelection);
     });
   }
 
   /// Build the selection rectangle overlay
   Widget _buildSelectionOverlay() {
-    if (!_isDraggingRect ||
-        _dragStartPosition == null ||
-        _dragCurrentPosition == null) {
-      return const SizedBox.shrink();
-    }
-
     final theme = Theme.of(context);
-    final selectionRect = Rect.fromPoints(
-      _dragStartPosition!,
-      _dragCurrentPosition!,
-    );
+    return ValueListenableBuilder<Rect?>(
+      valueListenable: _dragSelectionRect,
+      builder: (context, selectionRect, _) {
+        if (selectionRect == null) return const SizedBox.shrink();
 
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: CustomPaint(
-          painter: SelectionRectanglePainter(
-            selectionRect: selectionRect,
-            fillColor: theme.colorScheme.primaryContainer.withValues(
-              alpha: 0.4,
+        return Positioned.fill(
+          child: IgnorePointer(
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: SelectionRectanglePainter(
+                  selectionRect: selectionRect,
+                  fillColor: theme.colorScheme.primaryContainer.withValues(
+                    alpha: 0.4,
+                  ),
+                  borderColor: theme.colorScheme.primary,
+                ),
+              ),
             ),
-            borderColor: theme.colorScheme.primary,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -3470,28 +3497,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final theme = Theme.of(context);
     final isDesktop = _isDesktop;
 
-    return LayoutBuilder(
+    final tile = LayoutBuilder(
       builder: (context, constraints) {
-        // Register this item's position after layout
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            final RenderBox? renderBox =
-                context.findRenderObject() as RenderBox?;
-            if (renderBox != null && renderBox.hasSize) {
-              final position = renderBox.localToGlobal(Offset.zero);
-              final size = renderBox.size;
-              _registerTagPosition(
-                tag,
-                Rect.fromLTWH(
-                  position.dx,
-                  position.dy,
-                  size.width,
-                  size.height,
-                ),
-              );
-            }
-          }
-        });
+        _registerTagContext(tag, context);
 
         return Listener(
           onPointerDown: isEditing
@@ -3678,6 +3686,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         );
       },
     );
+
+    if (isEditing) return tile;
+    return _buildTagDragDropItem(tag: tag, child: tile);
   }
 
   Widget _buildTagsContent() {
@@ -3853,39 +3864,22 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           // Dragging a row that is being edited would fight text selection,
           // and the tree's own tap handling would steal the caret.
           if (isEditing) return row;
-          return _buildTagTreeDragDropRow(tag: tag, child: row);
+          return _buildTagDragDropItem(tag: tag, child: row);
         },
       ),
     );
   }
 
-  Widget _buildTagTreeDragDropRow({
-    required String tag,
-    required Widget child,
-  }) {
-    if (!_isDesktop || _viewMode != _TagViewMode.tree) return child;
+  /// Makes a tag both a drag source and a drop target in every desktop view.
+  /// Dropping [child] on [tag] reparents the child under the target tag.
+  Widget _buildTagDragDropItem({required String tag, required Widget child}) {
+    if (!_isDesktop) return child;
 
     final draggable = Draggable<String>(
       data: tag,
       maxSimultaneousDrags: 1,
-      feedback: Material(
-        color: Colors.transparent,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text(
-              tag,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      ),
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: _buildTagDragFeedback(tag),
       childWhenDragging: Opacity(opacity: 0.55, child: child),
       child: child,
     );
@@ -3896,14 +3890,20 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       onAcceptWithDetails: (details) =>
           _moveTagUnderParent(childTag: details.data, parentTag: tag),
       builder: (context, candidateData, rejectedData) {
-        if (candidateData.isEmpty) return draggable;
+        final isAccepted = candidateData.isNotEmpty;
+        final isRejected = rejectedData.isNotEmpty;
+        if (!isAccepted && !isRejected) return draggable;
         return DecoratedBox(
           decoration: BoxDecoration(
             border: Border.all(
-              color: Theme.of(context).colorScheme.primary,
+              color: isAccepted
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.error,
               width: 1.5,
             ),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(
+              _viewMode == _TagViewMode.grid ? 16 : 4,
+            ),
           ),
           child: draggable,
         );
@@ -3911,15 +3911,78 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     );
   }
 
+  Widget _buildTagDragFeedback(String tag) {
+    final theme = Theme.of(context);
+    final tagColor = _tagColorManager.getTagColor(tag);
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        key: const ValueKey('tag-drag-feedback'),
+        width: 240,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: tagColor.withValues(alpha: 0.75)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: SizedBox(
+                key: const ValueKey('tag-drag-thumbnail'),
+                width: 56,
+                height: 56,
+                child: _buildTagCardThumbnailFill(tag, tagColor),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tag,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Tag',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTagsListView() {
     final isDesktop = _isDesktop;
 
-    // Clear tag positions when building the list
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _clearTagPositions();
-    });
+    // Item builders below repopulate the visible context registry.
+    _clearTagContexts();
 
     return Stack(
+      key: _tagSelectionStackKey,
       children: [
         GestureDetector(
           onTap: () {
@@ -4156,14 +4219,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final iconSize = isDesktop ? 20.0 : 16.0;
     final spacing = isDesktop ? 8.0 : 4.0;
 
-    // Clear tag positions when building the grid
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _clearTagPositions();
-    });
+    // Item builders below repopulate the visible context registry.
+    _clearTagContexts();
 
     // GridView with drag selection support (same as ListView).
     // Ctrl+scroll is handled by _buildTagsContent so it works in all modes.
     return Stack(
+      key: _tagSelectionStackKey,
       children: [
         GestureDetector(
           onTap: () {
@@ -4231,28 +4293,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               final isSelected = _selectedTags.contains(tag);
               final isFocused = _focusedTag == tag;
 
-              return LayoutBuilder(
+              final card = LayoutBuilder(
                 builder: (context, constraints) {
-                  // Register this item's position after layout for drag selection
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      final RenderBox? renderBox =
-                          context.findRenderObject() as RenderBox?;
-                      if (renderBox != null && renderBox.hasSize) {
-                        final position = renderBox.localToGlobal(Offset.zero);
-                        final size = renderBox.size;
-                        _registerTagPosition(
-                          tag,
-                          Rect.fromLTWH(
-                            position.dx,
-                            position.dy,
-                            size.width,
-                            size.height,
-                          ),
-                        );
-                      }
-                    }
-                  });
+                  _registerTagContext(tag, context);
 
                   return Listener(
                     onPointerDown: isEditing
@@ -4538,6 +4581,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   );
                 },
               );
+              if (isEditing) return card;
+              return _buildTagDragDropItem(tag: tag, child: card);
             },
           ),
         ),
@@ -4962,9 +5007,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       return;
     }
 
-    final currentQuery = _searchController.text.trim().toLowerCase();
+    final currentQuery = _searchController.text.trim();
     if (currentQuery.isNotEmpty &&
-        !normalizedTagName.toLowerCase().contains(currentQuery)) {
+        !TextUtils.matchesSearch(normalizedTagName, currentQuery)) {
       _searchController.clear();
     }
 
@@ -5059,9 +5104,9 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
 
       if (!mounted) return;
 
-      final currentQuery = _searchController.text.trim().toLowerCase();
+      final currentQuery = _searchController.text.trim();
       if (currentQuery.isNotEmpty &&
-          !parentName.toLowerCase().contains(currentQuery)) {
+          !TextUtils.matchesSearch(parentName, currentQuery)) {
         _searchController.clear();
       }
 
@@ -5255,11 +5300,11 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       setState(() => _childSuggestions = []);
       return;
     }
-    final q = query.toLowerCase().trim();
+    final q = query.trim();
     final suggestions = widget.allTags
         .where((t) {
           final tl = t.toLowerCase();
-          return tl.contains(q) &&
+          return TextUtils.matchesSearch(t, q) &&
               tl != widget.tag.toLowerCase() &&
               !_children.any((c) => c.toLowerCase() == tl);
         })
@@ -5273,11 +5318,11 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       setState(() => _parentSuggestions = []);
       return;
     }
-    final q = query.toLowerCase().trim();
+    final q = query.trim();
     final suggestions = widget.allTags
         .where((t) {
           final tl = t.toLowerCase();
-          return tl.contains(q) &&
+          return TextUtils.matchesSearch(t, q) &&
               tl != widget.tag.toLowerCase() &&
               !_parents.any((p) => p.toLowerCase() == tl);
         })

@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../helpers/core/filesystem_utils.dart';
+import '../helpers/core/text_utils.dart';
 import '../models/database/sqlite_database_provider.dart';
 import '../models/objectbox/album.dart';
 import '../models/objectbox/album_config.dart';
@@ -513,9 +514,10 @@ class AlbumService {
       final query = searchQuery.toLowerCase();
       return allImages
           .where((file) {
-            final fileName = path.basename(file.path).toLowerCase();
-            final filePath = file.path.toLowerCase();
-            return fileName.contains(query) || filePath.contains(query);
+            final fileName = path.basename(file.path);
+            final filePath = file.path;
+            return TextUtils.matchesSearch(fileName, query) ||
+                TextUtils.matchesSearch(filePath, query);
           })
           .toList(growable: false);
     } catch (error) {

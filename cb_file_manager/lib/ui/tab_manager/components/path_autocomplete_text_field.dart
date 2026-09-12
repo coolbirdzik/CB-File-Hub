@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:path/path.dart' as p;
 
@@ -117,12 +118,7 @@ class _PathAutocompleteTextFieldState extends State<PathAutocompleteTextField> {
 
   bool _matchesQuery(String candidate, String query) {
     if (query.isEmpty) return true;
-    if (Platform.isWindows) {
-      final c = candidate.toLowerCase();
-      final q = query.toLowerCase();
-      return c.startsWith(q) || c.contains(q);
-    }
-    return candidate.startsWith(query) || candidate.contains(query);
+    return TextUtils.matchesSearch(candidate, query);
   }
 
   bool _shouldSuggestFromFileSystem(String query) {

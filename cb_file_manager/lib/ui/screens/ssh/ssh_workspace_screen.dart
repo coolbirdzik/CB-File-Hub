@@ -14,6 +14,7 @@ import '../../utils/route.dart';
 import '../../utils/platform_utils.dart';
 import '../../components/common/grid_list_collection.dart';
 import '../../../helpers/core/user_preferences.dart';
+import '../../../helpers/core/text_utils.dart';
 import '../folder_list/folder_list_state.dart';
 import 'ssh_host_list_item.dart';
 import '../network_browsing/components/network_navigation_bar.dart';
@@ -204,13 +205,14 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
   @override
   Widget build(BuildContext context) {
     final tr = context.tr;
-    final query = _search.text.toLowerCase();
+    final query = _search.text;
     final profiles =
         store.profiles
             .where(
-              (p) => '${p.name} ${p.host} ${p.username} ${p.group}'
-                  .toLowerCase()
-                  .contains(query),
+              (p) => TextUtils.matchesSearch(
+                '${p.name} ${p.host} ${p.username} ${p.group}',
+                query,
+              ),
             )
             .toList()
           ..sort(

@@ -107,9 +107,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
                 return _availableTags;
               }
               return _availableTags.where(
-                (tag) => tag.toLowerCase().contains(
-                  textEditingValue.text.toLowerCase(),
-                ),
+                (tag) => TextUtils.matchesSearch(tag, textEditingValue.text),
               );
             },
             onSelected: (String selection) {

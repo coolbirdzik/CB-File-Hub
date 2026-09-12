@@ -18,6 +18,17 @@ import 'package:media_kit_video/media_kit_video.dart' as mk;
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  // A missing/unavailable audio device (headless CI runner, no sound card)
+  // does not stop mpv decoding and playing video, it just plays silently —
+  // see the matching filter in video_player.dart. Tests that listen to
+  // player.stream.error directly (bypassing that widget) need the same
+  // filter so they don't fail on an environment limitation unrelated to the
+  // playback behavior under test.
+  bool isBenignAudioDeviceError(String error) {
+    final lower = error.toLowerCase();
+    return lower.contains('audio device') || lower.contains('no sound');
+  }
+
   Future<void> waitFor(WidgetTester tester, bool Function() condition) async {
     for (var i = 0; i < 300 && !condition(); i++) {
       await tester.pump(const Duration(milliseconds: 100));
@@ -37,7 +48,9 @@ void main() {
     debugPrint('media_kit test platform: $defaultTargetPlatform');
     final player = PlaybackPlayer();
     final errors = <String>[];
-    final subscription = player.stream.error.listen(errors.add);
+    final subscription = player.stream.error.listen((e) {
+      if (!isBenignAudioDeviceError(e)) errors.add(e);
+    });
     final video = PlaybackVideoController(player);
     await tester.pumpWidget(
       MaterialApp(
@@ -172,7 +185,9 @@ void main() {
         for (var iteration = 0; iteration < 12; iteration++) {
           final player = PlaybackPlayer();
           final errors = <String>[];
-          final subscription = player.stream.error.listen(errors.add);
+          final subscription = player.stream.error.listen((e) {
+            if (!isBenignAudioDeviceError(e)) errors.add(e);
+          });
           await tester.pumpWidget(
             MaterialApp(
               home: PlaybackVideo(

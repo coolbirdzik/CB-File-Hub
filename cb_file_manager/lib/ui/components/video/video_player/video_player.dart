@@ -810,6 +810,15 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       //
       // Instead, persist software decoding for next time and surface a clear
       // error so the user just needs to reopen the video.
+      // A missing/unavailable audio device (no sound card, disabled output,
+      // headless CI runner) does not stop mpv from decoding and playing
+      // video — it just plays silently. Surfacing this as a fatal error
+      // would replace working video controls with an error screen over
+      // something the user cannot even hear is wrong.
+      if (_isAudioDeviceError(error)) {
+        return;
+      }
+
       if (_isHardwareDecodeError(error)) {
         _persistSoftwareDecodingPreference();
         if (mounted && !_hasError) {
@@ -838,6 +847,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
   /// Returns true if [error] looks like a hardware/GPU decoding failure that
   /// could be resolved by falling back to software decoding.
+  bool _isAudioDeviceError(String error) {
+    final lower = error.toLowerCase();
+    return lower.contains('audio device') || lower.contains('no sound');
+  }
+
   bool _isHardwareDecodeError(String error) {
     final lower = error.toLowerCase();
     return lower.contains('d3d11') ||

@@ -22,7 +22,18 @@ class TextUtils {
     return spelling != 0 ? spelling : a.compareTo(b);
   }
 
-  /// Fuzzy search with diacritic normalization for all languages
+  /// Produces the canonical form used by every user-facing search.
+  ///
+  /// Accented and decomposed Unicode characters are folded to their base
+  /// forms, then compared case-insensitively. For example, both `chào` and
+  /// `cha\u0300o` become `chao`.
+  static String normalizeForSearch(String value) {
+    return removeDiacritics(
+      value.toLowerCase(),
+    ).replaceAll(_combiningDiacritics, '');
+  }
+
+  /// Fuzzy Unicode search used by every user-facing search surface.
   /// Supports partial matching, word order independence, and special characters
   ///
   /// Examples:
@@ -31,10 +42,9 @@ class TextUtils {
   /// - "uber" matches "über" (German)
   /// - "hello world" matches "world hello" (word order)
   /// - "test_file" matches "test file" (special chars)
-  static bool matchesVietnamese(String text, String query) {
-    // Normalize both text and query (remove diacritics, lowercase)
-    final normalizedText = removeDiacritics(text.toLowerCase());
-    final normalizedQuery = removeDiacritics(query.toLowerCase());
+  static bool matchesSearch(String text, String query) {
+    final normalizedText = normalizeForSearch(text);
+    final normalizedQuery = normalizeForSearch(query);
 
     // Remove special characters for better matching
     final cleanText = _cleanString(normalizedText);
@@ -54,6 +64,10 @@ class TextUtils {
     // Check if all query words exist in text (order independent)
     return queryWords.every((word) => cleanText.contains(word));
   }
+
+  /// Backwards-compatible name for older file-search callers.
+  static bool matchesVietnamese(String text, String query) =>
+      matchesSearch(text, query);
 
   /// Clean string by replacing special characters with spaces
   /// This allows matching "test_file" with "test file"

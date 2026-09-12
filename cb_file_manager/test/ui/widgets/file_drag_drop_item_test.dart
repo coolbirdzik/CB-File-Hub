@@ -1,5 +1,6 @@
 import 'dart:ui' show PointerDeviceKind;
 import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
+import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -33,6 +34,17 @@ void main() {
     await gesture.moveBy(const Offset(25, 0));
     await tester.pump();
     expect(handedOff, isEmpty);
+    expect(find.byKey(const ValueKey('file-drag-feedback')), findsOneWidget);
+    expect(find.byKey(const ValueKey('file-drag-count')), findsOneWidget);
+    expect(find.text('one.txt'), findsOneWidget);
+    expect(
+      tester.getTopLeft(
+        find.byKey(const ValueKey('file-drag-feedback')),
+        warnIfMissed: false,
+      ),
+      const Offset(65, 30),
+      reason: 'drag preview should stay anchored directly to the cursor',
+    );
     await gesture.moveTo(const Offset(-20, 30));
     await tester.pump();
     expect(handedOff, hasLength(1));
@@ -40,6 +52,41 @@ void main() {
     await gesture.up();
     await tester.pump();
     expect(find.text('2 items'), findsNothing);
+  });
+
+  testWidgets('video drag feedback uses the cached thumbnail', (tester) async {
+    const videoPath = '/files/movie.mp4';
+    ThumbnailWidgetCache().cacheThumbnailPath(
+      videoPath,
+      'assets/images/logo1440.png',
+    );
+    addTearDown(ThumbnailWidgetCache().clearCache);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: FileDragDropItem(
+            path: videoPath,
+            isFolder: false,
+            selectedPaths: <String>{},
+            child: SizedBox(width: 120, height: 60, child: Text('movie.mp4')),
+          ),
+        ),
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      const Offset(40, 30),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(25, 0));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('file-drag-thumbnail')), findsOneWidget);
+    expect(find.text('Video'), findsOneWidget);
+
+    await gesture.up();
+    await tester.pump();
   });
 
   testWidgets(

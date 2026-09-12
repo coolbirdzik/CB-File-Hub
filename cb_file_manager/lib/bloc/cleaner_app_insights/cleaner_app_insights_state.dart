@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../helpers/core/text_utils.dart';
 import '../../services/app_insights/app_insights_models.dart';
 
 enum CleanerAppInsightsStatus { idle, loading, ready, failure }
@@ -187,7 +188,7 @@ List<AppStorageProfile> filterAndSortAppProfiles({
   required int staleThresholdDays,
   required DateTime evaluatedAt,
 }) {
-  final normalizedQuery = searchQuery.trim().toLowerCase();
+  final normalizedQuery = TextUtils.normalizeForSearch(searchQuery.trim());
   final staleThreshold = Duration(days: staleThresholdDays);
 
   final result = profiles
@@ -323,7 +324,7 @@ String _searchHaystack(AppStorageProfile profile) {
       ..write('\n')
       ..write(entry.path);
   }
-  final haystack = buffer.toString().toLowerCase();
+  final haystack = TextUtils.normalizeForSearch(buffer.toString());
   _searchHaystacks[profile] = haystack;
   return haystack;
 }

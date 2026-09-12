@@ -4,6 +4,7 @@ import 'package:path/path.dart' as path;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_sorter.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/services/video_library_cache_service.dart';
@@ -334,9 +335,9 @@ class VideoLibraryNavigationBloc
     FileNavigationSearchByFileName event,
     Emitter<FileNavigationState> emit,
   ) {
-    final query = event.query.toLowerCase();
+    final query = event.query;
     final results = state.files
-        .where((f) => f.path.toLowerCase().contains(query))
+        .where((f) => TextUtils.matchesSearch(f.path, query))
         .toList();
     emit(
       state.copyWith(

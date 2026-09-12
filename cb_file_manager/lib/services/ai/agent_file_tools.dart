@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
+import '../../helpers/core/text_utils.dart';
+
 /// Shared filesystem primitives, with bounded scans and resumable result pages.
 /// Approval is owned by the agent loop, before calling any mutating primitive.
 class AgentFileTools {
@@ -277,7 +279,7 @@ class AgentFileTools {
         }
         if (name != 'search_content' &&
             query.isNotEmpty &&
-            !filename.contains(query)) {
+            !TextUtils.matchesSearch(filename, query)) {
           continue;
         }
         try {

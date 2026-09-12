@@ -15,6 +15,7 @@ import 'package:ffi/ffi.dart';
 
 // local files
 import 'io_extensions.dart';
+import 'text_utils.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 
 String storageRootPath = "/storage/emulated/0/";
@@ -174,11 +175,11 @@ Future<List<FileSystemEntity>> search(
   // Cải thiện cách tìm kiếm để hoạt động tốt hơn với thư mục
   List<FileSystemEntity> results = entities.where((entity) {
     // Lấy tên của thực thể mà không bao gồm đường dẫn
-    String name = pathlib.basename(entity.path).toLowerCase();
-    String searchQuery = query.toLowerCase();
+    String name = pathlib.basename(entity.path);
+    String searchQuery = query;
 
     // Kiểm tra nếu tên chứa truy vấn tìm kiếm
-    bool matches = name.contains(searchQuery);
+    bool matches = TextUtils.matchesSearch(name, searchQuery);
 
     // Log kết quả tìm kiếm để dễ debug
     if (matches) {
@@ -215,7 +216,7 @@ Stream<List<FileSystemEntity>> searchStream(
       handleData: (data, sink) {
         // Filtering
         data.retainWhere(
-          (test) => test.basename().toLowerCase().contains(query.toLowerCase()),
+          (test) => TextUtils.matchesSearch(test.basename(), query),
         );
         sink.add(data);
       },

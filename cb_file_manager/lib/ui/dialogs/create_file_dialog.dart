@@ -13,6 +13,7 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 
 /// Dialog for creating a new file from a template.
 /// Shows a grid (desktop) or list (mobile) of file types, filtered by detected
@@ -94,10 +95,10 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
 
     // Search filter
     if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
+      final q = _searchQuery;
       templates = templates.where((t) {
-        final name = _displayName(t).toLowerCase();
-        return name.contains(q) || t.extension.toLowerCase().contains(q);
+        return TextUtils.matchesSearch(_displayName(t), q) ||
+            TextUtils.matchesSearch(t.extension, q);
       }).toList();
     }
 

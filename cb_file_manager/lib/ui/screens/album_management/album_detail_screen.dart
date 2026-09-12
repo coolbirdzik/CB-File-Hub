@@ -20,6 +20,7 @@ import 'create_album_dialog.dart';
 import 'batch_add_dialog.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
@@ -675,9 +676,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void _applyFiltersAndOrder() {
     List<File> files = List<File>.from(_originalImageFiles);
     if (_searchQuery != null && _searchQuery!.trim().isNotEmpty) {
-      final q = _searchQuery!.toLowerCase();
+      final q = _searchQuery!;
       files = files
-          .where((f) => pathlib.basename(f.path).toLowerCase().contains(q))
+          .where((f) => TextUtils.matchesSearch(pathlib.basename(f.path), q))
           .toList();
     }
     if (_isShuffled) files.shuffle();

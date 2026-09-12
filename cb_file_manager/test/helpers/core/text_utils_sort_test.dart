@@ -2,6 +2,18 @@ import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('Unicode-insensitive search', () {
+    test('finds Vietnamese tags when the query omits tone marks', () {
+      expect(TextUtils.matchesSearch('chào', 'chao'), isTrue);
+      expect(TextUtils.matchesSearch('Chào bạn', 'CHAO BAN'), isTrue);
+    });
+
+    test('normalizes composed and decomposed Unicode accents consistently', () {
+      expect(TextUtils.matchesSearch('ca\u0300 phe\u0302', 'cà phê'), isTrue);
+      expect(TextUtils.matchesSearch('café', 'cafe'), isTrue);
+    });
+  });
+
   test('A-Z groups Vietnamese and accented Latin tags by base letters', () {
     final tags = ['Zebra', 'Ứng dụng', 'Đồ họa', 'Bản nhạc', 'Ảnh', 'École'];
     tags.sort(TextUtils.compareAlphabetically);

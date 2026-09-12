@@ -10,6 +10,7 @@ import '../../../bloc/network_browsing/network_browsing_bloc.dart';
 import '../../../bloc/network_browsing/network_browsing_event.dart';
 import '../../../bloc/network_browsing/network_browsing_state.dart';
 import '../../../config/languages/app_localizations.dart';
+import '../../../helpers/core/text_utils.dart';
 import '../../../models/database/network_credentials.dart';
 import '../../../services/network_browsing/network_service_registry.dart';
 import '../../../services/network_credentials_service.dart';
@@ -574,8 +575,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                               return _savedHosts;
                             }
                             return _savedHosts.where(
-                              (option) => option.toLowerCase().contains(
-                                textEditingValue.text.toLowerCase(),
+                              (option) => TextUtils.matchesSearch(
+                                option,
+                                textEditingValue.text,
                               ),
                             );
                           },

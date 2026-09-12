@@ -13,6 +13,7 @@ import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_collection_view.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
@@ -1313,10 +1314,10 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
+      final query = _searchQuery;
       items = items.where((item) {
-        return item.displayNameValue.toLowerCase().contains(query) ||
-            item.originalPath.toLowerCase().contains(query);
+        return TextUtils.matchesSearch(item.displayNameValue, query) ||
+            TextUtils.matchesSearch(item.originalPath, query);
       }).toList();
     }
 

@@ -1,6 +1,7 @@
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 
 import '../../../../models/ai/ai_provider_model.dart';
 
@@ -333,13 +334,14 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
     if (_query.isEmpty) return widget.catalogs;
     final result = <AiProviderModelCatalog>[];
     for (final catalog in widget.catalogs) {
-      final providerMatches = catalog.providerName.toLowerCase().contains(
+      final providerMatches = TextUtils.matchesSearch(
+        catalog.providerName,
         _query,
       );
       final matchingModels = providerMatches
           ? catalog.models
           : catalog.models
-                .where((m) => m.toLowerCase().contains(_query))
+                .where((m) => TextUtils.matchesSearch(m, _query))
                 .toList();
       if (matchingModels.isEmpty) continue;
       result.add(

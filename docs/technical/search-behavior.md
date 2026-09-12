@@ -11,9 +11,11 @@ changes and wait for IME composition to commit. Ordinary controller listeners
 remain available to Flutter for painting the caret and selection.
 
 Use `SearchQuery.tags` for `#tag` parsing on desktop and mobile. Spaces inside
-a tag are preserved; another `#` introduces another tag. Use the existing
-`TextUtils.matchesVietnamese` for filename matching. Search scope and available
-options still depend on the data source: Network filters its current listing;
+a tag are preserved; another `#` introduces another tag. Use
+`TextUtils.matchesSearch` for every text filter. It folds case, Unicode accents
+and combining marks, so `chao` finds `chào` (and the same rule applies to tags,
+filenames, paths, and picker suggestions). Search scope and available options
+still depend on the data source: Network filters its current listing;
 folder search supports recursive traversal; Video Library searches its sources.
 
 Asynchronous searches use `SearchRequestGuard`. Begin a revision for new work,

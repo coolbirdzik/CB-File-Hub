@@ -9,6 +9,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -614,11 +615,11 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       setState(() => _childSuggestions = []);
       return;
     }
-    final q = query.toLowerCase().trim();
+    final q = query.trim();
     final suggestions = widget.allTags
         .where((t) {
           final tl = t.toLowerCase();
-          return tl.contains(q) &&
+          return TextUtils.matchesSearch(t, q) &&
               tl != widget.tag.toLowerCase() &&
               !_children.any((c) => c.toLowerCase() == tl);
         })
@@ -632,11 +633,11 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
       setState(() => _parentSuggestions = []);
       return;
     }
-    final q = query.toLowerCase().trim();
+    final q = query.trim();
     final suggestions = widget.allTags
         .where((t) {
           final tl = t.toLowerCase();
-          return tl.contains(q) &&
+          return TextUtils.matchesSearch(t, q) &&
               tl != widget.tag.toLowerCase() &&
               !_parents.any((p) => p.toLowerCase() == tl);
         })

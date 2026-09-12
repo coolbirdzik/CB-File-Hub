@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -354,7 +355,9 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         for (final entity in results) {
           if (entity is File) {
             final tags = await TagManager.getTags(entity.path);
-            if (tags.contains(event.tags[i])) {
+            if (tags.any(
+              (tag) => TextUtils.matchesSearch(tag, event.tags[i]),
+            )) {
               filtered.add(entity);
             }
           }
@@ -404,7 +407,9 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         for (final entity in results) {
           if (entity is File && entity.existsSync()) {
             final tags = await TagManager.getTags(entity.path);
-            if (tags.contains(event.tags[i])) {
+            if (tags.any(
+              (tag) => TextUtils.matchesSearch(tag, event.tags[i]),
+            )) {
               filtered.add(entity);
             }
           }

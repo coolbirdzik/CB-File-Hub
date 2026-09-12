@@ -296,12 +296,12 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   /// Tags matching the current query plus all of their ancestors, so matches
   /// stay reachable in the tree. Returns null when no filter is active.
   Set<String>? _filterSet() {
-    final needle = _query.trim().toLowerCase();
+    final needle = _query.trim();
     if (needle.isEmpty) return null;
 
     final keep = <String>{};
     for (final normalized in _display.keys) {
-      if (_nameOf(normalized).toLowerCase().contains(needle)) {
+      if (TextUtils.matchesSearch(_nameOf(normalized), needle)) {
         keep.add(normalized);
         _collectAncestors(normalized, keep, <String>{});
       }
@@ -380,9 +380,9 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   List<String> _gridEntries() {
     final filter = _filterSet();
     if (filter != null) {
-      final needle = _query.trim().toLowerCase();
+      final needle = _query.trim();
       final matches = _display.keys
-          .where((n) => _nameOf(n).toLowerCase().contains(needle))
+          .where((n) => TextUtils.matchesSearch(_nameOf(n), needle))
           .toList();
       matches.sort((a, b) => _compareDisplay(_display, a, b));
       return matches;

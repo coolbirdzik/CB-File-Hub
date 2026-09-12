@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/platform_paths.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -578,10 +579,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     if (_searchQuery.isEmpty) {
       return true;
     }
-    return path
-        .basename(entity.path)
-        .toLowerCase()
-        .contains(_searchQuery.toLowerCase());
+    return TextUtils.matchesSearch(path.basename(entity.path), _searchQuery);
   }
 
   bool _matchesFilter(File file) {
@@ -1072,9 +1070,8 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
         ? _allTags
         : _allTags
               .where(
-                (tag) => tag.toLowerCase().contains(
-                  _tagController.text.trim().toLowerCase(),
-                ),
+                (tag) =>
+                    TextUtils.matchesSearch(tag, _tagController.text.trim()),
               )
               .toList();
 
@@ -1093,7 +1090,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                     return _allTags;
                   }
                   return _allTags.where(
-                    (tag) => tag.toLowerCase().contains(query),
+                    (tag) => TextUtils.matchesSearch(tag, query),
                   );
                 },
                 onSelected: (selection) {

@@ -422,16 +422,14 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         return;
       }
 
-      final normalizedSearchTags = normalizedTags
-          .map((tag) => tag.toLowerCase())
-          .toSet();
       final matchedPaths = files
           .where((entity) {
             final tagsForFile = fileTags[entity.path] ?? const <String>[];
-            final normalizedFileTags = tagsForFile
-                .map((tag) => tag.toLowerCase())
-                .toSet();
-            return normalizedSearchTags.every(normalizedFileTags.contains);
+            return normalizedTags.every(
+              (queryTag) => tagsForFile.any(
+                (tag) => TextUtils.matchesSearch(tag, queryTag),
+              ),
+            );
           })
           .map((entity) => entity.path)
           .toSet();

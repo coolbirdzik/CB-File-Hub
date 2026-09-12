@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../helpers/core/filesystem_utils.dart';
+import '../helpers/core/text_utils.dart';
 import '../helpers/tags/tag_manager.dart';
 import '../models/database/sqlite_database_provider.dart';
 import '../models/objectbox/video_library.dart';
@@ -541,11 +542,10 @@ class VideoLibraryService {
         allVideos = allFiles.toList(growable: false);
       }
 
-      final queryLower = query.toLowerCase();
       final matchingVideos = allVideos
           .where(
             (filePath) =>
-                path.basename(filePath).toLowerCase().contains(queryLower),
+                TextUtils.matchesSearch(path.basename(filePath), query),
           )
           .toList(growable: true);
 

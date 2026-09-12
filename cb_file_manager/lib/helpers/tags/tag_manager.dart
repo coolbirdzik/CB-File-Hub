@@ -7,6 +7,7 @@ import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'package:cb_file_manager/utils/app_logger.dart';
@@ -124,9 +125,7 @@ class TagManager {
     if (tagQuery.isEmpty) return false;
     if (_tagsCache.containsKey(entity.path)) {
       final tags = _tagsCache[entity.path]!;
-      return tags.any(
-        (tag) => tag.toLowerCase().contains(tagQuery.toLowerCase()),
-      );
+      return tags.any((tag) => TextUtils.matchesSearch(tag, tagQuery));
     }
     return false;
   }
@@ -178,9 +177,7 @@ class TagManager {
     if (query.isEmpty) return [];
 
     final allTags = await getAllUniqueTags("");
-    return allTags
-        .where((tag) => tag.toLowerCase().contains(query.toLowerCase()))
-        .toList();
+    return allTags.where((tag) => TextUtils.matchesSearch(tag, query)).toList();
   }
 
   /// Initialize the global tags system by determining the storage path.
@@ -942,7 +939,7 @@ class TagManager {
           // Check if file has the matching tag
           final hasMatchingTag = tags.any((fileTag) {
             return fileTag.toLowerCase() == normalizedTag ||
-                fileTag.toLowerCase().contains(normalizedTag);
+                TextUtils.matchesSearch(fileTag, normalizedTag);
           });
 
           // Only process if file has matching tag
@@ -994,7 +991,7 @@ class TagManager {
                   if (fileTags.any(
                     (fileTag) =>
                         fileTag.toLowerCase() == normalizedTag ||
-                        fileTag.toLowerCase().contains(normalizedTag),
+                        TextUtils.matchesSearch(fileTag, normalizedTag),
                   )) {
                     results.add(entity);
                     addedPaths.add(
@@ -1088,7 +1085,7 @@ class TagManager {
             // Check if file has the matching tag
             final hasMatchingTag = tagsList.any((fileTag) {
               return fileTag.toLowerCase() == normalizedTag ||
-                  fileTag.toLowerCase().contains(normalizedTag);
+                  TextUtils.matchesSearch(fileTag, normalizedTag);
             });
 
             if (hasMatchingTag) {

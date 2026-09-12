@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../../helpers/tags/tag_manager.dart';
+import '../../helpers/core/text_utils.dart';
 import 'agent_file_tools.dart';
 
 /// Adapter to the app's existing tag store, also used by file operations.
@@ -53,7 +54,7 @@ class AgentTagTools {
           .toLowerCase();
       final tags =
           (await store.all())
-              .where((tag) => tag.toLowerCase().contains(query))
+              .where((tag) => TextUtils.matchesSearch(tag, query))
               .toList()
             ..sort();
       return pages.page(

@@ -162,7 +162,12 @@ class _SearchDialogState extends State<SearchDialog> {
       for (final entity in results.whereType<File>()) {
         final tags = await TagManager.getTags(entity.path);
         if (!mounted || !_resultsRequest.isCurrent(request)) return;
-        if (searchTags.every((tag) => tags.contains(tag))) matched.add(entity);
+        if (searchTags.every(
+          (queryTag) =>
+              tags.any((tag) => TextUtils.matchesSearch(tag, queryTag)),
+        )) {
+          matched.add(entity);
+        }
       }
       if (!mounted || !_resultsRequest.isCurrent(request)) return;
 
