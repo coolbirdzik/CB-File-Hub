@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -28,7 +29,7 @@ class MobileSearchDialog extends StatefulWidget {
 }
 
 class _MobileSearchDialogState extends State<MobileSearchDialog> {
-  late TextEditingController _searchController;
+  late SearchTextController _searchController;
   final FocusNode _searchFocusNode = FocusNode();
   bool _isGlobalSearch = false;
 
@@ -39,8 +40,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: widget.initialQuery ?? '');
-    _searchController.addListener(_onSearchChanged);
+    _searchController = SearchTextController(text: widget.initialQuery ?? '');
+    _searchController.addQueryListener(_onSearchChanged);
 
     // Load popular tags asynchronously (don't block UI)
     Future.microtask(() => _loadPopularTags());
@@ -82,6 +83,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
   }
 
   void _onSearchChanged() {
+    setState(() {});
+    setState(() {});
     final query = _searchController.text.toLowerCase();
 
     // Tag-aware behaviour kept for potential future use; currently a no-op.
@@ -138,7 +141,7 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
           const SizedBox(height: 16),
 
           // Search field
-          TextField(
+          SearchTextField(
             controller: _searchController,
             focusNode: _searchFocusNode,
             autofocus: false, // Don't auto focus to avoid keyboard lag

@@ -183,11 +183,13 @@ features:
   media_streaming:
     status: stub
     entrypoints:
+      - cb_file_manager/lib/services/media/media_kit_playback.dart
       - cb_file_manager/lib/services/streaming/streaming_service_manager.dart
       - cb_file_manager/lib/services/streaming/file_streaming_manager.dart
       - cb_file_manager/lib/services/streaming/smb_http_proxy_server.dart
     related:
       - cb_file_manager/lib/ui/screens/media_gallery/video_player_full_screen.dart
+      - cb_file_manager/integration_test/media_kit_playback_e2e_test.dart
     invariants:
       - "HTTP streaming and SMB proxy servers are process-local helpers, not durable background daemons."
       - "Remote playback paths must keep auth and proxy lifetime bound to the active media session."

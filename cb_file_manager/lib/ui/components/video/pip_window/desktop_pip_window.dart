@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cb_file_manager/services/media/vlc_playback.dart';
+import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../helpers/core/user_preferences.dart';

@@ -60,10 +60,12 @@ class FileOperationsBloc
     extends Bloc<FileOperationsEvent, FileOperationsState> {
   final FileNavigationBloc navigationBloc;
   final OperationProgressController _progressController;
+  final void Function(Set<String> paths)? onPathsDeleted;
 
   FileOperationsBloc({
     required this.navigationBloc,
     required this._progressController,
+    this.onPathsDeleted,
   }) : super(const FileOperationsState()) {
     on<FileOperationsCopy>(_onCopy);
     on<FileOperationsCut>(_onCut);
@@ -231,8 +233,6 @@ class FileOperationsBloc
     final failureErrors = <String, Object>{};
     final progressThrottle = _ProgressUpdateThrottle();
 
-    navigationBloc.add(FileNavigationRemovePaths(targetPaths));
-
     final pathsList = event.filePaths.toList(growable: false);
     final Set<String> succeededSet = event.permanent
         ? await trashManager.deleteMultiplePermanently(
@@ -270,6 +270,7 @@ class FileOperationsBloc
       if (!succeededSet.contains(p)) failed.add(p);
     }
     completed = pathsList.length;
+    _notifyPathsDeleted(succeededSet);
 
     if (failed.isNotEmpty) {
       final failureMessage = formatDeleteFailure(
@@ -347,8 +348,6 @@ class FileOperationsBloc
     final failureErrors = <String, Object>{};
     final progressThrottle = _ProgressUpdateThrottle();
 
-    navigationBloc.add(FileNavigationRemovePaths(targets));
-
     // Combine files + folders into a single batch — SHFileOperationW handles
     // both in one shell call, much faster than per-item Dart deletes.
     final pathsList = <String>[...event.filePaths, ...event.folderPaths];
@@ -390,10 +389,7 @@ class FileOperationsBloc
     }
     completed = pathsList.length;
 
-    final successfulDeletes = targets.difference(failed.toSet());
-    if (successfulDeletes.isNotEmpty && failed.isNotEmpty) {
-      navigationBloc.add(FileNavigationRemovePaths(successfulDeletes));
-    }
+    _notifyPathsDeleted(succeededSet);
 
     if (failed.isNotEmpty) {
       final failureMessage = formatDeleteFailure(
@@ -462,9 +458,7 @@ class FileOperationsBloc
     );
     final failed = paths.where((path) => !succeeded.contains(path)).toList();
 
-    if (succeeded.isNotEmpty) {
-      navigationBloc.add(FileNavigationRemovePaths(succeeded));
-    }
+    _notifyPathsDeleted(succeeded);
 
     if (failed.isEmpty) {
       final message = paths.length == 1
@@ -494,6 +488,13 @@ class FileOperationsBloc
 
     final navState = navigationBloc.state;
     navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
+  }
+
+  void _notifyPathsDeleted(Set<String> paths) {
+    if (paths.isEmpty) return;
+    DirectoryListingCacheService.instance.removePaths(paths);
+    navigationBloc.add(FileNavigationRemovePaths(paths));
+    onPathsDeleted?.call(paths);
   }
 
   Future<void> _onRename(

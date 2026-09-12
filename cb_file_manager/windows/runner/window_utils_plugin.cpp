@@ -921,8 +921,8 @@ namespace
     };
 
     explicit TabDropTarget(
-        flutter::MethodChannel<flutter::EncodableValue> *channel)
-        : channel_(channel), pid_(::GetCurrentProcessId()) {}
+        flutter::MethodChannel<flutter::EncodableValue> *channel, HWND view_hwnd)
+        : channel_(channel), view_hwnd_(view_hwnd), pid_(::GetCurrentProcessId()) {}
 
     HRESULT __stdcall QueryInterface(REFIID riid,
                                      void **ppvObject) override
@@ -1022,12 +1022,18 @@ namespace
             encoded_paths.emplace_back(WideToUtf8(path));
 
           flutter::EncodableMap payload;
+          // OLE supplies physical screen pixels. Flutter hit testing uses
+          // logical coordinates relative to the rendering view's client area.
+          POINT client_point = {pt.x, pt.y};
+          ::ScreenToClient(view_hwnd_, &client_point);
+          const UINT dpi = ::GetDpiForWindow(view_hwnd_);
+          const double scale = dpi == 0 ? 1.0 : dpi / 96.0;
           payload[flutter::EncodableValue("paths")] =
               flutter::EncodableValue(encoded_paths);
           payload[flutter::EncodableValue("globalX")] =
-              flutter::EncodableValue(static_cast<double>(pt.x));
+              flutter::EncodableValue(client_point.x / scale);
           payload[flutter::EncodableValue("globalY")] =
-              flutter::EncodableValue(static_cast<double>(pt.y));
+              flutter::EncodableValue(client_point.y / scale);
           payload[flutter::EncodableValue("effect")] =
               flutter::EncodableValue("move");
 
@@ -1212,6 +1218,7 @@ namespace
     }
 
     flutter::MethodChannel<flutter::EncodableValue> *channel_;
+    HWND view_hwnd_;
     DWORD pid_;
     ULONG ref_count_ = 1;
     bool allow_drop_ = false;
@@ -1301,7 +1308,7 @@ void WindowUtilsPlugin::EnsureDropTargetRegistered()
     return;
 
   drop_target_hwnd_ = hwnd;
-  drop_target_ = new TabDropTarget(channel_.get());
+  drop_target_ = new TabDropTarget(channel_.get(), registrar_->GetView()->GetNativeWindow());
 
   const HRESULT hr = ::RegisterDragDrop(hwnd, drop_target_);
   if (hr == DRAGDROP_E_ALREADYREGISTERED)

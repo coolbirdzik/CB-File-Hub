@@ -1,3 +1,6 @@
+import 'package:cb_file_manager/helpers/core/search_query.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -55,7 +58,7 @@ class VideoLibraryFilesScreen extends StatefulWidget {
 class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   final VideoLibraryService _service = VideoLibraryService();
   final UserPreferences _preferences = UserPreferences.instance;
-  late final VideoLibraryNavigationBloc _bloc;
+  late VideoLibraryNavigationBloc _bloc;
   late final SelectionBloc _selectionBloc;
   late final FolderListBloc _dragFolderListBloc;
   late final TabbedFolderDragSelectionController _dragSelectionController;
@@ -72,9 +75,12 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
   bool _useRegexSearch = false;
   bool _isSearchLoading = false;
   List<FileSystemEntity>? _liveSearchSource;
+  Set<String> _removedPaths = {};
   bool _showFileTags = true;
   ColumnVisibility _columnVisibility = const ColumnVisibility();
-  int _filterToken = 0;
+  final _searchRequests = SearchRequestGuard();
+  StreamSubscription<String>? _tagChanges;
+  Timer? _tagRefreshDebounce;
   int _gridCrossAxisCount = 1;
 
   @override
@@ -88,25 +94,43 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       selectionBloc: _selectionBloc,
     );
     _bloc.loadLibrary(); // Kick off initial load
+    _tagChanges = TagManager.onTagChanged.listen((_) {
+      if (!mounted || _activeSearchTags.isEmpty) return;
+      _tagRefreshDebounce?.cancel();
+      _tagRefreshDebounce = Timer(const Duration(milliseconds: 100), () {
+        if (mounted && _activeSearchTags.isNotEmpty) {
+          unawaited(_applyTagSearch(List.of(_activeSearchTags), false));
+        }
+      });
+    });
   }
 
   @override
   void didUpdateWidget(VideoLibraryFilesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.library.id != widget.library.id) {
+      _searchRequests.invalidate();
+      _tagRefreshDebounce?.cancel();
       _bloc.close();
-      // ignore: invalid_use_of_visible_for_testing_member
-      _bloc.add(
-        FileNavigationLoad(
-          '#video-library/${widget.library.id}',
-          isVirtualPath: true,
-        ),
-      );
+      _bloc = VideoLibraryNavigationBloc(libraryId: widget.library.id);
+      _isInitialized = false;
+      _searchQuery = '';
+      _removedPaths = {};
+      _activeSearchTags = const [];
+      _tagMatchedPaths = null;
+      _liveSearchSource = null;
+      _isSearchLoading = false;
+      _useRegexSearch = false;
+      _clearSelection();
+      _bloc.loadLibrary();
     }
   }
 
   @override
   void dispose() {
+    _tagRefreshDebounce?.cancel();
+    _tagChanges?.cancel();
+    _searchRequests.dispose();
     _dragSelectionController.dispose();
     _dragFolderListBloc.close();
     _selectionBloc.close();
@@ -171,20 +195,27 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     }
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({Set<String> deletedPaths = const {}}) async {
     setState(() {
-      _filterToken++;
+      _removedPaths = deletedPaths;
+      _searchRequests.invalidate();
       _liveSearchSource = null;
       _isSearchLoading = false;
     });
     // Clear both memory and disk cache before re-scanning
     await VideoLibraryNavigationBloc.invalidateCache(widget.library.id);
+    if (!mounted) return;
     _bloc.refreshLibrary();
+    if (_activeSearchTags.isNotEmpty) {
+      await _applyTagSearch(List.of(_activeSearchTags), false);
+    } else if (_searchQuery.isNotEmpty) {
+      await _applySearchWithOptions(_searchQuery, _useRegexSearch);
+    }
   }
 
   Future<void> _applyFilters() async {
-    final int token = ++_filterToken;
-    if (!mounted || token != _filterToken) return;
+    final int token = _searchRequests.begin();
+    if (!mounted || !_searchRequests.isCurrent(token)) return;
     // Trigger rebuild to re-apply local search filter
     _bloc.add(const FileNavigationClearSearchAndFilters());
   }
@@ -327,7 +358,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   Future<void> _applySearchWithOptions(String value, bool useRegex) async {
     final trimmed = value.trim();
-    final int token = ++_filterToken;
+    final int token = _searchRequests.begin();
     setState(() {
       _searchQuery = trimmed;
       _useRegexSearch = useRegex;
@@ -346,13 +377,14 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       // sources directly so a submitted query is evaluated against the full,
       // current collection rather than only the files loaded so far.
       final files = await _loadLiveLibraryFiles();
-      if (!mounted || token != _filterToken) return;
+      if (!mounted || !_searchRequests.isCurrent(token)) return;
       setState(() {
         _liveSearchSource = files;
+        _removedPaths = {};
         _isSearchLoading = false;
       });
     } catch (error) {
-      if (!mounted || token != _filterToken) return;
+      if (!mounted || !_searchRequests.isCurrent(token)) return;
       AppLogger.warning(
         'Failed to refresh video library search source',
         error: error,
@@ -371,18 +403,22 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         .toList();
     if (normalizedTags.isEmpty) return;
 
-    final int token = ++_filterToken;
+    final int token = _searchRequests.begin();
     setState(() {
+      _activeSearchTags = normalizedTags;
+      _searchQuery = normalizedTags.map((tag) => '#$tag').join(' ');
+      _useRegexSearch = false;
+      _tagMatchedPaths = null;
       _liveSearchSource = null;
       _isSearchLoading = true;
     });
     try {
       final files = await _loadLiveLibraryFiles();
-      if (!mounted || token != _filterToken) return;
+      if (!mounted || !_searchRequests.isCurrent(token)) return;
       final fileTags = await TagManager.getTagsForFiles(
         files.map((entity) => entity.path).toList(),
       );
-      if (!mounted || token != _filterToken) {
+      if (!mounted || !_searchRequests.isCurrent(token)) {
         return;
       }
 
@@ -406,11 +442,12 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
         _searchQuery = normalizedTags.map((tag) => '#$tag').join(' ');
         _useRegexSearch = false;
         _liveSearchSource = files;
+        _removedPaths = {};
         _isSearchLoading = false;
       });
       _bloc.add(const FileNavigationClearSearchAndFilters());
     } catch (error) {
-      if (!mounted || token != _filterToken) return;
+      if (!mounted || !_searchRequests.isCurrent(token)) return;
       AppLogger.warning('Failed to search video library tags', error: error);
       setState(() {
         _isSearchLoading = false;
@@ -427,7 +464,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       return;
     }
     setState(() {
-      _filterToken++;
+      _searchRequests.invalidate();
       _searchQuery = '';
       _useRegexSearch = false;
       _activeSearchTags = const [];
@@ -501,7 +538,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     onTagSearch: _applyTagSearch,
     onClearSearch: _clearSearch,
     onCloseSearch: _closeSearchBar,
-    showClearButton: _searchQuery.isNotEmpty || _activeSearchTags.isNotEmpty,
+    showClearButton: true,
     showTipsButton: true,
     showTagSearch: true,
     showGlobalSearchToggle: false,
@@ -552,10 +589,11 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       permanent: permanent,
       onMoved: (filePath) =>
           _service.removeFileFromLibrary(widget.library.id, filePath),
-      onAfterSuccess: (_) async {
-        await VideoLibraryNavigationBloc.invalidateCache(widget.library.id);
-        _bloc.refreshLibrary();
+      onAfterSuccess: (deletedPaths) async {
+        if (!mounted) return;
         _clearSelection();
+        // Invalidate in-flight search before rescanning after a mutation.
+        await _refresh(deletedPaths: deletedPaths);
       },
       onMoveError: (filePath, _) {
         AppLogger.warning(
@@ -577,7 +615,11 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
 
   List<FileSystemEntity> _visibleFilesForState(FileNavigationState state) {
     final trimmedQuery = _searchQuery.trim();
-    final sourceFiles = _liveSearchSource ?? state.files;
+    final sourceFiles = (_liveSearchSource ?? state.files)
+        .where(
+          (entity) => !SearchQuery.isRemovedPath(entity.path, _removedPaths),
+        )
+        .toList();
     if (_activeSearchTags.isNotEmpty) {
       final matchedPaths = _tagMatchedPaths ?? const <String>{};
       return sourceFiles
@@ -585,7 +627,7 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
           .toList();
     }
     return trimmedQuery.isEmpty
-        ? state.files
+        ? sourceFiles
         : _filterFilesBySearch(sourceFiles, trimmedQuery);
   }
 
@@ -884,19 +926,19 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       final normalizedQuery = query.toLowerCase();
       return files
           .where(
-            (file) => path
-                .basename(file.path)
-                .toLowerCase()
-                .contains(normalizedQuery),
+            (file) => TextUtils.matchesVietnamese(
+              path.basename(file.path),
+              normalizedQuery,
+            ),
           )
           .toList();
     }
 
     RegExp pattern;
     try {
-      pattern = RegExp(query, caseSensitive: false);
+      pattern = RegExp(query, caseSensitive: false, unicode: true);
     } catch (_) {
-      return files;
+      return const [];
     }
 
     return files

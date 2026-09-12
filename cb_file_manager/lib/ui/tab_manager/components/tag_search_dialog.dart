@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -23,6 +24,7 @@ class TagSearchDialog extends StatefulWidget {
 
 class _TagSearchDialogState extends State<TagSearchDialog> {
   final TextEditingController _tagController = TextEditingController();
+  final FocusNode _tagFocusNode = FocusNode();
   bool _isGlobalSearch = false;
   bool _isSearching = false;
   List<String> _availableTags = [];
@@ -35,6 +37,7 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
 
   Future<void> _loadAvailableTags() async {
     final tags = await TagManager.getAllUniqueTags(widget.currentPath);
+    if (!mounted) return;
     setState(() {
       _availableTags = tags.toList()..sort(TextUtils.compareAlphabetically);
     });
@@ -42,15 +45,18 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
 
   @override
   void dispose() {
+    _tagFocusNode.dispose();
     _tagController.dispose();
     super.dispose();
   }
 
   Future<void> _performSearch() async {
-    if (_tagController.text.trim().isEmpty) {
+    if (_isSearching || _tagController.text.trim().isEmpty) {
       return;
     }
 
+    final query = _tagController.text.trim();
+    final isGlobalSearch = _isGlobalSearch;
     setState(() {
       _isSearching = true;
     });
@@ -62,21 +68,17 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
 
     try {
       List<FileSystemEntity> results;
-      if (_isGlobalSearch) {
-        results = await TagManager.findFilesByTagGlobally(
-          _tagController.text.trim(),
-        );
+      if (isGlobalSearch) {
+        results = await TagManager.findFilesByTagGlobally(query);
       } else {
-        results = await TagManager.findFilesByTag(
-          widget.currentPath,
-          _tagController.text.trim(),
-        );
+        results = await TagManager.findFilesByTag(widget.currentPath, query);
       }
 
+      if (!mounted) return;
       try {
         navigator.pop();
       } catch (_) {}
-      widget.onSearchComplete(results, _tagController.text.trim());
+      widget.onSearchComplete(results, query);
     } catch (e) {
       try {
         toast.error(l10n.searchError(e.toString()));
@@ -98,6 +100,8 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Autocomplete<String>(
+            textEditingController: _tagController,
+            focusNode: _tagFocusNode,
             optionsBuilder: (TextEditingValue textEditingValue) {
               if (textEditingValue.text.isEmpty) {
                 return _availableTags;
@@ -115,9 +119,9 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
             },
             fieldViewBuilder:
                 (context, controller, focusNode, onFieldSubmitted) {
-                  _tagController.text = controller.text;
-                  return TextField(
+                  return SearchTextField(
                     controller: controller,
+                    enabled: !_isSearching,
                     focusNode: focusNode,
                     decoration: const InputDecoration(
                       labelText: 'Nhập tag để tìm kiếm',

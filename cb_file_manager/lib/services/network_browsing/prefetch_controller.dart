@@ -9,7 +9,7 @@ class PrefetchControllerConfig {
   final int prefetchSize; // How much to prefetch ahead
   final int maxPrefetchChunks; // Maximum number of chunks to prefetch
   final Duration prefetchTimeout; // Timeout for prefetch operations
-  final bool enableCircularBuffer; // Use circular buffer like VLC
+  final bool enableCircularBuffer; // Use circular buffer like media_kit
 
   const PrefetchControllerConfig({
     this.bufferSize = 5 * 1024 * 1024, // 5MB buffer

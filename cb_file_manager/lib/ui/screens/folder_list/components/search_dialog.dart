@@ -1,3 +1,8 @@
+import 'package:cb_file_manager/helpers/core/search_query.dart';
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
+import 'package:path/path.dart' as path;
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:io';
 import 'dart:math';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -30,8 +35,10 @@ class SearchDialog extends StatefulWidget {
 }
 
 class _SearchDialogState extends State<SearchDialog> {
-  final TextEditingController _searchController = TextEditingController();
+  final SearchTextController _searchController = SearchTextController();
   final FocusNode _searchFocusNode = FocusNode();
+  final _resultsRequest = SearchRequestGuard();
+  final _suggestionsRequest = SearchRequestGuard();
   List<File> _filteredFiles = [];
   List<Directory> _filteredFolders = [];
   bool _isSearchingTags = false;
@@ -50,7 +57,7 @@ class _SearchDialogState extends State<SearchDialog> {
     _preloadTagData();
 
     // Add listener for search text changes
-    _searchController.addListener(_onSearchChanged);
+    _searchController.addQueryListener(_onSearchChanged);
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus) {
         _removeOverlay();
@@ -67,13 +74,15 @@ class _SearchDialogState extends State<SearchDialog> {
 
     // Load popular tags for suggestions
     final popularTags = await TagManager.instance.getPopularTags(limit: 15);
+    if (!mounted) return;
     setState(() {
       _suggestedTags = popularTags.keys.toList();
     });
   }
 
   void _onSearchChanged() {
-    final query = _searchController.text.toLowerCase();
+    final query = _searchController.text.trim().toLowerCase();
+    _suggestionsRequest.invalidate();
 
     // Check if we're in tag search mode
     if (query.contains('#')) {
@@ -101,17 +110,24 @@ class _SearchDialogState extends State<SearchDialog> {
   }
 
   Future<void> _updateTagSuggestions(String tagQuery) async {
+    final request = _suggestionsRequest.begin();
     if (tagQuery.isEmpty) {
       // Show popular tags
       _showOverlay(_suggestedTags);
     } else {
       // Search for tags matching the query
       final matchingTags = await TagManager.instance.searchTags(tagQuery);
+      if (!mounted ||
+          !_suggestionsRequest.isCurrent(request) ||
+          !_searchFocusNode.hasFocus) {
+        return;
+      }
       _showOverlay(matchingTags);
     }
   }
 
   void _updateFilteredItems(String query) async {
+    final request = _resultsRequest.begin();
     if (query.isEmpty) {
       setState(() {
         _filteredFiles = widget.files;
@@ -121,10 +137,8 @@ class _SearchDialogState extends State<SearchDialog> {
     }
 
     if (_isSearchingTags) {
-      final int hashPosition = query.lastIndexOf('#');
-      final String tagQuery = query.substring(hashPosition + 1).trim();
-
-      if (tagQuery.isEmpty) {
+      final searchTags = SearchQuery.tags(query);
+      if (searchTags.isEmpty) {
         setState(() {
           _filteredFiles = widget.files;
           _filteredFolders = widget.folders;
@@ -142,11 +156,18 @@ class _SearchDialogState extends State<SearchDialog> {
       // Get all tagged files including in subdirectories
       final results = await TagManager.findFilesByTag(
         widget.currentPath,
-        tagQuery,
+        searchTags.first,
       );
+      final matched = <File>[];
+      for (final entity in results.whereType<File>()) {
+        final tags = await TagManager.getTags(entity.path);
+        if (!mounted || !_resultsRequest.isCurrent(request)) return;
+        if (searchTags.every((tag) => tags.contains(tag))) matched.add(entity);
+      }
+      if (!mounted || !_resultsRequest.isCurrent(request)) return;
 
       // Tất cả kết quả đều là file do đã sửa đổi findFilesByTag
-      final List<File> taggedFiles = results.cast<File>().toList();
+      final List<File> taggedFiles = matched;
 
       // Cập nhật UI với kết quả tìm kiếm
       setState(() {
@@ -158,10 +179,18 @@ class _SearchDialogState extends State<SearchDialog> {
       // Regular text search
       setState(() {
         _filteredFiles = widget.files
-            .where((file) => file.path.toLowerCase().contains(query))
+            .where(
+              (file) =>
+                  TextUtils.matchesVietnamese(path.basename(file.path), query),
+            )
             .toList();
         _filteredFolders = widget.folders
-            .where((folder) => folder.path.toLowerCase().contains(query))
+            .where(
+              (folder) => TextUtils.matchesVietnamese(
+                path.basename(folder.path),
+                query,
+              ),
+            )
             .toList();
       });
     }
@@ -226,6 +255,7 @@ class _SearchDialogState extends State<SearchDialog> {
   }
 
   void _removeOverlay() {
+    _suggestionsRequest.invalidate();
     _overlayEntry?.remove();
     _overlayEntry = null;
   }
@@ -296,6 +326,8 @@ class _SearchDialogState extends State<SearchDialog> {
   @override
   void dispose() {
     _removeOverlay();
+    _resultsRequest.dispose();
+    _suggestionsRequest.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -305,7 +337,7 @@ class _SearchDialogState extends State<SearchDialog> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
+        title: SearchTextField(
           controller: _searchController,
           focusNode: _searchFocusNode,
           decoration: InputDecoration(

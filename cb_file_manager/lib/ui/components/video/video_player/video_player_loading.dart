@@ -267,16 +267,15 @@ class _VideoPlayerLoadingWidgetState extends State<VideoPlayerLoadingWidget> {
   }
 }
 
-/// VLC-specific placeholder shown while VLC player is initializing.
-class VideoPlayerVlcPlaceholder extends StatefulWidget {
-  const VideoPlayerVlcPlaceholder({super.key});
+/// media_kit-specific placeholder shown while media_kit player is initializing.
+class VideoPlayerPlaceholder extends StatefulWidget {
+  const VideoPlayerPlaceholder({super.key});
 
   @override
-  State<VideoPlayerVlcPlaceholder> createState() =>
-      _VideoPlayerVlcPlaceholderState();
+  State<VideoPlayerPlaceholder> createState() => _VideoPlayerPlaceholderState();
 }
 
-class _VideoPlayerVlcPlaceholderState extends State<VideoPlayerVlcPlaceholder> {
+class _VideoPlayerPlaceholderState extends State<VideoPlayerPlaceholder> {
   @override
   Widget build(BuildContext context) {
     return Container(

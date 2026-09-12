@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 class WindowsExplorerFileDropEvent {
   final List<String> paths;
+
+  /// Flutter view logical coordinates (converted from OLE screen pixels).
   final Offset globalPosition;
   final String effect;
 

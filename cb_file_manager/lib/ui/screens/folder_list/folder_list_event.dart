@@ -185,6 +185,15 @@ class FolderListDeleteItems extends FolderListEvent {
   List<Object> get props => [filePaths, folderPaths, permanent];
 }
 
+/// Remove confirmed moved/deleted sources from the visible listing and search.
+class FolderListRemovePaths extends FolderListEvent {
+  final Set<String> paths;
+  const FolderListRemovePaths(this.paths);
+
+  @override
+  List<Object> get props => [paths];
+}
+
 class FolderListRetryDeleteAsAdministrator extends FolderListEvent {
   final List<String> failedPaths;
 

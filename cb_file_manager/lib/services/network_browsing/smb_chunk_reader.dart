@@ -4,7 +4,7 @@ import 'package:mobile_smb_native/mobile_smb_native.dart';
 
 /// Configuration for the [SmbChunkReader].
 ///
-/// These values are inspired by VLC and typical media-streaming defaults. They
+/// These values are inspired by media_kit and typical media-streaming defaults. They
 /// are **not** performance-critical for a stub implementation – they merely
 /// need to exist so that the rest of the project can compile. Feel free to
 /// tweak the defaults later when a real reader is implemented.

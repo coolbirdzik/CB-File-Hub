@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:cb_file_manager/services/media/vlc_playback.dart';
+import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 
 import '../video_player/video_player_utils.dart';
 
-/// Modeless, draggable PiP overlay for Windows (in‑process), using VLC.
+/// Modeless, draggable PiP overlay for Windows (in‑process), using media_kit.
 ///
 /// This avoids launching a second process and behaves like a floating dialog
 /// that can be dragged within the app window.

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -39,13 +40,13 @@ class CleanerAppsView extends StatefulWidget {
 class _CleanerAppsViewState extends State<CleanerAppsView> {
   static const Duration _searchDebounce = Duration(milliseconds: 220);
 
-  late final TextEditingController _searchController;
+  late final SearchTextController _searchController;
   Timer? _searchDebounceTimer;
 
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(
+    _searchController = SearchTextController(
       text: widget.cubit.state.searchQuery,
     );
   }
@@ -587,7 +588,7 @@ class _SearchField extends StatelessWidget {
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: controller,
         builder: (context, value, child) {
-          return TextField(
+          return SearchTextField(
             key: const ValueKey<String>('cleaner-apps-search'),
             controller: controller,
             onChanged: onChanged,

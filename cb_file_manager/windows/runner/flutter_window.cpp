@@ -33,6 +33,10 @@ bool FlutterWindow::OnCreate()
   {
     return false;
   }
+  // Attach the rendering view before plugins cache GA_ROOT or register OLE
+  // drop targets. Otherwise they retain the unparented child HWND and file
+  // operation completion messages never reach the top-level window delegate.
+  SetChildContent(flutter_controller_->view()->GetNativeWindow());
   RegisterPlugins(flutter_controller_->engine());
 
   // Manually register FC Native Video Thumbnail plugin
@@ -75,8 +79,6 @@ bool FlutterWindow::OnCreate()
   WindowUtilsPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarManager::GetInstance()
           ->GetRegistrar<flutter::PluginRegistrarWindows>(window_utils_registrar));
-
-  SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   // Window visibility is managed by Dart via the window_manager package.
   // This avoids startup flicker from multiple show/maximize transitions on

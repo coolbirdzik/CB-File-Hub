@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import '../../widgets/file_drag_drop_item.dart';
 import '../../../helpers/files/file_icon_helper.dart';
 import '../../widgets/thumbnail_loader.dart';
 import '../../widgets/lazy_video_thumbnail.dart';
@@ -39,10 +40,21 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   int _lastTapTime = 0;
   Offset? _lastTapPosition;
   bool _skipNextTap = false;
+  TapDownDetails? _deferredTap;
   static const int _doubleTapTimeout = 300; // milliseconds
   static const double _doubleTapMaxDistance = 40.0; // pixels
 
   void _handleTapDown(TapDownDetails details) {
+    if (context.findAncestorWidgetOfExactType<FileDragDropItem>() != null) {
+      // A held mouse button may become a file drag. Do not collapse a
+      // multi-selection (or open on double-click) until it resolves as a tap.
+      _deferredTap = details;
+      return;
+    }
+    _activateTapDown(details);
+  }
+
+  void _activateTapDown(TapDownDetails details) {
     final now = DateTime.now().millisecondsSinceEpoch;
     final position = details.globalPosition;
 
@@ -81,6 +93,9 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   }
 
   void _handleTap() {
+    final deferred = _deferredTap;
+    _deferredTap = null;
+    if (deferred != null) _activateTapDown(deferred);
     if (_skipNextTap) {
       _skipNextTap = false;
       return;
@@ -89,6 +104,7 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   }
 
   void _handleTapCancel() {
+    _deferredTap = null;
     _skipNextTap = false;
   }
 

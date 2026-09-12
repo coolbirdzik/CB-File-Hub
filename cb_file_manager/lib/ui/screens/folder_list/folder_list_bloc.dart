@@ -54,6 +54,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     _operationsBloc = FileOperationsBloc(
       navigationBloc: _navigationBloc,
       progressController: locator<OperationProgressController>(),
+      onPathsDeleted: (paths) {
+        if (!isClosed) _tagSearchBloc.add(tag.TagSearchRemovePaths(paths));
+      },
     );
     _tagSearchBloc = TagSearchBloc(navigationBloc: _navigationBloc);
 
@@ -71,6 +74,10 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
     on<ClearSearchAndFilters>(_onClearSearchAndFilters);
     on<FolderListDeleteFiles>(_onDeleteFiles);
     on<FolderListDeleteItems>(_onDeleteItems);
+    on<FolderListRemovePaths>((event, emit) {
+      _navigationBloc.add(nav.FileNavigationRemovePaths(event.paths));
+      _tagSearchBloc.add(tag.TagSearchRemovePaths(event.paths));
+    });
     on<FolderListRetryDeleteAsAdministrator>(_onRetryDeleteAsAdministrator);
     on<FolderListReloadCurrentFolder>(_onReloadCurrentFolder);
     on<FolderListDeleteTagGlobally>(_onDeleteTagGlobally);
@@ -538,9 +545,11 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   void _onTagStateChanged(TagSearchState tagState) {
     if (isClosed) return;
 
-    // Tag search does not apply inside an archive; merging its loading/error
-    // flags would hide or replace the virtual listing.
-    if (_archiveBrowsePath != null) {
+    // Metadata updates must not replace the listing owned by navigation (for
+    // example, filename search results) with the inactive tag search's results.
+    // Still merge the transition out of an active tag search when it is cleared.
+    if (_archiveBrowsePath != null ||
+        (tagState.currentSearchTag == null && state.currentSearchTag == null)) {
       // ignore: invalid_use_of_visible_for_testing_member
       emit(
         state.copyWith(

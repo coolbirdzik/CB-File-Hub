@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:cb_file_manager/services/media/vlc_playback.dart';
+import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
@@ -85,6 +85,9 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
         }
       });
 
+      // Picking a frame needs no sound; media_kit renders the paused first frame.
+      await _player.setVolume(0);
+
       // Open the video paused
       await _player.open(PlaybackMedia(widget.videoPath), play: false);
 
@@ -155,7 +158,7 @@ class _VideoFramePickerDialogState extends State<VideoFramePickerDialog> {
 
       String? savedPath;
 
-      // Strategy 1 (WYSIWYG): capture exactly the frame VLC is currently
+      // Strategy 1 (WYSIWYG): capture exactly the frame media_kit is currently
       // showing. The player and the native extractor seek independently, so
       // re-seeking natively can land on a different (earlier) keyframe than the
       // one on screen. Screenshotting the displayed frame guarantees the saved

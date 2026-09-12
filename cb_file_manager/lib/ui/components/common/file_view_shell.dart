@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_focus_gate.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 
@@ -140,6 +141,11 @@ class _FileViewShellState extends State<FileViewShell> {
 
   KeyEventResult _onKeyEvent(FocusNode _, KeyEvent event) {
     if (!widget.enableKeyboardShortcuts) {
+      return KeyEventResult.ignored;
+    }
+    // Hidden tabs stay mounted, so a stale focus must never run shortcuts
+    // against a view the user cannot see.
+    if (!TabFocusGate.isActiveTab(context)) {
       return KeyEventResult.ignored;
     }
     return BrowserLikeKeyboardShortcuts.handleBasic(

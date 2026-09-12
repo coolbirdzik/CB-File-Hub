@@ -50,6 +50,70 @@ void expectFolderRowVisible(String absolutePath) {
   );
 }
 
+/// Pumps frames in real-time steps until [finder] matches at least one
+/// widget, or until [timeout] elapses. Returns whether the finder matched.
+///
+/// `pumpAndSettle` alone is not enough on slow CI runners: directory
+/// listings, watcher refreshes, paste/rename completion and submenu loads
+/// finish as real async I/O with no scheduled frames in between, so the
+/// binding can be fully "settled" while the UI has not caught up yet.
+/// Polling with real wall-clock time (like [_confirmDeleteDialog] in
+/// app_e2e_test.dart) bridges that gap.
+Future<bool> pumpUntilFound(
+  WidgetTester tester,
+  Finder finder, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    if (finder.evaluate().isNotEmpty) return true;
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  return finder.evaluate().isNotEmpty;
+}
+
+/// Waits (polling) for a file row to appear after an async operation
+/// (create, copy, cut, paste, rename), then asserts visibility with the
+/// same failure message as [expectFileRowVisible].
+Future<void> waitForFileRowVisible(
+  WidgetTester tester,
+  String absolutePath, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  await pumpUntilFound(
+    tester,
+    find.byKey(ValueKey('file-grid-item-$absolutePath')),
+    timeout: timeout,
+  );
+  await pumpUntilFound(
+    tester,
+    find.byKey(ValueKey('file-item-$absolutePath')),
+    timeout: const Duration(milliseconds: 200),
+  );
+  expectFileRowVisible(absolutePath);
+}
+
+/// Waits (polling) for a folder row to appear after an async operation,
+/// then asserts visibility with the same failure message as
+/// [expectFolderRowVisible].
+Future<void> waitForFolderRowVisible(
+  WidgetTester tester,
+  String absolutePath, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  await pumpUntilFound(
+    tester,
+    find.byKey(ValueKey('folder-grid-item-$absolutePath')),
+    timeout: timeout,
+  );
+  await pumpUntilFound(
+    tester,
+    find.byKey(ValueKey('folder-item-$absolutePath')),
+    timeout: const Duration(milliseconds: 200),
+  );
+  expectFolderRowVisible(absolutePath);
+}
+
 /// Verifies a folder row exists (grid or list). Fails immediately if not found.
 void assertFolderRowExists(String absolutePath) {
   final grid = find.byKey(ValueKey('folder-grid-item-$absolutePath'));
@@ -329,9 +393,19 @@ Future<void> tapContextMenuItem(WidgetTester tester, String actionId) async {
     final trigger = submenuTriggerFinder.at(i);
     await tester.ensureVisible(trigger);
     await tester.tap(trigger, warnIfMissed: false);
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
+    // Submenu sections load asynchronously (e.g. Windows registry
+    // enumeration for "New" items). Poll for the target instead of using
+    // fixed pumps: slow CI runners regularly exceed a fixed 900 ms window.
+    final deadline = DateTime.now().add(const Duration(seconds: 6));
+    while (DateTime.now().isBefore(deadline)) {
+      final polledKeyed = _findFirstVisibleContextMenuAction(actionIds);
+      final polledText = _findFirstVisibleText(labels);
+      if ((polledKeyed != null && polledKeyed.evaluate().isNotEmpty) ||
+          (polledText != null && polledText.evaluate().isNotEmpty)) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
     final retryKeyedFinder = _findFirstVisibleContextMenuAction(actionIds);
     if (retryKeyedFinder != null && retryKeyedFinder.evaluate().isNotEmpty) {

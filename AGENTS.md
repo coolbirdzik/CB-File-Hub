@@ -75,7 +75,7 @@ CI runs: **format check -> analyze -> unit tests -> E2E (Windows) -> build**. Ma
 - **Localization:** Custom delegate-based (Vietnamese + English) in `lib/config/languages/`. Does **not** use Flutter's `gen-l10n` / ARB files.
 - **Navigation:** Tab-based via `TabMainScreen` (`lib/ui/tab_manager/`), not standard Flutter routing.
 - **Database:** SQLite via `sqflite` / `sqflite_common_ffi`. On Windows, uses system `winsqlite3.dll` (no bundled DLL).
-- **Video:** shared VLC backend (`lib/services/media/vlc_playback.dart`), using vendored `vlc_player` 2.1.2 with Windows libVLC 3.0.23. See `docs/technical/07-vlc-playback.md`.
+- **Video:** shared media_kit backend (`lib/services/media/media_kit_playback.dart`), using `media_kit` 1.2.6, `media_kit_video` 2.0.1 and `media_kit_libs_video` 1.0.7. See `docs/technical/07-media-kit-playback.md`.
 - **Streaming:** Built-in HTTP media server via `shelf` (`lib/services/streaming/`).
 - **Network browsing:** SMB/CIFS via local `mobile_smb_native` FFI plugin, plus FTP support.
 - **Windows native:** Uses `win32` FFI, acrylic backdrop, native tab drag-drop, PiP windowing.

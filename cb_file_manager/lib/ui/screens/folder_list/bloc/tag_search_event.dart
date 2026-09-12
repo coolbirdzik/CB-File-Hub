@@ -128,3 +128,11 @@ class TagSearchSetResults extends TagSearchEvent {
 class TagSearchClearResults extends TagSearchEvent {
   const TagSearchClearResults();
 }
+
+class TagSearchRemovePaths extends TagSearchEvent {
+  final Set<String> paths;
+  const TagSearchRemovePaths(this.paths);
+
+  @override
+  List<Object> get props => [paths];
+}

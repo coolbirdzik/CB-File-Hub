@@ -157,7 +157,7 @@ void main() {
       ),
     );
 
-    // Wait for VLC to open the real MP4 and begin advancing position.
+    // Wait for media_kit to open the real MP4 and begin advancing position.
     for (var i = 0; i < 100; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }

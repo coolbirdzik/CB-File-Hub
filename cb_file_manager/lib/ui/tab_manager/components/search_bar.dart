@@ -1,3 +1,6 @@
+import 'package:cb_file_manager/helpers/core/search_query.dart';
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Handles keyboard events.
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -50,7 +53,7 @@ class SearchBar extends StatefulWidget {
     this.showTagSearch = true,
     this.showGlobalSearchToggle = true,
     this.showRegexToggle = true,
-    this.showClearButton = false,
+    this.showClearButton = true,
   });
 
   @override
@@ -58,10 +61,11 @@ class SearchBar extends StatefulWidget {
 }
 
 class _SearchBarState extends State<SearchBar> {
-  final TextEditingController _searchController = TextEditingController();
+  final SearchTextController _searchController = SearchTextController();
   final FocusNode _searchFocusNode = FocusNode();
   final LayerLink _suggestionsLink = LayerLink();
   final Object _tapRegionGroupId = Object();
+  final _suggestionsRequest = SearchRequestGuard();
   bool _isSearchingTags = false;
   bool _isSearchFocused = false;
   List<String> _suggestedTags = [];
@@ -91,14 +95,14 @@ class _SearchBarState extends State<SearchBar> {
     _searchController.text = widget.initialQuery ?? '';
     // Focus the search field when it appears.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
+      if (mounted) _searchFocusNode.requestFocus();
     });
 
-    _searchController.addListener(_onSearchChanged);
+    _searchController.addQueryListener(_onSearchChanged);
     _searchFocusNode.addListener(_onSearchFocusChanged);
 
     // Load popular tags.
-    _loadPopularTags();
+    if (widget.showTagSearch) _loadPopularTags();
   }
 
   @override
@@ -121,6 +125,7 @@ class _SearchBarState extends State<SearchBar> {
   Future<void> _loadPopularTags() async {
     try {
       final popularTags = await TagManager.instance.getPopularTags(limit: 10);
+      if (!mounted) return;
       setState(() {
         _suggestedTags = popularTags.keys.toList();
       });
@@ -140,6 +145,7 @@ class _SearchBarState extends State<SearchBar> {
     // Remove the overlay before disposing the widget.
     _removeOverlay();
     _searchFocusNode.removeListener(_onSearchFocusChanged);
+    _suggestionsRequest.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -147,6 +153,7 @@ class _SearchBarState extends State<SearchBar> {
 
   // Removes the autocomplete overlay when it is no longer needed.
   void _removeOverlay() {
+    _suggestionsRequest.invalidate();
     _overlayEntry?.remove();
     _overlayEntry = null;
   }
@@ -181,6 +188,7 @@ class _SearchBarState extends State<SearchBar> {
   }
 
   void _onSearchChanged() {
+    _suggestionsRequest.invalidate();
     final query = _searchController.text.toLowerCase();
     widget.onQueryChanged?.call(_searchController.text);
 
@@ -227,6 +235,7 @@ class _SearchBarState extends State<SearchBar> {
       return;
     }
 
+    final request = _suggestionsRequest.begin();
     List<String> tags = [];
 
     if (tagQuery.isEmpty) {
@@ -238,7 +247,9 @@ class _SearchBarState extends State<SearchBar> {
     }
 
     // Update the tag list and UI.
-    if (mounted) {
+    if (mounted &&
+        _suggestionsRequest.isCurrent(request) &&
+        _searchFocusNode.hasFocus) {
       setState(() {
         _currentTags = List.from(tags);
         // Reset selection when the list changes.
@@ -258,6 +269,7 @@ class _SearchBarState extends State<SearchBar> {
     _removeOverlay();
 
     // Search for matching tags.
+    final request = _suggestionsRequest.begin();
     List<String> tags = [];
     if (tagQuery.isEmpty) {
       tags = _suggestedTags;
@@ -269,7 +281,11 @@ class _SearchBarState extends State<SearchBar> {
     if (tags.isEmpty && tagQuery.isEmpty) return;
 
     // Stop if the widget was disposed while waiting.
-    if (!mounted) return;
+    if (!mounted ||
+        !_suggestionsRequest.isCurrent(request) ||
+        !_searchFocusNode.hasFocus) {
+      return;
+    }
 
     final localizations = AppLocalizations.of(context)!;
 
@@ -497,54 +513,37 @@ class _SearchBarState extends State<SearchBar> {
 
     // Keep the field focused after updating the text.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
+      if (mounted) _searchFocusNode.requestFocus();
     });
   }
 
-  // Parses the search query and extracts multiple tags.
-  List<String> _extractTags(String query) {
-    List<String> tags = [];
-
-    // Use regex to find all patterns that start with # and continue until another # or end of string
-    RegExp tagRegex = RegExp(r'#([^\s#][^#]*?)(?=\s+#|\s*$)');
-    final matches = tagRegex.allMatches(query);
-
-    for (var match in matches) {
-      if (match.group(1) != null && match.group(1)!.isNotEmpty) {
-        // Trim trailing whitespace but preserve spaces within the tag
-        String tag = match.group(1)!.trimRight();
-        if (tag.isNotEmpty) {
-          tags.add(tag);
-        }
-      }
+  void _clearSearch() {
+    _searchController.clear();
+    _removeOverlay();
+    if (widget.onClearSearch != null) {
+      widget.onClearSearch!();
+    } else if (widget.onSearchWithOptions != null) {
+      widget.onSearchWithOptions!('', _useRegex);
+    } else if (widget.onSearch != null) {
+      widget.onSearch!('');
+    } else {
+      (widget.folderListBloc ?? context.read<FolderListBloc>()).add(
+        const ClearSearchAndFilters(),
+      );
     }
-
-    // If no matches found using the regex, fallback to simpler method
-    if (tags.isEmpty) {
-      // Check if there's a single tag in the query
-      if (query.startsWith('#') && query.length > 1) {
-        String tag = query.substring(1).trim();
-        if (tag.isNotEmpty) {
-          tags.add(tag);
-        }
-      }
-    }
-
-    // Remove duplicates
-    return tags.toSet().toList();
   }
 
   void _performSearch() {
-    if (_searchController.text.isEmpty) {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      _clearSearch();
       return;
     }
 
-    final query = _searchController.text;
-
     // Check if it's a tag search (contains # character)
-    if (_isSearchingTags || query.contains('#')) {
+    if (widget.showTagSearch && (_isSearchingTags || query.contains('#'))) {
       // Extract all tags from the query
-      List<String> tags = _extractTags(query);
+      List<String> tags = SearchQuery.tags(query);
 
       // If no valid tags were found, don't search
       if (tags.isEmpty) {
@@ -587,12 +586,12 @@ class _SearchBarState extends State<SearchBar> {
       }
     } else {
       if (widget.onSearchWithOptions != null) {
-        widget.onSearchWithOptions!(_searchController.text, _useRegex);
+        widget.onSearchWithOptions!(query, _useRegex);
         return;
       }
 
       if (widget.onSearch != null) {
-        widget.onSearch!(_searchController.text);
+        widget.onSearch!(query);
         return;
       }
 
@@ -758,28 +757,29 @@ class _SearchBarState extends State<SearchBar> {
                                 child: SizedBox(
                                   height: 16,
                                   width: double.infinity,
-                                  child: EditableText(
-                                    controller: _searchController,
-                                    focusNode: _searchFocusNode,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      height: 1,
-                                      color: theme.colorScheme.onSurface,
+                                  child: Material(
+                                    type: MaterialType.transparency,
+                                    child: SearchTextField(
+                                      decoration: null,
+                                      controller: _searchController,
+                                      focusNode: _searchFocusNode,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        height: 1,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                      strutStyle: const StrutStyle(
+                                        fontSize: 15,
+                                        height: 1,
+                                        forceStrutHeight: true,
+                                      ),
+                                      cursorColor: theme.colorScheme.primary,
+                                      cursorHeight: 16,
+                                      maxLines: 1,
+                                      textAlign: TextAlign.start,
+                                      textInputAction: TextInputAction.search,
+                                      onSubmitted: (_) => _performSearch(),
                                     ),
-                                    strutStyle: const StrutStyle(
-                                      fontSize: 15,
-                                      height: 1,
-                                      forceStrutHeight: true,
-                                    ),
-                                    cursorColor: theme.colorScheme.primary,
-                                    backgroundCursorColor: Colors.transparent,
-                                    selectionColor: theme.colorScheme.primary
-                                        .withValues(alpha: 0.28),
-                                    cursorHeight: 16,
-                                    maxLines: 1,
-                                    textAlign: TextAlign.start,
-                                    textInputAction: TextInputAction.search,
-                                    onSubmitted: (_) => _performSearch(),
                                   ),
                                 ),
                               ),
@@ -840,7 +840,7 @@ class _SearchBarState extends State<SearchBar> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
                     onTap: () {
-                      _searchFocusNode.requestFocus();
+                      if (mounted) _searchFocusNode.requestFocus();
                       final query = _searchController.text;
                       if (query.contains('#')) {
                         final hashPosition = query.lastIndexOf('#');
@@ -990,10 +990,7 @@ class _SearchBarState extends State<SearchBar> {
                   borderRadius: BorderRadius.circular(20),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      _searchController.clear();
-                      widget.onClearSearch?.call();
-                    },
+                    onTap: _clearSearch,
                     child: CbTooltip(
                       message: AppLocalizations.of(context)!.clearSearch,
                       child: Padding(

@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -170,7 +171,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: TextField(
+          child: SearchTextField(
             controller: _searchController,
             autofocus: true,
             style: const TextStyle(fontSize: 13),

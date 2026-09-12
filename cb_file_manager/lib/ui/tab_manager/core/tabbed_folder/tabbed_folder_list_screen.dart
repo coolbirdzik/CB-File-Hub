@@ -1,4 +1,6 @@
+import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'dart:async';
+import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -24,6 +26,7 @@ import 'package:cb_file_manager/ui/tab_manager/shared/screen_menu_registry.dart'
 import 'package:cb_file_manager/ui/components/common/skeleton_helper.dart';
 import '../tab_manager.dart';
 import '../tab_paths.dart';
+import '../tab_focus_gate.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
 import 'package:path/path.dart' as path;
 
@@ -568,6 +571,16 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     WindowsExplorerDragDropService.startFileDrag(paths).then((result) {
       if (!mounted) return;
       if (result == WindowsExplorerDragResult.moved && !_isDrivesMode()) {
+        final movedPaths = paths
+            .where(
+              (path) =>
+                  FileSystemEntity.typeSync(path, followLinks: false) ==
+                  FileSystemEntityType.notFound,
+            )
+            .toSet();
+        if (movedPaths.isNotEmpty) {
+          _folderListBloc.add(FolderListRemovePaths(movedPaths));
+        }
         _folderListBloc.add(FolderListRefresh(_currentPath));
         _selectionBloc.add(ClearSelection());
       }
@@ -579,16 +592,13 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     if (context.read<TabManagerBloc>().state.activeTabId != widget.tabId) {
       return;
     }
-    if (_currentPath.startsWith('#') || _isDrivesMode()) return;
-
-    final folderPaths = _folderListBloc.state.folders
-        .whereType<Directory>()
-        .map((folder) => folder.path)
-        .toSet();
-    final hitFolder = _dragSelectionController.hitTestItem(
-      event.globalPosition,
-      allowedPaths: folderPaths,
-    );
+    final hitFolder = FileDragDropItem.folderAt(context, event.globalPosition);
+    // Search results can expose real destination folders even though the tab
+    // itself has a virtual path. Only a background drop needs a real cwd.
+    if (hitFolder == null &&
+        (_currentPath.startsWith('#') || _isDrivesMode())) {
+      return;
+    }
     await _moveDroppedItemsToFolder(event.paths, hitFolder ?? _currentPath);
   }
 
@@ -605,6 +615,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     switch (rejection) {
       case FileDragDropMoveRejection.none:
         _selectionBloc.add(ClearSelection());
+        _folderListBloc.add(FolderListRemovePaths(sources.toSet()));
         _folderListBloc.add(FolderListRefresh(_currentPath));
         AppToast.success(context, 'Moved ${sources.length} item(s)');
         return;
@@ -1314,6 +1325,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         autofocus: isDesktopPlatform,
         focusNode: _keyboardController.focusNode,
         onKeyEvent: (node, event) {
+          // Shortcuts belong to the tab in front of the user. Hidden tabs stay
+          // mounted in the shell's IndexedStack, so without this guard a stale
+          // focus would let Delete / Shift+Delete hit an invisible folder.
+          if (!TabFocusGate.isActiveTab(context)) {
+            return KeyEventResult.ignored;
+          }
           return BrowserLikeKeyboardShortcuts.handle(
             isDesktop: isDesktopPlatform,
             keyboardController: _keyboardController,

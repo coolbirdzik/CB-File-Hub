@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
@@ -169,13 +171,14 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
   late String _currentPath;
   late MediaPickerViewMode _viewMode;
   late MediaPickerSort _sortBy;
+  final _tagSearchRequests = SearchRequestGuard();
   String _searchQuery = '';
   String? _activeFilterId;
   bool _isLoading = false;
   String? _errorMessage;
   List<Directory> _directories = [];
   List<File> _files = [];
-  final TextEditingController _searchController = TextEditingController();
+  final SearchTextController _searchController = SearchTextController();
   final TextEditingController _pathController = TextEditingController();
   final FocusNode _pathFocusNode = FocusNode();
   String? _rootPath;
@@ -345,6 +348,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
 
   @override
   void dispose() {
+    _tagSearchRequests.dispose();
     _searchController.dispose();
     _tagController.dispose();
     _tagFocusNode.dispose();
@@ -589,6 +593,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
   }
 
   Future<void> _performTagSearch(String tag) async {
+    final request = _tagSearchRequests.begin();
     final query = tag.trim();
     if (query.isEmpty) {
       return;
@@ -627,14 +632,14 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
             .compareTo(path.basename(b.path).toLowerCase()),
       );
 
-      if (!mounted) return;
+      if (!mounted || !_tagSearchRequests.isCurrent(request)) return;
       setState(() {
         _tagResults = files;
         _isTagSearching = false;
       });
     } catch (e) {
       debugPrint('MediaPickerDialog: tag search failed: $e');
-      if (!mounted) return;
+      if (!mounted || !_tagSearchRequests.isCurrent(request)) return;
       setState(() {
         _tagResults = [];
         _isTagSearching = false;
@@ -891,7 +896,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.config.showSearch)
-          TextField(
+          SearchTextField(
             controller: _searchController,
             onChanged: (value) {
               setState(() {
@@ -1097,7 +1102,7 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                 },
                 fieldViewBuilder:
                     (context, controller, focusNode, onFieldSubmitted) {
-                      return TextField(
+                      return SearchTextField(
                         controller: controller,
                         focusNode: focusNode,
                         decoration: InputDecoration(
@@ -1107,8 +1112,10 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                               ? null
                               : IconButton(
                                   onPressed: () {
+                                    _tagSearchRequests.invalidate();
                                     controller.clear();
                                     setState(() {
+                                      _isTagSearching = false;
                                       _activeTagQuery = null;
                                       _tagResults = [];
                                     });

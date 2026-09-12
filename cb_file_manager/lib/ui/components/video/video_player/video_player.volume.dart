@@ -18,7 +18,7 @@ abstract class _VideoPlayerVolumeHost extends State<VideoPlayer> {
 
 mixin _VideoPlayerVolumeMixin on _VideoPlayerVolumeHost {
   Future<void> _applyVolumeSettings() async {
-    // The shared VLC backend also queues volume before native attachment.
+    // The shared media_kit backend also queues volume before native attachment.
     await _applyVolumeToActiveController();
   }
 

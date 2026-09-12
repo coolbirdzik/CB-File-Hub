@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
@@ -9,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:path/path.dart' as p;
 
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -64,17 +64,6 @@ class FileListViewBuilder {
     return factors[hash.abs() % factors.length];
   }
 
-  static List<String> _dragPayloadFor(
-    String path,
-    SelectionState selectionState,
-  ) {
-    if (selectionState.isPathSelected(path) &&
-        selectionState.allSelectedPaths.isNotEmpty) {
-      return selectionState.allSelectedPaths.toSet().toList(growable: false);
-    }
-    return <String>[path];
-  }
-
   static Widget _wrapFileDragDrop({
     required Widget child,
     required bool isDesktopPlatform,
@@ -82,61 +71,17 @@ class FileListViewBuilder {
     required String path,
     required SelectionState selectionState,
     ValueChanged<List<String>>? onStartFileDrag,
-    Future<void> Function(List<String> sources, String destinationFolder)?
-    onMoveItemsToFolder,
-  }) {
-    if (!isDesktopPlatform) return child;
-
-    final payload = _dragPayloadFor(path, selectionState);
-    Widget wrapped = Draggable<List<String>>(
-      data: payload,
-      maxSimultaneousDrags: 1,
-      feedback: Material(
-        color: Colors.transparent,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text(
-              payload.length == 1
-                  ? p.basename(payload.first)
-                  : '${payload.length} items',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      ),
-      childWhenDragging: Opacity(opacity: 0.55, child: child),
-      onDragStarted: () => onStartFileDrag?.call(payload),
-      child: child,
-    );
-
-    if (!isFolder || onMoveItemsToFolder == null) return wrapped;
-
-    return DragTarget<List<String>>(
-      onWillAcceptWithDetails: (details) =>
-          details.data.isNotEmpty && !details.data.contains(path),
-      onAcceptWithDetails: (details) => onMoveItemsToFolder(details.data, path),
-      builder: (context, candidateData, rejectedData) {
-        if (candidateData.isEmpty) return wrapped;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary,
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: wrapped,
+    Future<void> Function(List<String>, String)? onMoveItemsToFolder,
+  }) => !isDesktopPlatform
+      ? child
+      : FileDragDropItem(
+          path: path,
+          isFolder: isFolder,
+          selectedPaths: selectionState.allSelectedPaths.toSet(),
+          onStartFileDrag: onStartFileDrag,
+          onMoveItemsToFolder: onMoveItemsToFolder,
+          child: child,
         );
-      },
-    );
-  }
 
   /// Build the appropriate view based on the current view mode
   /// If [searchResults] is provided, it will be used instead of state.files and state.folders
@@ -253,6 +198,8 @@ class FileListViewBuilder {
       );
     } else if (resolvedViewMode == ViewMode.columns && isDesktopPlatform) {
       contentView = MillerColumnsView(
+        onStartFileDrag: onStartFileDrag,
+        onMoveItemsToFolder: onMoveItemsToFolder,
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,
@@ -297,6 +244,8 @@ class FileListViewBuilder {
       );
     } else if (resolvedViewMode == ViewMode.tree) {
       contentView = FileTreeView(
+        onStartFileDrag: onStartFileDrag,
+        onMoveItemsToFolder: onMoveItemsToFolder,
         state: displayState,
         selectionState: selectionState,
         isDesktopPlatform: isDesktopPlatform,

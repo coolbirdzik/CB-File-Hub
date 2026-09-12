@@ -42,7 +42,7 @@ String smbTabPathToUNC(String tabPath) {
 /// Converts an SMB URI to a Windows UNC path.
 ///
 /// Returns a native path for Windows filesystem operations. Playback uses
-/// the VLC source resolver, which also preserves SMB authentication.
+/// the media_kit source resolver, which also preserves SMB authentication.
 String smbMrlToUnc(String smbMrl) {
   final uri = Uri.tryParse(smbMrl);
   if (uri == null || !uri.isScheme('smb') || uri.host.isEmpty) {

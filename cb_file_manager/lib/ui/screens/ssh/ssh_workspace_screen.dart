@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -305,7 +306,7 @@ class _SshWorkspaceScreenState extends State<SshWorkspaceScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: SearchTextField(
                       controller: _search,
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(

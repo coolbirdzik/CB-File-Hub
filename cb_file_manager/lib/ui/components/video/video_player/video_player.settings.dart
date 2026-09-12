@@ -510,7 +510,7 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
       await prefs.init();
 
       // Retain the existing Windows software-decoding migration preference.
-      // Users can still enable VLC hardware decoding explicitly.
+      // Users can still enable media_kit hardware decoding explicitly.
       if (!kIsWeb && Platform.isWindows) {
         final migrated =
             await prefs.getVideoPlayerBool(

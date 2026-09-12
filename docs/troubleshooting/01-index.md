@@ -6,5 +6,5 @@
 - **Desktop** Install required toolchains (CMake, platform SDKs).
 - **Permissions** Recheck Android storage/all-files + iOS local network entitlements.
 - **Networking** Validate SMB/WebDAV credentials and streaming config files.
-- **Android SMB VLC** If SMB plays audio but the UI never renders video, see `docs/troubleshooting/02-android-smb-vlc-no-render.md`.
+- **Historical Android SMB VLC** For the removed backend only, see `docs/troubleshooting/02-android-smb-vlc-no-render.md`.
 - **Logging** Use `flutter run -v`, sprinkle temporary logs in services/blocs while debugging.

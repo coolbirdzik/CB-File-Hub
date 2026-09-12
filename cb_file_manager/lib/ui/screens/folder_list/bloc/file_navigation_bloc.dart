@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
+import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -22,6 +24,7 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 
 class FileNavigationBloc
     extends Bloc<FileNavigationEvent, FileNavigationState> {
+  final _searchRequests = SearchRequestGuard();
   StreamSubscription<String>? _directoryWatcherSubscription;
   final DirectoryWatcherService _directoryWatcher =
       DirectoryWatcherService.instance;
@@ -75,29 +78,34 @@ class FileNavigationBloc
     Emitter<FileNavigationState> emit,
   ) {
     if (event.paths.isEmpty) return;
-    final removed = event.paths;
+    _searchRequests.invalidate();
+    bool removed(FileSystemEntity entity) =>
+        SearchQuery.isRemovedPath(entity.path, event.paths);
     final searchBefore = state.searchResults.length;
+    final pendingBefore = _pendingSearchResults.length;
     _pendingSearchResults = _pendingSearchResults
-        .where((entity) => !removed.contains(entity.path))
+        .where((entity) => !removed(entity))
         .toList();
     final filteredSearchResults = state.searchResults
-        .where((entity) => !removed.contains(entity.path))
+        .where((entity) => !removed(entity))
         .toList();
-    final removedFromSearch = searchBefore - filteredSearchResults.length;
+    final removedFromSearch =
+        searchBefore -
+        filteredSearchResults.length +
+        pendingBefore -
+        _pendingSearchResults.length;
     final currentTotal = state.searchResultsTotal;
 
     emit(
       state.copyWith(
-        folders: state.folders
-            .where((entity) => !removed.contains(entity.path))
-            .toList(),
-        files: state.files
-            .where((entity) => !removed.contains(entity.path))
-            .toList(),
+        isLoading: false,
+        folders: state.folders.where((entity) => !removed(entity)).toList(),
+        files: state.files.where((entity) => !removed(entity)).toList(),
         filteredFiles: state.filteredFiles
-            .where((entity) => !removed.contains(entity.path))
+            .where((entity) => !removed(entity))
             .toList(),
         searchResults: filteredSearchResults,
+        hasMoreSearchResults: _pendingSearchResults.isNotEmpty,
         searchResultsTotal: currentTotal == null
             ? null
             : math.max(0, currentTotal - removedFromSearch),
@@ -107,6 +115,7 @@ class FileNavigationBloc
 
   @override
   Future<void> close() {
+    _searchRequests.dispose();
     _directoryWatcherSubscription?.cancel();
     _directoryWatcher.stopWatching();
     return super.close();
@@ -154,6 +163,7 @@ class FileNavigationBloc
     FileNavigationLoad event,
     Emitter<FileNavigationState> emit,
   ) async {
+    _searchRequests.invalidate();
     final totalSw = Stopwatch()..start();
     AppLogger.perf('Starting folder load path=${event.path}');
 
@@ -520,11 +530,33 @@ class FileNavigationBloc
     FileNavigationFilter event,
     Emitter<FileNavigationState> emit,
   ) {
+    _searchRequests.invalidate();
+    _pendingSearchResults = [];
     if (event.fileType == null) {
-      emit(state.copyWith(currentFilter: null, filteredFiles: []));
+      emit(
+        state.copyWith(
+          currentFilter: null,
+          filteredFiles: [],
+          currentSearchQuery: null,
+          searchResults: [],
+          searchResultsTotal: null,
+          hasMoreSearchResults: false,
+          isSearchByName: false,
+        ),
+      );
       return;
     }
-    emit(state.copyWith(isLoading: true, currentFilter: event.fileType));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        currentFilter: event.fileType,
+        currentSearchQuery: null,
+        searchResults: [],
+        searchResultsTotal: null,
+        hasMoreSearchResults: false,
+        isSearchByName: false,
+      ),
+    );
     final filtered = _filterFilesByType(state.files, event.fileType!);
     emit(state.copyWith(isLoading: false, filteredFiles: filtered));
   }
@@ -658,6 +690,7 @@ class FileNavigationBloc
     FileNavigationSearchByFileName event,
     Emitter<FileNavigationState> emit,
   ) async {
+    final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true));
 
     try {
@@ -699,6 +732,7 @@ class FileNavigationBloc
         }
       }
 
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       final grouped = <FileSystemEntity>[
         ...results.whereType<Directory>(),
         ...results.where((e) => e is! Directory && e is! File),
@@ -710,12 +744,15 @@ class FileNavigationBloc
           isLoading: false,
           searchResults: grouped,
           currentSearchQuery: event.query,
+          currentFilter: null,
+          filteredFiles: [],
           searchRecursive: event.recursive,
           isSearchByName: true,
           error: grouped.isEmpty ? 'No files found matching "$query"' : null,
         ),
       );
     } catch (e) {
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -729,9 +766,11 @@ class FileNavigationBloc
     FileNavigationClearSearchAndFilters event,
     Emitter<FileNavigationState> emit,
   ) {
+    _searchRequests.invalidate();
     _pendingSearchResults = [];
     emit(
       state.copyWith(
+        isLoading: false,
         currentSearchQuery: null,
         currentFilter: null,
         searchResults: [],

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -115,7 +116,10 @@ class _TreeRowShellState<T> extends State<TreeRowShell<T>> {
         onSecondaryTapUp: widget.onSecondary == null
             ? null
             : (details) => widget.onSecondary!(details.globalPosition),
-        onLongPressStart: widget.onSecondary == null
+        onLongPressStart:
+            widget.onSecondary == null ||
+                (defaultTargetPlatform != TargetPlatform.android &&
+                    defaultTargetPlatform != TargetPlatform.iOS)
             ? null
             : (details) => widget.onSecondary!(details.globalPosition),
         child: Container(

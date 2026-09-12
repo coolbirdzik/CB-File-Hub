@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -116,6 +118,29 @@ void main() {
       isTrue,
     );
     expect(tabs.state.activeTab!.path, path);
+    final screenContext = tester.element(find.byType(NetworkBrowserScreen));
+    final l10n = AppLocalizations.of(screenContext)!;
+    await tester.tap(find.byTooltip(l10n.search));
+    await tester.pumpAndSettle();
+    final search = find.descendant(
+      of: find.byType(SearchTextField),
+      matching: find.byType(TextField),
+    );
+    expect(search, findsOneWidget);
+    await tester.enterText(search, 'Folder 01');
+    await tester.pump();
+    expect(find.text('Folder 00'), findsNothing);
+    expect(find.byType(FolderItem), findsOneWidget);
+    await tester.enterText(search, 'missing-file');
+    await tester.pump();
+    expect(find.byType(FolderItem), findsNothing);
+    expect(
+      find.text(l10n.noFilesFoundQuery({'query': 'missing-file'})),
+      findsOneWidget,
+    );
+    await tester.enterText(search, '');
+    await tester.pump();
+    expect(find.text('Folder 00'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);

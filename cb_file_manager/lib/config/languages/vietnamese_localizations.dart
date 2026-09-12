@@ -1210,7 +1210,7 @@ class VietnameseLocalizations implements AppLocalizations {
       'Dùng ứng dụng mặc định của hệ thống cho video';
   @override
   String get useSystemDefaultForVideoDescription =>
-      'Bật: chạm video mở bằng app mặc định (vd. VLC). Tắt: dùng trình phát trong app.';
+      'Bật: chạm video mở bằng app mặc định. Tắt: dùng trình phát trong app.';
   @override
   String get useSystemDefaultForVideoEnabled =>
       'Video sẽ mở bằng ứng dụng mặc định của hệ thống';
@@ -2909,11 +2909,11 @@ class VietnameseLocalizations implements AppLocalizations {
   String get viewScreenshot => 'Xem';
 
   @override
-  String get screenshotNotAvailableVlc => 'Chụp màn hình không khả dụng';
+  String get screenshotNotAvailable => 'Chụp màn hình không khả dụng';
 
   @override
-  String get screenshotNotAvailableVlcMessage =>
-      'VLC chưa chụp được khung hình này. Vui lòng đợi video tải xong rồi thử lại.';
+  String get screenshotNotAvailableMessage =>
+      'Chưa chụp được khung hình này. Vui lòng đợi video tải xong rồi thử lại.';
 
   @override
   String get screenshotFileNotFound => 'Không tìm thấy file ảnh';
@@ -3079,11 +3079,11 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get mediaPlaybackError => 'Lỗi phát media';
   @override
-  String mediaPlaybackErrorVlcContent(String error) =>
-      'Không thể phát file với VLC Direct SMB:\n\n$error\n\nVui lòng kiểm tra:\n• Kết nối SMB\n• Đường dẫn file\n• Quyền truy cập file';
+  String mediaPlaybackErrorSmbContent(String error) =>
+      'Không thể phát file SMB:\n\n$error\n\nVui lòng kiểm tra:\n• Kết nối SMB\n• Đường dẫn file\n• Quyền truy cập file';
   @override
   String mediaPlaybackErrorNativeContent(String error) =>
-      'Không thể phát file với Native VLC Direct SMB:\n\n$error\n\nVui lòng kiểm tra:\n• Kết nối SMB\n• Đường dẫn file\n• Quyền truy cập file\n• Tính khả dụng của Native SMB client';
+      'Không thể phát file SMB:\n\n$error\n\nVui lòng kiểm tra:\n• Kết nối SMB\n• Đường dẫn file\n• Quyền truy cập file\n• Tính khả dụng của Native SMB client';
   @override
   String get chooseAnotherApp => 'Chọn ứng dụng khác...';
   @override

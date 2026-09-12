@@ -1258,8 +1258,8 @@ abstract class AppLocalizations {
   String get screenshotSavedToFolder;
   String get openScreenshotFolder;
   String get viewScreenshot;
-  String get screenshotNotAvailableVlc;
-  String get screenshotNotAvailableVlcMessage;
+  String get screenshotNotAvailable;
+  String get screenshotNotAvailableMessage;
   String get screenshotFileNotFound;
   String get screenshotCannotOpenTab;
   String get screenshotErrorOpeningFolder;
@@ -1319,7 +1319,7 @@ abstract class AppLocalizations {
   String get errorDownloadingFile;
   String get errorTitle;
   String get mediaPlaybackError;
-  String mediaPlaybackErrorVlcContent(String error);
+  String mediaPlaybackErrorSmbContent(String error);
   String mediaPlaybackErrorNativeContent(String error);
   String get chooseAnotherApp;
   String get folderProperties;

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'file_drag_drop_item.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,8 @@ class FileTreeView extends StatefulWidget {
   final void Function(String path, {bool shiftSelect, bool ctrlSelect})
   toggleFolderSelection;
   final VoidCallback clearSelection;
+  final ValueChanged<List<String>>? onStartFileDrag;
+  final Future<void> Function(List<String>, String)? onMoveItemsToFolder;
   final void Function(BuildContext context, Offset position) showContextMenu;
 
   const FileTreeView({
@@ -40,6 +43,8 @@ class FileTreeView extends StatefulWidget {
     required this.toggleFileSelection,
     required this.toggleFolderSelection,
     required this.clearSelection,
+    this.onStartFileDrag,
+    this.onMoveItemsToFolder,
     required this.showContextMenu,
   });
 
@@ -170,7 +175,7 @@ class _FileTreeViewState extends State<FileTreeView> {
               .toList();
           final name = segments.isEmpty ? entity.path : segments.last;
           final theme = Theme.of(context);
-          return Row(
+          final row = Row(
             children: [
               Icon(
                 isDir ? PhosphorIconsLight.folder : PhosphorIconsLight.file,
@@ -193,6 +198,15 @@ class _FileTreeViewState extends State<FileTreeView> {
                 ),
               ),
             ],
+          );
+          if (!widget.isDesktopPlatform) return row;
+          return FileDragDropItem(
+            path: entity.path,
+            isFolder: isDir,
+            selectedPaths: selected,
+            onStartFileDrag: widget.onStartFileDrag,
+            onMoveItemsToFolder: widget.onMoveItemsToFolder,
+            child: SizedBox.expand(child: row),
           );
         },
       ),

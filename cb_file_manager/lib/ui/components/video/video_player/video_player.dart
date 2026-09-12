@@ -10,7 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cb_file_manager/services/media/vlc_playback.dart';
+import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path/path.dart' as pathlib;
 import 'package:image/image.dart' as img;
@@ -314,7 +314,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         WidgetsBindingObserver,
         _VideoPlayerVolumeMixin,
         _VideoPlayerSettingsMixin {
-  // VLC controllers
+  // media_kit controllers
   @override
   PlaybackPlayer? _player;
   @override
@@ -565,6 +565,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _resumeAfterSeekDrag = false;
       _isSeeking = false;
       _fastSeekTimer?.cancel();
+      _isFastSeeking = false;
       _tempRaf?.close();
       _tempFile?.delete();
       // Clear video controller reference before disposing the player
@@ -662,7 +663,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         oldWidget.fileStream != widget.fileStream;
   }
 
-  /// Applies the persisted hardware decoding preference to libVLC.
+  /// Applies the persisted hardware decoding preference to libmpv.
   @override
   PlaybackVideoConfiguration _buildVideoControllerConfig() {
     return PlaybackVideoConfiguration(
@@ -785,7 +786,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       }
     });
 
-    // Persist only user changes (in the volume mixin). VLC's initial default
+    // Persist only user changes (in the volume mixin). media_kit's initial default
     // volume must not overwrite the restored volume or mute preference.
     _player!.stream.volume.listen((_) {
       if (mounted) setState(() {});
@@ -896,7 +897,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         await _player!.play();
       }
     } else if (widget.smbMrl != null) {
-      // Direct SMB playback uses the same VLC backend as local files.
+      // Direct SMB playback uses the same media_kit backend as local files.
       {
         await _openSmbMrl();
       }
@@ -905,12 +906,11 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       await _openFileStream();
     }
 
-    // Metadata comes from native VLC events once the view is attached.
+    // Metadata comes from the native media_kit event streams.
   }
 
   Future<void> _openSmbMrl() async {
-    // Keep authentication and escaping intact; VLC receives SMB credentials
-    // as media options and can seek without downloading a temporary copy.
+    // Preserve authentication and escaping for the shared SMB source resolver.
     await _player!.open(PlaybackMedia(widget.smbMrl!), play: widget.autoPlay);
   }
 
@@ -1109,6 +1109,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         : Focus(
             autofocus: true,
             onKeyEvent: (node, event) => _handleKeyEvent(event),
+            onFocusChange: (focused) {
+              if (!focused) _stopFastSeeking();
+            },
             child: MouseRegion(
               onHover: (_) {
                 _showControlsWithTimer();
@@ -1159,6 +1162,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     return Focus(
       autofocus: true,
       onKeyEvent: (node, event) => _handleKeyEvent(event),
+      onFocusChange: (focused) {
+        if (!focused) _stopFastSeeking();
+      },
       child: _buildPlayerBody(),
     );
   }
@@ -1184,7 +1190,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   Widget _buildVideoPlayer() {
-    // On Android we prefer VLC for all sources
+    // On Android we prefer media_kit for all sources
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1194,7 +1200,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       onDoubleTap: _toggleFullScreen,
       child: Stack(
         // Hidden desktop overlays are SizedBox.shrink(). Without tight
-        // constraints they collapse this Stack (and its positioned VLC surface)
+        // constraints they collapse this Stack (and its positioned media_kit surface)
         // to zero when the controls hide, even though playback keeps running.
         fit: StackFit.expand,
         children: [
@@ -1214,7 +1220,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Widget _buildVideoWidget() {
     final boxFit = VideoPlayerUtils.getBoxFitFromString(_videoScaleMode);
 
-    // Check for VLC player first (works on all platforms)
+    // Check for media_kit player first (works on all platforms)
     if (_videoController != null) {
       return RepaintBoundary(
         key: _screenshotKey,
@@ -1234,7 +1240,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     }
   }
 
-  // Initialize Exo for Android as a VLC fallback (non-PiP & PiP)
+  // Initialize Exo for Android as a media_kit fallback (non-PiP & PiP)
 
   // UI Helper Methods
   Widget _buildErrorWidget(String message) {
@@ -1250,8 +1256,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     );
   }
 
-  /// Single unified loading: same minimal spinner for init and for VlcPlayer placeholder.
-  /// Avoids "big" VideoPlayerLoadingWidget + a second different loading in SMB/VLC mode.
+  /// Single unified loading: same minimal spinner for init and for video placeholder.
+  /// Avoids "big" VideoPlayerLoadingWidget + a second different loading in SMB/media_kit mode.
   Widget _buildLoadingWidget() {
     return const Center(child: CircularProgressIndicator(color: Colors.white));
   }
@@ -1442,6 +1448,13 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   // Event Handlers
   KeyEventResult _handleKeyEvent(KeyEvent event) {
     final isCtrlPressed = HardwareKeyboard.instance.isControlPressed;
+
+    // Our timer owns repetition; consume platform repeats as well.
+    if (event is KeyRepeatEvent &&
+        (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            event.logicalKey == LogicalKeyboardKey.arrowRight)) {
+      return KeyEventResult.handled;
+    }
 
     if (event is KeyDownEvent) {
       // Ctrl+Left/Right for 1 minute seek (desktop)
@@ -1685,11 +1698,16 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   // Fast seeking methods (hold arrow on desktop, long press on mobile)
-  // VLC-style: aggressive acceleration, tick every 100ms
+  // Accelerated seeking: aggressive acceleration, tick every 100ms
   // Normal: 3s -> 5s -> 10s -> 20s -> 30s -> 60s -> 2m -> 5m -> 10m
   // With Ctrl: 30s -> 60s -> 2m -> 5m -> 10m -> 20m
   void _startFastSeeking({required bool forward, bool withCtrl = false}) {
-    if (_isFastSeeking) return;
+    if (_isFastSeeking || _player == null) return;
+
+    // Use the same paused, live frame previews as a slider drag. Repeated
+    // seeks while playing can starve media_kit's decoder of a reference clock.
+    _startSeekDrag();
+    _seekDragPosition = _player!.state.position;
 
     _fastSeekTicks = 0;
     _fastSeekSeconds = withCtrl ? 30 : 3;
@@ -1700,30 +1718,25 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     });
 
     // Perform initial seek
-    if (forward) {
-      _seekForward(_fastSeekSeconds);
-    } else {
-      _seekBackward(_fastSeekSeconds);
-    }
+    _advanceFastSeek();
 
-    // Tick every 100ms for VLC-like responsiveness
+    // Tick every 100ms for responsive previews
     _fastSeekTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (!mounted || !_isFastSeeking) {
         _fastSeekTimer?.cancel();
         return;
       }
 
-      // Stop fast seeking if we've reached the boundary
-      final currentPos = _player?.state.position ?? Duration.zero;
+      // Hold the boundary preview until release instead of resuming into EOF
+      // while the user still has the key/finger down.
+      final currentPos = _seekDragPosition ?? Duration.zero;
       final totalDuration = _player?.state.duration ?? Duration.zero;
 
       if (_fastSeekingForward &&
           currentPos >= totalDuration - const Duration(seconds: 1)) {
-        _stopFastSeeking();
         return;
       }
       if (!_fastSeekingForward && currentPos <= Duration.zero) {
-        _stopFastSeeking();
         return;
       }
 
@@ -1740,7 +1753,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 : _fastSeekTicks));
 
       if (withCtrl) {
-        // Ctrl+Arrow: aggressive VLC-style (10 ticks = 1s real time)
+        // Ctrl+Arrow: aggressive (10 ticks = 1s real time)
         // 0-0.5s: 30s, 0.5-1.5s: 60s, 1.5-3s: 2m
         // 3-5s: 5m, 5-7s: 10m, 7s+: 20m
         if (scaledTick > 70) {
@@ -1757,7 +1770,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           _fastSeekSeconds = 30;
         }
       } else {
-        // Normal arrow: VLC-style acceleration (10 ticks = 1s real time)
+        // Normal arrow: acceleration (10 ticks = 1s real time)
         // 0-0.3s: 3s, 0.3-1s: 5s, 1-2s: 10s, 2-3s: 20s
         // 3-4s: 30s, 4-5.5s: 60s, 5.5-7s: 2m
         // 7-9s: 5m, 9s+: 10m
@@ -1782,11 +1795,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         }
       }
 
-      if (_fastSeekingForward) {
-        _seekForward(_fastSeekSeconds);
-      } else {
-        _seekBackward(_fastSeekSeconds);
-      }
+      _advanceFastSeek();
 
       // Update UI to show current speed
       if (mounted) setState(() {});
@@ -1795,11 +1804,30 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     _showControlsWithTimer();
   }
 
+  void _advanceFastSeek() {
+    final player = _player;
+    if (player == null) return;
+    // media_kit position events lag behind the 100ms repeat timer. Accumulate from
+    // the requested position so every tick actually advances the preview.
+    final current = _seekDragPosition ?? player.state.position;
+    final delta = Duration(
+      seconds: _fastSeekingForward ? _fastSeekSeconds : -_fastSeekSeconds,
+    );
+    final maxMs = (player.state.duration.inMilliseconds - 1000).clamp(
+      0,
+      player.state.duration.inMilliseconds,
+    );
+    _seekDuringDrag(
+      (current + delta).inMilliseconds.clamp(0, maxMs).toDouble(),
+    );
+  }
+
   void _stopFastSeeking() {
     _fastSeekTimer?.cancel();
     _fastSeekTimer = null;
 
     if (_isFastSeeking) {
+      _finishSeekDrag();
       setState(() {
         _isFastSeeking = false;
         _fastSeekSeconds = 5;
@@ -1962,7 +1990,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     );
   }
 
-  // Slider used by mobile controls with support for VLC/Exo/Vlc
+  // Slider used by mobile controls with support for media_kit
   Widget _buildMobileSeekSlider() {
     {
       return StreamBuilder<Duration>(
@@ -2267,20 +2295,20 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       }
 
       // Try to capture screenshot based on active player
-      // If still null, try VLC API screenshot
+      // If still null, try media_kit API screenshot
       if (_player != null && _videoController != null) {
-        debugPrint('Attempting VLC screenshot...');
+        debugPrint('Attempting media_kit screenshot...');
         try {
           screenshotBytes = await _player!.screenshot();
           if (screenshotBytes != null) {
             debugPrint(
-              'VLC screenshot successful: ${screenshotBytes.length} bytes',
+              'media_kit screenshot successful: ${screenshotBytes.length} bytes',
             );
           } else {
-            debugPrint('VLC screenshot returned null');
+            debugPrint('media_kit screenshot returned null');
           }
         } catch (e) {
-          debugPrint('VLC screenshot failed: $e');
+          debugPrint('media_kit screenshot failed: $e');
         }
       }
 
@@ -3158,7 +3186,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
   void _startSeekDrag() {
     final player = _player;
-    _resumeAfterSeekDrag = player?.state.playing ?? false;
+    // A preceding drag may have requested play while media_kit still reports its
+    // temporary pause. Capture the requested mode, not that stale snapshot.
+    _resumeAfterSeekDrag = player?.playRequested ?? false;
     _seekingTimer?.cancel();
     _hideControlsTimer?.cancel();
     _seekPreviewTimer?.cancel();
@@ -3186,7 +3216,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     if (target == null || player == null) return;
     unawaited(player.seek(target));
 
-    // Give VLC time to decode a preview between seeks. Always retain the
+    // Seeking this often is only safe because _startSeekDrag pauses first: a
+    // paused input reacquires its clock between seeks, where a playing one
+    // cannot and strands the decoder in "no reference clock". Always keep the
     // newest pointer position, including when the user holds the thumb still.
     _seekPreviewTimer = Timer(const Duration(milliseconds: 80), () {
       _seekPreviewTimer = null;

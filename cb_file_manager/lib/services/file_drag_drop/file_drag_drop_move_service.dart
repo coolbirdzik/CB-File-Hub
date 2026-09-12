@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/helpers/files/windows_file_operations.dart';
+import 'package:cb_file_manager/services/directory_listing_cache_service.dart';
 import 'package:path/path.dart' as p;
 
 enum FileDragDropMoveRejection {
@@ -120,6 +121,10 @@ class FileDragDropMoveService {
           )
         : await _moveWithDart(plan.sources, plan.destination);
 
+    if (moved) {
+      DirectoryListingCacheService.instance.removePaths(plan.sources.toSet());
+      DirectoryListingCacheService.instance.invalidate(plan.destination);
+    }
     return moved
         ? FileDragDropMoveRejection.none
         : FileDragDropMoveRejection.moveFailed;

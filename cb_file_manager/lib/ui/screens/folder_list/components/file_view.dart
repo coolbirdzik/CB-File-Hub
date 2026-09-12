@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
@@ -16,7 +17,6 @@ import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
 import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:path/path.dart' as p;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'file_item.dart';
@@ -114,72 +114,20 @@ class FileView extends StatelessWidget {
   Function(String, {bool shiftSelect, bool ctrlSelect})
   get _folderSelectionHandler => toggleFolderSelection ?? toggleFileSelection;
 
-  List<String> _dragPayloadFor(String itemPath) {
-    if (selectedFiles.contains(itemPath) && selectedFiles.isNotEmpty) {
-      return selectedFiles.toSet().toList(growable: false);
-    }
-    return <String>[itemPath];
-  }
-
   Widget _wrapFileDragDrop({
     required Widget child,
     required bool isFolder,
     required String itemPath,
-  }) {
-    if (!isDesktopMode) return child;
-
-    final payload = _dragPayloadFor(itemPath);
-    Widget wrapped = Draggable<List<String>>(
-      data: payload,
-      maxSimultaneousDrags: 1,
-      feedback: Material(
-        color: Colors.transparent,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Text(
-              payload.length == 1
-                  ? p.basename(payload.first)
-                  : '${payload.length} items',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      ),
-      childWhenDragging: Opacity(opacity: 0.55, child: child),
-      onDragStarted: () => onStartFileDrag?.call(payload),
-      child: child,
-    );
-
-    if (!isFolder || onMoveItemsToFolder == null) return wrapped;
-
-    return DragTarget<List<String>>(
-      onWillAcceptWithDetails: (details) =>
-          details.data.isNotEmpty && !details.data.contains(itemPath),
-      onAcceptWithDetails: (details) =>
-          onMoveItemsToFolder!(details.data, itemPath),
-      builder: (context, candidateData, rejectedData) {
-        if (candidateData.isEmpty) return wrapped;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary,
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: wrapped,
+  }) => !isDesktopMode
+      ? child
+      : FileDragDropItem(
+          path: itemPath,
+          isFolder: isFolder,
+          selectedPaths: selectedFiles.toSet(),
+          onStartFileDrag: onStartFileDrag,
+          onMoveItemsToFolder: onMoveItemsToFolder,
+          child: child,
         );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Optimize frame timing before building view

@@ -61,9 +61,10 @@ dependencies:
   sqflite_common: ^2.5.5
   sqflite_common_ffi: ^2.3.6
 
-  # VLC 2.1.2 plugin with the Windows runtime pinned to VLC 3.0.23.
-  vlc_player:
-    path: third_party/vlc_player
+  # Shared video/audio playback and native libraries for all platforms.
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

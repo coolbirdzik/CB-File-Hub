@@ -21,7 +21,7 @@ helpers/
 ├── network/                   # Network & streaming
 │   ├── streaming_helper.dart
 │   ├── network_*.dart
-│   ├── *_vlc_*_helper.dart
+│   ├── *smb*playback_helper.dart
 │   └── win32_smb_helper.dart
 ├── files/                     # File management
 │   ├── file_*.dart

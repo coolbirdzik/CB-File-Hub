@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -130,7 +131,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   String _searchQuery = '';
   bool _showSearch = false;
   int _gridZoomLevel = UserPreferences.defaultGridZoomLevel;
-  final TextEditingController _searchController = TextEditingController();
+  final SearchTextController _searchController = SearchTextController();
 
   // Drag-to-select state (desktop only — lasso / rubber-band selection)
   bool _isDraggingRect = false;
@@ -832,7 +833,7 @@ class _TrashBinScreenState extends State<TrashBinScreen> {
   }
 
   Widget _buildInlineSearchField(AppLocalizations l10n) {
-    return TextField(
+    return SearchTextField(
       controller: _searchController,
       autofocus: true,
       decoration: InputDecoration(

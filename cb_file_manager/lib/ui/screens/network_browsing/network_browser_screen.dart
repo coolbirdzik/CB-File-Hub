@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:io';
 import 'dart:async'; // Add this import for Completer
 // For math operations with drag selection and min/max functions
@@ -71,7 +73,7 @@ class NetworkBrowserScreen extends StatefulWidget {
 class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     with SingleTickerProviderStateMixin {
   static const bool _enableVerboseLogs = false;
-  late TextEditingController _searchController;
+  late SearchTextController _searchController;
 
   late SelectionBloc _selectionBloc;
   bool _showSearchBar = false;
@@ -122,7 +124,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   void initState() {
     super.initState();
     _currentPath = widget.path;
-    _searchController = TextEditingController();
+    _searchController = SearchTextController();
     _scrollController = ScrollController();
 
     // Add scroll listener for auto load more
@@ -183,10 +185,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     });
 
     // Add listener to search controller to update UI when text changes
-    _searchController.addListener(() {
+    _searchController.addQueryListener(() {
       if (mounted) {
         setState(() {
-          // Force UI update when search text changes
+          // Render the current query against the latest network state.
+          _itemPositions.clear();
         });
       }
     });
@@ -404,20 +407,30 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
     _selectionBloc.add(ToggleSelectionMode(forceValue: forceValue));
   }
 
+  List<FileSystemEntity> _matchingEntities(List<FileSystemEntity>? entities) {
+    final query = _searchController.text.trim();
+    return (entities ?? const <FileSystemEntity>[])
+        .where(
+          (entity) => TextUtils.matchesVietnamese(
+            entity.path.replaceAll('\\', '/').split('/').last,
+            query,
+          ),
+        )
+        .toList();
+  }
+
   List<String> _visiblePathsForState(NetworkBrowsingState state) {
-    final folders = (state.directories ?? const <FileSystemEntity>[]).map(
-      (entity) => entity.path,
-    );
-    final files = (state.files ?? const <FileSystemEntity>[]).map(
-      (entity) => entity.path,
-    );
+    final folders = _matchingEntities(
+      state.directories,
+    ).map((entity) => entity.path);
+    final files = _matchingEntities(state.files).map((entity) => entity.path);
     return [...folders, ...files];
   }
 
   Set<String> _folderPathSetForState(NetworkBrowsingState state) {
-    return (state.directories ?? const <FileSystemEntity>[])
-        .map((entity) => entity.path)
-        .toSet();
+    return _matchingEntities(
+      state.directories,
+    ).map((entity) => entity.path).toSet();
   }
 
   void _toggleFileSelection(
@@ -525,14 +538,12 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   void _selectAll(NetworkBrowsingState state) {
     _selectionBloc.add(
       SelectAll(
-        allFilePaths: (state.files ?? const <FileSystemEntity>[])
-            .whereType<File>()
-            .map((file) => file.path)
-            .toList(),
-        allFolderPaths: (state.directories ?? const <FileSystemEntity>[])
-            .whereType<Directory>()
-            .map((directory) => directory.path)
-            .toList(),
+        allFilePaths: _matchingEntities(
+          state.files,
+        ).whereType<File>().map((file) => file.path).toList(),
+        allFolderPaths: _matchingEntities(
+          state.directories,
+        ).whereType<Directory>().map((directory) => directory.path).toList(),
       ),
     );
   }
@@ -922,10 +933,11 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
   Widget _buildSearchBar(BuildContext context) {
     return SizedBox(
       height: 40,
-      child: TextField(
+      child: SearchTextField(
         controller: _searchController,
+        autofocus: true,
         decoration: InputDecoration(
-          hintText: AppLocalizations.of(context)!.searchHintText,
+          hintText: AppLocalizations.of(context)!.searchByFilename,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16.0),
             borderSide: BorderSide.none,
@@ -1006,14 +1018,24 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         ),
       );
     } else {
-      final List<FileSystemEntity> folders = List.from(state.directories ?? []);
-      final List<FileSystemEntity> files = List.from(state.files ?? []);
+      final List<FileSystemEntity> folders = _matchingEntities(
+        state.directories,
+      );
+      final List<FileSystemEntity> files = _matchingEntities(state.files);
 
       if (folders.isEmpty && files.isEmpty && !state.isLoading) {
         // An empty folder simply shows nothing — no "empty folder" label.
         content = FluentBackground.container(
           context: context,
-          child: const SizedBox.shrink(),
+          child: _searchController.text.trim().isEmpty
+              ? const SizedBox.shrink()
+              : Center(
+                  child: Text(
+                    AppLocalizations.of(context)!.noFilesFoundQuery({
+                      'query': _searchController.text.trim(),
+                    }),
+                  ),
+                ),
         );
       } else {
         final Widget contentView = _buildContentView(

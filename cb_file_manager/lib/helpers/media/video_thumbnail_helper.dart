@@ -905,7 +905,6 @@ class VideoThumbnailHelper {
     try {
       while (_pendingQueue.isNotEmpty) {
         if (_shouldStopProcessing) {
-          _log('VideoThumbnail: Stopping queue processing due to stop flag');
           break;
         }
 

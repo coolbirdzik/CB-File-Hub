@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageFilter;
@@ -16,6 +17,7 @@ import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_focus_gate.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/components/common/soft_checkbox.dart';
@@ -110,7 +112,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   final List<String> _drillPath = [];
 
   // Search functionality
-  final TextEditingController _searchController = TextEditingController();
+  final SearchTextController _searchController = SearchTextController();
   final TextEditingController _addressController = TextEditingController(
     text: '#tags',
   );
@@ -213,7 +215,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       _setDefaultViewMode();
     });
 
-    _searchController.addListener(_filterTags);
+    _searchController.addQueryListener(_filterTags);
 
     // Listen to keyboard events for Ctrl and Shift
     HardwareKeyboard.instance.addHandler(_onKeyEvent);
@@ -254,6 +256,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     // keyboard, and F2 or Delete firing behind it would act on the page the
     // user cannot currently see.
     if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return false;
+    }
+
+    // This handler is installed process-wide, so it keeps firing while the
+    // page sits in a background tab. Only the tab in front of the user may act
+    // on a shortcut — otherwise Delete here would wipe tags selected in a tab
+    // nobody is looking at.
+    if (!TabFocusGate.isActiveTab(context)) {
       return false;
     }
 
@@ -510,7 +520,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     _tagReloadDebounce?.cancel();
     _tagChangeSubscription?.cancel();
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
-    _searchController.removeListener(_filterTags);
+    _searchController.removeQueryListener(_filterTags);
     _searchController.dispose();
     _addressController.dispose();
     _editingTagController?.dispose();
@@ -1927,7 +1937,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                     ],
                     if (_isSearching && !showingTaggedFiles)
                       Expanded(
-                        child: TextField(
+                        child: SearchTextField(
                           controller: _searchController,
                           autofocus: true,
                           textInputAction: TextInputAction.search,

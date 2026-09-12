@@ -2,7 +2,7 @@
 
 - **Filesystem API**: `helpers/core/filesystem_utils.dart` centralizes directory listing, search, and recursive scanning; includes mobile-specific fallbacks for empty gallery paths.
 - **Album Pipeline**: `services/album_*` family uses isolates and background scanners to build smart/featured albums.
-- **Streaming**: `services/streaming_service_manager.dart` coordinates network streams; playback uses the shared VLC backend in `services/media/vlc_playback.dart` (see `docs/technical/07-vlc-playback.md`).
+- **Streaming**: `services/streaming_service_manager.dart` coordinates network streams; playback uses the shared media_kit backend in `services/media/media_kit_playback.dart` (see `docs/technical/07-media-kit-playback.md`).
 - **PiP Windows**: `ui/components/video/pip_window/desktop_pip_window.dart` and `services/pip_window_service.dart` support desktop picture-in-picture playback.
 
 ### Hybrid Thumbnail Generation

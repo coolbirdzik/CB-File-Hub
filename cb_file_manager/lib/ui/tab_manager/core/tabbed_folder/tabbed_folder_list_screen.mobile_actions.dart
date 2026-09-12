@@ -76,12 +76,7 @@ extension _TabbedFolderListMobileActions on _TabbedFolderListScreenState {
     // Check if it's a tag search (contains # character)
     if (query.contains('#')) {
       // Extract tags from query
-      final tags = query
-          .split(' ')
-          .where((word) => word.startsWith('#'))
-          .map((tag) => tag.substring(1).trim())
-          .where((tag) => tag.isNotEmpty)
-          .toList();
+      final tags = SearchQuery.tags(query);
 
       if (tags.isEmpty) return;
 

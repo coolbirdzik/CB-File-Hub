@@ -12,6 +12,7 @@ import 'tab_manager.dart';
 import 'tab_data.dart';
 import 'tab_paths.dart';
 import 'tab_content_overlay.dart';
+import 'tab_focus_gate.dart';
 import '../../drawer.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'tabbed_folder/tabbed_folder_list_screen.dart';
@@ -115,6 +116,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   OverlayEntry? _windowDropOverlayEntry;
   final Map<String, _CachedTabContent> _tabContentCache =
       <String, _CachedTabContent>{};
+
+  /// One focus scope per tab, so keyboard shortcuts only ever reach the tab
+  /// the user is looking at. See [TabFocusGate].
+  final Map<String, FocusScopeNode> _tabFocusScopes =
+      <String, FocusScopeNode>{};
   StreamSubscription<TabManagerState>? _tabStateSubscription;
 
   @override
@@ -152,6 +158,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   void dispose() {
     _removeWindowDropOverlay();
     _tabContentCache.clear();
+    for (final node in _tabFocusScopes.values) {
+      node.dispose();
+    }
+    _tabFocusScopes.clear();
     _tabStateSubscription?.cancel();
     _tabStateSubscription = null;
     _tabController.dispose();
@@ -1357,6 +1367,40 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   void _syncTabContentCache(List<TabData> tabs) {
     final currentIds = tabs.map((tab) => tab.id).toSet();
     _tabContentCache.removeWhere((id, _) => !currentIds.contains(id));
+
+    // Focus scopes of closed tabs are dropped here, but only disposed after the
+    // frame: their FocusScope widget is still mounted while this build runs.
+    final orphanScopes = <FocusScopeNode>[];
+    _tabFocusScopes.removeWhere((id, node) {
+      if (currentIds.contains(id)) return false;
+      orphanScopes.add(node);
+      return true;
+    });
+    if (orphanScopes.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final node in orphanScopes) {
+          node.dispose();
+        }
+      });
+    }
+  }
+
+  FocusScopeNode _focusScopeForTab(String tabId) => _tabFocusScopes.putIfAbsent(
+    tabId,
+    () => FocusScopeNode(debugLabel: 'TabFocusScope($tabId)'),
+  );
+
+  /// Pulls the keyboard back to the visible tab after a hidden one grabbed it
+  /// (a background tab mounting a `Focus(autofocus: true)`, for instance).
+  void _restoreFocusToActiveTab() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final activeTabId = context.read<TabManagerBloc>().state.activeTabId;
+      if (activeTabId == null) return;
+      final scope = _tabFocusScopes[activeTabId];
+      if (scope == null || scope.hasFocus) return;
+      scope.requestFocus();
+    });
   }
 
   Widget _buildOrGetTabContent(TabData tab) {
@@ -1423,7 +1467,16 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         : 0;
 
     _syncTabContentCache(state.tabs);
-    final children = state.tabs.map(_buildOrGetTabContent).toList();
+    final children = <Widget>[
+      for (int i = 0; i < state.tabs.length; i++)
+        TabFocusGate(
+          key: ValueKey('tab_focus_gate_${state.tabs[i].id}'),
+          node: _focusScopeForTab(state.tabs[i].id),
+          isActive: i == safeActiveIndex,
+          onFocusEscaped: _restoreFocusToActiveTab,
+          child: _buildOrGetTabContent(state.tabs[i]),
+        ),
+    ];
 
     final tabContent = IndexedStack(index: safeActiveIndex, children: children);
 
@@ -2174,7 +2227,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                   }
                 },
               ),
-              // Native Streaming Test removed - using the shared VLC backend now
+              // Native Streaming Test removed - using the shared media_kit backend now
             ],
           ),
         ),

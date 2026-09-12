@@ -1189,7 +1189,7 @@ class EnglishLocalizations implements AppLocalizations {
   String get useSystemDefaultForVideo => 'Use system default app for video';
   @override
   String get useSystemDefaultForVideoDescription =>
-      'When on, tapping a video opens it with the system default app (e.g. VLC). When off, uses the in-app player.';
+      'When on, tapping a video opens it with the system default app. When off, uses the in-app player.';
   @override
   String get useSystemDefaultForVideoEnabled =>
       'Videos will open with the system default app';
@@ -2916,11 +2916,11 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewScreenshot => 'View';
 
   @override
-  String get screenshotNotAvailableVlc => 'Screenshot not available';
+  String get screenshotNotAvailable => 'Screenshot not available';
 
   @override
-  String get screenshotNotAvailableVlcMessage =>
-      'VLC could not capture this frame. Please wait for the video to load and try again.';
+  String get screenshotNotAvailableMessage =>
+      'Could not capture this frame. Please wait for the video to load and try again.';
 
   @override
   String get screenshotFileNotFound => 'Image file not found';
@@ -3087,11 +3087,11 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get mediaPlaybackError => 'Media playback error';
   @override
-  String mediaPlaybackErrorVlcContent(String error) =>
-      'Cannot play file with VLC Direct SMB:\n\n$error\n\nPlease check:\n• SMB connection\n• File path\n• File access permission';
+  String mediaPlaybackErrorSmbContent(String error) =>
+      'Cannot play this SMB file:\n\n$error\n\nPlease check:\n• SMB connection\n• File path\n• File access permission';
   @override
   String mediaPlaybackErrorNativeContent(String error) =>
-      'Cannot play file with Native VLC Direct SMB:\n\n$error\n\nPlease check:\n• SMB connection\n• File path\n• File access permission\n• Native SMB client availability';
+      'Cannot play this SMB file:\n\n$error\n\nPlease check:\n• SMB connection\n• File path\n• File access permission\n• Native SMB client availability';
   @override
   String get chooseAnotherApp => 'Choose another app...';
   @override

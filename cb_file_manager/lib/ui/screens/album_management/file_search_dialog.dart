@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
+import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:io';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -23,19 +25,20 @@ class FileSearchDialog extends StatefulWidget {
 }
 
 class _FileSearchDialogState extends State<FileSearchDialog> {
-  final TextEditingController _searchController = TextEditingController();
+  final SearchTextController _searchController = SearchTextController();
   final AlbumService _albumService = AlbumService.instance;
 
   List<File> _searchResults = [];
   Set<String> _selectedFiles = {};
   bool _isSearching = false;
   Timer? _debounceTimer;
+  final _searchRequests = SearchRequestGuard();
   String? _currentSearchQuery;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onSearchChanged);
+    _searchController.addQueryListener(_onSearchChanged);
     // Start with initial search if no query provided
     if (_searchController.text.isEmpty) {
       _performSearch('');
@@ -44,23 +47,26 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
 
   @override
   void dispose() {
+    _searchRequests.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
 
   void _onSearchChanged() {
+    _searchRequests.invalidate();
+    setState(() {});
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       final query = _searchController.text.trim();
-      if (query != _currentSearchQuery) {
-        _performSearch(query);
-      }
+      _performSearch(query);
     });
   }
 
   Future<void> _performSearch(String query) async {
     if (!mounted) return;
+    _debounceTimer?.cancel();
+    final request = _searchRequests.begin();
 
     setState(() {
       _isSearching = true;
@@ -73,6 +79,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
         rootPath: widget.initialSearchPath,
       );
 
+      if (!_searchRequests.isCurrent(request)) return;
       // Filter out files that are already in the album
       final filteredResults = <File>[];
       for (final file in results) {
@@ -80,12 +87,13 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
           widget.albumId,
           file.path,
         );
+        if (!_searchRequests.isCurrent(request)) return;
         if (!isInAlbum) {
           filteredResults.add(file);
         }
       }
 
-      if (mounted) {
+      if (mounted && _searchRequests.isCurrent(request)) {
         setState(() {
           _searchResults = filteredResults;
           _isSearching = false;
@@ -95,7 +103,7 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
       }
     } catch (e) {
       debugPrint('Error searching files: $e');
-      if (mounted) {
+      if (mounted && _searchRequests.isCurrent(request)) {
         setState(() {
           _searchResults = [];
           _isSearching = false;
@@ -260,8 +268,9 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
             // Search bar
             Padding(
               padding: const EdgeInsets.all(16),
-              child: TextField(
+              child: SearchTextField(
                 controller: _searchController,
+                onSubmitted: (query) => _performSearch(query.trim()),
                 decoration: InputDecoration(
                   hintText: 'Search for images...',
                   prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass),

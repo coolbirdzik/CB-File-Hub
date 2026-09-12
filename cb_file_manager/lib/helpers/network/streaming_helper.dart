@@ -12,9 +12,9 @@ import 'package:path/path.dart' as p;
 import '../files/file_type_registry.dart';
 import '../../ui/utils/file_type_utils.dart';
 import 'network_file_cache_service.dart';
-import 'vlc_direct_smb_helper.dart';
+import 'smb_playback_helper.dart';
 // import '../helpers/libsmb2_streaming_helper.dart';
-import 'native_vlc_direct_helper.dart';
+import 'native_smb_playback_helper.dart';
 import '../../config/languages/app_localizations.dart';
 import '../../ui/utils/route.dart';
 import '../../services/network_browsing/webdav_service.dart';
@@ -216,28 +216,28 @@ class StreamingHelper {
         }
       }
 
-      // Priority 1: Attempt Native VLC Direct streaming (highest priority)
+      // Priority 1: Attempt Native media_kit Direct streaming (highest priority)
       debugPrint(
-        'StreamingHelper: Checking for Native VLC Direct streaming...',
+        'StreamingHelper: Checking for Native media_kit Direct streaming...',
       );
       debugPrint(
-        'StreamingHelper: NativeVlcDirectHelper.canStreamDirectly($fileType): ${NativeVlcDirectHelper.canStreamDirectly(fileType)}',
+        'StreamingHelper: NativeSmbPlaybackHelper.canStreamDirectly($fileType): ${NativeSmbPlaybackHelper.canStreamDirectly(fileType)}',
       );
       if (service is ISmbService &&
-          NativeVlcDirectHelper.canStreamDirectly(fileType)) {
+          NativeSmbPlaybackHelper.canStreamDirectly(fileType)) {
         try {
           final canUseNative =
-              await NativeVlcDirectHelper.canUseNativeVlcDirect(
+              await NativeSmbPlaybackHelper.canUseNativeSmbPlayback(
                 fileType: fileType,
                 smbService: service,
               );
 
           if (canUseNative) {
             debugPrint(
-              'StreamingHelper: ✅ Attempting Native VLC Direct streaming',
+              'StreamingHelper: ✅ Attempting Native media_kit Direct streaming',
             );
             if (context.mounted) {
-              await NativeVlcDirectHelper.openMediaWithNativeVlcDirect(
+              await NativeSmbPlaybackHelper.openMediaWithNativeSmbPlayback(
                 context: context,
                 smbPath: remotePath,
                 fileName: fileName,
@@ -248,31 +248,33 @@ class StreamingHelper {
             return FileOpenResult(success: true, viewerLaunched: true);
           } else {
             debugPrint(
-              'StreamingHelper: ❌ Native VLC Direct not available, trying LibSMB2',
+              'StreamingHelper: ❌ Native media_kit Direct not available, trying LibSMB2',
             );
           }
         } catch (e) {
           debugPrint(
-            'StreamingHelper: ❌ Native VLC Direct streaming failed: $e. Trying LibSMB2 fallback.',
+            'StreamingHelper: ❌ Native media_kit Direct streaming failed: $e. Trying LibSMB2 fallback.',
           );
         }
       }
 
-      // LibSMB2 streaming removed - now using the shared VLC backend for SMB direct streaming
+      // LibSMB2 streaming removed - now using the shared media_kit backend for SMB direct streaming
 
-      // Priority 3: Fallback to VLC Direct SMB streaming for other SMB services
-      debugPrint('StreamingHelper: Checking for VLC Direct SMB fallback...');
+      // Priority 3: Fallback to media_kit Direct SMB streaming for other SMB services
       debugPrint(
-        'StreamingHelper: VlcDirectSmbHelper.canStreamDirectly($fileType): ${VlcDirectSmbHelper.canStreamDirectly(fileType)}',
+        'StreamingHelper: Checking for media_kit Direct SMB fallback...',
+      );
+      debugPrint(
+        'StreamingHelper: SmbPlaybackHelper.canStreamDirectly($fileType): ${SmbPlaybackHelper.canStreamDirectly(fileType)}',
       );
       if (service is ISmbService &&
-          VlcDirectSmbHelper.canStreamDirectly(fileType)) {
+          SmbPlaybackHelper.canStreamDirectly(fileType)) {
         try {
           debugPrint(
-            'StreamingHelper: ✅ Attempting VLC Direct SMB streaming (fallback)',
+            'StreamingHelper: ✅ Attempting media_kit Direct SMB streaming (fallback)',
           );
           if (context.mounted) {
-            await VlcDirectSmbHelper.openMediaWithVlcDirectSmb(
+            await SmbPlaybackHelper.openMediaWithSmbPlayback(
               context: context,
               smbPath: remotePath,
               fileName: fileName,
@@ -280,11 +282,11 @@ class StreamingHelper {
               smbService: service,
             );
           }
-          // If VLC player is launched, we return a success result indicating this
+          // If media_kit player is launched, we return a success result indicating this
           return FileOpenResult(success: true, viewerLaunched: true);
         } catch (e) {
           debugPrint(
-            'StreamingHelper: ❌ VLC Direct SMB failed: $e. Proceeding to other fallbacks.',
+            'StreamingHelper: ❌ media_kit Direct SMB failed: $e. Proceeding to other fallbacks.',
           );
           // If it fails, we just log it and continue with other methods
         }
@@ -296,7 +298,7 @@ class StreamingHelper {
           (fileType == FileCategory.video || fileType == FileCategory.audio)) {
         return FileOpenResult(
           success: false,
-          errorMessage: 'VLC SMB playback failed on Android.',
+          errorMessage: 'media_kit SMB playback failed on Android.',
           fileType: fileType,
         );
       }
@@ -548,7 +550,7 @@ class StreamingHelper {
       return;
     }
 
-    // If an external viewer was launched (e.g., VLC), we don't need to do anything else.
+    // If an external viewer was launched (e.g., media_kit), we don't need to do anything else.
     if (result.viewerLaunched) {
       debugPrint(
         "StreamingHelper: Viewer already launched, skipping internal player.",
@@ -621,7 +623,7 @@ class StreamingHelper {
       }
     } else if (result.fileType == FileCategory.video ||
         result.fileType == FileCategory.audio) {
-      // Debug thông tin trước khi kiểm tra VLC Direct SMB
+      // Debug thông tin trước khi kiểm tra media_kit Direct SMB
       debugPrint('StreamingHelper: Processing video/audio file');
       debugPrint(
         'StreamingHelper: _currentNetworkService type: ${_currentNetworkService.runtimeType}',
@@ -629,21 +631,21 @@ class StreamingHelper {
 
       debugPrint('StreamingHelper: File type: ${result.fileType}');
       debugPrint(
-        'StreamingHelper: Can stream directly: ${VlcDirectSmbHelper.canStreamDirectly(result.fileType!)}',
+        'StreamingHelper: Can stream directly: ${SmbPlaybackHelper.canStreamDirectly(result.fileType!)}',
       );
 
-      // LibSMB2 streaming removed - now using the shared VLC backend for SMB
+      // LibSMB2 streaming removed - now using the shared media_kit backend for SMB
 
-      // Fallback: VLC Direct SMB streaming
+      // Fallback: media_kit Direct SMB streaming
       if (result.streamingUrl == null &&
           _currentNetworkService is ISmbService &&
-          VlcDirectSmbHelper.canStreamDirectly(result.fileType!)) {
+          SmbPlaybackHelper.canStreamDirectly(result.fileType!)) {
         try {
           debugPrint(
-            'StreamingHelper: ✅ Attempting VLC Direct SMB streaming (fallback)',
+            'StreamingHelper: ✅ Attempting media_kit Direct SMB streaming (fallback)',
           );
           debugPrint('StreamingHelper: Using remotePath: $remotePath');
-          await VlcDirectSmbHelper.openMediaWithVlcDirectSmb(
+          await SmbPlaybackHelper.openMediaWithSmbPlayback(
             context: context,
             smbPath: remotePath,
             fileName: fileName,
@@ -652,7 +654,7 @@ class StreamingHelper {
           );
           return;
         } catch (e) {
-          debugPrint('StreamingHelper: ❌ VLC Direct SMB failed: $e');
+          debugPrint('StreamingHelper: ❌ media_kit Direct SMB failed: $e');
           // Tiếp tục với fallback khác
         }
       } else {

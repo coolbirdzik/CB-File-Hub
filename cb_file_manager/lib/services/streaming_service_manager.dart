@@ -15,7 +15,7 @@ class StreamingServiceManager {
 
     try {
       // Add native SMB streaming helper with highest priority
-      // _helpers.add(NativeSmbStreamingHelper()); // Removed - using the shared VLC backend
+      // _helpers.add(NativeSmbStreamingHelper()); // Removed - using the shared media_kit backend
 
       // Sort helpers by priority (highest first)
       _helpers.sort((a, b) => (b).priority.compareTo((a).priority));

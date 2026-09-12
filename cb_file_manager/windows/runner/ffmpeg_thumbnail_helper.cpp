@@ -14,6 +14,49 @@ namespace fc_native_video_thumbnail
     // Forward declaration of GetEncoderClsid from fc_native_video_thumbnail_plugin.cpp
     extern int GetEncoderClsid(const WCHAR *format, CLSID *pClsid);
 
+    // Demuxed packets are not frames: an MP4 may contain dozens of audio
+    // packets between video packets, and frame-threaded decoding needs several
+    // video packets before it produces its first image.
+    static bool DecodeFirstVideoFrame(AVFormatContext *formatContext,
+                                      AVCodecContext *codecContext,
+                                      int videoStreamIndex,
+                                      AVPacket *packet,
+                                      AVFrame *frame)
+    {
+        if (!packet || !frame) return false;
+        int videoPackets = 0;
+        for (int packets = 0; packets < 4096 && videoPackets < 120; ++packets)
+        {
+            const int readResult = av_read_frame(formatContext, packet);
+            if (readResult < 0)
+            {
+                // Short videos can end before a frame-threaded decoder emits
+                // a picture. Drain delayed frames at EOF.
+                if (readResult == AVERROR_EOF)
+                {
+                    avcodec_send_packet(codecContext, nullptr);
+                    return avcodec_receive_frame(codecContext, frame) == 0;
+                }
+                return false;
+            }
+            if (packet->stream_index != videoStreamIndex)
+            {
+                av_packet_unref(packet);
+                continue;
+            }
+            ++videoPackets;
+            const int sendResult = avcodec_send_packet(codecContext, packet);
+            av_packet_unref(packet);
+            // EAGAIN means the decoder has output waiting to be received.
+            if ((sendResult == 0 || sendResult == AVERROR(EAGAIN)) &&
+                avcodec_receive_frame(codecContext, frame) == 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ============================================================================
     // SHARED GDI+ SINGLETON - Eliminates per-call init/shutdown overhead
     // ============================================================================
@@ -403,39 +446,8 @@ namespace fc_native_video_thumbnail
             // ================================================================
             packet = av_packet_alloc();
             frame = av_frame_alloc();
-            bool frameFound = false;
-
-            // Read frames with limit to avoid infinite loops
-            int frameCount = 0;
-            while (av_read_frame(formatContext, packet) >= 0)
-            {
-                if (packet->stream_index == videoStreamIndex)
-                {
-                    int sendResult = avcodec_send_packet(codecContext, packet);
-                    if (sendResult == 0)
-                    {
-                        int receiveResult = avcodec_receive_frame(codecContext, frame);
-                        if (receiveResult == 0)
-                        {
-                            frameFound = true;
-                            break;
-                        }
-                    }
-                }
-                av_packet_unref(packet);
-
-                // Limit search to 30 frames max for speed
-                frameCount++;
-                if (frameCount > 30)
-                    break;
-
-                // Also limit by time
-                if (av_q2d(formatContext->streams[videoStreamIndex]->time_base) * packet->pts >
-                    timeSeconds + 10)
-                {
-                    break;
-                }
-            }
+            const bool frameFound = DecodeFirstVideoFrame(
+                formatContext, codecContext, videoStreamIndex, packet, frame);
 
             if (!frameFound)
             {
@@ -729,29 +741,8 @@ namespace fc_native_video_thumbnail
             // Read frames
             packet = av_packet_alloc();
             frame = av_frame_alloc();
-            bool frameFound = false;
-
-            while (av_read_frame(formatContext, packet) >= 0)
-            {
-                if (packet->stream_index == videoStreamIndex)
-                {
-                    if (avcodec_send_packet(codecContext, packet) == 0)
-                    {
-                        if (avcodec_receive_frame(codecContext, frame) == 0)
-                        {
-                            frameFound = true;
-                            break;
-                        }
-                    }
-                }
-                av_packet_unref(packet);
-
-                if (av_q2d(formatContext->streams[videoStreamIndex]->time_base) * packet->pts >
-                    timeSeconds + 10)
-                {
-                    break;
-                }
-            }
+            const bool frameFound = DecodeFirstVideoFrame(
+                formatContext, codecContext, videoStreamIndex, packet, frame);
 
             if (!frameFound)
             {

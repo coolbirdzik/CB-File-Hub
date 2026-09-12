@@ -21,6 +21,7 @@
 import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
@@ -88,6 +89,16 @@ Future<bool> _confirmDeleteDialog(
 Finder _findInlineRenameField() {
   return find.descendant(
     of: find.byType(InlineRenameField),
+    matching: find.byType(TextField),
+  );
+}
+
+/// Finder for the rename popover's TextField. In list view the context-menu
+/// rename action cannot edit in place, so it opens a [CbInlineRenamePanel]
+/// popover instead of mounting an [InlineRenameField] in the row.
+Finder _findRenamePopoverField() {
+  return find.descendant(
+    of: find.byType(CbInlineRenamePanel),
     matching: find.byType(TextField),
   );
 }
@@ -284,7 +295,7 @@ void main() {
         await et.init('02.01 create new folder via right-click context menu');
 
         // Verify dummy file is visible (confirms FileListViewBuilder has rendered)
-        expectFileRowVisible(dummyFile.path);
+        await waitForFileRowVisible(tester, dummyFile.path);
 
         // Right-click background to open the BACKGROUND context menu,
         // which HAS the "New Folder" option (unlike file context menu).
@@ -294,10 +305,13 @@ void main() {
         await et.tapContextMenuItem('new_folder');
 
         // Scope to the dialog so we do not hit the address/path TextField.
+        // The dialog opens asynchronously after the menu action; poll for
+        // it so slow CI runners don't fail the immediate expectation.
         final textField = find.descendant(
           of: find.byType(AlertDialog),
           matching: find.byType(TextField),
         );
+        await pumpUntilFound(tester, textField);
         expect(
           textField,
           findsOneWidget,
@@ -314,7 +328,7 @@ void main() {
 
         final createdPath =
             '${dir.path}${Platform.pathSeparator}$newFolderName';
-        expectFolderRowVisible(createdPath);
+        await waitForFolderRowVisible(tester, createdPath);
         if (kDebugMode) debugPrint('[E2E] create new folder — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -490,7 +504,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('03.01 cut and move file via right-click context menu');
 
-        expectFileRowVisible(srcFile.path);
+        await waitForFileRowVisible(tester, srcFile.path);
 
         // Right-click the file and select Cut
         await et.rightClickFileRow(srcFile.path, detail: 'open_context_menu');
@@ -509,7 +523,7 @@ void main() {
         // Verify file appears in destination
         final movedPath =
             '${destFolder.path}${Platform.pathSeparator}moveme.txt';
-        expectFileRowVisible(movedPath);
+        await waitForFileRowVisible(tester, movedPath);
 
         // Verify source file is gone from filesystem (cut = move)
         expect(
@@ -630,8 +644,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('04.01 copy folder to another location via context menu');
 
-        expectFolderRowVisible(sourceFolder.path);
-        expectFolderRowVisible(destFolder.path);
+        await waitForFolderRowVisible(tester, sourceFolder.path);
+        await waitForFolderRowVisible(tester, destFolder.path);
 
         // Right-click source folder and copy
         await et.rightClickFolderRow(
@@ -653,7 +667,7 @@ void main() {
         // Verify copied folder appears in dest
         final copiedPath =
             '${destFolder.path}${Platform.pathSeparator}source_dir';
-        expectFolderRowVisible(copiedPath);
+        await waitForFolderRowVisible(tester, copiedPath);
 
         // Verify inner file was copied too (filesystem check)
         final innerCopy = File('$copiedPath${Platform.pathSeparator}inner.txt');
@@ -751,8 +765,8 @@ void main() {
             '05.01 multi-select two files and batch copy via keyboard shortcuts',
           );
 
-          expectFileRowVisible(fileA.path);
-          expectFileRowVisible(fileB.path);
+          await waitForFileRowVisible(tester, fileA.path);
+          await waitForFileRowVisible(tester, fileB.path);
 
           // Ctrl+click to select both files
           await et.selectFileWithCtrl(fileA.path, detail: 'select_alpha');
@@ -787,8 +801,8 @@ void main() {
           await et.pumpAndSettle(const Duration(seconds: 3));
 
           final pastedB = '${destFolder.path}${Platform.pathSeparator}beta.txt';
-          expectFileRowVisible(pastedA);
-          expectFileRowVisible(pastedB);
+          await waitForFileRowVisible(tester, pastedA);
+          await waitForFileRowVisible(tester, pastedB);
           if (kDebugMode) debugPrint('[E2E] multi-select batch copy — SUCCESS');
         } finally {
           await et.screenshot('result');
@@ -926,7 +940,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('06.02 cancel rename with Escape key after pressing F2');
 
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
 
         // Select and press F2 to start rename
         await et.tapFileRow(targetFile.path, detail: 'select_file');
@@ -934,11 +948,13 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.f2);
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // Verify rename field is visible
-        final textFields = find.byType(TextField);
+        // Verify rename field is visible. The editor mounts asynchronously
+        // after the F2 key event; poll so slow CI runners don't race it.
+        final renameField = _findInlineRenameField();
+        await pumpUntilFound(tester, renameField);
         expect(
-          textFields,
-          findsAtLeastNWidgets(1),
+          renameField,
+          findsOneWidget,
           reason: 'Rename TextField should appear after F2',
         );
 
@@ -1078,8 +1094,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('07.02 clear search to show all files again');
 
-        expectFileRowVisible(fileA.path);
-        expectFileRowVisible(fileB.path);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
 
         // Open search and type a query
         final searchIcon = find.byIcon(Icons.search);
@@ -1098,9 +1114,10 @@ void main() {
           await et.keyPress(LogicalKeyboardKey.escape);
           await et.pumpAndSettle(const Duration(seconds: 2));
 
-          // Both files should be visible again
-          expectFileRowVisible(fileA.path);
-          expectFileRowVisible(fileB.path);
+          // Both files should be visible again. The listing restores
+          // asynchronously; poll so slow CI runners don't race it.
+          await waitForFileRowVisible(tester, fileA.path);
+          await waitForFileRowVisible(tester, fileB.path);
         }
         if (kDebugMode) debugPrint('[E2E] clear search — SUCCESS');
       } finally {
@@ -1460,7 +1477,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('10.02 handle rename with empty name correctly');
 
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
 
         // Select and press F2 to start rename
         await et.tapFileRow(targetFile.path, detail: 'select_file');
@@ -1468,18 +1485,23 @@ void main() {
         await et.keyPress(LogicalKeyboardKey.f2);
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // Clear the text field
-        await et.enterText(
-          find.byType(TextField).first,
-          '',
-          detail: 'clear_name',
+        // Clear the text field. Target the inline editor specifically: a
+        // bare `find.byType(TextField).first` can resolve to the address
+        // bar, and typing "empty" there navigates instead of renaming.
+        final renameField = _findInlineRenameField();
+        await pumpUntilFound(tester, renameField);
+        expect(
+          renameField,
+          findsOneWidget,
+          reason: 'Inline rename TextField not found',
         );
+        await et.enterText(renameField, '', detail: 'clear_name');
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await et.pumpAndSettle(const Duration(seconds: 3));
 
         // Original name should still be there (invalid empty rename rejected)
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
         if (kDebugMode) debugPrint('[E2E] empty rename handled — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1631,27 +1653,31 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('11.02 rename file via context menu');
 
-        expectFileRowVisible(originalFile.path);
+        await waitForFileRowVisible(tester, originalFile.path);
 
         // Right-click to open context menu
         await et.rightClickFileRow(originalFile.path, detail: 'open_ctx_menu');
         await et.tapContextMenuItem('rename', detail: 'context_rename');
         await et.pumpAndSettle(const Duration(seconds: 2));
 
-        // Enter new name
-        final textFields = find.byType(TextField);
+        // Enter new name. In list view the context-menu rename opens a
+        // CbInlineRenamePanel popover (not the in-row editor), and it only
+        // opens after async preference reads — poll so slow CI runners
+        // don't race it.
+        final renameField = _findRenamePopoverField();
+        await pumpUntilFound(tester, renameField);
         expect(
-          textFields,
-          findsAtLeastNWidgets(1),
-          reason: 'Rename TextField not found',
+          renameField,
+          findsOneWidget,
+          reason: 'Rename popover TextField not found',
         );
-        await et.enterText(textFields.first, newName, detail: 'type_new_name');
+        await et.enterText(renameField, newName, detail: 'type_new_name');
         await tester.pumpAndSettle(const Duration(milliseconds: 300));
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await et.pumpAndSettle(const Duration(seconds: 3));
 
         final renamedPath = '${dir.path}${Platform.pathSeparator}$newName';
-        expectFileRowVisible(renamedPath);
+        await waitForFileRowVisible(tester, renamedPath);
         expectFileRowAbsent(originalFile.path);
         if (kDebugMode) debugPrint('[E2E] context menu rename — SUCCESS');
       } finally {
@@ -1683,8 +1709,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('11.03 batch move multiple files to destination folder');
 
-        expectFileRowVisible(fileA.path);
-        expectFileRowVisible(fileB.path);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
 
         // Multi-select both files with Ctrl+click
         await et.selectFileWithCtrl(fileA.path, detail: 'select_a');
@@ -1713,8 +1739,8 @@ void main() {
         // Verify both files moved
         final movedA = '${destFolder.path}${Platform.pathSeparator}move_a.txt';
         final movedB = '${destFolder.path}${Platform.pathSeparator}move_b.txt';
-        expectFileRowVisible(movedA);
-        expectFileRowVisible(movedB);
+        await waitForFileRowVisible(tester, movedA);
+        await waitForFileRowVisible(tester, movedB);
 
         // Verify source files are gone
         expect(fileA.existsSync(), isFalse);
@@ -1760,7 +1786,7 @@ void main() {
           '11.04 copy folder with nested contents to another location',
         );
 
-        expectFolderRowVisible(sourceFolder.path);
+        await waitForFolderRowVisible(tester, sourceFolder.path);
 
         // Copy folder via context menu
         await et.rightClickFolderRow(sourceFolder.path, detail: 'open_menu');
@@ -1779,19 +1805,28 @@ void main() {
         // Verify folder was copied
         final copiedFolder =
             '${destFolder.path}${Platform.pathSeparator}deep_source';
-        expectFolderRowVisible(copiedFolder);
+        await waitForFolderRowVisible(tester, copiedFolder);
 
-        // Verify nested structure was copied
-        final copiedRoot = '$copiedFolder${Platform.pathSeparator}root.txt';
-        final copiedNested =
-            '$copiedFolder${Platform.pathSeparator}level2${Platform.pathSeparator}nested.txt';
+        // Verify nested structure was copied (filesystem check). The row
+        // appearing means the copy finished, but poll briefly anyway so a
+        // slow CI runner cannot race the FS metadata visibility.
+        final copiedRoot = File(
+          '$copiedFolder${Platform.pathSeparator}root.txt',
+        );
+        final nestedDeadline = DateTime.now().add(const Duration(seconds: 5));
+        while (!copiedRoot.existsSync() &&
+            DateTime.now().isBefore(nestedDeadline)) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
         expect(
-          File(copiedRoot).existsSync(),
+          copiedRoot.existsSync(),
           isTrue,
           reason: 'Root file should be copied',
         );
         expect(
-          File(copiedNested).existsSync(),
+          File(
+            '$copiedFolder${Platform.pathSeparator}level2${Platform.pathSeparator}nested.txt',
+          ).existsSync(),
           isTrue,
           reason: 'Nested file should be copied',
         );

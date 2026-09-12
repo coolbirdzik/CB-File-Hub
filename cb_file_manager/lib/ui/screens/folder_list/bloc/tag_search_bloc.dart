@@ -1,4 +1,8 @@
+import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
+import 'package:cb_file_manager/helpers/core/search_query.dart';
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -73,7 +77,9 @@ class TagSearchState extends Equatable {
 }
 
 class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
+  final _searchRequests = SearchRequestGuard();
   final FileNavigationBloc navigationBloc;
+  late final StreamSubscription<String> _tagChangeSubscription;
 
   TagSearchBloc({required this.navigationBloc})
     : super(const TagSearchState()) {
@@ -90,9 +96,42 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     on<TagSearchByMultipleTagsGlobally>(_onSearchByMultipleTagsGlobally);
     on<TagSearchSetResults>(_onSetResults);
     on<TagSearchClearResults>(_onClearResults);
+    on<TagSearchRemovePaths>(_onRemovePaths);
 
     // Subscribe to TagManager changes to keep state in sync
-    TagManager.onTagChanged.listen(_onTagChanged);
+    _tagChangeSubscription = TagManager.onTagChanged.listen(_onTagChanged);
+  }
+
+  @override
+  Future<void> close() async {
+    _searchRequests.dispose();
+    await _tagChangeSubscription.cancel();
+    await super.close();
+  }
+
+  void _onRemovePaths(
+    TagSearchRemovePaths event,
+    Emitter<TagSearchState> emit,
+  ) {
+    if (event.paths.isEmpty) return;
+    _searchRequests.invalidate();
+    bool removed(String candidate) =>
+        SearchQuery.isRemovedPath(candidate, event.paths);
+    final remaining = state.searchResultPaths
+        .where((path) => !removed(path))
+        .toList();
+    final removedCount = state.searchResultPaths.length - remaining.length;
+    emit(
+      state.copyWith(
+        isLoading: false,
+        searchResultPaths: remaining,
+        searchResultsTotal: state.searchResultsTotal == null
+            ? null
+            : math.max(0, state.searchResultsTotal! - removedCount),
+        fileTags: Map<String, List<String>>.from(state.fileTags)
+          ..removeWhere((path, _) => removed(path)),
+      ),
+    );
   }
 
   void _onTagChanged(String filePath) {
@@ -225,6 +264,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByTag event,
     Emitter<TagSearchState> emit,
   ) async {
+    final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true));
     try {
       TagManager.clearCache();
@@ -233,6 +273,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         event.tag,
       );
       final paths = results.map((e) => e.path).toList();
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -243,6 +284,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         ),
       );
     } catch (e) {
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -256,6 +298,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByTagGlobally event,
     Emitter<TagSearchState> emit,
   ) async {
+    final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true, searchResultPaths: []));
     try {
       TagManager.clearCache();
@@ -266,6 +309,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
           validPaths.add(entity.path);
         }
       }
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -277,6 +321,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         ),
       );
     } catch (e) {
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -290,10 +335,14 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByMultipleTags event,
     Emitter<TagSearchState> emit,
   ) async {
+    final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true));
     try {
       TagManager.clearCache();
-      if (event.tags.isEmpty) return;
+      if (event.tags.isEmpty) {
+        emit(state.copyWith(isLoading: false));
+        return;
+      }
 
       var results = await TagManager.findFilesByTag(
         event.currentDirectory,
@@ -314,6 +363,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
       }
 
       final paths = results.map((e) => e.path).toList();
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -324,6 +374,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         ),
       );
     } catch (e) {
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -337,10 +388,14 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByMultipleTagsGlobally event,
     Emitter<TagSearchState> emit,
   ) async {
+    final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true, searchResultPaths: []));
     try {
       TagManager.clearCache();
-      if (event.tags.isEmpty) return;
+      if (event.tags.isEmpty) {
+        emit(state.copyWith(isLoading: false));
+        return;
+      }
 
       var results = await TagManager.findFilesByTagGlobally(event.tags.first);
 
@@ -363,6 +418,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
           .map((f) => f.path)
           .toList();
 
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -374,6 +430,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
         ),
       );
     } catch (e) {
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
       emit(
         state.copyWith(
           isLoading: false,
@@ -384,6 +441,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   }
 
   void _onSetResults(TagSearchSetResults event, Emitter<TagSearchState> emit) {
+    _searchRequests.invalidate();
     emit(
       state.copyWith(
         searchResultPaths: event.resultPaths,
@@ -399,8 +457,10 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchClearResults event,
     Emitter<TagSearchState> emit,
   ) {
+    _searchRequests.invalidate();
     emit(
       state.copyWith(
+        isLoading: false,
         searchResultPaths: const [],
         currentSearchTag: null,
         isGlobalSearch: false,

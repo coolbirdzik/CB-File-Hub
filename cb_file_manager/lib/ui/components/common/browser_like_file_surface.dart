@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_focus_gate.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_keyboard_controller.dart';
 import 'package:cb_file_manager/ui/utils/entity_open_actions.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
@@ -142,6 +143,12 @@ class _BrowserLikeFileSurfaceState extends State<BrowserLikeFileSurface> {
   KeyEventResult _handleKeyEvent(KeyEvent event) {
     if (!widget.isDesktop ||
         BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
+      return KeyEventResult.ignored;
+    }
+
+    // Hidden tabs stay mounted in the tab shell's IndexedStack, so a stale
+    // focus must never run shortcuts against a view the user cannot see.
+    if (!TabFocusGate.isActiveTab(context)) {
       return KeyEventResult.ignored;
     }
 

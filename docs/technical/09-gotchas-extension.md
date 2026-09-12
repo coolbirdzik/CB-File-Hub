@@ -20,9 +20,8 @@
 - **Windows build locks:** `LNK1168` commonly means a running executable owns
   the output. Do not terminate a user's application automatically; use a
   temporary target when practical.
-- **Android VLC and SMB:** if playback starts without a rendered surface, check
-  the Pigeon channel compatibility described in
-  `docs/troubleshooting/02-android-smb-vlc-no-render.md`.
+- **Video surfaces:** keep the media_kit texture mounted while buffering or hiding
+  controls. See `docs/technical/07-media-kit-playback.md`.
 
 ## Extending the application safely
 

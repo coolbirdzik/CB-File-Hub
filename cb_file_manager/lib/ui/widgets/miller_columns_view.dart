@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'file_drag_drop_item.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -83,6 +84,8 @@ class MillerColumnsView extends StatefulWidget {
   final Function(BuildContext, Offset) showContextMenu;
   final ScrollController? scrollController;
   final GlobalKey Function(String path)? itemKeyForPath;
+  final ValueChanged<List<String>>? onStartFileDrag;
+  final Future<void> Function(List<String>, String)? onMoveItemsToFolder;
 
   static const double columnWidth = 280.0;
   static const double dividerWidth = 1.0;
@@ -107,6 +110,8 @@ class MillerColumnsView extends StatefulWidget {
     required this.showContextMenu,
     this.scrollController,
     this.itemKeyForPath,
+    this.onStartFileDrag,
+    this.onMoveItemsToFolder,
   });
 
   @override
@@ -385,15 +390,22 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
     final isSelected = selectionState.isPathSelected(folder.path);
     final isColumnSelected = _columns[columnIndex].selectedPath == folder.path;
 
-    return _MillerFolderRow(
-      key: ValueKey('miller-folder-${folder.path}'),
-      folder: folder,
-      isSelected: isSelected,
-      isColumnSelected: isColumnSelected,
-      lastSelectedPath: selectionState.lastSelectedPath,
-      onOpenColumn: () => _onFolderTap(columnIndex, folder.path),
-      onNavigate: () => _onFolderDoubleTap(folder.path),
-      toggleFolderSelection: widget.toggleFolderSelection,
+    return FileDragDropItem(
+      path: folder.path,
+      isFolder: true,
+      selectedPaths: selectionState.allSelectedPaths.toSet(),
+      onStartFileDrag: widget.onStartFileDrag,
+      onMoveItemsToFolder: widget.onMoveItemsToFolder,
+      child: _MillerFolderRow(
+        key: ValueKey('miller-folder-${folder.path}'),
+        folder: folder,
+        isSelected: isSelected,
+        isColumnSelected: isColumnSelected,
+        lastSelectedPath: selectionState.lastSelectedPath,
+        onOpenColumn: () => _onFolderTap(columnIndex, folder.path),
+        onNavigate: () => _onFolderDoubleTap(folder.path),
+        toggleFolderSelection: widget.toggleFolderSelection,
+      ),
     );
   }
 
@@ -405,16 +417,23 @@ class _MillerColumnsViewState extends State<MillerColumnsView> {
   ) {
     final isSelected = selectionState.isPathSelected(file.path);
 
-    return _MillerFileRow(
-      key: ValueKey('miller-file-${file.path}'),
-      file: file,
-      isSelected: isSelected,
-      lastSelectedPath: selectionState.lastSelectedPath,
-      showAddTagToFileDialog: widget.showAddTagToFileDialog,
-      onDeleteFile: widget.onDeleteFile,
-      onTapFile: () => _onFileTap(columnIndex, file),
-      onOpenFile: () => _onFileDoubleTap(file),
-      toggleFileSelection: widget.toggleFileSelection,
+    return FileDragDropItem(
+      path: file.path,
+      isFolder: false,
+      selectedPaths: selectionState.allSelectedPaths.toSet(),
+      onStartFileDrag: widget.onStartFileDrag,
+      onMoveItemsToFolder: widget.onMoveItemsToFolder,
+      child: _MillerFileRow(
+        key: ValueKey('miller-file-${file.path}'),
+        file: file,
+        isSelected: isSelected,
+        lastSelectedPath: selectionState.lastSelectedPath,
+        showAddTagToFileDialog: widget.showAddTagToFileDialog,
+        onDeleteFile: widget.onDeleteFile,
+        onTapFile: () => _onFileTap(columnIndex, file),
+        onOpenFile: () => _onFileDoubleTap(file),
+        toggleFileSelection: widget.toggleFileSelection,
+      ),
     );
   }
 }

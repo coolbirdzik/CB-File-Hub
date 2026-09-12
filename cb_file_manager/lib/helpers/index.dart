@@ -18,13 +18,13 @@ export 'media/thumbnail_queue_manager.dart';
 export 'media/video_thumbnail_helper.dart';
 
 // Network & Streaming
-export 'network/native_vlc_direct_helper.dart';
+export 'network/native_smb_playback_helper.dart';
 export 'network/network_file_cache_service.dart';
 export 'network/network_file_helper.dart';
 export 'network/network_thumbnail_helper.dart';
 export 'network/smb_native_thumbnail_helper.dart';
 export 'network/streaming_helper.dart';
-export 'network/vlc_direct_smb_helper.dart';
+export 'network/smb_playback_helper.dart';
 export 'network/win32_smb_helper.dart';
 
 // File Management
