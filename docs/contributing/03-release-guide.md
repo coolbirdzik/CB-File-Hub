@@ -36,7 +36,13 @@ CI will automatically:
 2. Increment the build number (`+1`, `+2`, ...).
 3. Commit the updated `pubspec.yaml` back to the repo.
 4. Build release artifacts (Windows portable ZIP, Windows MSI, Windows MSIX, Android APK, Android AAB).
-5. Create a GitHub Release with changelog and download links.
+5. Create a GitHub Release with changelog and download links (MSIX excluded, see below).
+6. Create a Microsoft Partner Center draft submission from the MSIX.
+
+The MSIX is **not** attached to the GitHub Release. It is signed with a self-signed
+certificate that only the Store accepts (the Store re-signs it on publish). Installed
+directly, Windows rejects it with `0x800B010A`. Windows users outside the Store get
+the portable ZIP or MSI instead.
 
 For Microsoft Store and MSIX signing details, see:
 
@@ -144,7 +150,7 @@ This is fully **repo-based** — no dependency on GitHub Run IDs, works with any
 | Android | `CBFileManager-{ver}.aab` | For Google Play |
 | Windows | `CBFileManager-{ver}-windows-portable.zip` | No install needed |
 | Windows | `CBFileManager-Setup-{ver}.msi` | Classic desktop installer |
-| Windows | `CBFileManager-{ver}.msix` | Signed package for Store or enterprise |
+| Windows | `CBFileManager-{ver}.msix` | Microsoft Store only (workflow artifact + Partner Center draft, not on GitHub Release) |
 
 ---
 

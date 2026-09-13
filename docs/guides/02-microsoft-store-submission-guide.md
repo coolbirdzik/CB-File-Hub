@@ -58,7 +58,11 @@ The pipeline will:
 1. Restore the `.pfx` from `MSIX_CERT_BASE64`
 2. Build the Windows MSIX
 3. Sign it with the certificate
-4. Upload the `.msix` artifact to the GitHub Release
+4. Upload the `.msix` as the `windows-msix` workflow artifact and create a Partner Center draft
+
+The `.msix` is intentionally not attached to the GitHub Release: the certificate is
+self-signed, so a direct install fails with `0x800B010A` on machines that don't trust it.
+The Store re-signs the package on publish, so Store installs are unaffected.
 
 ## 4. Verify Before Submission
 
@@ -73,6 +77,10 @@ Expected:
 
 - `Status` is `Valid`
 - `Subject` is `CN=C193F601-16B4-4BC5-89D3-1AE882F628DE`
+
+`Status` is only `Valid` on a machine that trusts the certificate. Elsewhere it shows
+`UnknownError` (the same `0x800B010A` chain error). To test-install locally, install the
+certificate into **Local Machine > Trusted People** first.
 
 ## 5. Submit to Microsoft Store
 

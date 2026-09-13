@@ -154,7 +154,7 @@ jobs:
           echo "### Windows" >> release_notes.md
           echo "- **Portable**: \`CBFileHub-$VERSION-windows-portable.zip\` - Extract and run, no installation needed" >> release_notes.md
           echo "- **MSI Installer**: \`CBFileHub-Setup-$VERSION.msi\` - Classic Windows installer" >> release_notes.md
-          echo "- **MSIX Package**: \`CBFileHub-$VERSION.msix\` - Modern Windows package with clean install/uninstall" >> release_notes.md
+          echo "- **Microsoft Store**: [CB FileHub](https://apps.microsoft.com/detail/9nchpzkc4m5c) - Store install with automatic updates" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android" >> release_notes.md
           echo "- **APK**: \`CBFileHub-$VERSION-arm64-v8a.apk\` (64-bit)" >> release_notes.md
@@ -174,10 +174,9 @@ jobs:
           echo "2. Run the installer" >> release_notes.md
           echo "3. Follow the setup wizard" >> release_notes.md
           echo "" >> release_notes.md
-          echo "**MSIX Package:**" >> release_notes.md
-          echo "1. Download \`CBFileHub-$VERSION.msix\`" >> release_notes.md
-          echo "2. Open the package in Windows" >> release_notes.md
-          echo "3. Approve the installation if Windows prompts for confirmation" >> release_notes.md
+          echo "**Microsoft Store:**" >> release_notes.md
+          echo "1. Open [CB FileHub on Microsoft Store](https://apps.microsoft.com/detail/9nchpzkc4m5c)" >> release_notes.md
+          echo "2. Click **Get** to install" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Android" >> release_notes.md
           echo "- Download and install the \`.apk\` file" >> release_notes.md
@@ -609,7 +608,6 @@ jobs:
       - generate-release-notes
       - build-windows
       - build-windows-msi
-      - build-windows-msix
       - build-android-apk
       - build-android-aab
     permissions:
@@ -634,7 +632,6 @@ jobs:
           files: |
             artifacts/windows-build/*.zip
             artifacts/windows-msi/*.msi
-            artifacts/windows-msix/*.msix
             artifacts/android-apk/*.apk
             artifacts/android-aab/*.aab
         env:
