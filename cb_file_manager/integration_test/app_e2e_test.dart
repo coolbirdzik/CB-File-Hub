@@ -141,9 +141,9 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('01.01 sandbox lists two files and a subfolder');
 
-        expectFileRowVisible(aFile.path);
-        expectFileRowVisible(bFile.path);
-        expectFolderRowVisible(sub.path);
+        await waitForFileRowVisible(tester, aFile.path);
+        await waitForFileRowVisible(tester, bFile.path);
+        await waitForFolderRowVisible(tester, sub.path);
       } finally {
         await et.screenshot('result');
         await e2eTearDown(tester, dir);
@@ -173,13 +173,13 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('01.02 open subfolder shows file inside');
 
-        expectFolderRowVisible(sub.path);
+        await waitForFolderRowVisible(tester, sub.path);
         if (kDebugMode) {
           debugPrint('[E2E] Folder found, navigating into: ${sub.path}');
         }
         await et.tapFolderRow(sub.path, detail: 'navigate_into_innerdir');
         await et.pumpAndSettle(const Duration(seconds: 5));
-        expectFileRowVisible(innerFile.path);
+        await waitForFileRowVisible(tester, innerFile.path);
         if (kDebugMode) debugPrint('[E2E] Navigation complete — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -240,13 +240,13 @@ void main() {
           );
 
           // Verify root contents visible
-          expectFileRowVisible(rootFile.path);
-          expectFolderRowVisible(sub.path);
+          await waitForFileRowVisible(tester, rootFile.path);
+          await waitForFolderRowVisible(tester, sub.path);
 
           // Navigate into subfolder
           await et.tapFolderRow(sub.path, detail: 'navigate_into_innerdir');
           await et.pumpAndSettle(const Duration(seconds: 5));
-          expectFileRowVisible(innerFile.path);
+          await waitForFileRowVisible(tester, innerFile.path);
           await et.screenshot('inside subfolder');
 
           // Press Backspace to go back to parent
@@ -257,8 +257,8 @@ void main() {
           await et.pumpAndSettle(const Duration(seconds: 5));
 
           // Verify back in parent folder
-          expectFileRowVisible(rootFile.path);
-          expectFolderRowVisible(sub.path);
+          await waitForFileRowVisible(tester, rootFile.path);
+          await waitForFolderRowVisible(tester, sub.path);
           if (kDebugMode) {
             debugPrint('[E2E] navigate back with Backspace — SUCCESS');
           }
@@ -356,7 +356,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('02.02 copy file via right-click context menu and paste');
 
-        expectFileRowVisible(srcFile.path);
+        await waitForFileRowVisible(tester, srcFile.path);
 
         // Right-click the file to open context menu
         await et.rightClickFileRow(srcFile.path, detail: 'open_context_menu');
@@ -373,7 +373,7 @@ void main() {
         await et.tapContextMenuItem('paste', detail: 'paste');
 
         final pastedPath = '${sub.path}${Platform.pathSeparator}source.txt';
-        expectFileRowVisible(pastedPath);
+        await waitForFileRowVisible(tester, pastedPath);
         if (kDebugMode) debugPrint('[E2E] copy + paste — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -401,7 +401,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('02.03 rename file via F2 keyboard shortcut');
 
-        expectFileRowVisible(originalFile.path);
+        await waitForFileRowVisible(tester, originalFile.path);
 
         await et.tapFileRow(originalFile.path, detail: 'select_file');
         await et.pumpAndSettle(const Duration(milliseconds: 300));
@@ -425,7 +425,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 3));
 
         final renamedPath = '${dir.path}${Platform.pathSeparator}$newName';
-        expectFileRowVisible(renamedPath);
+        await waitForFileRowVisible(tester, renamedPath);
         expectFileRowAbsent(originalFile.path);
         if (kDebugMode) debugPrint('[E2E] rename file — SUCCESS');
       } finally {
@@ -453,7 +453,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('02.04 delete file via keyboard shortcut');
 
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
 
         await et.tapFileRow(targetFile.path, detail: 'select_file');
         await et.pumpAndSettle(const Duration(milliseconds: 300));
@@ -563,7 +563,7 @@ void main() {
             '03.02 cut and move file via Ctrl+X Ctrl+V keyboard shortcuts',
           );
 
-          expectFileRowVisible(srcFile.path);
+          await waitForFileRowVisible(tester, srcFile.path);
 
           // Select the file
           await et.tapFileRow(srcFile.path, detail: 'select_file');
@@ -594,7 +594,7 @@ void main() {
           // Verify file appears in destination
           final movedPath =
               '${destFolder.path}${Platform.pathSeparator}moveme.txt';
-          expectFileRowVisible(movedPath);
+          await waitForFileRowVisible(tester, movedPath);
 
           // Verify source file is gone from filesystem
           expect(
@@ -709,7 +709,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('04.02 delete folder via keyboard shortcut');
 
-        expectFolderRowVisible(targetFolder.path);
+        await waitForFolderRowVisible(tester, targetFolder.path);
 
         // Select the folder (single tap — NOT double-tap which navigates)
         await et.selectFolderRow(targetFolder.path, detail: 'select_folder');
@@ -833,9 +833,9 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('05.02 select all with Ctrl+A and batch delete');
 
-        expectFileRowVisible(fileA.path);
-        expectFileRowVisible(fileB.path);
-        expectFileRowVisible(fileC.path);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
+        await waitForFileRowVisible(tester, fileC.path);
 
         // Ctrl+A to select all
         if (kDebugMode) debugPrint('[E2E] Pressing Ctrl+A');
@@ -894,7 +894,7 @@ void main() {
           '06.01 refresh folder listing with F5 after external change',
         );
 
-        expectFileRowVisible(existingFile.path);
+        await waitForFileRowVisible(tester, existingFile.path);
 
         // Create a new file externally (NOT through the app UI)
         final newFile = File(
@@ -911,9 +911,9 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 5));
 
         // Verify the externally created file now appears
-        expectFileRowVisible(newFile.path);
+        await waitForFileRowVisible(tester, newFile.path);
         // Verify original file is still there
-        expectFileRowVisible(existingFile.path);
+        await waitForFileRowVisible(tester, existingFile.path);
         if (kDebugMode) debugPrint('[E2E] refresh with F5 — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -963,7 +963,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 2));
 
         // Original filename should still be there (rename cancelled)
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
         if (kDebugMode) debugPrint('[E2E] cancel rename with Escape — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -989,7 +989,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('06.03 open file with Enter key when file is selected');
 
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
 
         // Select the file
         await et.tapFileRow(targetFile.path, detail: 'select_file');
@@ -1040,8 +1040,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('07.01 search for file by typing in search box');
 
-        expectFileRowVisible(targetFile.path);
-        expectFileRowVisible(otherFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
+        await waitForFileRowVisible(tester, otherFile.path);
 
         // Find and tap search box (search icon button)
         final searchIcon = find.byIcon(Icons.search);
@@ -1058,7 +1058,7 @@ void main() {
           await et.pumpAndSettle(const Duration(seconds: 2));
 
           // Target file should still be visible (filtered)
-          expectFileRowVisible(targetFile.path);
+          await waitForFileRowVisible(tester, targetFile.path);
         } else {
           // Search may be implemented differently - verify current state
           if (kDebugMode) {
@@ -1152,8 +1152,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('08.01 toggle to grid view from list view');
 
-        expectFileRowVisible(fileA.path);
-        expectFileRowVisible(fileB.path);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
 
         // Look for grid icon to toggle view
         final gridIcon = find.byIcon(Icons.grid_view);
@@ -1162,8 +1162,8 @@ void main() {
           await et.pumpAndSettle(const Duration(seconds: 2));
 
           // Verify files are still visible in grid mode
-          expectFileRowVisible(fileA.path);
-          expectFileRowVisible(fileB.path);
+          await waitForFileRowVisible(tester, fileA.path);
+          await waitForFileRowVisible(tester, fileB.path);
         }
         if (kDebugMode) debugPrint('[E2E] toggle to grid view — SUCCESS');
       } finally {
@@ -1192,8 +1192,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('08.02 toggle back to list view from grid view');
 
-        expectFileRowVisible(fileA.path);
-        expectFileRowVisible(fileB.path);
+        await waitForFileRowVisible(tester, fileA.path);
+        await waitForFileRowVisible(tester, fileB.path);
 
         // First toggle to grid
         final gridIcon = find.byIcon(Icons.grid_view);
@@ -1208,8 +1208,8 @@ void main() {
             await et.pumpAndSettle(const Duration(seconds: 2));
 
             // Verify files are still visible in list mode
-            expectFileRowVisible(fileA.path);
-            expectFileRowVisible(fileB.path);
+            await waitForFileRowVisible(tester, fileA.path);
+            await waitForFileRowVisible(tester, fileB.path);
           }
         }
         if (kDebugMode) debugPrint('[E2E] toggle back to list view — SUCCESS');
@@ -1247,7 +1247,7 @@ void main() {
           await et.pumpAndSettle(const Duration(seconds: 2));
         }
 
-        expectFileRowVisible(fileA.path);
+        await waitForFileRowVisible(tester, fileA.path);
 
         // Copy file via context menu in grid view
         await et.rightClickFileRow(
@@ -1268,7 +1268,7 @@ void main() {
 
         final pastedPath =
             '${destFolder.path}${Platform.pathSeparator}grid_op_file.txt';
-        expectFileRowVisible(pastedPath);
+        await waitForFileRowVisible(tester, pastedPath);
         if (kDebugMode) debugPrint('[E2E] grid view file ops — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -1334,7 +1334,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('09.02 close a tab with Ctrl+W');
 
-        expectFileRowVisible(fileA.path);
+        await waitForFileRowVisible(tester, fileA.path);
 
         // Press Ctrl+W to close the tab
         if (kDebugMode) debugPrint('[E2E] Pressing Ctrl+W to close tab');
@@ -1422,7 +1422,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('10.01 handle delete confirmation cancel correctly');
 
-        expectFileRowVisible(targetFile.path);
+        await waitForFileRowVisible(tester, targetFile.path);
 
         // Select file and trigger delete
         await et.tapFileRow(targetFile.path, detail: 'select_file');
@@ -1437,7 +1437,7 @@ void main() {
           await et.pumpAndSettle(const Duration(seconds: 2));
 
           // File should still exist after cancel
-          expectFileRowVisible(targetFile.path);
+          await waitForFileRowVisible(tester, targetFile.path);
           expect(
             targetFile.existsSync(),
             isTrue,
@@ -1449,7 +1449,7 @@ void main() {
             debugPrint('[E2E] No cancel button found, checking file state');
           }
           // File should still exist
-          expectFileRowVisible(targetFile.path);
+          await waitForFileRowVisible(tester, targetFile.path);
         }
         if (kDebugMode) debugPrint('[E2E] delete cancel — SUCCESS');
       } finally {
@@ -1531,7 +1531,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('10.03 handle paste when no file is copied or cut');
 
-        expectFileRowVisible(existingFile.path);
+        await waitForFileRowVisible(tester, existingFile.path);
 
         // Navigate to dest folder
         await et.tapFolderRow(destFolder.path, detail: 'navigate_to_dest');
@@ -1573,7 +1573,7 @@ void main() {
           '10.04 handle navigating to a folder that no longer exists',
         );
 
-        expectFileRowVisible(file.path);
+        await waitForFileRowVisible(tester, file.path);
 
         // The folder we wanted to navigate to doesn't exist
         // This tests error handling for invalid navigation paths
@@ -1582,7 +1582,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 5));
 
         // File should still be visible (app handled gracefully)
-        expectFileRowVisible(file.path);
+        await waitForFileRowVisible(tester, file.path);
         if (kDebugMode) {
           debugPrint('[E2E] nav to missing folder handled — SUCCESS');
         }
@@ -1616,7 +1616,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('11.01 create new file via context menu');
 
-        expectFileRowVisible(dummyFile.path);
+        await waitForFileRowVisible(tester, dummyFile.path);
 
         // Right-click background to open context menu
         await et.openBackgroundContextMenu(detail: 'open_bg_menu');
@@ -1860,7 +1860,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('11.05 rename folder via F2 keyboard shortcut');
 
-        expectFolderRowVisible(originalFolder.path);
+        await waitForFolderRowVisible(tester, originalFolder.path);
 
         // Select the folder (single tap)
         await et.selectFolderRow(originalFolder.path, detail: 'select_folder');
@@ -1888,7 +1888,7 @@ void main() {
 
         final renamedPath =
             '${dir.path}${Platform.pathSeparator}$newFolderName';
-        expectFolderRowVisible(renamedPath);
+        await waitForFolderRowVisible(tester, renamedPath);
         expectFolderRowAbsent(originalFolder.path);
 
         // Verify contents still exist inside
