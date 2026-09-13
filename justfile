@@ -270,17 +270,17 @@ bump-build: verify
     git add {{pubspec}}
     git commit -m "chore: bump build number to $(bash scripts/version.sh build)" || echo "Nothing to commit"
 
-# Create patch release (x.x.X)
+# Create patch release (x.x.X), then pick a remote and push branch + tag
 release-patch: verify
-    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1\".\"\$2\".\"\$3+1}"); echo "Creating patch release: $NEW_VER"; bash scripts/version.sh set-version $NEW_VER; git add {{pubspec}}; git commit -m "chore: bump version to $NEW_VER"; git tag -a "v$NEW_VER" -m "Release v$NEW_VER"; echo "Created tag v$NEW_VER"; echo "Push with: git push origin main && git push origin v$NEW_VER"'
+    PUBSPEC={{pubspec}} bash scripts/release.sh patch
 
-# Create minor release (x.X.0)
+# Create minor release (x.X.0), then pick a remote and push branch + tag
 release-minor: verify
-    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1\".\"\$2+1\".0\"}"); echo "Creating minor release: $NEW_VER"; bash scripts/version.sh set-version $NEW_VER; git add {{pubspec}}; git commit -m "chore: bump version to $NEW_VER"; git tag -a "v$NEW_VER" -m "Release v$NEW_VER"; echo "Created tag v$NEW_VER"; echo "Push with: git push origin main && git push origin v$NEW_VER"'
+    PUBSPEC={{pubspec}} bash scripts/release.sh minor
 
-# Create major release (X.0.0)
+# Create major release (X.0.0), then pick a remote and push branch + tag
 release-major: verify
-    bash -c 'NEW_VER=$(bash scripts/version.sh name | awk -F. "{print \$1+1\".0.0\"}"); echo "Creating major release: $NEW_VER"; bash scripts/version.sh set-version $NEW_VER; git add {{pubspec}}; git commit -m "chore: bump version to $NEW_VER"; git tag -a "v$NEW_VER" -m "Release v$NEW_VER"; echo "Created tag v$NEW_VER"; echo "Push with: git push origin main && git push origin v$NEW_VER"'
+    PUBSPEC={{pubspec}} bash scripts/release.sh major
 
 # Retag: recreate annotated tag and force-push (interactive)
 retag tag remote="origin":
