@@ -114,6 +114,31 @@ Future<void> waitForFolderRowVisible(
   expectFolderRowVisible(absolutePath);
 }
 
+/// Waits (polling) for a file row to disappear after an async operation
+/// (delete, cut, overwrite), then asserts absence with the same failure
+/// message as [expectFileRowAbsent]. The directory watcher / listing refresh
+/// that removes the row is async I/O with no scheduled frames in between, so
+/// `pumpAndSettle` alone can report "settled" before the row is actually
+/// gone — the same gap [waitForFileRowVisible] bridges for appearance.
+Future<void> waitForFileRowAbsent(
+  WidgetTester tester,
+  String absolutePath, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final gone =
+        find
+            .byKey(ValueKey('file-grid-item-$absolutePath'))
+            .evaluate()
+            .isEmpty &&
+        find.byKey(ValueKey('file-item-$absolutePath')).evaluate().isEmpty;
+    if (gone) break;
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expectFileRowAbsent(absolutePath);
+}
+
 /// Verifies a folder row exists (grid or list). Fails immediately if not found.
 void assertFolderRowExists(String absolutePath) {
   final grid = find.byKey(ValueKey('folder-grid-item-$absolutePath'));

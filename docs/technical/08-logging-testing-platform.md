@@ -32,6 +32,14 @@ and stack trace when they are available.
   [test-impact map](../agent/verification/test-impact-map.yaml).
 - Automated checks do not prove perceived latency, native menu behavior, or
   other runtime UX. Report manual confirmation separately.
+- A new `integration_test/*.dart` file is not run by CI or `just
+  e2e-parallel` until it is wired into `tool/e2e_parallel.dart`, `justfile`
+  (`e2e-list`), and `.github/workflows/build-test.yml`.
+- E2E tests that pass locally but fail only on GitHub Actions CI are a known,
+  recurring pattern here (async races, font/width estimation, missing CI
+  hardware) — see
+  [troubleshooting/03-e2e-ci-only-failures.md](../troubleshooting/03-e2e-ci-only-failures.md)
+  for the causes and the rules to follow before adding new E2E assertions.
 
 ## Platform notes
 
@@ -42,4 +50,4 @@ and stack trace when they are available.
 - Windows MethodChannel contracts are indexed in
   [method-channels.yaml](../agent/native/method-channels.yaml).
 
-_Last reviewed: 2026-08-08_
+_Last reviewed: 2026-09-13_

@@ -470,7 +470,7 @@ void main() {
         await _confirmDeleteDialog(et);
         await et.pumpAndSettle(const Duration(seconds: 1));
 
-        expectFileRowAbsent(targetFile.path);
+        await waitForFileRowAbsent(tester, targetFile.path);
         if (kDebugMode) debugPrint('[E2E] delete file — SUCCESS');
       } finally {
         await et.screenshot('result');
@@ -857,9 +857,9 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 1));
 
         // Verify all files are gone
-        expectFileRowAbsent(fileA.path);
-        expectFileRowAbsent(fileB.path);
-        expectFileRowAbsent(fileC.path);
+        await waitForFileRowAbsent(tester, fileA.path);
+        await waitForFileRowAbsent(tester, fileB.path);
+        await waitForFileRowAbsent(tester, fileC.path);
         if (kDebugMode) debugPrint('[E2E] select all + batch delete — SUCCESS');
       } finally {
         await et.screenshot('result');

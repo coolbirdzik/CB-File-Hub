@@ -126,8 +126,8 @@ void main() {
         await et.init('video file row is visible and has correct file type');
 
         // Video file row should be visible alongside the text file
-        expectFileRowVisible(videoFile.path);
-        expectFileRowVisible(dummyTxt.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        await waitForFileRowVisible(tester, dummyTxt.path);
 
         // Verify the video row exists (grid or list)
         assertFileRowExists(videoFile.path);
@@ -247,11 +247,11 @@ void main() {
         await et.init('multiple video formats display correctly');
 
         // All video formats should appear as rows
-        expectFileRowVisible(mp4File.path);
-        expectFileRowVisible(aviFile.path);
-        expectFileRowVisible(mkvFile.path);
-        expectFileRowVisible(movFile.path);
-        expectFileRowVisible(txtFile.path);
+        await waitForFileRowVisible(tester, mp4File.path);
+        await waitForFileRowVisible(tester, aviFile.path);
+        await waitForFileRowVisible(tester, mkvFile.path);
+        await waitForFileRowVisible(tester, movFile.path);
+        await waitForFileRowVisible(tester, txtFile.path);
 
         // All video rows should be assertable
         assertFileRowExists(mp4File.path);
@@ -286,16 +286,16 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('video files persist after folder refresh');
 
-        expectFileRowVisible(videoFile.path);
-        expectFileRowVisible(textFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        await waitForFileRowVisible(tester, textFile.path);
 
         // Refresh the folder with F5
         await et.keyPress(LogicalKeyboardKey.f5);
         await et.pumpAndSettle(const Duration(seconds: 3));
 
         // Video file should still be visible after refresh
-        expectFileRowVisible(videoFile.path);
-        expectFileRowVisible(textFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        await waitForFileRowVisible(tester, textFile.path);
 
         if (kDebugMode) debugPrint('[E2E] video after F5 refresh — SUCCESS');
       } finally {
@@ -322,8 +322,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('deleting a video file removes it from the list');
 
-        expectFileRowVisible(videoFile.path);
-        expectFileRowVisible(keepFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        await waitForFileRowVisible(tester, keepFile.path);
 
         // Right-click the video file
         await rightClickFileRow(tester, videoFile.path);
@@ -339,8 +339,8 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 3));
 
         // Video file row should be gone; keep.txt should remain
-        expectFileRowAbsent(videoFile.path);
-        expectFileRowVisible(keepFile.path);
+        await waitForFileRowAbsent(tester, videoFile.path);
+        await waitForFileRowVisible(tester, keepFile.path);
 
         // File should also be deleted from disk
         expect(
@@ -373,7 +373,7 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('video file can be renamed via context menu');
 
-        expectFileRowVisible(originalVideo.path);
+        await waitForFileRowVisible(tester, originalVideo.path);
 
         // Right-click to open context menu
         await rightClickFileRow(tester, originalVideo.path);
@@ -401,7 +401,7 @@ void main() {
         await et.pumpAndSettle(const Duration(seconds: 3));
 
         final renamedPath = '${dir.path}${Platform.pathSeparator}$newVideoName';
-        expectFileRowVisible(renamedPath);
+        await waitForFileRowVisible(tester, renamedPath);
         expectFileRowAbsent(originalVideo.path);
 
         if (kDebugMode) debugPrint('[E2E] rename video file — SUCCESS');
@@ -429,8 +429,8 @@ void main() {
         await tester.pumpAndSettle(const Duration(seconds: 5));
         await et.init('opening a video via context menu does not crash app');
 
-        expectFileRowVisible(videoFile.path);
-        expectFileRowVisible(txtFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        await waitForFileRowVisible(tester, txtFile.path);
 
         // Single-tap the video row to select it
         await tapFileRow(tester, videoFile.path);
@@ -485,8 +485,8 @@ void main() {
         await et.init('video file row is FileItem not FolderItem');
 
         // Both rows should be visible
-        expectFileRowVisible(videoFile.path);
-        expectFileRowVisible(txtFile.path);
+        await waitForFileRowVisible(tester, videoFile.path);
+        await waitForFileRowVisible(tester, txtFile.path);
 
         // Verify video row is a FileItem/FileGridItem (not a folder item)
         assertFileRowExists(videoFile.path);
@@ -519,8 +519,8 @@ void main() {
         await et.init('unsupported video extension shows as generic file');
 
         // The .abc file should still appear as a file row
-        expectFileRowVisible(badFile.path);
-        expectFileRowVisible(txtFile.path);
+        await waitForFileRowVisible(tester, badFile.path);
+        await waitForFileRowVisible(tester, txtFile.path);
 
         // Right-click the .abc file — should NOT have "Play video" option
         await rightClickFileRow(tester, badFile.path);
