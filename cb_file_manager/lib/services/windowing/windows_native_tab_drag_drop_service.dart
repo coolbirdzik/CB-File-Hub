@@ -146,6 +146,27 @@ class WindowsNativeTabDragDropService {
     } catch (_) {}
   }
 
+  /// Resizes the window for content of [width] x [height] logical pixels,
+  /// around its centre and inside its monitor's work area: at most 85% of it,
+  /// at least the 800x600 window minimum. Maximized, minimized and fullscreen
+  /// windows are left alone. Returns whether the window was resized.
+  static Future<bool> fitWindowToContent(double width, double height) async {
+    if (!Platform.isWindows) return false;
+    try {
+      return await _channel
+              .invokeMethod<bool>('fitWindowToContent', <String, double>{
+                'width': width,
+                'height': height,
+                'maxFraction': 0.85,
+                'minWidth': 800,
+                'minHeight': 600,
+              }) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<bool> startWindowDragIfMouseDown() async {
     if (!Platform.isWindows) return false;
     try {

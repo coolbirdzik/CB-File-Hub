@@ -29,6 +29,7 @@ class UserPreferences {
 
   SharedPreferences? _preferences;
   bool _initialized = false;
+  Future<void>? _pendingInit;
 
   // Database manager for storing preferences in SQLite.
   DatabaseManager? _databaseManager;
@@ -153,18 +154,29 @@ class UserPreferences {
   UserPreferences._internal();
 
   /// Initialize the preferences
-  Future<void> init() async {
+  ///
+  /// Concurrent callers share one in-flight initialization; a failure clears
+  /// it so a later call can retry.
+  Future<void> init() {
     if (_initialized) {
-      return;
+      return Future<void>.value();
     }
+    return _pendingInit ??= _initializeStorage().whenComplete(
+      () => _pendingInit = null,
+    );
+  }
 
+  Future<void> _initializeStorage() async {
     _preferences ??= await SharedPreferences.getInstance();
     _databaseManager ??= DatabaseManager.getInstance();
 
     try {
       await _databaseManager!.initialize();
       _useDatabaseStorage = true;
-      await _preferences?.setBool(_useDatabaseStorageKey, true);
+      // Setting it rewrites the whole preferences file, so only do it once.
+      if (_preferences?.getBool(_useDatabaseStorageKey) != true) {
+        await _preferences?.setBool(_useDatabaseStorageKey, true);
+      }
     } catch (_) {
       _useDatabaseStorage = false;
     } finally {

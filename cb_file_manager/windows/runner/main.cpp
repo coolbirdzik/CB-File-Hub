@@ -28,6 +28,102 @@ void GetPrimaryMonitorWorkArea(int *width, int *height)
   }
 }
 
+// Placement of the dedicated video player window (CB_WINDOW_ROLE=video), in
+// physical pixels. It opens centred over the window that launched it
+// (CB_VIDEO_WINDOW_PARENT_HWND) and inside that window's monitor, or on the
+// monitor under the cursor when the launcher is unknown. Creating the window in
+// place avoids moving it (and DPI-rescaling it) after it is already visible.
+static bool ResolveVideoWindowPlacement(RECT *bounds, bool *maximized)
+{
+  wchar_t role[32];
+  DWORD role_len = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", role, 32);
+  if (role_len == 0 || role_len >= 32 || wcscmp(role, L"video") != 0)
+  {
+    return false;
+  }
+
+  HWND parent = nullptr;
+  wchar_t parent_buf[32];
+  DWORD parent_len =
+      GetEnvironmentVariableW(L"CB_VIDEO_WINDOW_PARENT_HWND", parent_buf, 32);
+  if (parent_len > 0 && parent_len < 32)
+  {
+    parent = reinterpret_cast<HWND>(
+        static_cast<INT_PTR>(_wcstoi64(parent_buf, nullptr, 10)));
+    if (!IsWindow(parent))
+    {
+      parent = nullptr;
+    }
+  }
+
+  HMONITOR monitor = nullptr;
+  if (parent)
+  {
+    monitor = MonitorFromWindow(parent, MONITOR_DEFAULTTONEAREST);
+  }
+  else
+  {
+    POINT cursor{};
+    GetCursorPos(&cursor);
+    monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
+  }
+
+  MONITORINFO monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfo(monitor, &monitor_info))
+  {
+    return false;
+  }
+  const RECT &work = monitor_info.rcWork;
+
+  // Centre over the launcher; over the work area when it is unknown or
+  // minimized (a minimized window's rect is off-screen).
+  RECT anchor = work;
+  if (parent && !IsIconic(parent))
+  {
+    GetWindowRect(parent, &anchor);
+  }
+
+  // Same logical size as the other secondary windows, capped to the work area.
+  const double scale = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  LONG width = static_cast<LONG>(1200 * scale);
+  LONG height = static_cast<LONG>(800 * scale);
+  if (width > work.right - work.left)
+  {
+    width = work.right - work.left;
+  }
+  if (height > work.bottom - work.top)
+  {
+    height = work.bottom - work.top;
+  }
+
+  LONG left = (anchor.left + anchor.right) / 2 - width / 2;
+  LONG top = (anchor.top + anchor.bottom) / 2 - height / 2;
+  if (left + width > work.right)
+  {
+    left = work.right - width;
+  }
+  if (top + height > work.bottom)
+  {
+    top = work.bottom - height;
+  }
+  if (left < work.left)
+  {
+    left = work.left;
+  }
+  if (top < work.top)
+  {
+    top = work.top;
+  }
+  *bounds = {left, top, left + width, top + height};
+
+  wchar_t maximized_buf[8];
+  DWORD maximized_len = GetEnvironmentVariableW(
+      L"CB_VIDEO_WINDOW_INITIALLY_MAXIMIZED", maximized_buf, 8);
+  *maximized = maximized_len > 0 && maximized_len < 8 && maximized_buf[0] == L'1';
+  return true;
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
@@ -36,7 +132,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent())
   {
     CreateAndAttachConsole();
-  } // Initialize COM, so that it is available for use in the library and/or
+  }
+
+  // A file manager touches every mounted letter, including empty card readers,
+  // optical drives with no disc and mapped shares whose server is gone. By
+  // default Windows answers those with a modal hard-error box and holds the
+  // calling thread until it is dismissed, which shows up as the app hanging.
+  // Ask for a plain error code instead. Set before any thread is created so
+  // every thread the Dart VM spawns inherits it.
+  ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
+
+  // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -106,7 +212,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     size = Win32Window::Size(screenWidth, screenHeight);
   }
 
-  if (!window.Create(L"CB File Hub", origin, size))
+  RECT video_bounds{};
+  bool video_maximized = false;
+  // A PiP window spawned from the player inherits its CB_WINDOW_ROLE=video.
+  const bool created =
+      !pip_mode && ResolveVideoWindowPlacement(&video_bounds, &video_maximized)
+          ? window.CreateWithPhysicalBounds(L"CB File Hub", video_bounds,
+                                            video_maximized)
+          : window.Create(L"CB File Hub", origin, size);
+  if (!created)
   {
     return EXIT_FAILURE;
   }

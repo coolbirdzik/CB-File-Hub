@@ -1,7 +1,6 @@
-import 'dart:ffi';
+import 'dart:async';
 import 'dart:io';
 
-import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:win32/win32.dart' as win32;
 
@@ -9,6 +8,7 @@ import '../../helpers/core/filesystem_utils.dart';
 import '../../helpers/core/io_extensions.dart';
 import 'android_storage_volumes.dart';
 import 'drive_info.dart';
+import 'windows_volume_probe.dart';
 
 /// Process-local inventory of mounted drives/volumes.
 class DriveInventoryService {
@@ -60,23 +60,60 @@ class DriveInventoryService {
     return a.path.toLowerCase().compareTo(b.path.toLowerCase());
   }
 
+  /// How long the drive list waits for per-volume metadata before it settles
+  /// for letters alone. One unreachable network share must not hold the whole
+  /// list hostage.
+  static const Duration volumeProbeTimeout = Duration(seconds: 6);
+
   static Future<List<DriveInfo>> _loadWindows() async {
     final systemDrive = Platform.environment['SystemDrive'];
     final directories = await getAllWindowsDrives();
-    final results = await Future.wait(
-      directories.map((dir) => _windowsDriveInfo(dir, systemDrive)),
-    );
-    return results;
+    final roots = <String>[
+      for (final dir in directories) DriveInfo.normalizeWindowsRoot(dir.path),
+    ];
+    if (roots.isEmpty) return <DriveInfo>[];
+
+    // GetDriveType/GetVolumeInformation/GetDiskFreeSpaceEx each block their
+    // calling thread until the volume answers, so they run in a background
+    // isolate: on the UI isolate a sleeping disk or an offline mapped share
+    // froze the window for as long as the OS took to time out.
+    var probes = const <String, WindowsVolumeProbe>{};
+    try {
+      final results = await compute(
+        probeWindowsVolumes,
+        roots,
+      ).timeout(volumeProbeTimeout);
+      probes = <String, WindowsVolumeProbe>{
+        for (final probe in results) probe.root: probe,
+      };
+    } on TimeoutException {
+      debugPrint(
+        'DriveInventoryService: volume probe timed out, '
+        'showing drive letters without metadata',
+      );
+    } catch (e) {
+      debugPrint('DriveInventoryService: volume probe failed: $e');
+    }
+
+    return <DriveInfo>[
+      for (final dir in directories)
+        _windowsDriveInfo(
+          dir,
+          DriveInfo.normalizeWindowsRoot(dir.path),
+          probes,
+          systemDrive,
+        ),
+    ];
   }
 
-  static Future<DriveInfo> _windowsDriveInfo(
+  static DriveInfo _windowsDriveInfo(
     Directory dir,
+    String root,
+    Map<String, WindowsVolumeProbe> probes,
     String? systemDrive,
-  ) async {
-    final root = DriveInfo.normalizeWindowsRoot(dir.path);
-    final volume = await _readWindowsVolume(root);
-    final space = await _readWindowsSpace(root);
-    final kind = _windowsDriveKind(root);
+  ) {
+    final probe = probes[root];
+    final kind = _windowsDriveKind(probe?.driveType ?? win32.DRIVE_UNKNOWN);
     final isSystem = DriveInfo.isWindowsSystemDrive(
       root,
       systemDrive: systemDrive,
@@ -84,7 +121,7 @@ class DriveInventoryService {
     final requiresAdmin = dir.getProperty('requiresAdmin') == true;
     final isRemovable =
         kind == DriveKind.removable || kind == DriveKind.optical;
-    final label = volume.label;
+    final label = probe?.label ?? '';
     final displayName = label.isNotEmpty ? '$root ($label)' : root;
 
     return DriveInfo(
@@ -92,9 +129,11 @@ class DriveInventoryService {
       displayName: displayName,
       label: label,
       kind: kind,
-      filesystem: volume.filesystem,
-      volumeSerial: volume.serial,
-      space: space,
+      filesystem: probe?.filesystem ?? '',
+      volumeSerial: probe?.serial,
+      space: probe == null
+          ? const DriveSpaceInfo.empty()
+          : DriveSpaceInfo.fromTotalFree(probe.totalBytes, probe.freeBytes),
       isRemovable: isRemovable,
       canEject: isRemovable && !isSystem,
       canRename:
@@ -105,102 +144,20 @@ class DriveInventoryService {
     );
   }
 
-  static DriveKind _windowsDriveKind(String root) {
-    final pathPtr = root.toNativeUtf16();
-    try {
-      final type = win32.GetDriveType(win32.PCWSTR(pathPtr));
-      switch (type) {
-        case win32.DRIVE_REMOVABLE:
-          return DriveKind.removable;
-        case win32.DRIVE_FIXED:
-          return DriveKind.fixed;
-        case win32.DRIVE_REMOTE:
-          return DriveKind.network;
-        case win32.DRIVE_CDROM:
-          return DriveKind.optical;
-        case win32.DRIVE_RAMDISK:
-          return DriveKind.ram;
-        default:
-          return DriveKind.unknown;
-      }
-    } catch (_) {
-      return DriveKind.unknown;
-    } finally {
-      calloc.free(pathPtr);
-    }
-  }
-
-  static Future<_WindowsVolumeMeta> _readWindowsVolume(String root) async {
-    final drive = root.endsWith('\\') ? root : '$root\\';
-    final volumeNameBuffer = calloc<Uint16>(win32.MAX_PATH + 1).cast<Utf16>();
-    final fileSystemNameBuffer = calloc<Uint16>(
-      win32.MAX_PATH + 1,
-    ).cast<Utf16>();
-    final volumeSerialNumber = calloc<Uint32>();
-    final maximumComponentLength = calloc<Uint32>();
-    final fileSystemFlags = calloc<Uint32>();
-    final pathPtr = drive.toNativeUtf16();
-
-    try {
-      final ok = win32.GetVolumeInformation(
-        win32.PCWSTR(pathPtr),
-        win32.PWSTR(volumeNameBuffer),
-        win32.MAX_PATH + 1,
-        volumeSerialNumber,
-        maximumComponentLength,
-        fileSystemFlags,
-        win32.PWSTR(fileSystemNameBuffer),
-        win32.MAX_PATH + 1,
-      ).value;
-      if (!ok) {
-        return const _WindowsVolumeMeta();
-      }
-      final label = volumeNameBuffer.toDartString();
-      final fs = fileSystemNameBuffer.toDartString();
-      final serial = volumeSerialNumber.value
-          .toRadixString(16)
-          .padLeft(8, '0')
-          .toUpperCase();
-      return _WindowsVolumeMeta(label: label, filesystem: fs, serial: serial);
-    } catch (e) {
-      debugPrint('DriveInventoryService volume info failed for $root: $e');
-      return const _WindowsVolumeMeta();
-    } finally {
-      calloc.free(volumeNameBuffer);
-      calloc.free(fileSystemNameBuffer);
-      calloc.free(volumeSerialNumber);
-      calloc.free(maximumComponentLength);
-      calloc.free(fileSystemFlags);
-      calloc.free(pathPtr);
-    }
-  }
-
-  static Future<DriveSpaceInfo> _readWindowsSpace(String root) async {
-    final drive = root.endsWith('\\') ? root : '$root\\';
-    final lpFreeBytesAvailable = calloc<Uint64>();
-    final lpTotalNumberOfBytes = calloc<Uint64>();
-    final lpTotalNumberOfFreeBytes = calloc<Uint64>();
-    final pathPtr = drive.toNativeUtf16();
-
-    try {
-      final ok = win32.GetDiskFreeSpaceEx(
-        win32.PCWSTR(pathPtr),
-        lpFreeBytesAvailable,
-        lpTotalNumberOfBytes,
-        lpTotalNumberOfFreeBytes,
-      ).value;
-      if (!ok) return const DriveSpaceInfo.empty();
-      return DriveSpaceInfo.fromTotalFree(
-        lpTotalNumberOfBytes.value,
-        lpFreeBytesAvailable.value,
-      );
-    } catch (_) {
-      return const DriveSpaceInfo.empty();
-    } finally {
-      calloc.free(lpFreeBytesAvailable);
-      calloc.free(lpTotalNumberOfBytes);
-      calloc.free(lpTotalNumberOfFreeBytes);
-      calloc.free(pathPtr);
+  static DriveKind _windowsDriveKind(int driveType) {
+    switch (driveType) {
+      case win32.DRIVE_REMOVABLE:
+        return DriveKind.removable;
+      case win32.DRIVE_FIXED:
+        return DriveKind.fixed;
+      case win32.DRIVE_REMOTE:
+        return DriveKind.network;
+      case win32.DRIVE_CDROM:
+        return DriveKind.optical;
+      case win32.DRIVE_RAMDISK:
+        return DriveKind.ram;
+      default:
+        return DriveKind.unknown;
     }
   }
 
@@ -274,16 +231,4 @@ class DriveInventoryService {
         )
         .toList();
   }
-}
-
-class _WindowsVolumeMeta {
-  final String label;
-  final String filesystem;
-  final String? serial;
-
-  const _WindowsVolumeMeta({
-    this.label = '',
-    this.filesystem = '',
-    this.serial,
-  });
 }

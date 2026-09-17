@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -28,7 +29,7 @@ class VideoWindowApp extends StatefulWidget {
   State<VideoWindowApp> createState() => _VideoWindowAppState();
 }
 
-class _VideoWindowAppState extends State<VideoWindowApp> {
+class _VideoWindowAppState extends State<VideoWindowApp> with WindowListener {
   final LanguageController _languageController = locator<LanguageController>();
   late String _currentPath = widget.initialPath;
   bool _didFitWindow = false;
@@ -38,13 +39,31 @@ class _VideoWindowAppState extends State<VideoWindowApp> {
     super.initState();
     _languageController.languageNotifier.addListener(_onLanguageChanged);
     VideoWindowService.startPlayerIpcServer(_playPath);
+    _interceptNativeClose();
   }
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _languageController.languageNotifier.removeListener(_onLanguageChanged);
     VideoWindowService.stopPlayerIpcServer();
     super.dispose();
+  }
+
+  /// The process never reaches [dispose] when its window closes, so a native
+  /// close (Alt+F4, taskbar) is routed through [_closeWindow] instead.
+  Future<void> _interceptNativeClose() async {
+    try {
+      windowManager.addListener(this);
+      await windowManager.setPreventClose(true);
+    } catch (_) {}
+  }
+
+  @override
+  void onWindowClose() => _closeWindow();
+
+  void _closeWindow() {
+    unawaited(VideoWindowService.closePlayerWindow());
   }
 
   void _onLanguageChanged() {
@@ -75,11 +94,20 @@ class _VideoWindowAppState extends State<VideoWindowApp> {
   /// Sizes the window to the video's aspect ratio.
   Future<void> _fitWindowToVideo(Map<String, dynamic> metadata) async {
     if (_didFitWindow) return;
-    _didFitWindow = true;
 
+    // The first metadata event can carry the duration before the video size;
+    // only a real size may consume the one-time fit.
     final width = (metadata['width'] as num?)?.toDouble() ?? 0;
     final height = (metadata['height'] as num?)?.toDouble() ?? 0;
     if (width <= 0 || height <= 0) return;
+    _didFitWindow = true;
+
+    if (Platform.isWindows) {
+      // Resized natively around the window's centre and kept on its monitor;
+      // setSize grows it from the top-left corner, off the parent and screen.
+      await WindowsNativeTabDragDropService.fitWindowToContent(width, height);
+      return;
+    }
 
     try {
       if (await windowManager.isMaximized()) return;
@@ -143,6 +171,7 @@ class _VideoWindowAppState extends State<VideoWindowApp> {
             home: VideoPlayerFullScreen(
               file: File(_currentPath),
               onVideoMetadata: _fitWindowToVideo,
+              onClose: _closeWindow,
             ),
           );
         },

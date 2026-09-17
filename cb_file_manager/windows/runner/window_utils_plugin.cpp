@@ -1492,8 +1492,9 @@ void WindowUtilsPlugin::HandleMethodCall(
       return;
     }
 
-    // Restore if minimized, then try multiple activation paths.
-    ::ShowWindow(hwnd, SW_RESTORE);
+    // Restore only if minimized (SW_RESTORE would also un-maximize), then try
+    // multiple activation paths.
+    ::ShowWindow(hwnd, ::IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
     ::SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
                    SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     ::BringWindowToTop(hwnd);
@@ -1501,6 +1502,93 @@ void WindowUtilsPlugin::HandleMethodCall(
 
     const BOOL ok = ::SetForegroundWindow(hwnd);
     result->Success(flutter::EncodableValue(ok != FALSE));
+    return;
+  }
+
+  if (method == "fitWindowToContent")
+  {
+    // Resizes the window for content of width x height (logical pixels): at
+    // most maxFraction of its monitor's work area, at least minWidth x
+    // minHeight, around its current centre and kept inside that work area.
+    HWND hwnd = GetTopLevelWindow(registrar_);
+    const auto *args =
+        std::get_if<flutter::EncodableMap>(method_call.arguments());
+    if (!hwnd || !args)
+    {
+      result->Error("INVALID_ARGUMENTS", "Window or content size unavailable.");
+      return;
+    }
+    const auto read_number = [args](const char *key, double fallback)
+    {
+      auto it = args->find(flutter::EncodableValue(key));
+      if (it == args->end())
+        return fallback;
+      if (const auto *value = std::get_if<double>(&it->second))
+        return *value;
+      if (const auto *value = std::get_if<int32_t>(&it->second))
+        return static_cast<double>(*value);
+      return fallback;
+    };
+    const double content_width = read_number("width", 0);
+    const double content_height = read_number("height", 0);
+    const double max_fraction = read_number("maxFraction", 0.85);
+    const double min_width = read_number("minWidth", 0);
+    const double min_height = read_number("minHeight", 0);
+
+    // A maximized, minimized or fullscreen window keeps the user's choice.
+    RECT window_rect{};
+    MONITORINFO monitor_info{};
+    monitor_info.cbSize = sizeof(monitor_info);
+    if (content_width <= 0 || content_height <= 0 || g_is_fullscreen ||
+        ::IsZoomed(hwnd) || ::IsIconic(hwnd) ||
+        !::GetWindowRect(hwnd, &window_rect) ||
+        !::GetMonitorInfo(::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                          &monitor_info))
+    {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+
+    const RECT &work = monitor_info.rcWork;
+    const double work_width = static_cast<double>(work.right - work.left);
+    const double work_height = static_cast<double>(work.bottom - work.top);
+    const double scale = ::GetDpiForWindow(hwnd) / 96.0;
+
+    const double width = content_width * scale;
+    const double height = content_height * scale;
+    double fit = 1.0;
+    if (work_width * max_fraction / width < fit)
+      fit = work_width * max_fraction / width;
+    if (work_height * max_fraction / height < fit)
+      fit = work_height * max_fraction / height;
+
+    double target_width = width * fit;
+    double target_height = height * fit;
+    if (target_width < min_width * scale)
+      target_width = min_width * scale;
+    if (target_height < min_height * scale)
+      target_height = min_height * scale;
+    if (target_width > work_width)
+      target_width = work_width;
+    if (target_height > work_height)
+      target_height = work_height;
+
+    const LONG new_width = static_cast<LONG>(target_width);
+    const LONG new_height = static_cast<LONG>(target_height);
+    LONG left = (window_rect.left + window_rect.right) / 2 - new_width / 2;
+    LONG top = (window_rect.top + window_rect.bottom) / 2 - new_height / 2;
+    if (left + new_width > work.right)
+      left = work.right - new_width;
+    if (top + new_height > work.bottom)
+      top = work.bottom - new_height;
+    if (left < work.left)
+      left = work.left;
+    if (top < work.top)
+      top = work.top;
+
+    ::SetWindowPos(hwnd, nullptr, left, top, new_width, new_height,
+                   SWP_NOZORDER | SWP_NOACTIVATE);
+    result->Success(flutter::EncodableValue(true));
     return;
   }
 

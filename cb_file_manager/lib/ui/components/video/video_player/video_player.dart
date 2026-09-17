@@ -40,6 +40,7 @@ import 'video_player_dialogs.dart';
 import 'video_player_fast_seek.dart';
 import 'video_player_loading.dart';
 import 'video_player_models.dart';
+import 'video_player_seek_preview.dart';
 import 'video_player_seek_slider.dart';
 import 'video_player_utils.dart';
 
@@ -351,6 +352,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Duration? _pendingSeekPreview;
   bool _resumeAfterSeekDrag = false;
 
+  // Seek bar hover thumbnails, decoded apart from the main player.
+  VideoSeekPreviewController? _seekHoverFrames;
+  bool _isHoveringSeekBar = false;
+
   // New advanced features state
   @override
   final List<SubtitleTrack> _subtitleTracks = [];
@@ -564,6 +569,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _seekDragPosition = null;
       _resumeAfterSeekDrag = false;
       _isSeeking = false;
+      _seekHoverFrames?.dispose();
+      _seekHoverFrames = null;
+      _isHoveringSeekBar = false;
       _fastSeekTimer?.cancel();
       _isFastSeeking = false;
       _tempRaf?.close();
@@ -699,10 +707,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       final userPreferences = UserPreferences.instance;
       await userPreferences.init();
 
-      final savedVolume = await userPreferences.getVideoPlayerVolume();
+      // Seek speed is already loaded by _loadSettings, which runs first.
+      final (savedVolume, savedMuted) = await (
+        userPreferences.getVideoPlayerVolume(),
+        userPreferences.getVideoPlayerMute(),
+      ).wait;
       _lastVolume = savedVolume > 0 ? savedVolume : _lastVolume;
-      final savedMuted = await userPreferences.getVideoPlayerMute();
-      _videoSeekSpeed = await userPreferences.getVideoSeekSpeed();
 
       setState(() {
         _savedVolume = savedVolume.clamp(0.0, 100.0);
@@ -1548,7 +1558,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   bool _shouldAutoHideControls() {
     if (!widget.showControls) return false;
     if (_isAndroidPip) return false;
-    if (_isSeeking || _isFastSeeking) return false;
+    if (_isSeeking || _isFastSeeking || _isHoveringSeekBar) return false;
     return _isCurrentlyPlaying();
   }
 
@@ -2007,25 +2017,62 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   // Slider used by mobile controls with support for media_kit
   Widget _buildMobileSeekSlider() {
     {
-      return StreamBuilder<Duration>(
-        stream: _player!.stream.position,
-        builder: (context, snapshot) {
-          final position = snapshot.data ?? Duration.zero;
-          final duration = _player!.state.duration;
-          final maxMs = duration.inMilliseconds <= 0
-              ? 1
-              : duration.inMilliseconds;
-          final value = _seekSliderValue(position, maxMs);
-          return VideoPlayerSeekSlider(
-            value: value,
-            min: 0,
-            max: maxMs.toDouble(),
-            onChangeStart: _startSeekDrag,
-            onChanged: _seekDuringDrag,
-            onChangeEnd: _finishSeekDrag,
-          );
-        },
+      return _withSeekHoverPreview(
+        StreamBuilder<Duration>(
+          stream: _player!.stream.position,
+          builder: (context, snapshot) {
+            final position = snapshot.data ?? Duration.zero;
+            final duration = _player!.state.duration;
+            final maxMs = duration.inMilliseconds <= 0
+                ? 1
+                : duration.inMilliseconds;
+            final value = _seekSliderValue(position, maxMs);
+            return VideoPlayerSeekSlider(
+              value: value,
+              min: 0,
+              max: maxMs.toDouble(),
+              onChangeStart: _startSeekDrag,
+              onChanged: _seekDuringDrag,
+              onChangeEnd: _finishSeekDrag,
+            );
+          },
+        ),
       );
+    }
+  }
+
+  Widget _withSeekHoverPreview(Widget seekSlider) {
+    final state = _player!.state;
+    final width = state.width ?? 0;
+    final height = state.height ?? 0;
+    final hasVideo = width > 0 && height > 0;
+    return VideoSeekHoverPreview(
+      duration: state.duration,
+      frames: hasVideo ? _seekHoverFramesForSource() : null,
+      videoAspectRatio: hasVideo ? width / height : null,
+      onHoverChanged: _setSeekBarHovered,
+      child: seekSlider,
+    );
+  }
+
+  VideoSeekPreviewController? _seekHoverFramesForSource() {
+    // A progressive fileStream cannot be opened by a second decoder.
+    final source = widget.file?.path ?? widget.streamingUrl ?? widget.smbMrl;
+    if (source == null) return null;
+    return _seekHoverFrames ??= VideoSeekPreviewController(
+      source: source,
+      enableHardwareAcceleration: _hardwareAcceleration,
+    );
+  }
+
+  void _setSeekBarHovered(bool hovered) {
+    if (!mounted || _isHoveringSeekBar == hovered) return;
+    _isHoveringSeekBar = hovered;
+    // Keep the bar on screen while the user reads a thumbnail.
+    if (hovered) {
+      _hideControlsTimer?.cancel();
+    } else {
+      _startHideControlsTimer();
     }
   }
 
@@ -2091,41 +2138,43 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                   // Material Slider owns an OverlayPortal for its value
                   // indicator. Keep that traversal anchor separate while
                   // playback continuously updates the control row.
-                  child: Semantics(
-                    container: true,
-                    child: StreamBuilder<Duration>(
-                      stream: _player!.stream.position,
-                      builder: (context, snapshot) {
-                        final position = snapshot.data ?? Duration.zero;
-                        final duration = _player!.state.duration;
-                        final maxMs = duration.inMilliseconds <= 0
-                            ? 1
-                            : duration.inMilliseconds;
-                        final value = _seekSliderValue(position, maxMs);
-                        return Semantics(
-                          container: true,
-                          child: SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 2.5,
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 7,
+                  child: _withSeekHoverPreview(
+                    Semantics(
+                      container: true,
+                      child: StreamBuilder<Duration>(
+                        stream: _player!.stream.position,
+                        builder: (context, snapshot) {
+                          final position = snapshot.data ?? Duration.zero;
+                          final duration = _player!.state.duration;
+                          final maxMs = duration.inMilliseconds <= 0
+                              ? 1
+                              : duration.inMilliseconds;
+                          final value = _seekSliderValue(position, maxMs);
+                          return Semantics(
+                            container: true,
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 2.5,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 7,
+                                ),
+                              ),
+                              child: Slider(
+                                value: value,
+                                min: 0,
+                                max: maxMs.toDouble(),
+                                activeColor: Colors.white,
+                                inactiveColor: Colors.white24,
+                                onChangeStart: (_) => _startSeekDrag(),
+                                onChanged: _seekDuringDrag,
+                                onChangeEnd: (value) => _finishSeekDrag(
+                                  Duration(milliseconds: value.toInt()),
+                                ),
                               ),
                             ),
-                            child: Slider(
-                              value: value,
-                              min: 0,
-                              max: maxMs.toDouble(),
-                              activeColor: Colors.white,
-                              inactiveColor: Colors.white24,
-                              onChangeStart: (_) => _startSeekDrag(),
-                              onChanged: _seekDuringDrag,
-                              onChangeEnd: (value) => _finishSeekDrag(
-                                Duration(milliseconds: value.toInt()),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 );

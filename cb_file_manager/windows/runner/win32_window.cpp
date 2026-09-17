@@ -137,11 +137,6 @@ bool Win32Window::Create(const std::wstring &title,
                          const Point &origin,
                          const Size &size)
 {
-  Destroy();
-
-  const wchar_t *window_class =
-      WindowClassRegistrar::GetInstance()->GetWindowClass();
-
   const POINT target_point = {static_cast<LONG>(origin.x),
                               static_cast<LONG>(origin.y)};
   HMONITOR monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
@@ -155,12 +150,6 @@ bool Win32Window::Create(const std::wstring &title,
   {
     return false;
   }
-
-  // Detect progress window role from environment variable.
-  // Used to paint the correct background color in WM_ERASEBKGND.
-  wchar_t roleBuf[32];
-  DWORD roleLen = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", roleBuf, 32);
-  is_progress_window_ = (roleLen > 0 && wcscmp(roleBuf, L"progress") == 0);
 
   // Calculate window size with respect to work area (excludes taskbar)
   // This ensures the window doesn't overflow the usable screen area
@@ -180,6 +169,28 @@ bool Win32Window::Create(const std::wstring &title,
             (monitor_info.rcWork.bottom - monitor_info.rcWork.top - adjusted_height) / 2;
   }
 
+  const LONG left = Scale(x_pos, scale_factor);
+  const LONG top = Scale(y_pos, scale_factor);
+  const RECT bounds = {left, top, left + Scale(adjusted_width, scale_factor),
+                       top + Scale(adjusted_height, scale_factor)};
+  return CreateWithPhysicalBounds(title, bounds, false);
+}
+
+bool Win32Window::CreateWithPhysicalBounds(const std::wstring &title,
+                                           const RECT &bounds,
+                                           bool maximized)
+{
+  Destroy();
+
+  const wchar_t *window_class =
+      WindowClassRegistrar::GetInstance()->GetWindowClass();
+
+  // Detect progress window role from environment variable.
+  // Used to paint the correct background color in WM_ERASEBKGND.
+  wchar_t roleBuf[32];
+  DWORD roleLen = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", roleBuf, 32);
+  is_progress_window_ = (roleLen > 0 && wcscmp(roleBuf, L"progress") == 0);
+
   // Use WS_OVERLAPPEDWINDOW for all windows \u2014 flutter_controller_ requires
   // this style for correct child window embedding (FlutterViewController).
   //
@@ -194,11 +205,11 @@ bool Win32Window::Create(const std::wstring &title,
       ex_style,
       window_class,
       title.c_str(),
-      WS_OVERLAPPEDWINDOW,
-      Scale(x_pos, scale_factor),
-      Scale(y_pos, scale_factor),
-      Scale(adjusted_width, scale_factor),
-      Scale(adjusted_height, scale_factor),
+      maximized ? WS_OVERLAPPEDWINDOW | WS_MAXIMIZE : WS_OVERLAPPEDWINDOW,
+      bounds.left,
+      bounds.top,
+      bounds.right - bounds.left,
+      bounds.bottom - bounds.top,
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
   if (!window)

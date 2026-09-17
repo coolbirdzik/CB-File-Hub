@@ -528,56 +528,58 @@ mixin _VideoPlayerSettingsMixin on _VideoPlayerSettingsHost {
         }
       }
 
-      _selectedCodec =
-          await prefs.getVideoPlayerString(
-            'video_codec',
-            defaultValue: 'auto',
-          ) ??
-          'auto';
       // Preserve the established Windows default across the backend migration.
       final hwAccelDefault = kIsWeb ? true : !Platform.isWindows;
-      _hardwareAcceleration =
-          await prefs.getVideoPlayerBool(
+      // The reads are independent; issue them together so the player (which
+      // waits for these settings) is created sooner.
+      final (
+        (
+          codec,
+          hardwareAcceleration,
+          videoDecoder,
+          audioDecoder,
+          videoOutputFormat,
+          videoScaleMode,
+        ),
+        (bufferSize, networkTimeout, subtitleEncoding, videoSeekSpeed),
+      ) = await (
+        (
+          prefs.getVideoPlayerString('video_codec', defaultValue: 'auto'),
+          prefs.getVideoPlayerBool(
             'hardware_acceleration',
             defaultValue: hwAccelDefault,
-          ) ??
-          hwAccelDefault;
-      _videoDecoder =
-          await prefs.getVideoPlayerString(
-            'video_decoder',
-            defaultValue: 'auto',
-          ) ??
-          'auto';
-      _audioDecoder =
-          await prefs.getVideoPlayerString(
-            'audio_decoder',
-            defaultValue: 'auto',
-          ) ??
-          'auto';
-      _bufferSize =
-          await prefs.getVideoPlayerInt('buffer_size', defaultValue: 10) ?? 10;
-      _networkTimeout =
-          await prefs.getVideoPlayerInt('network_timeout', defaultValue: 30) ??
-          30;
-      _subtitleEncoding =
-          await prefs.getVideoPlayerString(
-            'subtitle_encoding',
-            defaultValue: 'utf-8',
-          ) ??
-          'utf-8';
-      _videoOutputFormat =
-          await prefs.getVideoPlayerString(
+          ),
+          prefs.getVideoPlayerString('video_decoder', defaultValue: 'auto'),
+          prefs.getVideoPlayerString('audio_decoder', defaultValue: 'auto'),
+          prefs.getVideoPlayerString(
             'video_output_format',
             defaultValue: 'auto',
-          ) ??
-          'auto';
-      _videoScaleMode =
-          await prefs.getVideoPlayerString(
+          ),
+          prefs.getVideoPlayerString(
             'video_scale_mode',
             defaultValue: 'contain',
-          ) ??
-          'contain';
-      _videoSeekSpeed = await prefs.getVideoSeekSpeed();
+          ),
+        ).wait,
+        (
+          prefs.getVideoPlayerInt('buffer_size', defaultValue: 10),
+          prefs.getVideoPlayerInt('network_timeout', defaultValue: 30),
+          prefs.getVideoPlayerString(
+            'subtitle_encoding',
+            defaultValue: 'utf-8',
+          ),
+          prefs.getVideoSeekSpeed(),
+        ).wait,
+      ).wait;
+      _selectedCodec = codec ?? 'auto';
+      _hardwareAcceleration = hardwareAcceleration ?? hwAccelDefault;
+      _videoDecoder = videoDecoder ?? 'auto';
+      _audioDecoder = audioDecoder ?? 'auto';
+      _bufferSize = bufferSize ?? 10;
+      _networkTimeout = networkTimeout ?? 30;
+      _subtitleEncoding = subtitleEncoding ?? 'utf-8';
+      _videoOutputFormat = videoOutputFormat ?? 'auto';
+      _videoScaleMode = videoScaleMode ?? 'contain';
+      _videoSeekSpeed = videoSeekSpeed;
 
       // Keep hardware acceleration in sync with explicit decoder choice
       if (_videoDecoder == 'software') _hardwareAcceleration = false;

@@ -25,11 +25,16 @@ class VideoPlayerFullScreen extends StatefulWidget {
   /// Reports the loaded media's `width` / `height` / `duration`.
   final void Function(Map<String, dynamic> metadata)? onVideoMetadata;
 
+  /// Replaces the app bar's default close, which pops the route or exits the
+  /// process when the player is the root.
+  final VoidCallback? onClose;
+
   VideoPlayerFullScreen({
     super.key,
     this.file,
     this.contentUri,
     this.onVideoMetadata,
+    this.onClose,
   }) : assert(file != null || (contentUri != null && contentUri.isNotEmpty));
 
   // ignore: library_private_types_in_public_api
@@ -165,8 +170,8 @@ class _VideoPlayerFullScreenState extends State<VideoPlayerFullScreen> {
                           onPressed: () => _showVideoInfo(context),
                         ),
                     ],
-                    onClose: null,
-                    // Default: pop when in a route, else exit(0)
+                    // Null keeps the default: pop when in a route, else exit.
+                    onClose: widget.onClose,
                     showWindowControls: true,
                     blurAmount: 12.0,
                     opacity: 0.6,

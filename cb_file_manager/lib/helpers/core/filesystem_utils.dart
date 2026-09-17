@@ -14,6 +14,8 @@ import 'package:win32/win32.dart' as win32;
 import 'package:ffi/ffi.dart';
 
 // local files
+import 'package:cb_file_manager/services/drive/windows_volume_probe.dart';
+
 import 'io_extensions.dart';
 import 'text_utils.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -296,17 +298,20 @@ Future<List<FileSystemEntity>> sort(
 /// Returns a list of directories representing each drive
 /// Now also detects drives that require admin privileges and includes drive labels.
 ///
-/// Probes A: through Z: in parallel so a single stuck/optical/network drive
-/// no longer serializes the entire enumeration. Per-drive permission probe
-/// keeps the same 500 ms timeout, but they all run concurrently.
+/// Which letters are mounted comes from `GetLogicalDrives`, a kernel bitmask
+/// that touches no device. The previous version asked `Directory.exists()` for
+/// all of A: through Z:, which hands 26 blocking syscalls to the file-IO thread
+/// pool the whole process shares — an offline mapped share or a sleeping disk
+/// parked those threads for the OS timeout, and every later navigation queued
+/// behind them.
 Future<List<Directory>> getAllWindowsDrives() async {
   if (!Platform.isWindows) {
     return [];
   }
 
-  // Build one async probe per possible drive letter.
   final List<Future<Directory?>> probes = <Future<Directory?>>[
-    for (var i = 65; i <= 90; i++) _probeWindowsDrive(String.fromCharCode(i)),
+    for (final letter in _mountedWindowsDriveLetters())
+      _probeWindowsDrive(letter),
   ];
 
   final List<Directory?> results = await Future.wait(probes);
@@ -314,48 +319,63 @@ Future<List<Directory>> getAllWindowsDrives() async {
   return <Directory>[for (final drive in results) ?drive];
 }
 
-/// Probe a single Windows drive letter and return a populated [Directory] when
-/// it exists (accessible or admin-restricted). Returns null when the letter is
-/// not mounted or the probe fails outright.
+/// Letters currently mounted, A→Z, read from the `GetLogicalDrives` bitmask.
+List<String> _mountedWindowsDriveLetters() {
+  int mask;
+  try {
+    mask = win32.GetLogicalDrives().value;
+  } catch (e) {
+    debugPrint('GetLogicalDrives failed, falling back to A-Z probe: $e');
+    return <String>[for (var i = 65; i <= 90; i++) String.fromCharCode(i)];
+  }
+  if (mask == 0) {
+    return <String>[for (var i = 65; i <= 90; i++) String.fromCharCode(i)];
+  }
+  return <String>[
+    for (var i = 0; i < 26; i++)
+      if (mask & (1 << i) != 0) String.fromCharCode(65 + i),
+  ];
+}
+
+/// Build a populated [Directory] for a mounted Windows drive letter, tagging it
+/// with its label and whether listing it needs elevation.
 Future<Directory?> _probeWindowsDrive(String driveLetter) async {
   final String drivePath = '$driveLetter:\\';
   try {
-    Directory drive = Directory(drivePath);
-    if (!await drive.exists()) {
-      return null;
+    final Directory drive = Directory(drivePath);
+
+    // Probe only the volumes where the admin-only / BitLocker-locked case this
+    // exists to catch is real and answers quickly: a locked disk returns
+    // ACCESS_DENIED immediately. Network and optical letters are skipped
+    // because they are the ones that answer slowly or not at all — an offline
+    // mapped share sits on the SMB timeout, and `Future.timeout` only stops the
+    // waiting, it cannot cancel the syscall or free the IO thread underneath.
+    final driveType = windowsDriveType(drivePath);
+    if (driveType == win32.DRIVE_FIXED ||
+        driveType == win32.DRIVE_REMOVABLE) {
+      try {
+        await drive
+            .list(followLinks: false)
+            .first
+            .timeout(
+              const Duration(milliseconds: 500),
+              onTimeout: () {
+                throw TimeoutException('Permission check timed out');
+              },
+            );
+      } catch (_) {
+        // Drive exists but listing failed (admin-only, BitLocker-locked, etc.).
+        drive.setProperty('requiresAdmin', true);
+      }
     }
 
     try {
-      // Quick permission probe: try to enumerate one entry. Bail on timeout
-      // so a hung volume can't stall the whole drives list.
-      await drive
-          .list(followLinks: false)
-          .first
-          .timeout(
-            const Duration(milliseconds: 500),
-            onTimeout: () {
-              throw TimeoutException('Permission check timed out');
-            },
-          );
-
-      // Accessible. Tag with label when available.
-      try {
-        final String driveLabel = await getDriveLabel(drivePath);
-        drive.setProperty('driveLabel', driveLabel);
-      } catch (_) {
-        // Label is optional metadata; ignore failures here.
-      }
-      return drive;
+      final String driveLabel = await getDriveLabel(drivePath);
+      drive.setProperty('driveLabel', driveLabel);
     } catch (_) {
-      // Drive exists but listing failed (admin-only, BitLocker-locked, etc.).
-      drive = Directory(drivePath);
-      drive.setProperty('requiresAdmin', true);
-      try {
-        final String driveLabel = await getDriveLabel(drivePath);
-        drive.setProperty('driveLabel', driveLabel);
-      } catch (_) {}
-      return drive;
+      // Label is optional metadata; ignore failures here.
     }
+    return drive;
   } catch (e) {
     debugPrint('Drive not found or cannot be accessed: $drivePath - $e');
     return null;
@@ -378,6 +398,8 @@ Future<String> getDriveLabel(String drivePath) async {
       win32.MAX_PATH + 1,
     ).cast<Utf16>();
 
+    final drivePtr = drive.toNativeUtf16();
+
     // Volume serial number
     final volumeSerialNumber = calloc<Uint32>(1);
 
@@ -390,7 +412,7 @@ Future<String> getDriveLabel(String drivePath) async {
     try {
       // Get volume information
       final ok = win32.GetVolumeInformation(
-        win32.PCWSTR(drive.toNativeUtf16()),
+        win32.PCWSTR(drivePtr),
         win32.PWSTR(volumeNameBuffer),
         win32.MAX_PATH + 1,
         volumeSerialNumber,
@@ -414,6 +436,7 @@ Future<String> getDriveLabel(String drivePath) async {
       calloc.free(volumeSerialNumber);
       calloc.free(maximumComponentLength);
       calloc.free(fileSystemFlags);
+      calloc.free(drivePtr);
     }
   } catch (e) {
     debugPrint('Error getting drive label: $e');

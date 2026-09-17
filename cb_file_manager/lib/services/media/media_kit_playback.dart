@@ -107,6 +107,11 @@ class PlaybackPlayer {
         'cache-secs',
         (configuration.networkCaching.inMilliseconds / 1000).toString(),
       );
+      if (configuration.framePreview) {
+        // Hover previews need a frame quickly, not sound or exact frames.
+        await native.setProperty('aid', 'no');
+        await native.setProperty('hr-seek', 'no');
+      }
     }
     await _player.setPlaylistMode(
       configuration.looping ? mk.PlaylistMode.single : mk.PlaylistMode.none,
@@ -185,9 +190,13 @@ class PlaybackConfiguration {
   const PlaybackConfiguration({
     this.networkCaching = const Duration(seconds: 1),
     this.looping = false,
+    this.framePreview = false,
   });
   final Duration networkCaching;
   final bool looping;
+
+  /// Silent decoder that seeks to keyframes, for seek bar thumbnails.
+  final bool framePreview;
 }
 
 class PlaybackMedia {

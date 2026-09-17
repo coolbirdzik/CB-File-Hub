@@ -39,6 +39,14 @@ public:
   // |Show| is called. Returns true if the window was created successfully.
   bool Create(const std::wstring &title, const Point &origin, const Size &size);
 
+  // Creates the window at |bounds|, given in physical screen pixels (no DPI
+  // scaling is applied). With |maximized| the window is created maximized on
+  // the monitor holding |bounds|, which becomes its restore rect. Like
+  // |Create|, the window stays invisible until it is shown.
+  bool CreateWithPhysicalBounds(const std::wstring &title,
+                                const RECT &bounds,
+                                bool maximized);
+
   // Show the current window. Returns true if the window was successfully shown.
   bool Show();
 

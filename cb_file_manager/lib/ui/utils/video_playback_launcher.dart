@@ -36,13 +36,16 @@ class VideoPlaybackLauncher {
 
       if (inNewWindow || forceNewWindow) {
         var parentIsMaximized = false;
+        int? parentWindowId;
         try {
           parentIsMaximized = await windowManager.isMaximized();
+          parentWindowId = await windowManager.getId();
         } catch (_) {}
         final launched = await AppBusyCursor.run(
           () => VideoWindowService.openVideoWindow(
             file.path,
             initiallyMaximized: parentIsMaximized,
+            parentWindowId: parentWindowId,
           ),
         );
         if (launched) {

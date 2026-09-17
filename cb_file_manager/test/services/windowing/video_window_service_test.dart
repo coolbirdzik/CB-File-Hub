@@ -29,6 +29,7 @@ void main() {
       await VideoWindowService.openVideoWindow(
         'C:\\Videos\\one.mp4',
         initiallyMaximized: true,
+        parentWindowId: 6699,
       ),
       isTrue,
     );
@@ -44,5 +45,30 @@ void main() {
       r'C:\Videos\one.mp4',
     );
     expect(launches.single[VideoWindowService.envInitiallyMaximizedKey], '1');
+    expect(launches.single[VideoWindowService.envParentWindowKey], '6699');
+  });
+
+  test('a player without a known launcher gets no parent handle', () async {
+    final launches = <Map<String, String>>[];
+    VideoWindowService.reuseRequesterForTesting = (_) async => false;
+    VideoWindowService.processLauncherForTesting =
+        ({
+          required executable,
+          required arguments,
+          required environment,
+          required workingDirectory,
+        }) async {
+          launches.add(Map<String, String>.from(environment));
+        };
+
+    expect(
+      await VideoWindowService.openVideoWindow('C:\\Videos\\one.mp4'),
+      isTrue,
+    );
+
+    expect(
+      launches.single.containsKey(VideoWindowService.envParentWindowKey),
+      isFalse,
+    );
   });
 }

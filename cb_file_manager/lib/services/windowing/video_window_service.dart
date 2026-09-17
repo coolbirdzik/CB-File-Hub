@@ -26,6 +26,10 @@ class VideoWindowService {
   static const String envInitiallyMaximizedKey =
       'CB_VIDEO_WINDOW_INITIALLY_MAXIMIZED';
 
+  /// Native handle of the launching window. The Windows runner creates the
+  /// player over it, on its monitor (see windows/runner/main.cpp).
+  static const String envParentWindowKey = 'CB_VIDEO_WINDOW_PARENT_HWND';
+
   static VideoWindowProcessLauncher _processLauncher = _launchDetachedProcess;
   static VideoWindowReuseRequester _reuseRequester = _playInExistingWindow;
 
@@ -42,9 +46,13 @@ class VideoWindowService {
   static int? _ownedPort;
 
   /// Reuses the current player window, or starts it for [filePath].
+  ///
+  /// A new player opens over [parentWindowId] (a window_manager id) and is
+  /// maximized when [initiallyMaximized]; a reused player keeps its placement.
   static Future<bool> openVideoWindow(
     String filePath, {
     bool initiallyMaximized = false,
+    int? parentWindowId,
   }) async {
     if (!isSupported || filePath.trim().isEmpty) return false;
 
@@ -58,6 +66,11 @@ class VideoWindowService {
       env[envFlagKey] = '1';
       env[envArgsKey] = jsonEncode(<String, dynamic>{'path': filePath});
       env[envInitiallyMaximizedKey] = initiallyMaximized ? '1' : '0';
+      if (parentWindowId != null) {
+        env[envParentWindowKey] = '$parentWindowId';
+      } else {
+        env.remove(envParentWindowKey);
+      }
       // A player window must never inherit the parent's tab/window payload.
       env.remove('CB_STARTUP_TABS');
       env.remove('CB_PIP_MODE');
@@ -146,10 +159,14 @@ class VideoWindowService {
 
     Socket? socket;
     try {
+      // The OS accepts on a live player's socket even while its UI isolate is
+      // busy, so this only has to cover loopback latency. Windows retries a
+      // connect to a dead port for ~2s, so a stale port file costs exactly
+      // this timeout before the player can be spawned.
       socket = await Socket.connect(
         InternetAddress.loopbackIPv4,
         port,
-        timeout: const Duration(milliseconds: 600),
+        timeout: const Duration(milliseconds: 200),
       );
       socket.write(
         '${jsonEncode(<String, dynamic>{'type': 'play', 'path': filePath})}\n',
@@ -247,6 +264,18 @@ class VideoWindowService {
     } catch (_) {}
   }
 
+  /// Ends the dedicated player process.
+  ///
+  /// Exiting skips widget disposal, so the IPC endpoint and its port file are
+  /// released here first; otherwise the next open waits on a dead port.
+  static Future<void> closePlayerWindow() async {
+    await stopPlayerIpcServer().timeout(
+      const Duration(milliseconds: 500),
+      onTimeout: () {},
+    );
+    exit(0);
+  }
+
   @visibleForTesting
   static set processLauncherForTesting(VideoWindowProcessLauncher launcher) {
     _processLauncher = launcher;
@@ -280,5 +309,16 @@ class VideoWindowService {
 
   static bool startupInitiallyMaximized() {
     return isSupported && Platform.environment[envInitiallyMaximizedKey] == '1';
+  }
+
+  /// Whether the Windows runner already created this process's window in
+  /// place: over its parent and maximized as requested (see
+  /// windows/runner/main.cpp). File-association launches are not placed.
+  static bool startupPlacedByRunner() {
+    final env = Platform.environment;
+    // A PiP window spawned from the player inherits the player's role.
+    return Platform.isWindows &&
+        env[WindowStartupPayload.envWindowRoleKey] == 'video' &&
+        env['CB_PIP_MODE'] != '1';
   }
 }

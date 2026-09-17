@@ -22,7 +22,7 @@
   </tr>
 </table>
 
-CB File Hub is a cross-platform file manager for large media libraries. It combines fast visual browsing, tabs, tags, network access, disk cleanup, and an AI assistant so photos, videos, downloads, and messy folders are easier to search, review, and maintain.
+CB File Hub is a cross-platform file manager for large media libraries. It combines fast visual browsing, tabs, tags, network and SSH access, disk cleanup, and an AI assistant so photos, videos, downloads, remote servers, and messy folders are easier to search, review, and maintain.
 
 ## Key Highlights
 
@@ -31,7 +31,8 @@ CB File Hub is a cross-platform file manager for large media libraries. It combi
 - **Media-first browsing**: Use thumbnails, gallery views, and video previews designed for photo and video heavy folders.
 - **Tabbed workflow on desktop and mobile**: Keep multiple locations open and switch contexts quickly.
 - **Tags, smart albums, and discovery tools**: Organize large libraries beyond folder names.
-- **Local and network access**: Browse local storage, SMB shares, and FTP in one workflow.
+- **Local, network, and SSH access**: Work with local storage, SMB, FTP, WebDAV, SFTP, and saved SSH hosts from one app.
+- **SSH workspace**: Keep SSH hosts and keys organized, open an in-app terminal, or browse the same host through SFTP.
 
 ## Preview
 
@@ -104,6 +105,7 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 - Find files that may need attention, including broken media, missing thumbnails, duplicates, odd names, or misplaced items.
 - Sort messy downloads, recordings, photos, and videos into clearer folder structures.
 - Assist with larger cleanup workflows while keeping file operations visible and controllable.
+- Optionally run compatible models on-device for local cleanup advice, with model selection and context-window controls in Settings.
 
 ### Disk cleaner
 
@@ -112,6 +114,7 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 - Select cleanup candidates manually or by category.
 - Review selected files and folders with CB Agent before deleting.
 - Move supported cleanup targets to the Recycle Bin instead of deleting blindly.
+- Inspect installed-app storage, cleanable data, and available Windows usage evidence so large or rarely used apps can be reviewed before taking action.
 
 ### Tagging and discovery
 
@@ -132,6 +135,7 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 
 - Generate image, video, and folder thumbnails.
 - Tune video thumbnail extraction position from settings.
+- Choose whether thumbnails fill their frame or preserve their full aspect ratio.
 - Browse dedicated image and video gallery views.
 - Use the built-in video player for local and supported network files.
 - Support desktop-oriented media workflows such as external opening and focused playback.
@@ -139,10 +143,25 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 ### Network access
 
 - Browse SMB shares.
-- Connect to FTP servers.
+- Connect to FTP and SFTP servers.
+- Connect to WebDAV locations.
 - Generate thumbnails for supported network files.
 - Stream supported media directly from network locations.
 - Store network credentials locally for faster reconnects.
+
+### SSH workspace
+
+- Save and organize SSH host profiles, with password or private-key authentication.
+- Import existing OpenSSH / PEM keys, generate new keys, and copy public keys when provisioning a server.
+- Discover eligible hosts and keys from the local `.ssh` folder without running shell commands.
+- Verify and manage trusted host fingerprints, including an explicit warning when a host key changes.
+- Open an interactive in-app SSH terminal, reconnect or clear its session, and open remote files through SFTP in the current or a new tab.
+
+### Archives
+
+- Browse archive contents as virtual folders without extracting everything first.
+- Extract a selected entry or an entire archive when needed.
+- Support ZIP, TAR, GZip, BZip2, and common compressed TAR variants; on Windows, use installed 7-Zip for 7z and RAR archives.
 
 ### Album automation
 

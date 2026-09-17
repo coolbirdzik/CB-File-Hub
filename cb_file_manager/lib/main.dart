@@ -189,10 +189,6 @@ void main(List<String> args) {
 Future<void> runCbFileApp() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (Platform.isWindows) {
-    unawaited(ExternalAppHelper.ensureWindowsFileAssociations());
-  }
-
   // Bundled Inter / JetBrains Mono are OFL-licensed; the licence has to ship
   // with them. Lazy — the text is only read if the user opens the licence page.
   registerCbFontLicenses();
@@ -250,6 +246,13 @@ Future<void> runCbFileApp() async {
   final isSecondaryWindow =
       env[WindowStartupPayload.envSecondaryWindowKey] == '1' ||
       isDedicatedVideoWindow;
+
+  // Secondary processes (spare, video, progress windows) only exist once a
+  // primary window has registered the associations, so skip the registry
+  // rewrite there.
+  if (Platform.isWindows && !isSecondaryWindow) {
+    unawaited(ExternalAppHelper.ensureWindowsFileAssociations());
+  }
   final startHidden = env[WindowStartupPayload.envStartHiddenKey] == '1';
   final initialWindowPositionX = double.tryParse(
     env[WindowStartupPayload.envWindowPositionXKey] ?? '',
@@ -351,8 +354,6 @@ Future<void> runCbFileApp() async {
   }
 
   final windowAcrylicService = WindowAcrylicService();
-  final initialNativeBackdropDarkMode =
-      await _resolveInitialNativeBackdropDarkMode();
   final List<Future<void> Function()> deferredSecondaryInitializers = [];
 
   if (isDesktopPlatform) {
@@ -361,16 +362,34 @@ Future<void> runCbFileApp() async {
     } catch (_) {}
 
     if (!isPip && !isProgressWindow) {
+      // A player spawned by VideoWindowService was already created over its
+      // parent window, maximized when the parent is (windows/runner/main.cpp).
+      // Centering, or waitUntilReadyToShow (which unmaximizes), would undo it.
+      final isRunnerPlacedVideoWindow =
+          VideoWindowService.startupPlacedByRunner();
       final windowOptions = WindowOptions(
-        center: initialWindowPosition == null,
-        backgroundColor: Colors.transparent,
+        center: initialWindowPosition == null && !isRunnerPlacedVideoWindow,
+        // The player gets no acrylic backdrop (below), so paint it black like
+        // its first frame rather than leaving a see-through window meanwhile.
+        backgroundColor: isDedicatedVideoWindow
+            ? Colors.black
+            : Colors.transparent,
         titleBarStyle: TitleBarStyle.hidden,
         windowButtonVisibility: !Platform.isWindows,
         minimumSize: const Size(800, 600),
       );
 
       try {
-        if (isSecondaryWindow) {
+        if (isRunnerPlacedVideoWindow) {
+          await windowManager.setTitleBarStyle(
+            windowOptions.titleBarStyle!,
+            windowButtonVisibility: windowOptions.windowButtonVisibility!,
+          );
+          await windowManager.setMinimumSize(windowOptions.minimumSize!);
+          await windowManager.setBackgroundColor(
+            windowOptions.backgroundColor!,
+          );
+        } else if (isSecondaryWindow) {
           unawaited(windowManager.waitUntilReadyToShow(windowOptions));
         } else {
           await windowManager.waitUntilReadyToShow(windowOptions);
@@ -392,14 +411,18 @@ Future<void> runCbFileApp() async {
             } catch (_) {}
           } else {
             try {
-              await windowManager.setSkipTaskbar(false);
+              // Only waitUntilReadyToShow creates the taskbar interface this
+              // uses; the runner-placed player is never hidden from it.
+              if (!isRunnerPlacedVideoWindow) {
+                await windowManager.setSkipTaskbar(false);
+              }
               if (initialWindowPosition != null) {
                 await windowManager.setPosition(initialWindowPosition);
               }
               await windowManager.show();
               await windowManager.focus();
               await WindowsNativeTabDragDropService.forceActivateWindow();
-              if (initialWindowPosition == null) {
+              if (initialWindowPosition == null && !isRunnerPlacedVideoWindow) {
                 unawaited(windowManager.center());
               }
             } catch (_) {}
@@ -422,13 +445,16 @@ Future<void> runCbFileApp() async {
       }
     }
 
-    if (!isPip && !kCbE2EFast) {
+    // The player paints an opaque black surface, so the backdrop (and the
+    // settle delay before it) would only postpone its first frame.
+    if (!isPip && !kCbE2EFast && !isDedicatedVideoWindow) {
       try {
+        final isDarkMode = await _resolveInitialNativeBackdropDarkMode();
         await Future<void>.delayed(const Duration(milliseconds: 120));
         await windowAcrylicService.applyDesktopAcrylicBackground(
           isDesktopPlatform: isDesktopPlatform,
           isPipWindow: isPip,
-          isDarkMode: initialNativeBackdropDarkMode,
+          isDarkMode: isDarkMode,
         );
       } catch (_) {}
     }
@@ -595,15 +621,17 @@ Future<void> runCbFileApp() async {
   // Dedicated video player window (desktop): boot straight into the player.
   if (startupVideoPath != null) {
     // This process booted on the deferred "secondary window" path, so the bits
-    // the player actually needs must be initialized here.
-    try {
-      await locator<UserPreferences>().init();
-    } catch (_) {}
+    // the player actually needs must be initialized here. Preferences open
+    // SQLite, which must not hold back the first frame: start it now and let
+    // the player await the same in-flight initialization.
+    unawaited(locator<UserPreferences>().init().catchError((_) {}));
     try {
       await locator<LanguageController>().initialize();
     } catch (_) {}
 
-    if (VideoWindowService.startupInitiallyMaximized()) {
+    // On Windows a spawned player was already created maximized in place.
+    if (VideoWindowService.startupInitiallyMaximized() &&
+        !VideoWindowService.startupPlacedByRunner()) {
       try {
         await windowManager.maximize();
       } catch (_) {}
