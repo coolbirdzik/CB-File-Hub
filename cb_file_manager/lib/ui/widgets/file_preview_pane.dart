@@ -11,6 +11,7 @@ import 'package:cb_file_manager/services/archive/archive_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/ui/utils/preview_syntax_highlighter.dart';
 import 'package:cb_file_manager/ui/widgets/archive_preview.dart';
+import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/services/ai/content_reader.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -47,6 +48,11 @@ class FilePreviewPane extends StatelessWidget {
     final panelTint = isDark
         ? theme.scaffoldBackgroundColor.withValues(alpha: 0.2)
         : theme.scaffoldBackgroundColor.withValues(alpha: 0.28);
+    // The host overlays the selection summary bar across the bottom edge;
+    // keep the body (video controls in particular) clear of it.
+    final summaryBarInset = SelectionSummaryTooltip.isVisibleFor(selectionState)
+        ? SelectionSummaryTooltip.height
+        : 0.0;
 
     return ClipRect(
       child: Stack(
@@ -98,7 +104,7 @@ class FilePreviewPane extends StatelessWidget {
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                  padding: EdgeInsets.fromLTRB(10, 0, 10, 12 + summaryBarInset),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: _buildBody(

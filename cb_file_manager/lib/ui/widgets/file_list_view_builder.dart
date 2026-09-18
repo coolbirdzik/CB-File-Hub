@@ -1417,15 +1417,7 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
           widget.minPreviewWidth,
           widget.maxPreviewWidth,
         );
-        final double previewWidthForIndicator =
-            _dragPreviewWidth ?? effectivePreviewWidth;
-        final double indicatorRight =
-            (previewWidthForIndicator + _PreviewResizeHandle.handleWidth / 2)
-                .clamp(0.0, widget.availableWidth);
-        final double ghostWidth = previewWidthForIndicator.clamp(
-          0.0,
-          widget.availableWidth,
-        );
+        final double? dragPreviewWidth = _dragPreviewWidth;
 
         return Stack(
           fit: StackFit.expand,
@@ -1450,50 +1442,24 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
                 ),
               ],
             ),
-            if (_dragPreviewWidth != null)
-              Positioned.fill(
+            if (dragPreviewWidth != null)
+              Positioned(
+                top: 0,
+                bottom: 0,
+                right: 0,
+                // Line up the ghost edge with where the handle line lands
+                // once the new width is committed.
+                width:
+                    (dragPreviewWidth +
+                            _PreviewResizeHandle.handleWidth / 2 +
+                            _PreviewResizeHandle.lineWidth / 2)
+                        .clamp(0.0, widget.availableWidth),
                 child: IgnorePointer(
-                  child: Stack(
-                    children: [
-                      if (ghostWidth > 0)
-                        Positioned(
-                          top: 0,
-                          bottom: 0,
-                          right: 0,
-                          width: ghostWidth,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerRight,
-                                end: Alignment.centerLeft,
-                                colors: [
-                                  Theme.of(
-                                    context,
-                                  ).shadowColor.withValues(alpha: 0.04),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        top: 0,
-                        bottom: 0,
-                        right: indicatorRight.clamp(0.0, widget.availableWidth),
-                        child: Center(
-                          child: Container(
-                            width: 1,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: _PreviewResizeGhost(
+                    width: dragPreviewWidth,
+                    atLimit:
+                        dragPreviewWidth <= widget.minPreviewWidth ||
+                        dragPreviewWidth >= widget.maxPreviewWidth,
                   ),
                 ),
               ),
@@ -1504,11 +1470,71 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
   }
 }
 
+/// Outline of the preview pane's target size, shown while the resize handle
+/// is dragged. The real pane only resizes on release.
+class _PreviewResizeGhost extends StatelessWidget {
+  final double width;
+  final bool atLimit;
+
+  const _PreviewResizeGhost({required this.width, required this.atLimit});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final accent = atLimit ? colorScheme.outline : colorScheme.primary;
+    final onAccent = atLimit ? colorScheme.surface : colorScheme.onPrimary;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        border: Border(
+          left: BorderSide(
+            color: accent,
+            width: _PreviewResizeHandle.lineWidth,
+          ),
+        ),
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: FractionalTranslation(
+          translation: const Offset(-0.5, 0),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: accent,
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.shadowColor.withValues(alpha: 0.18),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                '${width.round()} px',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: onAccent,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PreviewResizeHandle extends StatefulWidget {
   final GestureDragStartCallback onPanStart;
   final GestureDragUpdateCallback onPanUpdate;
   final GestureDragEndCallback onPanEnd;
   static const double _handleWidth = 6.0;
+  static const double lineWidth = 2.0;
 
   const _PreviewResizeHandle({
     required this.onPanStart,
@@ -1528,12 +1554,17 @@ class _PreviewResizeHandleState extends State<_PreviewResizeHandle> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final active = _hovering || _dragging;
-    final lineColor = active
-        ? theme.colorScheme.onSurface.withValues(alpha: isDark ? 0.16 : 0.1)
-        : Colors.transparent;
+    final colorScheme = Theme.of(context).colorScheme;
+    // While dragging, the ghost shows the target edge in the accent color;
+    // the handle stays behind as a faint marker of the starting edge.
+    final Color lineColor;
+    if (_dragging) {
+      lineColor = colorScheme.onSurface.withValues(alpha: 0.2);
+    } else if (_hovering) {
+      lineColor = colorScheme.primary.withValues(alpha: 0.7);
+    } else {
+      lineColor = colorScheme.primary.withValues(alpha: 0);
+    }
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -1553,16 +1584,14 @@ class _PreviewResizeHandleState extends State<_PreviewResizeHandle> {
         },
         child: SizedBox(
           width: _PreviewResizeHandle._handleWidth,
+          height: double.infinity,
           child: Center(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              width: active ? 1.5 : 0,
-              height: active ? 56 : 0,
-              decoration: BoxDecoration(
-                color: lineColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              width: _PreviewResizeHandle.lineWidth,
+              height: double.infinity,
+              color: lineColor,
             ),
           ),
         ),

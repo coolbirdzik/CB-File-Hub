@@ -351,8 +351,7 @@ Future<Directory?> _probeWindowsDrive(String driveLetter) async {
     // mapped share sits on the SMB timeout, and `Future.timeout` only stops the
     // waiting, it cannot cancel the syscall or free the IO thread underneath.
     final driveType = windowsDriveType(drivePath);
-    if (driveType == win32.DRIVE_FIXED ||
-        driveType == win32.DRIVE_REMOVABLE) {
+    if (driveType == win32.DRIVE_FIXED || driveType == win32.DRIVE_REMOVABLE) {
       try {
         await drive
             .list(followLinks: false)

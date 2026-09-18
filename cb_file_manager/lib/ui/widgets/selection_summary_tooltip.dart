@@ -1,9 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
 class SelectionSummaryTooltip extends StatefulWidget {
+  /// Fixed bar height, so content drawn beneath the overlay (e.g. the preview
+  /// pane) can reserve exactly this much space.
+  static const double height = 30;
+
+  /// Whether the bar renders anything for this selection. Hosts only mount it
+  /// on desktop while in selection mode; an empty selection renders nothing.
+  static bool isVisibleFor(SelectionState selectionState) =>
+      selectionState.isSelectionMode &&
+      (selectionState.selectedFilePaths.isNotEmpty ||
+          selectionState.selectedFolderPaths.isNotEmpty);
+
   final int selectedFileCount;
   final int selectedFolderCount;
   final List<String> selectedFilePaths;
@@ -94,7 +106,8 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      height: SelectionSummaryTooltip.height,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       margin: EdgeInsets.zero,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF202020) : const Color(0xFFF9F9F9),
