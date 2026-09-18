@@ -13,6 +13,12 @@ class TabbedFolderKeyboardController {
     debugLabel: 'tabbed-folder-list-keyboard',
   );
 
+  /// Focus for the desktop preview pane. It sits below [focusNode], so while
+  /// it holds focus the list must ignore the keys that bubble up from it.
+  final FocusNode previewFocusNode = FocusNode(
+    debugLabel: 'tabbed-folder-preview-pane',
+  );
+
   /// Scroll controller attached to the active list/grid view.
   /// The screen creates this and passes it to [FileListViewBuilder].
   final ScrollController scrollController = ScrollController();
@@ -37,6 +43,7 @@ class TabbedFolderKeyboardController {
   void dispose() {
     _immediateSelectionGeneration++;
     focusNode.dispose();
+    previewFocusNode.dispose();
     scrollController.dispose();
     for (final notifier in _immediateSelectionNotifiers.values) {
       notifier.dispose();

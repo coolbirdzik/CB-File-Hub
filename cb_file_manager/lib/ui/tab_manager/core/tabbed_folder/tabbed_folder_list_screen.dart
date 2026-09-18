@@ -215,13 +215,14 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     return state.files.any((file) => FileTypeUtils.isMediaFile(file.path));
   }
 
-  bool _isPointerInsideFocusedEditableText(PointerDownEvent event) {
-    final focused = FocusManager.instance.primaryFocus;
-    final focusedContext = focused?.context;
-    if (focusedContext == null) return false;
+  bool _isPointerInsideFocusedEditableText(PointerDownEvent event) =>
+      _isPointerInside(FocusManager.instance.primaryFocus?.context, event);
 
-    RenderObject? renderObject = focusedContext.findRenderObject();
-    if (renderObject is! RenderBox) return false;
+  bool _isPointerInside(BuildContext? context, PointerDownEvent event) {
+    if (context == null || !context.mounted) return false;
+
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return false;
 
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final rect = topLeft & renderObject.size;
@@ -1331,6 +1332,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           if (!TabFocusGate.isActiveTab(context)) {
             return KeyEventResult.ignored;
           }
+          // Keys the focused preview pane didn't use (it only claims the
+          // video player's) must not drive the list behind it.
+          if (_keyboardController.previewFocusNode.hasFocus) {
+            return KeyEventResult.ignored;
+          }
           return BrowserLikeKeyboardShortcuts.handle(
             isDesktop: isDesktopPlatform,
             keyboardController: _keyboardController,
@@ -1399,7 +1405,12 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
         },
         child: Listener(
           onPointerDown: (PointerDownEvent event) {
-            if (isDesktopPlatform) {
+            // The preview pane takes focus itself when clicked.
+            if (isDesktopPlatform &&
+                !_isPointerInside(
+                  _keyboardController.previewFocusNode.context,
+                  event,
+                )) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!mounted) return;
                 if (BrowserLikeKeyboardShortcuts.isTextInputFocused()) {
@@ -1954,6 +1965,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   onPreviewPaneWidthChanged: _updatePreviewPaneWidth,
                   onPreviewPaneWidthCommitted: _commitPreviewPaneWidth,
                   onPreviewPaneToggled: _togglePreviewPane,
+                  listFocusNode: _keyboardController.focusNode,
+                  previewFocusNode: _keyboardController.previewFocusNode,
                   scrollController: _keyboardController.scrollController,
                   itemKeyForPath: _keyboardController.itemKeyForPath,
                   immediateSelectionForPath:

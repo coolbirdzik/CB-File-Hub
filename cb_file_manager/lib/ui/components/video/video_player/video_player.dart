@@ -440,6 +440,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   Map<String, dynamic>? _videoMetadata;
   bool _hasNotifiedInitialization = false;
 
+  // Clicking the player focuses it, so its keys work when it's embedded
+  // (e.g. the file preview pane) and autofocus didn't apply.
+  final FocusNode _keyboardFocusNode = FocusNode(
+    debugLabel: 'video-player-keyboard',
+  );
+
   // Fast forward/rewind state (long press on mobile, hold arrow on desktop)
   bool _isFastSeeking = false;
   bool _fastSeekingForward = true; // true = forward, false = backward
@@ -543,6 +549,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     WidgetsBinding.instance.removeObserver(this);
     VideoUiState.notifyPlayerDisposed();
     _disposeResources();
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
@@ -1131,34 +1138,40 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         : _hasError
         ? _buildErrorWidget(_errorMessage)
         : Focus(
+            focusNode: _keyboardFocusNode,
             autofocus: true,
             onKeyEvent: (node, event) => _handleKeyEvent(event),
             onFocusChange: (focused) {
               if (!focused) _stopFastSeeking();
             },
-            child: MouseRegion(
-              onHover: (_) {
-                _showControlsWithTimer();
-              },
-              child: GestureDetector(
-                onTap: () {
+            child: Listener(
+              onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+              child: MouseRegion(
+                onHover: (_) {
                   _showControlsWithTimer();
                 },
-                child: Stack(
-                  children: [
-                    GestureDetector(
-                      onDoubleTap: widget.allowFullScreen
-                          ? _toggleFullScreen
-                          : null,
-                      child: _buildPrimaryVideoSurface(),
-                    ),
-                    if (_isLoading)
-                      Positioned.fill(
-                        child: IgnorePointer(child: _buildLoadingWidget()),
+                child: GestureDetector(
+                  onTap: () {
+                    _showControlsWithTimer();
+                  },
+                  child: Stack(
+                    children: [
+                      GestureDetector(
+                        onDoubleTap: widget.allowFullScreen
+                            ? _toggleFullScreen
+                            : null,
+                        child: _buildPrimaryVideoSurface(),
                       ),
-                    if (!_isAndroidPip && widget.showControls && _showControls)
-                      _buildCustomControls(),
-                  ],
+                      if (_isLoading)
+                        Positioned.fill(
+                          child: IgnorePointer(child: _buildLoadingWidget()),
+                        ),
+                      if (!_isAndroidPip &&
+                          widget.showControls &&
+                          _showControls)
+                        _buildCustomControls(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1184,12 +1197,16 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
   Widget _buildStreamingPlayer() {
     return Focus(
+      focusNode: _keyboardFocusNode,
       autofocus: true,
       onKeyEvent: (node, event) => _handleKeyEvent(event),
       onFocusChange: (focused) {
         if (!focused) _stopFastSeeking();
       },
-      child: _buildPlayerBody(),
+      child: Listener(
+        onPointerDown: (_) => _keyboardFocusNode.requestFocus(),
+        child: _buildPlayerBody(),
+      ),
     );
   }
 

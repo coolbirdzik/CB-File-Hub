@@ -8,7 +8,6 @@ import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_
 import 'package:cb_file_manager/ui/widgets/file_list_view_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -58,8 +57,10 @@ void main() {
                 isDesktopPlatform: true,
                 onNavigateToPath: (_) {},
                 onFileTap: (_, _) {},
-                toggleFileSelection: (p, {shiftSelect = false, ctrlSelect = false}) {},
-                toggleFolderSelection: (p, {shiftSelect = false, ctrlSelect = false}) {},
+                toggleFileSelection:
+                    (p, {shiftSelect = false, ctrlSelect = false}) {},
+                toggleFolderSelection:
+                    (p, {shiftSelect = false, ctrlSelect = false}) {},
                 clearSelection: () {},
                 dragSelectionController: dragSel,
                 showFileTags: false,

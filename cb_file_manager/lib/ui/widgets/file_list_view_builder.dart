@@ -1,6 +1,7 @@
 import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -21,7 +22,9 @@ import 'package:cb_file_manager/ui/widgets/ctrl_scroll_zoom.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'package:cb_file_manager/ui/utils/fluent_background.dart';
 import 'package:cb_file_manager/ui/utils/scroll_velocity_notifier.dart';
+import 'package:cb_file_manager/design_system/cb_tokens.dart';
 import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
+import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/ui/tab_manager/mobile/mobile_file_actions_controller.dart';
 import 'package:cb_file_manager/ui/utils/grid_zoom_constraints.dart';
 import 'package:cb_file_manager/ui/widgets/miller_columns_view.dart';
@@ -111,6 +114,8 @@ class FileListViewBuilder {
     required ValueChanged<double> onPreviewPaneWidthChanged,
     required ValueChanged<double> onPreviewPaneWidthCommitted,
     required VoidCallback onPreviewPaneToggled,
+    FocusNode? listFocusNode,
+    FocusNode? previewFocusNode,
     ScrollController? scrollController,
     GlobalKey Function(String path)? itemKeyForPath,
     ValueListenable<bool?> Function(String path)? immediateSelectionForPath,
@@ -292,6 +297,8 @@ class FileListViewBuilder {
         previewPaneWidthListenable: previewPaneWidthListenable,
         onPreviewPaneWidthChanged: onPreviewPaneWidthChanged,
         onPreviewPaneWidthCommitted: onPreviewPaneWidthCommitted,
+        listFocusNode: listFocusNode,
+        previewFocusNode: previewFocusNode,
       );
     }
 
@@ -1298,6 +1305,8 @@ class FileListViewBuilder {
     required ValueListenable<double> previewPaneWidthListenable,
     required ValueChanged<double> onPreviewPaneWidthChanged,
     required ValueChanged<double> onPreviewPaneWidthCommitted,
+    FocusNode? listFocusNode,
+    FocusNode? previewFocusNode,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1330,6 +1339,8 @@ class FileListViewBuilder {
           minPreviewWidth: effectiveMinPreviewWidth,
           maxPreviewWidth: maxPreviewWidth,
           availableWidth: constraints.maxWidth,
+          listFocusNode: listFocusNode,
+          previewFocusNode: previewFocusNode,
         );
       },
     );
@@ -1349,6 +1360,11 @@ class _PreviewPaneLayout extends StatefulWidget {
   final double maxPreviewWidth;
   final double availableWidth;
 
+  /// The list's keyboard node; the preview pane's node sits below it.
+  /// Without both, neither side is outlined as focused.
+  final FocusNode? listFocusNode;
+  final FocusNode? previewFocusNode;
+
   const _PreviewPaneLayout({
     required this.contentView,
     required this.state,
@@ -1361,16 +1377,90 @@ class _PreviewPaneLayout extends StatefulWidget {
     required this.minPreviewWidth,
     required this.maxPreviewWidth,
     required this.availableWidth,
+    this.listFocusNode,
+    this.previewFocusNode,
   });
 
   @override
   State<_PreviewPaneLayout> createState() => _PreviewPaneLayoutState();
 }
 
+enum _PreviewLayoutRegion { none, list, preview }
+
 class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
   double? _dragStartX;
   double? _dragStartWidth;
   double? _dragPreviewWidth;
+
+  /// Never takes focus itself; reports focus held inside the list (e.g. the
+  /// inline rename field), which lives below [_PreviewPaneLayout.listFocusNode]
+  /// just like the preview pane does.
+  final FocusNode _listRegionNode = FocusNode(
+    debugLabel: 'preview-layout-list-region',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+  _PreviewLayoutRegion _focusedRegion = _PreviewLayoutRegion.none;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusedRegion = _resolveFocusedRegion();
+    FocusManager.instance.addListener(_handleFocusChanged);
+  }
+
+  @override
+  void didUpdateWidget(_PreviewPaneLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _focusedRegion = _resolveFocusedRegion();
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_handleFocusChanged);
+    _listRegionNode.dispose();
+    super.dispose();
+  }
+
+  _PreviewLayoutRegion _resolveFocusedRegion() {
+    final listNode = widget.listFocusNode;
+    final previewNode = widget.previewFocusNode;
+    if (listNode == null || previewNode == null) {
+      return _PreviewLayoutRegion.none;
+    }
+    if (previewNode.hasFocus) return _PreviewLayoutRegion.preview;
+    if (listNode.hasPrimaryFocus || _listRegionNode.hasFocus) {
+      return _PreviewLayoutRegion.list;
+    }
+    return _PreviewLayoutRegion.none;
+  }
+
+  void _handleFocusChanged() {
+    final region = _resolveFocusedRegion();
+    if (mounted && region != _focusedRegion) {
+      setState(() => _focusedRegion = region);
+    }
+  }
+
+  void _handlePreviewPointerDown(PointerDownEvent event) {
+    final previewNode = widget.previewFocusNode;
+    if (previewNode == null) return;
+    // Runs after focus requests made for this same event have been applied,
+    // so a child that claims focus on click (the video player) keeps it.
+    scheduleMicrotask(() {
+      if (!mounted || previewNode.hasFocus) return;
+      previewNode.requestFocus();
+    });
+  }
+
+  KeyEventResult _handlePreviewKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      widget.listFocusNode?.requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   void _handlePanStart(DragStartDetails details, double currentWidth) {
     _dragStartX = details.globalPosition.dx;
@@ -1418,27 +1508,63 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
           widget.maxPreviewWidth,
         );
         final double? dragPreviewWidth = _dragPreviewWidth;
+        // Keep the outlines' bottom edge above the overlaid summary bar.
+        final double bottomInset =
+            SelectionSummaryTooltip.isVisibleFor(widget.selectionState)
+            ? SelectionSummaryTooltip.height
+            : 0.0;
+
+        Widget previewPane = SizedBox(
+          width: effectivePreviewWidth,
+          child: FilePreviewPane(
+            state: widget.state,
+            selectionState: widget.selectionState,
+            onOpenFile: widget.onFileTap,
+            onClosePreview: widget.onPreviewPaneToggled,
+          ),
+        );
+        final previewNode = widget.previewFocusNode;
+        if (previewNode != null) {
+          previewPane = Focus(
+            focusNode: previewNode,
+            onKeyEvent: _handlePreviewKeyEvent,
+            child: Listener(
+              onPointerDown: _handlePreviewPointerDown,
+              child: previewPane,
+            ),
+          );
+        }
 
         return Stack(
           fit: StackFit.expand,
           children: [
             Row(
               children: [
-                Expanded(child: child!),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Focus(focusNode: _listRegionNode, child: child!),
+                      _FocusedRegionOutline(
+                        visible: _focusedRegion == _PreviewLayoutRegion.list,
+                        bottomInset: bottomInset,
+                      ),
+                    ],
+                  ),
+                ),
                 _PreviewResizeHandle(
                   onPanStart: (details) =>
                       _handlePanStart(details, effectivePreviewWidth),
                   onPanUpdate: _handlePanUpdate,
                   onPanEnd: _handlePanEnd,
                 ),
-                SizedBox(
-                  width: effectivePreviewWidth,
-                  child: FilePreviewPane(
-                    state: widget.state,
-                    selectionState: widget.selectionState,
-                    onOpenFile: widget.onFileTap,
-                    onClosePreview: widget.onPreviewPaneToggled,
-                  ),
+                Stack(
+                  children: [
+                    previewPane,
+                    _FocusedRegionOutline(
+                      visible: _focusedRegion == _PreviewLayoutRegion.preview,
+                      bottomInset: bottomInset,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1466,6 +1592,50 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Accent ring around whichever side of the preview layout — the file list or
+/// the preview pane — currently receives keyboard input.
+class _FocusedRegionOutline extends StatelessWidget {
+  final bool visible;
+  final double bottomInset;
+
+  const _FocusedRegionOutline({
+    required this.visible,
+    required this.bottomInset,
+  });
+
+  static const double _inset = 3;
+  static const double _strokeWidth = 1.5;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 120),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              _inset,
+              _inset,
+              _inset,
+              _inset + bottomInset,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.circular(10)),
+                border: Border.all(
+                  color: context.cbColors.focusRing.withValues(alpha: 0.6),
+                  width: _strokeWidth,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
