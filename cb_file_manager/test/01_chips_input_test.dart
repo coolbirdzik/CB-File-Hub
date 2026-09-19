@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/config/languages/app_localizations_delegate.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -105,5 +106,121 @@ void main() {
     expect(draftText, 'new');
     expect(find.text('existing'), findsOneWidget);
     expect(find.text('favorite'), findsOneWidget);
+  });
+
+  testWidgets('01.03 ":" on a suggestion scopes the field to that parent', (
+    tester,
+  ) async {
+    final scopeChanges = <String?>[];
+    String? draftText;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: const [AppLocalizationsDelegate()],
+        supportedLocales: const [Locale('en')],
+        home: Scaffold(
+          body: ChipsInput<String>(
+            values: const <String>[],
+            suggestions: const <String>['Actress', 'Album'],
+            enableColonAutocomplete: true,
+            onScopeChanged: scopeChanges.add,
+            onChanged: (_) {},
+            onTextChanged: (value) => draftText = value,
+            chipBuilder: (context, value) => Chip(label: Text(value)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'act');
+    await tester.pump();
+
+    // ":" arrives as shift+";" — the handler reads event.character, not the key.
+    await simulateKeyDownEvent(LogicalKeyboardKey.semicolon, character: ':');
+    await simulateKeyUpEvent(LogicalKeyboardKey.semicolon);
+    await tester.pumpAndSettle();
+
+    expect(scopeChanges, equals(<String?>['Actress']));
+    // The parent moves into the pill, so the draft starts over on the child.
+    expect(draftText, isEmpty);
+  });
+
+  testWidgets(
+    '01.04 Backspace on an empty draft leaves the scope, not a chip',
+    (tester) async {
+      final scopeChanges = <String?>[];
+      var chipsChanged = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: const [AppLocalizationsDelegate()],
+          supportedLocales: const [Locale('en')],
+          home: Scaffold(
+            body: ChipsInput<String>(
+              values: const <String>['existing'],
+              scopeParent: 'Actress',
+              onScopeChanged: scopeChanges.add,
+              onChanged: (_) => chipsChanged = true,
+              chipBuilder: (context, value) => Chip(label: Text(value)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.backspace);
+      await tester.pumpAndSettle();
+
+      expect(scopeChanges, equals(<String?>[null]));
+      expect(chipsChanged, isFalse);
+    },
+  );
+
+  testWidgets('01.05 the scope pill names the parent and its "x" leaves it', (
+    tester,
+  ) async {
+    final scopeChanges = <String?>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: const [AppLocalizationsDelegate()],
+        supportedLocales: const [Locale('en')],
+        home: Scaffold(
+          body: ChipsInput<String>(
+            values: const <String>['existing'],
+            scopeParent: 'Actress',
+            onScopeChanged: scopeChanges.add,
+            onChanged: (_) {},
+            chipBuilder: (context, value) => Chip(label: Text(value)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(TagScopeChip, 'Actress'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(TagScopeChip),
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(scopeChanges, equals(<String?>[null]));
   });
 }

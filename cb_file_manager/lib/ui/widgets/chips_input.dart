@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 
@@ -20,6 +21,8 @@ class ChipsInput<T> extends StatefulWidget {
     this.onSuggestionSelected,
     this.suggestionBuilder,
     this.enableColonAutocomplete = false,
+    this.scopeParent,
+    this.onScopeChanged,
   });
 
   final List<T> values;
@@ -54,6 +57,18 @@ class ChipsInput<T> extends StatefulWidget {
   /// typing/autocompleting the child tag. Used for the parent:child hierarchy
   /// syntax in the tag dialog.
   final bool enableColonAutocomplete;
+
+  /// The parent tag the field is scoped to, or null when typing at the top
+  /// level. While scoped, a pill is shown at the head of the field and the
+  /// typed text is only the child name — the caller composes "parent:child"
+  /// itself and decides when the scope is dropped.
+  final String? scopeParent;
+
+  /// Called when the scope changes: a parent is entered (":" or "->" on a
+  /// highlighted suggestion) or left (Backspace on an empty draft, or the
+  /// pill's "x"). Leaving this null keeps the older inline "parent:" prefix
+  /// behavior of [enableColonAutocomplete].
+  final ValueChanged<String?>? onScopeChanged;
 
   final Widget Function(BuildContext context, T data) chipBuilder;
 
@@ -201,26 +216,12 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                               ),
                             ),
                             const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withValues(
-                                  alpha: 0.12,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Tab ↹',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ),
+                            if (widget.onScopeChanged != null &&
+                                widget.scopeParent == null) ...[
+                              _keyHintBadge(theme, '→'),
+                              const SizedBox(width: 4),
+                            ],
+                            _keyHintBadge(theme, 'Tab ↹'),
                           ],
                         ),
                       ),
@@ -313,6 +314,25 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     );
   }
 
+  /// Small keycap badge in the suggestion overlay header.
+  Widget _keyHintBadge(ThemeData theme, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: theme.colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
   void _pickSuggestion(String suggestion) {
     widget.onSuggestionSelected?.call(suggestion);
     _focusNode.requestFocus();
@@ -335,6 +355,31 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     );
     _focusNode.requestFocus();
     widget.onTextChanged?.call(newTyped);
+  }
+
+  /// Enters [parent] as the field's scope: the draft is cleared and the parent
+  /// is handed to the caller, which shows it as a pill and composes
+  /// "parent:child" on every submit until the scope is left.
+  void _enterScope(String parent) {
+    _clearDraft();
+    widget.onScopeChanged!(parent);
+    _focusNode.requestFocus();
+  }
+
+  /// Wipes the typed draft while keeping the chips. Programmatic controller
+  /// writes do not fire [TextField.onChanged], so [onTextChanged] is notified
+  /// by hand.
+  void _clearDraft() {
+    final String chipChars =
+        String.fromCharCode(
+          ChipsInputEditingController.kObjectReplacementChar,
+        ) *
+        widget.values.length;
+    controller.value = TextEditingValue(
+      text: chipChars,
+      selection: TextSelection.collapsed(offset: chipChars.length),
+    );
+    widget.onTextChanged?.call('');
   }
 
   // ── Key handling (Tab / Arrow navigation) ──
@@ -363,21 +408,54 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
       return KeyEventResult.handled;
     }
 
-    // Promote the highlighted suggestion into a "parent:" prefix when the user
-    // presses ":". Lets the user autocomplete the parent tag, then keep typing
-    // the child tag (parent:child hierarchy syntax).
-    if (widget.enableColonAutocomplete &&
-        event.character == ':' &&
-        suggestions.isNotEmpty) {
-      final typed = controller.textWithoutReplacements;
-      if (!typed.contains(':')) {
+    final bool scopeEnabled = widget.onScopeChanged != null;
+    final String typed = controller.textWithoutReplacements;
+
+    // Backspace on an empty draft leaves the parent scope. The pill sits
+    // between the chips and the caret, so it is what Backspace reaches first;
+    // deleting a chip stays one Backspace further back.
+    if (scopeEnabled &&
+        widget.scopeParent != null &&
+        event.logicalKey == LogicalKeyboardKey.backspace &&
+        typed.isEmpty) {
+      widget.onScopeChanged!(null);
+      return KeyEventResult.handled;
+    }
+
+    // ":" turns the highlighted suggestion into the parent tag: the pill in
+    // scope mode, an inline "parent:" prefix otherwise. While scoped the key
+    // is swallowed so the draft never carries a colon of its own — the caller
+    // composes "parent:child" from the scope, and a second colon would make
+    // "parent:child:grandchild", which parseHierarchyInput cannot represent.
+    if (widget.enableColonAutocomplete && event.character == ':') {
+      if (scopeEnabled && widget.scopeParent != null) {
+        return KeyEventResult.handled;
+      }
+      if (suggestions.isNotEmpty && !typed.contains(':')) {
         final index = _highlightedIndex.clamp(0, suggestions.length - 1);
-        _promoteToParent(suggestions[index]);
+        if (scopeEnabled) {
+          _enterScope(suggestions[index]);
+        } else {
+          _promoteToParent(suggestions[index]);
+        }
         return KeyEventResult.handled;
       }
     }
 
     if (suggestions.isEmpty) return KeyEventResult.ignored;
+
+    // Right arrow drills into the highlighted suggestion, but only with the
+    // caret already parked at the end of the draft, so it still moves the
+    // cursor everywhere else.
+    if (scopeEnabled &&
+        widget.scopeParent == null &&
+        event.logicalKey == LogicalKeyboardKey.arrowRight &&
+        controller.selection.isCollapsed &&
+        controller.selection.baseOffset >= controller.text.length) {
+      final index = _highlightedIndex.clamp(0, suggestions.length - 1);
+      _enterScope(suggestions[index]);
+      return KeyEventResult.handled;
+    }
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       // Pick the highlighted suggestion
@@ -455,10 +533,24 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     controller.updateValues(<T>[...widget.values]);
 
     // Create a decoration that ensures proper padding for chips
-    final InputDecoration adjustedDecoration = widget.decoration.copyWith(
+    InputDecoration adjustedDecoration = widget.decoration.copyWith(
       contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       isDense: false,
     );
+
+    // The scope pill rides in the decoration rather than in the text span:
+    // every span the controller builds has to map 1:1 onto a character of
+    // `text` (that is what the object-replacement chars are for), and the pill
+    // has no character of its own.
+    final String? scope = widget.scopeParent;
+    if (scope != null) {
+      adjustedDecoration = adjustedDecoration.copyWith(
+        prefix: TagScopeChip(
+          parent: scope,
+          onExit: () => widget.onScopeChanged?.call(null),
+        ),
+      );
+    }
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -562,6 +654,87 @@ class ChipsInputEditingController<T> extends TextEditingController {
     }
 
     return TextSpan(style: style, children: spans);
+  }
+}
+
+/// The parent pill that rides at the head of a scoped [ChipsInput]: while it
+/// is showing, everything typed into the field is added as a child of
+/// [parent]. It deliberately reads as a breadcrumb rather than a tag chip —
+/// bold label, tree icon, trailing caret — so it is not mistaken for one of
+/// the selected tags sitting next to it.
+class TagScopeChip extends StatelessWidget {
+  const TagScopeChip({super.key, required this.parent, required this.onExit});
+
+  final String parent;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final tagColor = TagColorManager.instance.getTagColor(parent);
+    final foregroundColor = TagChipStyle.readableOn(
+      Color.alphaBlend(
+        TagChipStyle.tint(tagColor, isDark: isDark),
+        theme.colorScheme.surface,
+      ),
+    );
+    final contentColor = foregroundColor == Colors.white
+        ? Colors.white
+        : tagColor;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 5, 5, 5),
+        decoration: TagChipStyle.decoration(tagColor, isDark: isDark),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsLight.treeStructure,
+              size: 13,
+              color: contentColor,
+            ),
+            const SizedBox(width: 5),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                parent,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: contentColor,
+                ),
+              ),
+            ),
+            Icon(
+              PhosphorIconsLight.caretRight,
+              size: 11,
+              color: contentColor.withValues(alpha: 0.7),
+            ),
+            const SizedBox(width: 3),
+            Tooltip(
+              message: AppLocalizations.of(context)!.exitTagScope(parent),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: onExit,
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(
+                    PhosphorIconsLight.x,
+                    size: 12,
+                    color: contentColor,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -765,6 +765,13 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get tagManagement => 'Tag Management';
   @override
+  String exitTagScope(String parent) => 'Leave "$parent"';
+  @override
+  String childTagHint(String parent) => 'New tag inside "$parent"...';
+  @override
+  String addingUnderTag(String parent) =>
+      'Adding inside "$parent" — Enter adds another child, Backspace leaves.';
+  @override
   String deleteTagConfirmation(String tag) => 'Delete tag "$tag"?';
   @override
   String get tagDeleteConfirmationText =>

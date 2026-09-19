@@ -365,6 +365,9 @@ abstract class AppLocalizations {
   String get addTag;
   String get removeTag;
   String get tagManagement;
+  String exitTagScope(String parent);
+  String childTagHint(String parent);
+  String addingUnderTag(String parent);
   String deleteTagConfirmation(String tag);
   String get tagDeleteConfirmationText;
   String tagDeleted(String tag);
