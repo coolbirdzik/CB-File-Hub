@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'cb_page_transitions.dart';
 import 'cb_tokens.dart';
 import 'primitives/cb_decorations.dart';
 import 'tokens/cb_color_tokens.dart';
@@ -295,14 +296,21 @@ class CbThemeBuilder {
       ),
 
       // ─── Selection controls ──────────────────────────────────────────────
+      // Flat toggles: the unchecked box and the unselected radio are solid
+      // fill steps, like the switch's off track — not stroked outlines. The
+      // side is a WidgetStateBorderSide because a plain BorderSide only
+      // applies while unselected; Material swaps in its own 2px ring once
+      // the control is on.
       checkboxTheme: CheckboxThemeData(
-        fillColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) return c.fillSubtle;
-          if (states.contains(WidgetState.selected)) return c.accent.base;
-          return Colors.transparent;
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => _toggleFill(c, states),
+        ),
+        checkColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return c.surface;
+          return c.accent.onBase;
         }),
-        checkColor: WidgetStatePropertyAll(c.accent.onBase),
-        side: BorderSide(color: c.strokeStrong, width: CbStrokes.hairline),
+        side: _noToggleSide,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(CbRadii.xs),
         ),
@@ -310,12 +318,24 @@ class CbThemeBuilder {
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
       ),
+      // Fluent radio: an accent disc with an on-accent dot that grows under
+      // the pointer and shrinks while pressed, instead of Material's ring
+      // around a same-colour dot.
       radioTheme: RadioThemeData(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => _toggleFill(c, states),
+        ),
         fillColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) return c.textDisabled;
-          if (states.contains(WidgetState.selected)) return c.accent.base;
-          return c.strokeStrong;
+          if (states.contains(WidgetState.disabled)) return c.surface;
+          return c.accent.onBase;
         }),
+        innerRadius: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) return 3.5;
+          if (states.contains(WidgetState.hovered)) return 5.0;
+          return 4.25;
+        }),
+        side: _noToggleSide,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         splashRadius: 0,
         visualDensity: VisualDensity.compact,
       ),
@@ -535,6 +555,15 @@ class CbThemeBuilder {
           TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
           TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
           TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          // Phones draw edge-to-edge; every page is kept clear of the
+          // system bars. Zoom is the transition these platforms already
+          // fell back to.
+          TargetPlatform.android: CbSafePageTransitionsBuilder(
+            ZoomPageTransitionsBuilder(),
+          ),
+          TargetPlatform.iOS: CbSafePageTransitionsBuilder(
+            ZoomPageTransitionsBuilder(),
+          ),
         },
       ),
     ).copyWith(
@@ -632,6 +661,30 @@ class CbThemeBuilder {
 
   static UnderlineInputBorder _inputBorder(Color? indicator) =>
       CbDecorations.inputBorder(indicator);
+
+  /// Body of a checkbox or radio. Off is a solid neutral step — one heavier
+  /// than the switch's off track, since the glyph is small and has nothing
+  /// drawn inside it — and on is the accent; both step with hover and press.
+  static Color _toggleFill(CbColorTokens c, Set<WidgetState> states) {
+    final bool selected = states.contains(WidgetState.selected);
+    if (states.contains(WidgetState.disabled)) {
+      return selected ? c.textDisabled : c.fillSubtle;
+    }
+    if (selected) {
+      if (states.contains(WidgetState.pressed)) return c.accent.pressed;
+      if (states.contains(WidgetState.hovered)) return c.accent.hover;
+      return c.accent.base;
+    }
+    if (states.contains(WidgetState.pressed) ||
+        states.contains(WidgetState.hovered)) {
+      return c.strokeStrong;
+    }
+    return c.fillPressed;
+  }
+
+  /// No outline on a checkbox or radio in any state.
+  static final WidgetStateBorderSide _noToggleSide =
+      WidgetStateBorderSide.resolveWith((_) => BorderSide.none);
 
   static TextTheme _textTheme(CbColorTokens c) {
     Color primary(TextStyle s) => c.textPrimary;

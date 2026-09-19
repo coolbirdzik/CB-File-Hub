@@ -53,6 +53,11 @@ class CbPressable extends StatefulWidget {
   /// Whether the control participates in tab traversal.
   final bool canRequestFocus;
 
+  /// Whether controls built inside this one — a switch in an expander
+  /// header — can take keyboard focus themselves. Off by default, so a
+  /// control's decorative children never become extra tab stops.
+  final bool descendantsAreFocusable;
+
   final String? semanticLabel;
   final String? tooltip;
 
@@ -67,6 +72,7 @@ class CbPressable extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     this.canRequestFocus = true,
+    this.descendantsAreFocusable = false,
     this.semanticLabel,
     this.tooltip,
   });
@@ -131,7 +137,7 @@ class _CbPressableState extends State<CbPressable> {
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
       enabled: _isEnabled && widget.canRequestFocus,
-      descendantsAreFocusable: false,
+      descendantsAreFocusable: widget.descendantsAreFocusable,
       onFocusChange: (value) {
         if (_focused == value) return;
         setState(() => _focused = value);

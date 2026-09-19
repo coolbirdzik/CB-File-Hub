@@ -143,6 +143,8 @@ abstract class AppLocalizations {
   String get viewModeColumns;
   String get viewModeTree;
   String get viewModeTiles;
+  String get defaultViewMode;
+  String get defaultViewModeDescription;
 
   // Preview pane
   String get previewPaneTitle;

@@ -22,13 +22,16 @@
 library;
 
 export 'cb_font_licenses.dart';
+export 'cb_page_transitions.dart';
 export 'cb_theme_builder.dart';
 export 'cb_tokens.dart';
 export 'fluent_surface_tokens.dart';
 export 'primitives/cb_button.dart';
+export 'primitives/cb_chevron.dart';
 export 'primitives/cb_color_swatch.dart';
 export 'primitives/cb_decorations.dart';
 export 'primitives/cb_dialog.dart';
+export 'primitives/cb_expander.dart';
 export 'primitives/cb_inline_rename.dart';
 export 'primitives/cb_pressable.dart';
 export 'primitives/cb_select.dart';

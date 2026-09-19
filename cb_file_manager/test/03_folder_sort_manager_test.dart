@@ -95,4 +95,22 @@ void main() {
     );
     expect(stored.single['sort_option'], SortOption.dateDesc.index);
   });
+
+  test(
+    '03.03 leaves view mode unset for folders without a saved one',
+    () async {
+      final manager = FolderSortManager();
+      final saved = path.join(testRoot.path, 'saved-view-mode');
+      final sortOnly = path.join(testRoot.path, 'sort-only');
+      final untouched = path.join(testRoot.path, 'untouched');
+
+      await manager.saveFolderViewMode(saved, ViewMode.tree);
+      await manager.saveFolderSortOption(sortOnly, SortOption.sizeDesc);
+
+      expect(await manager.getFolderViewMode(saved), ViewMode.tree);
+      // A row without a view mode must not shadow the default view mode.
+      expect(await manager.getFolderViewMode(sortOnly), isNull);
+      expect(await manager.getFolderViewMode(untouched), isNull);
+    },
+  );
 }

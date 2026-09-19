@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/services/archive/archive_service.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
@@ -594,7 +595,7 @@ class FileOperationsHandler {
       // Open image in our enhanced image viewer with gallery support
       Navigator.push(
         context,
-        MaterialPageRoute(
+        CbFullBleedPageRoute(
           builder: (context) => ImageViewerScreen(
             file: file,
             imageFiles: imageFiles.isNotEmpty ? imageFiles : null,

@@ -240,6 +240,25 @@ class TabbedFolderKeyboardController {
     clearImmediateSelection();
   }
 
+  /// Moves focus to an item picked outside the arrow keys (a click, or a
+  /// programmatic re-select). A plain or Ctrl pick also makes it the
+  /// Shift+Arrow range anchor; otherwise the next Shift+Arrow would extend
+  /// from an anchor left over by earlier keyboard navigation. A Shift pick
+  /// keeps the current anchor, falling back to [previousSelectedPath] (the
+  /// anchor the Shift+click range itself was built from).
+  void focusPickedPath(
+    String path, {
+    required bool shiftSelect,
+    String? previousSelectedPath,
+  }) {
+    focusedPath = path;
+    if (shiftSelect) {
+      _keyboardRangeAnchorPath ??= previousSelectedPath ?? path;
+    } else {
+      _keyboardRangeAnchorPath = path;
+    }
+  }
+
   void syncFromSelection(SelectionState selectionState) {
     _settleImmediateSelection(selectionState);
     final String? lastPath = selectionState.lastSelectedPath;

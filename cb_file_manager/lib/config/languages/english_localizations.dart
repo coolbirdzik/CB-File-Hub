@@ -308,6 +308,13 @@ class EnglishLocalizations implements AppLocalizations {
   String get viewModeTiles => 'Tiles';
 
   @override
+  String get defaultViewMode => 'Default view mode';
+
+  @override
+  String get defaultViewModeDescription =>
+      'Used for folders without their own saved view mode';
+
+  @override
   String get previewPaneTitle => 'Preview';
 
   @override

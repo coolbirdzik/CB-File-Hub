@@ -305,6 +305,13 @@ class VietnameseLocalizations implements AppLocalizations {
   String get viewModeTiles => 'Thẻ';
 
   @override
+  String get defaultViewMode => 'Chế độ xem mặc định';
+
+  @override
+  String get defaultViewModeDescription =>
+      'Áp dụng cho thư mục chưa lưu chế độ xem riêng';
+
+  @override
   String get previewPaneTitle => 'Xem trước';
 
   @override

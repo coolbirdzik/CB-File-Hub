@@ -13,8 +13,11 @@ import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/ui/screens/settings/cache_management_screen.dart';
 import 'package:cb_file_manager/ui/screens/settings/database_settings_screen.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
+import 'package:cb_file_manager/ui/utils/platform_utils.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
+import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'package:cb_file_manager/config/theme_config.dart';
 import 'package:cb_file_manager/config/design_system_config.dart';
 import 'package:cb_file_manager/providers/theme_provider.dart';
@@ -57,6 +60,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // Show file tags setting
   bool _showFileTags = true;
+  // Fallback view mode for folders without their own saved view mode.
+  ViewMode _defaultViewMode = ViewMode.list;
   FileThumbnailFitMode _fileThumbnailFitMode = FileThumbnailFitMode.cover;
   TagThumbnailFitMode _tagThumbnailFitMode = TagThumbnailFitMode.contain;
   bool _rememberTabWorkspace = false;
@@ -126,6 +131,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final thumbnailMode = await _preferences.getThumbnailMode();
       final maxConcurrency = await _preferences.getMaxThumbnailConcurrency();
       final showFileTags = await _preferences.getShowFileTags();
+      final defaultViewMode = _supportedDefaultViewMode(
+        await _preferences.getViewMode(),
+      );
       final fileThumbnailFitMode = await _preferences.getFileThumbnailFitMode();
       final tagThumbnailFitMode = await _preferences.getTagThumbnailFitMode();
       final rememberTabWorkspace = await _preferences
@@ -144,6 +152,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _thumbnailMode = thumbnailMode;
           _maxConcurrency = maxConcurrency;
           _showFileTags = showFileTags;
+          _defaultViewMode = defaultViewMode;
           _fileThumbnailFitMode = fileThumbnailFitMode;
           _tagThumbnailFitMode = tagThumbnailFitMode;
           _rememberTabWorkspace = rememberTabWorkspace;
@@ -229,6 +238,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context,
         showTags ? l10n.fileTagsEnabled : l10n.fileTagsDisabled,
       );
+    }
+  }
+
+  /// Maps legacy `gridPreview` to grid and, off desktop, `columns` to list so
+  /// the select always shows an option it actually offers.
+  ViewMode _supportedDefaultViewMode(ViewMode mode) {
+    final normalized = ViewModeUtils.normalize(mode);
+    if (!isDesktopPlatform && normalized == ViewMode.columns) {
+      return ViewMode.list;
+    }
+    return normalized;
+  }
+
+  Future<void> _updateDefaultViewMode(ViewMode mode) async {
+    final saved = await _preferences.setViewMode(mode);
+    if (saved && mounted) {
+      setState(() {
+        _defaultViewMode = mode;
+      });
     }
   }
 
@@ -532,6 +560,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _updateShowFileTags,
           ),
         ),
+        _buildDefaultViewModeTile(),
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.fileThumbnailFit,
           subtitle: AppLocalizations.of(context)!.fileThumbnailFitDescription,
@@ -601,6 +630,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: PhosphorIconsLight.info,
         ),
       ],
+    );
+  }
+
+  Widget _buildDefaultViewModeTile() {
+    final l10n = AppLocalizations.of(context)!;
+    return _buildCompactSettingTile(
+      title: l10n.defaultViewMode,
+      subtitle: l10n.defaultViewModeDescription,
+      icon: PhosphorIconsLight.eye,
+      trailing: CbSelect<ViewMode>(
+        value: _defaultViewMode,
+        onChanged: _updateDefaultViewMode,
+        items: [
+          CbSelectItem(
+            value: ViewMode.list,
+            label: l10n.viewModeList,
+            icon: PhosphorIconsLight.list,
+          ),
+          CbSelectItem(
+            value: ViewMode.tiles,
+            label: l10n.viewModeTiles,
+            icon: PhosphorIconsLight.gridNine,
+          ),
+          CbSelectItem(
+            value: ViewMode.grid,
+            label: l10n.viewModeGrid,
+            icon: PhosphorIconsLight.squaresFour,
+          ),
+          CbSelectItem(
+            value: ViewMode.details,
+            label: l10n.viewModeDetails,
+            icon: PhosphorIconsLight.listBullets,
+          ),
+          if (isDesktopPlatform)
+            CbSelectItem(
+              value: ViewMode.columns,
+              label: l10n.viewModeColumns,
+              icon: PhosphorIconsLight.columns,
+            ),
+          CbSelectItem(
+            value: ViewMode.tree,
+            label: l10n.viewModeTree,
+            icon: PhosphorIconsLight.treeView,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1183,43 +1258,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             // Cloud Sync Section
-            ExpansionTile(
-              initiallyExpanded: _isDatabaseSectionExpandedCloudSync,
-              onExpansionChanged: (expanded) {
-                setState(() {
-                  _isDatabaseSectionExpandedCloudSync = expanded;
-                });
-              },
-              tilePadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 0,
-              ),
-              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              leading: const Icon(PhosphorIconsLight.cloudArrowUp, size: 20),
-              title: const Text(
-                'Cloud Sync',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              subtitle: Text(
-                _isCloudSyncEnabled ? 'Enabled' : 'Disabled',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+            CbExpander(
+              expanded: _isDatabaseSectionExpandedCloudSync,
+              onExpansionChanged: (expanded) =>
+                  _isDatabaseSectionExpandedCloudSync = expanded,
+              leading: const Icon(PhosphorIconsLight.cloudArrowUp),
+              title: const Text('Cloud Sync'),
+              subtitle: Text(_isCloudSyncEnabled ? 'Enabled' : 'Disabled'),
               trailing: Switch(
                 value: _isCloudSyncEnabled,
                 onChanged: _toggleCloudSync,
               ),
               children: [
-                const SizedBox(height: 8),
-                Container(
+                Padding(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1886,7 +1938,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildThemeCollapseTile() {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
-        final theme = Theme.of(context);
         final currentTheme = themeProvider.currentTheme;
         final currentThemeName =
             ThemeConfig.themeNames[currentTheme] ?? currentTheme.name;
@@ -1896,71 +1947,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const showDesktopAcrylicControl =
             DesignSystemConfig.enableDesktopAcrylicWindowBackground;
 
-        return Theme(
-          data: theme.copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            childrenPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            initiallyExpanded: _isThemeExpanded,
-            onExpansionChanged: (expanded) {
-              setState(() {
-                _isThemeExpanded = expanded;
-              });
-            },
-            leading: const Icon(PhosphorIconsLight.palette, size: 20),
-            title: Text(
-              AppLocalizations.of(context)!.theme,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            subtitle: Text(
-              '$currentThemeName • Accent: $currentAccentName',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.onSurfaceVariant,
+        return CbExpander(
+          expanded: _isThemeExpanded,
+          onExpansionChanged: (expanded) => _isThemeExpanded = expanded,
+          leading: const Icon(PhosphorIconsLight.palette),
+          title: Text(AppLocalizations.of(context)!.theme),
+          subtitle: Text('$currentThemeName • Accent: $currentAccentName'),
+          children: [
+            RadioGroup<AppThemeType>(
+              groupValue: currentTheme,
+              onChanged: (value) {
+                if (value == null) return;
+                context.read<ThemeProvider>().setTheme(value);
+              },
+              child: Column(
+                children: [
+                  for (final themeType in AppThemeType.values)
+                    _buildRadioOption<AppThemeType>(
+                      value: themeType,
+                      title: Text(
+                        ThemeConfig.themeNames[themeType] ?? themeType.name,
+                      ),
+                    ),
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            trailing: AnimatedRotation(
-              duration: const Duration(milliseconds: 180),
-              turns: _isThemeExpanded ? 0.5 : 0,
-              child: const Icon(PhosphorIconsLight.caretDown, size: 16),
-            ),
-            children: [
-              ...AppThemeType.values.map((themeType) {
-                final title =
-                    ThemeConfig.themeNames[themeType] ?? themeType.name;
-                // ignore: deprecated_member_use
-                // ignore: deprecated_member_use
-                return RadioListTile<AppThemeType>(
-                  dense: true,
-                  value: themeType,
-                  // ignore: deprecated_member_use
-                  groupValue: currentTheme,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  title: Text(title, style: const TextStyle(fontSize: 13)),
-                  // ignore: deprecated_member_use
-                  onChanged: (value) {
-                    if (value == null) return;
-                    context.read<ThemeProvider>().setTheme(value);
-                  },
-                );
-              }),
-              _buildAccentColorControl(themeProvider),
-              _buildFontColorControl(themeProvider),
-              _buildUiFontControl(themeProvider),
-              if (showDesktopAcrylicControl) ...[
-                _buildBackdropModeControl(themeProvider),
-                _buildDesktopAcrylicStrengthControl(themeProvider),
-              ],
+            _buildAccentColorControl(themeProvider),
+            _buildFontColorControl(themeProvider),
+            _buildUiFontControl(themeProvider),
+            if (showDesktopAcrylicControl) ...[
+              _buildBackdropModeControl(themeProvider),
+              _buildDesktopAcrylicStrengthControl(themeProvider),
             ],
-          ),
+          ],
         );
       },
     );
@@ -2383,84 +2402,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildLanguageCollapseTile() {
-    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final languageLabel = _currentLanguageCode == 'vi'
-        ? AppLocalizations.of(context)!.vietnameseLanguage
-        : AppLocalizations.of(context)!.englishLanguage;
+        ? l10n.vietnameseLanguage
+        : l10n.englishLanguage;
 
-    return Theme(
-      data: theme.copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 4,
-        ),
-        initiallyExpanded: _isLanguageExpanded,
-        onExpansionChanged: (expanded) {
-          setState(() {
-            _isLanguageExpanded = expanded;
-          });
-        },
-        leading: const Icon(PhosphorIconsLight.globe, size: 20),
-        title: Text(
-          AppLocalizations.of(context)!.language,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        subtitle: Text(
-          languageLabel,
-          style: TextStyle(
-            fontSize: 12,
-            color: theme.colorScheme.onSurfaceVariant,
+    return CbExpander(
+      expanded: _isLanguageExpanded,
+      onExpansionChanged: (expanded) => _isLanguageExpanded = expanded,
+      leading: const Icon(PhosphorIconsLight.globe),
+      title: Text(l10n.language),
+      subtitle: Text(languageLabel),
+      children: [
+        RadioGroup<String>(
+          groupValue: _currentLanguageCode,
+          onChanged: (value) {
+            if (value != null) _updateLanguage(value);
+          },
+          child: Column(
+            children: [
+              _buildRadioOption<String>(
+                value: LanguageController.vietnamese,
+                title: Text('🇻🇳  ${l10n.vietnameseLanguage}'),
+              ),
+              _buildRadioOption<String>(
+                value: LanguageController.english,
+                title: Text('🇬🇧  ${l10n.englishLanguage}'),
+              ),
+            ],
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
-        trailing: AnimatedRotation(
-          duration: const Duration(milliseconds: 180),
-          turns: _isLanguageExpanded ? 0.5 : 0,
-          child: const Icon(PhosphorIconsLight.caretDown, size: 16),
-        ),
-        children: [
-          _buildLanguageOptionTile(
-            title: AppLocalizations.of(context)!.vietnameseLanguage,
-            value: LanguageController.vietnamese,
-            flagEmoji: '🇻🇳',
-          ),
-          _buildLanguageOptionTile(
-            title: AppLocalizations.of(context)!.englishLanguage,
-            value: LanguageController.english,
-            flagEmoji: '🇬🇧',
-          ),
-        ],
-      ),
+      ],
     );
   }
 
-  Widget _buildLanguageOptionTile({
-    required String title,
-    required String value,
-    required String flagEmoji,
-  }) {
-    final isSelected = _currentLanguageCode == value;
-    return ListTile(
+  /// One choice inside a [RadioGroup]: the flat Fluent radio from the theme
+  /// and its label, on a row that takes the hover fill.
+  Widget _buildRadioOption<T>({required T value, required Widget title}) {
+    return RadioListTile<T>(
+      value: value,
       dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      title: Row(
-        children: [
-          Text(flagEmoji),
-          const SizedBox(width: 8),
-          Text(title, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-      trailing: isSelected
-          ? Icon(
-              PhosphorIconsLight.checkCircle,
-              color: Theme.of(context).colorScheme.primary,
-              size: 18,
-            )
-          : null,
-      onTap: () => _updateLanguage(value),
+      contentPadding: const EdgeInsets.symmetric(horizontal: CbSpacing.md),
+      title: title,
     );
   }
 }

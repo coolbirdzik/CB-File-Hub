@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/design_system_config.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
@@ -124,92 +125,67 @@ class _StorageSectionWidgetState extends State<StorageSectionWidget> {
 
     return BlocBuilder<DrawerCubit, DrawerState>(
       builder: (context, state) {
-        return Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Material(
-              color: Colors.transparent,
-              child: ExpansionTile(
-                tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                trailing: AnimatedRotation(
-                  duration: const Duration(milliseconds: 180),
-                  turns: _isExpanded ? 0.5 : 0.0,
-                  child: Icon(
-                    PhosphorIconsLight.caretDown,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                leading: Icon(
-                  PhosphorIconsLight.hardDrives,
-                  size: 20,
-                  color: theme.colorScheme.primary,
-                ),
-                title: Text(
-                  context.tr.drivesTab,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                collapsedBackgroundColor: Colors.transparent,
-                backgroundColor: Colors.transparent,
-                childrenPadding: const EdgeInsets.only(bottom: 8),
-                initiallyExpanded: _isExpanded,
-                onExpansionChanged: (isExpanded) {
-                  setState(() {
-                    _isExpanded = isExpanded;
-                  });
-                  widget.onExpansionChanged?.call(isExpanded);
-                },
-                children: <Widget>[
-                  if (state.isLoading)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    )
-                  else if (state.storageLocations.isEmpty)
-                    ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 52,
-                        right: 14,
-                      ),
-                      title: Text(context.tr.noStorageLocationsFound),
-                      trailing: IconButton(
-                        icon: const Icon(PhosphorIconsLight.arrowsClockwise),
-                        onPressed: () {
-                          context.read<DrawerCubit>().loadStorageLocations();
-                        },
-                      ),
-                    )
-                  else
-                    ...state.storageLocations.map((storage) {
-                      return _buildStorageItem(context, storage);
-                    }),
-
-                  // Trash Bin
-                  _buildItem(
-                    context,
-                    icon: PhosphorIconsLight.trash,
-                    title: context.tr.trashBin,
-                    iconColor: theme.colorScheme.error,
-                    onTap: widget.onTrashTap,
-                  ),
-                ],
-              ),
+        return CbExpander(
+          flush: true,
+          headerPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: CbSpacing.sm,
+          ),
+          leading: Icon(
+            PhosphorIconsLight.hardDrives,
+            color: theme.colorScheme.primary,
+          ),
+          title: Text(
+            context.tr.drivesTab,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
             ),
           ),
+          contentPadding: const EdgeInsets.only(bottom: 8),
+          expanded: _isExpanded,
+          onExpansionChanged: (isExpanded) {
+            _isExpanded = isExpanded;
+            widget.onExpansionChanged?.call(isExpanded);
+          },
+          children: <Widget>[
+            if (state.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (state.storageLocations.isEmpty)
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 52, right: 14),
+                title: Text(context.tr.noStorageLocationsFound),
+                trailing: IconButton(
+                  icon: const Icon(PhosphorIconsLight.arrowsClockwise),
+                  onPressed: () {
+                    context.read<DrawerCubit>().loadStorageLocations();
+                  },
+                ),
+              )
+            else
+              ...state.storageLocations.map((storage) {
+                return _buildStorageItem(context, storage);
+              }),
+
+            // Trash Bin
+            _buildItem(
+              context,
+              icon: PhosphorIconsLight.trash,
+              title: context.tr.trashBin,
+              iconColor: theme.colorScheme.error,
+              onTap: widget.onTrashTap,
+            ),
+          ],
         );
       },
     );

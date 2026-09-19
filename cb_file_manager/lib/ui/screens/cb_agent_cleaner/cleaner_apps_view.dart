@@ -1375,35 +1375,39 @@ class _SharedStoragePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    return ExpansionTile(
+    // A card of its own; the entries inside are cards too, so they are
+    // disclosed flush rather than inside a second fill block. Clipped so the
+    // header's hover fill follows the card's corners.
+    return Container(
       key: const ValueKey<String>('cleaner-apps-shared-storage'),
-      initiallyExpanded: false,
-      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-      collapsedShape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(9),
-      ),
-      backgroundColor: context.cbColors.fillSubtle,
-      collapsedBackgroundColor: context.cbColors.fillSubtle,
-      leading: const Icon(Icons.folder_shared_outlined, size: 19),
-      title: Text(
-        '${l10n.cleanerAppsSharedFolders} (${entries.length})',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.labelLarge,
-      ),
-      children: [
-        for (final entry in entries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: _StorageEntryTile(
-              key: ValueKey<String>('cleaner-app-shared-${entry.path}'),
-              entry: entry,
-              onOpenFolder: onOpenFolder,
+      clipBehavior: Clip.antiAlias,
+      decoration: CbDecorations.card(context, radius: 9),
+      child: CbExpander(
+        flush: true,
+        headerPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: CbSpacing.sm,
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+        leading: const Icon(Icons.folder_shared_outlined, size: 19),
+        title: Text(
+          '${l10n.cleanerAppsSharedFolders} (${entries.length})',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelLarge,
+        ),
+        children: [
+          for (final entry in entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _StorageEntryTile(
+                key: ValueKey<String>('cleaner-app-shared-${entry.path}'),
+                entry: entry,
+                onOpenFolder: onOpenFolder,
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

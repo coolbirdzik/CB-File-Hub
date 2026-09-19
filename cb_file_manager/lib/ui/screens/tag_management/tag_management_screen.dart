@@ -2352,119 +2352,122 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           color: theme.scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.dividerColor.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                _selectedTagForFiles ?? localizations.moreOptions,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.dividerColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.folderSimple),
-              title: Text(localizations.openInNewTab),
-              onTap: _selectedTagForFiles == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _directTagSearch(_selectedTagForFiles!);
-                    },
-            ),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.pencilSimple),
-              title: Text(localizations.renameTag),
-              onTap: _selectedTagForFiles == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      if (_isDesktop) {
-                        _startTagRename(_selectedTagForFiles!);
-                      } else {
-                        _showRenameDialog(_selectedTagForFiles!);
-                      }
-                    },
-            ),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.palette),
-              title: Text(localizations.changeColor),
-              onTap: _selectedTagForFiles == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _showColorPickerDialog(_selectedTagForFiles!);
-                    },
-            ),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.image),
-              title: Text(localizations.setThumbnail),
-              onTap: _selectedTagForFiles == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _showThumbnailPicker(_selectedTagForFiles!);
-                    },
-            ),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.treeStructure),
-              title: Text(localizations.manageHierarchy),
-              onTap: _selectedTagForFiles == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _showManageHierarchyDialog(_selectedTagForFiles!);
-                    },
-            ),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.arrowsClockwise),
-              title: Text(localizations.refresh),
-              onTap: () {
-                Navigator.pop(context);
-                _refreshSelectedTagFiles();
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                PhosphorIconsLight.trash,
-                color: theme.colorScheme.error,
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  _selectedTagForFiles ?? localizations.moreOptions,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
               ),
-              title: Text(
-                localizations.deleteTagFromAllFiles,
-                style: TextStyle(color: theme.colorScheme.error),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.folderSimple),
+                title: Text(localizations.openInNewTab),
+                onTap: _selectedTagForFiles == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _directTagSearch(_selectedTagForFiles!);
+                      },
               ),
-              onTap: _selectedTagForFiles == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _confirmDeleteTag(_selectedTagForFiles!);
-                    },
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.arrowLeft),
-              title: Text(localizations.backToAllTags),
-              onTap: () {
-                Navigator.pop(context);
-                _clearTagSelection();
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.pencilSimple),
+                title: Text(localizations.renameTag),
+                onTap: _selectedTagForFiles == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        if (_isDesktop) {
+                          _startTagRename(_selectedTagForFiles!);
+                        } else {
+                          _showRenameDialog(_selectedTagForFiles!);
+                        }
+                      },
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.palette),
+                title: Text(localizations.changeColor),
+                onTap: _selectedTagForFiles == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _showColorPickerDialog(_selectedTagForFiles!);
+                      },
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.image),
+                title: Text(localizations.setThumbnail),
+                onTap: _selectedTagForFiles == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _showThumbnailPicker(_selectedTagForFiles!);
+                      },
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.treeStructure),
+                title: Text(localizations.manageHierarchy),
+                onTap: _selectedTagForFiles == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _showManageHierarchyDialog(_selectedTagForFiles!);
+                      },
+              ),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.arrowsClockwise),
+                title: Text(localizations.refresh),
+                onTap: () {
+                  Navigator.pop(context);
+                  _refreshSelectedTagFiles();
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  PhosphorIconsLight.trash,
+                  color: theme.colorScheme.error,
+                ),
+                title: Text(
+                  localizations.deleteTagFromAllFiles,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+                onTap: _selectedTagForFiles == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _confirmDeleteTag(_selectedTagForFiles!);
+                      },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(PhosphorIconsLight.arrowLeft),
+                title: Text(localizations.backToAllTags),
+                onTap: () {
+                  Navigator.pop(context);
+                  _clearTagSelection();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

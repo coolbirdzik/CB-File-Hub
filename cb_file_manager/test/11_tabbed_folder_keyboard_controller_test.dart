@@ -136,6 +136,92 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
   });
 
+  testWidgets(
+    '11.01b Shift+arrow after a click extends from the clicked item',
+    (tester) async {
+      final controller = TabbedFolderKeyboardController();
+      addTearDown(controller.dispose);
+
+      final files = List<FileSystemEntity>.generate(
+        6,
+        (i) => File('C:\\root\\file$i.txt'),
+      );
+      final state = FolderListState(r'C:\root', files: files);
+      SelectionState selectionState = const SelectionState();
+      Set<String>? lastRange;
+
+      KeyEventResult press(
+        LogicalKeyboardKey key,
+        PhysicalKeyboardKey physical,
+      ) {
+        return controller.handleKeyEvent(
+          isDesktop: true,
+          folderListState: state,
+          selectionState: selectionState,
+          currentFilter: null,
+          onBackInTabHistory: () {},
+          focusFolderPath: (_) {},
+          focusFilePath: (path) => selectionState = SelectionState(
+            selectedFilePaths: <String>{path},
+            lastSelectedPath: path,
+            isSelectionMode: true,
+          ),
+          selectRange:
+              ({
+                required Set<String> folderPaths,
+                required Set<String> filePaths,
+                required String lastSelectedPath,
+                required bool ctrlSelect,
+              }) {
+                lastRange = filePaths;
+                selectionState = SelectionState(
+                  selectedFilePaths: filePaths,
+                  lastSelectedPath: lastSelectedPath,
+                  isSelectionMode: true,
+                );
+              },
+          activateEntity: (_) {},
+          onDelete: (_) {},
+          event: KeyDownEvent(
+            logicalKey: key,
+            physicalKey: physical,
+            timeStamp: Duration.zero,
+          ),
+        );
+      }
+
+      // Plain arrow navigation leaves a keyboard range anchor near the top.
+      controller.focusedPath = files[0].path;
+      press(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+      expect(controller.focusedPath, files[1].path);
+
+      // The user then clicks an item further down.
+      controller.focusPickedPath(
+        files[3].path,
+        shiftSelect: false,
+        previousSelectedPath: selectionState.lastSelectedPath,
+      );
+      selectionState = SelectionState(
+        selectedFilePaths: <String>{files[3].path},
+        lastSelectedPath: files[3].path,
+        isSelectionMode: true,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+
+      press(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+      expect(lastRange, <String>{files[3].path, files[4].path});
+
+      press(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
+      press(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
+      expect(lastRange, <String>{files[2].path, files[3].path});
+      expect(controller.focusedPath, files[2].path);
+
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+    },
+  );
+
   testWidgets('11.02 Immediate selection settles after bloc state catches up', (
     tester,
   ) async {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 
@@ -54,72 +55,45 @@ class _PinnedSectionWidgetState extends State<PinnedSectionWidget> {
           return const SizedBox.shrink();
         }
 
-        return Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Material(
-              color: Colors.transparent,
-              child: ExpansionTile(
-                tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-                key: ValueKey<String>(
-                  'pinned-${state.activeTabId}-${widget.initialExpanded}',
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                trailing: AnimatedRotation(
-                  duration: const Duration(milliseconds: 180),
-                  turns: _isExpanded ? 0.5 : 0.0,
-                  child: Icon(
-                    PhosphorIconsLight.caretDown,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                leading: Icon(
-                  PhosphorIconsLight.pushPin,
-                  size: 20,
-                  color: theme.colorScheme.primary,
-                ),
-                title: Text(
-                  l10n.pinnedSection,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                collapsedBackgroundColor: Colors.transparent,
-                backgroundColor: Colors.transparent,
-                childrenPadding: const EdgeInsets.only(bottom: 8),
-                initiallyExpanded: _isExpanded,
-                onExpansionChanged: (isExpanded) {
-                  setState(() {
-                    _isExpanded = isExpanded;
-                  });
-                  widget.onExpansionChanged?.call(isExpanded);
-                },
-                children: state.pinnedPaths
-                    .map((pinnedPath) {
-                      return _buildPinnedItem(
-                        context,
-                        pinnedPath: pinnedPath,
-                        onTap: () => widget.onNavigate(
-                          pinnedPath,
-                          _getPinnedDisplayName(pinnedPath),
-                        ),
-                        onUnpin: () {
-                          context.read<DrawerCubit>().togglePinnedPath(
-                            pinnedPath,
-                          );
-                        },
-                      );
-                    })
-                    .toList(growable: false),
-              ),
+        return CbExpander(
+          flush: true,
+          headerPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: CbSpacing.sm,
+          ),
+          leading: Icon(
+            PhosphorIconsLight.pushPin,
+            color: theme.colorScheme.primary,
+          ),
+          title: Text(
+            l10n.pinnedSection,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
             ),
           ),
+          contentPadding: const EdgeInsets.only(bottom: 8),
+          expanded: _isExpanded,
+          onExpansionChanged: (isExpanded) {
+            _isExpanded = isExpanded;
+            widget.onExpansionChanged?.call(isExpanded);
+          },
+          children: state.pinnedPaths
+              .map((pinnedPath) {
+                return _buildPinnedItem(
+                  context,
+                  pinnedPath: pinnedPath,
+                  onTap: () => widget.onNavigate(
+                    pinnedPath,
+                    _getPinnedDisplayName(pinnedPath),
+                  ),
+                  onUnpin: () {
+                    context.read<DrawerCubit>().togglePinnedPath(pinnedPath);
+                  },
+                );
+              })
+              .toList(growable: false),
         );
       },
     );

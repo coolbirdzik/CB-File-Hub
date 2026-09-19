@@ -55,14 +55,19 @@ class ItemInteractionStyle {
   /// Foreground of a grid tile: the selection wash painted *over* the whole
   /// cell. A photo or video thumbnail fills the cell edge to edge and would
   /// hide a background fill, leaving only the name band tinted.
-  static BoxDecoration? gridForeground(
+  ///
+  /// Never null: [Container] only adds its foreground [DecoratedBox] when a
+  /// decoration is given, so toggling null on selection changed the tile's
+  /// depth and remounted everything below it. A video thumbnail then
+  /// re-read its cache asynchronously and blinked for a frame.
+  static BoxDecoration gridForeground(
     BuildContext context, {
     required bool isDesktopMode,
     required bool isSelected,
     required bool isHovering,
     double radius = CbRadii.md,
   }) {
-    if (!isSelected) return null;
+    if (!isSelected) return const BoxDecoration();
     return CbDecorations.selectedOverlay(
       context,
       radius: radius,

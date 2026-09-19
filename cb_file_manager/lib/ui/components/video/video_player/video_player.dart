@@ -2719,7 +2719,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
           if (mounted) {
             await Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(
+              CbFullBleedPageRoute(
                 builder: (_) =>
                     ImageViewerScreen(file: imageFile, imageBytes: imageBytes),
               ),
@@ -2767,7 +2767,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
           await Future.delayed(const Duration(milliseconds: 50));
           if (mounted) {
             await Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(
+              CbFullBleedPageRoute(
                 builder: (_) =>
                     ImageViewerScreen(file: imageFile, imageBytes: imageBytes),
               ),
@@ -2827,7 +2827,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         try {
           if (mounted) {
             await Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(
+              CbFullBleedPageRoute(
                 builder: (_) => ImageViewerScreen(file: File(filePath)),
               ),
             );

@@ -309,7 +309,7 @@ class _FileGridItemState extends State<FileGridItem> {
       isSelected: showAsSelected,
       isHovering: _isHovering,
     );
-    final BoxDecoration? cellForeground = ItemInteractionStyle.gridForeground(
+    final BoxDecoration cellForeground = ItemInteractionStyle.gridForeground(
       context,
       isDesktopMode: widget.isDesktopMode,
       isSelected: showAsSelected,

@@ -370,75 +370,101 @@ class MobileFileActionsController {
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.dividerColor.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                localizations.moreOptions,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.dividerColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
 
-            const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  localizations.moreOptions,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
 
-            // More options
-            ListTile(
-              leading: const Icon(PhosphorIconsLight.checks),
-              title: Text(localizations.selectMultiple ?? 'Chọn nhiều file'),
-              onTap: () {
-                Navigator.pop(context);
-                onSelectionModeToggled?.call();
-              },
-            ),
+              const Divider(height: 1),
 
-            if (onGridSizePressed != null &&
-                ViewModeUtils.isGridLike(currentViewMode))
+              // More options
               ListTile(
-                leading: const Icon(PhosphorIconsLight.rectangle),
-                title: Text(localizations.gridSize ?? 'Kích thước lưới'),
+                leading: const Icon(PhosphorIconsLight.checks),
+                title: Text(localizations.selectMultiple ?? 'Chọn nhiều file'),
                 onTap: () {
                   Navigator.pop(context);
-                  onGridSizePressed?.call();
+                  onSelectionModeToggled?.call();
                 },
               ),
 
-            if (onManageTagsPressed != null)
-              ListTile(
-                leading: const Icon(PhosphorIconsLight.tag),
-                title: Text(localizations.tagManagement),
-                onTap: () {
-                  Navigator.pop(context);
-                  onManageTagsPressed?.call();
-                },
-              ),
+              if (onGridSizePressed != null &&
+                  ViewModeUtils.isGridLike(currentViewMode))
+                ListTile(
+                  leading: const Icon(PhosphorIconsLight.rectangle),
+                  title: Text(localizations.gridSize ?? 'Kích thước lưới'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onGridSizePressed?.call();
+                  },
+                ),
 
-            if (onAllowFileExtensionRenameChanged != null)
+              if (onManageTagsPressed != null)
+                ListTile(
+                  leading: const Icon(PhosphorIconsLight.tag),
+                  title: Text(localizations.tagManagement),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onManageTagsPressed?.call();
+                  },
+                ),
+
+              if (onAllowFileExtensionRenameChanged != null)
+                ListTile(
+                  leading: Icon(
+                    PhosphorIconsLight.textAa,
+                    color: allowFileExtensionRename
+                        ? theme.colorScheme.primary
+                        : theme.iconTheme.color,
+                  ),
+                  title: Text(localizations.allowFileExtensionRename),
+                  trailing: allowFileExtensionRename
+                      ? Icon(
+                          PhosphorIconsLight.check,
+                          color: theme.colorScheme.primary,
+                        )
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    allowFileExtensionRename = !allowFileExtensionRename;
+                    onAllowFileExtensionRenameChanged?.call(
+                      allowFileExtensionRename,
+                    );
+                  },
+                ),
+
+              // Masonry toggle option
               ListTile(
                 leading: Icon(
-                  PhosphorIconsLight.textAa,
-                  color: allowFileExtensionRename
+                  PhosphorIconsLight.gridFour,
+                  color: isMasonryLayout
                       ? theme.colorScheme.primary
                       : theme.iconTheme.color,
                 ),
-                title: Text(localizations.allowFileExtensionRename),
-                trailing: allowFileExtensionRename
+                title: Text(localizations.masonryLayout),
+                trailing: isMasonryLayout
                     ? Icon(
                         PhosphorIconsLight.check,
                         color: theme.colorScheme.primary,
@@ -446,42 +472,19 @@ class MobileFileActionsController {
                     : null,
                 onTap: () {
                   Navigator.pop(context);
-                  allowFileExtensionRename = !allowFileExtensionRename;
-                  onAllowFileExtensionRenameChanged?.call(
-                    allowFileExtensionRename,
-                  );
+                  isMasonryLayout = !isMasonryLayout;
+                  if (isMasonryLayout &&
+                      !ViewModeUtils.isGridLike(currentViewMode)) {
+                    currentViewMode = ViewMode.grid;
+                    onViewModeToggled?.call(ViewMode.grid);
+                  }
+                  onMasonryToggled?.call();
                 },
               ),
 
-            // Masonry toggle option
-            ListTile(
-              leading: Icon(
-                PhosphorIconsLight.gridFour,
-                color: isMasonryLayout
-                    ? theme.colorScheme.primary
-                    : theme.iconTheme.color,
-              ),
-              title: Text(localizations.masonryLayout),
-              trailing: isMasonryLayout
-                  ? Icon(
-                      PhosphorIconsLight.check,
-                      color: theme.colorScheme.primary,
-                    )
-                  : null,
-              onTap: () {
-                Navigator.pop(context);
-                isMasonryLayout = !isMasonryLayout;
-                if (isMasonryLayout &&
-                    !ViewModeUtils.isGridLike(currentViewMode)) {
-                  currentViewMode = ViewMode.grid;
-                  onViewModeToggled?.call(ViewMode.grid);
-                }
-                onMasonryToggled?.call();
-              },
-            ),
-
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

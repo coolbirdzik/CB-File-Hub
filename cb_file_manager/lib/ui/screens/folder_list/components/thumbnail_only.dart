@@ -5,7 +5,6 @@ import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/helpers/files/file_icon_helper.dart';
 import 'package:path/path.dart' as p;
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 /// A widget that displays only the thumbnail of a file item.
 /// This widget is designed to be constant and not rebuild on selection changes.
@@ -115,14 +114,11 @@ class _ThumbnailOnlyState extends State<ThumbnailOnly>
               false, // Don't mark all as priority to reduce concurrent loads
           borderRadius: BorderRadius.circular(0),
           showLoadingIndicator: true,
+          // No placeholder icon for video: the loaded thumbnail brings its
+          // own play overlay, and a second, larger one here flashed before
+          // the frame landed.
           fallbackBuilder: () => isVideo
-              ? Center(
-                  child: Icon(
-                    PhosphorIconsLight.playCircle,
-                    size: widget.iconSize,
-                    color: Colors.white70,
-                  ),
-                )
+              ? const SizedBox.expand()
               : Center(
                   child: Icon(
                     genericIcon,

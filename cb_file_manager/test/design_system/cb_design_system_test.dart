@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cb_file_manager/config/theme_config.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -156,6 +157,55 @@ void main() {
         }
       }
     });
+
+    test('checkboxes and radios are flat fills, never outlined', () {
+      const stateSets = <Set<WidgetState>>[
+        {},
+        {WidgetState.hovered},
+        {WidgetState.selected},
+        {WidgetState.selected, WidgetState.hovered},
+      ];
+
+      for (final theme in [
+        ThemeConfig.getLightTheme(),
+        ThemeConfig.getDarkTheme(),
+      ]) {
+        final c = theme.cb.colors;
+        final checkbox = theme.checkboxTheme;
+        final radio = theme.radioTheme;
+
+        // A plain BorderSide would only cover the unselected state; Material
+        // brings back its own ring once the control is on.
+        for (final states in stateSets) {
+          expect(
+            WidgetStateProperty.resolveAs<BorderSide?>(checkbox.side, states),
+            BorderSide.none,
+            reason: 'checkbox side in $states',
+          );
+          expect(
+            WidgetStateProperty.resolveAs<BorderSide?>(radio.side, states),
+            BorderSide.none,
+            reason: 'radio side in $states',
+          );
+        }
+
+        // Off is a visible fill rather than an empty outline; on is the
+        // accent disc — the dot on it is the on-accent ink, not the accent.
+        expect(
+          checkbox.fillColor!.resolve(const {}),
+          isNot(Colors.transparent),
+        );
+        expect(radio.backgroundColor!.resolve(const {}), c.fillPressed);
+        expect(
+          radio.backgroundColor!.resolve(const {WidgetState.selected}),
+          c.accent.base,
+        );
+        expect(
+          radio.fillColor!.resolve(const {WidgetState.selected}),
+          c.accent.onBase,
+        );
+      }
+    });
   });
 
   group('CbDecorations.selectionFill', () {
@@ -293,6 +343,155 @@ void main() {
       final size = tester.getSize(find.byType(CbButton));
       expect(size.width, size.height);
       expect(find.byTooltip('Close'), findsOneWidget);
+    });
+  });
+
+  group('CbExpander', () {
+    Widget host(Widget child) => MaterialApp(
+      theme: ThemeConfig.getLightTheme(),
+      home: Scaffold(body: child),
+    );
+
+    testWidgets('discloses its children on tap and builds none collapsed', (
+      tester,
+    ) async {
+      final changes = <bool>[];
+      await tester.pumpWidget(
+        host(
+          CbExpander(
+            title: const Text('Theme'),
+            onExpansionChanged: changes.add,
+            children: const [Text('Inside')],
+          ),
+        ),
+      );
+      expect(find.text('Inside'), findsNothing);
+
+      await tester.tap(find.text('Theme'));
+      await tester.pumpAndSettle();
+      expect(find.text('Inside'), findsOneWidget);
+
+      await tester.tap(find.text('Theme'));
+      await tester.pumpAndSettle();
+      expect(find.text('Inside'), findsNothing);
+      expect(changes, [true, false]);
+    });
+
+    testWidgets('follows a stored state its parent passes back in', (
+      tester,
+    ) async {
+      var expanded = false;
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        host(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return CbExpander(
+                title: const Text('Drives'),
+                expanded: expanded,
+                children: const [Text('C:')],
+              );
+            },
+          ),
+        ),
+      );
+      expect(find.text('C:'), findsNothing);
+
+      setOuter(() => expanded = true);
+      await tester.pumpAndSettle();
+      expect(find.text('C:'), findsOneWidget);
+    });
+
+    testWidgets('a trailing switch works without toggling the expander', (
+      tester,
+    ) async {
+      bool? switched;
+      await tester.pumpWidget(
+        host(
+          CbExpander(
+            title: const Text('Cloud Sync'),
+            trailing: Switch(value: false, onChanged: (v) => switched = v),
+            children: const [Text('Inside')],
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(switched, isTrue);
+      expect(find.text('Inside'), findsNothing);
+    });
+  });
+
+  group('CbSafePageTransitionsBuilder', () {
+    const pageKey = Key('page');
+
+    // 24 logical px of status bar, 48 of navigation bar.
+    void edgeToEdgePhone(WidgetTester tester) {
+      tester.view.devicePixelRatio = 3.0;
+      tester.view.padding = const FakeViewPadding(top: 72, bottom: 144);
+      addTearDown(tester.view.reset);
+    }
+
+    Widget page() => const SizedBox.expand(key: pageKey);
+
+    testWidgets('keeps a phone page clear of the system bars, once', (
+      tester,
+    ) async {
+      edgeToEdgePhone(tester);
+      late EdgeInsets innerPadding;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeConfig.getLightTheme(),
+          home: Builder(
+            builder: (context) {
+              innerPadding = MediaQuery.paddingOf(context);
+              return page();
+            },
+          ),
+        ),
+      );
+
+      final rect = tester.getRect(find.byKey(pageKey));
+      expect(rect.top, 24);
+      expect(tester.view.physicalSize.height / 3.0 - rect.bottom, 48);
+      // Consumed, so a page's own SafeArea does not pad a second time.
+      expect(innerPadding, EdgeInsets.zero);
+    });
+
+    testWidgets('a full-bleed route is drawn under the bars', (tester) async {
+      edgeToEdgePhone(tester);
+      final navigatorKey = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeConfig.getLightTheme(),
+          navigatorKey: navigatorKey,
+          home: const SizedBox.shrink(),
+        ),
+      );
+
+      navigatorKey.currentState!.push(
+        CbFullBleedPageRoute<void>(builder: (_) => page()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(find.byKey(pageKey)).top, 0);
+    });
+
+    testWidgets('leaves desktop pages alone', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      try {
+        edgeToEdgePhone(tester);
+        await tester.pumpWidget(
+          MaterialApp(theme: ThemeConfig.getLightTheme(), home: page()),
+        );
+
+        expect(tester.getRect(find.byKey(pageKey)).top, 0);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 

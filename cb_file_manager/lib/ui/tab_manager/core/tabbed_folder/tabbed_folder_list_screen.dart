@@ -509,7 +509,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     bool shiftSelect = false,
     bool ctrlSelect = false,
   }) {
-    _keyboardController.focusedPath = filePath;
+    _keyboardController.focusPickedPath(
+      filePath,
+      shiftSelect: shiftSelect,
+      previousSelectedPath: _selectionBloc.state.lastSelectedPath,
+    );
     _showImmediateSelectionForToggle(
       filePath,
       shiftSelect: shiftSelect,
@@ -527,7 +531,11 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     bool shiftSelect = false,
     bool ctrlSelect = false,
   }) {
-    _keyboardController.focusedPath = folderPath;
+    _keyboardController.focusPickedPath(
+      folderPath,
+      shiftSelect: shiftSelect,
+      previousSelectedPath: _selectionBloc.state.lastSelectedPath,
+    );
     _showImmediateSelectionForToggle(
       folderPath,
       shiftSelect: shiftSelect,

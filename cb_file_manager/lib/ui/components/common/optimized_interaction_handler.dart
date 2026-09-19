@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import '../../widgets/file_drag_drop_item.dart';
@@ -41,21 +42,57 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   Offset? _lastTapPosition;
   bool _skipNextTap = false;
   TapDownDetails? _deferredTap;
+  int _deferredTapTime = 0;
+  bool _pressHandled = false;
   static const int _doubleTapTimeout = 300; // milliseconds
   static const double _doubleTapMaxDistance = 40.0; // pixels
 
+  /// Mouse presses select immediately, like Explorer. The tap recognizer
+  /// can't report the press any sooner: a draggable item keeps the gesture
+  /// arena open until kPressTimeout or release, so selection used to land
+  /// only after the button came back up.
+  void _handlePointerDown(PointerDownEvent event) {
+    _pressHandled = false;
+    if (event.kind != PointerDeviceKind.mouse ||
+        event.buttons != kPrimaryMouseButton ||
+        widget.onLongPress != null ||
+        widget.onLongPressStart != null) {
+      return;
+    }
+    _pressHandled = true;
+    _deferredTap = null;
+    _skipNextTap = false;
+    _pressDown(
+      TapDownDetails(
+        globalPosition: event.position,
+        localPosition: event.localPosition,
+        kind: event.kind,
+      ),
+    );
+  }
+
   void _handleTapDown(TapDownDetails details) {
-    if (context.findAncestorWidgetOfExactType<FileDragDropItem>() != null) {
-      // A held mouse button may become a file drag. Do not collapse a
-      // multi-selection (or open on double-click) until it resolves as a tap.
+    if (_pressHandled) return;
+    _pressDown(details);
+  }
+
+  void _pressDown(TapDownDetails details) {
+    final dragItem = context.findAncestorWidgetOfExactType<FileDragDropItem>();
+    if (dragItem != null && dragItem.selectedPaths.contains(dragItem.path)) {
+      // Pressing an already-selected item may start dragging the whole
+      // selection. Do not collapse it (or open on double-click) until the
+      // press resolves as a tap.
       _deferredTap = details;
+      _deferredTapTime = DateTime.now().millisecondsSinceEpoch;
       return;
     }
     _activateTapDown(details);
   }
 
-  void _activateTapDown(TapDownDetails details) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+  /// [pressedAt] is when the button went down; a deferred press resolves on
+  /// release, and timing it from there would stretch the double-click window.
+  void _activateTapDown(TapDownDetails details, {int? pressedAt}) {
+    final now = pressedAt ?? DateTime.now().millisecondsSinceEpoch;
     final position = details.globalPosition;
 
     // Check if this could be a double tap
@@ -95,7 +132,10 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   void _handleTap() {
     final deferred = _deferredTap;
     _deferredTap = null;
-    if (deferred != null) _activateTapDown(deferred);
+    _pressHandled = false;
+    if (deferred != null) {
+      _activateTapDown(deferred, pressedAt: _deferredTapTime);
+    }
     if (_skipNextTap) {
       _skipNextTap = false;
       return;
@@ -106,6 +146,7 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
   void _handleTapCancel() {
     _deferredTap = null;
     _skipNextTap = false;
+    _pressHandled = false;
   }
 
   void _handleLongPressStart(LongPressStartDetails d) {
@@ -115,6 +156,13 @@ class OptimizedInteractionLayerState extends State<OptimizedInteractionLayer> {
 
   @override
   Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: _handlePointerDown,
+      child: _buildGestureDetector(),
+    );
+  }
+
+  Widget _buildGestureDetector() {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       // These layers are invisible hit-test strips stacked over an item; they

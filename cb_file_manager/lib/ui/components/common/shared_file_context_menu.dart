@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
@@ -1887,7 +1888,7 @@ List<ContextMenuSection> _buildFileContextMenuSections({
             onSelected: (_) {
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                CbFullBleedPageRoute(
                   builder: (_) => ImageViewerScreen(file: file),
                 ),
               );

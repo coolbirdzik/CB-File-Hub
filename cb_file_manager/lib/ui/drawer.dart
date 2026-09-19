@@ -376,8 +376,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                       BlocBuilder<DrawerCubit, DrawerState>(
                         builder: (context, drawerState) {
                           return PinnedSectionWidget(
+                            // Not keyed by the expanded state: the section
+                            // follows it in place, so a toggle animates.
                             key: ValueKey<String>(
-                              'pinned-${drawerState.activeTabId}-${drawerState.isPinnedExpanded}',
+                              'pinned-${drawerState.activeTabId}',
                             ),
                             onNavigate: (path, name) => _navigateTo(
                               context,
@@ -400,7 +402,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         builder: (context, drawerState) {
                           return StorageSectionWidget(
                             key: ValueKey<String>(
-                              'storage-${drawerState.activeTabId}-${drawerState.isStorageExpanded}',
+                              'storage-${drawerState.activeTabId}',
                             ),
                             onNavigate: (path, name) => _navigateTo(
                               context,

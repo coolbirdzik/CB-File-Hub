@@ -203,11 +203,14 @@ class _AppToastOverlay extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktop = MediaQuery.of(context).size.width >= 700;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Toasts live in the root overlay, outside any page's safe area, so they
+    // clear the phone's navigation bar themselves. Zero on desktop.
+    final insets = MediaQuery.paddingOf(context);
 
     return Positioned(
-      right: isDesktop ? 24 : 16,
-      left: isDesktop ? null : 16,
-      bottom: isDesktop ? 24 : 16,
+      right: (isDesktop ? 24 : 16) + insets.right,
+      left: isDesktop ? null : 16 + insets.left,
+      bottom: (isDesktop ? 24 : 16) + insets.bottom,
       child: TweenAnimationBuilder<double>(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,

@@ -895,7 +895,8 @@ class UserPreferences {
     return await _deletePreference(_drawerSectionStatesByTabKey);
   }
 
-  /// Get current view mode preference (list or grid)
+  /// Get the default view mode, used when a folder has no saved view mode
+  /// of its own (see `FolderSortManager.getFolderViewMode`).
   Future<ViewMode> getViewMode() async {
     int viewModeIndex =
         await _getPreference<int>(_viewModeKey, defaultValue: 0) ?? 0;
@@ -905,7 +906,7 @@ class UserPreferences {
     return ViewMode.values[viewModeIndex];
   }
 
-  /// Save view mode preference
+  /// Save the default view mode. Folders with a saved view mode keep theirs.
   Future<bool> setViewMode(ViewMode viewMode) async {
     return await _savePreference<int>(_viewModeKey, viewMode.index);
   }

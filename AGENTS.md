@@ -27,29 +27,34 @@ Pinned to **3.47.2 stable** (`build.config`, CI workflows). Use this exact versi
 
 Run from repo root via `just` (requires Git Bash on Windows):
 
-| Task | Command |
-|------|---------|
-| Show all recipes | `just` |
-| Install deps | `just deps` |
-| Fetch llama.cpp runtime | `just fetch-llama` |
-| Unit/widget tests | `just test` |
-| E2E tests (parallel) | `just e2e-parallel` |
-| E2E single suite | `just e2e Navigation` |
-| E2E single test by name | `just e2e "navigate back to parent with Backspace"` |
-| E2E single file | `just e2e-file video_thumbnails_e2e_test` |
-| Rerun failed E2E only | `just e2e-failed` |
-| E2E plain output (debug) | `just e2e-plain` |
-| E2E serial (debug order) | `just e2e-serial` |
-| List all E2E test names | `just e2e-list` |
-| Analyze | `just analyze` |
-| Format | `just format` |
-| Format + analyze | `just verify` |
-| Clean | `just clean` |
-| Deep clean (rebuild) | `just deep-clean` then `just deps` |
-| Kill stray E2E processes | `just kill-e2e` |
-| Open dashboard | `just dashboard` |
+| Task                     | Command                                             |
+| ------------------------ | --------------------------------------------------- |
+| Show all recipes         | `just`                                              |
+| Install deps             | `just deps`                                         |
+| Fetch llama.cpp runtime  | `just fetch-llama`                                  |
+| Unit/widget tests        | `just test`                                         |
+| E2E tests (parallel)     | `just e2e-parallel`                                 |
+| E2E single suite         | `just e2e Navigation`                               |
+| E2E single test by name  | `just e2e "navigate back to parent with Backspace"` |
+| E2E single file          | `just e2e-file video_thumbnails_e2e_test`           |
+| Rerun failed E2E only    | `just e2e-failed`                                   |
+| E2E plain output (debug) | `just e2e-plain`                                    |
+| E2E serial (debug order) | `just e2e-serial`                                   |
+| List all E2E test names  | `just e2e-list`                                     |
+| Analyze                  | `just analyze`                                      |
+| Format                   | `just format`                                       |
+| Format + analyze         | `just verify`                                       |
+| Clean                    | `just clean`                                        |
+| Deep clean (rebuild)     | `just deep-clean` then `just deps`                  |
+| Kill stray E2E processes | `just kill-e2e`                                     |
+| Open dashboard           | `just dashboard`                                    |
+
+### E2E execution policy
+
+Do **not** run any E2E test command unless the user explicitly authorizes it in the current request. This includes `just e2e`, `just e2e-parallel`, `just e2e-serial`, `just e2e-plain`, `just e2e-failed`, `just e2e-file`, direct `flutter test integration_test ...` commands, and any equivalent E2E runner. Unit/widget tests, analysis, formatting, and builds may still be run when appropriate.
 
 E2E parallel defaults to half the CPU cores (clamped 2..6). Override via:
+
 - `just e2e-parallel "" 4` (positional arg)
 - `CB_E2E_MAX_PARALLEL=4 just e2e-parallel` (env var)
 
