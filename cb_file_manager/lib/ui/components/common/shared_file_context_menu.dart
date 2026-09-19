@@ -910,8 +910,8 @@ class _ContextMenuPopupSubmenuTriggerState
     final loader = widget.action.loadChildSections;
     if (_sectionsFuture != null || loader == null) return;
     final future = () async {
-      // Paint the loading row/cursor before invoking a potentially blocking
-      // native Shell extension on the Windows platform thread.
+      // Paint the loading row/cursor before starting a potentially slow
+      // native Shell extension discovery.
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted || !widget.actionContext.mounted) {
         return const <ContextMenuSection>[];

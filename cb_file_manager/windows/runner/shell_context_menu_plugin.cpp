@@ -14,11 +14,15 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 #pragma comment(lib, "comctl32.lib")
@@ -342,6 +346,8 @@ struct LoadedShellMenuSession {
   int64_t next_submenu_id = 1;
 };
 
+// Only touched on the Shell menu worker thread, which owns the session's COM
+// objects and HMENUs.
 std::unique_ptr<LoadedShellMenuSession> g_loaded_shell_menu_session;
 UINT64 g_next_shell_menu_session_id = 1;
 
@@ -812,7 +818,8 @@ std::optional<flutter::EncodableList> LoadThirdPartyShellSubmenu(
 
 std::optional<flutter::EncodableMap> LoadThirdPartyShellMenu(
     HWND hwnd,
-    const std::vector<std::wstring>& paths) {
+    const std::vector<std::wstring>& paths,
+    bool extended_verbs) {
   ReleaseLoadedShellMenuSession();
   if (!hwnd || paths.empty()) {
     return std::nullopt;
@@ -839,7 +846,7 @@ std::optional<flutter::EncodableMap> LoadThirdPartyShellMenu(
   }
 
   UINT flags = CMF_NORMAL | CMF_EXPLORE;
-  if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+  if (extended_verbs) {
     flags |= CMF_EXTENDEDVERBS;
   }
 
@@ -1200,7 +1207,227 @@ bool ShowCombinedContextMenu(HWND hwnd,
   return true;
 }
 
+// Posted to the worker's own window to drain its task queue.
+constexpr UINT kShellMenuWorkerTaskMessage = WM_APP + 0x5C0;
+// Posted to the Flutter top-level window when a worker reply is ready.
+constexpr UINT kShellMenuReplyMessage = WM_APP + 0x5C1;
+constexpr wchar_t kShellMenuWorkerWindowClass[] = L"CbShellMenuWorkerWindow";
+constexpr DWORD kShellMenuWorkerShutdownTimeoutMs = 2000;
+
 }  // namespace
+
+// Third-party Shell extensions can take seconds in QueryContextMenu, and
+// out-of-process handlers run a COM modal loop that re-enters whichever
+// message pump called them. Doing that on the Flutter platform thread froze
+// the whole app while the "Third-party apps" submenu loaded. This worker owns a
+// separate STA with its own message loop; the loaded session's COM objects and
+// HMENUs are created, used and released only on it.
+class ShellContextMenuPlugin::ShellMenuWorker {
+ public:
+  using Work = std::function<flutter::EncodableValue(HWND worker_window)>;
+
+  explicit ShellMenuWorker(HWND reply_window)
+      : state_(std::make_shared<State>()) {
+    state_->reply_window = reply_window;
+    thread_ = std::thread(&ShellMenuWorker::Run, state_);
+  }
+
+  ~ShellMenuWorker() {
+    HWND window = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(state_->mutex);
+      state_->stopping = true;
+      state_->tasks.clear();
+      window = state_->window;
+    }
+    if (window) {
+      PostMessageW(window, kShellMenuWorkerTaskMessage, 0, 0);
+    }
+    // A hung extension must not also hang app shutdown. The detached thread
+    // keeps `state_` alive and no longer replies once `stopping` is set.
+    if (WaitForSingleObject(thread_.native_handle(),
+                            kShellMenuWorkerShutdownTimeoutMs) ==
+        WAIT_OBJECT_0) {
+      thread_.join();
+    } else {
+      thread_.detach();
+    }
+  }
+
+  ShellMenuWorker(const ShellMenuWorker&) = delete;
+  ShellMenuWorker& operator=(const ShellMenuWorker&) = delete;
+
+  // Queues `work`; its value is later posted back to the reply window as
+  // kShellMenuReplyMessage(request_id) and collected with TakeReply.
+  bool Post(uint64_t request_id, Work work) {
+    HWND window = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(state_->mutex);
+      if (state_->stopping || state_->failed) {
+        return false;
+      }
+      state_->tasks.emplace_back(request_id, std::move(work));
+      window = state_->window;
+    }
+    // Before the window exists, Run() drains the queue once it is created.
+    if (window) {
+      PostMessageW(window, kShellMenuWorkerTaskMessage, 0, 0);
+    }
+    return true;
+  }
+
+  std::optional<flutter::EncodableValue> TakeReply(uint64_t request_id) {
+    std::lock_guard<std::mutex> lock(state_->mutex);
+    auto it = state_->replies.find(request_id);
+    if (it == state_->replies.end()) {
+      return std::nullopt;
+    }
+    flutter::EncodableValue value = std::move(it->second);
+    state_->replies.erase(it);
+    return value;
+  }
+
+ private:
+  struct State {
+    std::mutex mutex;
+    std::deque<std::pair<uint64_t, Work>> tasks;
+    std::map<uint64_t, flutter::EncodableValue> replies;
+    HWND reply_window = nullptr;
+    HWND window = nullptr;
+    bool stopping = false;
+    bool failed = false;
+    // Worker thread only.
+    bool draining = false;
+  };
+
+  static void Run(std::shared_ptr<State> state) {
+    // Shell extensions require an STA; OLE also backs the ones that use the
+    // clipboard or drag-and-drop helpers.
+    const HRESULT ole_result = OleInitialize(nullptr);
+
+    WNDCLASSEXW window_class{};
+    window_class.cbSize = sizeof(window_class);
+    window_class.lpfnWndProc = &ShellMenuWorker::WindowProc;
+    window_class.hInstance = GetModuleHandleW(nullptr);
+    window_class.lpszClassName = kShellMenuWorkerWindowClass;
+    RegisterClassExW(&window_class);
+
+    // A hidden top-level window rather than a message-only one: extensions may
+    // use the owner HWND from GetUIObjectOf as a dialog parent.
+    HWND window = CreateWindowExW(
+        WS_EX_TOOLWINDOW, kShellMenuWorkerWindowClass, L"", WS_POPUP, 0, 0, 0,
+        0, nullptr, nullptr, window_class.hInstance, state.get());
+
+    std::deque<std::pair<uint64_t, Work>> orphaned_tasks;
+    bool wake = false;
+    {
+      std::lock_guard<std::mutex> lock(state->mutex);
+      state->window = window;
+      if (!window) {
+        state->failed = true;
+        orphaned_tasks.swap(state->tasks);
+      }
+      wake = window && (state->stopping || !state->tasks.empty());
+    }
+    for (const auto& task : orphaned_tasks) {
+      Reply(*state, task.first, flutter::EncodableValue());
+    }
+
+    if (window) {
+      if (wake) {
+        PostMessageW(window, kShellMenuWorkerTaskMessage, 0, 0);
+      }
+      MSG message;
+      while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+      }
+    }
+
+    ReleaseLoadedShellMenuSession();
+    if (SUCCEEDED(ole_result)) {
+      OleUninitialize();
+    }
+  }
+
+  static LRESULT CALLBACK WindowProc(HWND hwnd,
+                                     UINT message,
+                                     WPARAM wparam,
+                                     LPARAM lparam) {
+    if (message == WM_NCCREATE) {
+      const auto* create = reinterpret_cast<const CREATESTRUCTW*>(lparam);
+      SetWindowLongPtrW(hwnd, GWLP_USERDATA,
+                        reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+    }
+    auto* state =
+        reinterpret_cast<State*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (message == kShellMenuWorkerTaskMessage && state) {
+      DrainTasks(*state, hwnd);
+      return 0;
+    }
+    if (message == WM_DESTROY) {
+      PostQuitMessage(0);
+      return 0;
+    }
+    return DefWindowProcW(hwnd, message, wparam, lparam);
+  }
+
+  static void DrainTasks(State& state, HWND window) {
+    // A task can pump messages (COM modal loops, extension dialogs). Queued
+    // work must wait for the running task instead of re-entering the session.
+    if (state.draining) {
+      return;
+    }
+    state.draining = true;
+    bool stopping = false;
+    for (;;) {
+      std::pair<uint64_t, Work> task;
+      {
+        std::lock_guard<std::mutex> lock(state.mutex);
+        stopping = state.stopping;
+        if (stopping || state.tasks.empty()) {
+          break;
+        }
+        task = std::move(state.tasks.front());
+        state.tasks.pop_front();
+      }
+      flutter::EncodableValue value;
+      try {
+        value = task.second(window);
+      } catch (...) {
+        value = flutter::EncodableValue();
+      }
+      Reply(state, task.first, std::move(value));
+    }
+    state.draining = false;
+    if (stopping) {
+      DestroyWindow(window);
+    }
+  }
+
+  static void Reply(State& state,
+                    uint64_t request_id,
+                    flutter::EncodableValue value) {
+    HWND reply_window = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(state.mutex);
+      if (state.stopping) {
+        return;
+      }
+      state.replies[request_id] = std::move(value);
+      reply_window = state.reply_window;
+    }
+    if (!reply_window ||
+        !PostMessageW(reply_window, kShellMenuReplyMessage,
+                      static_cast<WPARAM>(request_id), 0)) {
+      std::lock_guard<std::mutex> lock(state.mutex);
+      state.replies.erase(request_id);
+    }
+  }
+
+  std::shared_ptr<State> state_;
+  std::thread thread_;
+};
 
 // static
 void ShellContextMenuPlugin::RegisterWithRegistrar(
@@ -1221,10 +1448,62 @@ void ShellContextMenuPlugin::RegisterWithRegistrar(
 
 ShellContextMenuPlugin::ShellContextMenuPlugin(
     flutter::PluginRegistrarWindows* registrar)
-    : registrar_(registrar) {}
+    : registrar_(registrar) {
+  if (auto* view = registrar_->GetView()) {
+    HWND native_window = view->GetNativeWindow();
+    top_level_window_ =
+        native_window ? GetAncestor(native_window, GA_ROOT) : nullptr;
+  }
+  if (top_level_window_) {
+    window_proc_delegate_id_ = registrar_->RegisterTopLevelWindowProcDelegate(
+        [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+          return HandleWindowProc(hwnd, message, wparam, lparam);
+        });
+    shell_menu_worker_ = std::make_unique<ShellMenuWorker>(top_level_window_);
+  }
+}
 
 ShellContextMenuPlugin::~ShellContextMenuPlugin() {
-  ReleaseLoadedShellMenuSession();
+  if (window_proc_delegate_id_ != 0) {
+    registrar_->UnregisterTopLevelWindowProcDelegate(window_proc_delegate_id_);
+  }
+  // Releases the loaded session on the worker thread that owns it.
+  shell_menu_worker_.reset();
+}
+
+std::optional<LRESULT> ShellContextMenuPlugin::HandleWindowProc(
+    HWND /*hwnd*/,
+    UINT message,
+    WPARAM wparam,
+    LPARAM /*lparam*/) {
+  if (message != kShellMenuReplyMessage) {
+    return std::nullopt;
+  }
+
+  const auto request_id = static_cast<uint64_t>(wparam);
+  std::optional<flutter::EncodableValue> reply;
+  if (shell_menu_worker_) {
+    reply = shell_menu_worker_->TakeReply(request_id);
+  }
+  auto it = pending_results_.find(request_id);
+  if (it != pending_results_.end()) {
+    MethodResultPtr result = std::move(it->second);
+    pending_results_.erase(it);
+    result->Success(reply.value_or(flutter::EncodableValue()));
+  }
+  return 0;
+}
+
+void ShellContextMenuPlugin::RunOnShellMenuWorker(
+    MethodResultPtr result,
+    std::function<flutter::EncodableValue(HWND worker_window)> work) {
+  const uint64_t request_id = next_request_id_++;
+  if (!shell_menu_worker_ ||
+      !shell_menu_worker_->Post(request_id, std::move(work))) {
+    result->Success();
+    return;
+  }
+  pending_results_.emplace(request_id, std::move(result));
 }
 
 void ShellContextMenuPlugin::HandleMethodCall(
@@ -1281,14 +1560,19 @@ void ShellContextMenuPlugin::HandleMethodCall(
       return;
     }
 
-    const bool matches_active_session =
-        g_loaded_shell_menu_session &&
-        g_loaded_shell_menu_session->id == *session_id;
+    // Worker thread only: the session lives on the Shell menu worker.
+    auto matches_active_session = [id = *session_id]() {
+      return g_loaded_shell_menu_session &&
+             g_loaded_shell_menu_session->id == id;
+    };
     if (is_release_context_menu_session) {
-      if (matches_active_session) {
-        ReleaseLoadedShellMenuSession();
-      }
-      result->Success();
+      RunOnShellMenuWorker(std::move(result),
+                           [matches_active_session](HWND) {
+                             if (matches_active_session()) {
+                               ReleaseLoadedShellMenuSession();
+                             }
+                             return flutter::EncodableValue();
+                           });
       return;
     }
 
@@ -1306,18 +1590,22 @@ void ShellContextMenuPlugin::HandleMethodCall(
         }
       }
 
-      if (!matches_active_session || submenu_id <= 0) {
+      if (submenu_id <= 0) {
         result->Success(flutter::EncodableValue());
         return;
       }
 
-      auto entries = LoadThirdPartyShellSubmenu(
-          *g_loaded_shell_menu_session, submenu_id);
-      if (entries.has_value()) {
-        result->Success(flutter::EncodableValue(entries.value()));
-      } else {
-        result->Success(flutter::EncodableValue());
-      }
+      RunOnShellMenuWorker(
+          std::move(result), [matches_active_session, submenu_id](HWND) {
+            if (!matches_active_session()) {
+              return flutter::EncodableValue();
+            }
+            auto entries = LoadThirdPartyShellSubmenu(
+                *g_loaded_shell_menu_session, submenu_id);
+            return entries.has_value()
+                       ? flutter::EncodableValue(std::move(entries.value()))
+                       : flutter::EncodableValue();
+          });
       return;
     }
 
@@ -1337,16 +1625,24 @@ void ShellContextMenuPlugin::HandleMethodCall(
       }
     }
 
-    bool invoked = false;
-    if (matches_active_session && command_id > 0 &&
-        g_loaded_shell_menu_session->command_ids.find(command_id) !=
-            g_loaded_shell_menu_session->command_ids.end()) {
-      invoked = InvokeShellCommand(
-          g_loaded_shell_menu_session->hwnd,
-          g_loaded_shell_menu_session->shell.context_menu.Get(), command_id, 1);
-      ReleaseLoadedShellMenuSession();
-    }
-    result->Success(flutter::EncodableValue(invoked));
+    // Dialogs opened by the command belong to the app window, not the hidden
+    // worker window that only hosts menu discovery.
+    HWND owner_window = top_level_window_;
+    RunOnShellMenuWorker(
+        std::move(result),
+        [matches_active_session, command_id, owner_window](HWND) {
+          bool invoked = false;
+          if (matches_active_session() && command_id > 0 &&
+              g_loaded_shell_menu_session->command_ids.find(command_id) !=
+                  g_loaded_shell_menu_session->command_ids.end()) {
+            invoked = InvokeShellCommand(
+                owner_window,
+                g_loaded_shell_menu_session->shell.context_menu.Get(),
+                command_id, 1);
+            ReleaseLoadedShellMenuSession();
+          }
+          return flutter::EncodableValue(invoked);
+        });
     return;
   }
 
@@ -1376,12 +1672,18 @@ void ShellContextMenuPlugin::HandleMethodCall(
   std::optional<POINT> screen_point = GetScreenPointFromArgs(hwnd, *arguments);
 
   if (is_load_third_party_menu) {
-    auto response = LoadThirdPartyShellMenu(hwnd, paths);
-    if (response.has_value()) {
-      result->Success(flutter::EncodableValue(response.value()));
-    } else {
-      result->Success(flutter::EncodableValue());
-    }
+    // Shift state belongs to the platform thread's input queue; the worker
+    // thread has its own and would never see Shift held.
+    const bool extended_verbs = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+    RunOnShellMenuWorker(
+        std::move(result),
+        [paths = std::move(paths), extended_verbs](HWND worker_window) {
+          auto response =
+              LoadThirdPartyShellMenu(worker_window, paths, extended_verbs);
+          return response.has_value()
+                     ? flutter::EncodableValue(std::move(response.value()))
+                     : flutter::EncodableValue();
+        });
     return;
   }
 

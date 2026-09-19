@@ -38,6 +38,11 @@ void main() {
       folderListBloc: bloc,
       selectionBloc: selection,
     );
+    addTearDown(() async {
+      dragSel.dispose();
+      await selection.close();
+      width.dispose();
+    });
 
     await tester.pumpWidget(
       RepaintBoundary(
@@ -90,6 +95,7 @@ void main() {
     final center = tester.getCenter(handle);
 
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
     await mouse.addPointer(location: center);
     await tester.pump(const Duration(milliseconds: 300));
     await expectLater(
@@ -122,9 +128,5 @@ void main() {
     expect(committed, [460]);
     expect(width.value, 460);
     expect(find.textContaining(' px'), findsNothing);
-
-    dragSel.dispose();
-    await selection.close();
-    width.dispose();
   });
 }
