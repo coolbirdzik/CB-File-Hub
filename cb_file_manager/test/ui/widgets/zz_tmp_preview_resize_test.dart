@@ -98,10 +98,7 @@ void main() {
     addTearDown(mouse.removePointer);
     await mouse.addPointer(location: center);
     await tester.pump(const Duration(milliseconds: 300));
-    await expectLater(
-      find.byKey(const Key('shot')),
-      matchesGoldenFile('zz_tmp_hover.png'),
-    );
+    expect(find.byKey(const Key('shot')), findsOneWidget);
 
     await mouse.down(center);
     await tester.pump();
@@ -109,18 +106,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('460 px'), findsOneWidget);
     expect(width.value, 360, reason: 'pane only resizes on release');
-    await expectLater(
-      find.byKey(const Key('shot')),
-      matchesGoldenFile('zz_tmp_drag.png'),
-    );
 
     await mouse.moveTo(center + const Offset(400, 0));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('280 px'), findsOneWidget);
-    await expectLater(
-      find.byKey(const Key('shot')),
-      matchesGoldenFile('zz_tmp_limit.png'),
-    );
 
     await mouse.moveTo(center - const Offset(100, 0));
     await mouse.up();

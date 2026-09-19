@@ -62,6 +62,13 @@ class ChipsInput<T> extends StatefulWidget {
 }
 
 class ChipsInputState<T> extends State<ChipsInput<T>> {
+  /// Height of one row of the field. The strut is forced to it so a row of
+  /// chips and a row of plain text are the same height (the field does not
+  /// jump when the first chip lands) and is taller than a chip, so chips
+  /// neither touch the floating label / border nor overlap when they wrap.
+  static const double _kRowHeight = 36;
+  static const double _kStrutFontSize = 16;
+
   late final ChipsInputEditingController<T> controller;
   late final FocusNode _focusNode;
 
@@ -466,7 +473,16 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
             style: widget.style,
             strutStyle:
                 widget.strutStyle ??
-                const StrutStyle(forceStrutHeight: true, height: 1.25),
+                const StrutStyle(
+                  fontSize: _kStrutFontSize,
+                  height: _kRowHeight / _kStrutFontSize,
+                  forceStrutHeight: true,
+                  leadingDistribution: TextLeadingDistribution.even,
+                ),
+            // Keep the caret text-sized; it would otherwise span the whole row.
+            cursorHeight: widget.strutStyle == null
+                ? (widget.style?.fontSize ?? _kStrutFontSize) * 1.25
+                : null,
             controller: controller,
             focusNode: _focusNode,
             decoration: adjustedDecoration,
@@ -526,42 +542,18 @@ class ChipsInputEditingController<T> extends TextEditingController {
     // Create a list to hold all spans
     final List<InlineSpan> spans = <InlineSpan>[];
 
-    // Determine if we need to add line breaks for better spacing
-    int currentLineWidth = 0;
-    int currentLineCount = 0;
-    const int maxLineWidth = 400; // Rough estimate of max line width
-
-    // Add each chip with proper spacing
+    // Chips are centered in the row; the forced strut in ChipsInputState
+    // provides the vertical breathing room, so no per-row offsets are needed.
     for (int i = 0; i < values.length; i++) {
-      // Estimate width of this chip (rough approximation)
-      final chipWidth = 80 + (values[i].toString().length * 5);
-
-      // Check if we need to add a line break
-      if (currentLineWidth > 0 && currentLineWidth + chipWidth > maxLineWidth) {
-        // Reset line width and increment line count
-        currentLineWidth = 0;
-        currentLineCount++;
-      }
-
-      // Keep chips visually centered inside the text field line box.
-      final verticalPadding = currentLineCount > 0 ? 4.0 : 0.0;
-
-      // Add the chip widget
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: Padding(
-            padding: EdgeInsets.only(right: 4, bottom: verticalPadding, top: 0),
-            child: Transform.translate(
-              offset: const Offset(0, 2),
-              child: chipBuilder(context, values[i]),
-            ),
+            padding: const EdgeInsets.only(right: 4),
+            child: chipBuilder(context, values[i]),
           ),
         ),
       );
-
-      // Update current line width
-      currentLineWidth += chipWidth;
     }
 
     // Add text input after chips
@@ -652,7 +644,7 @@ class _TagInputChipState extends State<TagInputChip>
           child: Transform.scale(
             scale: _scaleAnimation.value,
             child: Container(
-              margin: const EdgeInsets.only(right: 4, top: 2, bottom: 4),
+              margin: const EdgeInsets.only(right: 4),
               child: MouseRegion(
                 onEnter: (_) => setState(() => isHovered = true),
                 onExit: (_) => setState(() => isHovered = false),
