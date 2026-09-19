@@ -8,6 +8,7 @@ import '../tokens/cb_geometry_tokens.dart';
 import '../tokens/cb_motion_tokens.dart';
 import '../tokens/cb_type_tokens.dart';
 import 'cb_button.dart';
+import 'cb_decorations.dart';
 import 'cb_surface.dart';
 
 /// Characters Windows — the strictest of the three desktop targets — refuses
@@ -32,9 +33,9 @@ Rect? cbAnchorRectOf(BuildContext context) {
 ///
 /// Replaces a file, folder or tag label exactly where it sits, so the row
 /// never jumps and the user keeps their place in the list. It reads as a
-/// lifted slab of the row rather than a form control: an overlay fill, a
-/// hairline that thickens to the accent on focus, and a crisp accent ring so
-/// the name being edited is unmistakable in a dense grid.
+/// lifted slab of the row rather than a form control: an overlay fill lifted
+/// by its shadow, an accent bottom indicator on focus, and a crisp accent ring
+/// so the name being edited is unmistakable in a dense grid.
 ///
 /// [lockedSuffix] renders the part of the name the user is not editing — the
 /// file extension when extension renaming is off — dimmed and inside the
@@ -205,20 +206,22 @@ class _CbInlineRenameFieldState extends State<CbInlineRenameField> {
             horizontal: CbSpacing.sm,
             vertical: widget.dense ? CbSpacing.xxs : CbSpacing.xs + 1,
           ),
+          // Flat: the field floats on its shadow; focus and error show as the
+          // shared bottom indicator plus a crisp translucent ring rather than
+          // a boxed outline.
           decoration: BoxDecoration(
             color: c.surfaceOverlay,
             borderRadius: CbRadii.mdAll,
-            border: Border.all(
-              color: _focused || widget.hasError ? accent : c.stroke,
-              width: _focused || widget.hasError
-                  ? CbStrokes.emphasis
-                  : CbStrokes.hairline,
+            border: CbDecorations.fieldIndicator(
+              c,
+              focused: _focused,
+              error: widget.hasError,
             ),
             boxShadow: [
               ...tokens.shadowLevel2,
               // A crisp ring rather than a blur: at 13px type a soft halo only
-              // muddies the edge the border already draws.
-              if (_focused)
+              // muddies the edge of the field.
+              if (_focused || widget.hasError)
                 BoxShadow(
                   color: accent.withValues(alpha: tokens.isDark ? 0.30 : 0.18),
                   spreadRadius: CbStrokes.emphasis,
@@ -508,7 +511,6 @@ class _CbInlineRenamePanelState extends State<CbInlineRenamePanel> {
       width: math.min(widget.width, math.max(240, available)),
       child: CbSurface(
         level: CbSurfaceLevel.overlay,
-        bordered: true,
         radius: CbRadii.lg,
         padding: const EdgeInsets.all(CbSpacing.md + 2),
         child: Column(

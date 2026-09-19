@@ -164,15 +164,10 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                           final isFocused = _cancelButtonFocusNode.hasFocus;
                           return TextButton(
                             onPressed: () => Navigator.of(context).pop(false),
+                            // Flat focus: a tinted fill, no outline.
                             style: TextButton.styleFrom(
                               backgroundColor: isFocused
-                                  ? colorScheme.primary.withValues(alpha: 0.1)
-                                  : null,
-                              side: isFocused
-                                  ? BorderSide(
-                                      color: colorScheme.primary,
-                                      width: 2,
-                                    )
+                                  ? colorScheme.primary.withValues(alpha: 0.14)
                                   : null,
                             ),
                             child: Text(widget.cancelText),
@@ -188,15 +183,9 @@ class _DeleteConfirmationDialogState extends State<DeleteConfirmationDialog> {
                           return TextButton(
                             onPressed: () => Navigator.of(context).pop(true),
                             style: TextButton.styleFrom(
-                              foregroundColor: Colors.red,
+                              foregroundColor: colorScheme.error,
                               backgroundColor: isFocused
-                                  ? Colors.red.withValues(alpha: 0.1)
-                                  : null,
-                              side: isFocused
-                                  ? const BorderSide(
-                                      color: Colors.red,
-                                      width: 2,
-                                    )
+                                  ? colorScheme.error.withValues(alpha: 0.14)
                                   : null,
                             ),
                             child: Text(

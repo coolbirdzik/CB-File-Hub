@@ -300,21 +300,22 @@ class _FileGridItemState extends State<FileGridItem> {
     // with text selection color
     final bool showAsSelected = isVisuallySelected && !isBeingRenamed;
 
-    // Whole-cell selection fill + border, mirroring list/details rows so the
-    // selected tint reads consistently across view modes. No overlay is painted
-    // over the thumbnail itself.
-    final Color cellBackgroundColor = ItemInteractionStyle.backgroundColor(
+    // Hover is a neutral fill behind the cell; selection is the same accent
+    // wash as list/details rows, but painted over the whole cell — a photo
+    // or video thumbnail covers the cell and would hide a fill behind it.
+    final Color cellBackgroundColor = ItemInteractionStyle.gridBackgroundColor(
       theme: theme,
       isDesktopMode: widget.isDesktopMode,
       isSelected: showAsSelected,
       isHovering: _isHovering,
     );
-    final Color primary = theme.colorScheme.primary;
-    final Color cellBorderColor = showAsSelected
-        ? primary
-        : (_isHovering && widget.isDesktopMode
-              ? primary.withValues(alpha: 0.4)
-              : Colors.transparent);
+    final BoxDecoration? cellForeground = ItemInteractionStyle.gridForeground(
+      context,
+      isDesktopMode: widget.isDesktopMode,
+      isSelected: showAsSelected,
+      isHovering: _isHovering,
+      radius: 8.0,
+    );
 
     // Windows Explorer style: transparent background, icon + name layout
     final double nameAreaHeight = (widget.showFileTags && widget.state != null)
@@ -339,11 +340,9 @@ class _FileGridItemState extends State<FileGridItem> {
           child: Container(
             decoration: BoxDecoration(
               color: cellBackgroundColor,
-              // Reserve the border width in every state so hover/selection
-              // changes only its color and never resizes the thumbnail.
-              border: Border.all(color: cellBorderColor, width: 1.5),
               borderRadius: BorderRadius.circular(8.0),
             ),
+            foregroundDecoration: cellForeground,
             child: Column(
               mainAxisSize: MainAxisSize.max,
               children: [

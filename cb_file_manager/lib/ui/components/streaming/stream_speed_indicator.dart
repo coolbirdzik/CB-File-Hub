@@ -140,12 +140,6 @@ class _StreamSpeedIndicatorState extends State<StreamSpeedIndicator>
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isActive
-              ? Colors.blue.withValues(alpha: 0.5)
-              : Colors.grey.withValues(alpha: 0.3),
-          width: 1,
-        ),
         boxShadow: const [],
       ),
       child: Column(

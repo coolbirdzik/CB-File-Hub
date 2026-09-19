@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
@@ -166,29 +167,11 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                       },
                     )
                   : null,
-              filled: true,
-              fillColor: WidgetStateColor.resolveWith((states) {
-                final base = theme.colorScheme.surfaceContainerHighest;
-                return states.contains(WidgetState.focused)
-                    ? base.withValues(alpha: 0.5)
-                    : base.withValues(alpha: 0.3);
-              }),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.0),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.0),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.55),
-                  width: 1,
-                ),
-              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 12,
               ),
-            ),
+            ).flat(context, radius: 16),
             onSubmitted: (_) => _performSearch(),
           ),
 

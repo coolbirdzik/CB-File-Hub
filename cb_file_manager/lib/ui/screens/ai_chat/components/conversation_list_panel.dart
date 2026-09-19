@@ -33,7 +33,6 @@ class ConversationListPanel extends StatelessWidget {
           decoration: BoxDecoration(
             // Same surface the app's other side menus use.
             color: scheme.surfaceContainerLow,
-            border: Border(right: BorderSide(color: scheme.outlineVariant)),
           ),
           child: Column(
             children: [

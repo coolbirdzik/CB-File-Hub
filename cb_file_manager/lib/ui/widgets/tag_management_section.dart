@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
+import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
@@ -386,8 +388,6 @@ class _TagManagementSectionState extends State<TagManagementSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -395,36 +395,12 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         ChipsInput<String>(
           values: _selectedTags,
           decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.transparent, width: 0),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.transparent, width: 0),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16.0),
-              borderSide: BorderSide(
-                color: theme.colorScheme.outline.withValues(alpha: 0.48),
-                width: 1,
-              ),
-            ),
             labelText: AppLocalizations.of(context)!.tagName,
             labelStyle: const TextStyle(fontSize: 18),
             hintText: AppLocalizations.of(context)!.enterTagName,
             hintStyle: const TextStyle(fontSize: 18),
             prefixIcon: const Icon(PhosphorIconsLight.tag, size: 24),
-            filled: true,
-            fillColor: WidgetStateColor.resolveWith((states) {
-              final focused = states.contains(WidgetState.focused);
-              return theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: isDarkMode
-                    ? (focused ? 0.82 : 0.7)
-                    : (focused ? 0.44 : 0.3),
-              );
-            }),
-          ),
+          ).flat(context, radius: 16),
           style: const TextStyle(fontSize: 18),
           onChanged: (updatedTags) async {
             setState(() {
@@ -454,7 +430,7 @@ class _TagManagementSectionState extends State<TagManagementSection> {
         ),
         if (_tagSuggestions.isNotEmpty) ...[
           const SizedBox(height: 12),
-          _buildTagSuggestionsSection(theme, isDarkMode),
+          _buildTagSuggestionsSection(theme),
         ],
         _buildPopularTagsSection(),
         _buildRecentTagsSection(),
@@ -462,20 +438,11 @@ class _TagManagementSectionState extends State<TagManagementSection> {
     );
   }
 
-  Widget _buildTagSuggestionsSection(ThemeData theme, bool isDarkMode) {
+  Widget _buildTagSuggestionsSection(ThemeData theme) {
     return Container(
       constraints: const BoxConstraints(maxHeight: 250),
-      decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      clipBehavior: Clip.antiAlias,
+      decoration: CbDecorations.floating(context, radius: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,31 +504,18 @@ class _TagManagementSectionState extends State<TagManagementSection> {
                       clearDraft: true,
                     );
                   },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDarkMode
-                          ? const Color(0xFF2D2D2D)
-                          : const Color(0xFFFFFFFF),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: theme.dividerColor,
-                          width: 0.5,
-                        ),
-                      ),
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(
+                      PhosphorIconsLight.tag,
+                      size: 20,
+                      color: theme.colorScheme.primary,
                     ),
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(
-                        PhosphorIconsLight.tag,
-                        size: 20,
-                        color: theme.colorScheme.primary,
-                      ),
-                      title: Text(
-                        suggestion,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode ? Colors.white : Colors.black87,
-                        ),
+                    title: Text(
+                      suggestion,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -768,7 +722,6 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
   bool _isHovered = false;
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _elevationAnimation;
   late final TagColorManager _colorManager = TagColorManager.instance;
   late final TagThumbnailManager _thumbnailManager =
       TagThumbnailManager.instance;
@@ -787,11 +740,6 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
       begin: 1.0,
       end: 1.05,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
-    _elevationAnimation = Tween<double>(
-      begin: 0,
-      end: 2,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -803,25 +751,19 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
     // getTagColor never returns null — an unassigned tag still gets a colour
     // derived from its hash — so the tag colour always drives the chip.
     final tagColor = _colorManager.getTagColor(widget.tag);
 
-    // Dynamic colors based on hover state and tag color
-    final Color backgroundColor = tagColor.withValues(
-      alpha: _isHovered ? 0.3 : 0.2,
+    final Color foregroundColor = TagChipStyle.readableOn(
+      Color.alphaBlend(
+        TagChipStyle.tint(tagColor, isDark: isDark, hovered: _isHovered),
+        theme.colorScheme.surface,
+      ),
     );
-    final Color effectiveBackground = Color.alphaBlend(
-      backgroundColor,
-      theme.colorScheme.surface,
-    );
-    final Color foregroundColor = _bestForegroundColor(effectiveBackground);
     final Color textColor = foregroundColor;
     final Color iconColor = foregroundColor.withValues(alpha: 0.92);
-
-    final Color borderColor = tagColor.withValues(
-      alpha: _isHovered ? 0.8 : 0.3,
-    );
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -841,17 +783,17 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
+            // Flat: hover lifts the chip by scale and a stronger tint, not
+            // by an elevation shadow or an outline.
             return Transform.scale(
               scale: _scaleAnimation.value,
               child: Material(
-                elevation: _elevationAnimation.value,
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
+                type: MaterialType.transparency,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: backgroundColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor, width: 1),
+                  decoration: TagChipStyle.decoration(
+                    tagColor,
+                    isDark: isDark,
+                    hovered: _isHovered,
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -899,22 +841,6 @@ class _AnimatedTagChipState extends State<AnimatedTagChip>
         ),
       ),
     );
-  }
-
-  Color _bestForegroundColor(Color background) {
-    const light = Colors.white;
-    const dark = Colors.black;
-    final lightContrast = _contrastRatio(background, light);
-    final darkContrast = _contrastRatio(background, dark);
-    return lightContrast >= darkContrast ? light : dark;
-  }
-
-  double _contrastRatio(Color a, Color b) {
-    final aLuminance = a.computeLuminance();
-    final bLuminance = b.computeLuminance();
-    final lighter = aLuminance > bLuminance ? aLuminance : bLuminance;
-    final darker = aLuminance > bLuminance ? bLuminance : aLuminance;
-    return (lighter + 0.05) / (darker + 0.05);
   }
 
   /// Builds thumbnail image or tag icon as the leading widget.

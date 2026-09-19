@@ -78,30 +78,25 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
 
   final colorScheme = baseTheme.colorScheme;
   const Color lightSurfaceBase = fluentLightBackground3;
-  const Color lightContainerBase = fluentLightBackground2;
   final Color effectiveSurfaceBase = isLightMode
       ? lightSurfaceBase
       : colorScheme.surface;
-  final Color effectiveContainerBase = isLightMode
-      ? lightContainerBase
-      : colorScheme.surfaceContainer;
+
+  // The container ladder keeps its tonal steps under acrylic. Collapsing
+  // every level onto one base colour (as this bridge used to) only worked
+  // while cards carried an outline; flat cards need the steps to show.
+  Color container(Color base) => base.withValues(alpha: containerOpacity);
 
   final bridgedColorScheme = colorScheme.copyWith(
     surface: effectiveSurfaceBase.withValues(alpha: surfaceOpacity),
     surfaceBright: (isLightMode ? lightSurfaceBase : colorScheme.surfaceBright)
         .withValues(alpha: surfaceOpacity),
-    surfaceDim: (isLightMode ? lightContainerBase : colorScheme.surfaceDim)
+    surfaceDim: (isLightMode ? fluentLightBackground2 : colorScheme.surfaceDim)
         .withValues(alpha: surfaceOpacity),
-    surfaceContainer: effectiveContainerBase.withValues(
-      alpha: containerOpacity,
-    ),
-    surfaceContainerHigh: effectiveContainerBase.withValues(
-      alpha: containerOpacity,
-    ),
-    surfaceContainerHighest: effectiveContainerBase.withValues(
-      alpha: containerOpacity,
-    ),
-    surfaceContainerLow: effectiveSurfaceBase.withValues(
+    surfaceContainer: container(colorScheme.surfaceContainer),
+    surfaceContainerHigh: container(colorScheme.surfaceContainerHigh),
+    surfaceContainerHighest: container(colorScheme.surfaceContainerHighest),
+    surfaceContainerLow: colorScheme.surfaceContainerLow.withValues(
       alpha: lowContainerOpacity,
     ),
     surfaceContainerLowest: effectiveSurfaceBase.withValues(
@@ -113,10 +108,11 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
     surfaceTint: Colors.transparent,
   );
 
-  final cardColor = effectiveContainerBase.withValues(alpha: containerOpacity);
-  final dialogColor = effectiveContainerBase;
-  // Menus and dropdown overlays stay solid even when page chrome uses acrylic.
-  final Color menuColor = effectiveContainerBase;
+  // Dialogs, menus and dropdown overlays stay solid even when page chrome
+  // uses acrylic, and sit one tonal step above the canvas so they still read
+  // as separate layers without an outline.
+  final Color dialogColor = colorScheme.surfaceContainer;
+  final Color menuColor = colorScheme.surfaceContainer;
 
   return baseTheme.copyWith(
     colorScheme: bridgedColorScheme,
@@ -124,23 +120,13 @@ ThemeData createDesktopAcrylicMaterialBridgeTheme({
       alpha: scaffoldOpacity,
     ),
     canvasColor: menuColor,
-    cardColor: cardColor,
-    cardTheme: baseTheme.cardTheme.copyWith(color: cardColor),
+    // Cards keep the base theme's translucent flat fill, which already
+    // composites correctly over the acrylic backdrop.
+    cardColor: container(colorScheme.surfaceContainer),
     dialogTheme: baseTheme.dialogTheme.copyWith(backgroundColor: dialogColor),
     popupMenuTheme: baseTheme.popupMenuTheme.copyWith(
       color: menuColor,
-      elevation: 4,
-      shadowColor: Colors.black54,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isLightMode
-              ? Colors.black.withValues(alpha: 0.08)
-              : Colors.white.withValues(alpha: 0.08),
-          width: 1,
-        ),
-      ),
     ),
     dropdownMenuTheme: baseTheme.dropdownMenuTheme.copyWith(
       menuStyle: (baseTheme.dropdownMenuTheme.menuStyle ?? const MenuStyle())

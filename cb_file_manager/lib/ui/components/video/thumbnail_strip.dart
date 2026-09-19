@@ -127,13 +127,6 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
                   horizontal: widget.spacing,
                   vertical: 8.0,
                 ),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isSelected ? Colors.blue : Colors.transparent,
-                    width: 2.0,
-                  ),
-                  borderRadius: BorderRadius.circular(16.0),
-                ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(2.0),
                   child: SizedBox(
@@ -158,7 +151,8 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
   /// small 54×54 strip cells at once when the viewer first opens.
   Widget _buildThumbnailImage(File file, bool isSelected) {
     return Opacity(
-      opacity: isSelected ? 1.0 : 0.7,
+      // Flat: the current frame is marked by full opacity, not an outline.
+      opacity: isSelected ? 1.0 : 0.5,
       child: ThumbnailLoader(
         key: ValueKey('strip-${file.path}'),
         filePath: file.path,

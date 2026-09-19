@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
@@ -307,18 +308,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
     return Container(
       height: 30,
       padding: const EdgeInsets.only(left: 14, right: 8),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.03)
-            : Colors.black.withValues(alpha: 0.02),
-        border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.06),
-          ),
-        ),
-      ),
+      decoration: CbDecorations.bar(context),
       child: Row(
         children: [
           Icon(
@@ -469,17 +459,7 @@ class _AiChatBodyState extends State<_AiChatBody> {
               height: 72,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.colorScheme.primary.withValues(alpha: 0.18),
-                    theme.colorScheme.primary.withValues(alpha: 0.04),
-                  ],
-                ),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.18),
-                ),
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
               ),
               child: Icon(
                 PhosphorIconsLight.brain,
@@ -595,13 +575,10 @@ class _AiChatBodyState extends State<_AiChatBody> {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.error.withValues(alpha: 0.4),
-          width: 1,
-        ),
+      decoration: CbDecorations.tint(
+        context,
+        theme.colorScheme.error,
+        radius: 8,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -886,9 +863,6 @@ class _AiChatBodyState extends State<_AiChatBody> {
             topRight: Radius.circular(18),
             bottomLeft: Radius.circular(18),
             bottomRight: Radius.circular(18),
-          ),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
         ),
         child: Column(

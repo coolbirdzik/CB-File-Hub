@@ -550,255 +550,236 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       tintAlpha: surfaces.drawerTintAlpha,
       blurSigma: surfaces.chromeBlur,
       borderRadius: drawerRadius,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(
-              color: surfaces.chromeStroke,
-              width: widget.isPinned ? 1 : 0.75,
-            ),
-          ),
-        ),
-        child: SizedBox(
-          width: _FluentDrawerTokens.width,
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                _buildFluentDrawerHeader(
-                  context,
-                  resources: resources,
-                  accent: accent,
-                ),
-                Expanded(
-                  child: BlocBuilder<DrawerCubit, DrawerState>(
-                    builder: (context, state) {
-                      final hasSelectedPinnedPath = state.pinnedPaths.any(
-                        (path) => _isFluentPathSelected(activePath, path),
-                      );
-                      final hasSelectedStoragePath = state.storageLocations.any(
-                        (storage) =>
-                            _isFluentPathSelected(activePath, storage.path),
-                      );
+      child: SizedBox(
+        width: _FluentDrawerTokens.width,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildFluentDrawerHeader(
+                context,
+                resources: resources,
+                accent: accent,
+              ),
+              Expanded(
+                child: BlocBuilder<DrawerCubit, DrawerState>(
+                  builder: (context, state) {
+                    final hasSelectedPinnedPath = state.pinnedPaths.any(
+                      (path) => _isFluentPathSelected(activePath, path),
+                    );
+                    final hasSelectedStoragePath = state.storageLocations.any(
+                      (storage) =>
+                          _isFluentPathSelected(activePath, storage.path),
+                    );
 
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-                        children: [
-                          _fluentNavigationItem(
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+                      children: [
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.house,
+                          title: context.tr.home,
+                          semanticLabel: context.tr.home,
+                          selected: _isFluentPathSelected(activePath, '#home'),
+                          onPressed: () =>
+                              _navigateTo(context, '#home', 'Home'),
+                        ),
+                        const SizedBox(height: _FluentDrawerTokens.groupGap),
+                        if (state.pinnedPaths.isNotEmpty)
+                          _buildFluentSection(
                             context,
-                            icon: PhosphorIconsLight.house,
-                            title: context.tr.home,
-                            semanticLabel: context.tr.home,
-                            selected: _isFluentPathSelected(
-                              activePath,
-                              '#home',
-                            ),
-                            onPressed: () =>
-                                _navigateTo(context, '#home', 'Home'),
-                          ),
-                          const SizedBox(height: _FluentDrawerTokens.groupGap),
-                          if (state.pinnedPaths.isNotEmpty)
-                            _buildFluentSection(
-                              context,
-                              key: const ValueKey<String>('fluent-pinned'),
-                              icon: PhosphorIconsLight.pushPin,
-                              title: context.tr.pinnedSection,
-                              selected: hasSelectedPinnedPath,
-                              expanded: state.isPinnedExpanded,
-                              onStateChanged: context
-                                  .read<DrawerCubit>()
-                                  .setPinnedExpanded,
-                              content: Column(
-                                children: state.pinnedPaths
-                                    .map(
-                                      (path) => _fluentNavigationItem(
+                            key: const ValueKey<String>('fluent-pinned'),
+                            icon: PhosphorIconsLight.pushPin,
+                            title: context.tr.pinnedSection,
+                            selected: hasSelectedPinnedPath,
+                            expanded: state.isPinnedExpanded,
+                            onStateChanged: context
+                                .read<DrawerCubit>()
+                                .setPinnedExpanded,
+                            content: Column(
+                              children: state.pinnedPaths
+                                  .map(
+                                    (path) => _fluentNavigationItem(
+                                      context,
+                                      icon: _fluentPinnedIcon(path),
+                                      title: _fluentPinnedName(path),
+                                      semanticLabel: _fluentPinnedName(path),
+                                      selected: _isFluentPathSelected(
+                                        activePath,
+                                        path,
+                                      ),
+                                      onPressed: () => _navigateTo(
                                         context,
-                                        icon: _fluentPinnedIcon(path),
-                                        title: _fluentPinnedName(path),
-                                        semanticLabel: _fluentPinnedName(path),
-                                        selected: _isFluentPathSelected(
-                                          activePath,
-                                          path,
-                                        ),
-                                        onPressed: () => _navigateTo(
-                                          context,
-                                          path,
-                                          _fluentPinnedName(path),
-                                          isStorage: true,
-                                        ),
-                                        trailing: CbFluentTooltip(
-                                          message: context.tr.unpinFromSidebar,
-                                          child: Semantics(
-                                            button: true,
-                                            label: context.tr.unpinFromSidebar,
-                                            child: fluent.IconButton(
-                                              icon: Icon(
-                                                PhosphorIconsLight.pushPinSlash,
-                                                size: 14,
-                                                color: resources
-                                                    .textFillColorSecondary,
-                                              ),
-                                              iconButtonMode:
-                                                  fluent.IconButtonMode.tiny,
-                                              onPressed: () => context
-                                                  .read<DrawerCubit>()
-                                                  .togglePinnedPath(path),
+                                        path,
+                                        _fluentPinnedName(path),
+                                        isStorage: true,
+                                      ),
+                                      trailing: CbFluentTooltip(
+                                        message: context.tr.unpinFromSidebar,
+                                        child: Semantics(
+                                          button: true,
+                                          label: context.tr.unpinFromSidebar,
+                                          child: fluent.IconButton(
+                                            icon: Icon(
+                                              PhosphorIconsLight.pushPinSlash,
+                                              size: 14,
+                                              color: resources
+                                                  .textFillColorSecondary,
                                             ),
+                                            iconButtonMode:
+                                                fluent.IconButtonMode.tiny,
+                                            onPressed: () => context
+                                                .read<DrawerCubit>()
+                                                .togglePinnedPath(path),
                                           ),
                                         ),
                                       ),
-                                    )
-                                    .toList(growable: false),
-                              ),
-                            ),
-                          const SizedBox(height: _FluentDrawerTokens.groupGap),
-                          _buildFluentSection(
-                            context,
-                            key: const ValueKey<String>('fluent-storage'),
-                            icon: PhosphorIconsLight.hardDrives,
-                            title: context.tr.drivesTab,
-                            selected: hasSelectedStoragePath,
-                            expanded: state.isStorageExpanded,
-                            onStateChanged: context
-                                .read<DrawerCubit>()
-                                .setStorageExpanded,
-                            content: _buildFluentStorageItems(
-                              context,
-                              state,
-                              activePath: activePath,
+                                    ),
+                                  )
+                                  .toList(growable: false),
                             ),
                           ),
-                          const SizedBox(height: _FluentDrawerTokens.groupGap),
+                        const SizedBox(height: _FluentDrawerTokens.groupGap),
+                        _buildFluentSection(
+                          context,
+                          key: const ValueKey<String>('fluent-storage'),
+                          icon: PhosphorIconsLight.hardDrives,
+                          title: context.tr.drivesTab,
+                          selected: hasSelectedStoragePath,
+                          expanded: state.isStorageExpanded,
+                          onStateChanged: context
+                              .read<DrawerCubit>()
+                              .setStorageExpanded,
+                          content: _buildFluentStorageItems(
+                            context,
+                            state,
+                            activePath: activePath,
+                          ),
+                        ),
+                        const SizedBox(height: _FluentDrawerTokens.groupGap),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.image,
+                          title: context.tr.imageGallery,
+                          semanticLabel: context.tr.imageGallery,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            '#gallery',
+                          ),
+                          onPressed: () => _navigateTo(
+                            context,
+                            '#gallery',
+                            context.tr.imageGallery,
+                          ),
+                        ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.videoCamera,
+                          title: context.tr.videoGallery,
+                          semanticLabel: context.tr.videoGallery,
+                          selected: _isFluentPathSelected(activePath, '#video'),
+                          onPressed: () => _navigateTo(
+                            context,
+                            '#video',
+                            context.tr.videoGallery,
+                          ),
+                        ),
+                        const SizedBox(height: _FluentDrawerTokens.groupGap),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.tag,
+                          title: context.tr.tags,
+                          semanticLabel: context.tr.tags,
+                          selected: _isFluentPathSelected(activePath, '#tags'),
+                          onPressed: () =>
+                              _navigateTo(context, '#tags', 'Tags'),
+                        ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.wifiHigh,
+                          title: context.tr.networksMenu,
+                          semanticLabel: context.tr.networksMenu,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            '#network',
+                          ),
+                          onPressed: () => _navigateTo(
+                            context,
+                            '#network',
+                            context.tr.networkTab,
+                          ),
+                        ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.terminalWindow,
+                          title: context.tr.sshWorkspace,
+                          semanticLabel: context.tr.sshWorkspace,
+                          selected: _isFluentPathSelected(activePath, '#ssh'),
+                          onPressed: () => _navigateTo(
+                            context,
+                            '#ssh',
+                            context.tr.sshWorkspace,
+                          ),
+                        ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.sparkle,
+                          title: context.tr.cbAgent,
+                          semanticLabel: context.tr.cbAgent,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            kAiChatPath,
+                          ),
+                          onPressed: () => _navigateToAiChat(context),
+                        ),
+                        if (Platform.isWindows)
                           _fluentNavigationItem(
                             context,
-                            icon: PhosphorIconsLight.image,
-                            title: context.tr.imageGallery,
-                            semanticLabel: context.tr.imageGallery,
+                            icon: PhosphorIconsLight.broom,
+                            title: context.tr.cbAgentCleanerTitle,
+                            semanticLabel: context.tr.cbAgentCleanerTitle,
                             selected: _isFluentPathSelected(
                               activePath,
-                              '#gallery',
+                              kCbAgentCleanerPath,
                             ),
                             onPressed: () => _navigateTo(
                               context,
-                              '#gallery',
-                              context.tr.imageGallery,
+                              kCbAgentCleanerPath,
+                              context.tr.cbAgentCleanerTitle,
                             ),
                           ),
-                          _fluentNavigationItem(
-                            context,
-                            icon: PhosphorIconsLight.videoCamera,
-                            title: context.tr.videoGallery,
-                            semanticLabel: context.tr.videoGallery,
-                            selected: _isFluentPathSelected(
-                              activePath,
-                              '#video',
-                            ),
-                            onPressed: () => _navigateTo(
-                              context,
-                              '#video',
-                              context.tr.videoGallery,
-                            ),
-                          ),
-                          const SizedBox(height: _FluentDrawerTokens.groupGap),
-                          _fluentNavigationItem(
-                            context,
-                            icon: PhosphorIconsLight.tag,
-                            title: context.tr.tags,
-                            semanticLabel: context.tr.tags,
-                            selected: _isFluentPathSelected(
-                              activePath,
-                              '#tags',
-                            ),
-                            onPressed: () =>
-                                _navigateTo(context, '#tags', 'Tags'),
-                          ),
-                          _fluentNavigationItem(
-                            context,
-                            icon: PhosphorIconsLight.wifiHigh,
-                            title: context.tr.networksMenu,
-                            semanticLabel: context.tr.networksMenu,
-                            selected: _isFluentPathSelected(
-                              activePath,
-                              '#network',
-                            ),
-                            onPressed: () => _navigateTo(
-                              context,
-                              '#network',
-                              context.tr.networkTab,
-                            ),
-                          ),
-                          _fluentNavigationItem(
-                            context,
-                            icon: PhosphorIconsLight.terminalWindow,
-                            title: context.tr.sshWorkspace,
-                            semanticLabel: context.tr.sshWorkspace,
-                            selected: _isFluentPathSelected(activePath, '#ssh'),
-                            onPressed: () => _navigateTo(
-                              context,
-                              '#ssh',
-                              context.tr.sshWorkspace,
-                            ),
-                          ),
-                          _fluentNavigationItem(
-                            context,
-                            icon: PhosphorIconsLight.sparkle,
-                            title: context.tr.cbAgent,
-                            semanticLabel: context.tr.cbAgent,
-                            selected: _isFluentPathSelected(
-                              activePath,
-                              kAiChatPath,
-                            ),
-                            onPressed: () => _navigateToAiChat(context),
-                          ),
-                          if (Platform.isWindows)
-                            _fluentNavigationItem(
-                              context,
-                              icon: PhosphorIconsLight.broom,
-                              title: context.tr.cbAgentCleanerTitle,
-                              semanticLabel: context.tr.cbAgentCleanerTitle,
-                              selected: _isFluentPathSelected(
-                                activePath,
-                                kCbAgentCleanerPath,
-                              ),
-                              onPressed: () => _navigateTo(
-                                context,
-                                kCbAgentCleanerPath,
-                                context.tr.cbAgentCleanerTitle,
-                              ),
-                            ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: fluent.Divider(
-                              style: fluent.DividerThemeData(
-                                decoration: BoxDecoration(
-                                  color: resources.dividerStrokeColorDefault,
-                                ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: fluent.Divider(
+                            style: fluent.DividerThemeData(
+                              decoration: BoxDecoration(
+                                color: resources.dividerStrokeColorDefault,
                               ),
                             ),
                           ),
-                          _fluentNavigationItem(
-                            context,
-                            icon: PhosphorIconsLight.gear,
-                            title: context.tr.settings,
-                            semanticLabel: context.tr.settings,
-                            selected: _isFluentPathSelected(
-                              activePath,
-                              kSettingsPath,
-                            ),
-                            onPressed: () => _navigateTo(
-                              context,
-                              kSettingsPath,
-                              context.tr.settings,
-                            ),
+                        ),
+                        _fluentNavigationItem(
+                          context,
+                          icon: PhosphorIconsLight.gear,
+                          title: context.tr.settings,
+                          semanticLabel: context.tr.settings,
+                          selected: _isFluentPathSelected(
+                            activePath,
+                            kSettingsPath,
                           ),
-                        ],
-                      );
-                    },
-                  ),
+                          onPressed: () => _navigateTo(
+                            context,
+                            kSettingsPath,
+                            context.tr.settings,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-                _buildFluentDrawerFooter(resources: resources),
-              ],
-            ),
+              ),
+              _buildFluentDrawerFooter(resources: resources),
+            ],
           ),
         ),
       ),
@@ -814,74 +795,67 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
         ? context.tr.unpinMenu
         : context.tr.pinMenu;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: resources.dividerStrokeColorDefault),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 12, 13),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 32,
-                width: 32,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.12),
-                  ),
-                  child: SizedBox(
-                    height: 32,
-                    width: 32,
-                    child: Icon(
-                      PhosphorIconsLight.folder,
-                      size: 20,
-                      color: accent,
-                    ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 13),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              width: 32,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => DecoratedBox(
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                ),
+                child: SizedBox(
+                  height: 32,
+                  width: 32,
+                  child: Icon(
+                    PhosphorIconsLight.folder,
+                    size: 20,
+                    color: accent,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                context.tr.appTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: resources.textFillColorPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              context.tr.appTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: resources.textFillColorPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            Semantics(
-              button: true,
-              label: pinLabel,
-              child: CbFluentTooltip(
-                message: pinLabel,
-                child: fluent.IconButton(
-                  icon: Icon(
-                    widget.isPinned
-                        ? PhosphorIconsFill.pushPin
-                        : PhosphorIconsLight.pushPin,
-                    size: 16,
-                    color: resources.textFillColorSecondary,
-                  ),
-                  iconButtonMode: fluent.IconButtonMode.small,
-                  onPressed: () {
-                    widget.onPinStateChanged(!widget.isPinned);
-                  },
+          ),
+          Semantics(
+            button: true,
+            label: pinLabel,
+            child: CbFluentTooltip(
+              message: pinLabel,
+              child: fluent.IconButton(
+                icon: Icon(
+                  widget.isPinned
+                      ? PhosphorIconsFill.pushPin
+                      : PhosphorIconsLight.pushPin,
+                  size: 16,
+                  color: resources.textFillColorSecondary,
                 ),
+                iconButtonMode: fluent.IconButtonMode.small,
+                onPressed: () {
+                  widget.onPinStateChanged(!widget.isPinned);
+                },
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1093,42 +1067,35 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   Widget _buildFluentDrawerFooter({
     required fluent.ResourceDictionary resources,
   }) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: resources.dividerStrokeColorDefault),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 9, 16, 13),
-        child: Row(
-          children: [
-            Expanded(
-              child: FutureBuilder<String>(
-                future: _getFullVersion(),
-                builder: (context, snapshot) {
-                  final version = snapshot.data;
-                  return Text(
-                    version == null || version.isEmpty
-                        ? 'Version'
-                        : 'Version $version',
-                    style: TextStyle(
-                      color: resources.textFillColorSecondary,
-                      fontSize: 11,
-                    ),
-                  );
-                },
-              ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 9, 16, 13),
+      child: Row(
+        children: [
+          Expanded(
+            child: FutureBuilder<String>(
+              future: _getFullVersion(),
+              builder: (context, snapshot) {
+                final version = snapshot.data;
+                return Text(
+                  version == null || version.isEmpty
+                      ? 'Version'
+                      : 'Version $version',
+                  style: TextStyle(
+                    color: resources.textFillColorSecondary,
+                    fontSize: 11,
+                  ),
+                );
+              },
             ),
-            Text(
-              '© CoolBirdZik',
-              style: TextStyle(
-                color: resources.textFillColorSecondary,
-                fontSize: 11,
-              ),
+          ),
+          Text(
+            '© CoolBirdZik',
+            style: TextStyle(
+              color: resources.textFillColorSecondary,
+              fontSize: 11,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

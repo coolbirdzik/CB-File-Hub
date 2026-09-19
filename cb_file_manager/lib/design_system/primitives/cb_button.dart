@@ -5,6 +5,7 @@ import '../tokens/cb_color_tokens.dart';
 import '../tokens/cb_geometry_tokens.dart';
 import '../tokens/cb_motion_tokens.dart';
 import '../tokens/cb_type_tokens.dart';
+import 'cb_decorations.dart';
 import 'cb_pressable.dart';
 
 /// Visual weight of a button.
@@ -14,24 +15,27 @@ import 'cb_pressable.dart';
 /// Material's five overlapping button types (elevated / filled / tonal /
 /// outlined / text) invite inconsistency because the difference between them
 /// is decorative rather than semantic.
+///
+/// Every variant is flat: weight is carried by the fill alone, never by a
+/// border.
 enum CbButtonVariant {
   /// Solid accent fill. The single most important action in a view.
   primary,
 
-  /// Bordered, neutral fill. The default for most actions.
+  /// Neutral tonal fill. The default for most actions.
   secondary,
 
-  /// Filled with a neutral wash, no border. Dense toolbars, segmented groups.
+  /// A lighter neutral wash. Dense toolbars, segmented groups.
   subtle,
 
-  /// No fill, no border until hovered. Tertiary actions, close buttons.
+  /// No fill until hovered. Tertiary actions, close buttons.
   ghost,
 
   /// Solid destructive fill. Delete, permanently remove, format.
   danger,
 
-  /// Bordered destructive. Destructive but not the primary action.
-  dangerOutline,
+  /// Destructive tint. Destructive but not the primary action.
+  dangerSubtle,
 }
 
 enum CbButtonSize {
@@ -161,18 +165,12 @@ class CbButton extends StatelessWidget {
 
   _CbButtonPaint _paint(CbColorTokens c, CbInteractionState s) {
     if (s.disabled) {
-      final bool solid =
-          variant == CbButtonVariant.primary ||
-          variant == CbButtonVariant.danger;
       return _CbButtonPaint(
-        // A disabled solid button keeps its silhouette — a flat wash — so the
-        // layout does not shift and the hierarchy stays readable.
-        background: solid ? c.surfaceSunken : Colors.transparent,
-        border:
-            variant == CbButtonVariant.secondary ||
-                variant == CbButtonVariant.dangerOutline
-            ? c.strokeSubtle
-            : Colors.transparent,
+        // A disabled filled button keeps its silhouette — the faintest wash —
+        // so the layout does not shift and the hierarchy stays readable.
+        background: variant == CbButtonVariant.ghost
+            ? Colors.transparent
+            : c.fillSubtle,
         foreground: c.textDisabled,
       );
     }
@@ -185,29 +183,26 @@ class CbButton extends StatelessWidget {
               : s.hovered
               ? c.accent.hover
               : c.accent.base,
-          border: Colors.transparent,
           foreground: c.accent.onBase,
         );
 
       case CbButtonVariant.secondary:
         return _CbButtonPaint(
-          background: s.pressed
-              ? c.surfacePressed
-              : s.hovered
-              ? c.surfaceHover
-              : Colors.transparent,
-          border: s.hovered ? c.strokeStrong : c.stroke,
+          background: CbDecorations.controlFill(
+            c,
+            hovered: s.hovered,
+            pressed: s.pressed,
+          ),
           foreground: c.textPrimary,
         );
 
       case CbButtonVariant.subtle:
         return _CbButtonPaint(
           background: s.pressed
-              ? c.surfacePressed
+              ? c.fillHover
               : s.hovered
-              ? c.surfaceHover
-              : c.surfaceSunken,
-          border: Colors.transparent,
+              ? c.fill
+              : c.fillSubtle,
           foreground: c.textPrimary,
         );
 
@@ -218,8 +213,7 @@ class CbButton extends StatelessWidget {
               : s.hovered
               ? c.surfaceHover
               : Colors.transparent,
-          border: Colors.transparent,
-          foreground: c.textSecondary,
+          foreground: s.hovered ? c.textPrimary : c.textSecondary,
         );
 
       case CbButtonVariant.danger:
@@ -227,16 +221,21 @@ class CbButton extends StatelessWidget {
           background: s.pressed || s.hovered
               ? c.status.dangerHover
               : c.status.danger,
-          border: Colors.transparent,
           foreground: c.textInverse,
         );
 
-      case CbButtonVariant.dangerOutline:
+      case CbButtonVariant.dangerSubtle:
         return _CbButtonPaint(
-          background: s.pressed || s.hovered
-              ? c.status.dangerSurface
-              : Colors.transparent,
-          border: s.hovered ? c.status.danger : c.stroke,
+          background: Color.alphaBlend(
+            c.status.danger.withValues(
+              alpha: s.pressed
+                  ? 0.16
+                  : s.hovered
+                  ? 0.10
+                  : 0.0,
+            ),
+            c.status.dangerSurface,
+          ),
           foreground: c.status.danger,
         );
     }
@@ -267,17 +266,9 @@ class CbButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: paint.background,
             borderRadius: CbRadii.all(_radius),
-            border: Border.all(color: paint.border, width: CbStrokes.hairline),
-            // The focus ring sits outside the border rather than recolouring
-            // it, so focus stays visible on every variant including filled.
-            boxShadow: state.focused
-                ? [
-                    BoxShadow(
-                      color: c.focusRing,
-                      spreadRadius: CbStrokes.emphasis,
-                    ),
-                  ]
-                : null,
+            // The focus ring sits outside the shape, so focus stays visible
+            // on every variant including the accent fill.
+            boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
           ),
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
@@ -336,12 +327,7 @@ class CbButton extends StatelessWidget {
 @immutable
 class _CbButtonPaint {
   final Color background;
-  final Color border;
   final Color foreground;
 
-  const _CbButtonPaint({
-    required this.background,
-    required this.border,
-    required this.foreground,
-  });
+  const _CbButtonPaint({required this.background, required this.foreground});
 }

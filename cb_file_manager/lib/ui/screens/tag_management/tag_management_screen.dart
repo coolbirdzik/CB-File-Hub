@@ -1,12 +1,9 @@
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show ImageFilter;
 
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
@@ -29,6 +26,7 @@ import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dar
 import 'package:cb_file_manager/utils/app_logger.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:path/path.dart' as pathlib;
@@ -1693,16 +1691,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   Container(
                     width: 160,
                     height: 160,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: 0.3,
-                        ),
-                      ),
-                    ),
+                    decoration: CbDecorations.card(context, radius: 16),
                     child: currentThumbnail != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(15),
@@ -3041,7 +3030,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
       backgroundColor: theme.colorScheme.primaryContainer.withValues(
         alpha: 0.3,
       ),
-      side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
     );
   }
 
@@ -3196,50 +3184,35 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     required VoidCallback onTap,
     IconData? icon,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.4,
-                ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 14,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
-              ),
+    return CbSurface(
+      onPressed: onTap,
+      selected: selected,
+      radius: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 14,
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
             ),
+            const SizedBox(width: 6),
           ],
-        ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3519,14 +3492,6 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
             child: ListTile(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16.0),
-                side: isEditing
-                    ? BorderSide(color: theme.colorScheme.primary, width: 2)
-                    : isSelected || isFocused
-                    ? BorderSide(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                        width: 1.5,
-                      )
-                    : BorderSide.none,
               ),
               tileColor: isSelected || isFocused
                   ? theme.colorScheme.primary.withValues(alpha: 0.12)
@@ -3894,16 +3859,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         final isRejected = rejectedData.isNotEmpty;
         if (!isAccepted && !isRejected) return draggable;
         return DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isAccepted
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.error,
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(
-              _viewMode == _TagViewMode.grid ? 16 : 4,
-            ),
+          position: DecorationPosition.foreground,
+          decoration: CbDecorations.dropTarget(
+            context,
+            rejected: !isAccepted,
+            radius: _viewMode == _TagViewMode.grid ? 16 : 4,
           ),
           child: draggable,
         );
@@ -3921,18 +3881,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         key: const ValueKey('tag-drag-feedback'),
         width: 240,
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: tagColor.withValues(alpha: 0.75)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+        decoration: CbDecorations.floating(context, radius: 12),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -4103,20 +4052,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     return Material(
       color: Colors.transparent,
       child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(24.0),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+        decoration: CbDecorations.floating(context, radius: 24.0),
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth - 8),
@@ -4328,248 +4264,194 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                             Positioned.fill(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(16.0),
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(
-                                    sigmaX: 14,
-                                    sigmaY: 14,
-                                  ),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: isSelected || isFocused
-                                            ? [
-                                                theme.colorScheme.primary
-                                                    .withValues(alpha: 0.26),
-                                                theme.colorScheme.primary
-                                                    .withValues(alpha: 0.16),
-                                              ]
-                                            : [
-                                                theme.colorScheme.surface
-                                                    .withValues(alpha: 0.34),
-                                                Color.alphaBlend(
-                                                  tagColor.withValues(
-                                                    alpha: 0.10,
-                                                  ),
-                                                  theme.colorScheme.surface
-                                                      .withValues(alpha: 0.22),
-                                                ),
-                                              ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(16.0),
-                                      border: Border.all(
-                                        color: isEditing
-                                            ? theme.colorScheme.primary
-                                            : isSelected || isFocused
-                                            ? theme.colorScheme.primary
-                                                  .withValues(alpha: 0.55)
-                                            : Colors.white.withValues(
-                                                alpha: 0.14,
-                                              ),
-                                        width: isEditing
-                                            ? 2
-                                            : isSelected || isFocused
-                                            ? 1.5
-                                            : 1,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          blurRadius: 18,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                      ],
+                                child: Container(
+                                  decoration: CbDecorations.card(
+                                    context,
+                                    radius: 16.0,
+                                    selected: isSelected || isFocused,
+                                    // Unselected tiles keep a wash of
+                                    // their tag colour; flat, no glass.
+                                    color: tagColor.withValues(
+                                      alpha: theme.brightness == Brightness.dark
+                                          ? 0.14
+                                          : 0.10,
                                     ),
-                                    child: Column(
-                                      children: [
-                                        // Top area: thumbnail or color dot, with a
-                                        // hover toolbar (desktop) / overflow button
-                                        // (mobile) revealed over the bottom edge.
-                                        Expanded(
-                                          child: _HoverReveal(
-                                            enabled: isDesktop && !isEditing,
-                                            builder: (context, hovering) => Stack(
-                                              clipBehavior: Clip.none,
-                                              children: [
-                                                Positioned.fill(
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        const BorderRadius.vertical(
-                                                          top: Radius.circular(
-                                                            16.0,
-                                                          ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      // Top area: thumbnail or color dot, with a
+                                      // hover toolbar (desktop) / overflow button
+                                      // (mobile) revealed over the bottom edge.
+                                      Expanded(
+                                        child: _HoverReveal(
+                                          enabled: isDesktop && !isEditing,
+                                          builder: (context, hovering) => Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Positioned.fill(
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      const BorderRadius.vertical(
+                                                        top: Radius.circular(
+                                                          16.0,
                                                         ),
-                                                    child:
-                                                        _buildTagCardThumbnailFill(
-                                                          tag,
-                                                          tagColor,
-                                                        ),
-                                                  ),
+                                                      ),
+                                                  child:
+                                                      _buildTagCardThumbnailFill(
+                                                        tag,
+                                                        tagColor,
+                                                      ),
                                                 ),
-                                                // Desktop: floating action toolbar
-                                                // that slides up + fades in on hover.
-                                                if (isDesktop && !isEditing)
-                                                  Positioned(
-                                                    left: 0,
-                                                    right: 0,
-                                                    // Float over the bottom edge of
-                                                    // the full-bleed thumbnail.
-                                                    bottom: 6,
-                                                    child: Center(
-                                                      child: AnimatedSlide(
-                                                        offset: Offset(
-                                                          0,
-                                                          hovering ? 0 : 0.35,
-                                                        ),
+                                              ),
+                                              // Desktop: floating action toolbar
+                                              // that slides up + fades in on hover.
+                                              if (isDesktop && !isEditing)
+                                                Positioned(
+                                                  left: 0,
+                                                  right: 0,
+                                                  // Float over the bottom edge of
+                                                  // the full-bleed thumbnail.
+                                                  bottom: 6,
+                                                  child: Center(
+                                                    child: AnimatedSlide(
+                                                      offset: Offset(
+                                                        0,
+                                                        hovering ? 0 : 0.35,
+                                                      ),
+                                                      duration: const Duration(
+                                                        milliseconds: 160,
+                                                      ),
+                                                      curve:
+                                                          Curves.easeOutCubic,
+                                                      child: AnimatedOpacity(
+                                                        opacity: hovering
+                                                            ? 1.0
+                                                            : 0.0,
                                                         duration:
                                                             const Duration(
                                                               milliseconds: 160,
                                                             ),
-                                                        curve:
-                                                            Curves.easeOutCubic,
-                                                        child: AnimatedOpacity(
-                                                          opacity: hovering
-                                                              ? 1.0
-                                                              : 0.0,
-                                                          duration:
-                                                              const Duration(
-                                                                milliseconds:
-                                                                    160,
+                                                        child: IgnorePointer(
+                                                          ignoring: !hovering,
+                                                          child:
+                                                              _buildTagHoverToolbar(
+                                                                tag,
+                                                                theme,
+                                                                iconSize,
+                                                                maxWidth:
+                                                                    constraints
+                                                                        .maxWidth,
                                                               ),
-                                                          child: IgnorePointer(
-                                                            ignoring: !hovering,
-                                                            child: _buildTagHoverToolbar(
-                                                              tag,
-                                                              theme,
-                                                              iconSize,
-                                                              maxWidth:
-                                                                  constraints
-                                                                      .maxWidth,
-                                                            ),
-                                                          ),
                                                         ),
                                                       ),
                                                     ),
                                                   ),
-                                                // Mobile: always-visible overflow
-                                                if (_isMobile && !isEditing)
-                                                  Positioned(
-                                                    top: 4,
-                                                    right: 4,
-                                                    child:
-                                                        _buildTagOverflowButton(
-                                                          tag,
-                                                          theme,
-                                                        ),
-                                                  ),
-                                              ],
-                                            ),
+                                                ),
+                                              // Mobile: always-visible overflow
+                                              if (_isMobile && !isEditing)
+                                                Positioned(
+                                                  top: 4,
+                                                  right: 4,
+                                                  child:
+                                                      _buildTagOverflowButton(
+                                                        tag,
+                                                        theme,
+                                                      ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                        // Bottom area: tag name
-                                        Container(
-                                          margin: const EdgeInsets.only(top: 1),
-                                          decoration: BoxDecoration(
-                                            color: theme.colorScheme.surface
-                                                .withValues(alpha: 0.28),
-                                            border: Border(
-                                              top: BorderSide(
-                                                color: Colors.white.withValues(
-                                                  alpha: 0.12,
-                                                ),
-                                              ),
-                                            ),
+                                      ),
+                                      // Bottom area: tag name
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 1),
+                                        decoration: BoxDecoration(
+                                          color: context.cbColors.fillSubtle,
+                                        ),
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                            top: spacing,
+                                            left: isDesktop ? 8 : 6,
+                                            right: isDesktop ? 8 : 6,
+                                            bottom: isDesktop ? 8 : 6,
                                           ),
-                                          child: Padding(
-                                            padding: EdgeInsets.only(
-                                              top: spacing,
-                                              left: isDesktop ? 8 : 6,
-                                              right: isDesktop ? 8 : 6,
-                                              bottom: isDesktop ? 8 : 6,
-                                            ),
-                                            child: Column(
-                                              children: [
-                                                // Tag name or rename TextField
-                                                if (isEditing &&
-                                                    _editingTagController !=
-                                                        null)
-                                                  // Lifted into the overlay so
-                                                  // a long tag wraps over the
-                                                  // cards below instead of
-                                                  // squeezing this card's
-                                                  // thumbnail or being cut off.
-                                                  CbInlineRenameOverlay(
-                                                    active: true,
-                                                    label: Text(
-                                                      tag,
-                                                      style: TextStyle(
+                                          child: Column(
+                                            children: [
+                                              // Tag name or rename TextField
+                                              if (isEditing &&
+                                                  _editingTagController != null)
+                                                // Lifted into the overlay so
+                                                // a long tag wraps over the
+                                                // cards below instead of
+                                                // squeezing this card's
+                                                // thumbnail or being cut off.
+                                                CbInlineRenameOverlay(
+                                                  active: true,
+                                                  label: Text(
+                                                    tag,
+                                                    style: TextStyle(
+                                                      fontSize: fontSize,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurface,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  editorBuilder: (context) =>
+                                                      _buildTagRenameField(
+                                                        tag,
                                                         fontSize: fontSize,
                                                         fontWeight:
                                                             FontWeight.w600,
-                                                        color: theme
-                                                            .colorScheme
-                                                            .onSurface,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        maxLines:
+                                                            cbInlineRenameMaxLines,
                                                       ),
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      maxLines: 2,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                    editorBuilder: (context) =>
-                                                        _buildTagRenameField(
-                                                          tag,
+                                                )
+                                              else
+                                                CbTooltip(
+                                                  message:
+                                                      _tagHierarchyManager
+                                                          .isParent(tag)
+                                                      ? 'Double click to open child tags'
+                                                      : 'Double click to open files',
+                                                  child: Column(
+                                                    children: [
+                                                      Text(
+                                                        tag,
+                                                        style: TextStyle(
                                                           fontSize: fontSize,
                                                           fontWeight:
                                                               FontWeight.w600,
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          maxLines:
-                                                              cbInlineRenameMaxLines,
+                                                          color: theme
+                                                              .colorScheme
+                                                              .onSurface,
                                                         ),
-                                                  )
-                                                else
-                                                  CbTooltip(
-                                                    message:
-                                                        _tagHierarchyManager
-                                                            .isParent(tag)
-                                                        ? 'Double click to open child tags'
-                                                        : 'Double click to open files',
-                                                    child: Column(
-                                                      children: [
-                                                        Text(
-                                                          tag,
-                                                          style: TextStyle(
-                                                            fontSize: fontSize,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurface,
-                                                          ),
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          maxLines: 2,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                        _buildHierarchyContext(
-                                                          tag,
-                                                          theme,
-                                                          centered: true,
-                                                        ),
-                                                      ],
-                                                    ),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                      _buildHierarchyContext(
+                                                        tag,
+                                                        theme,
+                                                        centered: true,
+                                                      ),
+                                                    ],
                                                   ),
-                                              ],
-                                            ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -5592,8 +5474,6 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     required ValueChanged<String> onChanged,
     required Future<void> Function(String) onSubmit,
   }) {
-    final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -5607,12 +5487,6 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               horizontal: 12,
               vertical: 10,
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-            ),
             suffixIcon: IconButton(
               icon: const Icon(PhosphorIconsLight.plus, size: 18),
               onPressed: () {
@@ -5623,7 +5497,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               },
               visualDensity: VisualDensity.compact,
             ),
-          ),
+          ).flat(context, radius: 8),
           style: const TextStyle(fontSize: 13),
           onChanged: onChanged,
           onSubmitted: (value) {
@@ -5636,13 +5510,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
           Container(
             margin: const EdgeInsets.only(top: 2),
             constraints: const BoxConstraints(maxHeight: 150),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-              ),
-            ),
+            decoration: CbDecorations.card(context, radius: 8),
             child: ListView.builder(
               shrinkWrap: true,
               padding: EdgeInsets.zero,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../models/ai/ai_message.dart';
@@ -34,11 +35,7 @@ class _ToolCallChipState extends State<ToolCallChip> {
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: accent.withValues(alpha: 0.2), width: 1),
-      ),
+      decoration: CbDecorations.tint(context, accent, radius: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

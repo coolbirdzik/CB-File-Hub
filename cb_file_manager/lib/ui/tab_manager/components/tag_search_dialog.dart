@@ -124,7 +124,6 @@ class _TagSearchDialogState extends State<TagSearchDialog> {
                     decoration: const InputDecoration(
                       labelText: 'Nhập tag để tìm kiếm',
                       hintText: 'Ví dụ: important, work, personal',
-                      border: OutlineInputBorder(),
                     ),
                     onSubmitted: (_) => _performSearch(),
                   );

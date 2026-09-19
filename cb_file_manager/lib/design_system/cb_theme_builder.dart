@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cb_tokens.dart';
+import 'primitives/cb_decorations.dart';
 import 'tokens/cb_color_tokens.dart';
 import 'tokens/cb_geometry_tokens.dart';
 import 'tokens/cb_motion_tokens.dart';
@@ -26,6 +27,12 @@ import 'tokens/cb_type_tokens.dart';
 ///     colour, which is the pointer-driven convention.
 ///  3. **The `fromSeed` tonal palette.** The [ColorScheme] below is assembled
 ///     field by field from tokens, so no Material algorithm decides colour.
+///
+/// And one CoolBird rule is enforced on top: **flat, borderless chrome.**
+/// Buttons, cards, chips, inputs, menus, dialogs and tooltips draw no
+/// outline. Resting things separate from the page by a step on the fill
+/// ramp, floating things by their shadow. The only lines left are dividers
+/// (content structure) and focus/error indicators (state).
 class CbThemeBuilder {
   const CbThemeBuilder._();
 
@@ -110,33 +117,17 @@ class CbThemeBuilder {
       ),
 
       // ─── Buttons ─────────────────────────────────────────────────────────
-      // Mirrors CbButton: 32px tall, 5px radius, label type, no elevation.
+      // Mirrors CbButton: 32px tall, 5px radius, label type, no elevation,
+      // no outline. `OutlinedButton` keeps its name but renders as the
+      // tonal secondary button — the outline was the only thing separating
+      // it from a text button, and a fill does that job without a border.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: _filledStyle(c, c.accent, isDark),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: _filledStyle(c, c.accent, isDark),
       ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: _baseButtonStyle(c).copyWith(
-          foregroundColor: WidgetStatePropertyAll(c.textPrimary),
-          backgroundColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.pressed)) return c.surfacePressed;
-            if (states.contains(WidgetState.hovered)) return c.surfaceHover;
-            return Colors.transparent;
-          }),
-          side: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.disabled)) {
-              return BorderSide(color: c.strokeSubtle);
-            }
-            return BorderSide(
-              color: states.contains(WidgetState.hovered)
-                  ? c.strokeStrong
-                  : c.stroke,
-            );
-          }),
-        ),
-      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _tonalStyle(c)),
       textButtonTheme: TextButtonThemeData(
         style: _baseButtonStyle(c).copyWith(
           foregroundColor: WidgetStateProperty.resolveWith((states) {
@@ -182,28 +173,27 @@ class CbThemeBuilder {
       ),
 
       // ─── Containers ──────────────────────────────────────────────────────
+      // A card is a flat tonal block (same recipe as CbSurface.flat): the
+      // translucent fill separates it on the canvas, inside a dialog and on
+      // the acrylic backdrop alike, with no outline and no shadow.
       cardTheme: CardThemeData(
-        color: c.surfaceRaised,
+        color: c.fillSubtle,
         surfaceTintColor: Colors.transparent, // (1) no tinted elevation
+        shadowColor: Colors.transparent,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: CbRadii.mdAll,
-          side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
-        ),
+        shape: const RoundedRectangleBorder(borderRadius: CbRadii.mdAll),
       ),
 
       dialogTheme: DialogThemeData(
         backgroundColor: c.surfaceOverlay,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        shadowColor: c.shadow,
+        elevation: _floatingElevation,
         barrierColor: c.scrim,
         titleTextStyle: CbTypography.headingLg.copyWith(color: c.textPrimary),
         contentTextStyle: CbTypography.body.copyWith(color: c.textSecondary),
-        shape: RoundedRectangleBorder(
-          borderRadius: CbRadii.xlAll,
-          side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
-        ),
+        shape: const RoundedRectangleBorder(borderRadius: CbRadii.xlAll),
       ),
 
       bottomSheetTheme: BottomSheetThemeData(
@@ -220,18 +210,16 @@ class CbThemeBuilder {
       ),
 
       // ─── Menus and popovers ──────────────────────────────────────────────
+      // Floating layers: no outline, so the shadow carries the separation.
       popupMenuTheme: PopupMenuThemeData(
         color: c.surfaceOverlay,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: _floatingElevation,
         shadowColor: c.shadow,
         labelTextStyle: WidgetStatePropertyAll(
           CbTypography.body.copyWith(color: c.textPrimary),
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: CbRadii.lgAll,
-          side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
-        ),
+        shape: const RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       ),
 
       menuTheme: MenuThemeData(style: _menuStyle(c)),
@@ -267,24 +255,20 @@ class CbThemeBuilder {
         decoration: BoxDecoration(
           color: c.surfaceOverlay,
           borderRadius: CbRadii.smAll,
-          border: Border.all(color: c.stroke, width: CbStrokes.hairline),
           boxShadow: tokens.shadowLevel3,
         ),
       ),
 
       // ─── Inputs ──────────────────────────────────────────────────────────
-      // Kept in step with CbTextField: sunken fill, hairline border, and a
-      // neutral raised-fill focus state instead of a coloured outline.
+      // Kept in step with CbTextField (CbDecorations.field): a tonal fill
+      // with no outline, and a bottom indicator that turns accent on focus
+      // and danger on error. Underline borders — not outline ones — so a
+      // floating label sits inside the fill instead of cutting its edge.
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: WidgetStateColor.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) {
-            return c.surfaceSunken.withValues(alpha: 0.5);
-          }
-          if (states.contains(WidgetState.focused)) {
-            return c.surfaceRaised;
-          }
-          return c.surfaceSunken;
+          if (states.contains(WidgetState.disabled)) return c.fillSubtle;
+          return c.fill;
         }),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
@@ -296,15 +280,12 @@ class CbThemeBuilder {
         floatingLabelStyle: CbTypography.labelSm.copyWith(color: c.textPrimary),
         helperStyle: CbTypography.caption.copyWith(color: c.textTertiary),
         errorStyle: CbTypography.caption.copyWith(color: c.status.danger),
-        border: _inputBorder(c.stroke),
-        enabledBorder: _inputBorder(c.stroke),
-        disabledBorder: _inputBorder(c.strokeSubtle),
-        focusedBorder: _inputBorder(c.strokeStrong),
+        border: _inputBorder(null),
+        enabledBorder: _inputBorder(null),
+        disabledBorder: _inputBorder(null),
+        focusedBorder: _inputBorder(c.accent.base),
         errorBorder: _inputBorder(c.status.danger),
-        focusedErrorBorder: _inputBorder(
-          c.status.danger,
-          width: CbStrokes.emphasis,
-        ),
+        focusedErrorBorder: _inputBorder(c.status.danger),
       ),
 
       textSelectionTheme: TextSelectionThemeData(
@@ -316,7 +297,7 @@ class CbThemeBuilder {
       // ─── Selection controls ──────────────────────────────────────────────
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) return c.surfaceSunken;
+          if (states.contains(WidgetState.disabled)) return c.fillSubtle;
           if (states.contains(WidgetState.selected)) return c.accent.base;
           return Colors.transparent;
         }),
@@ -342,30 +323,29 @@ class CbThemeBuilder {
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.disabled)) return c.textDisabled;
           if (states.contains(WidgetState.selected)) return c.accent.onBase;
-          return c.surface;
+          return c.textSecondary;
         }),
+        // Flat switch: the off track is a fill step, not an outlined pill.
         trackColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) return c.surfaceSunken;
+          if (states.contains(WidgetState.disabled)) return c.fillSubtle;
           if (states.contains(WidgetState.selected)) return c.accent.base;
-          return c.surfaceSunken;
+          if (states.contains(WidgetState.hovered)) return c.fillPressed;
+          return c.fillHover;
         }),
-        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) return Colors.transparent;
-          return c.strokeStrong;
-        }),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
         splashRadius: 0,
       ),
       sliderTheme: SliderThemeData(
         activeTrackColor: c.accent.base,
-        inactiveTrackColor: c.surfaceSunken,
+        inactiveTrackColor: c.fillPressed,
         thumbColor: c.accent.base,
         overlayColor: c.accent.base.withValues(alpha: 0.12),
         trackHeight: CbStrokes.emphasis * 2,
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: c.accent.base,
-        linearTrackColor: c.surfaceSunken,
-        circularTrackColor: c.surfaceSunken,
+        linearTrackColor: c.fillHover,
+        circularTrackColor: c.fillHover,
         linearMinHeight: CbStrokes.emphasis,
       ),
 
@@ -386,9 +366,9 @@ class CbThemeBuilder {
       ),
 
       chipTheme: ChipThemeData(
-        backgroundColor: c.surfaceSunken,
+        backgroundColor: c.fill,
         selectedColor: c.accent.tintStrong,
-        disabledColor: c.surfaceSunken,
+        disabledColor: c.fillSubtle,
         surfaceTintColor: Colors.transparent,
         labelStyle: CbTypography.labelSm.copyWith(color: c.textPrimary),
         secondaryLabelStyle: CbTypography.labelSm.copyWith(
@@ -398,12 +378,72 @@ class CbThemeBuilder {
           horizontal: CbSpacing.sm,
           vertical: CbSpacing.xxs,
         ),
-        side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(CbRadii.full),
-        ),
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
         elevation: 0,
         pressElevation: 0,
+      ),
+
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: _tonalStyle(c).copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) return c.fillSubtle;
+            if (states.contains(WidgetState.selected)) {
+              return states.contains(WidgetState.hovered)
+                  ? c.accent.tintStrong
+                  : c.surfaceSelected;
+            }
+            if (states.contains(WidgetState.pressed)) return c.fillPressed;
+            if (states.contains(WidgetState.hovered)) return c.fillHover;
+            return c.fill;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) return c.textDisabled;
+            if (states.contains(WidgetState.selected)) return c.accent.text;
+            return c.textPrimary;
+          }),
+          fixedSize: const WidgetStatePropertyAll(null),
+        ),
+      ),
+
+      toggleButtonsTheme: ToggleButtonsThemeData(
+        color: c.textPrimary,
+        selectedColor: c.accent.text,
+        disabledColor: c.textDisabled,
+        fillColor: c.surfaceSelected,
+        hoverColor: c.surfaceHover,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderColor: Colors.transparent,
+        selectedBorderColor: Colors.transparent,
+        disabledBorderColor: Colors.transparent,
+        borderRadius: CbRadii.smAll,
+        borderWidth: 0,
+      ),
+
+      expansionTileTheme: ExpansionTileThemeData(
+        iconColor: c.icon,
+        collapsedIconColor: c.icon,
+        textColor: c.textPrimary,
+        collapsedTextColor: c.textPrimary,
+        // Material draws divider lines above and below an expanded tile;
+        // giving both shapes explicitly is what turns them off.
+        shape: const RoundedRectangleBorder(borderRadius: CbRadii.smAll),
+        collapsedShape: const RoundedRectangleBorder(
+          borderRadius: CbRadii.smAll,
+        ),
+      ),
+
+      searchBarTheme: SearchBarThemeData(
+        elevation: const WidgetStatePropertyAll(0),
+        shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) return c.fillHover;
+          return c.fill;
+        }),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: const WidgetStatePropertyAll(BorderSide.none),
       ),
 
       tabBarTheme: TabBarThemeData(
@@ -412,7 +452,10 @@ class CbThemeBuilder {
         labelStyle: CbTypography.label,
         unselectedLabelStyle: CbTypography.body,
         indicatorSize: TabBarIndicatorSize.label,
-        dividerColor: c.stroke,
+        // Flat: the accent indicator marks the active tab; no full-width
+        // rule under the whole bar.
+        dividerColor: Colors.transparent,
+        dividerHeight: 0,
         overlayColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.hovered)) return c.surfaceHover;
           return Colors.transparent;
@@ -453,11 +496,8 @@ class CbThemeBuilder {
         contentTextStyle: CbTypography.body.copyWith(color: c.textPrimary),
         actionTextColor: c.accent.text,
         behavior: SnackBarBehavior.floating,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: CbRadii.lgAll,
-          side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
-        ),
+        elevation: _floatingElevation,
+        shape: const RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       ),
 
       // ─── Scrollbar ───────────────────────────────────────────────────────
@@ -503,6 +543,11 @@ class CbThemeBuilder {
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────
+
+  /// Material elevation for floating layers (menus, dialogs, snackbars).
+  /// With no outline to separate them, a light-mode white menu over a white
+  /// page is only distinguishable by its shadow.
+  static const double _floatingElevation = 6;
 
   static ButtonStyle _baseButtonStyle(CbColorTokens c) {
     return ButtonStyle(
@@ -550,10 +595,22 @@ class CbThemeBuilder {
         return accent.onBase;
       }),
       backgroundColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.disabled)) return c.surfaceSunken;
+        if (states.contains(WidgetState.disabled)) return c.fillSubtle;
         if (states.contains(WidgetState.pressed)) return accent.pressed;
         if (states.contains(WidgetState.hovered)) return accent.hover;
         return accent.base;
+      }),
+    );
+  }
+
+  /// The neutral tonal button — CbButtonVariant.secondary for Material.
+  static ButtonStyle _tonalStyle(CbColorTokens c) {
+    return _baseButtonStyle(c).copyWith(
+      backgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) return c.fillSubtle;
+        if (states.contains(WidgetState.pressed)) return c.fillPressed;
+        if (states.contains(WidgetState.hovered)) return c.fillHover;
+        return c.fill;
       }),
     );
   }
@@ -567,24 +624,14 @@ class CbThemeBuilder {
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(vertical: CbSpacing.xs),
       ),
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(
-          borderRadius: CbRadii.lgAll,
-          side: BorderSide(color: c.stroke, width: CbStrokes.hairline),
-        ),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       ),
     );
   }
 
-  static OutlineInputBorder _inputBorder(
-    Color color, {
-    double width = CbStrokes.hairline,
-  }) {
-    return OutlineInputBorder(
-      borderRadius: CbRadii.smAll,
-      borderSide: BorderSide(color: color, width: width),
-    );
-  }
+  static UnderlineInputBorder _inputBorder(Color? indicator) =>
+      CbDecorations.inputBorder(indicator);
 
   static TextTheme _textTheme(CbColorTokens c) {
     Color primary(TextStyle s) => c.textPrimary;
@@ -660,7 +707,7 @@ class CbThemeBuilder {
       onPrimaryContainer: c.accent.text,
       secondary: c.textSecondary,
       onSecondary: c.textInverse,
-      secondaryContainer: c.surfaceSunken,
+      secondaryContainer: Color.alphaBlend(c.fillHover, c.surface),
       onSecondaryContainer: c.textPrimary,
       tertiary: c.accent.text,
       onTertiary: c.textInverse,
@@ -673,11 +720,16 @@ class CbThemeBuilder {
       surface: c.surface,
       onSurface: c.textPrimary,
       onSurfaceVariant: c.textSecondary,
+      // The container ladder is the fill ramp laid over `surface`, so every
+      // step is a visible tone rather than another white. Un-migrated
+      // widgets paint cards as `surfaceContainerHighest.withValues(...)`;
+      // with a white top step those cards only showed because of their
+      // outline, and removing the outline would have erased them.
       surfaceContainerLowest: c.surface,
-      surfaceContainerLow: c.surfaceRaised,
-      surfaceContainer: c.surfaceSunken,
-      surfaceContainerHigh: c.surfaceOverlay,
-      surfaceContainerHighest: c.surfaceOverlay,
+      surfaceContainerLow: Color.alphaBlend(c.fillSubtle, c.surface),
+      surfaceContainer: Color.alphaBlend(c.fill, c.surface),
+      surfaceContainerHigh: Color.alphaBlend(c.fillHover, c.surface),
+      surfaceContainerHighest: Color.alphaBlend(c.fillPressed, c.surface),
       surfaceDim: c.canvas,
       surfaceBright: c.surfaceRaised,
       // Opaque equivalents: `outline` is consumed by widgets that paint it on

@@ -712,14 +712,9 @@ class _NetworkConnectionDialogState extends State<NetworkConnectionDialog> {
                         const SizedBox(height: CbSpacing.lg),
                         Container(
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colors.status.dangerSurface,
-                            border: Border.all(
-                              color: colors.status.danger.withValues(
-                                alpha: 0.3,
-                              ),
-                            ),
-                            borderRadius: CbRadii.mdAll,
+                          decoration: CbDecorations.tint(
+                            context,
+                            colors.status.danger,
                           ),
                           child: Row(
                             children: [

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
@@ -40,10 +41,7 @@ class DirectoryListWidget extends StatelessWidget {
 
     return Container(
       constraints: const BoxConstraints(maxHeight: 200),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.dividerColor),
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: CbDecorations.card(context, radius: 16),
       child: ListView.builder(
         shrinkWrap: true,
         itemCount: directories.length,

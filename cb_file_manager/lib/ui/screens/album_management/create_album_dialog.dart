@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
 import 'package:cb_file_manager/services/album_service.dart';
@@ -166,59 +167,31 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
           runSpacing: 8,
           children: [
             // Clear selection option
-            GestureDetector(
-              onTap: () {
+            CbColorSwatch.glyph(
+              size: 40,
+              selected: _selectedColor == null,
+              onPressed: () {
                 setState(() {
                   _selectedColor = null;
                 });
               },
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _selectedColor == null
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.outlineVariant,
-                    width: _selectedColor == null ? 3 : 1,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  PhosphorIconsLight.x,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
+              child: Icon(
+                PhosphorIconsLight.x,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                size: 20,
               ),
             ),
             // Color options
             ..._colorOptions.map((color) {
-              final isSelected = _selectedColor == color;
-              return GestureDetector(
-                onTap: () {
+              return CbColorSwatch(
+                size: 40,
+                color: Color(int.parse(color.replaceFirst('#', '0xFF'))),
+                selected: _selectedColor == color,
+                onPressed: () {
                   setState(() {
                     _selectedColor = color;
                   });
                 },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Color(int.parse(color.replaceFirst('#', '0xFF'))),
-                    border: Border.all(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      width: 3,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: isSelected
-                      ? const Icon(
-                          PhosphorIconsLight.check,
-                          color: Colors.white,
-                          size: 20,
-                        )
-                      : null,
-                ),
               );
             }),
           ],
@@ -245,7 +218,6 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Album Name *',
                   hintText: 'Enter album name',
-                  border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -265,7 +237,6 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
                 decoration: const InputDecoration(
                   labelText: 'Description (Optional)',
                   hintText: 'Enter album description',
-                  border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
                 maxLength: 200,

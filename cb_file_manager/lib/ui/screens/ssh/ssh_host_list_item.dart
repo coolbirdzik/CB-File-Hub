@@ -128,9 +128,7 @@ class _SshHostListItemState extends State<SshHostListItem> {
   Widget _grid(BuildContext context) {
     final colors = context.cbColors;
     return CbSurface(
-      level: CbSurfaceLevel.flat,
-      bordered: false,
-      color: widget.isSelected ? colors.surfaceSelected : colors.surfaceRaised,
+      selected: widget.isSelected,
       clip: true,
       child: Stack(
         children: [
@@ -203,11 +201,9 @@ class _SshHostListItemState extends State<SshHostListItem> {
                   ),
                 ),
               ),
+              // Action strip: one more fill step instead of a rule above it.
               DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surfaceSunken,
-                  border: Border(top: BorderSide(color: colors.strokeSubtle)),
-                ),
+                decoration: BoxDecoration(color: colors.fillSubtle),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: CbSpacing.sm,
@@ -247,16 +243,16 @@ class _SshHostListItemState extends State<SshHostListItem> {
             right: CbSpacing.xs,
             child: _menuButton(),
           ),
-          if (_showFocus || widget.isSelected)
+          // Selection is carried by the surface fill; only keyboard focus
+          // draws a ring, because it is state rather than decoration.
+          if (_showFocus)
             Positioned.fill(
               child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: CbRadii.mdAll,
                     border: Border.all(
-                      color: widget.isSelected
-                          ? colors.accent.border
-                          : colors.focusRing,
+                      color: colors.focusRing,
                       width: CbStrokes.emphasis,
                     ),
                   ),

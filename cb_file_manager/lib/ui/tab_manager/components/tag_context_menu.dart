@@ -1,13 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_inline_rename.dart';
 import 'package:cb_file_manager/helpers/core/uri_utils.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
@@ -303,17 +303,7 @@ Future<void> showTagThumbnailPicker(
             Container(
               width: 160,
               height: 160,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.4,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.3,
-                  ),
-                ),
-              ),
+              decoration: CbDecorations.card(context, radius: 16),
               child: currentThumbnail != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(15),
@@ -897,8 +887,6 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
     required ValueChanged<String> onChanged,
     required Future<void> Function(String) onSubmit,
   }) {
-    final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -912,12 +900,6 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               horizontal: 12,
               vertical: 10,
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-            ),
             suffixIcon: IconButton(
               icon: const Icon(PhosphorIconsLight.plus, size: 18),
               onPressed: () {
@@ -926,7 +908,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
               },
               visualDensity: VisualDensity.compact,
             ),
-          ),
+          ).flat(context, radius: 8),
           style: const TextStyle(fontSize: 13),
           onChanged: onChanged,
           onSubmitted: (value) {
@@ -937,13 +919,7 @@ class _ManageHierarchyDialogState extends State<_ManageHierarchyDialog> {
           Container(
             margin: const EdgeInsets.only(top: 2),
             constraints: const BoxConstraints(maxHeight: 150),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-              ),
-            ),
+            decoration: CbDecorations.card(context, radius: 8),
             child: ListView.builder(
               shrinkWrap: true,
               padding: EdgeInsets.zero,

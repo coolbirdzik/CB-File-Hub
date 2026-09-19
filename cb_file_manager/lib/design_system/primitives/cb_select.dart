@@ -8,6 +8,7 @@ import '../tokens/cb_color_tokens.dart';
 import '../tokens/cb_geometry_tokens.dart';
 import '../tokens/cb_motion_tokens.dart';
 import '../tokens/cb_type_tokens.dart';
+import 'cb_decorations.dart';
 import 'cb_pressable.dart';
 
 /// One option in a [CbSelect].
@@ -48,8 +49,8 @@ enum CbSelectSize {
 }
 
 enum CbSelectVariant {
-  /// Field chrome: sunken fill and a hairline border, matching `CbTextField`.
-  outlined,
+  /// Field chrome: tonal fill and a focus indicator, matching `CbTextField`.
+  filled,
 
   /// No chrome until hovered — for a value sitting inline in a row of text.
   ghost,
@@ -65,7 +66,7 @@ enum CbSelectVariant {
 ///
 /// This one behaves the way a native combo box does: the trigger is a 32px
 /// field with a chevron, the menu opens *below* the trigger as a flat popover
-/// with a hairline border, rows highlight on hover with a colour change rather
+/// lifted by its shadow, rows highlight on hover with a colour change rather
 /// than a ripple, and the selected row is marked with an accent bar on its
 /// leading edge. Arrow keys move the highlight, Enter commits, Escape
 /// dismisses.
@@ -115,7 +116,7 @@ class CbSelect<T> extends StatefulWidget {
     this.helperText,
     this.errorText,
     this.size = CbSelectSize.md,
-    this.variant = CbSelectVariant.outlined,
+    this.variant = CbSelectVariant.filled,
     this.enabled = true,
     this.expand = false,
     this.width,
@@ -134,7 +135,7 @@ class CbSelect<T> extends StatefulWidget {
     String? label,
     String? placeholder,
     CbSelectSize size = CbSelectSize.md,
-    CbSelectVariant variant = CbSelectVariant.outlined,
+    CbSelectVariant variant = CbSelectVariant.filled,
     bool enabled = true,
     bool expand = false,
     double? width,
@@ -298,14 +299,12 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
     return math.max(widest + chrome, scaler.scale(120));
   }
 
-  _CbSelectPaint _paint(CbColorTokens c, CbInteractionState s, bool hasError) {
+  _CbSelectPaint _paint(CbColorTokens c, CbInteractionState s) {
     if (s.disabled) {
-      final bool outlined = widget.variant == CbSelectVariant.outlined;
       return _CbSelectPaint(
-        background: outlined
-            ? c.surfaceSunken.withValues(alpha: 0.5)
+        background: widget.variant == CbSelectVariant.filled
+            ? c.fillSubtle
             : Colors.transparent,
-        border: outlined ? c.strokeSubtle : Colors.transparent,
         foreground: c.textDisabled,
         chevron: c.textDisabled,
       );
@@ -314,18 +313,13 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
     final bool active = s.pressed || _isOpen;
 
     switch (widget.variant) {
-      case CbSelectVariant.outlined:
+      case CbSelectVariant.filled:
         return _CbSelectPaint(
-          background: active
-              ? c.surfaceRaised
-              : s.hovered
-              ? c.surfaceHover
-              : c.surfaceSunken,
-          border: hasError
-              ? c.status.danger
-              : (active || s.hovered)
-              ? c.strokeStrong
-              : c.stroke,
+          background: CbDecorations.controlFill(
+            c,
+            hovered: s.hovered,
+            pressed: active,
+          ),
           foreground: c.textPrimary,
           chevron: c.iconSubtle,
         );
@@ -337,7 +331,6 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
               : s.hovered
               ? c.surfaceHover
               : Colors.transparent,
-          border: Colors.transparent,
           foreground: c.textPrimary,
           chevron: c.iconSubtle,
         );
@@ -361,7 +354,7 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
       focusNode: widget.focusNode,
       semanticLabel: widget.label ?? text,
       builder: (context, state) {
-        final paint = _paint(c, state, hasError);
+        final paint = _paint(c, state);
         final Color labelColor = selected == null && !state.disabled
             ? c.textTertiary
             : paint.foreground;
@@ -375,20 +368,16 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
           decoration: BoxDecoration(
             color: paint.background,
             borderRadius: CbRadii.smAll,
-            border: Border.all(
-              color: paint.border,
-              width: hasError ? CbStrokes.emphasis : CbStrokes.hairline,
+            // Open reads as focused: the same bottom indicator a text field
+            // shows, so a select and an input side by side stay in step.
+            border: CbDecorations.fieldIndicator(
+              c,
+              focused: _isOpen && widget.variant == CbSelectVariant.filled,
+              error: hasError,
+              enabled: !state.disabled,
             ),
-            // Like CbButton, the focus ring sits outside the border instead of
-            // recolouring it, so focus stays visible on every variant.
-            boxShadow: state.focused
-                ? [
-                    BoxShadow(
-                      color: c.focusRing,
-                      spreadRadius: CbStrokes.emphasis,
-                    ),
-                  ]
-                : null,
+            // Like CbButton, the keyboard focus ring sits outside the shape.
+            boxShadow: state.focused ? CbDecorations.focusRing(c) : null,
           ),
           child: Row(
             // `min` matters beyond sizing: a select dropped straight into a
@@ -458,13 +447,11 @@ class _CbSelectState<T> extends State<CbSelect<T>> {
 @immutable
 class _CbSelectPaint {
   final Color background;
-  final Color border;
   final Color foreground;
   final Color chevron;
 
   const _CbSelectPaint({
     required this.background,
-    required this.border,
     required this.foreground,
     required this.chevron,
   });
@@ -731,12 +718,7 @@ class _CbSelectMenuState<T> extends State<_CbSelectMenu<T>> {
       autofocus: true,
       onKeyEvent: _onKey,
       child: Container(
-        decoration: BoxDecoration(
-          color: c.surfaceOverlay,
-          borderRadius: CbRadii.lgAll,
-          border: Border.all(color: c.stroke, width: CbStrokes.hairline),
-          boxShadow: tokens.shadowLevel3,
-        ),
+        decoration: CbDecorations.floating(context),
         clipBehavior: Clip.antiAlias,
         child: ListView.builder(
           controller: _scrollController,

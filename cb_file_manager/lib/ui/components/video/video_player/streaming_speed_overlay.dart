@@ -167,10 +167,6 @@ class _StreamingSpeedOverlayState extends State<StreamingSpeedOverlay>
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
         boxShadow: const [],
       ),
       child: Column(
@@ -275,10 +271,6 @@ class StreamingSpeedToggleButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
-            width: 1,
-          ),
         ),
         child: Icon(
           isVisible

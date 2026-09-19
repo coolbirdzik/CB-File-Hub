@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
@@ -107,7 +108,6 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                 decoration: InputDecoration(
                   labelText: '${localizations.fileName} *',
                   hintText: 'My Movies',
-                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
@@ -118,7 +118,6 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                 decoration: InputDecoration(
                   labelText: localizations.aboutTagsDescription,
                   hintText: 'Personal movie collection',
-                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 2,
               ),
@@ -136,33 +135,15 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
                 children: _colorOptions.map((color) {
                   final colorHex =
                       '#${color.toARGB32().toRadixString(16).substring(2)}';
-                  final isSelected = _selectedColorTheme == colorHex;
-                  return InkWell(
-                    onTap: () {
+                  return CbColorSwatch(
+                    size: 40,
+                    color: color,
+                    selected: _selectedColorTheme == colorHex,
+                    onPressed: () {
                       setState(() {
                         _selectedColorTheme = colorHex;
                       });
                     },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : Colors.transparent,
-                          width: 3,
-                        ),
-                      ),
-                      child: isSelected
-                          ? const Icon(
-                              PhosphorIconsLight.check,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
                   );
                 }).toList(),
               ),

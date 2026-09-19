@@ -2099,98 +2099,82 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
     return SizedBox(
       width: 250,
-      child: Material(
-        color: selected
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.45)
-            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => setState(() => _selectedDrive = d.path),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.dividerColor.withValues(alpha: 0.6),
-                width: selected ? 1.6 : 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      child: CbSurface(
+        onPressed: () => setState(() => _selectedDrive = d.path),
+        selected: selected,
+        radius: 12,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      PhosphorIconsLight.hardDrive,
-                      size: 16,
-                      color: theme.colorScheme.primary,
+                Icon(
+                  PhosphorIconsLight.hardDrive,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isLow) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: barColor.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      l.diskCleanerDriveLowSpace,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: barColor,
                       ),
                     ),
-                    if (isLow) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: barColor.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          l.diskCleanerDriveLowSpace,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: barColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: fraction,
-                    minHeight: 6,
-                    backgroundColor: theme.colorScheme.onSurface.withValues(
-                      alpha: 0.10,
-                    ),
-                    valueColor: AlwaysStoppedAnimation<Color>(barColor),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l.diskCleanerDriveCapacity(
-                    _fmt(d.usedBytes),
-                    _fmt(d.totalBytes),
-                    _fmt(d.freeBytes),
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ],
             ),
-          ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: fraction,
+                minHeight: 6,
+                backgroundColor: theme.colorScheme.onSurface.withValues(
+                  alpha: 0.10,
+                ),
+                valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l.diskCleanerDriveCapacity(
+                _fmt(d.usedBytes),
+                _fmt(d.totalBytes),
+                _fmt(d.freeBytes),
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
@@ -2207,13 +2191,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       constraints: const BoxConstraints(maxWidth: 520),
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.35,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
-        ),
+        decoration: CbDecorations.card(context, radius: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3994,13 +3972,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
     Widget buildSectionCard(_OldLargeEvidenceSection section) {
       return DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.72),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: CbDecorations.card(context, radius: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -4069,15 +4041,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       height: panelHeight,
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.22,
-        ),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.65),
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: CbDecorations.card(context, radius: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -4247,10 +4211,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           final isPreparing = snap.total == 0;
           return Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(top: BorderSide(color: theme.dividerColor)),
-            ),
+            decoration: CbDecorations.bar(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -4437,19 +4398,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           }),
           backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
             if (!states.contains(WidgetState.selected)) {
-              return theme.colorScheme.surface;
+              return context.cbColors.fill;
             }
             return _selectedCleanMode == _CleanDeleteMode.permanent
                 ? Colors.red.shade700
                 : theme.colorScheme.primary;
-          }),
-          side: WidgetStateProperty.resolveWith<BorderSide?>((states) {
-            final color = states.contains(WidgetState.selected)
-                ? _selectedCleanMode == _CleanDeleteMode.permanent
-                      ? Colors.red.shade700
-                      : theme.colorScheme.primary
-                : theme.colorScheme.outlineVariant;
-            return BorderSide(color: color);
           }),
           shape: WidgetStatePropertyAll<OutlinedBorder>(_cleanerButtonShape),
         ),
@@ -4484,9 +4437,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
+      decoration: CbDecorations.bar(context),
       child: _reviewMode
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4525,11 +4476,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.7)),
-      ),
+      decoration: CbDecorations.card(context, radius: 8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -5335,13 +5282,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.35,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
-      ),
+      decoration: CbDecorations.card(context, radius: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -5564,11 +5505,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             width: double.infinity,
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.25)),
-            ),
+            decoration: CbDecorations.tint(context, Colors.orange, radius: 8),
             child: Row(
               children: [
                 Icon(
@@ -5594,11 +5531,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
             width: double.infinity,
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: theme.dividerColor),
-            ),
+            decoration: CbDecorations.card(context, radius: 8),
             child: Row(
               children: [
                 Icon(
@@ -5652,9 +5585,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: theme.dividerColor)),
-            ),
+            decoration: CbDecorations.bar(context),
             child: Row(
               children: [
                 Icon(
@@ -5829,9 +5760,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
           // Bottom bar: permanent delete
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: theme.dividerColor)),
-            ),
+            decoration: CbDecorations.bar(context),
             child: Row(
               children: [
                 Icon(

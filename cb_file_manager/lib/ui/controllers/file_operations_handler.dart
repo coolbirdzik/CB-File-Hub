@@ -44,6 +44,10 @@ class FileOperationsHandler {
     ];
   }
 
+  /// The item to focus once the focused [anchorPath] has been deleted: the
+  /// nearest surviving item *before* it — to its left in a grid, above it in
+  /// a list — so focus stays where the user was working. Only when nothing
+  /// survives before it (the first item was deleted) does focus move forward.
   @visibleForTesting
   static String? computeNextFocusPathAfterDelete({
     required FolderListState state,
@@ -62,12 +66,12 @@ class FileOperationsHandler {
     final int anchorIndex = orderedPaths.indexOf(anchorPath);
     if (anchorIndex < 0) return null;
 
-    for (int i = anchorIndex + 1; i < orderedPaths.length; i++) {
+    for (int i = anchorIndex - 1; i >= 0; i--) {
       final p = orderedPaths[i];
       if (!pathsToDelete.contains(p)) return p;
     }
 
-    for (int i = anchorIndex - 1; i >= 0; i--) {
+    for (int i = anchorIndex + 1; i < orderedPaths.length; i++) {
       final p = orderedPaths[i];
       if (!pathsToDelete.contains(p)) return p;
     }

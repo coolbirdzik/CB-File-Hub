@@ -60,12 +60,7 @@ class TabView extends StatelessWidget {
   Widget _buildTabBar(BuildContext context, TabManagerState state) {
     return Container(
       height: 48,
-      decoration: BoxDecoration(
-        color: Theme.of(context).canvasColor,
-        border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1.0),
-        ),
-      ),
+      decoration: BoxDecoration(color: Theme.of(context).canvasColor),
       child: Row(
         children: [
           Expanded(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:cb_file_manager/ui/components/common/optimized_interaction_handler.dart';
 import 'package:cb_file_manager/ui/utils/item_interaction_style.dart';
 
@@ -260,21 +261,14 @@ class _GridItemShellState extends State<GridItemShell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Whole-cell selection fill + border, matching the folder/file grid items so
-    // selection reads consistently without painting an overlay over the
-    // thumbnail itself.
-    final Color cellBackgroundColor = ItemInteractionStyle.backgroundColor(
+    // Hover fill behind the cell, selection wash over it — the same recipe
+    // as the folder/file grid items, so a thumbnail cannot hide selection.
+    final Color cellBackgroundColor = ItemInteractionStyle.gridBackgroundColor(
       theme: theme,
       isDesktopMode: widget.isDesktopMode,
       isSelected: widget.isSelected,
       isHovering: _isHovering,
     );
-    final Color primary = theme.colorScheme.primary;
-    final Color cellBorderColor = widget.isSelected
-        ? primary
-        : (_isHovering && widget.isDesktopMode
-              ? primary.withValues(alpha: 0.4)
-              : Colors.transparent);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -288,10 +282,13 @@ class _GridItemShellState extends State<GridItemShell> {
         child: Container(
           decoration: BoxDecoration(
             color: cellBackgroundColor,
-            border: cellBorderColor != Colors.transparent
-                ? Border.all(color: cellBorderColor, width: 1.5)
-                : null,
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: CbRadii.mdAll,
+          ),
+          foregroundDecoration: ItemInteractionStyle.gridForeground(
+            context,
+            isDesktopMode: widget.isDesktopMode,
+            isSelected: widget.isSelected,
+            isHovering: _isHovering,
           ),
           child: widget.child,
         ),

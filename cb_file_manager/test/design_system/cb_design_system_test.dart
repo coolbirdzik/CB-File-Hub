@@ -31,6 +31,66 @@ void main() {
       }
     });
 
+    test('chrome is flat: no outline on cards, dialogs, menus, chips', () {
+      BorderSide sideOf(ShapeBorder? shape) =>
+          shape is OutlinedBorder ? shape.side : BorderSide.none;
+
+      for (final theme in [
+        ThemeConfig.getLightTheme(),
+        ThemeConfig.getDarkTheme(),
+      ]) {
+        expect(sideOf(theme.cardTheme.shape), BorderSide.none);
+        expect(sideOf(theme.dialogTheme.shape), BorderSide.none);
+        expect(sideOf(theme.popupMenuTheme.shape), BorderSide.none);
+        expect(sideOf(theme.snackBarTheme.shape), BorderSide.none);
+        expect(theme.chipTheme.side, BorderSide.none);
+        expect(theme.tabBarTheme.dividerColor, Colors.transparent);
+        expect(
+          sideOf(theme.menuTheme.style!.shape!.resolve(const {})),
+          BorderSide.none,
+        );
+        // OutlinedButton keeps its name but renders as a tonal button.
+        final outlined = theme.outlinedButtonTheme.style!;
+        expect(
+          outlined.side?.resolve(const {}),
+          anyOf(isNull, BorderSide.none),
+        );
+        expect(
+          outlined.backgroundColor!.resolve(const {}),
+          theme.cb.colors.fill,
+        );
+        // Inputs show no line at rest; focus is a bottom accent indicator.
+        final inputs = theme.inputDecorationTheme;
+        expect(inputs.enabledBorder!.borderSide, BorderSide.none);
+        expect(inputs.focusedBorder, isA<UnderlineInputBorder>());
+        expect(
+          inputs.focusedBorder!.borderSide.color,
+          theme.cb.colors.accent.base,
+        );
+      }
+    });
+
+    test('the surface container ladder steps in tone, never repeats white', () {
+      for (final theme in [
+        ThemeConfig.getLightTheme(),
+        ThemeConfig.getDarkTheme(),
+      ]) {
+        final s = theme.colorScheme;
+        final ladder = [
+          s.surfaceContainerLowest,
+          s.surfaceContainerLow,
+          s.surfaceContainer,
+          s.surfaceContainerHigh,
+          s.surfaceContainerHighest,
+        ];
+        // Each step must be distinguishable from the one below it; flat cards
+        // painted from this ladder have no outline to fall back on.
+        for (var i = 1; i < ladder.length; i++) {
+          expect(ladder[i], isNot(ladder[i - 1]), reason: 'step $i');
+        }
+      }
+    });
+
     test('ink splash is disabled', () {
       final theme = ThemeConfig.getLightTheme();
       expect(theme.splashFactory, NoSplash.splashFactory);
@@ -92,6 +152,44 @@ void main() {
             _contrastRatio(ramp.onBase, ramp.base),
             greaterThanOrEqualTo(3.0),
             reason: '$accent/$brightness label on a filled control',
+          );
+        }
+      }
+    });
+  });
+
+  group('CbDecorations.selectionFill', () {
+    // Measured as perceptual distance (ΔE) from the canvas rather than
+    // luminance contrast: a pale yellow wash is lighter than the grey hover
+    // fill yet far easier to spot, and contrast alone would call it fainter.
+    // The old opaque `accent.tintStrong` managed only ~1.5× hover with the
+    // default blue, which is what made selected items hard to find.
+    test('selection stands at least twice as far off the canvas as hover', () {
+      for (final accent in AppAccentColor.values) {
+        for (final brightness in Brightness.values) {
+          final tokens = CbTokens.of(
+            brightness,
+            ThemeConfig.getAccentSeedColor(accent),
+          );
+          final canvas = tokens.colors.canvas;
+          double offset(Color fill) =>
+              _deltaE(Color.alphaBlend(fill, canvas), canvas);
+
+          final hover = offset(tokens.colors.fillHover);
+          final selected = offset(CbDecorations.selectionFill(tokens));
+          final selectedHover = offset(
+            CbDecorations.selectionFill(tokens, hovered: true),
+          );
+
+          expect(
+            selected,
+            greaterThanOrEqualTo(hover * 2),
+            reason: '$accent/$brightness selected vs hovered item',
+          );
+          expect(
+            selectedHover,
+            greaterThan(selected),
+            reason: '$accent/$brightness hovering a selected item',
           );
         }
       }
@@ -257,6 +355,35 @@ double _relativeLuminance(Color color) {
   return 0.2126 * channel(color.r) +
       0.7152 * channel(color.g) +
       0.0722 * channel(color.b);
+}
+
+/// CIE76 colour difference: how far apart two colours look, whatever their
+/// hue.
+double _deltaE(Color a, Color b) {
+  final (l1, a1, b1) = _lab(a);
+  final (l2, a2, b2) = _lab(b);
+  return math.sqrt(
+    math.pow(l1 - l2, 2) + math.pow(a1 - a2, 2) + math.pow(b1 - b2, 2),
+  );
+}
+
+/// CIE L*a*b* (D65) of an sRGB colour.
+(double, double, double) _lab(Color color) {
+  double linear(double value) => value <= 0.04045
+      ? value / 12.92
+      : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  final r = linear(color.r);
+  final g = linear(color.g);
+  final b = linear(color.b);
+  final x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+  final y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  final z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+  double f(double t) =>
+      t > 0.008856 ? math.pow(t, 1 / 3).toDouble() : 7.787 * t + 16 / 116;
+  final fx = f(x);
+  final fy = f(y);
+  final fz = f(z);
+  return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz));
 }
 
 /// A probe type that is never registered — used to assert that

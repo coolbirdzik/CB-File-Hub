@@ -89,7 +89,6 @@ class _VideoTagFilterBarState extends State<VideoTagFilterBar> {
       height: 50,
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         children: [

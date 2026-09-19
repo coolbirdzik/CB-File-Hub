@@ -427,7 +427,6 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: Colors.white24, width: 1),
                         ),
                         child: const Icon(
                           PhosphorIconsLight.cornersOut,

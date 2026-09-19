@@ -1,5 +1,6 @@
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 
@@ -142,11 +143,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
                 color: theme.colorScheme.surfaceContainerHigh,
                 clipBehavior: Clip.antiAlias,
                 child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: theme.colorScheme.outlineVariant),
-                  ),
+                  decoration: CbDecorations.card(context, radius: 10),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxHeight: panelHeight),
                     child: StatefulBuilder(
@@ -196,15 +193,7 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
                 horizontal: 8,
                 vertical: 8,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
-              ),
-            ),
+            ).flat(context, radius: 8),
             onChanged: (value) {
               setOverlayState(() => _query = value.trim().toLowerCase());
             },

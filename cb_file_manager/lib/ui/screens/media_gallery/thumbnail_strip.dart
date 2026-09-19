@@ -92,16 +92,9 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
         return GestureDetector(
           onTap: () => widget.onThumbnailTap(index),
           child: Container(
+            // Flat: the current image is marked by full opacity (others
+            // dim), not by an outline.
             margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: isCurrentImage
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
-                width: 2.0,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
             child: FutureBuilder<Uint8List?>(
               future: widget.loadAndCacheImage(file),
               builder: (context, snapshot) {
@@ -131,7 +124,7 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(16.0),
                     child: Opacity(
-                      opacity: isCurrentImage ? 1.0 : 0.7,
+                      opacity: isCurrentImage ? 1.0 : 0.5,
                       child: Image.memory(
                         snapshot.data!,
                         width: 54,

@@ -28,7 +28,7 @@ void main() {
       expect(surfaces.toolbar.a, lessThan(1.0));
       expect(surfaces.drawerTintAlpha, lessThan(1.0));
       expect(surfaces.toolbarTintAlpha, lessThan(1.0));
-      expect(surfaces.control, colors.surfaceSunken);
+      expect(surfaces.control, colors.fill);
       expect(surfaces.strokeSubtle, colors.strokeSubtle);
       expect(FluentSurfaceTokens.controlRadius, CbRadii.smAll);
     }

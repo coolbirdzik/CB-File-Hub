@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
@@ -819,17 +818,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.3,
-                ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-            width: 2,
-          ),
+        decoration: CbDecorations.card(
+          context,
+          radius: 16,
+          selected: isSelected,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,165 +890,151 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface.withValues(alpha: 0.38),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.10),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: CbDecorations.card(context, radius: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withValues(
-                              alpha: 0.12,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            PhosphorIconsLight.hardDrives,
-                            color: theme.colorScheme.primary,
-                            size: 20,
-                          ),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.12,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppLocalizations.of(context)!.appDataManagement,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                AppLocalizations.of(
-                                  context,
-                                )!.appDataManagementDescription,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildMetricPill(
-                          'Total',
-                          FormatUtils.formatFileSize(totalBytes),
-                        ),
-                        _buildMetricPill('Files', '$totalFiles'),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _cacheRootPath ??
-                          AppLocalizations.of(context)!.notInitialized,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      child: Icon(
+                        PhosphorIconsLight.hardDrives,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _isLoadingCacheInfo
-                                ? null
-                                : () async {
-                                    await _loadCacheInfo();
-                                    if (!mounted) return;
-                                    final l10n = AppLocalizations.of(context)!;
-                                    AppToast.success(
-                                      context,
-                                      l10n.cacheInfoUpdated,
-                                    );
-                                  },
-                            icon: const Icon(
-                              PhosphorIconsLight.arrowsClockwise,
-                              size: 16,
-                            ),
-                            label: Text(
-                              AppLocalizations.of(context)!.refreshCacheInfo,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppLocalizations.of(context)!.appDataManagement,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: () async {
-                              await RouteUtils.showAcrylicDialog<void>(
-                                context: context,
-                                builder: (dialogContext) {
-                                  final mediaQuery = MediaQuery.of(
-                                    dialogContext,
-                                  );
-                                  final maxDialogWidth =
-                                      mediaQuery.size.width * 0.88;
-                                  final maxDialogHeight =
-                                      mediaQuery.size.height * 0.82;
-
-                                  return Dialog(
-                                    insetPadding: const EdgeInsets.symmetric(
-                                      horizontal: 28,
-                                      vertical: 24,
-                                    ),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxWidth: maxDialogWidth.clamp(
-                                          560.0,
-                                          980.0,
-                                        ),
-                                        maxHeight: maxDialogHeight.clamp(
-                                          420.0,
-                                          900.0,
-                                        ),
-                                      ),
-                                      child: const CacheManagementScreen(
-                                        embedded: true,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                              if (mounted) {
-                                await _loadCacheInfo();
-                              }
-                            },
-                            icon: const Icon(
-                              PhosphorIconsLight.slidersHorizontal,
-                              size: 16,
+                          const SizedBox(height: 2),
+                          Text(
+                            AppLocalizations.of(
+                              context,
+                            )!.appDataManagementDescription,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            label: Text(AppLocalizations.of(context)!.manage),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildMetricPill(
+                      'Total',
+                      FormatUtils.formatFileSize(totalBytes),
+                    ),
+                    _buildMetricPill('Files', '$totalFiles'),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _cacheRootPath ??
+                      AppLocalizations.of(context)!.notInitialized,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoadingCacheInfo
+                            ? null
+                            : () async {
+                                await _loadCacheInfo();
+                                if (!mounted) return;
+                                final l10n = AppLocalizations.of(context)!;
+                                AppToast.success(
+                                  context,
+                                  l10n.cacheInfoUpdated,
+                                );
+                              },
+                        icon: const Icon(
+                          PhosphorIconsLight.arrowsClockwise,
+                          size: 16,
+                        ),
+                        label: Text(
+                          AppLocalizations.of(context)!.refreshCacheInfo,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        onPressed: () async {
+                          await RouteUtils.showAcrylicDialog<void>(
+                            context: context,
+                            builder: (dialogContext) {
+                              final mediaQuery = MediaQuery.of(dialogContext);
+                              final maxDialogWidth =
+                                  mediaQuery.size.width * 0.88;
+                              final maxDialogHeight =
+                                  mediaQuery.size.height * 0.82;
+
+                              return Dialog(
+                                insetPadding: const EdgeInsets.symmetric(
+                                  horizontal: 28,
+                                  vertical: 24,
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: maxDialogWidth.clamp(
+                                      560.0,
+                                      980.0,
+                                    ),
+                                    maxHeight: maxDialogHeight.clamp(
+                                      420.0,
+                                      900.0,
+                                    ),
+                                  ),
+                                  child: const CacheManagementScreen(
+                                    embedded: true,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                          if (mounted) {
+                            await _loadCacheInfo();
+                          }
+                        },
+                        icon: const Icon(
+                          PhosphorIconsLight.slidersHorizontal,
+                          size: 16,
+                        ),
+                        label: Text(AppLocalizations.of(context)!.manage),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
@@ -2024,38 +2002,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final accent = entry.key;
                   final color = entry.value;
                   final isSelected = accent == selectedAccent;
-                  return CbTooltip(
-                    message: ThemeConfig.accentNames[accent] ?? accent.name,
-                    child: InkWell(
-                      onTap: () =>
-                          context.read<ThemeProvider>().setAccentColor(accent),
-                      borderRadius: BorderRadius.circular(99),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? theme.colorScheme.onSurface
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.18),
-                                    blurRadius: 6,
-                                    spreadRadius: 0.2,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-                    ),
+                  return CbColorSwatch(
+                    color: color,
+                    selected: isSelected,
+                    tooltip: ThemeConfig.accentNames[accent] ?? accent.name,
+                    onPressed: () =>
+                        context.read<ThemeProvider>().setAccentColor(accent),
                   );
                 })
                 .toList(growable: false),
@@ -2104,49 +2056,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     accentColor: currentAccent,
                     fallback: theme.colorScheme.onSurface,
                   );
-                  return CbTooltip(
-                    message:
+                  return CbColorSwatch.glyph(
+                    selected: isSelected,
+                    tooltip:
                         ThemeConfig.fontColorNames[fontColor] ?? fontColor.name,
-                    child: InkWell(
-                      onTap: () =>
-                          context.read<ThemeProvider>().setFontColor(fontColor),
-                      borderRadius: BorderRadius.circular(99),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
-                        width: 28,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.outline.withValues(
-                                    alpha: 0.35,
-                                  ),
-                            width: isSelected ? 2 : 1,
-                          ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.18),
-                                    blurRadius: 6,
-                                    spreadRadius: 0.2,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Text(
-                          'A',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: letterColor,
-                            height: 1,
-                          ),
-                        ),
+                    onPressed: () =>
+                        context.read<ThemeProvider>().setFontColor(fontColor),
+                    child: Text(
+                      'A',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: letterColor,
+                        height: 1,
                       ),
                     ),
                   );
@@ -2198,61 +2120,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 .map((font) {
                   final isSelected = font == selected;
                   final name = AppUiFontConfig.displayNames[font] ?? font.name;
-                  return CbTooltip(
-                    message: name,
-                    child: InkWell(
-                      onTap: () =>
-                          context.read<ThemeProvider>().setUiFont(font),
-                      borderRadius: BorderRadius.circular(12),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? theme.colorScheme.primary.withValues(
-                                  alpha: 0.12,
-                                )
-                              : theme.colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.outline.withValues(
-                                    alpha: 0.28,
-                                  ),
-                            width: isSelected ? 1.5 : 1,
+                  return CbSurface(
+                    onPressed: () =>
+                        context.read<ThemeProvider>().setUiFont(font),
+                    selected: isSelected,
+                    radius: 12,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    tooltip: name,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          style: AppUiFontConfig.previewStyle(font).copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              name,
-                              style: AppUiFontConfig.previewStyle(font)
-                                  .copyWith(
-                                    color: theme.colorScheme.onSurface,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              AppUiFontConfig.previewSample,
-                              style:
-                                  AppUiFontConfig.previewStyle(
-                                    font,
-                                    fontSize: 12,
-                                  ).copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
+                        const SizedBox(height: 2),
+                        Text(
+                          AppUiFontConfig.previewSample,
+                          style: AppUiFontConfig.previewStyle(
+                            font,
+                            fontSize: 12,
+                          ).copyWith(color: theme.colorScheme.onSurfaceVariant),
                         ),
-                      ),
+                      ],
                     ),
                   );
                 })
@@ -2405,47 +2302,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
+    return CbSurface(
+      onPressed: onTap,
+      selected: isSelected,
+      radius: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
             color: isSelected
                 ? theme.colorScheme.primary
-                : theme.colorScheme.outline.withValues(alpha: 0.3),
-            width: 1,
+                : theme.colorScheme.onSurfaceVariant,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               color: isSelected
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

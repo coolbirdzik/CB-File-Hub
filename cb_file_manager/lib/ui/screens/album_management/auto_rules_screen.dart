@@ -228,15 +228,7 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
           (example) => Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.3,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.2),
-              ),
-            ),
+            decoration: CbDecorations.card(context, radius: 16),
             child: Row(
               children: [
                 Icon(
@@ -677,12 +669,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
       child: Container(
         width: 260,
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.3),
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
+        decoration: CbDecorations.card(context, radius: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -753,7 +740,6 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
           decoration: const InputDecoration(
             labelText: 'Rule Name',
             hintText: 'e.g., Screenshots to Screenshots Album',
-            border: OutlineInputBorder(),
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -772,10 +758,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         else
           TextFormField(
             enabled: false,
-            decoration: const InputDecoration(
-              labelText: 'Target Album',
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(labelText: 'Target Album'),
             initialValue: widget.fixedAlbum!.name,
           ),
         const SizedBox(height: 16),
@@ -806,7 +789,6 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                 decoration: InputDecoration(
                   labelText: 'Pattern',
                   hintText: _getPatternHint(_selectedCondition),
-                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -868,15 +850,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.3,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.2),
-            ),
-          ),
+          decoration: CbDecorations.card(context, radius: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1149,10 +1123,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
         const SizedBox(height: 16),
         TextField(
           controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Rule Name',
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(labelText: 'Rule Name'),
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
@@ -1194,7 +1165,6 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
                 decoration: InputDecoration(
                   labelText: 'Pattern',
                   hintText: _getPatternHint(_selectedCondition),
-                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -1236,15 +1206,7 @@ class _EditAutoRuleDialogState extends State<EditAutoRuleDialog> {
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.3,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.2),
-            ),
-          ),
+          decoration: CbDecorations.card(context, radius: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

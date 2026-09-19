@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart'; // Thêm import cho SystemUiOverlayStyle
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:io'; // Thêm import cho Platform
@@ -635,9 +636,6 @@ class MobileTabView extends StatelessWidget {
     required bool isActive,
   }) {
     final theme = Theme.of(context);
-    final borderColor = isActive
-        ? theme.colorScheme.primary.withValues(alpha: 0.5)
-        : theme.dividerColor.withValues(alpha: 0.3);
 
     return InkWell(
       borderRadius: BorderRadius.circular(16.0),
@@ -647,13 +645,9 @@ class MobileTabView extends StatelessWidget {
         }
         Navigator.pop(context);
       },
+      // Flat tile: the active tab is marked by the selection fill.
       child: Ink(
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(16.0),
-          border: Border.all(color: borderColor),
-          boxShadow: const [],
-        ),
+        decoration: CbDecorations.card(context, radius: 16, selected: isActive),
         child: Stack(
           children: [
             Positioned(

@@ -1,5 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../../../design_system/cb_tokens.dart';
+
+/// Flat checkbox box shared by [SoftCheckbox] and [SoftCheckboxInline]:
+/// a solid accent square when on, a tonal fill square when off — no outline
+/// in either state.
+BoxDecoration _softCheckboxDecoration(
+  BuildContext context, {
+  required bool active,
+  required double radius,
+  Color? activeColor,
+}) {
+  final theme = Theme.of(context);
+  return BoxDecoration(
+    shape: BoxShape.rectangle,
+    borderRadius: BorderRadius.circular(radius),
+    color: active
+        ? activeColor ?? theme.colorScheme.primary
+        : context.cbColors.fillPressed,
+  );
+}
+
 /// A soft, rounded checkbox component for better UI/UX
 /// Supports 3 states: unchecked, checked, and tristate (indeterminate)
 class SoftCheckbox extends StatelessWidget {
@@ -22,6 +43,8 @@ class SoftCheckbox extends StatelessWidget {
     this.compact = false,
   });
 
+  bool get _isActive => value == true || (value == null && tristate);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -33,11 +56,11 @@ class SoftCheckbox extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         width: effectiveSize,
         height: effectiveSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.rectangle,
-          borderRadius: BorderRadius.circular(effectiveSize / 3),
-          color: _getBackgroundColor(theme),
-          border: Border.all(color: _getBorderColor(theme), width: 2),
+        decoration: _softCheckboxDecoration(
+          context,
+          active: _isActive,
+          radius: effectiveSize / 3,
+          activeColor: activeColor,
         ),
         child: _buildCheckMark(theme, effectiveSize),
       ),
@@ -55,26 +78,6 @@ class SoftCheckbox extends StatelessWidget {
     } else {
       onChanged?.call!(value != true);
     }
-  }
-
-  Color _getBackgroundColor(ThemeData theme) {
-    if (value == true) {
-      return activeColor ?? theme.colorScheme.primary;
-    }
-    if (value == null && tristate) {
-      return activeColor ?? theme.colorScheme.primary;
-    }
-    return Colors.transparent;
-  }
-
-  Color _getBorderColor(ThemeData theme) {
-    if (value == true) {
-      return activeColor ?? theme.colorScheme.primary;
-    }
-    if (value == null && tristate) {
-      return activeColor ?? theme.colorScheme.primary;
-    }
-    return theme.colorScheme.outline;
   }
 
   Widget? _buildCheckMark(ThemeData theme, double effectiveSize) {
@@ -127,16 +130,10 @@ class SoftCheckboxInline extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.rectangle,
-          borderRadius: BorderRadius.circular(size / 3.5),
-          color: value ? theme.colorScheme.primary : Colors.transparent,
-          border: Border.all(
-            color: value
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outline,
-            width: 1.5,
-          ),
+        decoration: _softCheckboxDecoration(
+          context,
+          active: value,
+          radius: size / 3.5,
         ),
         child: value
             ? Center(

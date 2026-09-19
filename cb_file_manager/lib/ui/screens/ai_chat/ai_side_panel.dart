@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -140,14 +141,9 @@ class _AiSidePanelState extends State<AiSidePanel> {
       value: _bloc,
       child: Container(
         width: widget.width,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(
-            left: BorderSide(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-            ),
-          ),
-        ),
+        // Flat: one tonal step off the surface separates the docked panel
+        // from the page, not a rule down its edge.
+        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow),
         child: Stack(
           children: [
             Row(
@@ -307,7 +303,6 @@ class _AiSidePanelState extends State<AiSidePanel> {
     ThemeData theme,
     AiAgentState state,
   ) {
-    final isDark = theme.brightness == Brightness.dark;
     final path = state.currentPath;
     // Show just the last folder segment for compactness
     final folderName = path.isNotEmpty
@@ -323,18 +318,7 @@ class _AiSidePanelState extends State<AiSidePanel> {
     return Container(
       height: 26,
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.black.withValues(alpha: 0.03),
-        border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.07)
-                : Colors.black.withValues(alpha: 0.08),
-          ),
-        ),
-      ),
+      decoration: CbDecorations.bar(context),
       child: Row(
         children: [
           Icon(
@@ -397,13 +381,10 @@ class _AiSidePanelState extends State<AiSidePanel> {
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: theme.colorScheme.error.withValues(alpha: 0.4),
-          width: 1,
-        ),
+      decoration: CbDecorations.tint(
+        context,
+        theme.colorScheme.error,
+        radius: 6,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

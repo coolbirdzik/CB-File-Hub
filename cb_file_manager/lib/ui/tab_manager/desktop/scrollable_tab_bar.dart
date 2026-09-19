@@ -1,12 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'dart:async';
 import 'package:flutter/services.dart'; // Added import for HapticFeedback
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 // Import app theme
 import 'package:window_manager/window_manager.dart'; // Import window_manager
 import 'dart:io'; // Import dart:io for Platform check
-import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import '../../components/common/window_caption_buttons.dart';
 import 'desktop_tab_drag_data.dart';
 
@@ -777,15 +777,11 @@ class _ModernTabBarState extends State<_ModernTabBar> {
                                     height: 38,
                                   ),
                                   child: DecoratedBox(
-                                    decoration: BoxDecoration(
+                                    // A dragged tab floats: shadow, no outline.
+                                    decoration: CbDecorations.floating(
+                                      context,
+                                      radius: 16.0,
                                       color: widget.activeTabColor,
-                                      borderRadius: BorderRadius.circular(16.0),
-                                      border: Border.all(
-                                        color: widget.theme.colorScheme.primary
-                                            .withValues(alpha: 0.35),
-                                        width: 0.8,
-                                      ),
-                                      boxShadow: const [],
                                     ),
                                     child: Center(
                                       child: DefaultTextStyle.merge(

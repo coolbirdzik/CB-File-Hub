@@ -1083,10 +1083,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
       title: Text(widget.title),
       content: TextField(
         controller: _nameController,
-        decoration: InputDecoration(
-          labelText: widget.labelText,
-          border: const OutlineInputBorder(),
-        ),
+        decoration: InputDecoration(labelText: widget.labelText),
         autofocus: true,
         onSubmitted: (_) => _submit(),
       ),

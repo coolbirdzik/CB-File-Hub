@@ -3,20 +3,24 @@ import 'package:flutter/material.dart';
 import '../cb_tokens.dart';
 import '../tokens/cb_geometry_tokens.dart';
 import '../tokens/cb_motion_tokens.dart';
+import 'cb_decorations.dart';
+import 'cb_pressable.dart';
 
 /// How far a surface sits above what is behind it.
 ///
-/// Depth reads through shadow and border only. Unlike Material 3, the surface
-/// colour is *not* tinted with the accent as it rises, so a stack of panels
-/// stays neutral instead of drifting blue.
+/// Nothing here draws a border. Resting surfaces are separated from the page
+/// by a step on the translucent fill ramp; only layers that float above the
+/// page cast a shadow. The surface colour is never tinted with the accent as
+/// it rises (as Material 3 does), so a stack of panels stays neutral.
 enum CbSurfaceLevel {
-  /// Flush with the page. Border-only separation.
+  /// A tonal block flush with the page. The default card and section.
   flat,
 
-  /// Resting card or list row.
+  /// A stronger tonal block — emphasised cards, or a card nested in a
+  /// [flat] one.
   raised,
 
-  /// Hovered/lifted card, sticky header.
+  /// Solid surface with a soft shadow — dragged/lifted card, sticky header.
   lifted,
 
   /// Menu, popover, dropdown, toast.
@@ -29,9 +33,12 @@ enum CbSurfaceLevel {
 /// The container primitive — replaces `Card`, `Material` and the endless
 /// bespoke `Container(decoration: BoxDecoration(...))` blocks.
 ///
-/// Giving every panel one implementation is what keeps radius, border colour
-/// and shadow consistent; those three together are most of what makes a
-/// design system legible as one system.
+/// Giving every panel one implementation is what keeps radius, fill and
+/// shadow consistent; those three together are most of what makes a design
+/// system legible as one system.
+///
+/// Pass [onPressed] to make it a pressable card: the fill steps up the ramp
+/// on hover and press, and keyboard focus shows the focus ring.
 class CbSurface extends StatelessWidget {
   final Widget child;
   final CbSurfaceLevel level;
@@ -42,14 +49,10 @@ class CbSurface extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
 
-  /// Draws the hairline border. Defaults to on for [CbSurfaceLevel.flat] and
-  /// [CbSurfaceLevel.raised], where the shadow alone is too weak to separate.
-  final bool? bordered;
-
-  /// Overrides the background. Use a token, not a literal.
+  /// Overrides the resting background. Use a token, not a literal.
   final Color? color;
 
-  /// Paints the accent selection background and border.
+  /// Paints the accent selection fill.
   final bool selected;
 
   final double? width;
@@ -59,22 +62,34 @@ class CbSurface extends StatelessWidget {
   /// save layer, which is measurable in long file lists.
   final bool clip;
 
+  final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onSecondaryTap;
+  final String? tooltip;
+  final String? semanticLabel;
+  final MouseCursor cursor;
+
   const CbSurface({
     super.key,
     required this.child,
-    this.level = CbSurfaceLevel.raised,
+    this.level = CbSurfaceLevel.flat,
     this.radius,
     this.padding,
     this.margin,
-    this.bordered,
     this.color,
     this.selected = false,
     this.width,
     this.height,
     this.clip = false,
+    this.onPressed,
+    this.onLongPress,
+    this.onSecondaryTap,
+    this.tooltip,
+    this.semanticLabel,
+    this.cursor = SystemMouseCursors.click,
   });
 
-  double _radiusFor(CbSurfaceLevel level) {
+  static double radiusFor(CbSurfaceLevel level) {
     switch (level) {
       case CbSurfaceLevel.flat:
       case CbSurfaceLevel.raised:
@@ -89,57 +104,62 @@ class CbSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = onPressed == null
+        ? _paint(context, const CbInteractionState())
+        : CbPressable(
+            onPressed: onPressed,
+            onLongPress: onLongPress,
+            onSecondaryTap: onSecondaryTap,
+            tooltip: tooltip,
+            semanticLabel: semanticLabel,
+            cursor: cursor,
+            builder: _paint,
+          );
+    if (margin == null) return surface;
+    return Padding(padding: margin!, child: surface);
+  }
+
+  Widget _paint(BuildContext context, CbInteractionState state) {
     final tokens = context.cb;
     final c = tokens.colors;
-    final double r = radius ?? _radiusFor(level);
+    final double r = radius ?? radiusFor(level);
+    // Resting colour per level: null means "on the fill ramp" (flat/raised),
+    // otherwise a solid surface that hover washes over.
+    final (Color? base, List<BoxShadow> shadow) = switch (level) {
+      CbSurfaceLevel.flat || CbSurfaceLevel.raised => (null, const []),
+      CbSurfaceLevel.lifted => (c.surfaceRaised, tokens.shadowLevel2),
+      CbSurfaceLevel.overlay => (c.surfaceOverlay, tokens.shadowLevel3),
+      CbSurfaceLevel.modal => (c.surfaceOverlay, tokens.shadowLevel4),
+    };
 
-    Color background;
-    List<BoxShadow> shadow;
-    switch (level) {
-      case CbSurfaceLevel.flat:
-        background = c.surface;
-        shadow = const [];
-        break;
-      case CbSurfaceLevel.raised:
-        background = c.surfaceRaised;
-        shadow = tokens.shadowLevel1;
-        break;
-      case CbSurfaceLevel.lifted:
-        background = c.surfaceRaised;
-        shadow = tokens.shadowLevel2;
-        break;
-      case CbSurfaceLevel.overlay:
-        background = c.surfaceOverlay;
-        shadow = tokens.shadowLevel3;
-        break;
-      case CbSurfaceLevel.modal:
-        background = c.surfaceOverlay;
-        shadow = tokens.shadowLevel4;
-        break;
-    }
-
-    final bool showBorder =
-        bordered ??
-        (level == CbSurfaceLevel.flat || level == CbSurfaceLevel.raised);
+    final Color background =
+        level == CbSurfaceLevel.raised && color == null && !selected
+        ? CbDecorations.controlFill(
+            c,
+            hovered: state.hovered,
+            pressed: state.pressed,
+          )
+        : CbDecorations.cardFill(
+            c,
+            color: color ?? base,
+            selected: selected,
+            hovered: state.hovered,
+            pressed: state.pressed,
+          );
 
     return AnimatedContainer(
       duration: CbDurations.fast,
       curve: CbCurves.standard,
       width: width,
       height: height,
-      margin: margin,
       padding: padding,
       clipBehavior: clip ? Clip.antiAlias : Clip.none,
       decoration: BoxDecoration(
-        color: selected ? c.surfaceSelected : (color ?? background),
+        color: background,
         borderRadius: CbRadii.all(r),
-        border: showBorder || selected
-            ? Border.all(
-                color: selected ? c.accent.border : c.stroke,
-                width: CbStrokes.hairline,
-              )
-            : null,
-        boxShadow: shadow,
+        boxShadow: state.focused
+            ? [...shadow, ...CbDecorations.focusRing(c)]
+            : shadow,
       ),
       child: child,
     );

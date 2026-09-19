@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/widgets/tags_overlay.dart';
@@ -138,16 +139,12 @@ class GalleryTile extends StatelessWidget {
               ),
             ),
 
-          // Subtle hover/selection border
+          // Flat selection: an accent wash over the media, not an outline.
           if (isSelected)
             Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.6),
-                    width: 2,
-                  ),
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: CbDecorations.selectedOverlay(context, radius: 8),
                 ),
               ),
             ),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_tokens.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_decorations.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart';
 
 class ItemInteractionStyle {
@@ -12,21 +15,58 @@ class ItemInteractionStyle {
   /// The opacity to apply when an item is being cut
   static const double cutOpacity = 0.5;
 
+  /// Background of a file/folder row or tile.
+  ///
+  /// Flat: selection and hover are carried entirely by the fill — no item
+  /// draws an outline. Hover is a neutral wash; selection is the accent
+  /// [CbDecorations.selectionFill], a clearly stronger step than hover so it
+  /// stays unmistakable in a dense listing.
   static Color backgroundColor({
     required ThemeData theme,
     required bool isDesktopMode,
     required bool isSelected,
     required bool isHovering,
   }) {
+    final tokens = theme.cb;
+    final bool hovered = isHovering && isDesktopMode;
     if (isSelected) {
-      return theme.colorScheme.primaryContainer.withValues(alpha: 0.7);
+      return CbDecorations.selectionFill(tokens, hovered: hovered);
     }
-
-    if (isHovering && isDesktopMode) {
-      final bool isDarkMode = theme.brightness == Brightness.dark;
-      return isDarkMode ? Colors.grey[800]! : Colors.grey[100]!;
-    }
-
+    if (hovered) return tokens.colors.fillHover;
     return Colors.transparent;
+  }
+
+  /// Background of a grid tile: the neutral hover fill only. Selection is
+  /// painted on top by [gridForeground].
+  static Color gridBackgroundColor({
+    required ThemeData theme,
+    required bool isDesktopMode,
+    required bool isSelected,
+    required bool isHovering,
+  }) {
+    return backgroundColor(
+      theme: theme,
+      isDesktopMode: isDesktopMode,
+      isSelected: false,
+      isHovering: isHovering && !isSelected,
+    );
+  }
+
+  /// Foreground of a grid tile: the selection wash painted *over* the whole
+  /// cell. A photo or video thumbnail fills the cell edge to edge and would
+  /// hide a background fill, leaving only the name band tinted.
+  static BoxDecoration? gridForeground(
+    BuildContext context, {
+    required bool isDesktopMode,
+    required bool isSelected,
+    required bool isHovering,
+    double radius = CbRadii.md,
+  }) {
+    if (!isSelected) return null;
+    return CbDecorations.selectedOverlay(
+      context,
+      radius: radius,
+      hovered: isHovering && isDesktopMode,
+    );
   }
 }

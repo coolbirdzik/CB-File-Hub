@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../config/languages/app_localizations.dart';
@@ -98,16 +99,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final canSend =
         _controller.text.trim().isNotEmpty || _mentionedFiles.isNotEmpty;
 
-    // Focus reads through a quieter surface shift; dragging keeps the accent
-    // because it is an active drop target, not a routine text-field focus.
-    final Color composerBorder = _isDragging
-        ? theme.colorScheme.primary.withValues(alpha: 0.7)
-        : _isFocused
-        ? theme.colorScheme.outline.withValues(alpha: 0.55)
-        : (isDark
-              ? Colors.white.withValues(alpha: 0.10)
-              : Colors.black.withValues(alpha: 0.10));
-
     return DropTarget(
       onDragEntered: (_) => setState(() => _isDragging = true),
       onDragExited: (_) => setState(() => _isDragging = false),
@@ -150,29 +141,16 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(
-                            alpha: _isFocused ? 0.08 : 0.05,
-                          )
-                        : Color.alphaBlend(
-                            Colors.black.withValues(
-                              alpha: _isFocused ? 0.035 : 0,
-                            ),
-                            Colors.white.withValues(alpha: 0.72),
-                          ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: composerBorder),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDark ? 0.28 : 0.07,
+                  // Flat composer: the shared field recipe (fill + accent bottom
+                  // indicator on focus); while files are dragged over it, the
+                  // drop-target tint instead.
+                  decoration: _isDragging
+                      ? CbDecorations.dropTarget(context, radius: 18)
+                      : CbDecorations.field(
+                          context,
+                          focused: _isFocused,
+                          radius: 18,
                         ),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -313,17 +291,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 200),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.09)
-            : Colors.black.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.black.withValues(alpha: 0.1),
-        ),
-      ),
+      decoration: CbDecorations.card(context, radius: 6),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -414,45 +382,28 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   Widget _buildSuggestionChip(String label) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
-    return Material(
-      color: isDark
-          ? Colors.white.withValues(alpha: 0.05)
-          : Colors.black.withValues(alpha: 0.035),
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: () => widget.onSend(label, const []),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : Colors.black.withValues(alpha: 0.08),
+    return CbSurface(
+      onPressed: () => widget.onSend(label, const []),
+      radius: 999,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            PhosphorIconsLight.sparkle,
+            size: 12,
+            color: theme.colorScheme.primary.withValues(alpha: 0.8),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                PhosphorIconsLight.sparkle,
-                size: 12,
-                color: theme.colorScheme.primary.withValues(alpha: 0.8),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }

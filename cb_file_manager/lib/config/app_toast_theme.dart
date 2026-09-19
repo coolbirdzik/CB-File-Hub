@@ -24,7 +24,6 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
 
   // Colours / opacity
   final double surfaceOpacity;
-  final double borderOpacity;
   final double shadowOpacityLight;
   final double shadowOpacityDark;
   final double iconAccentOpacity;
@@ -47,7 +46,6 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
     required this.blurSigmaDesktopDark,
     required this.blurSigmaMobile,
     required this.surfaceOpacity,
-    required this.borderOpacity,
     required this.shadowOpacityLight,
     required this.shadowOpacityDark,
     required this.iconAccentOpacity,
@@ -70,7 +68,6 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
     double? blurSigmaDesktopDark,
     double? blurSigmaMobile,
     double? surfaceOpacity,
-    double? borderOpacity,
     double? shadowOpacityLight,
     double? shadowOpacityDark,
     double? iconAccentOpacity,
@@ -90,7 +87,6 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
     blurSigmaDesktopDark: blurSigmaDesktopDark ?? this.blurSigmaDesktopDark,
     blurSigmaMobile: blurSigmaMobile ?? this.blurSigmaMobile,
     surfaceOpacity: surfaceOpacity ?? this.surfaceOpacity,
-    borderOpacity: borderOpacity ?? this.borderOpacity,
     shadowOpacityLight: shadowOpacityLight ?? this.shadowOpacityLight,
     shadowOpacityDark: shadowOpacityDark ?? this.shadowOpacityDark,
     iconAccentOpacity: iconAccentOpacity ?? this.iconAccentOpacity,
@@ -123,7 +119,6 @@ class AppToastTheme extends ThemeExtension<AppToastTheme> {
       )!,
       blurSigmaMobile: lerpDouble(blurSigmaMobile, other.blurSigmaMobile, t)!,
       surfaceOpacity: lerpDouble(surfaceOpacity, other.surfaceOpacity, t)!,
-      borderOpacity: lerpDouble(borderOpacity, other.borderOpacity, t)!,
       shadowOpacityLight: lerpDouble(
         shadowOpacityLight,
         other.shadowOpacityLight,

@@ -78,9 +78,6 @@ class ScreenScaffold extends StatelessWidget {
                     tintAlpha: surfaces.toolbarTintAlpha,
                     blurSigma: surfaces.chromeBlur,
                     borderRadius: FluentSurfaceTokens.toolbarRadius,
-                    border: Border(
-                      bottom: BorderSide(color: surfaces.chromeStroke),
-                    ),
                     child: SizedBox(
                       height: FluentSurfaceTokens.toolbarHeight,
                       child: Padding(

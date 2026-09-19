@@ -529,8 +529,12 @@ class _MillerFolderRowState extends State<_MillerFolderRow> {
           isHovering: isHovering,
         );
         if (widget.isColumnSelected && !widget.isSelected) {
-          // Folder is the currently expanded column: subtle accent background.
-          background = theme.colorScheme.primary.withValues(alpha: 0.18);
+          // Folder is the currently expanded column: a half-strength accent
+          // wash, kept well below the selection fill so the two never read
+          // as the same state.
+          background = theme.colorScheme.primary.withValues(
+            alpha: theme.brightness == Brightness.dark ? 0.16 : 0.10,
+          );
         }
 
         return Opacity(

@@ -194,7 +194,6 @@ class _AppToastOverlay extends StatelessWidget {
   }
 
   double get _surfaceOpacity => theme?.surfaceOpacity ?? 0.82;
-  double get _borderOpacity => theme?.borderOpacity ?? 0.22;
   double get _shadowOpacityLight => theme?.shadowOpacityLight ?? 0.16;
   double get _shadowOpacityDark => theme?.shadowOpacityDark ?? 0.40;
   double get _iconAccentOpacity => theme?.iconAccentOpacity ?? 0.14;
@@ -242,11 +241,6 @@ class _AppToastOverlay extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: colorScheme.surface.withValues(alpha: _surfaceOpacity),
                   borderRadius: BorderRadius.circular(_containerRadius),
-                  border: Border.all(
-                    color: colorScheme.outline.withValues(
-                      alpha: _borderOpacity,
-                    ),
-                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(

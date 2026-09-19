@@ -3,11 +3,11 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
@@ -516,13 +516,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
       constraints: widget.fillHeight
           ? null
           : BoxConstraints(maxHeight: widget.maxHeight),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-        ),
-      ),
+      decoration: CbDecorations.card(context, radius: 14),
       child: isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
@@ -579,13 +573,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     final zoom = _gridZoomLevel
         .clamp(UserPreferences.minGridZoomLevel, _maxGridZoom)
         .toInt();
-    final decoration = BoxDecoration(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(13),
-      border: Border.all(
-        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-      ),
-    );
+    final decoration = CbDecorations.card(context, radius: 13);
     final icon = Icon(
       PhosphorIconsLight.squaresFour,
       size: 17,
@@ -668,15 +656,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
 
     return Container(
       padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.35,
-        ),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-        ),
-      ),
+      decoration: CbDecorations.card(context, radius: 13),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -793,18 +773,10 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
       borderRadius: BorderRadius.circular(12),
       onTap: () => _handleTagTap(normalized),
       child: Container(
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.35,
-                ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary.withValues(alpha: 0.55)
-                : theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-          ),
+        decoration: CbDecorations.card(
+          context,
+          radius: 12,
+          selected: isSelected,
         ),
         child: Column(
           children: [
@@ -930,7 +902,6 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
   }
 
   Widget _buildSearchField(AppLocalizations l10n, ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
     return TextField(
       controller: _searchController,
       style: const TextStyle(fontSize: 14),
@@ -952,29 +923,7 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
                   setState(() => _query = '');
                 },
               ),
-        filled: true,
-        fillColor: WidgetStateColor.resolveWith((states) {
-          final focused = states.contains(WidgetState.focused);
-          return theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: isDark ? (focused ? 0.56 : 0.42) : (focused ? 0.34 : 0.2),
-          );
-        }),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.transparent, width: 0),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.transparent, width: 0),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.48),
-            width: 1,
-          ),
-        ),
-      ),
+      ).flat(context, radius: 14),
       onChanged: (value) => setState(() => _query = value),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class BreadcrumbNavigation extends StatelessWidget {
@@ -50,11 +51,7 @@ class BreadcrumbNavigation extends StatelessWidget {
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
+      decoration: CbDecorations.card(context, radius: 16.0),
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,

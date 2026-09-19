@@ -784,15 +784,10 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
+    // Flat rail: a fill step separates it from the file pane, not a rule.
     return Container(
       width: 200,
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-          ),
-        ),
-      ),
+      decoration: CbDecorations.card(context, radius: 12),
       child: ListView(
         padding: const EdgeInsets.only(right: 8),
         children: [
@@ -865,15 +860,12 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                 vertical: 10,
               ),
               hintText: _currentPath,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-              ),
               suffixIcon: IconButton(
                 onPressed: () => _submitTypedPath(_pathController.text),
                 tooltip: l10n.open,
                 icon: const Icon(PhosphorIconsLight.arrowRight, size: 18),
               ),
-            ),
+            ).flat(context, radius: 12),
             onSubmitted: _submitTypedPath,
           ),
         ),
@@ -915,11 +907,8 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                       },
                       icon: const Icon(PhosphorIconsLight.x),
                     ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16.0),
-              ),
               isDense: true,
-            ),
+            ).flat(context, radius: 16),
           ),
         const SizedBox(height: 8),
         Wrap(
@@ -1119,11 +1108,8 @@ class _MediaPickerDialogState extends State<_MediaPickerDialog> {
                                   },
                                   icon: const Icon(PhosphorIconsLight.x),
                                 ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16.0),
-                          ),
                           isDense: true,
-                        ),
+                        ).flat(context, radius: 16),
                         onChanged: (_) => setState(() {}),
                         onSubmitted: (value) => _performTagSearch(value),
                       );

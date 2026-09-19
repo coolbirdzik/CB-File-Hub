@@ -236,7 +236,6 @@ class _VideoSeekHoverPreviewState extends State<VideoSeekHoverPreview> {
                     decoration: BoxDecoration(
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.white38),
                       boxShadow: const [
                         BoxShadow(color: Colors.black54, blurRadius: 8),
                       ],

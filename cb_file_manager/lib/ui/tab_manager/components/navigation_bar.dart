@@ -2,17 +2,15 @@ import 'dart:io' show Platform;
 
 import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../config/design_system_config.dart';
-import '../../../design_system/fluent_surface_tokens.dart';
 import '../core/tab_manager.dart';
 import '../../../config/languages/app_localizations.dart';
 import 'address_bar_menu.dart';
-import '../../../design_system/primitives/cb_button.dart';
 import '../../../helpers/files/archive_path_utils.dart';
 import '../../../ui/components/common/breadcrumb_address_bar.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 
 /// Navigation bar component that includes back/forward buttons and path input field
 class PathNavigationBar extends StatefulWidget {
@@ -470,8 +468,11 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
               decoration: BoxDecoration(
                 color: surfaces.control,
                 borderRadius: FluentSurfaceTokens.controlRadius,
-                border: Border.all(
-                  color: _pathHasFocus ? surfaces.focusRing : surfaces.stroke,
+                // Flat field: no outline at rest, the shared bottom
+                // indicator while the path has focus.
+                border: CbDecorations.fieldIndicator(
+                  context.cbColors,
+                  focused: _pathHasFocus,
                 ),
               ),
               child: pathContent,

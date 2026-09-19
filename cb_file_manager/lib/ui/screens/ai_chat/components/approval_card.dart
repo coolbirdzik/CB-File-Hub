@@ -66,17 +66,11 @@ class ApprovalCard extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 120),
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      // Flat: the container tint carries the approval's weight — no accent
+      // outline, no coloured glow.
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -117,7 +111,6 @@ class ApprovalCard extends StatelessWidget {
                   onPressed: onReject,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: accentColor, width: 1.5),
                   ),
                   child: const Text(
                     'Reject',

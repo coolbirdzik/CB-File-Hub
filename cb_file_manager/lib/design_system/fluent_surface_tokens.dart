@@ -14,7 +14,6 @@ class FluentSurfaceTokens {
   final Color canvas;
   final Color chromeTint;
   final Color toolbar;
-  final Color chromeStroke;
   final double toolbarTintAlpha;
   final double drawerTintAlpha;
   final double chromeBlur;
@@ -33,7 +32,6 @@ class FluentSurfaceTokens {
     required this.canvas,
     required this.chromeTint,
     required this.toolbar,
-    required this.chromeStroke,
     required this.toolbarTintAlpha,
     required this.drawerTintAlpha,
     required this.chromeBlur,
@@ -69,11 +67,13 @@ class FluentSurfaceTokens {
       canvas: theme.scaffoldBackgroundColor,
       chromeTint: chromeTint,
       toolbar: chromeTint.withValues(alpha: toolbarTintAlpha),
-      chromeStroke: colors.stroke,
       toolbarTintAlpha: toolbarTintAlpha,
       drawerTintAlpha: drawerTintAlpha,
       chromeBlur: 18,
-      control: colors.surfaceSunken,
+      // A translucent fill, not the sunken neutral: with no outline around
+      // it, the control has to read as a tone on the tinted toolbar, and the
+      // sunken neutral matches the dark canvas exactly.
+      control: colors.fill,
       controlHover: colors.surfaceHover,
       controlPressed: colors.surfacePressed,
       stroke: colors.stroke,

@@ -5,6 +5,7 @@ import '../cb_tokens.dart';
 import '../tokens/cb_geometry_tokens.dart';
 import '../tokens/cb_motion_tokens.dart';
 import '../tokens/cb_type_tokens.dart';
+import 'cb_decorations.dart';
 
 /// The text input primitive.
 ///
@@ -13,7 +14,8 @@ import '../tokens/cb_type_tokens.dart';
 /// along the floating label, the animated underline and a 48px minimum height
 /// that cannot be fully overridden — all of which are unmistakably Material
 /// and all of which are wrong for a dense desktop app. Here the label sits
-/// above the field, the field is 32px, and focus uses a neutral raised fill.
+/// above the field, the field is 32px, and the chrome is flat: a tonal fill
+/// with a bottom accent indicator on focus (see [CbDecorations.field]).
 class CbTextField extends StatefulWidget {
   final TextEditingController? controller;
   final FocusNode? focusNode;
@@ -133,19 +135,6 @@ class _CbTextFieldState extends State<CbTextField> {
     final bool isEnabled = widget.enabled;
     final bool multiline = widget.maxLines > 1;
 
-    final Color borderColor = !isEnabled
-        ? c.strokeSubtle
-        : hasError
-        ? c.status.danger
-        : (_focused || _hovered)
-        ? c.strokeStrong
-        : c.stroke;
-    final Color fillColor = !isEnabled
-        ? c.surfaceSunken.withValues(alpha: 0.5)
-        : _focused
-        ? c.surfaceRaised
-        : c.surfaceSunken;
-
     final TextStyle textStyle =
         (widget.mono ? CbTypography.mono : CbTypography.body).copyWith(
           color: isEnabled ? c.textPrimary : c.textDisabled,
@@ -222,15 +211,12 @@ class _CbTextFieldState extends State<CbTextField> {
               horizontal: CbSpacing.sm + 2,
               vertical: multiline ? CbSpacing.sm : 0,
             ),
-            decoration: BoxDecoration(
-              color: fillColor,
-              borderRadius: CbRadii.smAll,
-              border: Border.all(
-                color: borderColor,
-                // Focus now reads through the fill; only errors need the
-                // heavier outline so the field does not look alarmed.
-                width: hasError ? CbStrokes.emphasis : CbStrokes.hairline,
-              ),
+            decoration: CbDecorations.field(
+              context,
+              focused: _focused,
+              hovered: _hovered,
+              error: hasError,
+              enabled: isEnabled,
             ),
             child: Row(
               crossAxisAlignment: multiline

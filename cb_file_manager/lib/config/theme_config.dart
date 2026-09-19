@@ -189,7 +189,6 @@ class ThemeConfig {
       blurSigmaDesktopDark: 10.0,
       blurSigmaMobile: 8.0,
       surfaceOpacity: 0.82,
-      borderOpacity: 0.22,
       shadowOpacityLight: 0.16,
       shadowOpacityDark: 0.40,
       iconAccentOpacity: 0.14,

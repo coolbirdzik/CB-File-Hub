@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -380,13 +381,11 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
       message: tooltip,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(
-            alpha: isEnabled ? 0.42 : 0.24,
+          color: CbDecorations.controlFill(
+            context.cbColors,
+            enabled: isEnabled,
           ),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.12),
-          ),
         ),
         child: IconButton(
           onPressed: onPressed,
@@ -820,13 +819,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
   Widget _buildMetricChip(ThemeData theme, String label, String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.12),
-        ),
-      ),
+      decoration: CbDecorations.card(context, radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -860,13 +853,7 @@ class _CacheManagementScreenState extends State<CacheManagementScreen> {
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
           padding: padding,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.42),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.12),
-            ),
-          ),
+          decoration: CbDecorations.card(context, radius: 24),
           child: child,
         ),
       ),

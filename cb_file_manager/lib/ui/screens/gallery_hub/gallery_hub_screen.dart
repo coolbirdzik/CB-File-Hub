@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
@@ -370,12 +371,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                ),
+              decoration: CbDecorations.tint(
+                context,
+                theme.colorScheme.primary,
+                radius: 20,
               ),
               child: Text(
                 localizations.quickAccess,
@@ -578,12 +577,10 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.secondary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: theme.colorScheme.secondary.withValues(alpha: 0.2),
-                ),
+              decoration: CbDecorations.tint(
+                context,
+                theme.colorScheme.secondary,
+                radius: 20,
               ),
               child: Text(
                 _localizations.personalized,
@@ -610,13 +607,7 @@ class _GalleryHubScreenState extends State<GalleryHubScreen>
         else if (_featuredAlbums.isEmpty)
           Container(
             padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.1),
-              ),
-            ),
+            decoration: CbDecorations.card(context, radius: 16),
             child: Column(
               children: [
                 Icon(

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_decorations.dart';
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
 import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
@@ -102,21 +103,12 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
         ? '   |   Calculating size...'
         : '   |   ${FormatUtils.formatFileSize(totalSize)}';
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       width: double.infinity,
       height: SelectionSummaryTooltip.height,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       margin: EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF202020) : const Color(0xFFF9F9F9),
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
-          ),
-        ),
-      ),
+      decoration: CbDecorations.bar(context),
       child: Row(
         children: [
           Text(

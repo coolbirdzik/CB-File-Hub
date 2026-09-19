@@ -1435,10 +1435,6 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                 ],
               ),
               borderRadius: BorderRadius.circular(16.0),
-              border: Border.all(
-                color: Colors.orange.withValues(alpha: 0.5),
-                width: 1,
-              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,6 +2,7 @@ import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/ui/components/common/search_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart'; // Handles keyboard events.
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -10,7 +11,6 @@ import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_event.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart'; // Add TabManager import
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
-import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
 import 'search_tips_dialog.dart';
 
 /// Search bar displayed directly in the toolbar.
@@ -294,7 +294,6 @@ class _SearchBarState extends State<SearchBar> {
     _currentTags = List.from(tags);
     _updateSuggestionsGeometry();
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     // Create a new overlay entry.
     _overlayEntry = OverlayEntry(
@@ -317,24 +316,14 @@ class _SearchBarState extends State<SearchBar> {
                     child: SizedBox(
                       width: _suggestionsWidth,
                       child: Material(
-                        elevation: 0,
-                        borderRadius: BorderRadius.circular(16),
-                        color: isDark
-                            ? Colors.grey[850]
-                            : theme.colorScheme.surface,
+                        type: MaterialType.transparency,
                         child: Container(
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.grey[850]
-                                : theme.colorScheme.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: const [],
-                            border: Border.all(
-                              color: theme.colorScheme.outline.withValues(
-                                alpha: 0.2,
-                              ),
-                              width: 1,
-                            ),
+                          clipBehavior: Clip.antiAlias,
+                          // Resolved from the search bar's own context: the
+                          // overlay may sit above the Material theme bridge.
+                          decoration: CbDecorations.floating(
+                            this.context,
+                            radius: 16,
                           ),
                           constraints: const BoxConstraints(maxHeight: 300),
                           child: Column(

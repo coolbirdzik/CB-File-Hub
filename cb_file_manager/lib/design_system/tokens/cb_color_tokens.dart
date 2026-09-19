@@ -278,6 +278,26 @@ class CbColorTokens {
   /// Selected-row background.
   final Color surfaceSelected;
 
+  // Flat fills. Translucent neutral washes, ordered weakest to strongest.
+  //
+  // This is what separates things in the flat look instead of a border:
+  // a card is a [fillSubtle] block, a control is a [fill] block, and each
+  // interaction steps one rung up the ramp. Being translucent, the same
+  // token reads correctly on the canvas, inside a dialog, and over the
+  // desktop acrylic backdrop — an opaque grey only works on one of those.
+
+  /// Resting fill for containers — cards, grouped sections, list panels.
+  final Color fillSubtle;
+
+  /// Resting fill for controls — secondary buttons, inputs, chips.
+  final Color fill;
+
+  /// A [fill]ed control or [fillSubtle] card under the pointer.
+  final Color fillHover;
+
+  /// A [fill]ed control while pressed; also the switch/progress track.
+  final Color fillPressed;
+
   // Content.
   final Color textPrimary;
   final Color textSecondary;
@@ -309,6 +329,10 @@ class CbColorTokens {
     required this.surfaceHover,
     required this.surfacePressed,
     required this.surfaceSelected,
+    required this.fillSubtle,
+    required this.fill,
+    required this.fillHover,
+    required this.fillPressed,
     required this.textPrimary,
     required this.textSecondary,
     required this.textTertiary,
@@ -341,6 +365,10 @@ class CbColorTokens {
         surfaceHover: const Color(0x0FFFFFFF),
         surfacePressed: const Color(0x1AFFFFFF),
         surfaceSelected: ramp.tint,
+        fillSubtle: const Color(0x0DFFFFFF),
+        fill: const Color(0x14FFFFFF),
+        fillHover: const Color(0x1CFFFFFF),
+        fillPressed: const Color(0x26FFFFFF),
         textPrimary: const Color(0xFFF2F4F8),
         textSecondary: const Color(0xFFAAB2C0),
         textTertiary: const Color(0xFF7C8494),
@@ -368,6 +396,10 @@ class CbColorTokens {
       surfaceHover: const Color(0x0A0B0D10),
       surfacePressed: const Color(0x140B0D10),
       surfaceSelected: ramp.tint,
+      fillSubtle: const Color(0x0A0B0D10),
+      fill: const Color(0x0F0B0D10),
+      fillHover: const Color(0x170B0D10),
+      fillPressed: const Color(0x210B0D10),
       textPrimary: CbNeutral.n900,
       textSecondary: CbNeutral.n600,
       textTertiary: CbNeutral.n500,
@@ -395,6 +427,10 @@ class CbColorTokens {
     Color? surfaceHover,
     Color? surfacePressed,
     Color? surfaceSelected,
+    Color? fillSubtle,
+    Color? fill,
+    Color? fillHover,
+    Color? fillPressed,
     Color? textPrimary,
     Color? textSecondary,
     Color? textTertiary,
@@ -420,6 +456,10 @@ class CbColorTokens {
       surfaceHover: surfaceHover ?? this.surfaceHover,
       surfacePressed: surfacePressed ?? this.surfacePressed,
       surfaceSelected: surfaceSelected ?? this.surfaceSelected,
+      fillSubtle: fillSubtle ?? this.fillSubtle,
+      fill: fill ?? this.fill,
+      fillHover: fillHover ?? this.fillHover,
+      fillPressed: fillPressed ?? this.fillPressed,
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       textTertiary: textTertiary ?? this.textTertiary,

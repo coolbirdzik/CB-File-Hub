@@ -581,9 +581,6 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   }
 
   Widget _buildTagInputSection(AppLocalizations l10n) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return _buildSectionCard(
       icon: PhosphorIconsLight.pencilSimpleLine,
       title: l10n.addTag,
@@ -599,40 +596,10 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
             onSuggestionSelected: _onSuggestionSelected,
             suggestionBuilder: _buildSuggestionItem,
             decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(
-                  color: Colors.transparent,
-                  width: 0,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(
-                  color: Colors.transparent,
-                  width: 0,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.48),
-                  width: 1,
-                ),
-              ),
               labelText: l10n.tagName,
               hintText: '${l10n.enterTagName} (e.g. Actress:Hung)',
               prefixIcon: const Icon(PhosphorIconsLight.tag),
-              filled: true,
-              fillColor: WidgetStateColor.resolveWith((states) {
-                final focused = states.contains(WidgetState.focused);
-                return theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: isDarkMode
-                      ? (focused ? 0.56 : 0.42)
-                      : (focused ? 0.34 : 0.2),
-                );
-              }),
-            ),
+            ).flat(context, radius: 16),
             style: const TextStyle(fontSize: 16),
             onChanged: (updatedTags) {
               setState(() {
@@ -686,15 +653,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.32,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
-        ),
-      ),
+      decoration: CbDecorations.card(context, radius: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -761,15 +720,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.24,
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
-              ),
-            ),
+            decoration: CbDecorations.card(context, radius: 14),
             child: Row(
               children: [
                 Icon(
@@ -1204,20 +1155,12 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                                     hierarchyManager: hierarchyManager,
                                   ),
                           decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16.0),
-                            ),
                             labelText: AppLocalizations.of(context)!.tagName,
                             hintText: AppLocalizations.of(
                               context,
                             )!.enterTagName,
                             prefixIcon: const Icon(PhosphorIconsLight.tag),
-                            filled: true,
-                            fillColor:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.grey[800]
-                                : Colors.grey[100],
-                          ),
+                          ).flat(context, radius: 16),
                           onChanged: (updatedTags) {
                             setState(() {
                               selectedTags.clear();
@@ -1733,15 +1676,7 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                     const SizedBox(height: 16),
                     Expanded(
                       child: Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.grey[800]
-                              : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(16.0),
-                          border: Border.all(
-                            color: Colors.grey.withValues(alpha: 0.2),
-                          ),
-                        ),
+                        decoration: CbDecorations.card(context, radius: 16),
                         child: ListView(
                           padding: const EdgeInsets.all(8),
                           children: _commonTags.map((tag) {

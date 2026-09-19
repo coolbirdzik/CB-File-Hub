@@ -35,7 +35,7 @@ class TagChip extends StatelessWidget {
     final Color displayColor = isDarkMode
         ? Color.alphaBlend(Colors.white.withValues(alpha: 0.3), tagColor)
         : tagColor;
-    final Color foregroundColor = _bestForegroundColor(displayColor);
+    final Color foregroundColor = TagChipStyle.readableOn(displayColor);
 
     return InkWell(
       onTap: onTap,
@@ -61,13 +61,49 @@ class TagChip extends StatelessWidget {
       ),
     );
   }
+}
 
-  static Color _bestForegroundColor(Color background) {
+/// The shared colour recipe for every tag chip in the app.
+///
+/// Flat: a chip is a translucent tint of its tag colour with no outline;
+/// hover steps the tint up instead of darkening a border. Keeping the recipe
+/// here is what lets the inline chips, the chips-input chips and the tag
+/// management chips stay the same object in three places.
+class TagChipStyle {
+  const TagChipStyle._();
+
+  static const double radius = 16;
+
+  /// Translucent tint of [tagColor] for a chip at rest or [hovered].
+  static Color tint(
+    Color tagColor, {
+    required bool isDark,
+    bool hovered = false,
+  }) {
+    final double alpha = hovered
+        ? (isDark ? 0.34 : 0.28)
+        : (isDark ? 0.24 : 0.18);
+    return tagColor.withValues(alpha: alpha);
+  }
+
+  static BoxDecoration decoration(
+    Color tagColor, {
+    required bool isDark,
+    bool hovered = false,
+  }) {
+    return BoxDecoration(
+      color: tint(tagColor, isDark: isDark, hovered: hovered),
+      borderRadius: BorderRadius.circular(radius),
+    );
+  }
+
+  /// Black or white — whichever contrasts better with [background].
+  static Color readableOn(Color background) {
     const light = Colors.white;
     const dark = Colors.black;
-    final lightContrast = _contrastRatio(background, light);
-    final darkContrast = _contrastRatio(background, dark);
-    return lightContrast >= darkContrast ? light : dark;
+    return _contrastRatio(background, light) >= _contrastRatio(background, dark)
+        ? light
+        : dark;
   }
 
   static double _contrastRatio(Color a, Color b) {

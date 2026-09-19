@@ -7,6 +7,7 @@ import 'dart:async'; // Add this import for Completer
 import 'package:cb_file_manager/helpers/ui/frame_timing_optimizer.dart';
 import '../../components/common/shared_action_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
@@ -31,7 +32,6 @@ import 'package:cb_file_manager/bloc/selection/selection.dart';
 import 'components/network_recovery_view.dart';
 import 'components/network_navigation_bar.dart';
 import '../../components/common/screen_scaffold.dart';
-import '../../../design_system/primitives/cb_button.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_data.dart'; // Import TabData explicitly
 
 // Add imports for hardware acceleration
@@ -938,14 +938,6 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
         autofocus: true,
         decoration: InputDecoration(
           hintText: AppLocalizations.of(context)!.searchByFilename,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16.0),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Theme.of(
-            context,
-          ).colorScheme.surface.withValues(alpha: 0.8),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           prefixIcon: const Icon(PhosphorIconsLight.magnifyingGlass, size: 20),
           suffixIcon: _searchController.text.isEmpty
@@ -959,7 +951,7 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
                     });
                   },
                 ),
-        ),
+        ).flat(context, radius: 16),
       ),
     );
   }
@@ -1289,12 +1281,9 @@ class _NetworkBrowserScreenState extends State<NetworkBrowserScreen>
           width: rect.width,
           height: rect.height,
           child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).primaryColor,
-                width: 1,
-              ),
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            decoration: CbDecorations.tint(
+              context,
+              Theme.of(context).primaryColor,
             ),
           ),
         );

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
+import 'package:cb_file_manager/design_system/cb_tokens.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/video/video_player/video_player.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
@@ -663,21 +664,12 @@ class _LineNumberGutter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+    // Flat gutter: a fill step separates the line numbers from the code
+    // instead of a vertical rule.
     return Container(
       width: _gutterWidth(text),
       padding: const EdgeInsets.only(left: 6, right: 10),
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(
-            color: theme.colorScheme.onSurface.withValues(
-              alpha: isDark ? 0.08 : 0.05,
-            ),
-          ),
-        ),
-      ),
+      decoration: BoxDecoration(color: context.cbColors.fillSubtle),
       child: Text(text, style: style, textAlign: TextAlign.right),
     );
   }

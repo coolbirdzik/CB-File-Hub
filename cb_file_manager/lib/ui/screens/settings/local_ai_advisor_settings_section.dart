@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -263,14 +264,11 @@ class _LocalAiAdvisorSettingsSectionState
                     suffixText: l.localAiTokensSuffix,
                     hintText:
                         '${LocalAiAdvisorService.minContextTokens}–${LocalAiAdvisorService.maxContextTokens}',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 10,
                     ),
-                  ),
+                  ).flat(context, radius: 8),
                   onFieldSubmitted: (value) {
                     final parsed = int.tryParse(value);
                     if (parsed != null) {
@@ -318,15 +316,7 @@ class _LocalAiAdvisorSettingsSectionState
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isActive
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-            : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: isActive
-            ? Border.all(color: theme.colorScheme.primary, width: 2)
-            : null,
-      ),
+      decoration: CbDecorations.card(context, radius: 8, selected: isActive),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -435,12 +425,10 @@ class _LocalAiAdvisorSettingsSectionState
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: theme.colorScheme.error.withValues(alpha: 0.4),
-        ),
+      decoration: CbDecorations.tint(
+        context,
+        theme.colorScheme.error,
+        radius: 6,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

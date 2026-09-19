@@ -336,12 +336,11 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
     final baseColor = theme.colorScheme.primary;
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    final frameColor = baseColor.withValues(alpha: isDarkMode ? 0.26 : 0.22);
-    final stripBorderColor = baseColor.withValues(
-      alpha: isDarkMode ? 0.76 : 0.70,
-    );
+    // Flat drop zone: tinted fills mark the window and the tab strip as the
+    // target; no outlines.
+    final frameColor = baseColor.withValues(alpha: isDarkMode ? 0.07 : 0.05);
     final stripFillColor = baseColor.withValues(
-      alpha: isDarkMode ? 0.14 : 0.11,
+      alpha: isDarkMode ? 0.26 : 0.20,
     );
     final veilColor = isDarkMode
         ? Colors.black.withValues(alpha: 0.06)
@@ -363,7 +362,7 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16.0),
-                        border: Border.all(color: frameColor, width: 1.6),
+                        color: frameColor,
                       ),
                     ),
                   ),
@@ -377,8 +376,6 @@ class _NativeDropHoverOverlayState extends State<_NativeDropHoverOverlay>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(11),
                       color: stripFillColor,
-                      border: Border.all(color: stripBorderColor, width: 1.8),
-                      boxShadow: const [],
                     ),
                   ),
                 ),

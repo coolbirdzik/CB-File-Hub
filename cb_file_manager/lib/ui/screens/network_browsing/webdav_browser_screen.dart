@@ -210,44 +210,29 @@ class _WebDAVBrowserScreenState extends State<WebDAVBrowserScreen>
             children: [
               TextField(
                 controller: _hostController,
-                decoration: InputDecoration(
-                  labelText: l10n.host,
-                  border: const OutlineInputBorder(),
-                ),
+                decoration: InputDecoration(labelText: l10n.host),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: l10n.username,
-                  border: const OutlineInputBorder(),
-                ),
+                decoration: InputDecoration(labelText: l10n.username),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: l10n.password,
-                  border: const OutlineInputBorder(),
-                ),
+                decoration: InputDecoration(labelText: l10n.password),
                 obscureText: true,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _portController,
-                decoration: InputDecoration(
-                  labelText: l10n.port,
-                  border: const OutlineInputBorder(),
-                ),
+                decoration: InputDecoration(labelText: l10n.port),
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _basePathController,
-                decoration: InputDecoration(
-                  labelText: l10n.basePath,
-                  border: const OutlineInputBorder(),
-                ),
+                decoration: InputDecoration(labelText: l10n.basePath),
               ),
             ],
           ),

@@ -96,20 +96,19 @@ class _FolderGridItemState extends State<FolderGridItem> {
 
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
-    final Color borderColor = isVisuallySelected
-        ? primary
-        : _isHovering
-        ? primary.withValues(alpha: 0.55)
-        : primary.withValues(alpha: 0.35);
+    // Flat folder glyph: the tab and body are solid tints of the accent, the
+    // tab one step stronger, so the shape reads without an outline. State
+    // steps both tints up together.
     final Color tabColor = isVisuallySelected
-        ? primary.withValues(alpha: 0.25)
+        ? primary.withValues(alpha: 0.50)
         : _isHovering
-        ? primary.withValues(alpha: 0.12)
-        : primary.withValues(alpha: 0.08);
+        ? primary.withValues(alpha: 0.34)
+        : primary.withValues(alpha: 0.24);
     final Color bodyColor = isVisuallySelected
-        ? primary.withValues(alpha: 0.08)
-        : primary.withValues(alpha: 0.03);
-    const double borderWidth = 1.5;
+        ? primary.withValues(alpha: 0.26)
+        : _isHovering
+        ? primary.withValues(alpha: 0.16)
+        : primary.withValues(alpha: 0.10);
     const double bodyRadius = 6.0;
     const double tabRadius = 5.0;
 
@@ -123,69 +122,71 @@ class _FolderGridItemState extends State<FolderGridItem> {
         child: GestureDetector(
           onSecondaryTapDown: (details) =>
               _showFolderContextMenu(context, details.globalPosition),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Expanded(
-                child: _buildFolderShape(
-                  context,
-                  borderColor: borderColor,
-                  tabColor: tabColor,
-                  bodyColor: bodyColor,
-                  borderWidth: borderWidth,
-                  bodyRadius: bodyRadius,
-                  tabRadius: tabRadius,
-                  interactionLayer: OptimizedInteractionLayer(
-                    onTap: () {
-                      widget.onNavigate(widget.folder.path);
-                    },
-                    onDoubleTap: () {
-                      if (widget.clearSelectionMode != null) {
-                        widget.clearSelectionMode!();
-                      }
-                      widget.onNavigate(widget.folder.path);
-                    },
-                    onLongPressStart: !widget.isDesktopMode
-                        ? (details) {
-                            HapticFeedback.mediumImpact();
-                            _showFolderContextMenu(
-                              context,
-                              details.globalPosition,
-                            );
-                          }
-                        : null,
-                    onTertiaryTapUp: (_) {
-                      context.read<TabManagerBloc>().add(
-                        AddTab(path: widget.folder.path),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: nameAreaHeight,
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    top: 4.0,
-                    left: 4.0,
-                    right: 4.0,
-                  ),
-                  child: Text(
-                    _displayName,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: GridZoomConstraints.gridItemFilenameFontSize,
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: isVisuallySelected
-                          ? FontWeight.bold
-                          : FontWeight.w500,
+          child: _buildCell(
+            context,
+            isVisuallySelected: isVisuallySelected,
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Expanded(
+                  child: _buildFolderShape(
+                    context,
+                    tabColor: tabColor,
+                    bodyColor: bodyColor,
+                    bodyRadius: bodyRadius,
+                    tabRadius: tabRadius,
+                    interactionLayer: OptimizedInteractionLayer(
+                      onTap: () {
+                        widget.onNavigate(widget.folder.path);
+                      },
+                      onDoubleTap: () {
+                        if (widget.clearSelectionMode != null) {
+                          widget.clearSelectionMode!();
+                        }
+                        widget.onNavigate(widget.folder.path);
+                      },
+                      onLongPressStart: !widget.isDesktopMode
+                          ? (details) {
+                              HapticFeedback.mediumImpact();
+                              _showFolderContextMenu(
+                                context,
+                                details.globalPosition,
+                              );
+                            }
+                          : null,
+                      onTertiaryTapUp: (_) {
+                        context.read<TabManagerBloc>().add(
+                          AddTab(path: widget.folder.path),
+                        );
+                      },
                     ),
                   ),
                 ),
-              ),
-            ],
+                SizedBox(
+                  height: nameAreaHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: 4.0,
+                      left: 4.0,
+                      right: 4.0,
+                    ),
+                    child: Text(
+                      _displayName,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: GridZoomConstraints.gridItemFilenameFontSize,
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: isVisuallySelected
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -201,74 +202,104 @@ class _FolderGridItemState extends State<FolderGridItem> {
           onEnter: (_) => setState(() => _isHovering = true),
           onExit: (_) => setState(() => _isHovering = false),
           cursor: SystemMouseCursors.click,
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Expanded(
-                child: _buildFolderShape(
-                  context,
-                  borderColor: borderColor,
-                  tabColor: tabColor,
-                  bodyColor: bodyColor,
-                  borderWidth: borderWidth,
-                  bodyRadius: bodyRadius,
-                  tabRadius: tabRadius,
-                  interactionLayer: OptimizedInteractionLayer(
-                    onTap: () {
-                      if (widget.isDesktopMode &&
-                          widget.toggleFolderSelection != null) {
-                        _handleFolderSelection();
-                      } else {
+          child: _buildCell(
+            context,
+            isVisuallySelected: isVisuallySelected,
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Expanded(
+                  child: _buildFolderShape(
+                    context,
+                    tabColor: tabColor,
+                    bodyColor: bodyColor,
+                    bodyRadius: bodyRadius,
+                    tabRadius: tabRadius,
+                    interactionLayer: OptimizedInteractionLayer(
+                      onTap: () {
+                        if (widget.isDesktopMode &&
+                            widget.toggleFolderSelection != null) {
+                          _handleFolderSelection();
+                        } else {
+                          widget.onNavigate(widget.folder.path);
+                        }
+                      },
+                      onDoubleTap: () {
+                        if (widget.clearSelectionMode != null) {
+                          widget.clearSelectionMode!();
+                        }
                         widget.onNavigate(widget.folder.path);
-                      }
-                    },
-                    onDoubleTap: () {
-                      if (widget.clearSelectionMode != null) {
-                        widget.clearSelectionMode!();
-                      }
-                      widget.onNavigate(widget.folder.path);
-                    },
-                    onLongPressStart: !widget.isDesktopMode
-                        ? (details) {
-                            HapticFeedback.mediumImpact();
-                            _showFolderContextMenu(
-                              context,
-                              details.globalPosition,
-                            );
-                          }
-                        : null,
-                    onTertiaryTapUp: (_) {
-                      context.read<TabManagerBloc>().add(
-                        AddTab(path: widget.folder.path),
-                      );
-                    },
+                      },
+                      onLongPressStart: !widget.isDesktopMode
+                          ? (details) {
+                              HapticFeedback.mediumImpact();
+                              _showFolderContextMenu(
+                                context,
+                                details.globalPosition,
+                              );
+                            }
+                          : null,
+                      onTertiaryTapUp: (_) {
+                        context.read<TabManagerBloc>().add(
+                          AddTab(path: widget.folder.path),
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(
-                height: nameAreaHeight,
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    top: 4.0,
-                    left: 4.0,
-                    right: 4.0,
+                SizedBox(
+                  height: nameAreaHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: 4.0,
+                      left: 4.0,
+                      right: 4.0,
+                    ),
+                    child: _buildNameWidget(context, isVisuallySelected),
                   ),
-                  child: _buildNameWidget(context, isVisuallySelected),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  /// Whole-cell hover fill and selection wash, the same recipe as the file
+  /// grid tiles. The folder glyph's own tint steps up too, but on its own it
+  /// is too quiet to find a selected folder at a glance — and a folder
+  /// thumbnail can cover the glyph body entirely.
+  Widget _buildCell(
+    BuildContext context, {
+    required bool isVisuallySelected,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: ItemInteractionStyle.gridBackgroundColor(
+          theme: Theme.of(context),
+          isDesktopMode: widget.isDesktopMode,
+          isSelected: isVisuallySelected,
+          isHovering: _isHovering,
+        ),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      foregroundDecoration: ItemInteractionStyle.gridForeground(
+        context,
+        isDesktopMode: widget.isDesktopMode,
+        isSelected: isVisuallySelected,
+        isHovering: _isHovering,
+        radius: 8.0,
+      ),
+      child: child,
+    );
+  }
+
   Widget _buildFolderShape(
     BuildContext context, {
-    required Color borderColor,
     required Color tabColor,
     required Color bodyColor,
-    required double borderWidth,
     required double bodyRadius,
     required double tabRadius,
     required Widget interactionLayer,
@@ -283,11 +314,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
               width: 32,
               decoration: BoxDecoration(
                 color: tabColor,
-                border: Border(
-                  top: BorderSide(color: borderColor, width: borderWidth),
-                  left: BorderSide(color: borderColor, width: borderWidth),
-                  right: BorderSide(color: borderColor, width: borderWidth),
-                ),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(tabRadius),
                   topRight: Radius.circular(tabRadius),
@@ -302,7 +328,6 @@ class _FolderGridItemState extends State<FolderGridItem> {
           child: Container(
             decoration: BoxDecoration(
               color: bodyColor,
-              border: Border.all(color: borderColor, width: borderWidth),
               borderRadius: BorderRadius.only(
                 topRight: Radius.circular(bodyRadius),
                 bottomLeft: Radius.circular(bodyRadius),
@@ -311,9 +336,9 @@ class _FolderGridItemState extends State<FolderGridItem> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.only(
-                topRight: Radius.circular(bodyRadius - borderWidth),
-                bottomLeft: Radius.circular(bodyRadius - borderWidth),
-                bottomRight: Radius.circular(bodyRadius - borderWidth),
+                topRight: Radius.circular(bodyRadius),
+                bottomLeft: Radius.circular(bodyRadius),
+                bottomRight: Radius.circular(bodyRadius),
               ),
               child: Stack(
                 fit: StackFit.expand,

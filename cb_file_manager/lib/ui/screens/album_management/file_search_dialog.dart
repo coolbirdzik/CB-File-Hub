@@ -282,7 +282,6 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
                           },
                         )
                       : null,
-                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
               ),
@@ -363,13 +362,6 @@ class _FileSearchDialogState extends State<FileSearchDialog> {
             // Action buttons
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                  ),
-                ),
-              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [

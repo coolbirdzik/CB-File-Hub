@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/files/file_type_registry.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/material.dart';
@@ -116,15 +117,12 @@ class _FileDragDropItemState extends State<FileDragDropItem> {
         onAcceptWithDetails: (details) =>
             widget.onMoveItemsToFolder!(details.data, path),
         builder: (context, candidates, _) => DecoratedBox(
-          decoration: BoxDecoration(
-            border: candidates.isEmpty
-                ? null
-                : Border.all(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 1.5,
-                  ),
-            borderRadius: BorderRadius.circular(4),
-          ),
+          // Painted over the row so the tint shows even when the row has its
+          // own background; flat, so no outline.
+          position: DecorationPosition.foreground,
+          decoration: candidates.isEmpty
+              ? const BoxDecoration()
+              : CbDecorations.dropTarget(context, radius: 4),
           child: source,
         ),
       ),
@@ -163,20 +161,7 @@ class _FileDragFeedback extends StatelessWidget {
         key: const ValueKey('file-drag-feedback'),
         width: 240,
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.55),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+        decoration: CbDecorations.floating(context, radius: 12),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

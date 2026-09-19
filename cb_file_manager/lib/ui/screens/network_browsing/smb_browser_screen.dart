@@ -1,7 +1,7 @@
-import '../../../design_system/primitives/cb_button.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 // Aliased to avoid conflict with 'path' in _openSavedConnection
@@ -535,18 +535,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
                       // SMB Version Info
                       Container(
                         padding: const EdgeInsets.all(12.0),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(16.0),
-                          border: Border.all(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.outline.withValues(alpha: 0.2),
-                          ),
-                        ),
+                        decoration: CbDecorations.card(context, radius: 16.0),
                         child: Row(
                           children: [
                             Icon(
@@ -665,13 +654,7 @@ class _SMBBrowserScreenState extends State<SMBBrowserScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Container(
           padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.3,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
+          decoration: CbDecorations.card(context, radius: 16),
           child: Row(
             children: [
               Icon(

@@ -391,7 +391,6 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
                 decoration: BoxDecoration(
                   color: Colors.black,
                   borderRadius: BorderRadius.circular(16.0),
-                  border: Border.all(color: Colors.white24, width: 1),
                   boxShadow: const [
                     BoxShadow(
                       color: Colors.black54,

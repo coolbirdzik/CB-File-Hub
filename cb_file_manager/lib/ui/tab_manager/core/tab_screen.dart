@@ -900,18 +900,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             ),
                                             decoration: BoxDecoration(
                                               color: desktopTopBarColor,
-                                              border: chrome == null
-                                                  ? Border(
-                                                      bottom: BorderSide(
-                                                        color: theme
-                                                            .colorScheme
-                                                            .outline
-                                                            .withValues(
-                                                              alpha: 0.16,
-                                                            ),
-                                                      ),
-                                                    )
-                                                  : null,
                                             ),
                                             child: Row(
                                               children: [
@@ -1259,11 +1247,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             blurSigma: chrome.chromeBlur,
                                             borderRadius: FluentSurfaceTokens
                                                 .toolbarRadius,
-                                            border: Border(
-                                              bottom: BorderSide(
-                                                color: chrome.chromeStroke,
-                                              ),
-                                            ),
                                             child: tabBar,
                                           );
                                         },

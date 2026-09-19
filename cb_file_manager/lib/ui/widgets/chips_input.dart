@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
+import 'package:cb_file_manager/ui/widgets/tag_chip.dart';
 
 class ChipsInput<T> extends StatefulWidget {
   const ChipsInput({
@@ -633,14 +634,15 @@ class _TagInputChipState extends State<TagInputChip>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(widget.tag);
-    final backgroundColor = tagColor.withValues(alpha: isDark ? 0.22 : 0.16);
-    final foregroundColor = _bestForegroundColor(
-      Color.alphaBlend(backgroundColor, Theme.of(context).colorScheme.surface),
+    final foregroundColor = TagChipStyle.readableOn(
+      Color.alphaBlend(
+        TagChipStyle.tint(tagColor, isDark: isDark),
+        Theme.of(context).colorScheme.surface,
+      ),
     );
     final contentColor = foregroundColor == Colors.white
         ? Colors.white
         : tagColor;
-    final borderColor = tagColor.withValues(alpha: isHovered ? 0.75 : 0.35);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -666,10 +668,10 @@ class _TagInputChipState extends State<TagInputChip>
                         horizontal: 10,
                         vertical: 6,
                       ),
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderColor, width: 1),
+                      decoration: TagChipStyle.decoration(
+                        tagColor,
+                        isDark: isDark,
+                        hovered: isHovered,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -712,21 +714,5 @@ class _TagInputChipState extends State<TagInputChip>
         );
       },
     );
-  }
-
-  Color _bestForegroundColor(Color background) {
-    const light = Colors.white;
-    const dark = Colors.black;
-    final lightContrast = _contrastRatio(background, light);
-    final darkContrast = _contrastRatio(background, dark);
-    return lightContrast >= darkContrast ? light : dark;
-  }
-
-  double _contrastRatio(Color a, Color b) {
-    final aLuminance = a.computeLuminance();
-    final bLuminance = b.computeLuminance();
-    final lighter = aLuminance > bLuminance ? aLuminance : bLuminance;
-    final darker = aLuminance > bLuminance ? bLuminance : aLuminance;
-    return (lighter + 0.05) / (darker + 0.05);
   }
 }

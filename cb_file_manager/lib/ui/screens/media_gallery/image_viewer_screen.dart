@@ -1010,12 +1010,6 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                             width: double.infinity,
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.8),
-                              border: const Border(
-                                top: BorderSide(
-                                  color: Colors.white24,
-                                  width: 1,
-                                ),
-                              ),
                             ),
                             child: ThumbnailStrip(
                               images: _allImages,
@@ -1042,12 +1036,6 @@ class ImageViewerScreenState extends State<ImageViewerScreen>
                                   Colors.black.withValues(alpha: 0.55),
                                   Colors.transparent,
                                 ],
-                              ),
-                              border: const Border(
-                                top: BorderSide(
-                                  color: Colors.white24,
-                                  width: 1,
-                                ),
                               ),
                             ),
                             child: SafeArea(

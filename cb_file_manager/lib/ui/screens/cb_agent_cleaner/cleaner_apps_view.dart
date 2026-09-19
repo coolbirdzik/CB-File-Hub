@@ -3,11 +3,11 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../bloc/cleaner_app_insights/cleaner_app_insights.dart';
 import '../../../config/languages/app_localizations.dart';
-import '../../../design_system/primitives/cb_tooltip.dart';
 import '../../../helpers/files/windows_app_icon.dart';
 import '../../../services/app_insights/app_insights_models.dart';
 import '../../utils/format_utils.dart';
@@ -372,11 +372,7 @@ class _SummaryCards extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final report = state.report!;
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
+      decoration: CbDecorations.card(context, radius: 12),
       child: Row(
         children: [
           Expanded(
@@ -539,12 +535,6 @@ class _FiltersToolbar extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 showCheckmark: false,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.outlineVariant,
-                  ),
-                ),
               ),
             _ViewOptionsMenu(cubit: cubit, state: state),
           ],
@@ -573,14 +563,6 @@ class _SearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(999),
-      borderSide: BorderSide(color: colors.outlineVariant),
-    );
-    final focusedBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(999),
-      borderSide: BorderSide(color: colors.outline.withValues(alpha: 0.55)),
-    );
 
     return SizedBox(
       width: width,
@@ -596,12 +578,6 @@ class _SearchField extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
             decoration: InputDecoration(
               isDense: true,
-              filled: true,
-              fillColor: WidgetStateColor.resolveWith((states) {
-                return colors.surfaceContainerHighest.withValues(
-                  alpha: states.contains(WidgetState.focused) ? 0.62 : 0.45,
-                );
-              }),
               hintText: hintText,
               hintStyle: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
@@ -638,11 +614,8 @@ class _SearchField extends StatelessWidget {
                 minWidth: 36,
                 minHeight: 36,
               ),
-              border: border,
-              enabledBorder: border,
-              focusedBorder: focusedBorder,
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
-            ),
+            ).flat(context, radius: 999),
           );
         },
       ),
@@ -912,22 +885,14 @@ class _AppRow extends StatelessWidget {
     return Container(
       key: ValueKey<String>('cleaner-app-row-${app.id}'),
       margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: isAttention
-            ? attentionColor.withValues(alpha: isSelected ? 0.12 : 0.055)
-            : isSelected
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.52)
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(
-          color: isAttention
-              ? attentionColor.withValues(alpha: 0.65)
-              : isSelected
-              ? theme.colorScheme.primary
-              : theme.dividerColor,
-          width: isAttention ? 1.4 : 1,
-        ),
-      ),
+      decoration: isAttention
+          ? CbDecorations.tint(
+              context,
+              attentionColor,
+              radius: 9,
+              strong: isSelected,
+            )
+          : CbDecorations.card(context, radius: 9, selected: isSelected),
       child: InkWell(
         borderRadius: BorderRadius.circular(9),
         onTap: onTap,
@@ -1179,17 +1144,9 @@ class _DetailsMetrics extends StatelessWidget {
     final attentionColor = Colors.orange.shade800;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isAttention
-            ? attentionColor.withValues(alpha: 0.07)
-            : theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(
-          color: isAttention
-              ? attentionColor.withValues(alpha: 0.5)
-              : theme.dividerColor,
-        ),
-      ),
+      decoration: isAttention
+          ? CbDecorations.tint(context, attentionColor, radius: 9)
+          : CbDecorations.card(context, radius: 9),
       child: Row(
         children: [
           Expanded(
@@ -1338,11 +1295,7 @@ class _StorageEntryTile extends StatelessWidget {
         '${_measurementLabel(l10n, entry.measurementQuality)} • ${_attributionLabel(l10n, entry.attributionConfidence)}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.dividerColor),
-      ),
+      decoration: CbDecorations.card(context, radius: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -1427,14 +1380,12 @@ class _SharedStoragePanel extends StatelessWidget {
       initiallyExpanded: false,
       tilePadding: const EdgeInsets.symmetric(horizontal: 12),
       childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(9),
-        side: BorderSide(color: theme.dividerColor),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
       collapsedShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(9),
-        side: BorderSide(color: theme.dividerColor),
       ),
+      backgroundColor: context.cbColors.fillSubtle,
+      collapsedBackgroundColor: context.cbColors.fillSubtle,
       leading: const Icon(Icons.folder_shared_outlined, size: 19),
       title: Text(
         '${l10n.cleanerAppsSharedFolders} (${entries.length})',

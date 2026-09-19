@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -113,22 +114,6 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                     bottomLeft: const Radius.circular(18),
                     bottomRight: const Radius.circular(18),
                   ),
-                  border: isUser
-                      ? null
-                      : Border.all(
-                          color: colorScheme.outlineVariant.withValues(
-                            alpha: 0.35,
-                          ),
-                        ),
-                  boxShadow: isUser
-                      ? [
-                          BoxShadow(
-                            color: colorScheme.primary.withValues(alpha: 0.22),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : null,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,13 +369,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
           fontSize: 13,
           fontFamily: 'monospace',
         ),
-        codeblockDecoration: BoxDecoration(
-          color: colorScheme.surface.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-          ),
-        ),
+        codeblockDecoration: CbDecorations.card(context, radius: 8),
         codeblockPadding: const EdgeInsets.all(10),
         // Lists
         listBullet: TextStyle(color: textColor, fontSize: 14),

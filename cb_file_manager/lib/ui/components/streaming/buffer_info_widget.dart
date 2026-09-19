@@ -117,12 +117,6 @@ class _BufferInfoWidgetState extends State<BufferInfoWidget>
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isActive
-              ? Colors.purple.withValues(alpha: 0.5)
-              : Colors.grey.withValues(alpha: 0.3),
-          width: 1,
-        ),
         boxShadow: const [],
       ),
       child: Column(

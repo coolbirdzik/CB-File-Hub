@@ -160,10 +160,7 @@ class _MobileCreateFolderDialogState extends State<_MobileCreateFolderDialog> {
       title: const Text('New Folder'),
       content: TextField(
         controller: _nameController,
-        decoration: const InputDecoration(
-          labelText: 'Folder name',
-          border: OutlineInputBorder(),
-        ),
+        decoration: const InputDecoration(labelText: 'Folder name'),
         autofocus: true,
         onSubmitted: (_) => _submit(),
       ),

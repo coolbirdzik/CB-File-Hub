@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -340,32 +341,7 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
           horizontal: 12,
           vertical: 10,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: isDarkMode ? Colors.white30 : Colors.black26,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: isDarkMode ? Colors.white30 : Colors.black26,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: isDarkMode ? Colors.white54 : Colors.black38,
-          ),
-        ),
-        filled: true,
-        fillColor: WidgetStateColor.resolveWith((states) {
-          final focused = states.contains(WidgetState.focused);
-          return isDarkMode
-              ? Colors.white.withAlpha(focused ? 24 : 13)
-              : Colors.black.withAlpha(focused ? 12 : 5);
-        }),
-      ),
+      ).flat(context, radius: 8),
       onChanged: (value) {
         setState(() => _searchQuery = value);
       },
@@ -401,30 +377,14 @@ class _CreateFileDialogState extends State<CreateFileDialog> {
           final key = categories[index]['key']!;
           final label = categories[index]['label']!;
           final isSelected = _selectedCategory == key;
+          // Colours, fill and the (absent) outline come from the flat
+          // chip theme.
           return FilterChip(
-            label: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected
-                    ? (isDarkMode ? Colors.white : Colors.white)
-                    : (isDarkMode ? Colors.white70 : Colors.black87),
-              ),
-            ),
+            label: Text(label, style: const TextStyle(fontSize: 12)),
             selected: isSelected,
             onSelected: (_) {
               setState(() => _selectedCategory = key);
             },
-            backgroundColor: isDarkMode
-                ? Colors.white.withAlpha(13)
-                : Colors.black.withAlpha(8),
-            selectedColor: isDarkMode ? Colors.blueGrey[700] : Colors.blue,
-            checkmarkColor: Colors.white,
-            side: BorderSide(
-              color: isSelected
-                  ? (isDarkMode ? Colors.transparent : Colors.blue)
-                  : (isDarkMode ? Colors.white24 : Colors.black26),
-            ),
             padding: const EdgeInsets.symmetric(horizontal: 4),
             visualDensity: VisualDensity.compact,
           );
@@ -547,10 +507,7 @@ class _CreateFileNameDialogState extends State<_CreateFileNameDialog> {
         children: [
           TextField(
             controller: _controller,
-            decoration: InputDecoration(
-              labelText: l10n.fileName,
-              border: const OutlineInputBorder(),
-            ),
+            decoration: InputDecoration(labelText: l10n.fileName),
             autofocus: true,
             onSubmitted: (_) => _submit(),
           ),
