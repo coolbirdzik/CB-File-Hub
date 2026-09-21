@@ -36,6 +36,8 @@ CB File Hub is a cross-platform file manager for large media libraries. It combi
 
 ## Preview
 
+### Desktop workflow
+
 <table>
   <tr>
     <td colspan="4">
@@ -56,21 +58,58 @@ CB File Hub is a cross-platform file manager for large media libraries. It combi
     </td>
   </tr>
   <tr>
-    <td align="center">
-      <img src="screenshots/promo/mobile/01_mobile_home.png" alt="CB File Hub mobile home preview" width="220" />
+    <td align="center" width="50%">
+      <img src="screenshots/auto/desktop/014_showcase_tag_management_result.png" alt="CB File Hub tag management workspace" />
+      <p align="center"><sub>Tag library and tag management</sub></p>
+    </td>
+    <td align="center" width="50%">
+      <img src="screenshots/auto/desktop/ssh_workspace.png" alt="CB File Hub SSH workspace with a saved host" />
+      <p align="center"><sub>SSH workspace with saved hosts, keys, and trusted-host access</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="screenshots/auto/desktop/018_showcase_tag_tree_result.png" alt="CB File Hub hierarchical tag tree" />
+      <p align="center"><sub>Parent and child tag hierarchy</sub></p>
+    </td>
+    <td align="center" width="50%">
+      <img src="screenshots/auto/desktop/tag_assignment.png" alt="CB File Hub manage tags dialog for assigning tags to a file" />
+      <p align="center"><sub>Assign tags directly from a file context menu</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="screenshots/auto/desktop/network_connections.png" alt="CB File Hub network connections with SMB and WebDAV services" />
+      <p align="center"><sub>Network connections with SMB, WebDAV, FTP, and SFTP services</sub></p>
+    </td>
+    <td align="center" width="50%">
+      <img src="screenshots/auto/desktop/020_showcase_disk_cleaner_result.png" alt="CB File Hub disk cleaner results" />
+      <p align="center"><sub>Disk cleaner results and review workflow</sub></p>
+    </td>
+  </tr>
+</table>
+
+### Mobile workflow
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="screenshots/promo/mobile/01_mobile_home.png" alt="CB File Hub mobile home preview" width="320" />
       <p align="center"><sub>Mobile home</sub></p>
     </td>
-    <td align="center">
-      <img src="screenshots/promo/mobile/02_mobile_grid.png" alt="CB File Hub mobile file grid preview" width="220" />
+    <td align="center" width="50%">
+      <img src="screenshots/promo/mobile/02_mobile_grid.png" alt="CB File Hub mobile file grid preview" width="320" />
       <p align="center"><sub>File grid</sub></p>
     </td>
-    <td align="center">
-      <img src="screenshots/promo/mobile/03_mobile_tabs.png" alt="CB File Hub mobile tabs preview" width="220" />
-      <p align="center"><sub>Tabs</sub></p>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="screenshots/promo/mobile/03_mobile_tabs.png" alt="CB File Hub mobile tabs preview" width="320" />
+      <p align="center"><sub>Tabs and saved locations</sub></p>
     </td>
-    <td align="center">
-      <img src="screenshots/promo/mobile/04_mobile_tags.png" alt="CB File Hub mobile tags preview" width="220" />
-      <p align="center"><sub>Tags</sub></p>
+    <td align="center" width="50%">
+      <img src="screenshots/promo/mobile/04_mobile_tags.png" alt="CB File Hub mobile tags preview" width="320" />
+      <p align="center"><sub>Tags and tag browsing</sub></p>
     </td>
   </tr>
 </table>
@@ -327,7 +366,7 @@ screenshots/auto/desktop/
 screenshots/auto/android/
 ```
 
-The screenshot scripts use a dedicated showcase E2E flow and export only the final hero frames for each featured scenario, not every intermediate test step. Desktop and Android run different scene lists, because the two shells look nothing alike: desktop captures the multi-pane workspace, Android captures the home, file grid, tab manager, and tag screens that feed the four mobile promo slots.
+The screenshot scripts use a dedicated showcase E2E flow and export only the final hero frames for each featured scenario, not every intermediate test step. Desktop and Android run different scene lists, because the two shells look nothing alike: desktop captures the multi-pane workspace, file tag-assignment dialog, SSH workspace, SMB/WebDAV network catalog, and disk cleaner, while Android captures the home, file grid, tab manager, and tag screens that feed the four mobile promo slots.
 
 Android requires a connected device or running emulator visible in `flutter devices`. The test process writes its frames inside the app sandbox, so the script pulls them off the device with `adb` before copying them into `screenshots/auto/android/`.
 

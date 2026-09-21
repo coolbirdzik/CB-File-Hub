@@ -172,6 +172,22 @@ function Copy-Screenshots {
         Copy-Item $file.FullName -Destination (Join-Path $outputDir $file.Name) -Force
     }
 
+    # Keep stable README-facing aliases for scenes whose report counter can
+    # move when showcase scenarios are added or reordered.
+    $stableAliases = @{
+        'showcase_tag_assignment_result' = 'tag_assignment.png'
+        'showcase_ssh_workspace_result' = 'ssh_workspace.png'
+        'showcase_network_connections_result' = 'network_connections.png'
+    }
+    foreach ($alias in $stableAliases.GetEnumerator()) {
+        $source = $pngFiles |
+            Where-Object { $_.BaseName -like "*$($alias.Key)" } |
+            Select-Object -First 1
+        if ($null -ne $source) {
+            Copy-Item $source.FullName -Destination (Join-Path $outputDir $alias.Value) -Force
+        }
+    }
+
     Write-Info "Copied $($pngFiles.Count) screenshot(s) to $outputDir"
 }
 

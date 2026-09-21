@@ -8,6 +8,7 @@ import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
 import 'package:cb_file_manager/main.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/services/featured_albums_service.dart';
+import 'package:cb_file_manager/services/ssh/ssh_profile_store.dart';
 import 'package:cb_file_manager/services/windowing/window_startup_payload.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:flutter/material.dart';
@@ -356,8 +357,100 @@ void main() {
       }
     });
 
+    // -----------------------------------------------------------------------
+    // 10. Tag assignment — the file-level manage-tags dialog
+    // -----------------------------------------------------------------------
+    testWidgets('tag assignment dialog', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp(
+        'cb_showcase_tag_assignment_',
+      );
+      final media = await seedShowcaseLibrary(dir);
+      await seedWallpaperBackdrop();
+      // Keep the file itself untagged so the capture shows the real add-tag
+      // surface rather than a pre-filled result from the seed helper.
+      for (final tag in const <String>['vacation', 'favorite', 'project']) {
+        await TagManager.addStandaloneTag(tag);
+      }
+
+      CbE2EConfig.startupPayload = WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: dir.path)],
+      );
+
+      try {
+        await runCbFileApp();
+        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await et.init('showcase tag assignment');
+        await et.rightClickFileRow(media.heroImage, detail: 'open_file_menu');
+        await et.tapContextMenuItem('tags', detail: 'open_manage_tags');
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await et.screenshot('result');
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // 11. SSH workspace — saved host card without contacting a server
+    // -----------------------------------------------------------------------
+    testWidgets('ssh workspace', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_ssh_');
+      final showcaseProfile = const SshProfile(
+        id: 'cb-showcase-ssh-host',
+        name: 'Demo staging server',
+        host: 'staging.example.com',
+        username: 'deploy',
+        port: 22,
+        group: 'Showcase',
+      );
+      final sshStore = SshProfileStore.instance;
+      await sshStore.load();
+      await sshStore.saveProfile(showcaseProfile);
+
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: '#ssh')],
+      );
+
+      try {
+        await runCbFileApp();
+        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await et.init('showcase SSH workspace');
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await et.screenshot('result');
+      } finally {
+        // The E2E path sandbox protects the tag/database workspace. Remove the
+        // temporary credential-vault entry as well so the user's SSH list is
+        // unchanged after the showcase run.
+        await sshStore.deleteProfile(showcaseProfile.id);
+        await e2eTearDown(tester, dir);
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // 12. Network connections — SMB/WebDAV service catalog without connecting
+    // -----------------------------------------------------------------------
+    testWidgets('network connections', (WidgetTester tester) async {
+      final et = E2ETester(tester);
+      final dir = await Directory.systemTemp.createTemp('cb_showcase_network_');
+
+      CbE2EConfig.startupPayload = const WindowStartupPayload(
+        tabs: <WindowTabPayload>[WindowTabPayload(path: '#network')],
+      );
+
+      try {
+        await runCbFileApp();
+        await tester.pumpAndSettle(const Duration(seconds: 5));
+        await et.init('showcase network connections');
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+        await et.screenshot('result');
+      } finally {
+        await e2eTearDown(tester, dir);
+      }
+    });
+
     // -------------------------------------------------------------------------
-    // 10. Disk cleaner — scan results
+    // 13. Disk cleaner — scan results
     // -------------------------------------------------------------------------
     testWidgets('disk cleaner', (WidgetTester tester) async {
       final et = E2ETester(tester);

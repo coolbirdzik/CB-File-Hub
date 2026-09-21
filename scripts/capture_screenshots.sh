@@ -140,6 +140,24 @@ copy_screenshots() {
     copied=$((copied + 1))
   done < <(find "$REPORT_SCREENSHOTS_DIR" -type f -name "$pattern" -print0)
 
+  # Keep stable README-facing aliases for scenes whose report counter can
+  # move when showcase scenarios are added or reordered.
+  local tag_assignment
+  tag_assignment=$(find "$REPORT_SCREENSHOTS_DIR" -type f -name '*_showcase_tag_assignment_result.png' -print -quit)
+  if [ -n "$tag_assignment" ]; then
+    cp "$tag_assignment" "$output_dir/tag_assignment.png"
+  fi
+  local ssh_workspace
+  ssh_workspace=$(find "$REPORT_SCREENSHOTS_DIR" -type f -name '*_showcase_ssh_workspace_result.png' -print -quit)
+  if [ -n "$ssh_workspace" ]; then
+    cp "$ssh_workspace" "$output_dir/ssh_workspace.png"
+  fi
+  local network_connections
+  network_connections=$(find "$REPORT_SCREENSHOTS_DIR" -type f -name '*_showcase_network_connections_result.png' -print -quit)
+  if [ -n "$network_connections" ]; then
+    cp "$network_connections" "$output_dir/network_connections.png"
+  fi
+
   if [ "$copied" -eq 0 ]; then
     print_error "No screenshots produced for $platform"
     exit 1
