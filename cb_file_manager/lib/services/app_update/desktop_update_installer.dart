@@ -40,16 +40,7 @@ class DesktopUpdateInstaller {
         await File(
           scriptPath,
         ).writeAsBytes([0xEF, 0xBB, 0xBF, ...utf8.encode(script)]);
-        await Process.start('powershell.exe', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-WindowStyle',
-          'Hidden',
-          '-File',
-          scriptPath,
-        ], mode: ProcessStartMode.detached);
+        await _startWindowsHelper(scriptPath);
       case AppDistribution.macosDmg:
         final bundlePath = macosBundlePath(executable);
         if (bundlePath == null) {
@@ -81,6 +72,45 @@ class DesktopUpdateInstaller {
       case AppDistribution.googlePlay:
       case AppDistribution.unsupported:
         throw UnsupportedError('$distribution is not installed by this helper');
+    }
+  }
+
+  /// Starts the PowerShell helper so that it outlives this process.
+  ///
+  /// `Process.start(mode: ProcessStartMode.detached)` is not usable here: the
+  /// detached powershell.exe exits before running a single line, so the app
+  /// quit and nothing was installed. Instead a short-lived PowerShell hands
+  /// the script to `Start-Process`, which creates an independent process.
+  static Future<void> _startWindowsHelper(String scriptPath) async {
+    final helperArgs = [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-WindowStyle',
+      'Hidden',
+      '-File',
+      // Start-Process joins the arguments with spaces, so quote the path.
+      '"$scriptPath"',
+    ];
+    final command =
+        'Start-Process -FilePath powershell.exe -WindowStyle Hidden '
+        '-ArgumentList @(${helperArgs.map(_ps).join(', ')})';
+    final result = await Process.run('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      command,
+    ]);
+    if (result.exitCode != 0) {
+      throw ProcessException(
+        'powershell.exe',
+        ['Start-Process', scriptPath],
+        '${result.stderr}'.trim(),
+        result.exitCode,
+      );
     }
   }
 

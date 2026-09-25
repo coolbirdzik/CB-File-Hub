@@ -12,10 +12,21 @@ class AppToast {
   static AppToastPresenter capture(BuildContext context) {
     final theme = Theme.of(context);
     return AppToastPresenter._(
-      overlay: Overlay.maybeOf(context, rootOverlay: true),
+      overlay: _overlayOf(context),
       colorScheme: theme.colorScheme,
       toastTheme: theme.extension<AppToastTheme>(),
     );
+  }
+
+  static OverlayState? _overlayOf(BuildContext context) {
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay != null) return overlay;
+    // A navigator's own context (e.g. navigatorKey.currentContext) sits above
+    // the overlay it hosts, so the ancestor lookup finds nothing.
+    if (context is StatefulElement && context.state is NavigatorState) {
+      return (context.state as NavigatorState).overlay;
+    }
+    return null;
   }
 
   static void success(

@@ -691,11 +691,21 @@ Future<void> runCbFileApp() async {
 
 /// Background update check result: a toast whose action opens the update
 /// dialog (download with progress, then install on confirmation).
-void _announceAppUpdate(AppUpdateInfo update) {
+void _announceAppUpdate(AppUpdateInfo update, {int attempt = 0}) {
   final context = navigatorKey.currentContext;
-  if (context == null || !context.mounted) return;
-  final l10n = AppLocalizations.of(context);
-  if (l10n == null) return;
+  final l10n = context != null && context.mounted
+      ? AppLocalizations.of(context)
+      : null;
+  if (context == null || l10n == null) {
+    // The UI may still be starting up; try again shortly.
+    if (attempt < 10) {
+      Timer(
+        const Duration(seconds: 2),
+        () => _announceAppUpdate(update, attempt: attempt + 1),
+      );
+    }
+    return;
+  }
   final ready =
       AppUpdateService.instance.phase == AppUpdatePhase.readyToInstall;
   AppToast.show(
