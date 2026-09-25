@@ -28,6 +28,8 @@ add_executable(${BINARY_NAME} WIN32
   "file_operations_plugin.h"
   "window_utils_plugin.cpp"
   "window_utils_plugin.h"
+  "store_update_plugin.cpp"
+  "store_update_plugin.h"
   "Runner.rc"
   "runner.exe.manifest"
 )

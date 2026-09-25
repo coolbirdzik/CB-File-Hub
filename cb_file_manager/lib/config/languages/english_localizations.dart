@@ -4147,4 +4147,49 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get sshDiscoveryIncomplete =>
       'Some local SSH settings could not be loaded (unreadable files or conditional Match rules). Check the filled details.';
+
+  // App updates
+  @override
+  String get checkForUpdates => 'Check for updates';
+  @override
+  String get updateChecking => 'Checking for updates…';
+  @override
+  String get updateUpToDate => "You're on the latest version";
+  @override
+  String get updateAvailableTitle => 'Update available';
+  @override
+  String get updateAvailableGeneric => 'A new version is available';
+  @override
+  String get updateDownload => 'Download';
+  @override
+  String get updateDownloading => 'Downloading update…';
+  @override
+  String get updateStoreDownloading => 'The store is downloading the update…';
+  @override
+  String get updateReadyTitle => 'Update ready to install';
+  @override
+  String get updateReadyMessage =>
+      'The app will close to install the update, then reopen. Save your work before continuing.';
+  @override
+  String get updateAdminHint =>
+      'Windows will ask for administrator permission.';
+  @override
+  String get updateInstallNow => 'Install and restart';
+  @override
+  String get updateLater => 'Later';
+  @override
+  String get updateInstalling => 'Installing update…';
+  @override
+  String get updateFailed => 'Update failed';
+  @override
+  String get updateRetry => 'Try again';
+  @override
+  String get updateReleaseNotes => "What's new";
+  @override
+  String get updateAction => 'Update';
+  @override
+  String updateAvailableVersion(String version) =>
+      'Version $version is available';
+  @override
+  String updateCurrentVersion(String version) => 'Current version: $version';
 }

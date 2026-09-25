@@ -9,6 +9,7 @@
 #include "shell_context_menu_plugin.h"
 #include "file_operations_plugin.h"
 #include "window_utils_plugin.h"
+#include "store_update_plugin.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject &project)
     : project_(project) {}
@@ -79,6 +80,13 @@ bool FlutterWindow::OnCreate()
   WindowUtilsPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarManager::GetInstance()
           ->GetRegistrar<flutter::PluginRegistrarWindows>(window_utils_registrar));
+
+  // Manually register Microsoft Store update plugin (MSIX builds only).
+  auto store_update_registrar =
+      flutter_controller_->engine()->GetRegistrarForPlugin("StoreUpdatePlugin");
+  StoreUpdatePlugin::RegisterWithRegistrar(
+      flutter::PluginRegistrarManager::GetInstance()
+          ->GetRegistrar<flutter::PluginRegistrarWindows>(store_update_registrar));
 
   // Window visibility is managed by Dart via the window_manager package.
   // This avoids startup flicker from multiple show/maximize transitions on

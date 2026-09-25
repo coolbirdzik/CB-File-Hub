@@ -35,6 +35,9 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
+import 'package:cb_file_manager/services/app_update/app_update_models.dart';
+import 'package:cb_file_manager/services/app_update/app_update_service.dart';
+import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -76,6 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isThemeExpanded = false;
   bool _isLanguageExpanded = false;
   String _appVersion = '';
+  bool _updatesSupported = false;
 
   static const String _appAuthor = 'COOLBIRDZIK - ngtanhung41@gmail.com';
   static const String _appWebsite = 'coolbird.net';
@@ -107,6 +111,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadCacheInfo();
     _loadAppInfo();
     _loadDatabaseStats();
+    _loadUpdateSupport();
+  }
+
+  Future<void> _loadUpdateSupport() async {
+    final distribution = await AppUpdateService.instance.resolveDistribution();
+    if (!mounted) return;
+    setState(() {
+      _updatesSupported = distribution != AppDistribution.unsupported;
+    });
   }
 
   Future<void> _loadAppInfo() async {
@@ -623,6 +636,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
         ),
         _buildTabInactiveThresholdTile(),
+        if (_updatesSupported) _buildAppUpdateTile(),
         _buildCompactSettingTile(
           title: AppLocalizations.of(context)!.aboutApp,
           subtitle:
@@ -636,6 +650,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: _openWebsite,
         ),
       ],
+    );
+  }
+
+  Widget _buildAppUpdateTile() {
+    final service = AppUpdateService.instance;
+    return ListenableBuilder(
+      listenable: service,
+      builder: (context, _) {
+        final l10n = AppLocalizations.of(context)!;
+        final update = service.update;
+        final String subtitle;
+        switch (service.phase) {
+          case AppUpdatePhase.checking:
+            subtitle = l10n.updateChecking;
+          case AppUpdatePhase.upToDate:
+            subtitle = l10n.updateUpToDate;
+          case AppUpdatePhase.available:
+            subtitle = update != null && update.version.isNotEmpty
+                ? l10n.updateAvailableVersion(update.version)
+                : l10n.updateAvailableGeneric;
+          case AppUpdatePhase.downloading:
+            final progress = service.progress;
+            subtitle = progress == null
+                ? l10n.updateDownloading
+                : '${l10n.updateDownloading} ${(progress * 100).floor()}%';
+          case AppUpdatePhase.readyToInstall:
+            subtitle = l10n.updateReadyTitle;
+          case AppUpdatePhase.installing:
+            subtitle = l10n.updateInstalling;
+          case AppUpdatePhase.error:
+            subtitle = service.error ?? l10n.updateFailed;
+          case AppUpdatePhase.idle:
+            subtitle = _appVersion.isEmpty
+                ? l10n.checkForUpdates
+                : l10n.updateCurrentVersion(_appVersion);
+        }
+        return _buildCompactSettingTile(
+          title: l10n.checkForUpdates,
+          subtitle: subtitle,
+          icon: PhosphorIconsLight.arrowCircleUp,
+          trailing: CbButton(
+            label: service.hasUpdate ? l10n.updateAction : l10n.checkForUpdates,
+            variant: service.hasUpdate
+                ? CbButtonVariant.primary
+                : CbButtonVariant.secondary,
+            size: CbButtonSize.sm,
+            loading: service.phase == AppUpdatePhase.checking,
+            onPressed: () => showAppUpdateDialog(context),
+          ),
+          onTap: () => showAppUpdateDialog(context),
+        );
+      },
     );
   }
 

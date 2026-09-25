@@ -1810,4 +1810,26 @@ abstract class AppLocalizations {
   String get sshLocalKeyPending;
   String get sshConfigUnsupported;
   String get sshDiscoveryIncomplete;
+
+  // App updates
+  String get checkForUpdates;
+  String get updateChecking;
+  String get updateUpToDate;
+  String get updateAvailableTitle;
+  String get updateAvailableGeneric;
+  String get updateDownload;
+  String get updateDownloading;
+  String get updateStoreDownloading;
+  String get updateReadyTitle;
+  String get updateReadyMessage;
+  String get updateAdminHint;
+  String get updateInstallNow;
+  String get updateLater;
+  String get updateInstalling;
+  String get updateFailed;
+  String get updateRetry;
+  String get updateReleaseNotes;
+  String get updateAction;
+  String updateAvailableVersion(String version);
+  String updateCurrentVersion(String version);
 }

@@ -4145,4 +4145,47 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get sshDiscoveryIncomplete =>
       'Một số cấu hình SSH không tải được (file không đọc được hoặc quy tắc Match). Hãy kiểm tra thông tin đã điền.';
+
+  // App updates
+  @override
+  String get checkForUpdates => 'Kiểm tra cập nhật';
+  @override
+  String get updateChecking => 'Đang kiểm tra cập nhật…';
+  @override
+  String get updateUpToDate => 'Bạn đang dùng phiên bản mới nhất';
+  @override
+  String get updateAvailableTitle => 'Có bản cập nhật mới';
+  @override
+  String get updateAvailableGeneric => 'Đã có phiên bản mới';
+  @override
+  String get updateDownload => 'Tải xuống';
+  @override
+  String get updateDownloading => 'Đang tải bản cập nhật…';
+  @override
+  String get updateStoreDownloading => 'Cửa hàng đang tải bản cập nhật…';
+  @override
+  String get updateReadyTitle => 'Bản cập nhật đã sẵn sàng';
+  @override
+  String get updateReadyMessage =>
+      'Ứng dụng sẽ đóng để cài đặt bản cập nhật rồi tự mở lại. Hãy lưu công việc trước khi tiếp tục.';
+  @override
+  String get updateAdminHint => 'Windows sẽ yêu cầu quyền quản trị viên.';
+  @override
+  String get updateInstallNow => 'Cài đặt và khởi động lại';
+  @override
+  String get updateLater => 'Để sau';
+  @override
+  String get updateInstalling => 'Đang cài đặt bản cập nhật…';
+  @override
+  String get updateFailed => 'Cập nhật thất bại';
+  @override
+  String get updateRetry => 'Thử lại';
+  @override
+  String get updateReleaseNotes => 'Có gì mới';
+  @override
+  String get updateAction => 'Cập nhật';
+  @override
+  String updateAvailableVersion(String version) => 'Đã có phiên bản $version';
+  @override
+  String updateCurrentVersion(String version) => 'Phiên bản hiện tại: $version';
 }

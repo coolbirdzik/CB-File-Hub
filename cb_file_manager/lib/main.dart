@@ -36,6 +36,12 @@ import 'ui/utils/desktop_acrylic_backdrop.dart';
 import 'ui/utils/app_busy_cursor.dart';
 import 'core/service_locator.dart';
 import 'e2e/cb_e2e_config.dart';
+import 'services/app_update/app_update_models.dart';
+import 'services/app_update/app_update_service.dart';
+import 'ui/components/app_update/app_update_dialog.dart';
+import 'ui/components/common/app_toast.dart';
+import 'config/languages/app_localizations.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_player_full_screen.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/video_window_app.dart';
@@ -641,6 +647,10 @@ Future<void> runCbFileApp() async {
     return;
   }
 
+  if (!isSecondaryWindow && !kCbE2E) {
+    AppUpdateService.instance.scheduleStartupCheck(_announceAppUpdate);
+  }
+
   final WindowStartupPayload? startupPayload =
       kCbE2E && CbE2EConfig.startupPayload != null
       ? CbE2EConfig.startupPayload
@@ -677,6 +687,32 @@ Future<void> runCbFileApp() async {
       }
     });
   }
+}
+
+/// Background update check result: a toast whose action opens the update
+/// dialog (download with progress, then install on confirmation).
+void _announceAppUpdate(AppUpdateInfo update) {
+  final context = navigatorKey.currentContext;
+  if (context == null || !context.mounted) return;
+  final l10n = AppLocalizations.of(context);
+  if (l10n == null) return;
+  final ready =
+      AppUpdateService.instance.phase == AppUpdatePhase.readyToInstall;
+  AppToast.show(
+    context,
+    ready
+        ? l10n.updateReadyTitle
+        : update.version.isNotEmpty
+        ? l10n.updateAvailableVersion(update.version)
+        : l10n.updateAvailableGeneric,
+    icon: PhosphorIconsLight.arrowCircleUp,
+    duration: const Duration(seconds: 12),
+    actionLabel: l10n.updateAction,
+    onAction: () {
+      final current = navigatorKey.currentContext;
+      if (current != null && current.mounted) showAppUpdateDialog(current);
+    },
+  );
 }
 
 // Navigate directly to home screen - updated to use the tabbed interface

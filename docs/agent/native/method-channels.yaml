@@ -24,6 +24,23 @@ channels:
       - "Inventory and usage failures may produce partial results instead of hiding successful sources."
       - "Unknown usage evidence must remain unknown."
 
+  cb_file_manager/store_update:
+    dart:
+      - cb_file_manager/lib/services/app_update/app_update_service.dart
+    windows:
+      - cb_file_manager/windows/runner/store_update_plugin.cpp
+      - cb_file_manager/windows/runner/store_update_plugin.h
+    methods:
+      - isPackaged
+      - checkForUpdates
+      - download
+      - install
+      - getProgress
+    invariants:
+      - "Only the MSIX (Microsoft Store) build may call anything but isPackaged; unpackaged builds get NOT_PACKAGED."
+      - "StoreContext must be initialized with the top-level HWND and awaited off the platform thread."
+      - "install lets Windows close the app; Dart must not rely on code running after it succeeds."
+
   cb_file_manager/shell_context_menu:
     dart:
       - cb_file_manager/lib/helpers/files/windows_shell_context_menu.dart

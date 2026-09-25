@@ -24,6 +24,7 @@
   - `features/06-tag-management.md`
   - `features/07-tab-inactive-management.md` — Auto-suspend idle tabs to reclaim RAM
   - `features/08-cloud-backup-sync.md` — Backup/restore settings and tags via Google Drive, Dropbox or OneDrive
+  - `features/09-app-updates.md` — In-app updates: GitHub download for MSI/portable/DMG, Microsoft Store and Google Play APIs
 - **UI Patterns**
   - `ui-patterns/01-operation-progress.md`
   - `ui-patterns/02-file-folder-listing.md`

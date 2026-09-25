@@ -24,6 +24,10 @@ import 'package:cb_file_manager/ui/widgets/drawer/storage_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/pinned_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_button.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/services/app_update/app_update_service.dart';
+import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 import 'components/common/macos_traffic_light_inset.dart';
 
 /// Returns a key that forces a Fluent drawer section to honor the active tab's
@@ -1284,22 +1288,24 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          FutureBuilder<String>(
-            future: _getFullVersion(),
-            builder: (context, snapshot) {
-              final versionText = snapshot.data == null
-                  ? 'Version'
-                  : 'Version ${snapshot.data}';
-              return Text(
-                versionText,
-                style: TextStyle(
-                  color: theme.textTheme.bodySmall?.color?.withValues(
-                    alpha: 0.7,
+          Flexible(
+            child: ListenableBuilder(
+              listenable: AppUpdateService.instance,
+              builder: (context, child) {
+                if (!AppUpdateService.instance.hasUpdate) return child!;
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: CbButton(
+                    label: AppLocalizations.of(context)!.updateAvailableTitle,
+                    icon: PhosphorIconsLight.arrowCircleUp,
+                    variant: CbButtonVariant.primary,
+                    size: CbButtonSize.xs,
+                    onPressed: () => showAppUpdateDialog(context),
                   ),
-                  fontSize: 12,
-                ),
-              );
-            },
+                );
+              },
+              child: _buildVersionText(theme),
+            ),
           ),
           Text(
             '© CoolBirdZik',
@@ -1310,6 +1316,24 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVersionText(ThemeData theme) {
+    return FutureBuilder<String>(
+      future: _getFullVersion(),
+      builder: (context, snapshot) {
+        final versionText = snapshot.data == null
+            ? 'Version'
+            : 'Version ${snapshot.data}';
+        return Text(
+          versionText,
+          style: TextStyle(
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+            fontSize: 12,
+          ),
+        );
+      },
     );
   }
 
