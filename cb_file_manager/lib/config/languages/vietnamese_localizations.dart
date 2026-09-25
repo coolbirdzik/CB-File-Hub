@@ -1777,6 +1777,17 @@ class VietnameseLocalizations implements AppLocalizations {
       'Cần quyền này để hiển thị đầy đủ tất cả files bao gồm APK, documents và các file khác trong thư mục Download.';
 
   @override
+  String get allFilesAccessDescriptionMacos =>
+      'macOS cần quyền Truy cập toàn bộ ổ đĩa (Full Disk Access) để ứng dụng duyệt được mọi thư mục và ổ đĩa. Bấm Cấp quyền, kéo biểu tượng CB File Hub vào danh sách hiện ra và xác nhận bằng Touch ID hoặc mật khẩu, rồi chọn Thoát & Mở lại.';
+
+  @override
+  String get fullDiskAccessHelperTitle => 'Kéo CB File Hub vào danh sách';
+
+  @override
+  String get fullDiskAccessHelperMessage =>
+      'Kéo biểu tượng này vào danh sách Truy cập toàn bộ ổ đĩa, rồi xác nhận bằng Touch ID hoặc mật khẩu. Nếu CB File Hub đã có trong danh sách thì chỉ cần bật công tắc.';
+
+  @override
   String get installPackagesPermission => 'Cài đặt gói (APK)';
 
   @override

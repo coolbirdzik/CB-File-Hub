@@ -116,7 +116,11 @@ class LocalAiAdvisorService {
     LocalAiChatRuntime? chatRuntime,
     LocalAiChatRuntime? ggufChatRuntime,
     required this._prefs,
-  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+  }) : _secureStorage =
+           secureStorage ??
+           const FlutterSecureStorage(
+             mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+           ),
        _httpClient = httpClient ?? http.Client(),
        _chatRuntime = chatRuntime ?? const GemmaLiteRtLocalAiChatRuntime(),
        _ggufChatRuntime = ggufChatRuntime ?? GgufLlamaCppLocalAiChatRuntime(),

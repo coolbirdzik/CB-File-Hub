@@ -22,11 +22,23 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>CB File Hub needs access to your Desktop folder to browse and manage its files.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>CB File Hub needs access to your Documents folder to browse and manage its files.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>CB File Hub needs access to your Downloads folder to browse and manage its files.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>CB File Hub needs access to network drives to browse and manage their files.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CB File Hub needs access to your photo library to show your photos and videos.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>CB File Hub needs access to external drives to browse and manage their files.</string>
 </dict>
 </plist>

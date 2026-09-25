@@ -231,7 +231,7 @@ Available package types include:
 - Windows: portable ZIP, EXE installer, MSI installer
 - Android: APK and AAB
 - Linux: `tar.gz`
-- macOS: ZIP
+- macOS: DMG (Universal: Apple Silicon and Intel, macOS 12 or later)
 
 ## Quick Start
 
@@ -257,9 +257,14 @@ cd bundle
 
 ### macOS
 
-1. Download the macOS ZIP package.
-2. Extract it and move the app into `Applications`.
-3. Open it from Finder.
+1. Download `CBFileHub-<version>-macos.dmg`, open it, and drag **CB File Hub** into **Applications**.
+2. Open the app. The build is not notarized, so macOS says it cannot verify it: click **Done** (not **Move to Trash**).
+3. Open **System Settings → Privacy & Security** and click **Open Anyway** next to the CB File Hub message, then confirm with your password. After that the app opens normally.
+4. Grant **Full Disk Access** when the app asks. Click **Grant Permission**: System Settings opens on the Full Disk Access list, with a CB File Hub icon floating beside it. Drag that icon into the list, approve with Touch ID or your password, and choose **Quit & Reopen**.
+
+Without Full Disk Access the app still runs, but macOS asks separately for Desktop, Documents, Downloads, and external or network drives, and keeps some folders out of reach.
+
+Release builds are ad-hoc signed, so macOS may drop Full Disk Access after an update. Switch it on again in the same list. If macOS reports the app as damaged, run `xattr -dr com.apple.quarantine "/Applications/CB File Hub.app"` and open it again. The DMG includes the install and Full Disk Access steps in English and Vietnamese.
 
 ## Development
 
@@ -269,7 +274,7 @@ This repository is a workspace, not a single Flutter package:
 cb_file_manager/   main Flutter app
 mobile_smb_native/ local SMB/CIFS FFI plugin
 scripts/           build, screenshot, version, and CI helpers
-installer/         Windows installer configuration
+installer/         Windows installer configuration and macOS DMG notes
 justfile           primary developer command runner
 ```
 
@@ -284,7 +289,7 @@ Run `just` recipes from the repository root. Run direct `flutter` and `dart` com
 - Visual Studio 2022 with C++ tools for Windows builds
 - Android SDK and JDK 17+ for Android builds
 - GTK3 development libraries for Linux builds
-- Xcode and CocoaPods for macOS builds
+- Xcode and CocoaPods for macOS builds, on macOS 12 or later
 
 ### Local setup
 
@@ -296,11 +301,26 @@ cd cb_file_manager
 flutter run
 ```
 
+On macOS, run `flutter run -d macos` from `cb_file_manager/`.
+
 Enable the developer overlay only for local development:
 
 ```bash
 flutter run --dart-define=CB_SHOW_DEV_OVERLAY=true
 ```
+
+### macOS development signing
+
+Debug builds are ad-hoc signed by default, which gives the app a new identity on every rebuild, so macOS drops the Full Disk Access you granted each time. To keep it, sign Debug builds with your own Apple Development certificate:
+
+```bash
+cd cb_file_manager/macos/Runner/Configs
+cp Signing.local.xcconfig.example Signing.local.xcconfig
+# Set DEVELOPMENT_TEAM to your team ID (the OU= field):
+security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+```
+
+`Signing.local.xcconfig` is git-ignored and only affects Debug builds; CI and release builds are unchanged. Grant Full Disk Access once more after the first signed build.
 
 ### Common commands
 
@@ -322,7 +342,7 @@ just windows-msi
 just android
 just android-aab
 just linux
-just macos
+just macos        # DMG in cb_file_manager/build/macos/dmg/
 ```
 
 Direct Flutter commands are also valid when run inside `cb_file_manager/`:
@@ -402,7 +422,7 @@ cb_file_manager/
 
 mobile_smb_native/      Local SMB/CIFS FFI plugin
 scripts/                Build, screenshot, release, and CI scripts
-installer/              Windows installer definitions
+installer/              Windows installer definitions and macOS DMG notes
 docs/                   Feature and UI implementation notes
 ```
 

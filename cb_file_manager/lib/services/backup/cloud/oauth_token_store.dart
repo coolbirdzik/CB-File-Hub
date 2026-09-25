@@ -58,7 +58,11 @@ class OAuthTokens {
 /// Persists cloud tokens in the OS keychain/credential store.
 class OAuthTokenStore {
   OAuthTokenStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+          );
 
   final FlutterSecureStorage _storage;
 

@@ -1018,6 +1018,9 @@ abstract class AppLocalizations {
   String get storagePhotosDescription;
   String get allFilesAccessPermission;
   String get allFilesAccessDescription;
+  String get allFilesAccessDescriptionMacos;
+  String get fullDiskAccessHelperTitle;
+  String get fullDiskAccessHelperMessage;
   String get installPackagesPermission;
   String get installPackagesDescription;
   String get localNetworkPermission;

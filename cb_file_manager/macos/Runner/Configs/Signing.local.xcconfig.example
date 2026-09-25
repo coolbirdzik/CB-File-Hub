@@ -1,0 +1,8 @@
+// Copy to Signing.local.xcconfig (git-ignored) and set your own Apple team ID.
+// Debug builds are then signed with your Apple Development certificate, so the
+// app keeps the same identity across rebuilds and macOS remembers the Full
+// Disk Access you granted it. Find the team ID with:
+//   security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+// (the OU= field).
+DEVELOPMENT_TEAM[config=Debug] = YOUR_TEAM_ID
+CODE_SIGN_IDENTITY[config=Debug] = Apple Development

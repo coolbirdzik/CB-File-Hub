@@ -12,3 +12,8 @@ PRODUCT_BUNDLE_IDENTIFIER = com.cb.cbFileManager
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 com.cb. All rights reserved.
+
+// Optional, git-ignored per-developer signing (see Signing.local.xcconfig.example).
+// Ad-hoc signed dev builds get a new identity on every rebuild, so macOS drops
+// Full Disk Access each time; a real certificate keeps it.
+#include? "Signing.local.xcconfig"

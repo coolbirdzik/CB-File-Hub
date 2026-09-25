@@ -15,7 +15,8 @@ class PermissionExplainerScreen extends StatefulWidget {
       _PermissionExplainerScreenState();
 }
 
-class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
+class _PermissionExplainerScreenState extends State<PermissionExplainerScreen>
+    with WidgetsBindingObserver {
   bool _checking = true;
   bool _hasStorage = false;
   bool _hasAllFilesAccess = false;
@@ -26,7 +27,20 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refreshStates();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Permissions granted in System Settings only show up once the user is back.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshStates();
   }
 
   Future<void> _refreshStates() async {
@@ -37,6 +51,7 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
     final i = await svc.hasInstallPackagesPermission();
     final n = await svc.hasNotificationsPermission();
     final ln = await svc.hasLocalNetworkPermission();
+    if (!mounted) return;
     setState(() {
       _hasStorage = s;
       _hasAllFilesAccess = a;
@@ -49,7 +64,9 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
 
   bool get _mandatorySatisfied {
     final storageOk = _hasStorage;
-    final allFilesOk = Platform.isAndroid ? _hasAllFilesAccess : true;
+    final allFilesOk = (Platform.isAndroid || Platform.isMacOS)
+        ? _hasAllFilesAccess
+        : true;
     final installOk = Platform.isAndroid ? _hasInstallPackages : true;
     final localOk = Platform.isIOS ? _hasLocalNet : true;
     return storageOk && allFilesOk && installOk && localOk;
@@ -64,8 +81,13 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
   }
 
   Future<void> _requestAllFilesAccess() async {
-    final ok = await PermissionStateService.instance.requestAllFilesAccess();
-    if (!ok) {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await PermissionStateService.instance.requestAllFilesAccess(
+      macosHelperTitle: l10n.fullDiskAccessHelperTitle,
+      macosHelperMessage: l10n.fullDiskAccessHelperMessage,
+    );
+    // On macOS the request itself already opened System Settings.
+    if (!ok && !Platform.isMacOS) {
       await _openSettings();
     }
     await _refreshStates();
@@ -93,6 +115,7 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
   }
 
   Future<void> _requestAllPermissions() async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _checking = true);
 
     final svc = PermissionStateService.instance;
@@ -102,6 +125,12 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
     if (Platform.isAndroid) {
       await svc.requestAllFilesAccess();
       await svc.requestInstallPackages();
+    }
+    if (Platform.isMacOS) {
+      await svc.requestAllFilesAccess(
+        macosHelperTitle: l10n.fullDiskAccessHelperTitle,
+        macosHelperMessage: l10n.fullDiskAccessHelperMessage,
+      );
     }
     if (Platform.isIOS) {
       await svc.requestLocalNetwork();
@@ -131,10 +160,12 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
         granted: _hasStorage,
         onRequest: _requestStorage,
       ),
-      if (Platform.isAndroid)
+      if (Platform.isAndroid || Platform.isMacOS)
         _PermissionCard(
           title: l10n.allFilesAccessPermission,
-          description: l10n.allFilesAccessDescription,
+          description: Platform.isMacOS
+              ? l10n.allFilesAccessDescriptionMacos
+              : l10n.allFilesAccessDescription,
           granted: _hasAllFilesAccess,
           onRequest: _requestAllFilesAccess,
         ),
@@ -161,7 +192,12 @@ class _PermissionExplainerScreenState extends State<PermissionExplainerScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.grantPermissionsToContinue)),
+      appBar: AppBar(
+        title: Text(l10n.grantPermissionsToContinue),
+        // Clear the traffic lights; the buttons below close the page.
+        automaticallyImplyLeading: !Platform.isMacOS,
+        titleSpacing: Platform.isMacOS ? 84 : null,
+      ),
       body: _checking
           ? const Center(child: CircularProgressIndicator())
           : Padding(

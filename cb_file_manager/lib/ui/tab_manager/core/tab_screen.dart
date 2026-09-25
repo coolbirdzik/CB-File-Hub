@@ -39,6 +39,7 @@ import 'split_pane_view.dart'; // Split-pane view
 import '../../screens/ai_chat/ai_panel_controller.dart';
 import '../../screens/ai_chat/ai_side_panel.dart';
 import '../../components/common/operation_progress_overlay.dart';
+import '../../components/common/macos_traffic_light_inset.dart';
 import '../components/tab_inactive_indicator.dart';
 import '../components/tab_always_active_indicator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
@@ -904,6 +905,10 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                             ),
                                             child: Row(
                                               children: [
+                                                if (Platform.isMacOS)
+                                                  const MacosTrafficLightInset(
+                                                    barHeight: 48,
+                                                  ),
                                                 if (!_isDrawerPinned)
                                                   Padding(
                                                     padding:

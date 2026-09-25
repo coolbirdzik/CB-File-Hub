@@ -101,7 +101,11 @@ class SshStoredKey {
 class SshProfileStore extends ChangeNotifier {
   static final instance = SshProfileStore();
   final FlutterSecureStorage storage;
-  SshProfileStore({this.storage = const FlutterSecureStorage()});
+  SshProfileStore({
+    this.storage = const FlutterSecureStorage(
+      mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+    ),
+  });
   static const storageKey = 'cb.ssh.workspace.v1';
   List<SshProfile> _profiles = [];
   List<SshStoredKey> _keys = [];
