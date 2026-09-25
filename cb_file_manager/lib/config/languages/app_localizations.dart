@@ -564,6 +564,18 @@ abstract class AppLocalizations {
   String backupUploadedTo(String provider);
   String get deleteCloudBackupConfirm;
   String get connectCloudFirst;
+  String get syncAllClouds;
+  String cloudConnectedCount(int connected, int total);
+  String get cloudStatusConnected;
+  String get cloudStatusUnavailable;
+  String get cloudStatusFailed;
+  String get waitingForSignIn;
+  String lastBackupAt(String time);
+  String lastBackupFailedAt(String time, String error);
+  String get neverBackedUpHere;
+  String syncAllResult(int succeeded, int total);
+  String get backUpNow;
+  String get restoreBackup;
 
   // Database statistics
   String get databaseStatistics;

@@ -26,56 +26,65 @@ class BackupSyncScreen extends StatefulWidget {
   State<BackupSyncScreen> createState() => _BackupSyncScreenState();
 }
 
+/// What a provider row is doing right now; absent from the map when idle.
+enum _CloudActivity { connecting, uploading, listing, downloading }
+
 class _BackupSyncScreenState extends State<BackupSyncScreen> {
   final _preferences = UserPreferences.instance;
   final _registry = CloudBackupRegistry.instance;
   final _cloudBackups = CloudBackupService();
 
+  /// Set by archive and local folder operations, which block the whole screen.
   bool _busy = false;
   String? _busyMessage;
 
-  /// Either a provider id or [CloudBackupRegistry.localFolderId].
-  String _targetId = CloudBackupRegistry.localFolderId;
-  CloudAccount? _account;
-  bool _loadingAccount = false;
+  final Map<String, CloudAccount?> _accounts = {};
+  final Set<String> _loadingAccounts = {};
+  final Map<String, _CloudActivity> _activity = {};
+  final Map<String, CloudSyncRecord> _lastSync = {};
 
-  CloudBackupProvider? get _provider => _registry.byId(_targetId);
+  /// Nothing is running anywhere, so an action that changes local data is safe.
+  bool get _idle => !_busy && _activity.isEmpty;
+
+  List<CloudBackupProvider> get _connectedProviders => _registry
+      .configuredProviders
+      .where((provider) => _accounts[provider.id] != null)
+      .toList();
 
   @override
   void initState() {
     super.initState();
-    _loadSelectedTarget();
-  }
-
-  Future<void> _loadSelectedTarget() async {
-    final saved = await _registry.selectedProviderId();
-    if (!mounted || saved == null) return;
-    setState(() => _targetId = saved);
-    if (_registry.byId(saved) != null) await _refreshAccount();
-  }
-
-  Future<void> _refreshAccount() async {
-    final provider = _provider;
-    if (provider == null) {
-      setState(() => _account = null);
-      return;
+    for (final provider in _registry.configuredProviders) {
+      _loadingAccounts.add(provider.id);
+      _loadProvider(provider);
     }
-    setState(() => _loadingAccount = true);
-    final account = await provider.currentAccount();
+  }
+
+  Future<void> _loadProvider(CloudBackupProvider provider) async {
+    CloudAccount? account;
+    try {
+      account = await provider.currentAccount();
+    } catch (_) {
+      account = null;
+    }
+    final record = await _registry.lastSync(provider.id);
     if (!mounted) return;
     setState(() {
-      _account = account;
-      _loadingAccount = false;
+      _accounts[provider.id] = account;
+      if (record != null) _lastSync[provider.id] = record;
+      _loadingAccounts.remove(provider.id);
     });
   }
 
-  Future<void> _selectTarget(String id) async {
+  void _setActivity(CloudBackupProvider provider, _CloudActivity? activity) {
+    if (!mounted) return;
     setState(() {
-      _targetId = id;
-      _account = null;
+      if (activity == null) {
+        _activity.remove(provider.id);
+      } else {
+        _activity[provider.id] = activity;
+      }
     });
-    await _registry.setSelectedProviderId(id);
-    await _refreshAccount();
   }
 
   Future<Set<String>?> _chooseParts({required bool importing}) async {
@@ -179,62 +188,109 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
   // Cloud drives (Google Drive / Dropbox / OneDrive)
   // ---------------------------------------------------------------------------
 
-  Future<void> _connect() async {
-    final provider = _provider;
-    if (provider == null) return;
+  Future<void> _connect(CloudBackupProvider provider) async {
     final tr = context.tr;
-    _show(tr.openingBrowserToSignIn);
-    await _run(() async {
+    _setActivity(provider, _CloudActivity.connecting);
+    try {
       final account = await provider.connect();
       if (!mounted) return;
-      setState(() => _account = account);
+      setState(() => _accounts[provider.id] = account);
       _show(tr.connectedAsAccount(account.label));
-    });
+    } catch (error) {
+      _show('$error');
+    } finally {
+      _setActivity(provider, null);
+    }
   }
 
-  Future<void> _disconnect() async {
-    final provider = _provider;
-    if (provider == null) return;
+  Future<void> _disconnect(CloudBackupProvider provider) async {
     await provider.disconnect();
     if (!mounted) return;
-    setState(() => _account = null);
+    setState(() => _accounts[provider.id] = null);
   }
 
-  Future<void> _uploadToCloud() async {
-    final provider = _provider;
+  /// Uploads one archive to every provider in [providers] at the same time.
+  Future<void> _backUp(List<CloudBackupProvider> providers) async {
     final tr = context.tr;
-    if (provider == null) return;
-    if (_account == null) {
+    if (providers.isEmpty) {
       _show(tr.connectCloudFirst);
       return;
     }
     final parts = await _chooseParts(importing: false);
-    if (parts == null) return;
-    await _run(message: tr.uploadingBackup, () async {
-      await _cloudBackups.upload(
-        provider: provider,
+    if (parts == null || !mounted) return;
+    setState(() {
+      for (final provider in providers) {
+        _activity[provider.id] = _CloudActivity.uploading;
+      }
+    });
+
+    final List<CloudUploadResult> results;
+    try {
+      results = await _cloudBackups.uploadToMany(
+        providers: providers,
         includeSettings: parts.contains('settings'),
         includeTags: parts.contains('tags'),
+        onDone: _recordUpload,
       );
-      _show(tr.backupUploadedTo(provider.displayName));
-    });
-  }
-
-  Future<void> _restoreFromCloud() async {
-    final provider = _provider;
-    final tr = context.tr;
-    if (provider == null) return;
-    if (_account == null) {
-      _show(tr.connectCloudFirst);
+    } catch (error) {
+      // The archive itself could not be built, so no drive was touched.
+      if (!mounted) return;
+      setState(() {
+        for (final provider in providers) {
+          _activity.remove(provider.id);
+        }
+      });
+      _show('$error');
       return;
     }
 
-    List<CloudBackupFile> backups = const [];
-    await _run(message: tr.loading, () async {
-      backups = await provider.listBackups();
+    if (results.length == 1) {
+      final result = results.single;
+      _show(
+        result.succeeded
+            ? tr.backupUploadedTo(result.provider.displayName)
+            : '${result.error}',
+      );
+    } else {
+      _show(
+        tr.syncAllResult(
+          results.where((result) => result.succeeded).length,
+          results.length,
+        ),
+      );
+    }
+  }
+
+  void _recordUpload(CloudUploadResult result) {
+    final id = result.provider.id;
+    final previous = _lastSync[id] ?? const CloudSyncRecord();
+    final now = DateTime.now();
+    final record = result.succeeded
+        ? previous.succeeded(now, result.file?.name)
+        : previous.failed(now, '${result.error}');
+    _registry.saveLastSync(id, record);
+    if (!mounted) return;
+    setState(() {
+      _lastSync[id] = record;
+      _activity.remove(id);
     });
-    if (!mounted || backups.isEmpty) {
-      if (mounted && backups.isEmpty) _show(tr.noCloudBackupsYet);
+  }
+
+  Future<void> _restoreFromCloud(CloudBackupProvider provider) async {
+    final tr = context.tr;
+    _setActivity(provider, _CloudActivity.listing);
+    List<CloudBackupFile> backups;
+    try {
+      backups = await provider.listBackups();
+    } catch (error) {
+      _show('$error');
+      return;
+    } finally {
+      _setActivity(provider, null);
+    }
+    if (!mounted) return;
+    if (backups.isEmpty) {
+      _show(tr.noCloudBackupsYet);
       return;
     }
 
@@ -243,7 +299,8 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
 
     final parts = await _chooseParts(importing: true);
     if (parts == null) return;
-    await _run(message: tr.downloadingBackup, () async {
+    _setActivity(provider, _CloudActivity.downloading);
+    try {
       final result = await _cloudBackups.restore(
         provider: provider,
         remote: chosen,
@@ -255,7 +312,13 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
         '${tr.importSuccess}: ${result?['settingsCount'] ?? 0} '
         '${tr.backupSettingsPart}',
       );
-    });
+    } on CloudBackupException catch (error) {
+      _show(error.message);
+    } catch (error) {
+      _show('${tr.errorImporting}$error');
+    } finally {
+      _setActivity(provider, null);
+    }
   }
 
   Future<CloudBackupFile?> _pickRemoteBackup(
@@ -338,15 +401,16 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
   String _describeBackup(BuildContext context, CloudBackupFile backup) {
     final parts = <String>[];
     if (backup.modified != null) {
-      parts.add(
-        DateFormat('yyyy-MM-dd HH:mm').format(backup.modified!.toLocal()),
-      );
+      parts.add(_formatTime(backup.modified!));
     }
     if (backup.size != null) {
       parts.add(FormatUtils.formatFileSize(backup.size!));
     }
     return parts.join(' · ');
   }
+
+  String _formatTime(DateTime time) =>
+      DateFormat('yyyy-MM-dd HH:mm').format(time.toLocal());
 
   // ---------------------------------------------------------------------------
   // Local folder mirrored by a desktop sync client
@@ -511,12 +575,12 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
           ListTile(
             leading: const Icon(PhosphorIconsLight.uploadSimple),
             title: Text(context.tr.exportBackupZip),
-            onTap: _busy ? null : _exportZip,
+            onTap: _idle ? _exportZip : null,
           ),
           ListTile(
             leading: const Icon(PhosphorIconsLight.downloadSimple),
             title: Text(context.tr.importBackupZip),
-            onTap: _busy ? null : _importZip,
+            onTap: _idle ? _importZip : null,
           ),
         ],
       ),
@@ -525,7 +589,8 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
 
   Widget _buildCloudCard(BuildContext context) {
     final tr = context.tr;
-    final provider = _provider;
+    final available = _registry.configuredProviders;
+    final connected = _connectedProviders;
 
     return Card(
       child: Column(
@@ -534,65 +599,287 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
           ListTile(
             leading: const Icon(PhosphorIconsLight.cloudArrowUp),
             title: Text(tr.cloudSync),
-            subtitle: Text(tr.cloudSyncDescription),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final option in _registry.providers)
-                  _buildTargetChip(
-                    context,
-                    id: option.id,
-                    label: option.displayName,
-                    icon: option.icon,
-                    // A drive without a compiled-in client id cannot sign in.
-                    enabled: option.isConfigured,
-                  ),
-                _buildTargetChip(
-                  context,
-                  id: CloudBackupRegistry.localFolderId,
-                  label: tr.localSyncFolder,
-                  icon: PhosphorIconsLight.folder,
-                  enabled: true,
-                ),
-              ],
+            subtitle: Text(
+              available.isEmpty
+                  ? tr.cloudSyncDescription
+                  : '${tr.cloudSyncDescription}\n'
+                        '${tr.cloudConnectedCount(connected.length, available.length)}',
             ),
           ),
-          if (provider == null)
-            ..._buildLocalFolderActions(context, tr)
-          else
-            ..._buildProviderActions(context, tr, provider),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: FilledButton.icon(
+              icon: const Icon(PhosphorIconsLight.cloudArrowUp),
+              label: Text(tr.syncAllClouds),
+              onPressed: _idle && connected.isNotEmpty
+                  ? () => _backUp(connected)
+                  : null,
+            ),
+          ),
+          for (final provider in _registry.providers) ...[
+            const Divider(height: 1),
+            _buildProviderRow(context, provider),
+          ],
+          const Divider(height: 1),
+          ..._buildLocalFolderActions(context, tr),
         ],
       ),
     );
   }
 
-  Widget _buildTargetChip(
-    BuildContext context, {
-    required String id,
-    required String label,
-    required IconData icon,
-    required bool enabled,
-  }) {
-    final selected = _targetId == id;
-    return ChoiceChip(
-      avatar: Icon(icon, size: 18),
-      label: Text(label),
-      selected: selected,
-      onSelected: _busy
-          ? null
-          : (_) => enabled
-                ? _selectTarget(id)
-                : _show(context.tr.cloudProviderNotConfigured),
-      // Greyed out rather than hidden, so it is clear the drive exists but the
-      // build lacks its OAuth client id.
-      labelStyle: enabled
-          ? null
-          : TextStyle(color: Theme.of(context).disabledColor),
+  Widget _buildProviderRow(BuildContext context, CloudBackupProvider provider) {
+    final tr = context.tr;
+    final theme = Theme.of(context);
+    final account = _accounts[provider.id];
+    final activity = _activity[provider.id];
+    final loading = _loadingAccounts.contains(provider.id);
+    final rowIdle = !_busy && activity == null && !loading;
+    // Every sign-in listens on the same loopback ports, so only one at a time.
+    final signingIn = _activity.containsValue(_CloudActivity.connecting);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(provider.icon, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        provider.displayName,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatusBadge(context, provider),
+                  ],
+                ),
+                if (account != null)
+                  Text(
+                    account.label,
+                    style: theme.textTheme.bodySmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                const SizedBox(height: 4),
+                ..._buildStatusLines(context, provider),
+                if (activity != null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: LinearProgressIndicator(minHeight: 3),
+                  ),
+                if (provider.isConfigured && !loading) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: account != null
+                        ? [
+                            FilledButton.tonalIcon(
+                              icon: const Icon(
+                                PhosphorIconsLight.cloudArrowUp,
+                                size: 18,
+                              ),
+                              label: Text(tr.backUpNow),
+                              onPressed: rowIdle
+                                  ? () => _backUp([provider])
+                                  : null,
+                            ),
+                            // Restoring rewrites local data, so it waits for
+                            // every other drive to finish.
+                            OutlinedButton.icon(
+                              icon: const Icon(
+                                PhosphorIconsLight.cloudArrowDown,
+                                size: 18,
+                              ),
+                              label: Text(tr.restoreBackup),
+                              onPressed: _idle
+                                  ? () => _restoreFromCloud(provider)
+                                  : null,
+                            ),
+                            TextButton(
+                              onPressed: rowIdle
+                                  ? () => _disconnect(provider)
+                                  : null,
+                              child: Text(tr.disconnect),
+                            ),
+                          ]
+                        : [
+                            FilledButton.tonal(
+                              onPressed: rowIdle && !signingIn
+                                  ? () => _connect(provider)
+                                  : null,
+                              child: Text(tr.connect),
+                            ),
+                          ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildStatusBadge(BuildContext context, CloudBackupProvider provider) {
+    final tr = context.tr;
+    final theme = Theme.of(context);
+    final loading = _loadingAccounts.contains(provider.id);
+    final activity = _activity[provider.id];
+
+    final String label;
+    final Color color;
+    if (!provider.isConfigured) {
+      label = tr.cloudStatusUnavailable;
+      color = theme.disabledColor;
+    } else if (loading) {
+      label = tr.loading;
+      color = theme.colorScheme.outline;
+    } else if (_accounts[provider.id] == null) {
+      label = tr.notConnected;
+      color = activity == null
+          ? theme.colorScheme.outline
+          : theme.colorScheme.primary;
+    } else if (activity == null &&
+        (_lastSync[provider.id]?.lastAttemptFailed ?? false)) {
+      label = tr.cloudStatusFailed;
+      color = theme.colorScheme.error;
+    } else {
+      label = tr.cloudStatusConnected;
+      color = activity == null ? Colors.green : theme.colorScheme.primary;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (loading || activity != null)
+            SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+            )
+          else
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// What the row is doing now, or else how its last backup went.
+  List<Widget> _buildStatusLines(
+    BuildContext context,
+    CloudBackupProvider provider,
+  ) {
+    final tr = context.tr;
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    Widget line(IconData icon, String text, {Color? color}) => Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 14, color: color ?? muted?.color),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: muted?.copyWith(color: color),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!provider.isConfigured) {
+      return [line(PhosphorIconsLight.info, tr.cloudProviderNotConfigured)];
+    }
+
+    final primary = theme.colorScheme.primary;
+    switch (_activity[provider.id]) {
+      case _CloudActivity.connecting:
+        return [
+          line(PhosphorIconsLight.globe, tr.waitingForSignIn, color: primary),
+        ];
+      case _CloudActivity.uploading:
+        return [
+          line(
+            PhosphorIconsLight.cloudArrowUp,
+            tr.uploadingBackup,
+            color: primary,
+          ),
+        ];
+      case _CloudActivity.listing:
+        return [
+          line(PhosphorIconsLight.listBullets, tr.loading, color: primary),
+        ];
+      case _CloudActivity.downloading:
+        return [
+          line(
+            PhosphorIconsLight.cloudArrowDown,
+            tr.downloadingBackup,
+            color: primary,
+          ),
+        ];
+      case null:
+        break;
+    }
+    if (_loadingAccounts.contains(provider.id)) return const [];
+
+    final record = _lastSync[provider.id];
+    final connected = _accounts[provider.id] != null;
+    return [
+      if (record != null && record.lastAttemptFailed)
+        line(
+          PhosphorIconsLight.warningCircle,
+          tr.lastBackupFailedAt(_formatTime(record.failedAt!), record.error!),
+          color: theme.colorScheme.error,
+        ),
+      if (record?.succeededAt != null)
+        line(
+          PhosphorIconsLight.checkCircle,
+          tr.lastBackupAt(_formatTime(record!.succeededAt!)),
+          color: record.lastAttemptFailed ? null : Colors.green,
+        )
+      else if (connected)
+        line(PhosphorIconsLight.clock, tr.neverBackedUpHere),
+      if (connected)
+        line(
+          PhosphorIconsLight.folder,
+          tr.cloudBackupsStoredIn(provider.remoteFolderName),
+        ),
+    ];
   }
 
   List<Widget> _buildLocalFolderActions(
@@ -608,51 +895,12 @@ class _BackupSyncScreenState extends State<BackupSyncScreen> {
       ListTile(
         leading: const Icon(PhosphorIconsLight.cloudArrowUp),
         title: Text(tr.syncToCloud),
-        onTap: _busy ? null : () => _syncLocalFolder(upload: true),
+        onTap: _idle ? () => _syncLocalFolder(upload: true) : null,
       ),
       ListTile(
         leading: const Icon(PhosphorIconsLight.cloudArrowDown),
         title: Text(tr.syncFromCloud),
-        onTap: _busy ? null : () => _syncLocalFolder(upload: false),
-      ),
-    ];
-  }
-
-  List<Widget> _buildProviderActions(
-    BuildContext context,
-    AppLocalizations tr,
-    CloudBackupProvider provider,
-  ) {
-    final connected = _account != null;
-    return [
-      ListTile(
-        leading: Icon(provider.icon),
-        title: Text(
-          connected ? tr.connectedAsAccount(_account!.label) : tr.notConnected,
-        ),
-        subtitle: Text(tr.cloudBackupsStoredIn(provider.remoteFolderName)),
-        trailing: _loadingAccount
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : TextButton(
-                onPressed: _busy ? null : (connected ? _disconnect : _connect),
-                child: Text(connected ? tr.disconnect : tr.connect),
-              ),
-      ),
-      ListTile(
-        leading: const Icon(PhosphorIconsLight.cloudArrowUp),
-        title: Text(tr.syncToCloud),
-        enabled: connected && !_busy,
-        onTap: _uploadToCloud,
-      ),
-      ListTile(
-        leading: const Icon(PhosphorIconsLight.cloudArrowDown),
-        title: Text(tr.syncFromCloud),
-        enabled: connected && !_busy,
-        onTap: _restoreFromCloud,
+        onTap: _idle ? () => _syncLocalFolder(upload: false) : null,
       ),
     ];
   }

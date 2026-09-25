@@ -1050,6 +1050,33 @@ class EnglishLocalizations implements AppLocalizations {
       'Delete this backup from the cloud drive?';
   @override
   String get connectCloudFirst => 'Connect the cloud service first';
+  @override
+  String get syncAllClouds => 'Back up to all connected drives';
+  @override
+  String cloudConnectedCount(int connected, int total) =>
+      '$connected of $total drives connected';
+  @override
+  String get cloudStatusConnected => 'Connected';
+  @override
+  String get cloudStatusUnavailable => 'Unavailable';
+  @override
+  String get cloudStatusFailed => 'Failed';
+  @override
+  String get waitingForSignIn => 'Waiting for sign-in in the browser...';
+  @override
+  String lastBackupAt(String time) => 'Last backup: $time';
+  @override
+  String lastBackupFailedAt(String time, String error) =>
+      'Backup failed ($time): $error';
+  @override
+  String get neverBackedUpHere => 'Not backed up from this device yet';
+  @override
+  String syncAllResult(int succeeded, int total) =>
+      'Backed up to $succeeded of $total drives';
+  @override
+  String get backUpNow => 'Back up';
+  @override
+  String get restoreBackup => 'Restore';
 
   // Database statistics
   @override

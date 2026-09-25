@@ -8,6 +8,17 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/services/backup/backup_archive_service.dart';
 import 'package:cb_file_manager/services/backup/cloud/cloud_backup_provider.dart';
 
+/// Outcome of pushing one archive to one provider in [CloudBackupService.uploadToMany].
+class CloudUploadResult {
+  const CloudUploadResult._(this.provider, this.file, this.error);
+
+  final CloudBackupProvider provider;
+  final CloudBackupFile? file;
+  final Object? error;
+
+  bool get succeeded => error == null;
+}
+
 /// Moves backup archives between the app and a cloud drive: build the zip in a
 /// temp folder, hand it to the provider, and clean up afterwards.
 class CloudBackupService {
@@ -43,6 +54,48 @@ class CloudBackupService {
         throw CloudBackupException('Nothing was selected to back up');
       }
       return await provider.upload(file: File(exported), name: name);
+    } finally {
+      await _cleanUp(workDir);
+    }
+  }
+
+  /// Builds the archive once and uploads it to every provider in parallel.
+  ///
+  /// A failing drive does not stop the others: each outcome is reported via
+  /// [onStarted]/[onDone] as it happens and returned in [providers] order.
+  Future<List<CloudUploadResult>> uploadToMany({
+    required List<CloudBackupProvider> providers,
+    required bool includeSettings,
+    required bool includeTags,
+    void Function(CloudBackupProvider provider)? onStarted,
+    void Function(CloudUploadResult result)? onDone,
+  }) async {
+    final workDir = await _workDirectory();
+    final name = archiveName();
+    try {
+      final exported = await _archive.exportZip(
+        outputPath: path.join(workDir.path, name),
+        includeSettings: includeSettings,
+        includeTags: includeTags,
+      );
+      if (exported == null) {
+        throw CloudBackupException('Nothing was selected to back up');
+      }
+      final archive = File(exported);
+      return await Future.wait(
+        providers.map((provider) async {
+          onStarted?.call(provider);
+          CloudUploadResult result;
+          try {
+            final file = await provider.upload(file: archive, name: name);
+            result = CloudUploadResult._(provider, file, null);
+          } catch (error) {
+            result = CloudUploadResult._(provider, null, error);
+          }
+          onDone?.call(result);
+          return result;
+        }),
+      );
     } finally {
       await _cleanUp(workDir);
     }

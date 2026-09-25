@@ -12,7 +12,7 @@ lib/services/backup/
 ├── cloud_backup_service.dart        # zip ⇄ provider orchestration + temp cleanup
 └── cloud/
     ├── cloud_backup_provider.dart   # CloudBackupProvider interface + models
-    ├── cloud_backup_registry.dart   # provider list, selected target
+    ├── cloud_backup_registry.dart   # provider list, last sync record per drive
     ├── cloud_oauth_config.dart      # compile-time client ids
     ├── oauth_token_store.dart       # tokens in flutter_secure_storage
     ├── pkce_oauth_client.dart       # authorization code + PKCE, loopback redirect
@@ -24,6 +24,18 @@ lib/services/backup/
 ```
 
 Every archive is stored in a folder named **CB File Hub Backups** on the remote drive, with a timestamped file name (`cb_file_hub_backup_20260921_143000.zip`), so old versions are kept rather than overwritten.
+
+## Syncing several drives at once
+
+The screen lists every drive as its own row, so Google Drive, Dropbox and OneDrive can all be connected together. **Back up to all connected drives** builds the archive once and uploads it to each connected drive in parallel (`CloudBackupService.uploadToMany`); a drive that fails does not stop the others, and the snackbar reports how many succeeded. Each row also has its own Back up / Restore / Disconnect buttons.
+
+Each row shows:
+
+- a badge: Connected, Not connected, Unavailable, or Failed (the latest upload failed), with a spinner while that drive is busy;
+- what the drive is doing now (waiting for browser sign-in, uploading, listing, downloading) with a progress bar;
+- otherwise the last successful backup from this device and, if the latest attempt failed, when and why.
+
+The last-sync record is stored per drive in SharedPreferences (`cb_cloud_backup_last_sync_<id>`); a failure keeps the previous success time. Sign-ins run one at a time because every provider listens on the same loopback ports, and Restore waits until no drive is busy because it rewrites local data.
 
 ## Sign-in flow
 
@@ -93,7 +105,7 @@ iOS needs no define: the Google Sign-In SDK reads `GIDClientID` from `Info.plist
 
 In GitHub Actions, add them as repository secrets (**Settings → Secrets and variables → Actions**) with exactly these names: `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_SERVER_CLIENT_ID`, `DROPBOX_APP_KEY`, `ONEDRIVE_CLIENT_ID`. `release.yml` and `build-test.yml` map them to workflow-level env vars; the jobs that call `build.sh` inherit them, and the direct `flutter build apk/appbundle/windows` steps pass them explicitly. A missing secret just builds that provider as unavailable.
 
-A provider whose id is missing shows up greyed out in the picker with "not available in this build".
+A provider whose id is missing still gets its row on the screen, marked **Unavailable** with "not available in this build".
 
 | Provider | Console | Client type | Redirect URI | Scopes |
 |----------|---------|-------------|--------------|--------|
@@ -141,7 +153,7 @@ Each developer's debug SHA-1 has to be added to the Android client, so a shared 
 
 ## Local folder mode
 
-The original behaviour is kept as a fourth option in the picker: write `cb_file_hub_cloud_backup.zip` into any folder, typically one already mirrored by Drive for Desktop / OneDrive / Dropbox. It needs no OAuth client and works on every platform.
+The original behaviour is kept below the three drives on the same card: write `cb_file_hub_cloud_backup.zip` into any folder, typically one already mirrored by Drive for Desktop / OneDrive / Dropbox. It needs no OAuth client and works on every platform.
 
 ## Limits and known gaps
 

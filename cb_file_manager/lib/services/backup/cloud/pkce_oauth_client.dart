@@ -17,10 +17,17 @@ import 'oauth_token_store.dart';
 /// redirect, so no client secret has to be trusted to the binary and no
 /// platform specific URL scheme plumbing is needed.
 class PkceOAuthClient {
-  PkceOAuthClient({http.Client? httpClient})
-    : _http = httpClient ?? http.Client();
+  PkceOAuthClient({
+    http.Client? httpClient,
+    Future<bool> Function(Uri url)? launchBrowser,
+  }) : _http = httpClient ?? http.Client(),
+       _launchBrowser = launchBrowser ?? _openExternal;
 
   final http.Client _http;
+  final Future<bool> Function(Uri url) _launchBrowser;
+
+  static Future<bool> _openExternal(Uri url) =>
+      launchUrl(url, mode: LaunchMode.externalApplication);
 
   /// Ports tried in order. Providers such as Dropbox require the redirect URI
   /// to match a registered value exactly, hence the fixed first choice.
@@ -60,23 +67,33 @@ class PkceOAuthClient {
         },
       );
 
-      if (!await launchUrl(authUrl, mode: LaunchMode.externalApplication)) {
+      if (!await _launchBrowser(authUrl)) {
         throw CloudBackupException('Could not open the browser for sign-in');
       }
 
-      final code = await _awaitRedirect(server, state);
-      return await _exchange(
-        tokenEndpoint: tokenEndpoint,
-        body: {
-          'client_id': clientId,
-          if (clientSecret != null && clientSecret.isNotEmpty)
-            'client_secret': clientSecret,
-          'code': code,
-          'code_verifier': verifier,
-          'grant_type': 'authorization_code',
-          'redirect_uri': redirectUri,
-        },
-      );
+      final redirect = await _awaitRedirect(server, state);
+      // The browser tab stays open until the code is exchanged, so the page
+      // reports the real outcome instead of claiming success too early.
+      try {
+        final tokens = await _exchange(
+          tokenEndpoint: tokenEndpoint,
+          body: {
+            'client_id': clientId,
+            if (clientSecret != null && clientSecret.isNotEmpty)
+              'client_secret': clientSecret,
+            'code': redirect.code,
+            'code_verifier': verifier,
+            'grant_type': 'authorization_code',
+            'redirect_uri': redirectUri,
+          },
+        );
+        await _respond(redirect.request, ok: true);
+        return tokens;
+      } catch (error) {
+        debugPrint('PkceOAuthClient: token exchange failed: $error');
+        await _respond(redirect.request, ok: false, detail: '$error');
+        rethrow;
+      }
     } finally {
       await server.close(force: true);
     }
@@ -122,31 +139,43 @@ class PkceOAuthClient {
     return HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   }
 
-  Future<String> _awaitRedirect(HttpServer server, String state) async {
-    final completer = Completer<String>();
+  /// Waits for the provider's redirect and returns it with the browser
+  /// request still open, so [authorize] can answer once it knows the outcome.
+  Future<({String code, HttpRequest request})> _awaitRedirect(
+    HttpServer server,
+    String state,
+  ) async {
+    final completer = Completer<({String code, HttpRequest request})>();
     final subscription = server.listen((request) async {
       final params = request.uri.queryParameters;
       final error = params['error'];
       final code = params['code'];
-      final ok = error == null && code != null && params['state'] == state;
 
-      request.response
-        ..statusCode = ok ? HttpStatus.ok : HttpStatus.badRequest
-        ..headers.contentType = ContentType.html
-        ..write(_resultPage(ok: ok, error: error));
-      await request.response.close();
-
-      if (completer.isCompleted) return;
+      // favicon.ico and similar side requests are not the redirect.
+      if (error == null && code == null) {
+        request.response.statusCode = HttpStatus.notFound;
+        await request.response.close();
+        return;
+      }
+      if (completer.isCompleted) {
+        await _respond(request, ok: false, detail: 'Sign-in already handled');
+        return;
+      }
       if (error != null) {
+        final description = params['error_description'];
+        final reason = description == null ? error : '$error: $description';
+        await _respond(request, ok: false, detail: reason);
         completer.completeError(
-          CloudBackupException('Authorization was denied ($error)'),
+          CloudBackupException('Authorization was denied ($reason)'),
         );
-      } else if (code == null || params['state'] != state) {
-        completer.completeError(
-          CloudBackupException('Authorization response was invalid'),
-        );
+      } else if (params['state'] != state) {
+        const reason =
+            'This sign-in page belongs to an earlier attempt. '
+            'Start the sign-in again from CB File Hub.';
+        await _respond(request, ok: false, detail: reason);
+        completer.completeError(CloudBackupException(reason));
       } else {
-        completer.complete(code);
+        completer.complete((code: code!, request: request));
       }
     });
 
@@ -161,6 +190,23 @@ class PkceOAuthClient {
     }
   }
 
+  Future<void> _respond(
+    HttpRequest request, {
+    required bool ok,
+    String? detail,
+  }) async {
+    try {
+      request.response
+        ..statusCode = ok ? HttpStatus.ok : HttpStatus.badRequest
+        ..headers.contentType = ContentType.html
+        ..write(_resultPage(ok: ok, detail: detail));
+      await request.response.close();
+    } catch (error) {
+      // The user may already have closed the tab.
+      debugPrint('PkceOAuthClient: could not answer the browser: $error');
+    }
+  }
+
   Future<OAuthTokens> _exchange({
     required Uri tokenEndpoint,
     required Map<String, String> body,
@@ -172,7 +218,8 @@ class PkceOAuthClient {
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw CloudBackupException(
-        'Token request failed (${response.statusCode}): ${response.body}',
+        'Token request failed (${response.statusCode}): '
+        '${_describeError(response.body)}',
       );
     }
     final json = jsonDecode(response.body);
@@ -189,6 +236,20 @@ class PkceOAuthClient {
     );
   }
 
+  /// `invalid_client: Unauthorized` rather than the raw JSON body.
+  String _describeError(String body) {
+    try {
+      final json = jsonDecode(body);
+      if (json is Map && json['error'] is String) {
+        final description = json['error_description'];
+        return description is String && description.isNotEmpty
+            ? '${json['error']}: $description'
+            : json['error'] as String;
+      }
+    } catch (_) {}
+    return body;
+  }
+
   String _randomString(int length) {
     const alphabet =
         'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -199,15 +260,15 @@ class PkceOAuthClient {
     ).join();
   }
 
-  String _resultPage({required bool ok, String? error}) {
+  String _resultPage({required bool ok, String? detail}) {
     final title = ok ? 'CB File Hub is connected' : 'Sign-in failed';
-    final detail = ok
+    final message = ok
         ? 'You can close this tab and go back to the app.'
-        : 'Reason: ${error ?? 'unexpected response'}';
+        : 'Reason: ${const HtmlEscape().convert(detail ?? 'unexpected response')}';
     return '''
 <!doctype html>
 <html><head><meta charset="utf-8"><title>$title</title></head>
 <body style="font-family:system-ui,sans-serif;padding:48px;text-align:center">
-<h2>$title</h2><p>$detail</p></body></html>''';
+<h2>$title</h2><p>$message</p></body></html>''';
   }
 }

@@ -1069,6 +1069,33 @@ class VietnameseLocalizations implements AppLocalizations {
   String get deleteCloudBackupConfirm => 'Xoá bản sao lưu này khỏi cloud?';
   @override
   String get connectCloudFirst => 'Hãy kết nối dịch vụ cloud trước';
+  @override
+  String get syncAllClouds => 'Sao lưu lên tất cả cloud đã kết nối';
+  @override
+  String cloudConnectedCount(int connected, int total) =>
+      'Đã kết nối $connected/$total dịch vụ';
+  @override
+  String get cloudStatusConnected => 'Đã kết nối';
+  @override
+  String get cloudStatusUnavailable => 'Không khả dụng';
+  @override
+  String get cloudStatusFailed => 'Lỗi';
+  @override
+  String get waitingForSignIn => 'Đang chờ đăng nhập trên trình duyệt...';
+  @override
+  String lastBackupAt(String time) => 'Sao lưu gần nhất: $time';
+  @override
+  String lastBackupFailedAt(String time, String error) =>
+      'Sao lưu thất bại ($time): $error';
+  @override
+  String get neverBackedUpHere => 'Chưa sao lưu từ máy này';
+  @override
+  String syncAllResult(int succeeded, int total) =>
+      'Đã sao lưu lên $succeeded/$total dịch vụ';
+  @override
+  String get backUpNow => 'Sao lưu';
+  @override
+  String get restoreBackup => 'Khôi phục';
 
   // Database statistics
   @override
