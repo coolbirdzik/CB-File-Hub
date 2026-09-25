@@ -32,6 +32,7 @@ import 'package:cb_file_manager/ui/screens/settings/local_ai_advisor_settings_se
 import 'package:cb_file_manager/ui/screens/settings/context_menu_layout_settings_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
 import 'package:cb_file_manager/services/tab_activity/tab_activity_manager.dart';
 
@@ -77,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '';
 
   static const String _appAuthor = 'COOLBIRDZIK - ngtanhung41@gmail.com';
+  static const String _appWebsite = 'coolbird.net';
 
   // Database section state
   Map<String, int> _popularTags = {};
@@ -626,6 +628,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle:
               '${AppLocalizations.of(context)!.appDescription} • v${_appVersion.isEmpty ? '-' : _appVersion} • $_appAuthor',
           icon: PhosphorIconsLight.info,
+          trailing: TextButton.icon(
+            onPressed: _openWebsite,
+            icon: const Icon(PhosphorIconsLight.globe, size: 16),
+            label: const Text(_appWebsite),
+          ),
+          onTap: _openWebsite,
         ),
       ],
     );
@@ -1495,6 +1503,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
         ],
       ),
+    );
+  }
+
+  Future<void> _openWebsite() async {
+    await launchUrl(
+      Uri.https(_appWebsite),
+      mode: LaunchMode.externalApplication,
     );
   }
 

@@ -24,6 +24,8 @@
 
 CB File Hub is a cross-platform file manager for large media libraries. It combines fast visual browsing, tabs, tags, network and SSH access, disk cleanup, and an AI assistant so photos, videos, downloads, remote servers, and messy folders are easier to search, review, and maintain.
 
+Website: [coolbird.net](https://coolbird.net)
+
 ## Key Highlights
 
 - **AI-assisted file management**: Search, organize, review suspicious files, and guide cleanup workflows with CB Agent.
@@ -221,6 +223,8 @@ In the disk cleaner, you can right-click any file or folder and ask CB Agent whe
 Latest packaged builds are published here:
 
 [Download Latest Release](https://github.com/coolbirdzik/cb-file-hub/releases/latest)
+
+More information and downloads: [coolbird.net](https://coolbird.net)
 
 Available package types include:
 
