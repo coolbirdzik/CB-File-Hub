@@ -1779,6 +1779,17 @@ class EnglishLocalizations implements AppLocalizations {
       'This permission is needed to display all files including APKs, documents and other files in the Download folder.';
 
   @override
+  String get allFilesAccessDescriptionMacos =>
+      'macOS needs Full Disk Access so the app can browse every folder and drive. Click Grant Permission, drag the CB File Hub icon into the list that opens and approve with Touch ID or your password, then choose Quit & Reopen.';
+
+  @override
+  String get fullDiskAccessHelperTitle => 'Drag CB File Hub into the list';
+
+  @override
+  String get fullDiskAccessHelperMessage =>
+      'Drag this icon into the Full Disk Access list, then approve with Touch ID or your password. If CB File Hub is already listed, just switch it on.';
+
+  @override
   String get installPackagesPermission => 'Install Packages (APK)';
 
   @override

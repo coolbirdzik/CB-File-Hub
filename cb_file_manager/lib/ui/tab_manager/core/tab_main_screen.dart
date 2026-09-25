@@ -139,8 +139,10 @@ class _TabMainScreenState extends State<TabMainScreen> {
     await _showThemeOnboardingIfNeeded();
     if (!mounted) return;
 
-    // Desktop skips permission screen entirely.
-    if (_isDesktopPlatform()) return;
+    // Desktop skips the permission screen, except macOS, where browsing needs
+    // Full Disk Access. Secondary windows leave that to the primary one.
+    if (_isDesktopPlatform() && !Platform.isMacOS) return;
+    if (_isSecondaryDesktopWindow()) return;
 
     // E2E runs reinstall the app before every capture, which resets the runtime
     // permissions. Without this the explainer route sits on top of every screen
@@ -222,7 +224,7 @@ class _TabMainScreenState extends State<TabMainScreen> {
   Future<void> _showPermissionExplainerIfNeeded() async {
     final hasStorage = await PermissionStateService.instance
         .hasStorageOrPhotosPermission();
-    final hasAllFiles = Platform.isAndroid
+    final hasAllFiles = (Platform.isAndroid || Platform.isMacOS)
         ? await PermissionStateService.instance.hasAllFilesAccessPermission()
         : true;
     final hasInstallPackages = Platform.isAndroid

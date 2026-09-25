@@ -213,11 +213,9 @@ linux: clean deps
     mkdir -p {{build_dir}}/linux/portable
     cd {{build_dir}}/linux/x64/release && tar -czf ../portable/CBFileHub-Linux.tar.gz bundle/
 
-# Build macOS
-macos: clean deps
-    cd {{project_dir}} && {{flutter}} build macos --release {{dart_env}}
-    mkdir -p {{build_dir}}/macos/portable
-    cd {{build_dir}}/macos/Build/Products/Release && zip -r ../../../portable/CBFileHub-macOS.zip cb_file_hub.app
+# Build macOS DMG (ad-hoc signed; output: build/macos/dmg/*.dmg)
+macos:
+    bash scripts/build.sh macos
 
 # Build iOS
 ios: clean deps

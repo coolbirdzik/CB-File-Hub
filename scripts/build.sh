@@ -894,40 +894,87 @@ build_linux() {
     cd ..
 }
 
-# Build macOS
+# Ad-hoc sign a macOS app bundle inside-out. There is no Developer ID, so users
+# open the app via System Settings > Privacy & Security > Open Anyway; macOS only
+# offers that button when the signature is intact (a broken one reads "damaged").
+# No hardened runtime: with ad-hoc signatures there is no Team ID, so library
+# validation would refuse to load the bundled frameworks.
+adhoc_sign_macos_app() {
+    local app="$1"
+    local entitlements="$2"
+    local item
+
+    while IFS= read -r -d '' item; do
+        codesign --force --sign - --timestamp=none "$item"
+    done < <(find "$app/Contents/Frameworks" -mindepth 1 -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
+
+    codesign --force --sign - --timestamp=none --entitlements "$entitlements" "$app"
+    codesign --verify --deep --strict --verbose=2 "$app"
+}
+
+# Build macOS (.app packed into a drag-to-Applications DMG)
 build_macos() {
     print_info "Building macOS..."
-    
+
     if [[ "$OSTYPE" != "darwin"* ]]; then
         print_error "macOS builds can only be done on macOS!"
         return 1
     fi
-    
+
     clean_build
     install_deps
-    
-    cd "$PROJECT_DIR"
+
     local VERSION_NAME
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build macos --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
-    
-    if [ $? -eq 0 ]; then
-        print_info "Creating ZIP package..."
-        mkdir -p "$BUILD_DIR/macos/portable"
-        cd "$BUILD_DIR/macos/Build/Products/Release"
-        zip -r "../../../portable/CBFileHub-macOS.zip" cb_file_hub.app
-        cd ../.../../../../.
-        
-        print_success "macOS build completed!"
-        print_info "Output: $BUILD_DIR/macos/portable/CBFileHub-macOS.zip"
-    else
+
+    cd "$PROJECT_DIR"
+    if ! flutter build macos --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"; then
         print_error "macOS build failed!"
-        cd ..
+        cd "$REPO_DIR"
         return 1
     fi
-    cd ..
+    cd "$REPO_DIR"
+
+    local APP_PATH
+    APP_PATH=$(find "$BUILD_DIR/macos/Build/Products/Release" -maxdepth 1 -name '*.app' | head -n 1)
+    if [ -z "$APP_PATH" ]; then
+        print_error "No .app found in $BUILD_DIR/macos/Build/Products/Release"
+        return 1
+    fi
+
+    print_info "Ad-hoc signing $(basename "$APP_PATH")..."
+    adhoc_sign_macos_app "$APP_PATH" "$PROJECT_DIR/macos/Runner/Release.entitlements"
+
+    print_info "Creating DMG..."
+    local DMG_DIR="$BUILD_DIR/macos/dmg"
+    local STAGE_DIR="$BUILD_DIR/macos/dmg-stage"
+    local DMG_PATH="$DMG_DIR/CBFileHub-$VERSION_NAME-macos.dmg"
+    rm -rf "$STAGE_DIR" "$DMG_DIR"
+    mkdir -p "$STAGE_DIR" "$DMG_DIR"
+    ditto "$APP_PATH" "$STAGE_DIR/$(basename "$APP_PATH")"
+    ln -s /Applications "$STAGE_DIR/Applications"
+    cp "$REPO_DIR/installer/macos/README.txt" "$STAGE_DIR/How to open - Cach mo.txt"
+
+    # hdiutil intermittently fails with "Resource busy" on CI runners.
+    local attempt
+    for attempt in 1 2 3; do
+        if hdiutil create -volname "CB File Hub" -srcfolder "$STAGE_DIR" \
+            -fs HFS+ -format UDZO -ov "$DMG_PATH"; then
+            break
+        fi
+        if [ "$attempt" -eq 3 ]; then
+            print_error "hdiutil failed to create the DMG"
+            return 1
+        fi
+        print_warning "hdiutil failed (attempt $attempt), retrying..."
+        sleep 5
+    done
+    rm -rf "$STAGE_DIR"
+
+    print_success "macOS build completed!"
+    print_info "Output: $DMG_PATH"
 }
 
 # Build iOS

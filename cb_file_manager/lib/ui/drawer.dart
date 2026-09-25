@@ -24,6 +24,7 @@ import 'package:cb_file_manager/ui/widgets/drawer/storage_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/pinned_section_widget.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'components/common/macos_traffic_light_inset.dart';
 
 /// Returns a key that forces a Fluent drawer section to honor the active tab's
 /// persisted expansion state after a tab switch or expansion change.
@@ -352,6 +353,10 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
               ),
             Column(
               children: [
+                // The overlay drawer covers the tab bar row the traffic lights
+                // sit in (the pinned one sits below it).
+                if (Platform.isMacOS && !widget.isPinned)
+                  const MacosTrafficLightTopInset(height: 48),
                 // Modern drawer header
                 DrawerHeaderWidget(
                   isPinned: widget.isPinned,
@@ -559,6 +564,8 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
           bottom: false,
           child: Column(
             children: [
+              if (Platform.isMacOS && !widget.isPinned)
+                const MacosTrafficLightTopInset(height: 48),
               _buildFluentDrawerHeader(
                 context,
                 resources: resources,

@@ -172,6 +172,9 @@ jobs:
           echo "- **APK**: \`CBFileHub-$VERSION-armeabi-v7a.apk\` (32-bit)" >> release_notes.md
           echo "- **AAB**: \`CBFileHub-$VERSION.aab\` (For Google Play)" >> release_notes.md
           echo "" >> release_notes.md
+          echo "### macOS" >> release_notes.md
+          echo "- **DMG**: \`CBFileHub-$VERSION-macos.dmg\` - Universal (Apple Silicon + Intel), macOS 12+" >> release_notes.md
+          echo "" >> release_notes.md
           echo "## 🚀 Installation" >> release_notes.md
           echo "" >> release_notes.md
           echo "### Windows" >> release_notes.md
@@ -192,6 +195,13 @@ jobs:
           echo "### Android" >> release_notes.md
           echo "- Download and install the \`.apk\` file" >> release_notes.md
           echo "- Enable \"Install from Unknown Sources\" if needed" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### macOS" >> release_notes.md
+          echo "The app is not notarized by Apple, so macOS asks you to allow it once:" >> release_notes.md
+          echo "1. Open \`CBFileHub-$VERSION-macos.dmg\` and drag **CB File Hub** into **Applications**" >> release_notes.md
+          echo "2. Open the app; when macOS says it cannot verify it, click **Done**" >> release_notes.md
+          echo "3. Go to **System Settings → Privacy & Security** and click **Open Anyway** next to the CB File Hub message" >> release_notes.md
+          echo "4. Confirm **Open Anyway** and enter your password" >> release_notes.md
 
           # Save to output
           {
@@ -465,6 +475,39 @@ jobs:
           SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
           echo "Partner Center draft prepared: $SUBMISSION_ID"
 
+  # Build macOS DMG (ad-hoc signed, not notarized: users allow it once via
+  # System Settings > Privacy & Security > Open Anyway)
+  build-macos:
+    runs-on: macos-latest
+    needs: generate-release-notes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: "stable"
+
+      - name: Build macOS DMG
+        run: bash scripts/build.sh macos
+
+      - name: Check DMG name
+        run: |
+          DMG="${{ env.PROJECT_DIR }}/build/macos/dmg/CBFileHub-${{ needs.generate-release-notes.outputs.version_name }}-macos.dmg"
+          if [ ! -f "$DMG" ]; then
+            echo "::error::DMG not found at $DMG"
+            ls -la "${{ env.PROJECT_DIR }}/build/macos/dmg" || true
+            exit 1
+          fi
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: macos-dmg
+          path: ${{ env.PROJECT_DIR }}/build/macos/dmg/*.dmg
+
   # Build Android APK
   build-android-apk:
     runs-on: ubuntu-latest
@@ -619,6 +662,7 @@ jobs:
       - generate-release-notes
       - build-windows
       - build-windows-msi
+      - build-macos
       - build-android-apk
       - build-android-aab
     permissions:
@@ -643,6 +687,7 @@ jobs:
           files: |
             artifacts/windows-build/*.zip
             artifacts/windows-msi/*.msi
+            artifacts/macos-dmg/*.dmg
             artifacts/android-apk/*.apk
             artifacts/android-aab/*.aab
         env:

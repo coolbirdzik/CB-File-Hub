@@ -302,8 +302,12 @@ class _ModernTabBarState extends State<_ModernTabBar> {
   static const Duration _doubleClickTimeout = Duration(milliseconds: 350);
   static const double _doubleClickSlop = 22.0;
 
+  // Windows and macOS hide the native title bar, so the blank strip stands in
+  // for it: drag to move the window, double-click to maximize/zoom.
+  bool get _hasCustomTitleBar => Platform.isWindows || Platform.isMacOS;
+
   Future<void> _toggleMaximizeRestore() async {
-    if (!Platform.isWindows) return;
+    if (!_hasCustomTitleBar) return;
     try {
       final isMax = await windowManager.isMaximized();
       if (isMax) {
@@ -315,7 +319,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
   }
 
   bool _isBlankStripPosition(Offset globalPosition) {
-    if (!Platform.isWindows) return false;
+    if (!_hasCustomTitleBar) return false;
 
     final stripContext = _tabStripKey.currentContext;
     final rowContext = _tabRowKey.currentContext;
@@ -597,7 +601,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
       child: Listener(
         key: _tabStripKey,
         onPointerDown: (e) {
-          if (!Platform.isWindows) return;
+          if (!_hasCustomTitleBar) return;
           if (e.kind != PointerDeviceKind.mouse) return;
           if (e.buttons != kPrimaryMouseButton) return;
           if (!_isBlankStripPosition(e.position)) return;
@@ -607,7 +611,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
           _blankDragStarted = false;
         },
         onPointerMove: (e) {
-          if (!Platform.isWindows) return;
+          if (!_hasCustomTitleBar) return;
           if (!_blankDragEligible) return;
           if (_blankPointerDownGlobal == null) return;
           if ((e.buttons & kPrimaryMouseButton) == 0) {
@@ -625,7 +629,7 @@ class _ModernTabBarState extends State<_ModernTabBar> {
           unawaited(windowManager.startDragging());
         },
         onPointerUp: (e) {
-          if (!Platform.isWindows) {
+          if (!_hasCustomTitleBar) {
             _resetBlankDrag();
             return;
           }

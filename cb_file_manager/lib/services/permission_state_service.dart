@@ -2,12 +2,18 @@ import 'dart:io';
 
 import 'package:cb_file_manager/e2e/cb_e2e_config.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PermissionStateService {
   PermissionStateService._();
 
   static final PermissionStateService instance = PermissionStateService._();
+
+  static const MethodChannel _macosWindowChannel = MethodChannel(
+    'cb_file_manager/macos_window',
+  );
 
   Future<bool> hasStorageOrPhotosPermission() async {
     // An E2E run reinstalls the app for every pass, so the runtime permissions
@@ -55,8 +61,35 @@ class PermissionStateService {
         return false;
       }
     }
+    if (Platform.isMacOS) return _hasMacosFullDiskAccess();
     // iOS doesn't have this permission
     return true;
+  }
+
+  /// macOS has no API to query Full Disk Access, so probe files that TCC only
+  /// lets FDA apps open. Stat still works without it, so a probe that exists
+  /// but cannot be opened means access is missing.
+  bool _hasMacosFullDiskAccess() {
+    final home = Platform.environment['HOME'] ?? '';
+    final probes = <String>[
+      '$home/Library/Application Support/com.apple.TCC/TCC.db',
+      '/Library/Application Support/com.apple.TCC/TCC.db',
+      '$home/Library/Safari/Bookmarks.plist',
+    ];
+    var probed = false;
+    for (final path in probes) {
+      final file = File(path);
+      if (!file.existsSync()) continue;
+      probed = true;
+      try {
+        file.openSync().closeSync();
+        return true;
+      } on FileSystemException {
+        continue;
+      }
+    }
+    // Nothing to probe: do not block the user on a check we cannot make.
+    return !probed;
   }
 
   Future<bool> hasLocalNetworkPermission() async {
@@ -129,7 +162,12 @@ class PermissionStateService {
     return true;
   }
 
-  Future<bool> requestAllFilesAccess() async {
+  /// On macOS, [macosHelperTitle] and [macosHelperMessage] label the card
+  /// that walks the user through dragging the app into the settings list.
+  Future<bool> requestAllFilesAccess({
+    String? macosHelperTitle,
+    String? macosHelperMessage,
+  }) async {
     if (Platform.isAndroid) {
       try {
         final manage = await Permission.manageExternalStorage.request();
@@ -145,6 +183,29 @@ class PermissionStateService {
         await openAppSettings();
         return false;
       }
+    }
+    if (Platform.isMacOS) {
+      if (_hasMacosFullDiskAccess()) return true;
+      // No app may add itself to Full Disk Access. Open the list and float a
+      // draggable app icon beside it (macos/Runner/MainFlutterWindow.swift);
+      // dropping it in makes macOS ask the user to approve with Touch ID.
+      try {
+        await launchUrl(
+          Uri.parse(
+            'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+          ),
+        );
+        await _macosWindowChannel.invokeMethod<void>(
+          'showFullDiskAccessHelper',
+          <String, String>{
+            'title': macosHelperTitle ?? '',
+            'message': macosHelperMessage ?? '',
+          },
+        );
+      } catch (e) {
+        debugPrint('Error opening macOS Full Disk Access settings: $e');
+      }
+      return false;
     }
     // iOS doesn't have this permission
     return true;
