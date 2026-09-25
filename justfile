@@ -22,6 +22,12 @@ pubspec := project_dir / "pubspec.yaml"
 e2e_device := env("E2E_DEVICE", "windows")
 test_reporter := env("TEST_REPORTER", "expanded")
 
+# Cloud backup OAuth ids live in a git-ignored .env at the repo root (template:
+# .env.example). Recipes that call flutter directly pass it through; the ones
+# that go through scripts/build.sh get it from the script instead.
+env_file := justfile_directory() / ".env"
+dart_env := if path_exists(env_file) == "true" { "--dart-define-from-file=../.env" } else { "" }
+
 # Default recipe: show help
 default:
     @just --list --unsorted
@@ -167,13 +173,17 @@ e2e-clean full_startup="false" full_screenshots="false": kill-cb
 e2e-file file suite="": kill-cb
     cd {{project_dir}} && dart run tool/e2e_parallel.dart --file {{file}} {{ if suite != "" { '--plain-name "' + suite + '"' } else { "" } }}
 
+# Run the app on a device with the local .env applied (default: windows)
+run device="windows": deps
+    cd {{project_dir}} && {{flutter}} run -d {{device}} {{dart_env}}
+
 # =============================================================================
 # Build
 # =============================================================================
 
 # Build Windows portable (ZIP)
 windows: deps fetch-llama
-    cd {{project_dir}} && {{flutter}} build windows --release
+    cd {{project_dir}} && {{flutter}} build windows --release {{dart_env}}
     mkdir -p {{build_dir}}/windows/portable
     cd {{build_dir}}/windows/x64/runner/Release && if command -v zip >/dev/null 2>&1; then zip -r ../../portable/CBFileHub-Portable.zip ./*; elif command -v 7z >/dev/null 2>&1; then 7z a -tzip ../../portable/CBFileHub-Portable.zip ./*; fi
 
@@ -191,27 +201,27 @@ windows-msix-store:
 
 # Build Android APK
 android: clean deps
-    cd {{project_dir}} && {{flutter}} build apk --release --split-per-abi
+    cd {{project_dir}} && {{flutter}} build apk --release --split-per-abi {{dart_env}}
 
 # Build Android AAB
 android-aab: clean deps
-    cd {{project_dir}} && {{flutter}} build appbundle --release
+    cd {{project_dir}} && {{flutter}} build appbundle --release {{dart_env}}
 
 # Build Linux
 linux: clean deps
-    cd {{project_dir}} && {{flutter}} build linux --release
+    cd {{project_dir}} && {{flutter}} build linux --release {{dart_env}}
     mkdir -p {{build_dir}}/linux/portable
     cd {{build_dir}}/linux/x64/release && tar -czf ../portable/CBFileHub-Linux.tar.gz bundle/
 
 # Build macOS
 macos: clean deps
-    cd {{project_dir}} && {{flutter}} build macos --release
+    cd {{project_dir}} && {{flutter}} build macos --release {{dart_env}}
     mkdir -p {{build_dir}}/macos/portable
     cd {{build_dir}}/macos/Build/Products/Release && zip -r ../../../portable/CBFileHub-macOS.zip cb_file_hub.app
 
 # Build iOS
 ios: clean deps
-    cd {{project_dir}} && {{flutter}} build ios --release --no-codesign
+    cd {{project_dir}} && {{flutter}} build ios --release --no-codesign {{dart_env}}
 
 # Build all platforms (best-effort, skips failures)
 all:

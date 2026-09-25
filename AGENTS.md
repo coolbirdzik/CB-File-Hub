@@ -93,6 +93,12 @@ Passed via `--dart-define=FLAG=value`:
 - `CB_SHOW_DEV_OVERLAY=true` — shows developer debug overlay
 - `CB_ENABLE_FLUENT_DESKTOP_SHELL` — Fluent UI shell toggle
 
+Cloud Backup & Sync OAuth client ids come from a git-ignored `.env` in the repo
+root (template: `.env.example`). `scripts/build.sh` loads it, and the `just`
+recipes that call flutter directly pass `--dart-define-from-file`. Missing keys
+just mark that provider unavailable — builds never fail over them. See
+`docs/features/08-cloud-backup-sync.md`.
+
 ## Key conventions
 
 - **`avoid_print` is disabled** in `analysis_options.yaml` — `print()` is intentionally used in dev/debug code.

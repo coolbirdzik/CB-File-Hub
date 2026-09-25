@@ -319,6 +319,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
     if (path == '#tags') return context.tr.tags;
     if (path == '#network') return context.tr.networkTab;
     if (path == '#trash') return context.tr.trashBin;
+    if (isBackupSyncPath(path)) return context.tr.backupAndSync;
     if (isDrivesPath(path)) return context.tr.drivesTab;
     return _getStorageDisplayName(path);
   }

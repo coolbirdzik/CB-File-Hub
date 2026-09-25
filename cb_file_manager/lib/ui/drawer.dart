@@ -492,6 +492,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
 
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 14),
+
                         child: Divider(
                           height: 1,
                           thickness: 1,
@@ -687,6 +688,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                           ),
                         ),
                         const SizedBox(height: _FluentDrawerTokens.groupGap),
+
                         _fluentNavigationItem(
                           context,
                           icon: PhosphorIconsLight.tag,

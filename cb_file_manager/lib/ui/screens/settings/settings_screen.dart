@@ -4,15 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
-import 'package:cb_file_manager/helpers/files/save_location_picker.dart';
 import 'package:cb_file_manager/config/language_controller.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/network/network_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/core/app_path_helper.dart';
 import 'package:cb_file_manager/ui/screens/settings/cache_management_screen.dart';
 import 'package:cb_file_manager/ui/screens/settings/database_settings_screen.dart';
+import 'package:cb_file_manager/ui/screens/backup_sync/backup_sync_screen.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/utils/platform_utils.dart';
@@ -24,7 +25,6 @@ import 'package:cb_file_manager/providers/theme_provider.dart';
 import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/services/video_library_cache_service.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/screens/settings/ai_settings_section.dart';
@@ -79,8 +79,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const String _appAuthor = 'COOLBIRDZIK - ngtanhung41@gmail.com';
 
   // Database section state
-  bool _isCloudSyncEnabled = false;
-  bool _isSyncingCloud = false;
   Map<String, int> _popularTags = {};
   int _totalTagCount = 0;
   int _totalFileCount = 0;
@@ -1118,7 +1116,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   bool _isDatabaseSectionExpanded = true;
-  bool _isDatabaseSectionExpandedCloudSync = false;
 
   Widget _buildDatabaseSection() {
     return Card(
@@ -1174,51 +1171,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
-          // Quick actions (always visible)
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            leading: const Icon(PhosphorIconsLight.uploadSimple, size: 20),
-            title: Text(
-              AppLocalizations.of(context)!.exportSettings,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            subtitle: Text(
-              AppLocalizations.of(context)!.exportDescription,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: const Icon(PhosphorIconsLight.caretRight, size: 16),
-            onTap: () => _exportDatabase(context),
-          ),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            leading: const Icon(PhosphorIconsLight.downloadSimple, size: 20),
-            title: Text(
-              AppLocalizations.of(context)!.importSettings,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            subtitle: Text(
-              AppLocalizations.of(context)!.importDescription,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: const Icon(PhosphorIconsLight.caretRight, size: 16),
-            onTap: () => _importDatabase(context),
-          ),
           // Expanded content
           if (_isDatabaseSectionExpanded) ...[
             const Divider(),
@@ -1257,81 +1209,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            // Cloud Sync Section
-            CbExpander(
-              expanded: _isDatabaseSectionExpandedCloudSync,
-              onExpansionChanged: (expanded) =>
-                  _isDatabaseSectionExpandedCloudSync = expanded,
-              leading: const Icon(PhosphorIconsLight.cloudArrowUp),
-              title: const Text('Cloud Sync'),
-              subtitle: Text(_isCloudSyncEnabled ? 'Enabled' : 'Disabled'),
-              trailing: Switch(
-                value: _isCloudSyncEnabled,
-                onChanged: _toggleCloudSync,
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Sync your tags and albums across devices',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _isCloudSyncEnabled && !_isSyncingCloud
-                                  ? _syncToCloud
-                                  : null,
-                              icon: _isSyncingCloud
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      PhosphorIconsLight.cloudArrowUp,
-                                      size: 16,
-                                    ),
-                              label: Text(
-                                AppLocalizations.of(context)!.upload,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _isCloudSyncEnabled && !_isSyncingCloud
-                                  ? _syncFromCloud
-                                  : null,
-                              icon: const Icon(
-                                PhosphorIconsLight.cloudArrowDown,
-                                size: 16,
-                              ),
-                              label: Text(
-                                AppLocalizations.of(context)!.download,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
             // Popular Tags + Stats Section
             if (_isDatabaseStatsLoading)
               const Padding(
@@ -1437,6 +1314,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
               const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: OutlinedButton.icon(
+                  onPressed: _openBackupAndSync,
+                  icon: const Icon(PhosphorIconsLight.archive, size: 16),
+                  label: Text(AppLocalizations.of(context)!.backupAndSync),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
+                  ),
+                ),
+              ),
               // Open Advanced Database Settings
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -1505,9 +1393,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await _databaseManager.initialize();
 
-      // Load cloud sync state
-      _isCloudSyncEnabled = _databaseManager.isCloudSyncEnabled();
-
       // Get all unique tags
       final allTags = await _databaseManager.getAllUniqueTags();
       if (!mounted) return;
@@ -1531,212 +1416,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Opens Backup & Sync inside the current tab (same pattern as #settings)
+  /// so it does not cover the tab bar; falls back to a route when no tab host.
+  void _openBackupAndSync() {
+    TabManagerBloc? tabBloc;
+    try {
+      tabBloc = context.read<TabManagerBloc>();
+    } catch (_) {
+      tabBloc = null;
+    }
+
+    final activeTab = tabBloc?.state.activeTab;
+    if (tabBloc != null && activeTab != null) {
+      tabBloc.add(UpdateTabPath(activeTab.id, kBackupSyncPath));
+      tabBloc.add(
+        UpdateTabName(
+          activeTab.id,
+          AppLocalizations.of(context)!.backupAndSync,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BackupSyncScreen()),
+    );
+  }
+
   void _openAdvancedDatabaseSettings() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const DatabaseSettingsScreen()),
     );
-  }
-
-  Future<void> _toggleCloudSync(bool value) async {
-    try {
-      _databaseManager.setCloudSyncEnabled(value);
-      await _preferences.setCloudSyncEnabled(value);
-      if (mounted) {
-        setState(() {
-          _isCloudSyncEnabled = value;
-        });
-        final l10n = AppLocalizations.of(context)!;
-        AppToast.success(
-          context,
-          value ? l10n.cloudSyncEnabled : l10n.cloudSyncDisabled,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error toggling cloud sync: $e');
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        AppToast.error(context, l10n.errorWithMessage(e.toString()));
-      }
-    }
-  }
-
-  Future<void> _syncToCloud() async {
-    if (!_isCloudSyncEnabled) return;
-    setState(() => _isSyncingCloud = true);
-    try {
-      final success = await _databaseManager.syncToCloud();
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        AppToast.success(
-          context,
-          success ? l10n.syncToCloudSuccess : l10n.syncToCloudFailed,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error syncing to cloud: $e');
-    } finally {
-      if (mounted) setState(() => _isSyncingCloud = false);
-    }
-  }
-
-  Future<void> _syncFromCloud() async {
-    if (!_isCloudSyncEnabled) return;
-    setState(() => _isSyncingCloud = true);
-    try {
-      final success = await _databaseManager.syncFromCloud();
-      if (success) {
-        await _loadDatabaseStats();
-      }
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        AppToast.success(
-          context,
-          success ? l10n.syncFromCloudSuccess : l10n.syncFromCloudFailed,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error syncing from cloud: $e');
-    } finally {
-      if (mounted) setState(() => _isSyncingCloud = false);
-    }
-  }
-
-  Future<void> _exportDatabase(BuildContext context) async {
-    // Pre-extract context-dependent values before async gaps
-    final l10n = AppLocalizations.of(context)!;
-    final toast = AppToast.capture(context);
-
-    PickedSaveLocation? picked;
-    try {
-      picked = await pickSaveLocation(
-        dialogTitle: l10n.saveDatabaseExport,
-        fileName:
-            'cb_file_hub_db_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-
-      if (picked != null) {
-        final dbManager = DatabaseManager.getInstance();
-        final exported = await dbManager.exportDatabase(
-          customPath: picked.scratchPath,
-        );
-        if (exported != null) {
-          final filePath = await picked.commit();
-          if (mounted) {
-            toast.success(l10n.exportSuccess + filePath);
-          }
-        } else {
-          await picked.discard();
-          if (mounted) {
-            toast.error(l10n.exportFailed);
-          }
-        }
-      }
-    } catch (e) {
-      await picked?.discard();
-      if (mounted) {
-        toast.error(l10n.errorExporting + e.toString());
-      }
-    }
-  }
-
-  Future<void> _importDatabase(BuildContext context) async {
-    // Pre-extract context-dependent values before async gaps
-    final l10n = AppLocalizations.of(context)!;
-    final toast = AppToast.capture(context);
-
-    try {
-      final picked = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-
-      if (picked?.path != null) {
-        final filePath = picked!.path!;
-
-        // Show loading dialog
-        if (!mounted) return;
-
-        // Store the navigator key to close dialog later
-        late NavigatorState dialogNavigator;
-        showDialog(
-          // ignore: use_build_context_synchronously
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) {
-            dialogNavigator = Navigator.of(dialogContext);
-            return PopScope(
-              canPop: false,
-              child: AlertDialog(
-                content: Row(
-                  children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(width: 20),
-                    Text(l10n.importing),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-
-        try {
-          final dbManager = DatabaseManager.getInstance();
-
-          // Use skipFileExistenceCheck: true to allow importing tags for files
-          // that don't exist yet (e.g., network drives, files to be added later)
-          final success = await dbManager.importDatabase(
-            filePath,
-            skipFileExistenceCheck: true,
-          );
-
-          // Close loading dialog
-          if (mounted) {
-            dialogNavigator.pop();
-          }
-
-          if (success) {
-            // Clear TagManager cache after successful import to ensure UI refreshes
-            // This fixes the issue where background shows empty after import
-            try {
-              // Clear the static cache in TagManager
-              TagManager.clearCache();
-              debugPrint(
-                'SettingsScreen: Cleared TagManager cache after import',
-              );
-            } catch (e) {
-              debugPrint('SettingsScreen: Error clearing cache: $e');
-            }
-
-            if (mounted) {
-              toast.success(l10n.importSuccess);
-            }
-          } else {
-            if (mounted) {
-              toast.error(l10n.importFailed);
-            }
-          }
-        } catch (e) {
-          // Close loading dialog on error
-          if (mounted) {
-            try {
-              dialogNavigator.pop();
-            } catch (_) {}
-
-            toast.error(l10n.errorImporting + e.toString());
-          }
-        }
-      } else {
-        toast.info(l10n.importCancelled);
-      }
-    } catch (e) {
-      // Handle picker errors
-      if (mounted) {
-        toast.error(l10n.errorImporting + e.toString());
-      }
-    }
   }
 
   Widget _buildSectionCard({

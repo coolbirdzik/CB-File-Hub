@@ -1,0 +1,6 @@
+node_modules/
+.cache/
+# Gatsby build output (Firebase Hosting deploys this folder). Sources live in src/ and static/.
+public/
+firebase-debug.log
+.firebase/

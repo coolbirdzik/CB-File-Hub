@@ -114,6 +114,7 @@ dependencies:
   xterm:
     path: third_party/xterm # Flutter view-aware text input; see PATCHES.md
   pinenacl: ^0.6.0
+  google_sign_in: ^7.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

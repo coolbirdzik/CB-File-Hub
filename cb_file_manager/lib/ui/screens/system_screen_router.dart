@@ -34,6 +34,7 @@ import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import '../utils/route.dart';
 import 'trash_bin/trash_bin_screen.dart';
 import 'settings/settings_screen.dart';
+import 'backup_sync/backup_sync_screen.dart';
 import 'ai_chat/ai_chat_screen.dart';
 import 'cb_agent_cleaner/cb_agent_cleaner_screen.dart';
 import 'package:path/path.dart' as pathlib;
@@ -101,6 +102,8 @@ class SystemScreenRouter {
         return TrashBinScreen(tabId: tabId);
       case '#settings':
         return const SettingsScreen();
+      case '#backup-sync':
+        return const BackupSyncScreen();
       case '#network':
         return NetworkConnectionScreen(tabId: tabId);
       case '#smb':

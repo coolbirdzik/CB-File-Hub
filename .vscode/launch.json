@@ -9,13 +9,15 @@
             "name": "cb_file_manager",
             "cwd": "cb_file_manager",
             "request": "launch",
-            "type": "dart"
+            "type": "dart",
+            "toolArgs": ["--dart-define-from-file=../.env"]
         },
         {
             "name": "cb_file_manager (profile mode)",
             "cwd": "cb_file_manager",
             "request": "launch",
             "type": "dart",
+            "toolArgs": ["--dart-define-from-file=../.env"],
             "flutterMode": "profile"
         },
         {
@@ -23,6 +25,7 @@
             "cwd": "cb_file_manager",
             "request": "launch",
             "type": "dart",
+            "toolArgs": ["--dart-define-from-file=../.env"],
             "flutterMode": "release"
         }
     ]

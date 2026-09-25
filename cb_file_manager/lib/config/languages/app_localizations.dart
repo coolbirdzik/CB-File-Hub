@@ -547,6 +547,23 @@ abstract class AppLocalizations {
   String get syncFromCloudSuccess;
   String get syncFromCloudFailed;
   String get enableDatabaseForCloud;
+  String get backupAndSync;
+  String get chooseCloudSyncFolder;
+  String get cloudBackupNotFound;
+  String get cloudProvider;
+  String get cloudProviderNotConfigured;
+  String get localSyncFolder;
+  String get localSyncFolderDescription;
+  String get openingBrowserToSignIn;
+  String connectedAsAccount(String account);
+  String cloudBackupsStoredIn(String folder);
+  String get chooseBackupToRestore;
+  String get noCloudBackupsYet;
+  String get uploadingBackup;
+  String get downloadingBackup;
+  String backupUploadedTo(String provider);
+  String get deleteCloudBackupConfirm;
+  String get connectCloudFirst;
 
   // Database statistics
   String get databaseStatistics;
@@ -616,6 +633,13 @@ abstract class AppLocalizations {
   String settingsRestored(int count);
   String get saveBackup;
   String get exportPreferencesAsJson;
+  String get exportBackupZip;
+  String get exportBackupZipDesc;
+  String get importBackupZip;
+  String get importBackupZipDesc;
+  String get backupSettingsPart;
+  String get backupTagsPart;
+  String get continueText;
   String get sharedPreferencesKeyRemoved;
   String get jsonCopiedToClipboard;
   String get copyValue;

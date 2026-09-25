@@ -1032,6 +1032,43 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get enableDatabaseForCloud =>
       'Bật cơ sở dữ liệu SQLite để sử dụng đồng bộ đám mây';
+  @override
+  String get backupAndSync => 'Sao lưu & Đồng bộ';
+  @override
+  String get chooseCloudSyncFolder => 'Chọn thư mục đồng bộ';
+  @override
+  String get cloudBackupNotFound => 'Không tìm thấy bản sao lưu đồng bộ';
+  @override
+  String get cloudProvider => 'Dịch vụ cloud';
+  @override
+  String get cloudProviderNotConfigured =>
+      'Bản build này chưa cấu hình OAuth client ID cho dịch vụ đó';
+  @override
+  String get localSyncFolder => 'Thư mục đồng bộ trên máy';
+  @override
+  String get localSyncFolderDescription =>
+      'Ghi file sao lưu vào thư mục mà ứng dụng đồng bộ trên máy đang theo dõi';
+  @override
+  String get openingBrowserToSignIn => 'Đang mở trình duyệt để đăng nhập...';
+  @override
+  String connectedAsAccount(String account) => 'Đã kết nối: $account';
+  @override
+  String cloudBackupsStoredIn(String folder) =>
+      'Bản sao lưu được lưu trong $folder';
+  @override
+  String get chooseBackupToRestore => 'Chọn bản sao lưu để khôi phục';
+  @override
+  String get noCloudBackupsYet => 'Chưa có bản sao lưu nào trên drive này';
+  @override
+  String get uploadingBackup => 'Đang tải bản sao lưu lên...';
+  @override
+  String get downloadingBackup => 'Đang tải bản sao lưu về...';
+  @override
+  String backupUploadedTo(String provider) => 'Đã sao lưu lên $provider';
+  @override
+  String get deleteCloudBackupConfirm => 'Xoá bản sao lưu này khỏi cloud?';
+  @override
+  String get connectCloudFirst => 'Hãy kết nối dịch vụ cloud trước';
 
   // Database statistics
   @override
@@ -1172,6 +1209,20 @@ class VietnameseLocalizations implements AppLocalizations {
   String get saveBackup => 'Lưu bản sao lưu';
   @override
   String get exportPreferencesAsJson => 'Xuất cài đặt ra JSON';
+  @override
+  String get exportBackupZip => 'Xuất bản sao lưu ZIP';
+  @override
+  String get exportBackupZipDesc => 'Chọn cài đặt và thẻ muốn xuất';
+  @override
+  String get importBackupZip => 'Nhập bản sao lưu ZIP';
+  @override
+  String get importBackupZipDesc => 'Chọn phần muốn khôi phục';
+  @override
+  String get backupSettingsPart => 'Cài đặt';
+  @override
+  String get backupTagsPart => 'Thẻ';
+  @override
+  String get continueText => 'Tiếp tục';
   @override
   String get sharedPreferencesKeyRemoved =>
       'Đã xóa cài đặt khỏi SharedPreferences.';

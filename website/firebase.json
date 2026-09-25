@@ -1,0 +1,19 @@
+{
+  "hosting": {
+    "site": "cbfilehub",
+    "public": "public",
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "ignore": ["firebase.json", "**/.*", "**/*.map", "webpack.stats.json", "chunk-map.json"],
+    "headers": [
+      {
+        "source": "**/*.@(css|js|png|webp|woff|woff2)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+      },
+      {
+        "source": "page-data/**",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+      }
+    ]
+  }
+}

@@ -57,17 +57,23 @@ fi
 
 RELEASE_NOTES_FILE="$OUTPUT_DIR/release_notes.md"
 
+# CI housekeeping (e.g. "ci: auto bump build number") means nothing to users: leave it out.
+# `|| true` keeps pipefail happy when every commit in the range is a ci: commit.
+drop_ci_commits() {
+    grep -vE '^- ci(\([^)]*\))?!?:' || true
+}
+
 {
     echo "# CB File Hub $VERSION_NAME"
     echo
     if [[ -n "$PREVIOUS_TAG" ]]; then
         echo "Changes from \`$PREVIOUS_TAG\` to \`$RELEASE_TAG\`."
         echo
-        git -C "$REPO_DIR" log --reverse --pretty=format:'- %s (%h)' "$PREVIOUS_TAG..$RELEASE_REF"
+        git -C "$REPO_DIR" log --reverse --pretty=format:'- %s (%h)' "$PREVIOUS_TAG..$RELEASE_REF" | drop_ci_commits
     else
         echo "Changes included in the first tagged release."
         echo
-        git -C "$REPO_DIR" log --reverse --pretty=format:'- %s (%h)' "$RELEASE_REF"
+        git -C "$REPO_DIR" log --reverse --pretty=format:'- %s (%h)' "$RELEASE_REF" | drop_ci_commits
     fi
     echo
 } >"$RELEASE_NOTES_FILE"

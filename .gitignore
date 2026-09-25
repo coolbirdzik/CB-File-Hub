@@ -16,3 +16,11 @@ _bmad
 *.pfx
 .kilo
 .gitnexus/
+
+# Build-time secrets/config (see .env.example)
+.env
+.env.local
+!.env.example
+
+# Firebase Hosting deploy cache
+website/.firebase/

@@ -44,6 +44,49 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# OAuth client ids for Backup & Sync (see docs/features/08-cloud-backup-sync.md).
+# Each one is compiled in via --dart-define only when its env var is set, so a
+# local build without them still works and just greys out that provider.
+CLOUD_OAUTH_ENV_VARS=(
+    GOOGLE_DRIVE_CLIENT_ID
+    GOOGLE_DRIVE_CLIENT_SECRET
+    GOOGLE_DRIVE_SERVER_CLIENT_ID
+    DROPBOX_APP_KEY
+    ONEDRIVE_CLIENT_ID
+)
+
+# A .env in the repo root fills in whatever the environment did not set, so a
+# local build needs no exports while CI secrets still win over the file.
+CLOUD_ENV_FILE="${CB_ENV_FILE:-$REPO_DIR/.env}"
+if [ -f "$CLOUD_ENV_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line#"${line%%[![:space:]]*}"}"          # trim leading space
+        case "$line" in ''|'#'*) continue ;; esac
+        line="${line#export }"
+        key="${line%%=*}"
+        value="${line#*=}"
+        [ "$key" = "$line" ] && continue                 # no '=' on the line
+        key="${key%"${key##*[![:space:]]}"}"             # trim trailing space
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%$'\r'}"
+        # Strip one layer of matching quotes, the way a shell would.
+        case "$value" in
+            \"*\") value="${value#\"}"; value="${value%\"}" ;;
+            \'*\') value="${value#\'}"; value="${value%\'}" ;;
+        esac
+        if [ -z "${!key:-}" ]; then
+            export "$key=$value"
+        fi
+    done < "$CLOUD_ENV_FILE"
+fi
+
+CLOUD_DEFINES=()
+for var in "${CLOUD_OAUTH_ENV_VARS[@]}"; do
+    if [ -n "${!var:-}" ]; then
+        CLOUD_DEFINES+=("--dart-define=$var=${!var}")
+    fi
+done
+
 escape_powershell_single_quotes() {
     echo "${1//\'/\'\'}"
 }
@@ -439,13 +482,13 @@ build_windows_portable() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_windows_version_code)
-    if ! flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" 2>&1 | tee /tmp/flutter_build.log; then
+    if ! flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}" 2>&1 | tee /tmp/flutter_build.log; then
         # Check if it's the known CMake/VS race condition error
         if grep -q "MSB3073\|CMake.*failed\|Visual Studio" /tmp/flutter_build.log 2>/dev/null; then
             print_warning "First build failed (known CMake race condition)"
             print_info "Retrying build automatically..."
             sleep 2
-            flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"
+            flutter build windows --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
         else
             # Different error, don't retry
             cd ..
@@ -751,6 +794,12 @@ build_windows_msix() {
         msix_cmd+=(--publisher "$PUBLISHER")
     fi
 
+    # msix:create rebuilds Windows itself, so the OAuth defines must be
+    # forwarded or the packaged app ships without cloud providers.
+    if [ ${#CLOUD_DEFINES[@]} -gt 0 ]; then
+        msix_cmd+=(--windows-build-args "${CLOUD_DEFINES[*]}")
+    fi
+
     "${msix_cmd[@]}"
 
     if [ $? -eq 0 ]; then
@@ -776,7 +825,7 @@ build_android_apk() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build apk --release --split-per-abi --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"
+    flutter build apk --release --split-per-abi --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         print_success "Android APK build completed!"
@@ -801,7 +850,7 @@ build_android_aab() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"
+    flutter build appbundle --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         print_success "Android AAB build completed!"
@@ -826,7 +875,7 @@ build_linux() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build linux --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"
+    flutter build linux --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         print_info "Creating tar.gz package..."
@@ -862,7 +911,7 @@ build_macos() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build macos --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"
+    flutter build macos --release --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         print_info "Creating ZIP package..."
@@ -898,7 +947,7 @@ build_ios() {
     local VERSION_CODE
     VERSION_NAME=$(get_version_name)
     VERSION_CODE=$(get_version_code)
-    flutter build ios --release --no-codesign --build-name "$VERSION_NAME" --build-number "$VERSION_CODE"
+    flutter build ios --release --no-codesign --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" "${CLOUD_DEFINES[@]}"
     
     if [ $? -eq 0 ]; then
         print_success "iOS build completed!"

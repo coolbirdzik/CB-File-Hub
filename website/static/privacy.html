@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en" data-lang="en" data-title-en="Privacy Policy – CB File Hub" data-title-vi="Chính sách quyền riêng tư – CB File Hub">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy – CB File Hub</title>
+<meta name="description" content="How CB File Hub handles your data: files stay on your device, no analytics or ads, and cloud backup only touches the folder it creates.">
+<link rel="icon" type="image/png" href="/logo-badge.png?v=2">
+<link rel="stylesheet" href="/style.css">
+<script src="/lang.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/"><img src="/logo-badge.png?v=2" alt="">CB File Hub</a>
+    <nav class="nav">
+      <a href="/privacy" aria-current="page"><span class="en">Privacy</span><span class="vi">Quyền riêng tư</span></a>
+      <a href="/terms"><span class="en">Terms</span><span class="vi">Điều khoản</span></a>
+      <span class="lang-switch" role="group" aria-label="Language">
+        <button type="button" data-set-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-set-lang="vi" aria-pressed="false">VI</button>
+      </span>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ============================== ENGLISH ============================== -->
+<article class="doc en">
+  <h1>Privacy Policy</h1>
+  <p class="meta">Effective date: September 24, 2026 · Applies to CB File Hub on Windows, macOS, Linux, Android and iOS</p>
+
+  <p>CB File Hub ("the app", "we") is a file manager. This policy explains what information the app handles, where it goes, and the choices you have. We wrote it to be read, not skimmed past — the short version is below.</p>
+
+  <div class="summary">
+    <ul>
+      <li><strong>No account, no servers of our own.</strong> CB File Hub does not operate a backend that receives your data.</li>
+      <li><strong>No analytics, no ads, no tracking.</strong> The app contains no advertising or analytics SDKs and does not sell or share personal data.</li>
+      <li><strong>Your files stay on your device.</strong> Data leaves your device only when you turn on a feature that connects to a service you choose (cloud backup, a cloud AI provider, a network server).</li>
+      <li><strong>Google Drive access is limited</strong> to the files and folder the app itself creates (<code>drive.file</code> scope).</li>
+    </ul>
+  </div>
+
+  <nav class="toc" aria-label="Contents">
+    <ol>
+      <li><a href="#en-local">Data stored on your device</a></li>
+      <li><a href="#en-backup">Cloud Backup &amp; Sync</a></li>
+      <li><a href="#en-google">Google user data</a></li>
+      <li><a href="#en-ai">CB Agent (AI assistant)</a></li>
+      <li><a href="#en-network">Network connections &amp; streaming</a></li>
+      <li><a href="#en-permissions">Device permissions</a></li>
+      <li><a href="#en-thirdparty">Third-party services</a></li>
+      <li><a href="#en-sharing">Sharing &amp; selling</a></li>
+      <li><a href="#en-retention">Retention &amp; deletion</a></li>
+      <li><a href="#en-security">Security</a></li>
+      <li><a href="#en-children">Children</a></li>
+      <li><a href="#en-changes">Changes &amp; contact</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="en-local">1. Data stored on your device</h2>
+  <p>To work, the app keeps the following information locally, in its own database and settings on your device. It is not sent to us.</p>
+  <ul>
+    <li><strong>App data:</strong> settings, tags, smart albums, favourites, recent locations, open tabs, search history and thumbnail caches.</li>
+    <li><strong>Connection profiles:</strong> addresses, usernames and passwords for SMB, FTP, WebDAV, SFTP and SSH servers you add, and SSH keys you import or generate.</li>
+    <li><strong>AI settings:</strong> API keys you enter for AI providers, and your CB Agent conversations.</li>
+    <li><strong>Sign-in tokens</strong> for cloud backup providers, stored in your operating system's secure storage (Windows Credential Manager, macOS/iOS Keychain, Android Keystore, or the Linux secret service).</li>
+  </ul>
+
+  <h2 id="en-backup">2. Cloud Backup &amp; Sync</h2>
+  <p>Backup &amp; Sync is optional and off until you connect a provider. When you connect Google Drive, Dropbox or OneDrive:</p>
+  <ul>
+    <li>You sign in on the provider's own page in your browser or through the system account picker. CB File Hub never sees your password.</li>
+    <li>The app uploads a backup archive (a <code>.zip</code> containing your CB File Hub settings and tags) to a folder named <strong>CB File Hub Backups</strong> in your own cloud storage, and can list, download and restore those archives. <strong>Your personal files are not uploaded</strong> by this feature.</li>
+    <li>The app reads your account name and email address only to show which account is connected.</li>
+    <li>Data travels directly between your device and the provider over HTTPS. It does not pass through any server of ours.</li>
+  </ul>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Provider</th><th>Permissions requested</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Google Drive</td><td><code>drive.file</code>, <code>openid</code>, <code>email</code></td><td>Create and read only the backup files the app creates; show the connected account.</td></tr>
+      <tr><td>Dropbox</td><td><code>files.content.write</code>, <code>files.content.read</code>, <code>account_info.read</code></td><td>Upload, list and download backup archives; show the connected account.</td></tr>
+      <tr><td>OneDrive</td><td><code>Files.ReadWrite</code>, <code>User.Read</code>, <code>offline_access</code></td><td>Upload, list and download backup archives; show the connected account; stay signed in.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>You can disconnect a provider at any time in <em>Settings → Backup &amp; Sync</em>, which deletes the stored tokens from your device. You can also revoke access from your account settings at <a href="https://myaccount.google.com/permissions" rel="noopener">Google</a>, <a href="https://www.dropbox.com/account/connected_apps" rel="noopener">Dropbox</a> or <a href="https://account.live.com/consent/Manage" rel="noopener">Microsoft</a>.</p>
+
+  <h2 id="en-google">3. Google user data</h2>
+  <p>When you connect Google Drive, CB File Hub accesses:</p>
+  <ul>
+    <li>your email address, used only to display the connected account in the app;</li>
+    <li>files and folders in your Google Drive <em>that CB File Hub created</em> (the backup folder and archives), used only to store, list and restore your backups.</li>
+  </ul>
+  <p>This data is processed on your device only. It is not sent to us or to anyone else, not used for advertising, not used to train AI or machine-learning models, and not read by humans.</p>
+  <p class="note">CB File Hub's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+  <h2 id="en-ai">4. CB Agent (AI assistant)</h2>
+  <p>CB Agent can run in two ways, and you choose which:</p>
+  <ul>
+    <li><strong>Local models:</strong> the model runs entirely on your device. Your prompts and files are not sent anywhere. Downloading a model fetches it from the source you pick (for example Hugging Face), which sees a normal download request.</li>
+    <li><strong>Cloud AI providers</strong> (for example OpenAI, Anthropic, Google, OpenRouter, Mistral, Groq, DeepSeek or a custom endpoint): when you add your own API key and send a message, your message and any context the agent includes to answer it — such as file names, folder paths, file metadata, or file contents you ask it to read — are sent directly from your device to that provider. That provider's own privacy policy and terms apply to that data. We do not receive it.</li>
+  </ul>
+  <p>Actions the agent proposes (such as moving or deleting files) run on your device, and destructive actions ask for your confirmation.</p>
+
+  <h2 id="en-network">5. Network connections &amp; streaming</h2>
+  <ul>
+    <li><strong>Network servers:</strong> when you browse SMB, FTP, WebDAV, SFTP or SSH servers, the app connects directly to the addresses you enter, using the credentials you provide.</li>
+    <li><strong>Media streaming and casting:</strong> to play a file on another device, the app can start a temporary media server on your local network that serves only the files you choose to play.</li>
+  </ul>
+
+  <h2 id="en-permissions">6. Device permissions (Android)</h2>
+  <ul>
+    <li><strong>Storage and media access</strong> (including All files access): to browse, open, copy, move, rename and delete files — the core purpose of a file manager.</li>
+    <li><strong>Media location:</strong> to show photo location details stored in images you view. This stays on your device.</li>
+    <li><strong>Network and Wi-Fi state, Internet:</strong> for network browsing, streaming, cloud backup and cloud AI providers.</li>
+    <li><strong>Notifications, foreground service, wake lock:</strong> to keep media playing and show progress of long operations.</li>
+    <li><strong>Install packages:</strong> to let you open an APK file you select with the system installer.</li>
+    <li><strong>Phone state:</strong> CB File Hub does not use this to read or collect your phone number, call details or device identifiers.</li>
+  </ul>
+  <p>Permissions are requested when a feature needs them, and you can withdraw them in your system settings.</p>
+
+  <h2 id="en-thirdparty">7. Third-party services</h2>
+  <p>Services you connect — cloud storage providers, AI providers, model hosts, and network servers — process data under their own policies. App stores (Microsoft Store, Google Play, Apple App Store) may collect installation and crash diagnostics under their own policies and your device settings; we only see aggregated statistics those stores provide.</p>
+
+  <h2 id="en-sharing">8. Sharing &amp; selling</h2>
+  <p>We do not sell, rent or share your personal data, and we do not use it for advertising. Data reaches a third party only when you connect that party yourself, as described above.</p>
+
+  <h2 id="en-retention">9. Retention &amp; deletion</h2>
+  <ul>
+    <li>Local data stays on your device until you delete it in the app, clear the app's data, or uninstall the app.</li>
+    <li>Backup archives stay in your cloud storage until you delete them there — they are your files.</li>
+    <li>Disconnecting a provider removes its tokens from your device immediately.</li>
+  </ul>
+  <p>Because we hold no copy of your data, there is nothing for us to delete on a server; everything is under your control.</p>
+
+  <h2 id="en-security">10. Security</h2>
+  <p>Sign-in uses OAuth 2.0 with PKCE; tokens are kept in the operating system's secure storage; connections to cloud and AI providers use HTTPS. No method of storage or transmission is perfectly secure, so keep your device and accounts protected.</p>
+
+  <h2 id="en-children">11. Children</h2>
+  <p>CB File Hub is a general-purpose utility and is not directed at children under 13. We do not knowingly collect personal information from children.</p>
+
+  <h2 id="en-changes">12. Changes &amp; contact</h2>
+  <p>If this policy changes, we will update this page and its effective date. Significant changes will be noted in the app's release notes.</p>
+  <p>Questions or requests: open an issue at <a href="https://github.com/coolbirdzik/cb-file-hub/issues" rel="noopener">github.com/coolbirdzik/cb-file-hub/issues</a>.</p>
+</article>
+
+<!-- ============================ TIẾNG VIỆT ============================ -->
+<article class="doc vi" lang="vi">
+  <h1>Chính sách quyền riêng tư</h1>
+  <p class="meta">Ngày hiệu lực: 24/09/2026 · Áp dụng cho CB File Hub trên Windows, macOS, Linux, Android và iOS</p>
+
+  <p>CB File Hub ("ứng dụng", "chúng tôi") là một trình quản lý tệp. Chính sách này giải thích ứng dụng xử lý những thông tin nào, gửi chúng đi đâu và bạn có những lựa chọn gì. Bản tóm tắt ở ngay bên dưới.</p>
+
+  <div class="summary">
+    <ul>
+      <li><strong>Không tài khoản, không máy chủ riêng.</strong> CB File Hub không vận hành máy chủ nào để nhận dữ liệu của bạn.</li>
+      <li><strong>Không phân tích, không quảng cáo, không theo dõi.</strong> Ứng dụng không chứa SDK quảng cáo hay phân tích, và không bán hay chia sẻ dữ liệu cá nhân.</li>
+      <li><strong>Tệp của bạn ở trên thiết bị của bạn.</strong> Dữ liệu chỉ rời khỏi thiết bị khi bạn bật một tính năng kết nối tới dịch vụ do bạn chọn (sao lưu đám mây, nhà cung cấp AI, máy chủ mạng).</li>
+      <li><strong>Quyền truy cập Google Drive bị giới hạn</strong> ở các tệp và thư mục do chính ứng dụng tạo ra (phạm vi <code>drive.file</code>).</li>
+    </ul>
+  </div>
+
+  <nav class="toc" aria-label="Mục lục">
+    <ol>
+      <li><a href="#vi-local">Dữ liệu lưu trên thiết bị</a></li>
+      <li><a href="#vi-backup">Sao lưu &amp; đồng bộ đám mây</a></li>
+      <li><a href="#vi-google">Dữ liệu người dùng Google</a></li>
+      <li><a href="#vi-ai">CB Agent (trợ lý AI)</a></li>
+      <li><a href="#vi-network">Kết nối mạng &amp; phát trực tuyến</a></li>
+      <li><a href="#vi-permissions">Quyền trên thiết bị</a></li>
+      <li><a href="#vi-thirdparty">Dịch vụ bên thứ ba</a></li>
+      <li><a href="#vi-sharing">Chia sẻ &amp; mua bán dữ liệu</a></li>
+      <li><a href="#vi-retention">Lưu giữ &amp; xoá dữ liệu</a></li>
+      <li><a href="#vi-security">Bảo mật</a></li>
+      <li><a href="#vi-children">Trẻ em</a></li>
+      <li><a href="#vi-changes">Thay đổi &amp; liên hệ</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="vi-local">1. Dữ liệu lưu trên thiết bị</h2>
+  <p>Để hoạt động, ứng dụng lưu các thông tin sau ngay trên thiết bị của bạn, trong cơ sở dữ liệu và phần cài đặt của ứng dụng. Chúng không được gửi cho chúng tôi.</p>
+  <ul>
+    <li><strong>Dữ liệu ứng dụng:</strong> cài đặt, thẻ (tag), album thông minh, mục yêu thích, vị trí gần đây, các tab đang mở, lịch sử tìm kiếm và bộ nhớ đệm ảnh thu nhỏ.</li>
+    <li><strong>Hồ sơ kết nối:</strong> địa chỉ, tên người dùng và mật khẩu của các máy chủ SMB, FTP, WebDAV, SFTP, SSH mà bạn thêm, cùng các khoá SSH bạn nhập hoặc tạo.</li>
+    <li><strong>Cài đặt AI:</strong> khoá API bạn nhập cho các nhà cung cấp AI và các cuộc trò chuyện với CB Agent.</li>
+    <li><strong>Token đăng nhập</strong> của nhà cung cấp sao lưu, được lưu trong kho bảo mật của hệ điều hành (Windows Credential Manager, macOS/iOS Keychain, Android Keystore hoặc Linux secret service).</li>
+  </ul>
+
+  <h2 id="vi-backup">2. Sao lưu &amp; đồng bộ đám mây</h2>
+  <p>Tính năng này là tuỳ chọn và chỉ hoạt động khi bạn kết nối một nhà cung cấp. Khi bạn kết nối Google Drive, Dropbox hoặc OneDrive:</p>
+  <ul>
+    <li>Bạn đăng nhập trên trang của chính nhà cung cấp trong trình duyệt hoặc qua trình chọn tài khoản của hệ thống. CB File Hub không bao giờ thấy mật khẩu của bạn.</li>
+    <li>Ứng dụng tải một tệp sao lưu (<code>.zip</code> chứa cài đặt và thẻ của CB File Hub) lên thư mục <strong>CB File Hub Backups</strong> trong bộ nhớ đám mây của bạn, đồng thời có thể liệt kê, tải về và khôi phục các bản sao lưu đó. <strong>Tính năng này không tải tệp cá nhân của bạn lên.</strong></li>
+    <li>Ứng dụng chỉ đọc tên và địa chỉ email tài khoản để hiển thị tài khoản nào đang được kết nối.</li>
+    <li>Dữ liệu truyền trực tiếp giữa thiết bị của bạn và nhà cung cấp qua HTTPS, không đi qua máy chủ nào của chúng tôi.</li>
+  </ul>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Nhà cung cấp</th><th>Quyền yêu cầu</th><th>Mục đích</th></tr></thead>
+    <tbody>
+      <tr><td>Google Drive</td><td><code>drive.file</code>, <code>openid</code>, <code>email</code></td><td>Chỉ tạo và đọc các tệp sao lưu do ứng dụng tạo; hiển thị tài khoản đã kết nối.</td></tr>
+      <tr><td>Dropbox</td><td><code>files.content.write</code>, <code>files.content.read</code>, <code>account_info.read</code></td><td>Tải lên, liệt kê và tải về bản sao lưu; hiển thị tài khoản đã kết nối.</td></tr>
+      <tr><td>OneDrive</td><td><code>Files.ReadWrite</code>, <code>User.Read</code>, <code>offline_access</code></td><td>Tải lên, liệt kê và tải về bản sao lưu; hiển thị tài khoản; duy trì đăng nhập.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Bạn có thể ngắt kết nối bất cứ lúc nào tại <em>Cài đặt → Sao lưu &amp; Đồng bộ</em>; thao tác này xoá token khỏi thiết bị. Bạn cũng có thể thu hồi quyền trong cài đặt tài khoản tại <a href="https://myaccount.google.com/permissions" rel="noopener">Google</a>, <a href="https://www.dropbox.com/account/connected_apps" rel="noopener">Dropbox</a> hoặc <a href="https://account.live.com/consent/Manage" rel="noopener">Microsoft</a>.</p>
+
+  <h2 id="vi-google">3. Dữ liệu người dùng Google</h2>
+  <p>Khi bạn kết nối Google Drive, CB File Hub truy cập:</p>
+  <ul>
+    <li>địa chỉ email, chỉ dùng để hiển thị tài khoản đã kết nối trong ứng dụng;</li>
+    <li>các tệp và thư mục trong Google Drive <em>do CB File Hub tạo ra</em> (thư mục và tệp sao lưu), chỉ dùng để lưu, liệt kê và khôi phục bản sao lưu.</li>
+  </ul>
+  <p>Dữ liệu này chỉ được xử lý trên thiết bị của bạn. Nó không được gửi cho chúng tôi hay bất kỳ ai khác, không dùng cho quảng cáo, không dùng để huấn luyện mô hình AI/học máy và không bị con người đọc.</p>
+  <p class="note">Việc CB File Hub sử dụng và chuyển giao sang ứng dụng khác thông tin nhận được từ Google API sẽ tuân thủ <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Chính sách dữ liệu người dùng của Google API Services</a>, bao gồm các yêu cầu về Sử dụng giới hạn (Limited Use).</p>
+
+  <h2 id="vi-ai">4. CB Agent (trợ lý AI)</h2>
+  <p>CB Agent có thể chạy theo hai cách, do bạn chọn:</p>
+  <ul>
+    <li><strong>Mô hình cục bộ:</strong> mô hình chạy hoàn toàn trên thiết bị. Câu lệnh và tệp của bạn không được gửi đi đâu. Khi tải mô hình, ứng dụng tải từ nguồn bạn chọn (ví dụ Hugging Face), nơi đó chỉ thấy một yêu cầu tải xuống thông thường.</li>
+    <li><strong>Nhà cung cấp AI đám mây</strong> (ví dụ OpenAI, Anthropic, Google, OpenRouter, Mistral, Groq, DeepSeek hoặc endpoint tuỳ chỉnh): khi bạn thêm khoá API của riêng mình và gửi tin nhắn, tin nhắn cùng ngữ cảnh mà trợ lý đưa vào để trả lời — như tên tệp, đường dẫn thư mục, siêu dữ liệu, hoặc nội dung tệp bạn yêu cầu đọc — được gửi trực tiếp từ thiết bị tới nhà cung cấp đó. Chính sách quyền riêng tư và điều khoản của nhà cung cấp đó áp dụng cho dữ liệu này. Chúng tôi không nhận được dữ liệu đó.</li>
+  </ul>
+  <p>Các hành động trợ lý đề xuất (như di chuyển hoặc xoá tệp) chạy trên thiết bị của bạn, và các hành động có tính phá huỷ đều yêu cầu bạn xác nhận.</p>
+
+  <h2 id="vi-network">5. Kết nối mạng &amp; phát trực tuyến</h2>
+  <ul>
+    <li><strong>Máy chủ mạng:</strong> khi duyệt máy chủ SMB, FTP, WebDAV, SFTP hoặc SSH, ứng dụng kết nối trực tiếp tới địa chỉ bạn nhập, bằng thông tin đăng nhập bạn cung cấp.</li>
+    <li><strong>Phát và truyền media:</strong> để phát tệp trên thiết bị khác, ứng dụng có thể mở một máy chủ media tạm thời trong mạng nội bộ, chỉ phục vụ những tệp bạn chọn phát.</li>
+  </ul>
+
+  <h2 id="vi-permissions">6. Quyền trên thiết bị (Android)</h2>
+  <ul>
+    <li><strong>Truy cập bộ nhớ và media</strong> (bao gồm quyền truy cập mọi tệp): để duyệt, mở, sao chép, di chuyển, đổi tên và xoá tệp — chức năng cốt lõi của trình quản lý tệp.</li>
+    <li><strong>Vị trí trong media:</strong> để hiển thị thông tin vị trí được lưu trong ảnh bạn xem. Thông tin này ở lại trên thiết bị.</li>
+    <li><strong>Trạng thái mạng, Wi-Fi, Internet:</strong> cho duyệt mạng, phát trực tuyến, sao lưu đám mây và nhà cung cấp AI đám mây.</li>
+    <li><strong>Thông báo, dịch vụ nền, giữ màn hình/CPU:</strong> để tiếp tục phát media và hiển thị tiến trình các thao tác dài.</li>
+    <li><strong>Cài đặt gói:</strong> để bạn mở tệp APK đã chọn bằng trình cài đặt của hệ thống.</li>
+    <li><strong>Trạng thái điện thoại:</strong> CB File Hub không dùng quyền này để đọc hay thu thập số điện thoại, thông tin cuộc gọi hoặc mã định danh thiết bị.</li>
+  </ul>
+  <p>Quyền chỉ được yêu cầu khi tính năng cần đến, và bạn có thể thu hồi trong cài đặt hệ thống.</p>
+
+  <h2 id="vi-thirdparty">7. Dịch vụ bên thứ ba</h2>
+  <p>Các dịch vụ bạn kết nối — nhà cung cấp lưu trữ đám mây, nhà cung cấp AI, nơi lưu trữ mô hình và máy chủ mạng — xử lý dữ liệu theo chính sách riêng của họ. Các cửa hàng ứng dụng (Microsoft Store, Google Play, Apple App Store) có thể thu thập dữ liệu cài đặt và báo cáo lỗi theo chính sách của họ và cài đặt thiết bị của bạn; chúng tôi chỉ thấy số liệu thống kê tổng hợp mà các cửa hàng cung cấp.</p>
+
+  <h2 id="vi-sharing">8. Chia sẻ &amp; mua bán dữ liệu</h2>
+  <p>Chúng tôi không bán, cho thuê hay chia sẻ dữ liệu cá nhân của bạn và không dùng nó cho quảng cáo. Dữ liệu chỉ đến bên thứ ba khi chính bạn kết nối với bên đó, như mô tả ở trên.</p>
+
+  <h2 id="vi-retention">9. Lưu giữ &amp; xoá dữ liệu</h2>
+  <ul>
+    <li>Dữ liệu cục bộ ở trên thiết bị cho tới khi bạn xoá trong ứng dụng, xoá dữ liệu ứng dụng hoặc gỡ cài đặt.</li>
+    <li>Tệp sao lưu nằm trong bộ nhớ đám mây của bạn cho tới khi bạn xoá chúng ở đó — đó là tệp của bạn.</li>
+    <li>Ngắt kết nối một nhà cung cấp sẽ xoá token của nhà cung cấp đó khỏi thiết bị ngay lập tức.</li>
+  </ul>
+  <p>Vì chúng tôi không giữ bản sao dữ liệu nào của bạn, không có gì trên máy chủ để xoá; mọi thứ đều do bạn kiểm soát.</p>
+
+  <h2 id="vi-security">10. Bảo mật</h2>
+  <p>Đăng nhập dùng OAuth 2.0 với PKCE; token được giữ trong kho bảo mật của hệ điều hành; kết nối tới nhà cung cấp đám mây và AI dùng HTTPS. Không phương thức lưu trữ hay truyền tải nào an toàn tuyệt đối, vì vậy hãy bảo vệ thiết bị và tài khoản của bạn.</p>
+
+  <h2 id="vi-children">11. Trẻ em</h2>
+  <p>CB File Hub là tiện ích đa năng và không hướng tới trẻ em dưới 13 tuổi. Chúng tôi không cố ý thu thập thông tin cá nhân của trẻ em.</p>
+
+  <h2 id="vi-changes">12. Thay đổi &amp; liên hệ</h2>
+  <p>Nếu chính sách thay đổi, chúng tôi sẽ cập nhật trang này và ngày hiệu lực. Thay đổi quan trọng sẽ được ghi trong ghi chú phát hành của ứng dụng.</p>
+  <p>Câu hỏi hoặc yêu cầu: tạo issue tại <a href="https://github.com/coolbirdzik/cb-file-hub/issues" rel="noopener">github.com/coolbirdzik/cb-file-hub/issues</a>.</p>
+  <p class="meta">Bản tiếng Anh là bản chính thức nếu có khác biệt giữa hai bản.</p>
+</article>
+</main>
+
+<footer>
+  <span>© 2026 CB File Hub</span>
+  <span><a href="/privacy"><span class="en">Privacy Policy</span><span class="vi">Chính sách quyền riêng tư</span></a> · <a href="/terms"><span class="en">Terms of Service</span><span class="vi">Điều khoản dịch vụ</span></a></span>
+</footer>
+</body>
+</html>
+

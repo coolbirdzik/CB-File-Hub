@@ -1013,6 +1013,43 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get enableDatabaseForCloud =>
       'Enable SQLite database to use cloud sync';
+  @override
+  String get backupAndSync => 'Backup & Sync';
+  @override
+  String get chooseCloudSyncFolder => 'Choose sync folder';
+  @override
+  String get cloudBackupNotFound => 'Cloud backup was not found';
+  @override
+  String get cloudProvider => 'Cloud service';
+  @override
+  String get cloudProviderNotConfigured =>
+      'Not available in this build (no OAuth client id was compiled in)';
+  @override
+  String get localSyncFolder => 'Local sync folder';
+  @override
+  String get localSyncFolderDescription =>
+      'Write the archive into a folder your desktop sync app already mirrors';
+  @override
+  String get openingBrowserToSignIn => 'Opening the browser to sign in...';
+  @override
+  String connectedAsAccount(String account) => 'Connected as $account';
+  @override
+  String cloudBackupsStoredIn(String folder) => 'Backups are kept in $folder';
+  @override
+  String get chooseBackupToRestore => 'Choose a backup to restore';
+  @override
+  String get noCloudBackupsYet => 'No backup on this drive yet';
+  @override
+  String get uploadingBackup => 'Uploading backup...';
+  @override
+  String get downloadingBackup => 'Downloading backup...';
+  @override
+  String backupUploadedTo(String provider) => 'Backup uploaded to $provider';
+  @override
+  String get deleteCloudBackupConfirm =>
+      'Delete this backup from the cloud drive?';
+  @override
+  String get connectCloudFirst => 'Connect the cloud service first';
 
   // Database statistics
   @override
@@ -1152,6 +1189,20 @@ class EnglishLocalizations implements AppLocalizations {
   String get saveBackup => 'Save backup';
   @override
   String get exportPreferencesAsJson => 'Export preferences as JSON';
+  @override
+  String get exportBackupZip => 'Export backup as ZIP';
+  @override
+  String get exportBackupZipDesc => 'Choose settings and tags to include';
+  @override
+  String get importBackupZip => 'Import backup ZIP';
+  @override
+  String get importBackupZipDesc => 'Choose which parts to restore';
+  @override
+  String get backupSettingsPart => 'Settings';
+  @override
+  String get backupTagsPart => 'Tags';
+  @override
+  String get continueText => 'Continue';
   @override
   String get sharedPreferencesKeyRemoved =>
       'Setting removed from SharedPreferences.';

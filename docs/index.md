@@ -23,6 +23,7 @@
   - `features/05-ai-agent.md` - AI Agent chat, providers, tools, approval, and side panel
   - `features/06-tag-management.md`
   - `features/07-tab-inactive-management.md` — Auto-suspend idle tabs to reclaim RAM
+  - `features/08-cloud-backup-sync.md` — Backup/restore settings and tags via Google Drive, Dropbox or OneDrive
 - **UI Patterns**
   - `ui-patterns/01-operation-progress.md`
   - `ui-patterns/02-file-folder-listing.md`
