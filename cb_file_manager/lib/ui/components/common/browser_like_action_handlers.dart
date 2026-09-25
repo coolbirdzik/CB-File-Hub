@@ -10,6 +10,7 @@ import 'package:cb_file_manager/ui/controllers/inline_rename_controller.dart';
 import 'package:cb_file_manager/ui/dialogs/delete_confirmation_dialog.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_bloc.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/delete_failure_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 
@@ -227,12 +228,16 @@ class BrowserLikeActionHandlers {
     }
 
     final deletedPaths = <String>{};
+    final deleteErrors = <String, Object>{};
     final trashManager = TrashManager();
     if (permanent) {
       deletedPaths.addAll(
         await trashManager.deleteMultiplePermanently(
           filePaths,
-          onError: onMoveError,
+          onError: (filePath, error) {
+            deleteErrors[filePath] = error;
+            onMoveError?.call(filePath, error);
+          },
         ),
       );
       for (final filePath in deletedPaths) {
@@ -262,10 +267,23 @@ class BrowserLikeActionHandlers {
       return deletedPaths;
     }
 
-    final failedCount = filePaths.length - deletedPaths.length;
+    final failedPaths = filePaths
+        .where((filePath) => !deletedPaths.contains(filePath))
+        .toList(growable: false);
+    void showFailure(String message) => _showDeleteFailure(
+      context: context,
+      message: message,
+      retryPaths: DeleteFailureToast.accessDeniedPaths(
+        failedPaths,
+        deleteErrors,
+      ),
+      onMoved: onMoved,
+      onAfterSuccess: onAfterSuccess,
+      onMoveError: onMoveError,
+    );
+
     if (deletedPaths.isEmpty) {
-      AppToast.error(
-        context,
+      showFailure(
         filePaths.length == 1
             ? l10n.failedToDelete(path.basename(filePaths.first))
             : l10n.failedToDeleteFilesCount(filePaths.length),
@@ -281,10 +299,9 @@ class BrowserLikeActionHandlers {
       return deletedPaths;
     }
 
-    if (failedCount > 0) {
-      AppToast.error(
-        context,
-        l10n.itemsDeletedWithFailures(deletedPaths.length, failedCount),
+    if (failedPaths.isNotEmpty) {
+      showFailure(
+        l10n.itemsDeletedWithFailures(deletedPaths.length, failedPaths.length),
       );
     } else {
       final message = permanent
@@ -298,6 +315,80 @@ class BrowserLikeActionHandlers {
     }
 
     return deletedPaths;
+  }
+
+  /// Shows the delete-failure toast; its admin action retries [retryPaths]
+  /// with elevation and reports them through the same callbacks as the
+  /// original delete.
+  static void _showDeleteFailure({
+    required BuildContext context,
+    required String message,
+    required List<String> retryPaths,
+    required Future<void> Function(String filePath) onMoved,
+    Future<void> Function(Set<String> deletedPaths)? onAfterSuccess,
+    void Function(String filePath, Object error)? onMoveError,
+  }) {
+    DeleteFailureToast.show(
+      context,
+      message,
+      retryPaths: retryPaths,
+      onRetryAsAdministrator: (paths) => _retryDeleteAsAdministrator(
+        context: context,
+        paths: paths,
+        onMoved: onMoved,
+        onAfterSuccess: onAfterSuccess,
+        onMoveError: onMoveError,
+      ),
+    );
+  }
+
+  static Future<void> _retryDeleteAsAdministrator({
+    required BuildContext context,
+    required List<String> paths,
+    required Future<void> Function(String filePath) onMoved,
+    Future<void> Function(Set<String> deletedPaths)? onAfterSuccess,
+    void Function(String filePath, Object error)? onMoveError,
+  }) async {
+    if (!context.mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+
+    final deletedPaths = await TrashManager()
+        .retryPermanentDeleteAsAdministrator(paths);
+    for (final filePath in deletedPaths) {
+      try {
+        await onMoved(filePath);
+      } catch (error) {
+        onMoveError?.call(filePath, error);
+      }
+    }
+    if (deletedPaths.isNotEmpty && onAfterSuccess != null) {
+      await onAfterSuccess(deletedPaths);
+    }
+    if (!context.mounted) return;
+
+    final failedPaths = paths
+        .where((filePath) => !deletedPaths.contains(filePath))
+        .toList(growable: false);
+    if (failedPaths.isEmpty) {
+      AppToast.success(
+        context,
+        deletedPaths.length == 1
+            ? l10n.itemPermanentlyDeleted(path.basename(deletedPaths.first))
+            : l10n.itemsPermanentlyDeletedCount(deletedPaths.length),
+      );
+      return;
+    }
+    // Cancelled UAC prompt or still denied: offer the retry again.
+    _showDeleteFailure(
+      context: context,
+      message: failedPaths.length == 1
+          ? l10n.failedToDelete(path.basename(failedPaths.first))
+          : l10n.failedToDeleteFilesCount(failedPaths.length),
+      retryPaths: failedPaths,
+      onMoved: onMoved,
+      onAfterSuccess: onAfterSuccess,
+      onMoveError: onMoveError,
+    );
   }
 
   static bool _hasNoSelection(SelectionState selectionState) {

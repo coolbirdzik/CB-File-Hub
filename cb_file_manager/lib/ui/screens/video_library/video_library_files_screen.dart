@@ -195,9 +195,9 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
     }
   }
 
-  Future<void> _refresh({Set<String> deletedPaths = const {}}) async {
+  Future<void> _refresh() async {
     setState(() {
-      _removedPaths = deletedPaths;
+      _removedPaths = <String>{};
       _searchRequests.invalidate();
       _liveSearchSource = null;
       _isSearchLoading = false;
@@ -590,8 +590,10 @@ class _VideoLibraryFilesScreenState extends State<VideoLibraryFilesScreen> {
       onAfterSuccess: (deletedPaths) async {
         if (!mounted) return;
         _clearSelection();
-        // Invalidate in-flight search before rescanning after a mutation.
-        await _refresh(deletedPaths: deletedPaths);
+        // Hide the deleted items in place; a rescan would rebuild the whole
+        // list and rerun the search. Only the cache has to forget them.
+        setState(() => _removedPaths = {..._removedPaths, ...deletedPaths});
+        await VideoLibraryNavigationBloc.invalidateCache(widget.library.id);
       },
       onMoveError: (filePath, _) {
         AppLogger.warning(

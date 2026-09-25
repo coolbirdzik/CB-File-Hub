@@ -57,6 +57,8 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
       onPathsDeleted: (paths) {
         if (!isClosed) _tagSearchBloc.add(tag.TagSearchRemovePaths(paths));
       },
+      isShowingSearchResults: () =>
+          state.currentSearchTag != null || state.currentSearchQuery != null,
     );
     _tagSearchBloc = TagSearchBloc(navigationBloc: _navigationBloc);
 

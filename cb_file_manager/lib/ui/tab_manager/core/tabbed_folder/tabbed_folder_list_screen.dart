@@ -15,6 +15,7 @@ import 'package:cb_file_manager/ui/components/common/browser_like_display_state.
 import 'package:cb_file_manager/ui/components/common/browser_like_keyboard_shortcuts.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/ui/components/common/delete_failure_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -1448,31 +1449,14 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   _lastShownFolderError = null;
                 } else if (error != _lastShownFolderError) {
                   _lastShownFolderError = error;
-                  final retryPaths = List<String>.from(
-                    folderState.retryableElevatedDeletePaths,
+                  DeleteFailureToast.show(
+                    context,
+                    error,
+                    retryPaths: folderState.retryableElevatedDeletePaths,
+                    onRetryAsAdministrator: (paths) => _folderListBloc.add(
+                      FolderListRetryDeleteAsAdministrator(paths),
+                    ),
                   );
-                  if (retryPaths.isNotEmpty && Platform.isWindows) {
-                    final l10n = AppLocalizations.of(context)!;
-                    AppToast.show(
-                      context,
-                      error,
-                      icon: PhosphorIconsLight.warningCircle,
-                      accentColor: Theme.of(context).colorScheme.error,
-                      duration: const Duration(seconds: 12),
-                      actionLabel: '${l10n.retry} (${l10n.adminAccess})',
-                      onAction: () {
-                        _folderListBloc.add(
-                          FolderListRetryDeleteAsAdministrator(retryPaths),
-                        );
-                      },
-                    );
-                  } else {
-                    AppToast.error(
-                      context,
-                      error,
-                      duration: const Duration(seconds: 7),
-                    );
-                  }
                 }
 
                 _maybeApplyFocusAfterDelete(folderState);

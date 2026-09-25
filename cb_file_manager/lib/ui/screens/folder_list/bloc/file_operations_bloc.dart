@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cb_file_manager/helpers/files/trash_manager.dart';
 import 'package:cb_file_manager/helpers/core/filesystem_utils.dart'
     show FileOperations;
+import 'package:cb_file_manager/ui/components/common/delete_failure_toast.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:cb_file_manager/services/directory_listing_cache_service.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/bloc/file_navigation_bloc.dart';
@@ -61,11 +62,13 @@ class FileOperationsBloc
   final FileNavigationBloc navigationBloc;
   final OperationProgressController _progressController;
   final void Function(Set<String> paths)? onPathsDeleted;
+  final bool Function()? isShowingSearchResults;
 
   FileOperationsBloc({
     required this.navigationBloc,
     required this._progressController,
     this.onPathsDeleted,
+    this.isShowingSearchResults,
   }) : super(const FileOperationsState()) {
     on<FileOperationsCopy>(_onCopy);
     on<FileOperationsCut>(_onCut);
@@ -282,7 +285,7 @@ class FileOperationsBloc
         state.copyWith(
           error: failureMessage,
           retryableElevatedDeletePaths: event.permanent
-              ? _accessDeniedPaths(failed, failureErrors)
+              ? DeleteFailureToast.accessDeniedPaths(failed, failureErrors)
               : const <String>[],
         ),
       );
@@ -300,9 +303,7 @@ class FileOperationsBloc
       );
     }
 
-    // Refresh
-    final navState = navigationBloc.state;
-    navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
+    _refreshAfterDelete();
   }
 
   Future<void> _onDeleteItems(
@@ -401,7 +402,7 @@ class FileOperationsBloc
         state.copyWith(
           error: failureMessage,
           retryableElevatedDeletePaths: event.permanent
-              ? _accessDeniedPaths(failed, failureErrors)
+              ? DeleteFailureToast.accessDeniedPaths(failed, failureErrors)
               : const <String>[],
         ),
       );
@@ -419,8 +420,7 @@ class FileOperationsBloc
       );
     }
 
-    final navState = navigationBloc.state;
-    navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
+    _refreshAfterDelete();
   }
 
   Future<void> _onRetryDeleteAsAdministrator(
@@ -486,6 +486,15 @@ class FileOperationsBloc
       );
     }
 
+    _refreshAfterDelete();
+  }
+
+  /// Rescans the browsed folder after a delete. Skipped while search results
+  /// are shown: [_notifyPathsDeleted] already removed the deleted items from
+  /// them, and a rescan would cancel the results' thumbnails (they live
+  /// outside the browsed folder) and, on a tag-search tab, scan the drive root.
+  void _refreshAfterDelete() {
+    if (isShowingSearchResults?.call() ?? false) return;
     final navState = navigationBloc.state;
     navigationBloc.add(FileNavigationRefresh(navState.currentPath.path));
   }
@@ -572,18 +581,6 @@ class FileOperationsBloc
     }
 
     return 'Could not delete $itemLabel.';
-  }
-
-  static List<String> _accessDeniedPaths(
-    List<String> failedPaths,
-    Map<String, Object> errorsByPath,
-  ) {
-    return failedPaths
-        .where((path) {
-          final error = errorsByPath[path];
-          return error is FileSystemException && error.osError?.errorCode == 5;
-        })
-        .toList(growable: false);
   }
 
   static List<String> retainApprovedRetryPaths({

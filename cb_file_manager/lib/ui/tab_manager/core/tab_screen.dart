@@ -26,6 +26,7 @@ import 'package:cb_file_manager/config/design_system_config.dart';
 import 'package:cb_file_manager/ui/screens/system_screen_router.dart'; // Import system screen router
 import 'package:cb_file_manager/helpers/files/archive_path_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
+import 'package:cb_file_manager/design_system/primitives/cb_dialog.dart';
 import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:cb_file_manager/design_system/fluent_surface_tokens.dart';
 // import 'package:cb_file_manager/widgets/test_native_streaming.dart'; // Test widget removed
@@ -869,7 +870,20 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
                                   }
                                 }
 
-                                // If we're at the root (no history), exit app
+                                // At the root (no history): on Android ask
+                                // before leaving the app.
+                                if (Platform.isAndroid) {
+                                  final l10n = AppLocalizations.of(context)!;
+                                  final confirmed = await showCbConfirmDialog(
+                                    context: context,
+                                    title: l10n.exitApplicationTitle,
+                                    message: l10n.exitApplicationConfirm,
+                                    confirmLabel: l10n.exit,
+                                    icon: PhosphorIconsLight.signOut,
+                                    destructive: true,
+                                  );
+                                  if (confirmed != true) return;
+                                }
                                 SystemNavigator.pop();
                               } catch (e) {
                                 debugPrint('Error in TabScreen PopScope: $e');
