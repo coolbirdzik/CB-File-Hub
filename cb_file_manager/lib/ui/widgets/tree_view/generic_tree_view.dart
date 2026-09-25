@@ -22,7 +22,7 @@ typedef TreeChildrenLoader<T> =
 /// with a fixed `itemExtent`, which keeps scroll cheap even for tens of
 /// thousands of nodes. Expansion state is owned by each [TreeNode]
 /// (mutating `isExpanded`), and the parent screen is expected to call
-/// `setState` after toggling a node Ã¢â‚¬â€ which the tree does automatically
+/// `setState` after toggling a node — which the tree does automatically
 /// for built-in interactions (chevron tap, lazy load completion).
 class GenericTreeView<T> extends StatefulWidget {
   /// Top-level nodes to render. Order matters and is preserved.
@@ -59,7 +59,7 @@ class GenericTreeView<T> extends StatefulWidget {
   /// Right-click / long-press on the row.
   final void Function(TreeNode<T> node, Offset globalPosition)? onSecondary;
 
-  /// Selected node ids Ã¢â‚¬â€ rows whose `id` is in this set are highlighted.
+  /// Selected node ids — rows whose `id` is in this set are highlighted.
   final Set<String>? selectedIds;
 
   /// Currently focused node id (for keyboard navigation, lighter
@@ -67,7 +67,7 @@ class GenericTreeView<T> extends StatefulWidget {
   final String? focusedId;
 
   /// Cap on the number of children rendered per node. Excess children
-  /// are replaced by a `Ã¢â‚¬Â¦ and N more` row that, when tapped, raises the
+  /// are replaced by a `… and N more` row that, when tapped, raises the
   /// limit on that node. Default `2000`.
   final int maxChildrenPerNode;
 

@@ -34,8 +34,8 @@
     <WixVariable Id="WixUIBannerBmp" Value="$(var.AssetsDir)\banner.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="$(var.AssetsDir)\dialog.bmp" />
 
-    <!-- Icon -->
-    <Icon Id="AppIcon" SourceFile="$(var.AssetsDir)\app_icon.ico" />
+    <!-- Icon: the same file the app exe embeds (scripts/generate_app_icons.py) -->
+    <Icon Id="AppIcon" SourceFile="$(sys.SOURCEFILEDIR)..\..\cb_file_manager\windows\runner\resources\app_icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
   </Package>
 

@@ -4188,4 +4188,20 @@ class VietnameseLocalizations implements AppLocalizations {
   String updateAvailableVersion(String version) => 'Đã có phiên bản $version';
   @override
   String updateCurrentVersion(String version) => 'Phiên bản hiện tại: $version';
+
+  // Hardcoded-string cleanup
+  @override
+  String get chooseLocation => 'Chọn vị trí';
+  @override
+  String get navigationHistoryLabel => 'Lịch sử điều hướng';
+  @override
+  String get selectCommonTagsToRemove => 'Chọn thẻ chung để xóa:';
+  @override
+  String get streamCreateFailed =>
+      'Không thể tạo stream cho file này. Vui lòng kiểm tra kết nối mạng và thử lại.';
+  @override
+  String errorOpeningVideo(String error) => 'Lỗi mở video: $error';
+  @override
+  String unexpectedFileOpenError(String error) =>
+      'Lỗi không mong muốn khi mở file: $error';
 }

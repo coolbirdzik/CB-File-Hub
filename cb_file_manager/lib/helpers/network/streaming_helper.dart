@@ -460,8 +460,9 @@ class StreamingHelper {
 
       return FileOpenResult(
         success: false,
-        errorMessage:
-            'Không thể tạo stream cho file này. Vui lòng kiểm tra kết nối mạng và thử lại.',
+        errorMessage: context.mounted
+            ? AppLocalizations.of(context)!.streamCreateFailed
+            : 'Could not stream this file.',
         fileType: fileType,
       );
     } catch (e, stackTrace) {
@@ -473,7 +474,9 @@ class StreamingHelper {
 
       return FileOpenResult(
         success: false,
-        errorMessage: 'Lỗi không mong muốn khi mở file: $e',
+        errorMessage: context.mounted
+            ? AppLocalizations.of(context)!.unexpectedFileOpenError('$e')
+            : 'Unexpected error while opening the file: $e',
       );
     } finally {
       final totalDuration = DateTime.now().difference(startTime);

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 
+/// Top of the drawer: clears the status bar and, on wide screens, holds the
+/// pin toggle.
 class DrawerHeaderWidget extends StatelessWidget {
   final bool isPinned;
   final Function(bool) onPinStateChanged;
@@ -15,92 +17,36 @@ class DrawerHeaderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isSmallScreen = MediaQuery.of(context).size.width < 600;
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final topPadding = MediaQuery.of(context).padding.top + 16;
+    final cs = Theme.of(context).colorScheme;
+    final topPadding = MediaQuery.of(context).padding.top;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(18, topPadding, 14, isPinned ? 12 : 16),
-      decoration: isPinned
-          ? null
-          : BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  cs.primaryContainer.withValues(alpha: 0.55),
-                  cs.surfaceContainerHighest.withValues(alpha: 0.75),
-                ],
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomRight: Radius.circular(20),
-              ),
+    if (isSmallScreen) {
+      return SizedBox(height: topPadding + 8);
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(18, topPadding + 8, 14, 0),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: IconButton(
+          icon: Icon(
+            isPinned ? PhosphorIconsFill.pushPin : PhosphorIconsLight.pushPin,
+            color: isPinned ? cs.primary : cs.onSurfaceVariant,
+            size: 20,
+          ),
+          tooltip: isPinned ? context.tr.unpinMenu : context.tr.pinMenu,
+          style: IconButton.styleFrom(
+            backgroundColor: cs.onSurface.withValues(
+              alpha: isPinned ? 0.05 : 0.06,
             ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: isPinned ? 0.10 : 0.14),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  height: 30,
-                  width: 30,
-                  errorBuilder: (context, error, stackTrace) => Icon(
-                    PhosphorIconsLight.folder,
-                    color: cs.primary,
-                    size: 28,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 12),
-                  child: Text(
-                    context.tr.appTitle,
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              if (!isSmallScreen)
-                IconButton(
-                  icon: Icon(
-                    isPinned
-                        ? PhosphorIconsFill.pushPin
-                        : PhosphorIconsLight.pushPin,
-                    color: isPinned ? cs.primary : cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  tooltip: isPinned ? context.tr.unpinMenu : context.tr.pinMenu,
-                  style: IconButton.styleFrom(
-                    backgroundColor: cs.onSurface.withValues(
-                      alpha: isPinned ? 0.05 : 0.06,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () {
-                    onPinStateChanged(!isPinned);
-                  },
-                ),
-            ],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'File Management Made Simple',
-            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-          ),
-        ],
+          onPressed: () {
+            onPinStateChanged(!isPinned);
+          },
+        ),
       ),
     );
   }

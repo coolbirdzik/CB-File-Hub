@@ -442,7 +442,7 @@ class _DriveViewState extends State<DriveView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            drive.displayName,
+                            _driveName(context, drive),
                             style: TextStyle(
                               fontSize: compact ? 14 : 17,
                               fontWeight: FontWeight.bold,
@@ -689,7 +689,7 @@ class _DriveViewState extends State<DriveView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: Text(drive.displayName),
+                title: Text(_driveName(context, drive)),
                 subtitle: Text(_subtitleFor(context, drive)),
               ),
               const Divider(height: 1),
@@ -841,7 +841,9 @@ class _DriveViewState extends State<DriveView> {
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(l10n.driveEjectConfirmTitle),
-          content: Text(l10n.driveEjectConfirmMessage(drive.displayName)),
+          content: Text(
+            l10n.driveEjectConfirmMessage(_driveName(context, drive)),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
@@ -864,7 +866,7 @@ class _DriveViewState extends State<DriveView> {
       toast.info(l10n.driveEjectSuccess);
       await _reloadDriveEntries(force: true);
     } else {
-      toast.error(l10n.driveEjectFailed(drive.displayName));
+      toast.error(l10n.driveEjectFailed(_driveName(context, drive)));
     }
   }
 
@@ -875,7 +877,9 @@ class _DriveViewState extends State<DriveView> {
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(l10n.driveFormatConfirmTitle),
-          content: Text(l10n.driveFormatConfirmMessage(drive.displayName)),
+          content: Text(
+            l10n.driveFormatConfirmMessage(_driveName(context, drive)),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
@@ -893,7 +897,7 @@ class _DriveViewState extends State<DriveView> {
     final toast = AppToast.capture(context);
     final ok = await DriveActions.openFormat(drive);
     if (!ok && context.mounted) {
-      toast.error(l10n.startFormatFailed(drive.displayName));
+      toast.error(l10n.startFormatFailed(_driveName(context, drive)));
     }
   }
 
@@ -903,7 +907,7 @@ class _DriveViewState extends State<DriveView> {
     final newLabel = await showCbInlineRename(
       context: context,
       title: l10n.driveRenameTitle,
-      subtitle: drive.displayName,
+      subtitle: _driveName(context, drive),
       initialValue: drive.label,
       icon: PhosphorIconsLight.hardDrives,
       hintText: l10n.renameShortcutHint,
@@ -959,7 +963,7 @@ class _DriveViewState extends State<DriveView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _propertyRow('Name', drive.displayName),
+                _propertyRow('Name', _driveName(context, drive)),
                 const Divider(),
                 _propertyRow(l10n.filePath, drive.path),
                 const Divider(),
@@ -1047,4 +1051,13 @@ class _DriveSection {
   final List<DriveInfo> drives;
 
   const _DriveSection({required this.group, required this.drives});
+}
+
+/// Android reports the primary volume's label in the device language
+/// ("Bộ nhớ trong dùng chung"), not the app's, so use our own string there.
+String _driveName(BuildContext context, DriveInfo drive) {
+  if (Platform.isAndroid && drive.isPrimary) {
+    return AppLocalizations.of(context)?.internalStorage ?? drive.displayName;
+  }
+  return drive.displayName;
 }

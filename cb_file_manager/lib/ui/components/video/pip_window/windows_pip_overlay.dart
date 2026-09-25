@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/services/media/media_kit_playback.dart';
 
 import '../video_player/video_player_utils.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 /// Modeless, draggable PiP overlay for Windows (in‑process), using media_kit.
 ///
@@ -366,7 +367,8 @@ class _WindowsPipOverlayWidgetState extends State<_WindowsPipOverlayWidget> {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              'Lỗi mở video: $_openError',
+              AppLocalizations.of(context)?.errorOpeningVideo('$_openError') ??
+                  'Error opening video: $_openError',
               style: const TextStyle(color: Colors.white, fontSize: 11),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,

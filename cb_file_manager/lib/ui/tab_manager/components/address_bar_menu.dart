@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 /// Menu ba chấm trong thanh địa chỉ với các action dynamic tùy theo màn hình
 class AddressBarMenu extends StatelessWidget {
@@ -20,7 +21,7 @@ class AddressBarMenu extends StatelessWidget {
         size: 20,
         color: Theme.of(context).colorScheme.primary,
       ),
-      tooltip: tooltip ?? 'Tùy chọn',
+      tooltip: tooltip ?? AppLocalizations.of(context)?.moreOptions,
       onSelected: (item) {
         item.onTap();
       },

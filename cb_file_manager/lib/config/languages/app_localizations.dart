@@ -1832,4 +1832,12 @@ abstract class AppLocalizations {
   String get updateAction;
   String updateAvailableVersion(String version);
   String updateCurrentVersion(String version);
+
+  // Hardcoded-string cleanup
+  String get chooseLocation;
+  String get navigationHistoryLabel;
+  String get selectCommonTagsToRemove;
+  String get streamCreateFailed;
+  String errorOpeningVideo(String error);
+  String unexpectedFileOpenError(String error);
 }

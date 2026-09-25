@@ -4192,4 +4192,20 @@ class EnglishLocalizations implements AppLocalizations {
       'Version $version is available';
   @override
   String updateCurrentVersion(String version) => 'Current version: $version';
+
+  // Hardcoded-string cleanup
+  @override
+  String get chooseLocation => 'Choose location';
+  @override
+  String get navigationHistoryLabel => 'Navigation history';
+  @override
+  String get selectCommonTagsToRemove => 'Select shared tags to remove:';
+  @override
+  String get streamCreateFailed =>
+      'Could not stream this file. Check your network connection and try again.';
+  @override
+  String errorOpeningVideo(String error) => 'Error opening video: $error';
+  @override
+  String unexpectedFileOpenError(String error) =>
+      'Unexpected error while opening the file: $error';
 }

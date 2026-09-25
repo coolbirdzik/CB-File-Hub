@@ -540,7 +540,6 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   Widget _buildFluentDrawer(BuildContext context) {
     final theme = fluent.FluentTheme.of(context);
     final resources = theme.resources;
-    final accent = theme.accentColor.defaultBrushFor(theme.brightness);
     final surfaces = FluentSurfaceTokens.of(context);
     final drawerRadius = widget.isPinned
         ? BorderRadius.zero
@@ -570,11 +569,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
             children: [
               if (Platform.isMacOS && !widget.isPinned)
                 const MacosTrafficLightTopInset(height: 48),
-              _buildFluentDrawerHeader(
-                context,
-                resources: resources,
-                accent: accent,
-              ),
+              _buildFluentDrawerHeader(context, resources: resources),
               Expanded(
                 child: BlocBuilder<DrawerCubit, DrawerState>(
                   builder: (context, state) {
@@ -804,52 +799,16 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
   Widget _buildFluentDrawerHeader(
     BuildContext context, {
     required fluent.ResourceDictionary resources,
-    required Color accent,
   }) {
     final pinLabel = widget.isPinned
         ? context.tr.unpinMenu
         : context.tr.pinMenu;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 13),
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/images/logo.png',
-              height: 32,
-              width: 32,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => DecoratedBox(
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                ),
-                child: SizedBox(
-                  height: 32,
-                  width: 32,
-                  child: Icon(
-                    PhosphorIconsLight.folder,
-                    size: 20,
-                    color: accent,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              context.tr.appTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: resources.textFillColorPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
           Semantics(
             button: true,
             label: pinLabel,

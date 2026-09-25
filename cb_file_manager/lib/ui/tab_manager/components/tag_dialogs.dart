@@ -1748,8 +1748,8 @@ class _RemoveTagsChipDialogState extends State<RemoveTagsChipDialog> {
                           ),
                         ),
                       ),
-                    const Text(
-                      'Chọn thẻ chung để xóa:',
+                    Text(
+                      AppLocalizations.of(context)!.selectCommonTagsToRemove,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

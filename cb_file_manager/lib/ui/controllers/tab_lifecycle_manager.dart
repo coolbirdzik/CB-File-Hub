@@ -43,8 +43,12 @@ class TabLifecycleManager {
       debugPrint(
         '🟡 [TabLifecycleManager] Path mismatch detected, updating path from $currentPath to ${activeTab.path}',
       );
-      // Only update if the path has actually changed
+      // onPathUpdate loads the new folder itself. Falling through would
+      // schedule a reload of the stale [currentPath] — e.g. after the Android
+      // back button moved the tab back in history — and put the old folder
+      // back on screen.
       onPathUpdate(activeTab.path);
+      return;
     }
 
     // Only reload if the tab is active AND content is actually missing or outdated

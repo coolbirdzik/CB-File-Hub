@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 typedef RequestCallback = Future<void> Function();
 
@@ -53,7 +54,10 @@ class PermissionSoftBlock extends StatelessWidget {
                         await launchUrl(uri);
                       }
                     },
-                    child: const Text('Mở Cài đặt'),
+                    child: Text(
+                      AppLocalizations.of(context)?.openSettings ??
+                          'Open Settings',
+                    ),
                   ),
                 ],
               ),

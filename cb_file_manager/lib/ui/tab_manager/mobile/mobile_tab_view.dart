@@ -866,7 +866,7 @@ class MobileTabView extends StatelessWidget {
                       child: Row(
                         children: [
                           Text(
-                            'Chọn vị trí',
+                            AppLocalizations.of(context)!.chooseLocation,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -996,7 +996,7 @@ class MobileTabView extends StatelessWidget {
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'Lịch sử điều hướng:',
+                            '${AppLocalizations.of(context)!.navigationHistoryLabel}:',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.onSurface,

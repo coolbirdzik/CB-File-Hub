@@ -112,6 +112,21 @@ for variant in ("main", "debug", "profile"):
 for name in ("ic_launcher-web.png", "playstore-icon.png"):
     save(android / "main/res" / name, (512, 512), 0.88, BACKGROUND)
 
+# WiX installer artwork (the MSI's own icon is windows_icon above). The banner
+# keeps the logo on the right because WixUI draws its title text on the left;
+# the dialog image's left column sits beside the welcome text.
+installer = ROOT / "installer/windows/assets"
+
+
+def installer_bitmap(path: Path, size: tuple[int, int], x: int, y: int, side: int):
+    canvas = Image.new("RGBA", size, "white")
+    canvas.alpha_composite(MASTER.resize((side, side), Image.Resampling.LANCZOS), (x, y))
+    canvas.convert("RGB").save(path, format="BMP")
+
+
+installer_bitmap(installer / "banner.bmp", (493, 58), 447, 14, 30)
+installer_bitmap(installer / "dialog.bmp", (493, 312), 45, 118, 85)
+
 website = ROOT / "website/public"
 if website.exists():
     save(website / "logo.png", (512, 512))

@@ -403,7 +403,10 @@ class MobileFileActionsController {
               // More options
               ListTile(
                 leading: const Icon(PhosphorIconsLight.checks),
-                title: Text(localizations.selectMultiple ?? 'Chọn nhiều file'),
+                title: Text(
+                  localizations.selectMultiple ??
+                      localizations.selectMultipleFiles,
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   onSelectionModeToggled?.call();
@@ -414,7 +417,7 @@ class MobileFileActionsController {
                   ViewModeUtils.isGridLike(currentViewMode))
                 ListTile(
                   leading: const Icon(PhosphorIconsLight.rectangle),
-                  title: Text(localizations.gridSize ?? 'Kích thước lưới'),
+                  title: Text(localizations.gridSize ?? 'Grid size'),
                   onTap: () {
                     Navigator.pop(context);
                     onGridSizePressed?.call();

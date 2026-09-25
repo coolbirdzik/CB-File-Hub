@@ -2543,7 +2543,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             }
           } catch (e) {
             debugPrint('Failed to save screenshot: $e');
-            throw Exception('Không thể lưu ảnh: $e');
+            throw Exception('Could not save screenshot: $e');
           }
         } else {
           // Desktop: Save to downloads directory
@@ -2563,7 +2563,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
             debugPrint('Screenshot saved to: $screenshotPath');
           } catch (e) {
             debugPrint('Failed to write screenshot file: $e');
-            throw Exception('Không thể lưu file ảnh: $e');
+            throw Exception('Could not write screenshot file: $e');
           }
         }
 

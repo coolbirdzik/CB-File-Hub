@@ -344,7 +344,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           ),
         ],
         if (widget.menuItems != null && widget.menuItems!.isNotEmpty)
-          AddressBarMenu(items: widget.menuItems!, tooltip: 'Tùy chọn'),
+          AddressBarMenu(items: widget.menuItems!),
       ],
     );
   }
@@ -482,7 +482,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
         if (widget.menuItems != null && widget.menuItems!.isNotEmpty)
           Padding(
             padding: const EdgeInsetsDirectional.only(start: 6),
-            child: AddressBarMenu(items: widget.menuItems!, tooltip: 'Options'),
+            child: AddressBarMenu(items: widget.menuItems!),
           ),
       ],
     );

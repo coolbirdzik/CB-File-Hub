@@ -174,7 +174,7 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
           child: _isEditing ? _buildEditablePathField() : _buildPathSegments(),
         ),
         if (widget.menuItems != null && widget.menuItems!.isNotEmpty)
-          AddressBarMenu(items: widget.menuItems!, tooltip: 'Tùy chọn'),
+          AddressBarMenu(items: widget.menuItems!),
       ],
     );
   }

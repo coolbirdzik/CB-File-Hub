@@ -200,17 +200,17 @@ class _AutoRulesScreenState extends State<AutoRulesScreen> {
     final examples = [
       {
         'title': 'Screenshots',
-        'description': 'Files containing "screenshot" â†’ Screenshots album',
+        'description': 'Files containing "screenshot" → Screenshots album',
         'icon': PhosphorIconsLight.screencast,
       },
       {
         'title': 'Camera Photos',
-        'description': 'Files starting with "IMG_" â†’ Camera album',
+        'description': 'Files starting with "IMG_" → Camera album',
         'icon': PhosphorIconsLight.camera,
       },
       {
         'title': 'Edited Photos',
-        'description': 'Files ending with "_edited" â†’ Edited album',
+        'description': 'Files ending with "_edited" → Edited album',
         'icon': PhosphorIconsLight.imageSquare,
       },
     ];
@@ -700,7 +700,7 @@ class _CreateAutoRuleDialogState extends State<CreateAutoRuleDialog> {
                   (example) => Padding(
                     padding: const EdgeInsets.only(bottom: 2),
                     child: Text(
-                      'â€¢ $example',
+                      '• $example',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontFamily: 'monospace',
                         color: theme.colorScheme.onSurface.withValues(

@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../helpers/core/user_preferences.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 
 class DesktopPipWindow extends StatefulWidget {
   final Map<String, dynamic> args;
@@ -375,7 +376,10 @@ class _DesktopPipWindowState extends State<DesktopPipWindow>
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'Lỗi mở video: $_openError',
+                      AppLocalizations.of(
+                            context,
+                          )?.errorOpeningVideo('$_openError') ??
+                          'Error opening video: $_openError',
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 3,
