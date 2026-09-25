@@ -5,7 +5,7 @@
 //   GITHUB_TOKEN=... npm run releases   # optional, lifts the 60 req/h anonymous limit
 //
 // The commit list is parsed out of each release body ("What's Changed" section).
-// `ci:` commits (build-number bumps and the like) and merge commits are dropped: they mean nothing to users.
+// `ci:` commits (build-number bumps and the like), version bumps and merge commits are dropped: they mean nothing to users.
 // If GitHub cannot be reached, the existing snapshot is kept so builds never fail over it.
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -61,6 +61,7 @@ function parseCommits(body) {
       if (type === "ci") continue;
       const subject = (m ? m[4] : part).trim().replace(/\.$/, "");
       if (!subject) continue;
+      if (type === "chore" && /^bump version to /i.test(subject)) continue;
       items.push({
         group: groupOf(type, m?.[2] ?? null, subject),
         type,
@@ -79,6 +80,7 @@ function describeAsset(name) {
   if (lower.endsWith(".zip")) return { platform: "windows", label: "Portable", ext: "zip" };
   if (lower.endsWith(".msi")) return { platform: "windows", label: "Installer", ext: "msi" };
   if (lower.endsWith(".msix")) return { platform: "windows", label: "MSIX", ext: "msix" };
+  if (lower.endsWith(".dmg")) return { platform: "macos", label: "macOS DMG", ext: "dmg" };
   if (lower.endsWith(".apk")) {
     const arch = lower.match(/(arm64-v8a|armeabi-v7a|x86_64)/)?.[1] ?? "universal";
     return { platform: "android", label: `APK ${arch}`, ext: "apk" };

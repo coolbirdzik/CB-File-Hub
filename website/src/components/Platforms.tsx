@@ -1,6 +1,6 @@
 import * as React from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
-import { AndroidLogo, WindowsLogo } from "@phosphor-icons/react";
+import { AndroidLogo, AppleLogo, WindowsLogo } from "@phosphor-icons/react";
 import { T, useCopy } from "./lang";
 import { Reveal, SplitText } from "./motion";
 import { Eyebrow } from "./Eyebrow";
@@ -43,6 +43,10 @@ export function Platforms() {
               <li className="glass inline-flex h-10 items-center gap-2 rounded-full px-4">
                 <WindowsLogo size={18} weight="fill" className="text-accent" />
                 Windows
+              </li>
+              <li className="glass inline-flex h-10 items-center gap-2 rounded-full px-4">
+                <AppleLogo size={18} weight="fill" className="text-accent" />
+                macOS
               </li>
               <li className="glass inline-flex h-10 items-center gap-2 rounded-full px-4">
                 <AndroidLogo size={18} weight="fill" className="text-accent" />

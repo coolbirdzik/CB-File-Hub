@@ -2,6 +2,7 @@ import * as React from "react";
 import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from "motion/react";
 import {
   AndroidLogo,
+  AppleLogo,
   ArrowRight,
   DownloadSimple,
   ShareNetwork,
@@ -145,8 +146,9 @@ export function Hero() {
           <ul className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted">
             <li className="inline-flex items-center gap-1.5">
               <WindowsLogo size={16} weight="fill" className="text-accent" />
+              <AppleLogo size={16} weight="fill" className="-ml-0.5 text-accent" />
               <AndroidLogo size={16} weight="fill" className="-ml-0.5 text-accent" />
-              Windows · Android
+              Windows · macOS · Android
             </li>
             <li className="inline-flex items-center gap-1.5">
               <ShieldCheck size={16} weight="fill" className="text-accent" />

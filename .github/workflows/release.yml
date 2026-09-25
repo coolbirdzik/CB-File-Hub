@@ -693,3 +693,55 @@ jobs:
             artifacts/android-aab/*.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Rebuild the website (firebase hosting) so /releases and the download
+  # buttons, including the macOS DMG link, pick up the release just published.
+  # Auth: FIREBASE_SERVICE_ACCOUNT (service account JSON, preferred) or
+  # FIREBASE_TOKEN (from `firebase login:ci`). With neither set it is skipped.
+  deploy-website:
+    runs-on: ubuntu-latest
+    needs: create-release
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7.0.1
+
+      - name: Resolve Firebase credentials
+        id: firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$FIREBASE_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT / FIREBASE_TOKEN not set, skipping website deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.firebase.outputs.ready == 'true'
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install website dependencies
+        if: steps.firebase.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Build and deploy website
+        if: steps.firebase.outputs.ready == 'true'
+        env:
+          # fetch-releases.mjs uses it to lift the anonymous GitHub API rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        # npm appends the flag to the last command of the script: `firebase deploy`.
+        run: npm run deploy -- --non-interactive

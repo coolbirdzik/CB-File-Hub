@@ -2,6 +2,7 @@ import * as React from "react";
 import type { HeadFC } from "gatsby";
 import {
   AndroidLogo,
+  AppleLogo,
   ArrowRight,
   ArrowUpRight,
   Bug,
@@ -95,7 +96,7 @@ function Downloads({ release }: { release: Release }) {
       </h4>
       <ul className="mt-3 flex flex-wrap gap-2">
         {release.assets.map((a) => {
-          const PlatformIcon = a.platform === "windows" ? WindowsLogo : AndroidLogo;
+          const PlatformIcon = a.platform === "windows" ? WindowsLogo : a.platform === "macos" ? AppleLogo : AndroidLogo;
           return (
             <li key={a.name}>
               <a

@@ -35,6 +35,9 @@ export function Footer() {
           <a href={links.googlePlay} target="_blank" rel="noopener noreferrer">
             Google Play
           </a>
+          <a href={links.macos} target="_blank" rel="noopener noreferrer">
+            macOS
+          </a>
         </FooterColumn>
 
         <FooterColumn title={{ en: "Legal", vi: "Pháp lý" }}>

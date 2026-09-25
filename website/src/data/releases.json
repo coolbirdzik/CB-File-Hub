@@ -1,7 +1,275 @@
 {
   "repo": "coolbirdzik/CB-File-Hub",
-  "fetchedAt": "2026-09-25T05:37:01.637Z",
+  "fetchedAt": "2026-09-25T15:03:44.679Z",
   "releases": [
+    {
+      "tag": "v1.1.10",
+      "version": "1.1.10",
+      "date": "2026-09-25T14:35:00Z",
+      "prerelease": false,
+      "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/tag/v1.1.10",
+      "items": [
+        {
+          "group": "fixes",
+          "type": "fix",
+          "scope": null,
+          "breaking": false,
+          "subject": "Exclude CI and version bump commits from release notes",
+          "hash": "96df98a"
+        }
+      ],
+      "assets": [
+        {
+          "name": "CBFileHub-1.1.10-arm64-v8a.apk",
+          "size": 159714942,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.10/CBFileHub-1.1.10-arm64-v8a.apk",
+          "platform": "android",
+          "label": "APK arm64-v8a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.10-armeabi-v7a.apk",
+          "size": 4632122,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.10/CBFileHub-1.1.10-armeabi-v7a.apk",
+          "platform": "android",
+          "label": "APK armeabi-v7a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.10-macos.dmg",
+          "size": 66982839,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.10/CBFileHub-1.1.10-macos.dmg",
+          "platform": "macos",
+          "label": "macOS DMG",
+          "ext": "dmg"
+        },
+        {
+          "name": "CBFileHub-1.1.10-windows-portable.zip",
+          "size": 118155073,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.10/CBFileHub-1.1.10-windows-portable.zip",
+          "platform": "windows",
+          "label": "Portable",
+          "ext": "zip"
+        },
+        {
+          "name": "CBFileHub-1.1.10-x86_64.apk",
+          "size": 53790938,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.10/CBFileHub-1.1.10-x86_64.apk",
+          "platform": "android",
+          "label": "APK x86_64",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-Setup-1.1.10.msi",
+          "size": 100397056,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.10/CBFileHub-Setup-1.1.10.msi",
+          "platform": "windows",
+          "label": "Installer",
+          "ext": "msi"
+        }
+      ]
+    },
+    {
+      "tag": "v1.1.9",
+      "version": "1.1.9",
+      "date": "2026-09-25T14:11:39Z",
+      "prerelease": false,
+      "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/tag/v1.1.9",
+      "items": [
+        {
+          "group": "new",
+          "type": "feat",
+          "scope": null,
+          "breaking": false,
+          "subject": "Add support for Full Disk Access and improve macOS app signing process",
+          "hash": "73e389a"
+        }
+      ],
+      "assets": [
+        {
+          "name": "CBFileHub-1.1.9-arm64-v8a.apk",
+          "size": 159714950,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.9/CBFileHub-1.1.9-arm64-v8a.apk",
+          "platform": "android",
+          "label": "APK arm64-v8a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.9-armeabi-v7a.apk",
+          "size": 4632126,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.9/CBFileHub-1.1.9-armeabi-v7a.apk",
+          "platform": "android",
+          "label": "APK armeabi-v7a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.9-macos.dmg",
+          "size": 66978592,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.9/CBFileHub-1.1.9-macos.dmg",
+          "platform": "macos",
+          "label": "macOS DMG",
+          "ext": "dmg"
+        },
+        {
+          "name": "CBFileHub-1.1.9-windows-portable.zip",
+          "size": 118154779,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.9/CBFileHub-1.1.9-windows-portable.zip",
+          "platform": "windows",
+          "label": "Portable",
+          "ext": "zip"
+        },
+        {
+          "name": "CBFileHub-1.1.9-x86_64.apk",
+          "size": 53790942,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.9/CBFileHub-1.1.9-x86_64.apk",
+          "platform": "android",
+          "label": "APK x86_64",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-Setup-1.1.9.msi",
+          "size": 100442112,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.9/CBFileHub-Setup-1.1.9.msi",
+          "platform": "windows",
+          "label": "Installer",
+          "ext": "msi"
+        }
+      ]
+    },
+    {
+      "tag": "v1.1.8",
+      "version": "1.1.8",
+      "date": "2026-09-25T11:28:20Z",
+      "prerelease": false,
+      "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/tag/v1.1.8",
+      "items": [
+        {
+          "group": "new",
+          "type": "feat",
+          "scope": null,
+          "breaking": false,
+          "subject": "Add website link to settings screen and README",
+          "hash": "7d7ba42"
+        }
+      ],
+      "assets": [
+        {
+          "name": "CBFileHub-1.1.8-arm64-v8a.apk",
+          "size": 159714950,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.8/CBFileHub-1.1.8-arm64-v8a.apk",
+          "platform": "android",
+          "label": "APK arm64-v8a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.8-armeabi-v7a.apk",
+          "size": 4632126,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.8/CBFileHub-1.1.8-armeabi-v7a.apk",
+          "platform": "android",
+          "label": "APK armeabi-v7a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.8-windows-portable.zip",
+          "size": 118158919,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.8/CBFileHub-1.1.8-windows-portable.zip",
+          "platform": "windows",
+          "label": "Portable",
+          "ext": "zip"
+        },
+        {
+          "name": "CBFileHub-1.1.8-x86_64.apk",
+          "size": 53790942,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.8/CBFileHub-1.1.8-x86_64.apk",
+          "platform": "android",
+          "label": "APK x86_64",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-Setup-1.1.8.msi",
+          "size": 100405248,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.8/CBFileHub-Setup-1.1.8.msi",
+          "platform": "windows",
+          "label": "Installer",
+          "ext": "msi"
+        }
+      ]
+    },
+    {
+      "tag": "v1.1.7",
+      "version": "1.1.7",
+      "date": "2026-09-25T08:22:12Z",
+      "prerelease": false,
+      "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/tag/v1.1.7",
+      "items": [
+        {
+          "group": "new",
+          "type": "feat",
+          "scope": "docs",
+          "breaking": false,
+          "subject": "Update README with desktop and mobile workflow previews",
+          "hash": "ea6f486"
+        },
+        {
+          "group": "improvements",
+          "type": null,
+          "scope": null,
+          "breaking": false,
+          "subject": "Add styles, terms of service, and TypeScript configuration",
+          "hash": "229f79d"
+        },
+        {
+          "group": "new",
+          "type": "feat",
+          "scope": null,
+          "breaking": false,
+          "subject": "Enhance cloud backup functionality with multi-provider support",
+          "hash": "825f141"
+        }
+      ],
+      "assets": [
+        {
+          "name": "CBFileHub-1.1.7-arm64-v8a.apk",
+          "size": 159714950,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.7/CBFileHub-1.1.7-arm64-v8a.apk",
+          "platform": "android",
+          "label": "APK arm64-v8a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.7-armeabi-v7a.apk",
+          "size": 4632126,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.7/CBFileHub-1.1.7-armeabi-v7a.apk",
+          "platform": "android",
+          "label": "APK armeabi-v7a",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-1.1.7-windows-portable.zip",
+          "size": 118158053,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.7/CBFileHub-1.1.7-windows-portable.zip",
+          "platform": "windows",
+          "label": "Portable",
+          "ext": "zip"
+        },
+        {
+          "name": "CBFileHub-1.1.7-x86_64.apk",
+          "size": 53790942,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.7/CBFileHub-1.1.7-x86_64.apk",
+          "platform": "android",
+          "label": "APK x86_64",
+          "ext": "apk"
+        },
+        {
+          "name": "CBFileHub-Setup-1.1.7.msi",
+          "size": 100442112,
+          "url": "https://github.com/coolbirdzik/CB-File-Hub/releases/download/v1.1.7/CBFileHub-Setup-1.1.7.msi",
+          "platform": "windows",
+          "label": "Installer",
+          "ext": "msi"
+        }
+      ]
+    },
     {
       "tag": "v1.1.6",
       "version": "1.1.6",
@@ -88,14 +356,6 @@
           "breaking": false,
           "subject": "Implement tag scoping functionality in ChipsInput",
           "hash": "7d02060"
-        },
-        {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
-          "subject": "Bump version to 1.1.6",
-          "hash": "d0684f8"
         }
       ],
       "assets": [
@@ -307,14 +567,6 @@
           "breaking": false,
           "subject": "Add detailed guide for handling E2E tests that pass locally but fail on GitHub Actions CI",
           "hash": "a862208"
-        },
-        {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
-          "subject": "Bump version to 1.1.5",
-          "hash": "a37f4ee"
         }
       ],
       "assets": [
@@ -550,14 +802,6 @@
           "breaking": false,
           "subject": "Improve BreadcrumbAddressBar layout to handle deep Windows paths and add a test for it",
           "hash": "da30125"
-        },
-        {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
-          "subject": "Bump version to 1.1.4",
-          "hash": "9e4da4c"
         }
       ],
       "assets": [
@@ -711,14 +955,6 @@
           "type": "chore",
           "scope": null,
           "breaking": false,
-          "subject": "Bump version to 1.1.3",
-          "hash": "9944ff0"
-        },
-        {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
           "subject": "Update Android Gradle plugin and Gradle wrapper to latest versions",
           "hash": "dc660cb"
         },
@@ -812,14 +1048,6 @@
           "breaking": false,
           "subject": "Format code for improved readability in localization and UI files",
           "hash": "be9b6ba"
-        },
-        {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
-          "subject": "Bump version to 1.1.1",
-          "hash": "c857dcc"
         },
         {
           "group": "fixes",
@@ -1145,14 +1373,6 @@
           "hash": "38aad36"
         },
         {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
-          "subject": "Bump version to 1.1.0",
-          "hash": "09ba1e2"
-        },
-        {
           "group": "fixes",
           "type": "fix",
           "scope": null,
@@ -1306,14 +1526,6 @@
           "breaking": false,
           "subject": "Refactor code for improved readability and consistency",
           "hash": "85b3cf1"
-        },
-        {
-          "group": "maintenance",
-          "type": "chore",
-          "scope": null,
-          "breaking": false,
-          "subject": "Bump version to 1.0.3",
-          "hash": "ea1e883"
         },
         {
           "group": "fixes",

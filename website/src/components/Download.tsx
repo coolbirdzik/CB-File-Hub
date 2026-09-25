@@ -1,6 +1,6 @@
 import * as React from "react";
 import { motion } from "motion/react";
-import { ArrowUpRight, GooglePlayLogo, WindowsLogo, type Icon } from "@phosphor-icons/react";
+import { AppleLogo, ArrowUpRight, GooglePlayLogo, WindowsLogo, type Icon } from "@phosphor-icons/react";
 import { T } from "./lang";
 import { Reveal, SplitText, easeOut } from "./motion";
 import { links } from "./site";
@@ -75,10 +75,11 @@ export function Download() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.5 }}
           transition={{ duration: 0.8, delay: 0.25, ease: easeOut }}
-          className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          className="mt-10 flex flex-col flex-wrap items-center justify-center gap-3 sm:flex-row"
         >
           <StoreButton primary href={links.microsoftStore} icon={WindowsLogo} small={{ en: "Get it from", vi: "Tải trên" }} name="Microsoft Store" />
           <StoreButton href={links.googlePlay} icon={GooglePlayLogo} small={{ en: "Get it on", vi: "Tải trên" }} name="Google Play" />
+          <StoreButton href={links.macos} icon={AppleLogo} small={{ en: "Download for", vi: "Tải cho" }} name="macOS" />
         </motion.div>
       </div>
     </section>
