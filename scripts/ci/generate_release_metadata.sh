@@ -57,10 +57,11 @@ fi
 
 RELEASE_NOTES_FILE="$OUTPUT_DIR/release_notes.md"
 
-# CI housekeeping (e.g. "ci: auto bump build number") means nothing to users: leave it out.
-# `|| true` keeps pipefail happy when every commit in the range is a ci: commit.
+# CI housekeeping (e.g. "ci: auto bump build number") and release version bumps
+# ("chore: bump version to x.y.z") mean nothing to users: leave them out.
+# `|| true` keeps pipefail happy when every commit in the range is filtered out.
 drop_ci_commits() {
-    grep -vE '^- ci(\([^)]*\))?!?:' || true
+    grep -vE '^- (ci(\([^)]*\))?!?:|chore(\([^)]*\))?!?: bump version to )' || true
 }
 
 {

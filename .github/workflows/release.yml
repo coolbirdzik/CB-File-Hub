@@ -132,8 +132,9 @@ jobs:
           echo "Current tag:  $CURRENT_TAG"
           echo "Current ref:  $CURRENT_REF"
 
-          # CI housekeeping (e.g. "ci: auto bump build number") means nothing to users: leave it out.
-          CI_COMMIT_RE='^- ci(\([^)]*\))?!?:'
+          # CI housekeeping (e.g. "ci: auto bump build number") and release version
+          # bumps ("chore: bump version to x.y.z") mean nothing to users: leave them out.
+          CI_COMMIT_RE='^- (ci(\([^)]*\))?!?:|chore(\([^)]*\))?!?: bump version to )'
 
           echo "# 🎉 CB File Hub $VERSION" > release_notes.md
           echo "" >> release_notes.md

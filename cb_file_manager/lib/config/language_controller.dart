@@ -12,7 +12,7 @@ class LanguageController {
   static const String english = 'en';
 
   // Default language
-  static const String defaultLanguage = vietnamese;
+  static const String defaultLanguage = english;
 
   // Controller for language changes
   final _languageController = ValueNotifier<Locale>(
