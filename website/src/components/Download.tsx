@@ -74,6 +74,7 @@ export function Download() {
           className="mt-10 flex flex-col flex-wrap items-center justify-center gap-3 sm:flex-row"
         >
           <StoreButton primary href={links.microsoftStore} icon={WindowsLogo} small={{ en: "Get it from", vi: "Tải trên" }} name="Microsoft Store" />
+          <StoreButton href={links.windows} icon={WindowsLogo} small={{ en: "Download for", vi: "Tải cho" }} name="Windows" />
           <StoreButton href={links.googlePlay} icon={GooglePlayLogo} small={{ en: "Get it on", vi: "Tải trên" }} name="Google Play" />
           <StoreButton href={links.macos} icon={AppleLogo} small={{ en: "Download for", vi: "Tải cho" }} name="macOS" />
         </motion.div>

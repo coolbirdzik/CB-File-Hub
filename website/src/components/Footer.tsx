@@ -32,6 +32,9 @@ export function Footer() {
           <a href={links.microsoftStore} target="_blank" rel="noopener noreferrer">
             Microsoft Store
           </a>
+          <a href={links.windows} target="_blank" rel="noopener noreferrer">
+            Windows
+          </a>
           <a href={links.googlePlay} target="_blank" rel="noopener noreferrer">
             Google Play
           </a>
