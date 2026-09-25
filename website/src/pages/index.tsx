@@ -3,7 +3,6 @@ import type { HeadFC } from "gatsby";
 import { Layout, Seo } from "../components/Layout";
 import { Hero } from "../components/Hero";
 import { Marquee } from "../components/Marquee";
-import { LiveDemo } from "../components/LiveDemo";
 import { Tour } from "../components/Tour";
 import { Bento } from "../components/Bento";
 import { Platforms } from "../components/Platforms";
@@ -15,7 +14,6 @@ export default function IndexPage() {
     <Layout>
       <Hero />
       <Marquee />
-      <LiveDemo />
       <Tour />
       <Bento />
       <Platforms />

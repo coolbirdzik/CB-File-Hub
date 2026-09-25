@@ -57,7 +57,7 @@ import {
   tagById,
   toneBackground,
 } from "./data";
-import { DemoContext, type DemoApi, type Route } from "./context";
+import { DemoContext, type DemoApi, type Route, type TagPrefs } from "./context";
 import {
   BrowserScreen,
   CleanerScreen,
@@ -67,11 +67,11 @@ import {
   PreviewPane,
   SettingsScreen,
   SshScreen,
-  TagsScreen,
   sortEntries,
   type SortKey,
 } from "./screens";
 import { AgentPanel } from "./AgentPanel";
+import { TagsScreen } from "./TagsScreen";
 import { IconButton, Toast } from "./ui";
 
 type Tab = { id: number; history: Route[]; index: number };
@@ -89,7 +89,8 @@ function routeItems(route: Route): Entry[] {
 /** Tab strip label. Like the app, system screens show their raw "#route". */
 function routeLabel(route: Route, lang: "en" | "vi") {
   if (route.startsWith("fs:")) return pathString(route.slice(3));
-  if (route.startsWith("tag:")) return tagById.get(route.slice(4))?.name[lang] ?? route;
+  // The app names a tag-search tab "Tag: <name>".
+  if (route.startsWith("tag:")) return `Tag: ${tagById.get(route.slice(4))?.name[lang] ?? route.slice(4)}`;
   return route;
 }
 
@@ -134,6 +135,7 @@ export function AppDemo({ className = "" }: { className?: string }) {
   const [sheet, setSheet] = React.useState<Entry | null>(null);
   const [menu, setMenu] = React.useState<{ entry: Entry; x: number; y: number } | null>(null);
   const [accent, setAccent] = React.useState(accents[0].hex);
+  const [tagPrefs, setTagPrefs] = React.useState<TagPrefs>({ view: null, zoom: 5, sort: "name", ascending: true });
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
   const toastTimer = React.useRef<number>();
 
@@ -225,6 +227,10 @@ export function AppDemo({ className = "" }: { className?: string }) {
     compact,
     route,
     navigate,
+    canBack: tab.index > 0,
+    canForward: tab.index < tab.history.length - 1,
+    back: () => go(-1),
+    forward: () => go(1),
     openInNewTab,
     selected,
     select: setSelected,
@@ -239,6 +245,8 @@ export function AppDemo({ className = "" }: { className?: string }) {
     setAccent,
     setLang,
     openAgent: () => setAgentOpen(true),
+    tagPrefs,
+    setTagPrefs: (patch) => setTagPrefs((prev) => ({ ...prev, ...patch })),
   };
 
   // Shortcuts only fire while focus is inside the demo, so the landing page keeps its own keys.
@@ -310,7 +318,8 @@ export function AppDemo({ className = "" }: { className?: string }) {
 
         <div className="relative flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
-            {(isBrowser || ["#tags", "#network", "#ssh", "#trash"].includes(route)) && (
+            {/* Tag Management draws its own header bar, as it does in the app. */}
+            {(isBrowser || ["#network", "#ssh", "#trash"].includes(route)) && (
               <Toolbar
                 route={route}
                 canBack={tab.index > 0}
@@ -563,18 +572,16 @@ function Toolbar(props: {
   const crumbs: Array<{ label: string; route?: Route }> = route.startsWith("fs:")
     ? pathOf(route.slice(3)).map((e) => ({ label: e.name, route: `fs:${e.id}` }))
     : route.startsWith("tag:")
-      ? [{ label: t("Tags", "Thẻ"), route: "#tags" }, { label: tagById.get(route.slice(4))!.name[lang] }]
-      : route === "#tags"
-        ? [{ label: t("Tag Management", "Quản lý thẻ") }]
-        : route === "#network"
-          ? [{ label: t("Network", "Mạng") }]
-          : route === "#ssh"
-            ? [{ label: t("Network", "Mạng"), route: "#network" }, { label: "SSH" }]
-            : route === "#videos"
-              ? [{ label: t("Video Gallery", "Thư viện video") }]
-              : route === "#trash"
-                ? [{ label: t("Trash Bin", "Thùng rác") }]
-                : [{ label: t("All Pictures", "Tất cả ảnh"), route: "#gallery" }];
+      ? [{ label: t("Tag Management", "Quản lý Tags"), route: "#tags" }, { label: tagById.get(route.slice(4))!.name[lang] }]
+      : route === "#network"
+        ? [{ label: t("Network", "Mạng") }]
+        : route === "#ssh"
+          ? [{ label: t("Network", "Mạng"), route: "#network" }, { label: "SSH" }]
+          : route === "#videos"
+            ? [{ label: t("Video Gallery", "Thư viện video") }]
+            : route === "#trash"
+              ? [{ label: t("Trash Bin", "Thùng rác") }]
+              : [{ label: t("All Pictures", "Tất cả ảnh"), route: "#gallery" }];
   const LeadIcon = route.startsWith("fs:") ? HardDrive : routeIcon(route);
 
   const pathBar =

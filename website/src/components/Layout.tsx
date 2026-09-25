@@ -3,6 +3,7 @@ import { MotionConfig } from "motion/react";
 import { LangProvider, T } from "./lang";
 import { Nav } from "./Nav";
 import { Footer } from "./Footer";
+import { Cosmos } from "./Cosmos";
 
 /** `current` is the nav href of this page, marked with aria-current. */
 export function Layout({ children, current }: { children: React.ReactNode; current?: string }) {
@@ -16,6 +17,7 @@ export function Layout({ children, current }: { children: React.ReactNode; curre
         >
           <T en="Skip to content" vi="Đến nội dung" />
         </a>
+        <Cosmos />
         <Nav current={current} />
         <main id="main">{children}</main>
         <Footer />
@@ -31,8 +33,7 @@ export function Seo({ title, description, path = "/" }: { title: string; descrip
       <title>{title}</title>
       <meta name="description" content={description} />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="theme-color" content="#f3f6f9" media="(prefers-color-scheme: light)" />
-      <meta name="theme-color" content="#0a1220" media="(prefers-color-scheme: dark)" />
+      <meta name="theme-color" content="#05080d" />
       <meta property="og:type" content="website" />
       <meta property="og:title" content="CB File Hub" />
       <meta property="og:description" content="One place for your files, media and ideas." />

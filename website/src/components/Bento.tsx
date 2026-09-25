@@ -19,6 +19,7 @@ import {
 import { T, type Copy, useCopy } from "./lang";
 import { SplitText, easeOut } from "./motion";
 import { Eyebrow } from "./Eyebrow";
+import { Orbits } from "./Cosmos";
 
 /** Panel with a cursor-following highlight. Pointer position lives in motion values, never React state. */
 function Cell({
@@ -49,7 +50,7 @@ function Cell({
         x.set(-400);
         y.set(-400);
       }}
-      className={`group relative isolate overflow-hidden rounded-[24px] border border-line ${className}`}
+      className={`group relative isolate overflow-hidden rounded-[14px] border border-line ${className}`}
     >
       <motion.div aria-hidden style={{ background: spotlight }} className="pointer-events-none absolute inset-0 z-10" />
       {children}
@@ -68,26 +69,26 @@ function IconTile({ icon: Icon, className = "bg-surface text-accent" }: { icon: 
 /** Mock of the local runtime status: llama-server running a GGUF model on the GPU. */
 function RuntimePanel() {
   return (
-    <div aria-hidden className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 font-mono text-[12px] text-[#b4c4d6] backdrop-blur">
+    <div aria-hidden className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 font-mono text-[12px] text-[#7e92a8] backdrop-blur">
       <div className="flex items-center justify-between">
-        <span className="text-[#e8eff6]">llama.cpp · Vulkan</span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34d1b0]/15 px-2 py-0.5 text-[11px] text-[#34d1b0]">
+        <span className="text-[#e6f0fa]">llama.cpp · Vulkan</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#38a9ff]/15 px-2 py-0.5 text-[11px] text-[#38a9ff]">
           <span className="relative flex size-1.5">
-            <span className="animate-ping-soft absolute inset-0 rounded-full bg-[#34d1b0]" />
-            <span className="relative size-1.5 rounded-full bg-[#34d1b0]" />
+            <span className="animate-ping-soft absolute inset-0 rounded-full bg-[#38a9ff]" />
+            <span className="relative size-1.5 rounded-full bg-[#38a9ff]" />
           </span>
           GPU
         </span>
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
         <span>model.gguf</span>
-        <span className="text-[#e8eff6]">Q4_K_M</span>
+        <span className="text-[#e6f0fa]">Q4_K_M</span>
       </div>
       <div className="mt-3 flex h-8 items-end gap-[3px]">
         {Array.from({ length: 28 }, (_, i) => (
           <span
             key={i}
-            className="animate-bar w-full rounded-sm bg-gradient-to-t from-[#34d1b0]/30 to-[#34d1b0]"
+            className="animate-bar w-full rounded-sm bg-gradient-to-t from-[#38a9ff]/30 to-[#38a9ff]"
             style={{ animationDelay: `${-((i * 137) % 1100)}ms`, height: `${40 + ((i * 53) % 60)}%` }}
           />
         ))}
@@ -170,10 +171,10 @@ export function Bento() {
   return (
     <section id="features" ref={ref} aria-labelledby="features-title" className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <Eyebrow index="03" copy={{ en: "Features", vi: "Tính năng" }} />
+        <Eyebrow index="02" copy={{ en: "Features", vi: "Tính năng" }} />
         <h2
           id="features-title"
-          className="max-w-3xl text-4xl leading-[1.05] font-semibold tracking-[-0.035em] sm:text-5xl lg:text-6xl"
+          className="max-w-3xl text-4xl leading-[1.05] font-extrabold tracking-[-0.015em] uppercase sm:text-5xl lg:text-6xl"
         >
           <SplitText copy={{ en: "Everything you need to stay *in* *motion.*", vi: "Đủ công cụ để công việc *liền* *mạch.*" }} inView />
         </h2>
@@ -210,19 +211,16 @@ export function Bento() {
           </Cell>
 
           {/* Local model runtime: brand-navy panel. */}
-          <Cell delay={0.08} className="bg-[linear-gradient(140deg,var(--c-navy),#0b1a30)] text-[#e8eff6] lg:col-span-2">
-            <div
-              aria-hidden
-              className="bg-grid-light pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_top_right,#000,transparent_70%)]"
-            />
+          <Cell delay={0.08} className="bg-[linear-gradient(140deg,var(--c-navy),#03060f)] text-[#e6f0fa] lg:col-span-2">
+            <Orbits className="-top-40 -right-40 w-[520px]" rings={[0.34, 0.6, 1]} />
             <div className="relative z-20 grid h-full gap-8 p-7 sm:p-9 xl:grid-cols-2 xl:items-end">
               <div className="flex h-full flex-col justify-between gap-8">
-                <IconTile icon={Cpu} className="border-white/10 bg-white/5 text-[#34d1b0]" />
+                <IconTile icon={Cpu} className="border-white/10 bg-white/5 text-[#38a9ff]" />
                 <div>
                   <h3 className="text-2xl leading-tight font-semibold tracking-[-0.025em]">
                     <T en="Run the model on your own PC." vi="Chạy mô hình ngay trên máy của bạn." />
                   </h3>
-                  <p className="mt-3 max-w-[48ch] leading-relaxed text-[#b4c4d6]">
+                  <p className="mt-3 max-w-[48ch] leading-relaxed text-[#7e92a8]">
                     <T
                       en="On Windows, load a GGUF model and CB Agent runs it on your GPU. Or connect the cloud provider you already use."
                       vi="Trên Windows, nạp mô hình GGUF để CB Agent chạy bằng GPU của bạn. Hoặc kết nối nhà cung cấp đám mây bạn đang dùng."
@@ -301,7 +299,7 @@ export function Bento() {
                   ))}
                 </div>
                 <span className="ml-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
-                  <ArrowsClockwise size={13} weight="bold" className="animate-spin-slow" />
+                  <ArrowsClockwise size={13} weight="bold" />
                   Sync
                 </span>
               </div>

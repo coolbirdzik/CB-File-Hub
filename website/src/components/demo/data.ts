@@ -120,24 +120,35 @@ export function formatDate(iso: string, lang: "en" | "vi") {
 
 export const isMedia = (e: Entry) => e.kind === "image" || e.kind === "video";
 
-// Tag tree, matching the app's Tag Management showcase.
-export type TagDef = { id: string; name: { en: string; vi: string }; color: string; parent?: string };
+// Tag tree, matching the app's Tag Management showcase. Like the app, tag names are
+// the user's own strings (case included), and a tag may carry a picked thumbnail.
+export type TagDef = { id: string; name: { en: string; vi: string }; color: string; parent?: string; thumb?: Tone };
 
 export const tags: TagDef[] = [
   { id: "archive", name: { en: "Archive", vi: "Lưu trữ" }, color: "#f4511e" },
-  { id: "favorite", name: { en: "Favorite", vi: "Yêu thích" }, color: "#fb8c00" },
+  { id: "favorite", name: { en: "favorite", vi: "yêu thích" }, color: "#8d6e63" },
   { id: "media", name: { en: "Media", vi: "Media" }, color: "#43a047" },
-  { id: "movies", name: { en: "Movies", vi: "Phim" }, color: "#e91e63", parent: "media" },
+  { id: "movies", name: { en: "Movies", vi: "Phim" }, color: "#e91e63", parent: "media", thumb: "earth" },
   { id: "action", name: { en: "Action", vi: "Hành động" }, color: "#f4511e", parent: "movies" },
   { id: "photos", name: { en: "Photos", vi: "Ảnh" }, color: "#fb8c00", parent: "media" },
   { id: "project", name: { en: "project", vi: "dự án" }, color: "#00acc1" },
-  { id: "travel", name: { en: "Travel", vi: "Du lịch" }, color: "#7cb342" },
-  { id: "beach", name: { en: "Beach", vi: "Biển" }, color: "#fb8c00", parent: "travel" },
-  { id: "mountains", name: { en: "Mountains", vi: "Núi" }, color: "#7cb342", parent: "travel" },
+  { id: "travel", name: { en: "Travel", vi: "Du lịch" }, color: "#7cb342", thumb: "ocean" },
+  { id: "beach", name: { en: "Beach", vi: "Biển" }, color: "#fb8c00", parent: "travel", thumb: "sunset" },
+  { id: "mountains", name: { en: "Mountains", vi: "Núi" }, color: "#7cb342", parent: "travel", thumb: "forest" },
   { id: "vacation", name: { en: "vacation", vi: "kỳ nghỉ" }, color: "#8bc34a" },
 ];
 
 export const tagById = new Map(tags.map((t) => [t.id, t]));
+
+export const childTags = (id: string) => tags.filter((t) => t.parent === id);
+export const isParentTag = (id: string) => tags.some((t) => t.parent === id);
+
+/** Files carrying exactly this tag: what the app counts for "By Popular". */
+export const directTagCount = (id: string) => entries.filter((e) => e.tags?.includes(id)).length;
+
+/** Newest modified date among the tag's files, standing in for the app's "last used" stamp. */
+export const tagLastUsed = (id: string) =>
+  entries.reduce((latest, e) => (e.tags?.includes(id) && e.modified > latest ? e.modified : latest), "");
 
 /** Files carrying a tag or any of its descendants. */
 export function filesWithTag(tagId: string) {
@@ -162,8 +173,8 @@ export const toneBackground: Record<Tone, string> = {
 
 // Accent colours offered by the app's Settings > Accent color (theme_config.dart).
 export const accents = [
-  { id: "teal", hex: "#00b294", name: { en: "Teal", vi: "Xanh ngọc" } },
   { id: "blue", hex: "#0078d4", name: { en: "Blue", vi: "Xanh dương" } },
+  { id: "teal", hex: "#00b294", name: { en: "Teal", vi: "Xanh ngọc" } },
   { id: "green", hex: "#107c10", name: { en: "Green", vi: "Xanh lá" } },
   { id: "orange", hex: "#f7630c", name: { en: "Orange", vi: "Cam" } },
   { id: "red", hex: "#e81123", name: { en: "Red", vi: "Đỏ" } },

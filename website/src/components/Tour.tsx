@@ -138,8 +138,8 @@ function StepText({
         </p>
       </motion.div>
       {/* Below lg the sticky stage is hidden, so each step carries its own screenshot. */}
-      <div className="shadow-tinted mt-8 aspect-[16/10] overflow-hidden rounded-[20px] border border-line bg-surface p-1.5 lg:hidden">
-        <Shot step={step} className="rounded-[14px]" />
+      <div className="shadow-tinted mt-8 aspect-[16/10] overflow-hidden rounded-[12px] border border-line bg-surface p-1.5 lg:hidden">
+        <Shot step={step} className="rounded-[8px]" />
       </div>
     </div>
   );
@@ -155,10 +155,10 @@ export function Tour() {
   return (
     <section id="experience" aria-labelledby="experience-title" className="py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <Eyebrow index="02" copy={{ en: "Experience", vi: "Trải nghiệm" }} />
+        <Eyebrow index="01" copy={{ en: "Experience", vi: "Trải nghiệm" }} />
         <h2
           id="experience-title"
-          className="max-w-4xl text-4xl leading-[1.05] font-semibold tracking-[-0.035em] sm:text-5xl lg:text-6xl"
+          className="max-w-4xl text-4xl leading-[1.05] font-extrabold tracking-[-0.015em] uppercase sm:text-5xl lg:text-6xl"
         >
           <SplitText
             copy={{
@@ -173,10 +173,6 @@ export function Tour() {
           {/* Sticky stage: the screenshot swaps as each step reaches the middle of the viewport. */}
           <div className="hidden lg:col-span-7 lg:block">
             <div className="sticky top-[calc(50vh-16rem)]">
-              <div
-                aria-hidden
-                className="pointer-events-none absolute -inset-10 -z-10 rounded-full bg-[radial-gradient(closest-side,var(--c-aurora-1),var(--c-aurora-2)_60%,transparent)] blur-2xl"
-              />
               {/* Step switcher chips mirror the scroll position. */}
               <div aria-hidden className="mb-4 flex gap-2">
                 {steps.map((s, i) => {
@@ -194,14 +190,15 @@ export function Tour() {
                   );
                 })}
               </div>
-              <div className="shadow-tinted relative aspect-[16/10] overflow-hidden rounded-[24px] border border-line bg-surface p-2">
-                <div className="relative h-full w-full overflow-hidden rounded-[16px] bg-canvas">
+              <div className="shadow-tinted relative aspect-[16/10] overflow-hidden rounded-[14px] border border-line bg-surface p-2">
+                <div className="relative h-full w-full overflow-hidden rounded-[8px] bg-canvas">
                   <AnimatePresence initial={false}>
                     <motion.div
                       key={active}
                       className="absolute inset-0"
-                      initial={{ opacity: 0, scale: 1.04, filter: "blur(6px)" }}
-                      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                      // Opacity + scale only: a blur filter on a screenshot this size costs frames on every swap.
+                      initial={{ opacity: 0, scale: 1.04 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.98 }}
                       transition={{ duration: 0.7, ease: easeOut }}
                     >

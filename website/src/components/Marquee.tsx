@@ -30,11 +30,9 @@ function Row({ hidden = false }: { hidden?: boolean }) {
   return (
     <ul aria-hidden={hidden || undefined} className={`flex shrink-0 items-center ${hidden ? "marquee-dupe" : ""}`}>
       {items.map(({ icon: Icon, en, vi }) => (
-        <li key={en} className="px-2 sm:px-2.5">
-          <span className="inline-flex items-center gap-3 rounded-2xl border border-line bg-surface/70 py-2 pr-5 pl-2 text-[15px] font-medium whitespace-nowrap text-ink/80 sm:text-base">
-            <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent">
-              <Icon size={19} weight="duotone" />
-            </span>
+        <li key={en} className="px-5 sm:px-7">
+          <span className="inline-flex items-center gap-2.5 text-[15px] font-medium whitespace-nowrap text-muted sm:text-base">
+            <Icon size={18} weight="duotone" className="text-accent" />
             <T en={en} vi={vi} />
           </span>
         </li>
@@ -48,7 +46,7 @@ export function Marquee() {
   return (
     <section
       aria-label={copy({ en: "Supported connections and formats", vi: "Kết nối và định dạng được hỗ trợ" })}
-      className="marquee relative mt-20 overflow-hidden py-4 [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)] sm:mt-28"
+      className="marquee relative mt-16 overflow-hidden py-6 [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)] sm:mt-20"
     >
       <div className="marquee-track flex w-max">
         <Row />

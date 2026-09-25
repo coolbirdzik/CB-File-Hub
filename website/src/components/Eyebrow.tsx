@@ -19,7 +19,7 @@ export function Eyebrow({
 }) {
   const Wrap = immediate ? Rise : Reveal;
   return (
-    <Wrap y={12} className={`mb-6 flex items-center gap-3 text-sm font-medium text-muted ${className}`}>
+    <Wrap y={12} className={`mb-6 flex items-center gap-3 text-xs font-semibold tracking-[0.22em] uppercase text-muted ${className}`}>
       <span className="font-mono text-xs tabular-nums text-accent">{index}</span>
       <span aria-hidden className="h-px w-8 bg-gradient-to-r from-accent to-transparent" />
       <span>

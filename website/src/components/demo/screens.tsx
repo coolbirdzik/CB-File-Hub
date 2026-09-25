@@ -2,8 +2,6 @@ import * as React from "react";
 import {
   ArrowSquareOut,
   Broom,
-  CaretDown,
-  CaretRight,
   Check,
   Cloud,
   DotsThree,
@@ -364,89 +362,6 @@ export function GalleryHub() {
           </div>
         </button>
       </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ Tags */
-
-export function TagsScreen() {
-  const { t, lang, navigate, toast, compact } = useDemo();
-  const [collapsed, setCollapsed] = React.useState<Set<string>>(new Set());
-  const [selected, setSelected] = React.useState<string | null>("beach");
-
-  const rows: Array<{ id: string; depth: number }> = [];
-  const walk = (parent: string | undefined, depth: number) => {
-    for (const tag of tags.filter((x) => x.parent === parent)) {
-      rows.push({ id: tag.id, depth });
-      if (!collapsed.has(tag.id)) walk(tag.id, depth + 1);
-    }
-  };
-  walk(undefined, 0);
-
-  return (
-    <div className="relative h-full overflow-y-auto">
-      <div className="flex items-center gap-2 px-5 pt-4 pb-2 text-[13px] font-medium text-app-muted">
-        <Tag size={17} weight="light" className="text-app-accent" />
-        {tags.length} {t("tags created", "thẻ đã tạo")}
-      </div>
-      <div role="tree" aria-label={t("Tags", "Thẻ")} className="pb-20">
-        {rows.map(({ id, depth }) => {
-          const tag = tags.find((x) => x.id === id)!;
-          const hasKids = tags.some((x) => x.parent === id);
-          return (
-            <div
-              key={id}
-              role="treeitem"
-              aria-selected={selected === id}
-              aria-expanded={hasKids ? !collapsed.has(id) : undefined}
-              tabIndex={0}
-              onClick={() => (compact ? navigate(`tag:${id}`) : setSelected(id))}
-              onDoubleClick={() => navigate(`tag:${id}`)}
-              onKeyDown={(e) => e.key === "Enter" && navigate(`tag:${id}`)}
-              className={`flex h-9 cursor-default items-center gap-2 pr-4 text-[13px] ${
-                selected === id ? "bg-app-accent-soft" : "hover:bg-app-hover"
-              }`}
-              style={{ paddingLeft: 12 + depth * 16 }}
-            >
-              {hasKids ? (
-                <button
-                  type="button"
-                  aria-label={collapsed.has(id) ? t("Expand", "Mở rộng") : t("Collapse", "Thu gọn")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCollapsed((prev) => {
-                      const next = new Set(prev);
-                      next.has(id) ? next.delete(id) : next.add(id);
-                      return next;
-                    });
-                  }}
-                  className="grid size-4 place-items-center text-app-muted"
-                >
-                  {collapsed.has(id) ? <CaretRight size={11} /> : <CaretDown size={11} />}
-                </button>
-              ) : (
-                <span className="size-4" />
-              )}
-              <span className="size-2.5 rounded-full" style={{ background: tag.color }} />
-              <span className="flex-1">{tag.name[lang]}</span>
-            </div>
-          );
-        })}
-      </div>
-      <p className="px-5 pb-6 text-[11.5px] text-app-muted">
-        {compact
-          ? t("Tap a tag to see its files.", "Chạm vào thẻ để xem các tệp.")
-          : t("Double-click a tag to see its files.", "Nhấp đúp vào thẻ để xem các tệp.")}
-      </p>
-      <button
-        type="button"
-        aria-label={t("New tag", "Thẻ mới")}
-        onClick={() => toast(t("Creating tags is off in the demo", "Bản demo không tạo thẻ mới"))}
-        className="absolute right-4 bottom-4 grid size-12 place-items-center rounded-xl bg-app-accent text-white shadow-md transition hover:brightness-105 active:scale-95"
-      >
-        <Plus size={20} weight="light" />
-      </button>
     </div>
   );
 }

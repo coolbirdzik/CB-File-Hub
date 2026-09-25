@@ -57,7 +57,7 @@ export function Footer() {
         </span>
       </div>
       <div aria-hidden className="overflow-hidden">
-        <p className="mx-auto -mb-[0.2em] max-w-7xl bg-gradient-to-b from-ink/[0.09] to-transparent bg-clip-text px-4 text-center text-[clamp(4rem,17vw,15rem)] leading-none font-bold tracking-[-0.06em] whitespace-nowrap text-transparent select-none sm:px-6 lg:px-8">
+        <p className="mx-auto -mb-[0.2em] max-w-7xl bg-gradient-to-b from-ink/[0.09] to-transparent bg-clip-text px-4 text-center text-[clamp(4rem,17vw,15rem)] leading-none font-extrabold tracking-[-0.04em] whitespace-nowrap uppercase select-none sm:px-6 lg:px-8">
           CB File Hub
         </p>
       </div>

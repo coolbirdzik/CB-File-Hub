@@ -18,18 +18,10 @@ export function Platforms() {
 
   return (
     <section id="platforms" ref={ref} aria-labelledby="platforms-title" className="relative isolate overflow-hidden py-24 sm:py-32">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-[-10%] bottom-0 -z-10 size-[48rem] rounded-full bg-[radial-gradient(closest-side,var(--c-aurora-2),transparent)] blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-[10%] left-[-8%] -z-10 size-[30rem] rounded-full bg-[radial-gradient(closest-side,var(--c-aurora-1),transparent)] blur-3xl"
-      />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
-          <Eyebrow index="04" copy={{ en: "Platforms", vi: "Nền tảng" }} />
-          <h2 id="platforms-title" className="text-4xl leading-[1.05] font-semibold tracking-[-0.035em] sm:text-5xl lg:text-6xl">
+          <Eyebrow index="03" copy={{ en: "Platforms", vi: "Nền tảng" }} />
+          <h2 id="platforms-title" className="text-4xl leading-[1.05] font-extrabold tracking-[-0.015em] uppercase sm:text-5xl lg:text-6xl">
             <SplitText copy={{ en: "Your files go *where* *you* *do.*", vi: "Tệp đi cùng bạn *mọi* *nơi.*" }} inView />
           </h2>
           <Reveal delay={0.15}>
@@ -59,7 +51,7 @@ export function Platforms() {
         {/* Composition: wide desktop shot, phone overlapping its lower-left corner. */}
         <div className="relative mt-16 pb-10 sm:mt-20 lg:pb-24">
           <motion.div style={{ y: desktopY }} className="ml-auto w-full md:w-[82%]">
-            <div className="shadow-tinted rounded-[24px] border border-line bg-surface p-1.5 sm:p-2">
+            <div className="shadow-tinted rounded-[14px] border border-line bg-surface p-1.5 sm:p-2">
               <img
                 src="/media/tour-gallery.webp"
                 width={1600}
@@ -67,7 +59,7 @@ export function Platforms() {
                 loading="lazy"
                 decoding="async"
                 alt={copy({ en: "CB File Hub album view on Windows", vi: "Chế độ xem album của CB File Hub trên Windows" })}
-                className="block h-auto w-full rounded-[16px]"
+                className="block h-auto w-full rounded-[8px]"
               />
             </div>
           </motion.div>
@@ -76,7 +68,7 @@ export function Platforms() {
             style={{ y: phoneY, rotate: phoneRotate }}
             className="relative mx-auto -mt-24 w-[58%] max-w-[300px] md:absolute md:bottom-0 md:left-[3%] md:mt-0 md:w-[27%] md:max-w-[330px]"
           >
-            <div className="shadow-tinted rounded-[36px] border border-line bg-[#0b1422] p-2.5">
+            <div className="shadow-tinted rounded-[36px] border border-line bg-[#04070d] p-2.5">
               <img
                 src="/media/phone-files.webp"
                 width={720}

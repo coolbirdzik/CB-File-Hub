@@ -270,20 +270,11 @@ export default function ReleasesPage() {
   return (
     <Layout current={links.releases}>
       <section aria-labelledby="releases-title" className="relative isolate overflow-hidden pt-32 pb-16 sm:pt-40">
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-          <div className="bg-dots absolute inset-0 [mask-image:radial-gradient(ellipse_60%_70%_at_30%_20%,#000_20%,transparent_75%)]" />
-          <div className="animate-drift absolute -top-40 left-[4%] size-[34rem] rounded-full bg-[radial-gradient(closest-side,var(--c-aurora-1),transparent)] blur-2xl" />
-          <div
-            className="animate-drift absolute -top-20 right-[-4%] size-[30rem] rounded-full bg-[radial-gradient(closest-side,var(--c-aurora-2),transparent)] blur-2xl"
-            style={{ animationDelay: "-7s" }}
-          />
-        </div>
-
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Eyebrow immediate index={latest ? `v${latest.version}` : "—"} copy={{ en: "Changelog", vi: "Nhật ký thay đổi" }} />
           <h1
             id="releases-title"
-            className="max-w-4xl text-[clamp(2.75rem,7vw,5.5rem)] leading-[1.02] font-semibold tracking-[-0.045em]"
+            className="max-w-4xl text-[clamp(2.5rem,6.4vw,5rem)] leading-[1.0] font-extrabold tracking-[-0.02em] uppercase"
           >
             <SplitText copy={{ en: "Release *notes.*", vi: "Bản *phát* *hành.*" }} delay={0.05} />
           </h1>
