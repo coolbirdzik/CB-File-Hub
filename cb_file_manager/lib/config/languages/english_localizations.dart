@@ -765,6 +765,10 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get tagManagement => 'Tag Management';
   @override
+  String get parentTagLabel => 'Parent';
+  @override
+  String get childTagInputHint => 'Type child tag…';
+  @override
   String exitTagScope(String parent) => 'Leave "$parent"';
   @override
   String childTagHint(String parent) => 'New tag inside "$parent"...';

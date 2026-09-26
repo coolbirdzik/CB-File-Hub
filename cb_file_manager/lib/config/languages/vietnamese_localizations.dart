@@ -759,6 +759,10 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get tagManagement => 'Quản lý thẻ đánh dấu';
   @override
+  String get parentTagLabel => 'Thẻ cha';
+  @override
+  String get childTagInputHint => 'Nhập thẻ con…';
+  @override
   String exitTagScope(String parent) => 'Thoát "$parent"';
   @override
   String childTagHint(String parent) => 'Thẻ con mới trong "$parent"...';

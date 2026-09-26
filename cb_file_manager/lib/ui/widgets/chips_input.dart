@@ -59,9 +59,9 @@ class ChipsInput<T> extends StatefulWidget {
   final bool enableColonAutocomplete;
 
   /// The parent tag the field is scoped to, or null when typing at the top
-  /// level. While scoped, a pill is shown at the head of the field and the
-  /// typed text is only the child name — the caller composes "parent:child"
-  /// itself and decides when the scope is dropped.
+  /// level. While scoped, a pill is shown after the selected tag chips and
+  /// immediately before the child draft — the caller composes
+  /// "parent:child" itself and decides when the scope is dropped.
   final String? scopeParent;
 
   /// Called when the scope changes: a parent is entered (":" or "->" on a
@@ -100,9 +100,12 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   void initState() {
     super.initState();
 
-    controller = ChipsInputEditingController<T>(<T>[
-      ...widget.values,
-    ], widget.chipBuilder);
+    controller = ChipsInputEditingController<T>(
+      <T>[...widget.values],
+      widget.chipBuilder,
+      _exitScope,
+      scopeParent: widget.scopeParent,
+    );
     controller.addListener(_textListener);
     _focusNode = FocusNode();
     _focusNode.addListener(_onFocusChanged);
@@ -363,18 +366,37 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   void _enterScope(String parent) {
     _clearDraft();
     widget.onScopeChanged!(parent);
+    _restoreDraftFocusAfterScopeChange();
+  }
+
+  void _exitScope() {
+    widget.onScopeChanged?.call(null);
+    _restoreDraftFocusAfterScopeChange();
+  }
+
+  /// A scope change rebuilds the multiline field to insert/remove the parent
+  /// pill. With many wrapped chips Flutter can restore the click-derived text
+  /// selection after that rebuild, which puts the caret near the first chip.
+  /// Re-assert the logical draft end after layout so child typing always
+  /// resumes after every selected tag.
+  void _restoreDraftFocusAfterScopeChange() {
     _focusNode.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final draftEnd = controller.draftEndOffset;
+      controller.selection = TextSelection.collapsed(offset: draftEnd);
+      _focusNode.requestFocus();
+    });
   }
 
   /// Wipes the typed draft while keeping the chips. Programmatic controller
   /// writes do not fire [TextField.onChanged], so [onTextChanged] is notified
   /// by hand.
   void _clearDraft() {
-    final String chipChars =
-        String.fromCharCode(
-          ChipsInputEditingController.kObjectReplacementChar,
-        ) *
-        widget.values.length;
+    final String chipChars = controller.prefixFor(
+      valueCount: widget.values.length,
+      scopeParent: widget.scopeParent,
+    );
     controller.value = TextEditingValue(
       text: chipChars,
       selection: TextSelection.collapsed(offset: chipChars.length),
@@ -400,7 +422,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         (HardwareKeyboard.instance.isControlPressed ||
             HardwareKeyboard.instance.isMetaPressed);
     if (isSelectAll) {
-      final draftStart = countReplacements(controller.text);
+      final draftStart = countPrefixReplacements(controller.text);
       controller.selection = TextSelection(
         baseOffset: draftStart,
         extentOffset: controller.text.length,
@@ -418,7 +440,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         widget.scopeParent != null &&
         event.logicalKey == LogicalKeyboardKey.backspace &&
         typed.isEmpty) {
-      widget.onScopeChanged!(null);
+      _exitScope();
       return KeyEventResult.handled;
     }
 
@@ -442,20 +464,29 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
       }
     }
 
-    if (suggestions.isEmpty) return KeyEventResult.ignored;
-
     // Right arrow drills into the highlighted suggestion, but only with the
     // caret already parked at the end of the draft, so it still moves the
-    // cursor everywhere else.
+    // cursor everywhere else. If autocomplete has no match (or has not
+    // arrived yet), the typed draft becomes a new parent instead. This makes
+    // "type parent, then press right" a consistent way to start a child tag.
     if (scopeEnabled &&
         widget.scopeParent == null &&
         event.logicalKey == LogicalKeyboardKey.arrowRight &&
         controller.selection.isCollapsed &&
         controller.selection.baseOffset >= controller.text.length) {
-      final index = _highlightedIndex.clamp(0, suggestions.length - 1);
-      _enterScope(suggestions[index]);
-      return KeyEventResult.handled;
+      final typedParent = typed.trim();
+      if (suggestions.isNotEmpty) {
+        final index = _highlightedIndex.clamp(0, suggestions.length - 1);
+        _enterScope(suggestions[index]);
+        return KeyEventResult.handled;
+      }
+      if (typedParent.isNotEmpty) {
+        _enterScope(typedParent);
+        return KeyEventResult.handled;
+      }
     }
+
+    if (suggestions.isEmpty) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       // Pick the highlighted suggestion
@@ -528,29 +559,23 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         .length;
   }
 
+  static int countPrefixReplacements(String text) {
+    return text.codeUnits.where((int unit) {
+      return unit == ChipsInputEditingController.kObjectReplacementChar ||
+          unit == ChipsInputEditingController.kScopeReplacementChar;
+    }).length;
+  }
+
   @override
   Widget build(BuildContext context) {
     controller.updateValues(<T>[...widget.values]);
+    controller.updateScope(widget.scopeParent, _exitScope);
 
     // Create a decoration that ensures proper padding for chips
-    InputDecoration adjustedDecoration = widget.decoration.copyWith(
+    final InputDecoration adjustedDecoration = widget.decoration.copyWith(
       contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       isDense: false,
     );
-
-    // The scope pill rides in the decoration rather than in the text span:
-    // every span the controller builds has to map 1:1 onto a character of
-    // `text` (that is what the object-replacement chars are for), and the pill
-    // has no character of its own.
-    final String? scope = widget.scopeParent;
-    if (scope != null) {
-      adjustedDecoration = adjustedDecoration.copyWith(
-        prefix: TagScopeChip(
-          parent: scope,
-          onExit: () => widget.onScopeChanged?.call(null),
-        ),
-      );
-    }
 
     return CompositedTransformTarget(
       link: _layerLink,
@@ -577,6 +602,9 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                 : null,
             controller: controller,
             focusNode: _focusNode,
+            inputFormatters: const <TextInputFormatter>[
+              _ChipPrefixTextInputFormatter(),
+            ],
             decoration: adjustedDecoration,
             onChanged: (String value) =>
                 widget.onTextChanged?.call(controller.textWithoutReplacements),
@@ -593,14 +621,38 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 }
 
 class ChipsInputEditingController<T> extends TextEditingController {
-  ChipsInputEditingController(this.values, this.chipBuilder)
-    : super(text: String.fromCharCode(kObjectReplacementChar) * values.length);
+  ChipsInputEditingController(
+    this.values,
+    this.chipBuilder,
+    this._onScopeExit, {
+    this.scopeParent,
+  }) : super() {
+    final prefix = prefixFor(
+      valueCount: values.length,
+      scopeParent: scopeParent,
+    );
+    final text = _emptyDraftText(prefix, scopeParent);
+    value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: prefix.length),
+    );
+  }
 
   // This constant character acts as a placeholder in the TextField text value.
   // There will be one character for each of the InputChip displayed.
   static const int kObjectReplacementChar = 0xFFFE;
 
+  /// A separate placeholder keeps the parent scope pill in the editable text
+  /// flow without making it look like one of the selected value chips.
+  static const int kScopeReplacementChar = 0xFFFC;
+
+  /// One replacement character for the visible inline child-input hint.
+  /// The caret sits immediately before it; typing replaces it with the draft.
+  static const int kInputHintReplacementChar = 0xFFFB;
+
   List<T> values;
+  String? scopeParent;
+  VoidCallback _onScopeExit;
 
   final Widget Function(BuildContext context, T data) chipBuilder;
 
@@ -608,22 +660,64 @@ class ChipsInputEditingController<T> extends TextEditingController {
   /// from the outside the context of the text field.
   void updateValues(List<T> values) {
     if (values.length != this.values.length) {
-      final String char = String.fromCharCode(kObjectReplacementChar);
-      final int length = values.length;
+      final prefix = prefixFor(
+        valueCount: values.length,
+        scopeParent: scopeParent,
+      );
+      final text = _emptyDraftText(prefix, scopeParent);
       value = TextEditingValue(
-        text: char * length,
-        selection: TextSelection.collapsed(offset: length),
+        text: text,
+        selection: TextSelection.collapsed(offset: prefix.length),
       );
       this.values = values;
     }
   }
 
+  void updateScope(String? scopeParent, VoidCallback onScopeExit) {
+    _onScopeExit = onScopeExit;
+    if (scopeParent == this.scopeParent) return;
+
+    final draft = textWithoutReplacements;
+    this.scopeParent = scopeParent;
+    final prefix = prefixFor(
+      valueCount: values.length,
+      scopeParent: scopeParent,
+    );
+    final text = draft.isEmpty
+        ? _emptyDraftText(prefix, scopeParent)
+        : '$prefix$draft';
+    value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(
+        offset: draft.isEmpty ? prefix.length : text.length,
+      ),
+    );
+  }
+
+  String prefixFor({required int valueCount, required String? scopeParent}) {
+    final chip = String.fromCharCode(kObjectReplacementChar);
+    final scope = String.fromCharCode(kScopeReplacementChar);
+    return '${chip * valueCount}${scopeParent == null ? '' : scope}';
+  }
+
+  String _emptyDraftText(String prefix, String? scopeParent) {
+    if (scopeParent == null) return prefix;
+    return '$prefix${String.fromCharCode(kInputHintReplacementChar)}';
+  }
+
   String get textWithoutReplacements {
-    final String char = String.fromCharCode(kObjectReplacementChar);
-    return text.replaceAll(RegExp(char), '');
+    final chip = String.fromCharCode(kObjectReplacementChar);
+    final scope = String.fromCharCode(kScopeReplacementChar);
+    final hint = String.fromCharCode(kInputHintReplacementChar);
+    return text.replaceAll(chip, '').replaceAll(scope, '').replaceAll(hint, '');
   }
 
   String get textWithReplacements => text;
+
+  int get draftEndOffset {
+    final hintIndex = text.codeUnits.indexOf(kInputHintReplacementChar);
+    return hintIndex < 0 ? text.length : hintIndex;
+  }
 
   @override
   TextSpan buildTextSpan({
@@ -648,6 +742,27 @@ class ChipsInputEditingController<T> extends TextEditingController {
       );
     }
 
+    final parent = scopeParent;
+    if (parent != null) {
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: TagScopeChip(parent: parent, onExit: _onScopeExit),
+        ),
+      );
+    }
+
+    if (text.codeUnits.contains(kInputHintReplacementChar)) {
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: ChildTagInputHint(
+            label: AppLocalizations.of(context)!.childTagInputHint,
+          ),
+        ),
+      );
+    }
+
     // Add text input after chips
     if (textWithoutReplacements.isNotEmpty) {
       spans.add(TextSpan(text: textWithoutReplacements));
@@ -657,11 +772,89 @@ class ChipsInputEditingController<T> extends TextEditingController {
   }
 }
 
-/// The parent pill that rides at the head of a scoped [ChipsInput]: while it
-/// is showing, everything typed into the field is added as a child of
-/// [parent]. It deliberately reads as a breadcrumb rather than a tag chip —
-/// bold label, tree icon, trailing caret — so it is not mistaken for one of
-/// the selected tags sitting next to it.
+/// Keeps the editable draft after the replacement characters that represent
+/// selected chips and the optional parent-scope pill.
+///
+/// Flutter can place the raw text selection before (or between) replacement
+/// characters when a user clicks a wrapped chip field. The controller renders
+/// the draft after all chips, so inserting at that raw offset makes the caret
+/// appear to jump back into the chip list. Canonicalizing the editing value
+/// keeps the raw text order aligned with the visual order while preserving the
+/// draft-relative selection and IME composing range.
+class _ChipPrefixTextInputFormatter extends TextInputFormatter {
+  const _ChipPrefixTextInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final chipReplacement = String.fromCharCode(
+      ChipsInputEditingController.kObjectReplacementChar,
+    );
+    final scopeReplacement = String.fromCharCode(
+      ChipsInputEditingController.kScopeReplacementChar,
+    );
+    final hintReplacement = String.fromCharCode(
+      ChipsInputEditingController.kInputHintReplacementChar,
+    );
+    final chipCount = ChipsInputState.countReplacements(newValue.text);
+    final scopeCount = newValue.text.codeUnits
+        .where(
+          (unit) => unit == ChipsInputEditingController.kScopeReplacementChar,
+        )
+        .length;
+    final prefixLength = chipCount + scopeCount;
+    final draft = newValue.text
+        .replaceAll(chipReplacement, '')
+        .replaceAll(scopeReplacement, '')
+        .replaceAll(hintReplacement, '');
+    final normalizedText =
+        chipReplacement * chipCount +
+        scopeReplacement * scopeCount +
+        (scopeCount > 0 && draft.isEmpty ? hintReplacement : draft);
+
+    int mapOffset(int offset) {
+      if (offset < 0) return offset;
+      final safeOffset = offset.clamp(0, newValue.text.length);
+      final draftUnitsBeforeOffset = newValue.text
+          .substring(0, safeOffset)
+          .codeUnits
+          .where(
+            (unit) =>
+                unit != ChipsInputEditingController.kObjectReplacementChar &&
+                unit != ChipsInputEditingController.kScopeReplacementChar &&
+                unit != ChipsInputEditingController.kInputHintReplacementChar,
+          )
+          .length;
+      return prefixLength + draftUnitsBeforeOffset;
+    }
+
+    final selection = TextSelection(
+      baseOffset: mapOffset(newValue.selection.baseOffset),
+      extentOffset: mapOffset(newValue.selection.extentOffset),
+      affinity: newValue.selection.affinity,
+      isDirectional: newValue.selection.isDirectional,
+    );
+
+    final composing = newValue.composing.isValid
+        ? TextRange(
+            start: mapOffset(newValue.composing.start),
+            end: mapOffset(newValue.composing.end),
+          )
+        : TextRange.empty;
+
+    return newValue.copyWith(
+      text: normalizedText,
+      selection: selection,
+      composing: composing,
+    );
+  }
+}
+
+/// The parent pill that rides after selected chips in a scoped [ChipsInput]:
+/// while it is showing, everything typed after it is added as a child of
+/// [parent]. It deliberately reads as a breadcrumb rather than a tag chip.
 class TagScopeChip extends StatelessWidget {
   const TagScopeChip({super.key, required this.parent, required this.onExit});
 
@@ -671,6 +864,7 @@ class TagScopeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(parent);
     final foregroundColor = TagChipStyle.readableOn(
@@ -691,14 +885,17 @@ class TagScopeChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              PhosphorIconsLight.treeStructure,
-              size: 13,
-              color: contentColor,
+            Text(
+              '${l10n.parentTagLabel}:',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: contentColor.withValues(alpha: 0.72),
+              ),
             ),
-            const SizedBox(width: 5),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
+            const SizedBox(width: 4),
+            Flexible(
+              fit: FlexFit.loose,
               child: Text(
                 parent,
                 overflow: TextOverflow.ellipsis,
@@ -712,12 +909,12 @@ class TagScopeChip extends StatelessWidget {
             ),
             Icon(
               PhosphorIconsLight.caretRight,
-              size: 11,
+              size: 12,
               color: contentColor.withValues(alpha: 0.7),
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: 5),
             Tooltip(
-              message: AppLocalizations.of(context)!.exitTagScope(parent),
+              message: l10n.exitTagScope(parent),
               child: InkWell(
                 borderRadius: BorderRadius.circular(10),
                 onTap: onExit,
@@ -732,6 +929,32 @@ class TagScopeChip extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ghost text rendered at the actual child-draft caret position. It occupies
+/// one replacement character and disappears as soon as the user types.
+class ChildTagInputHint extends StatelessWidget {
+  const ChildTagInputHint({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(
+      context,
+    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.62);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontStyle: FontStyle.italic,
+          color: color,
         ),
       ),
     );
