@@ -371,12 +371,16 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     int newVersion,
   ) async {
     if (oldVersion < 4) {
-      await db.execute(
-        'ALTER TABLE albums ADD COLUMN is_nsfw INTEGER NOT NULL DEFAULT 0',
-      );
-      await db.execute(
-        'ALTER TABLE video_libraries ADD COLUMN is_nsfw INTEGER NOT NULL DEFAULT 0',
-      );
+      // The column may already exist: an older build opening a v4 file resets
+      // user_version to 3 (no onDowngrade), so this step can re-run.
+      for (final table in ['albums', 'video_libraries']) {
+        await _addColumnIfMissing(
+          db,
+          table,
+          'is_nsfw',
+          'INTEGER NOT NULL DEFAULT 0',
+        );
+      }
     }
 
     if (oldVersion < 2) {
@@ -451,6 +455,17 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         'CREATE INDEX IF NOT EXISTS idx_tag_hierarchy_child ON tag_hierarchy(child_normalized_tag)',
       );
     }
+  }
+
+  Future<void> _addColumnIfMissing(
+    DatabaseExecutor db,
+    String table,
+    String column,
+    String definition,
+  ) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (columns.any((row) => row['name'] == column)) return;
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
   }
 
   Future<Map<String, Object?>?> _getPreferenceRow(String key) async {

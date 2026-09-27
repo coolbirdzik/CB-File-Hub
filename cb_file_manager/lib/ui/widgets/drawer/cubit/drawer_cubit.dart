@@ -107,14 +107,27 @@ class DrawerCubit extends Cubit<DrawerState> {
         activeTabId: normalizedTabId,
       ),
     );
+    final List<Directory> locations;
     try {
-      final locations = await getAllStorageLocations();
+      locations = await getAllStorageLocations();
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+      return;
+    }
+
+    // Drives must still show when preferences are unavailable (for example a
+    // database that fails to open), so only the pinned/expanded state is lost.
+    var pinned = state.pinnedPaths;
+    var storageExpanded = state.isStorageExpanded;
+    var pinnedExpanded = state.isPinnedExpanded;
+    String? error;
+    try {
       final prefs = UserPreferences.instance;
       await prefs.init();
-      final pinned = await prefs.getSidebarPinnedPaths();
+      pinned = await prefs.getSidebarPinnedPaths();
       final rememberWorkspace = await prefs.getRememberTabWorkspaceEnabled();
-      var storageExpanded = false;
-      var pinnedExpanded = false;
+      storageExpanded = false;
+      pinnedExpanded = false;
 
       if (rememberWorkspace) {
         // First try to get the state for this specific tab
@@ -161,19 +174,20 @@ class DrawerCubit extends Cubit<DrawerState> {
           );
         }
       }
-      emit(
-        state.copyWith(
-          storageLocations: locations,
-          pinnedPaths: pinned,
-          activeTabId: normalizedTabId,
-          isStorageExpanded: storageExpanded,
-          isPinnedExpanded: pinnedExpanded,
-          isLoading: false,
-        ),
-      );
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      error = e.toString();
     }
+    emit(
+      state.copyWith(
+        storageLocations: locations,
+        pinnedPaths: pinned,
+        activeTabId: normalizedTabId,
+        isStorageExpanded: storageExpanded,
+        isPinnedExpanded: pinnedExpanded,
+        isLoading: false,
+        error: error,
+      ),
+    );
   }
 
   Future<void> togglePinnedPath(String path) async {
