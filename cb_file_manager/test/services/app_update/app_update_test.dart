@@ -147,6 +147,10 @@ void main() {
       expect(script, contains(r"'C:\Temp\O''Brien\CBFileHub-Setup-1.2.0.msi'"));
       expect(script, contains(r'Start-Process -FilePath $exe'));
       expect(script, isNot(contains('robocopy')));
+      // An unexpected error must not stop the script before the install.
+      expect(script, contains('trap {'));
+      // Hidden app processes (the spare window) are closed without waiting.
+      expect(script, contains(r'$_.MainWindowHandle -eq 0'));
     });
 
     test('portable script extracts and copies over the app folder', () {

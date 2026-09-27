@@ -176,20 +176,32 @@ function Log([string]\$message) {
   try { "\$(Get-Date -Format o) \$message" | Out-File -LiteralPath \$logFile -Append -Encoding utf8 } catch {}
 }
 
+# An unexpected error must not end the script before the install: the app is
+# already closed, so stopping here leaves the user with nothing on screen.
+trap { Log "Unexpected error: \$_"; continue }
+
 function Get-AppProcesses {
-  Get-Process -ErrorAction SilentlyContinue | Where-Object {
-    \$_.Path -and \$_.Path.StartsWith(\$appDir + '\\', [StringComparison]::OrdinalIgnoreCase)
+  foreach (\$proc in @(Get-Process -ErrorAction SilentlyContinue)) {
+    # Path throws or is empty for processes that exit meanwhile.
+    \$path = \$null
+    try { \$path = \$proc.Path } catch {}
+    if (\$path -and \$path.StartsWith(\$appDir + '\\', [StringComparison]::OrdinalIgnoreCase)) { \$proc }
   }
 }
 
 Log 'Waiting for the app to exit'
 try { Wait-Process -Id \$appPid -Timeout 60 -ErrorAction SilentlyContinue } catch {}
-# Other windows of the app run as separate processes; give them a moment,
-# then close whatever still holds files in the install folder.
-\$deadline = (Get-Date).AddSeconds(15)
+# Other windows of the app run as separate processes. Hidden ones (the
+# pre-warmed spare window) hold nothing worth saving, so close them at once;
+# give visible windows a moment, then close whatever still holds files in
+# the install folder.
+Get-AppProcesses | Where-Object { \$_.MainWindowHandle -eq 0 } |
+  Stop-Process -Force -ErrorAction SilentlyContinue
+\$deadline = (Get-Date).AddSeconds(10)
 while ((Get-AppProcesses) -and (Get-Date) -lt \$deadline) { Start-Sleep -Milliseconds 500 }
 Get-AppProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+Start-Sleep -Milliseconds 500
+Log 'Starting the installer'
 $install
 Remove-Item -LiteralPath \$package -Force -ErrorAction SilentlyContinue
 Start-Process -FilePath \$exe
