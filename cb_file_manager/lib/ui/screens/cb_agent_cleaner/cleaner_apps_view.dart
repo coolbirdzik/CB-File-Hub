@@ -1240,7 +1240,7 @@ class _DetailsActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final buttonShape = ChipTheme.of(context).shape ?? const StadiumBorder();
+    const buttonShape = RoundedRectangleBorder(borderRadius: CbRadii.buttonAll);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -1348,7 +1348,9 @@ class _StorageEntryTile extends StatelessWidget {
           if (onOpenFolder != null)
             IconButton(
               style: IconButton.styleFrom(
-                shape: ChipTheme.of(context).shape ?? const StadiumBorder(),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: CbRadii.buttonAll,
+                ),
               ),
               key: ValueKey<String>('cleaner-app-open-folder-${entry.path}'),
               tooltip: l10n.cleanerAppsOpenFolder,

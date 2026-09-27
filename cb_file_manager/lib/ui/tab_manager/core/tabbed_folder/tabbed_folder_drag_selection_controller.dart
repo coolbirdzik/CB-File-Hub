@@ -10,8 +10,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class TabbedFolderDragSelectionController {
-  final FolderListBloc folderListBloc;
+  final FolderListBloc? folderListBloc;
   final SelectionBloc selectionBloc;
+
+  /// Optional classifier for virtual collections whose items are not backed
+  /// by a [FolderListBloc]. Paths omitted from this iterable are treated as
+  /// files, matching the regular file-browser behavior.
+  final Iterable<String> Function()? folderPaths;
 
   final Map<String, Rect> _itemPositions = {};
 
@@ -40,10 +45,11 @@ class TabbedFolderDragSelectionController {
   StreamSubscription<FolderListState>? _folderListSub;
 
   TabbedFolderDragSelectionController({
-    required this.folderListBloc,
+    this.folderListBloc,
     required this.selectionBloc,
+    this.folderPaths,
   }) {
-    _folderListSub = folderListBloc.stream.listen((_) {
+    _folderListSub = folderListBloc?.stream.listen((_) {
       // Don't clear during an active drag — items are being hit-tested now.
       if (!isDragging.value) {
         clearItemPositions();
@@ -187,10 +193,14 @@ class TabbedFolderDragSelectionController {
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
         keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
 
-    final folderPaths = folderListBloc.state.folders
-        .whereType<Directory>()
-        .map((folder) => folder.path)
-        .toSet();
+    final configuredFolderPaths = folderPaths?.call();
+    final knownFolderPaths = configuredFolderPaths != null
+        ? configuredFolderPaths.toSet()
+        : folderListBloc?.state.folders
+                  .whereType<Directory>()
+                  .map((folder) => folder.path)
+                  .toSet() ??
+              const <String>{};
 
     final Set<String> selectedFoldersInDrag = {};
     final Set<String> selectedFilesInDrag = {};
@@ -198,7 +208,7 @@ class TabbedFolderDragSelectionController {
     _itemPositions.forEach((path, itemRect) {
       if (!globalSelectionRect.overlaps(itemRect)) return;
 
-      if (folderPaths.contains(path)) {
+      if (knownFolderPaths.contains(path)) {
         selectedFoldersInDrag.add(path);
       } else {
         selectedFilesInDrag.add(path);

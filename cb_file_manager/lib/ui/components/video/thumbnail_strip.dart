@@ -118,23 +118,16 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
           itemCount: widget.images.length,
           itemBuilder: (context, index) {
             final file = widget.images[index];
-            final bool isSelected = index == widget.currentIndex;
-
-            return GestureDetector(
-              onTap: () => widget.onThumbnailTap(index),
-              child: Container(
-                margin: EdgeInsets.symmetric(
-                  horizontal: widget.spacing,
-                  vertical: 8.0,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2.0),
-                  child: SizedBox(
-                    width: widget.thumbnailSize,
-                    height: widget.thumbnailSize,
-                    child: _buildThumbnailImage(file, isSelected),
-                  ),
-                ),
+            return Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.spacing,
+                vertical: 8.0,
+              ),
+              child: _StripThumbnail(
+                selected: index == widget.currentIndex,
+                size: widget.thumbnailSize,
+                onTap: () => widget.onThumbnailTap(index),
+                child: _buildThumbnailImage(file),
               ),
             );
           },
@@ -149,26 +142,98 @@ class _ThumbnailStripState extends State<ThumbnailStrip> {
   /// the grid already generated (256 px), instead of decoding the full-res
   /// source file.  This avoids reading potentially large files for dozens of
   /// small 54×54 strip cells at once when the viewer first opens.
-  Widget _buildThumbnailImage(File file, bool isSelected) {
-    return Opacity(
-      // Flat: the current frame is marked by full opacity, not an outline.
-      opacity: isSelected ? 1.0 : 0.5,
-      child: ThumbnailLoader(
-        key: ValueKey('strip-${file.path}'),
-        filePath: file.path,
-        isVideo: false,
-        isImage: true,
+  Widget _buildThumbnailImage(File file) {
+    return ThumbnailLoader(
+      key: ValueKey('strip-${file.path}'),
+      filePath: file.path,
+      isVideo: false,
+      isImage: true,
+      width: widget.thumbnailSize,
+      height: widget.thumbnailSize,
+      fit: BoxFit.cover,
+      showLoadingIndicator: false,
+      fallbackBuilder: () => Container(
         width: widget.thumbnailSize,
         height: widget.thumbnailSize,
-        fit: BoxFit.cover,
-        showLoadingIndicator: false,
-        fallbackBuilder: () => Container(
-          width: widget.thumbnailSize,
-          height: widget.thumbnailSize,
-          color: Colors.grey[800],
-          child: const Icon(
-            PhosphorIconsLight.imageBroken,
-            color: Colors.white70,
+        color: Colors.grey[850],
+        child: const Icon(
+          PhosphorIconsLight.imageBroken,
+          color: Colors.white70,
+        ),
+      ),
+    );
+  }
+}
+
+/// One strip cell: the current frame grows and lights up, the others stay
+/// dimmed until hovered.
+class _StripThumbnail extends StatefulWidget {
+  final bool selected;
+  final double size;
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _StripThumbnail({
+    required this.selected,
+    required this.size,
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  State<_StripThumbnail> createState() => _StripThumbnailState();
+}
+
+class _StripThumbnailState extends State<_StripThumbnail> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const duration = Duration(milliseconds: 260);
+    const curve = Curves.easeOutCubic;
+    final selected = widget.selected;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: selected ? 1.1 : (_hovered ? 1.04 : 1.0),
+          duration: duration,
+          curve: curve,
+          child: AnimatedContainer(
+            duration: duration,
+            curve: curve,
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: _hovered ? 0.3 : 0.0),
+                width: 2,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : const [],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedOpacity(
+                opacity: selected ? 1.0 : (_hovered ? 0.85 : 0.45),
+                duration: duration,
+                curve: curve,
+                child: widget.child,
+              ),
+            ),
           ),
         ),
       ),

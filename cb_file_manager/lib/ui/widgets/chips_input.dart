@@ -392,6 +392,9 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   /// Wipes the typed draft while keeping the chips. Programmatic controller
   /// writes do not fire [TextField.onChanged], so [onTextChanged] is notified
   /// by hand.
+  /// Clears only the editable draft, preserving selected chips and scope.
+  void clearDraft() => _clearDraft();
+
   void _clearDraft() {
     final String chipChars = controller.prefixFor(
       valueCount: widget.values.length,
@@ -568,6 +571,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
   @override
   Widget build(BuildContext context) {
+    controller.chipBuilder = widget.chipBuilder;
     controller.updateValues(<T>[...widget.values]);
     controller.updateScope(widget.scopeParent, _exitScope);
 
@@ -654,7 +658,8 @@ class ChipsInputEditingController<T> extends TextEditingController {
   String? scopeParent;
   VoidCallback _onScopeExit;
 
-  final Widget Function(BuildContext context, T data) chipBuilder;
+  /// Replaced on every build so chips never render through a stale closure.
+  Widget Function(BuildContext context, T data) chipBuilder;
 
   /// Called whenever chip is either added or removed
   /// from the outside the context of the text field.
@@ -669,8 +674,10 @@ class ChipsInputEditingController<T> extends TextEditingController {
         text: text,
         selection: TextSelection.collapsed(offset: prefix.length),
       );
-      this.values = values;
     }
+    // Always take the new list: a same-length change (another file's tags,
+    // a relabelled chip) must still repaint the chips.
+    this.values = values;
   }
 
   void updateScope(String? scopeParent, VoidCallback onScopeExit) {
@@ -967,11 +974,17 @@ class TagInputChip extends StatefulWidget {
     required this.tag,
     required this.onDeleted,
     required this.onSelected,
+    this.label,
+    this.tooltip,
   });
 
   final String tag;
   final ValueChanged<String> onDeleted;
   final ValueChanged<String> onSelected;
+
+  /// Text shown instead of [tag]; colour and callbacks still use [tag].
+  final String? label;
+  final String? tooltip;
 
   @override
   State<TagInputChip> createState() => _TagInputChipState();
@@ -1032,7 +1045,7 @@ class _TagInputChipState extends State<TagInputChip>
         ? Colors.white
         : tagColor;
 
-    return AnimatedBuilder(
+    final chip = AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return Opacity(
@@ -1072,7 +1085,7 @@ class _TagInputChipState extends State<TagInputChip>
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              widget.tag,
+                              widget.label ?? widget.tag,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                               style: TextStyle(
@@ -1102,5 +1115,7 @@ class _TagInputChipState extends State<TagInputChip>
         );
       },
     );
+    final tooltip = widget.tooltip;
+    return tooltip == null ? chip : Tooltip(message: tooltip, child: chip);
   }
 }

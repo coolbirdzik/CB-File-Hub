@@ -562,6 +562,32 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
   void _disposeResources() {
     try {
+      _releaseMediaResources();
+      // Clear video controller reference before disposing the player
+      _videoController = null;
+      _player?.dispose();
+      _player = null;
+
+      // Close PiP IPC if any
+      _pipMsgSub?.cancel();
+      _pipServerSub?.cancel();
+      _pipClient?.destroy();
+      _pipServer?.close();
+    } catch (e) {
+      debugPrint('Error disposing resources: $e');
+    }
+    // Reset global fullscreen flag if needed
+    try {
+      if (VideoUiState.isFullscreen.value == true) {
+        VideoUiState.isFullscreen.value = false;
+      }
+    } catch (_) {}
+  }
+
+  /// Releases everything tied to the current media source while keeping the
+  /// player, its video surface and the PiP link alive for the next source.
+  void _releaseMediaResources() {
+    try {
       _hideControlsTimer?.cancel();
 
       _initializationTimeout?.cancel();
@@ -581,29 +607,17 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
       _isHoveringSeekBar = false;
       _fastSeekTimer?.cancel();
       _isFastSeeking = false;
+      // Cleared so a later full dispose does not close or delete them twice.
       _tempRaf?.close();
+      _tempRaf = null;
       _tempFile?.delete();
-      // Clear video controller reference before disposing the player
-      _videoController = null;
-      _player?.dispose();
-      _player = null;
+      _tempFile = null;
 
       _streamController?.close();
-
-      // Close PiP IPC if any
-      _pipMsgSub?.cancel();
-      _pipServerSub?.cancel();
-      _pipClient?.destroy();
-      _pipServer?.close();
+      _streamController = null;
     } catch (e) {
-      debugPrint('Error disposing resources: $e');
+      debugPrint('Error releasing media resources: $e');
     }
-    // Reset global fullscreen flag if needed
-    try {
-      if (VideoUiState.isFullscreen.value == true) {
-        VideoUiState.isFullscreen.value = false;
-      }
-    } catch (_) {}
   }
 
   void _setupAndroidPipChannelListener() {
@@ -666,7 +680,16 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     super.didUpdateWidget(oldWidget);
     // Reinitialize if media source changed
     if (_hasMediaSourceChanged(oldWidget)) {
-      _disposeResources();
+      if (_hasError) {
+        // A failed source (e.g. a hardware-decode fallback) needs a fresh
+        // player so the updated decoding preferences take effect.
+        _disposeResources();
+      } else {
+        // Reuse the player and its video surface: recreating libmpv and the
+        // texture on every switch is the slow part of opening the next video.
+        _releaseMediaResources();
+        _videoMetadata = null;
+      }
       _initializePlayer();
     }
   }

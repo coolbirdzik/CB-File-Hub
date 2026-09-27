@@ -76,10 +76,8 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
 
   void _updateNavigationState() {
     if (_tabBloc != null) {
-      setState(() {
-        _canNavigateBack = _tabBloc!.canTabNavigateBack(widget.tabId);
-        _canNavigateForward = _tabBloc!.canTabNavigateForward(widget.tabId);
-      });
+      _canNavigateBack = _tabBloc!.canTabNavigateBack(widget.tabId);
+      _canNavigateForward = _tabBloc!.canTabNavigateForward(widget.tabId);
     }
   }
 
@@ -155,10 +153,15 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
 
   @override
   Widget build(BuildContext context) {
-    // Gọi lại _updateNavigationState để đảm bảo trạng thái mới nhất
-    if (_tabBloc != null) {
-      _updateNavigationState();
-    }
+    if (_tabBloc == null) return _buildNavigationBar(context);
+    return BlocBuilder<TabManagerBloc, TabManagerState>(
+      bloc: _tabBloc,
+      builder: (context, _) => _buildNavigationBar(context),
+    );
+  }
+
+  Widget _buildNavigationBar(BuildContext context) {
+    _updateNavigationState();
 
     final useFluentDesktopShell =
         (Platform.isWindows || Platform.isLinux || Platform.isMacOS) &&
@@ -352,8 +355,10 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
   Widget _buildDesktopNavigationBar(BuildContext context) {
     final surfaces = FluentSurfaceTokens.of(context);
     final buttonStyle = fluent.ButtonStyle(
+      // Icon-only nav button: the standard button radius, not the smaller
+      // field-radius rounded rect used for the address bar's own fill.
       shape: const WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: FluentSurfaceTokens.controlRadius),
+        RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
       ),
       padding: const WidgetStatePropertyAll(EdgeInsets.all(7)),
       backgroundColor: WidgetStateProperty.resolveWith((states) {

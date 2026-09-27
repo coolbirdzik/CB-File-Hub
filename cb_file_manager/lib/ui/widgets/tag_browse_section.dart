@@ -55,6 +55,7 @@ class TagBrowseSection extends StatefulWidget {
     this.selectedTags = const <String>[],
     this.maxHeight = 260,
     this.fillHeight = false,
+    this.refreshVersion = 0,
   });
 
   /// Called with the original-cased tag name when a row is tapped.
@@ -75,6 +76,9 @@ class TagBrowseSection extends StatefulWidget {
   /// parent gives it (the host must supply a bounded height, e.g. by putting
   /// this widget inside an [Expanded]) instead of capping at [maxHeight].
   final bool fillHeight;
+
+  /// Reload the catalog after a host persists file-tag changes.
+  final int refreshVersion;
 
   @override
   State<TagBrowseSection> createState() => _TagBrowseSectionState();
@@ -143,6 +147,12 @@ class _TagBrowseSectionState extends State<TagBrowseSection> {
     _load();
     _loadLayoutPrefs();
     _hierarchyManager.addListener(_handleHierarchyChanged);
+  }
+
+  @override
+  void didUpdateWidget(TagBrowseSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshVersion != widget.refreshVersion) _load();
   }
 
   Future<void> _loadLayoutPrefs() async {

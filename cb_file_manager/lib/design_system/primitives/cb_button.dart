@@ -149,7 +149,9 @@ class CbButton extends StatelessWidget {
     }
   }
 
-  double get _radius => size == CbButtonSize.lg ? CbRadii.md : CbRadii.sm;
+  // A soft rounded rect, not a pill: CbRadii.button everywhere, except the
+  // smallest size, where that radius would read as almost fully round.
+  double get _radius => size == CbButtonSize.xs ? CbRadii.md : CbRadii.button;
 
   TextStyle get _textStyle {
     switch (size) {

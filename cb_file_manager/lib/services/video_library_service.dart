@@ -1,3 +1,4 @@
+import 'media_library_updates.dart';
 import 'dart:io';
 
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
@@ -71,6 +72,7 @@ class VideoLibraryService {
     String? description,
     String? coverImagePath,
     String? colorTheme,
+    bool isNsfw = false,
     List<String>? directories,
     VideoLibraryConfig? config,
   }) async {
@@ -92,6 +94,7 @@ class VideoLibraryService {
         description: description,
         coverImagePath: coverImagePath,
         colorTheme: colorTheme,
+        isNsfw: isNsfw,
       );
       final libraryId = await database.insert(
         'video_libraries',
@@ -112,6 +115,7 @@ class VideoLibraryService {
       );
       libraryConfig.id = configId;
 
+      MediaLibraryUpdates.notifyChanged();
       return library;
     } catch (error) {
       debugPrint('Error creating video library: $error');
@@ -129,6 +133,7 @@ class VideoLibraryService {
         where: 'id = ?',
         whereArgs: <Object?>[library.id],
       );
+      MediaLibraryUpdates.notifyChanged();
       return true;
     } catch (error) {
       debugPrint('Error updating video library: $error');
@@ -156,6 +161,7 @@ class VideoLibraryService {
           whereArgs: <Object?>[libraryId],
         );
       });
+      MediaLibraryUpdates.notifyChanged();
       return true;
     } catch (error) {
       debugPrint('Error deleting video library: $error');
@@ -280,7 +286,6 @@ class VideoLibraryService {
       if (library != null) {
         await updateLibrary(library);
       }
-
       return true;
     } catch (error) {
       debugPrint('Error adding file to library: $error');
@@ -367,7 +372,6 @@ class VideoLibraryService {
       if (library != null) {
         await updateLibrary(library);
       }
-
       return true;
     } catch (error) {
       debugPrint('Error removing file from library: $error');
@@ -437,6 +441,7 @@ class VideoLibraryService {
         config.toDatabaseMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+      MediaLibraryUpdates.notifyChanged();
       return true;
     } catch (error) {
       debugPrint('Error updating library config: $error');
@@ -460,6 +465,7 @@ class VideoLibraryService {
         config.directoriesList = directories;
         return await updateLibraryConfig(config);
       }
+      MediaLibraryUpdates.notifyChanged();
       return true;
     } catch (error) {
       debugPrint('Error adding directory to library: $error');

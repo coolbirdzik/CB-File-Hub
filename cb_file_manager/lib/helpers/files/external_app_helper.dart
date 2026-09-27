@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -491,7 +492,15 @@ class ExternalAppHelper {
     }
 
     // ShellExecute "open" is the canonical path for the user's default ProgId.
-    if (_shellExecuteOpen(normalizedPath)) {
+    // It can block for a long time (association lookup, DDE, starting the
+    // handler), so it runs off the UI isolate to keep the app responsive.
+    bool opened;
+    try {
+      opened = await Isolate.run(() => _shellExecuteOpen(normalizedPath));
+    } catch (_) {
+      opened = false;
+    }
+    if (opened) {
       return true;
     }
 
@@ -514,6 +523,12 @@ class ExternalAppHelper {
   }
 
   static bool _shellExecuteOpen(String filePath) {
+    // Runs on a background isolate thread: ShellExecute needs COM there.
+    final comInit = win32.CoInitializeEx(
+      win32.COINIT(
+        win32.COINIT_APARTMENTTHREADED | win32.COINIT_DISABLE_OLE1DDE,
+      ),
+    );
     final verb = 'open'.toNativeUtf16();
     final file = filePath.toNativeUtf16();
     try {
@@ -532,6 +547,7 @@ class ExternalAppHelper {
     } finally {
       calloc.free(verb);
       calloc.free(file);
+      if (comInit.isOk) win32.CoUninitialize();
     }
   }
 

@@ -356,9 +356,9 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
                 ? surfaces?.controlHover ??
                       colorScheme.onSurface.withValues(alpha: 0.08)
                 : Colors.transparent,
-            borderRadius: surfaces != null
-                ? FluentSurfaceTokens.controlRadius
-                : BorderRadius.circular(14),
+            // A short (~24px) tappable chip: CbRadii.md, not the full
+            // button radius, which would read as almost round at this size.
+            borderRadius: CbRadii.mdAll,
           ),
           // The parent shares the address bar width across every crumb, so a
           // deep path on a narrow window can squeeze one chip down to a few
@@ -441,7 +441,9 @@ class _BreadcrumbChipState extends State<_BreadcrumbChip> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: backgroundColor,
-            borderRadius: FluentSurfaceTokens.controlRadius,
+            // Matches the Material chip above: CbRadii.md for this short a
+            // control, not the full button radius.
+            borderRadius: CbRadii.mdAll,
             border: isFocused
                 ? Border.all(
                     color: surfaces.focusRing,

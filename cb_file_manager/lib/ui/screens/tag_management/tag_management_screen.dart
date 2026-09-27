@@ -4111,7 +4111,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   Widget _buildTagOverflowButton(String tag, ThemeData theme) {
     return Material(
       color: theme.colorScheme.surface.withValues(alpha: 0.7),
-      shape: const CircleBorder(),
+      shape: const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showTagOptions(tag),

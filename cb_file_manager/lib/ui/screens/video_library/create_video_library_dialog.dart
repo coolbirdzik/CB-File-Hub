@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -20,6 +21,7 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final List<String> _selectedDirectories = [];
   bool _includeSubdirectories = true;
+  bool _isNsfw = false;
   String? _selectedColorTheme;
 
   final List<Color> _colorOptions = [
@@ -71,6 +73,7 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
           ? null
           : _descriptionController.text.trim(),
       colorTheme: _selectedColorTheme,
+      isNsfw: _isNsfw,
       directories: _selectedDirectories,
     );
 
@@ -123,6 +126,10 @@ class _CreateVideoLibraryDialogState extends State<CreateVideoLibraryDialog> {
               ),
               const SizedBox(height: 16),
 
+              GalleryNsfwToggle(
+                value: _isNsfw,
+                onChanged: (value) => setState(() => _isNsfw = value),
+              ),
               // Color Theme Picker
               Text(
                 localizations.changeColor,

@@ -21,6 +21,7 @@ class SelectionSummaryTooltip extends StatefulWidget {
   final int selectedFolderCount;
   final List<String> selectedFilePaths;
   final List<String> selectedFolderPaths;
+  final bool showTotalSize;
 
   const SelectionSummaryTooltip({
     super.key,
@@ -28,6 +29,7 @@ class SelectionSummaryTooltip extends StatefulWidget {
     required this.selectedFolderCount,
     required this.selectedFilePaths,
     required this.selectedFolderPaths,
+    this.showTotalSize = true,
   });
 
   @override
@@ -59,6 +61,10 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
 
   Future<void> _calculateSize() async {
     final generation = ++_calculationGeneration;
+    if (!widget.showTotalSize) {
+      if (mounted) setState(() => _totalSize = null);
+      return;
+    }
     if (widget.selectedFileCount == 0 && widget.selectedFolderCount == 0) {
       if (mounted) setState(() => _totalSize = null);
       return;
@@ -98,10 +104,12 @@ class _SelectionSummaryTooltipState extends State<SelectionSummaryTooltip> {
       text = '${widget.selectedFolderCount} items selected';
     }
 
-    final totalSize = _totalSize;
-    text += totalSize == null
-        ? '   |   Calculating size...'
-        : '   |   ${FormatUtils.formatFileSize(totalSize)}';
+    if (widget.showTotalSize) {
+      final totalSize = _totalSize;
+      text += totalSize == null
+          ? '   |   Calculating size...'
+          : '   |   ${FormatUtils.formatFileSize(totalSize)}';
+    }
 
     return Container(
       width: double.infinity,

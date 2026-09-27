@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter/material.dart';
 
 import '../design_system/cb_tokens.dart';
+import '../design_system/tokens/cb_geometry_tokens.dart';
 import 'theme_config.dart';
 
 /// Fluent theme mapping that preserves existing app theme preferences.
@@ -106,6 +107,31 @@ class FluentThemeConfig {
       cardColor: cardColor,
       shadowColor: materialTheme.shadowColor,
       visualDensity: materialTheme.visualDensity,
+      buttonTheme: _buttonTheme(),
+    );
+  }
+
+  /// Rounds every Fluent button to match the rest of the app: a soft
+  /// rounded rect ([CbRadii.button]), whether it carries a label
+  /// ([fluent.Button], [fluent.FilledButton]) or is icon-only
+  /// ([fluent.IconButton]). Only [Button] and its two subclasses are used
+  /// directly in this app, so only their three style slots need a shape
+  /// here — [fluent.OutlinedButton] and [fluent.HyperlinkButton] are unused
+  /// and keep Fluent's defaults.
+  static fluent.ButtonThemeData _buttonTheme() {
+    const rounded = WidgetStatePropertyAll<ShapeBorder>(
+      RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
+    );
+    return const fluent.ButtonThemeData(
+      defaultButtonStyle: fluent.ButtonStyle(shape: rounded),
+      filledButtonStyle: fluent.ButtonStyle(shape: rounded),
+      // Fluent's own icon-button padding is asymmetric (WinUI's rectangular
+      // touch target); symmetric padding keeps the box square so the
+      // rounded corners read evenly on every side.
+      iconButtonStyle: fluent.ButtonStyle(
+        shape: rounded,
+        padding: WidgetStatePropertyAll(EdgeInsets.all(CbSpacing.sm)),
+      ),
     );
   }
 

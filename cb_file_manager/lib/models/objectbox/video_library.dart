@@ -8,6 +8,7 @@ class VideoLibrary {
   DateTime modifiedAt;
   String? colorTheme;
   bool isSystemLibrary;
+  bool isNsfw;
 
   VideoLibrary({
     required this.name,
@@ -17,6 +18,7 @@ class VideoLibrary {
     DateTime? modifiedAt,
     this.colorTheme,
     this.isSystemLibrary = false,
+    this.isNsfw = false,
   }) : createdAt = createdAt ?? DateTime.now(),
        modifiedAt = modifiedAt ?? DateTime.now();
 
@@ -32,6 +34,7 @@ class VideoLibrary {
         map['modified_at'] as int? ?? 0,
       ),
       colorTheme: map['color_theme'] as String?,
+      isNsfw: (map['is_nsfw'] as int? ?? 0) == 1,
       isSystemLibrary: (map['is_system_library'] as int? ?? 0) == 1,
     )..id = map['id'] as int? ?? 0;
   }
@@ -45,6 +48,7 @@ class VideoLibrary {
       'created_at': createdAt.millisecondsSinceEpoch,
       'modified_at': modifiedAt.millisecondsSinceEpoch,
       'color_theme': colorTheme,
+      'is_nsfw': isNsfw ? 1 : 0,
       'is_system_library': isSystemLibrary ? 1 : 0,
     };
   }
@@ -61,6 +65,7 @@ class VideoLibrary {
     DateTime? modifiedAt,
     String? colorTheme,
     bool? isSystemLibrary,
+    bool? isNsfw,
   }) {
     return VideoLibrary(
       name: name ?? this.name,
@@ -69,6 +74,7 @@ class VideoLibrary {
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
       colorTheme: colorTheme ?? this.colorTheme,
+      isNsfw: isNsfw ?? this.isNsfw,
       isSystemLibrary: isSystemLibrary ?? this.isSystemLibrary,
     )..id = id;
   }
@@ -93,7 +99,8 @@ class VideoLibrary {
         other.createdAt == createdAt &&
         other.modifiedAt == modifiedAt &&
         other.colorTheme == colorTheme &&
-        other.isSystemLibrary == isSystemLibrary;
+        other.isSystemLibrary == isSystemLibrary &&
+        other.isNsfw == isNsfw;
   }
 
   @override
@@ -107,6 +114,7 @@ class VideoLibrary {
       modifiedAt,
       colorTheme,
       isSystemLibrary,
+      isNsfw,
     );
   }
 }

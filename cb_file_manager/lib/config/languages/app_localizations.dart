@@ -47,6 +47,18 @@ abstract class AppLocalizations {
   String get sshInvalidHost;
   String get sshInvalidPort;
 
+  String get galleryNsfwLabel;
+  String get galleryNsfwDescription;
+
+  // Home
+  String get homeSubtitle;
+  String get homeRecentFolders;
+  String get homeRecentEmpty;
+  String get homeRecentUnavailable;
+  String get homePhotosSubtitle;
+  String get homeVideosSubtitle;
+  String get homePinnedEmpty;
+
   // App title
   String get appTitle;
 
@@ -147,6 +159,15 @@ abstract class AppLocalizations {
   String get defaultViewModeDescription;
 
   // Preview pane
+  String get propertiesAndTags;
+  String get showPropertiesPane;
+  String get hidePropertiesPane;
+  String get propertiesSelectFile;
+  String get propertiesFilesOnly;
+  String get propertiesTagFailure;
+  String get propertiesResize;
+  String get propertiesTagHint;
+
   String get previewPaneTitle;
   String get previewSelectFile;
   String get previewNotSupported;
@@ -1327,6 +1348,12 @@ abstract class AppLocalizations {
   String get removeVideoSource;
   String get videoSources;
   String get noVideoSources;
+  String get createImageSource;
+  String get editImageSource;
+  String get addImageSource;
+  String get removeImageSource;
+  String get imageSources;
+  String get noImageSources;
   String get filterByTags;
   String get clearTagFilter;
   String get recentVideos;

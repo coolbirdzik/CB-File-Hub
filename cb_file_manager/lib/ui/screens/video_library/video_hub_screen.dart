@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/models/objectbox/video_library.dart';
 import 'package:cb_file_manager/services/video_library_service.dart';
@@ -7,8 +8,7 @@ import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_c
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/screens/video_library/widgets/video_library_helpers.dart';
 import 'package:cb_file_manager/ui/components/common/skeleton.dart';
-import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
-import 'package:cb_file_manager/ui/tab_manager/components/navigation_bar.dart';
+import 'package:cb_file_manager/ui/components/common/library_hub_scaffold.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'dart:io';
@@ -26,9 +26,6 @@ class VideoHubScreen extends StatefulWidget {
 
 class _VideoHubScreenState extends State<VideoHubScreen> {
   final VideoLibraryService _service = VideoLibraryService();
-  final TextEditingController _addressController = TextEditingController(
-    text: '#video',
-  );
   List<VideoLibrary> _libraries = [];
   Map<int, int> _videoCounts = {};
   bool _isLoading = true;
@@ -39,12 +36,6 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   void initState() {
     super.initState();
     _refreshData();
-  }
-
-  @override
-  void dispose() {
-    _addressController.dispose();
-    super.dispose();
   }
 
   /// Refresh both libraries and video counts.
@@ -115,6 +106,24 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     }
   }
 
+  Future<void> _toggleLibraryNsfw(VideoLibrary library) async {
+    final updated = library.copyWith(isNsfw: !library.isNsfw);
+    final success = await _service.updateLibrary(updated);
+    if (!mounted) return;
+    if (success) {
+      setState(
+        () => _libraries = _libraries
+            .map((item) => item.id == updated.id ? updated : item)
+            .toList(),
+      );
+    } else {
+      VideoLibraryHelpers.showErrorMessage(
+        context,
+        AppLocalizations.of(context)!.operationFailed,
+      );
+    }
+  }
+
   Future<void> _deleteLibrary(VideoLibrary library) async {
     final localizations = AppLocalizations.of(context)!;
 
@@ -157,7 +166,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
   void _navigateToLibrary(VideoLibrary library) {
     // Navigate within current tab to keep tab history
     final tabManager = context.read<TabManagerBloc>();
-    final activeTab = tabManager.state.activeTab;
+    final activeTab = tabManager.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
 
     if (activeTab != null) {
       final path = '#video-library/${library.id}';
@@ -171,7 +182,9 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
     // library files screen) instead of covering the app with a pushed route.
     final localizations = AppLocalizations.of(context)!;
     final tabManager = context.read<TabManagerBloc>();
-    final activeTab = tabManager.state.activeTab;
+    final activeTab = tabManager.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
 
     if (activeTab != null) {
       final path = '#video-library-settings/${library.id}';
@@ -215,31 +228,12 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
         ? theme.colorScheme.surface.withValues(alpha: 0.30)
         : theme.colorScheme.surface;
 
-    return Scaffold(
-      backgroundColor: isDesktopPlatform
-          ? Colors.transparent
-          : (isLightMode
-                ? theme.colorScheme.surfaceContainerLowest
-                : theme.scaffoldBackgroundColor),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: isDesktopPlatform ? Colors.transparent : null,
-        elevation: isDesktopPlatform ? 0 : null,
-        title: PathNavigationBar(
-          tabId: widget.tabId,
-          pathController: _addressController,
-          onPathSubmitted: (_) {},
-          currentPath: '#video',
-          tabPath: '#video',
-          enablePathEditing: false,
-          breadcrumbSegments: [
-            BreadcrumbSegment(
-              label: localizations.videoGallery,
-              icon: PhosphorIconsLight.filmStrip,
-            ),
-          ],
-        ),
-      ),
+    return LibraryHubScaffold(
+      tabId: widget.tabId,
+      path: '#video',
+      title: localizations.videoGallery,
+      icon: PhosphorIconsLight.filmStrip,
+      onRefresh: _refreshData,
       body: Container(
         decoration: isDesktopPlatform
             ? const BoxDecoration(color: Colors.transparent)
@@ -492,6 +486,7 @@ class _VideoHubScreenState extends State<VideoHubScreen> {
         localizations: localizations,
         onTap: () => _navigateToLibrary(library),
         onSettings: () => _navigateToSettings(library),
+        onToggleNsfw: () => _toggleLibraryNsfw(library),
         onDelete: () => _deleteLibrary(library),
         context: context,
       ),
@@ -577,6 +572,7 @@ class _LibraryCardContent extends StatelessWidget {
   final AppLocalizations localizations;
   final VoidCallback onTap;
   final VoidCallback onSettings;
+  final VoidCallback onToggleNsfw;
   final VoidCallback onDelete;
   final BuildContext context;
 
@@ -591,6 +587,7 @@ class _LibraryCardContent extends StatelessWidget {
     required this.localizations,
     required this.onTap,
     required this.onSettings,
+    required this.onToggleNsfw,
     required this.onDelete,
     required this.context,
   });
@@ -632,6 +629,8 @@ class _LibraryCardContent extends StatelessWidget {
                       top: 6,
                       right: 6,
                       child: _LibraryMenuButton(
+                        isNsfw: library.isNsfw,
+                        onToggleNsfw: onToggleNsfw,
                         onSettings: onSettings,
                         onDelete: onDelete,
                         settingsLabel: localizations.settings,
@@ -712,12 +711,16 @@ class _LibraryCardContent extends StatelessWidget {
 /// Translucent circular menu button overlaid on the library cover banner.
 class _LibraryMenuButton extends StatelessWidget {
   final VoidCallback onSettings;
+  final VoidCallback onToggleNsfw;
+  final bool isNsfw;
   final VoidCallback onDelete;
   final String settingsLabel;
   final String deleteLabel;
 
   const _LibraryMenuButton({
     required this.onSettings,
+    required this.onToggleNsfw,
+    required this.isNsfw,
     required this.onDelete,
     required this.settingsLabel,
     required this.deleteLabel,
@@ -732,7 +735,9 @@ class _LibraryMenuButton extends StatelessWidget {
       ),
       child: PopupMenuButton<String>(
         onSelected: (value) {
-          if (value == 'settings') {
+          if (value == 'nsfw') {
+            onToggleNsfw();
+          } else if (value == 'settings') {
             onSettings();
           } else if (value == 'delete') {
             onDelete();
@@ -740,6 +745,7 @@ class _LibraryMenuButton extends StatelessWidget {
         },
         icon: const Icon(Icons.more_vert, size: 18, color: Colors.white),
         itemBuilder: (ctx) => [
+          galleryNsfwMenuItem(ctx, isNsfw),
           PopupMenuItem(
             value: 'settings',
             child: Row(

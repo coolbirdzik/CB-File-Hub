@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'dart:io';
 import 'dart:ui' show PointerDeviceKind;
 
@@ -40,6 +41,54 @@ void main() {
     await locator.reset();
     await root.delete(recursive: true);
   });
+
+  test(
+    'inline tag edits update search membership without a loading reset',
+    () async {
+      final folder = await Directory(p.join(root.path, 'inline_tags')).create();
+      final a = await File(p.join(folder.path, 'a.txt')).writeAsString('a');
+      final b = await File(p.join(folder.path, 'b.txt')).writeAsString('b');
+      await TagManager.setTags(a.path, ['work', 'keep']);
+      await TagManager.setTags(b.path, ['work']);
+      final bloc = FolderListBloc();
+      final controller = SelectionTagsController();
+      try {
+        bloc.add(FolderListLoad(folder.path));
+        await bloc.stream
+            .firstWhere((s) => !s.isLoading && s.files.length == 2)
+            .timeout(const Duration(seconds: 10));
+        bloc.add(SetTagSearchResults([a, b], 'work'));
+        await bloc.stream
+            .firstWhere((s) => s.currentSearchTag == 'work')
+            .timeout(const Duration(seconds: 10));
+        final loadingStates = <bool>[];
+        final sub = bloc.stream.listen((s) => loadingStates.add(s.isLoading));
+        try {
+          await controller.select([a.path]);
+          final removed = bloc.stream.firstWhere(
+            (s) =>
+                s.searchResults.length == 1 &&
+                s.searchResults.single.path == b.path,
+          );
+          await controller.remove('work');
+          await removed.timeout(const Duration(seconds: 10));
+          expect(await TagManager.getTags(a.path), ['keep']);
+          final restored = bloc.stream.firstWhere(
+            (s) => s.searchResults.length == 2,
+          );
+          await controller.add('work');
+          await restored.timeout(const Duration(seconds: 10));
+          expect(loadingStates, everyElement(isFalse));
+          expect(bloc.state.currentSearchTag, 'work');
+        } finally {
+          await sub.cancel();
+        }
+      } finally {
+        controller.dispose();
+        await bloc.close();
+      }
+    },
+  );
 
   for (final tagSearch in [false, true]) {
     for (final deleteParent in [false, true]) {

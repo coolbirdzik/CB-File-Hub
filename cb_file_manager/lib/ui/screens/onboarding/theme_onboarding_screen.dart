@@ -74,11 +74,8 @@ class _ThemeOnboardingScreenState extends State<ThemeOnboardingScreen> {
       height: 48,
       child: FilledButton(
         onPressed: _saving ? null : _continue,
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
+        // No shape override: the theme's filled-button rounded rect already
+        // fits a full-width continue button.
         child: _saving
             ? const SizedBox(
                 height: 18,

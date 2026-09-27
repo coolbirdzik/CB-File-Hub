@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'address_bar_menu.dart';
 
 class PathNavigationBar extends StatefulWidget {
@@ -111,7 +112,9 @@ class _PathNavigationBarState extends State<PathNavigationBar> {
                   .join(Platform.pathSeparator);
               return InkWell(
                 onTap: () => widget.onPathSubmitted(segmentPath),
-                borderRadius: BorderRadius.circular(16.0),
+                // A short (~24px) breadcrumb chip: CbRadii.md, not the
+                // full button radius.
+                borderRadius: CbRadii.mdAll,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8.0,

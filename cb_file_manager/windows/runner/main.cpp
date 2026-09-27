@@ -148,6 +148,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   flutter::DartProject project(L"data");
 
+  // The dedicated video player (CB_WINDOW_ROLE=video, which a PiP window
+  // spawned from it inherits) is a fresh process, so engine startup sits
+  // between the user's click and the first video frame. Impeller's GLES
+  // backend takes ~1.1s to initialize here versus ~0.2s for Skia, and the
+  // player's video-plus-controls UI gains nothing from it.
+  {
+    wchar_t role[32];
+    DWORD role_len = GetEnvironmentVariableW(L"CB_WINDOW_ROLE", role, 32);
+    if (role_len > 0 && role_len < 32 && wcscmp(role, L"video") == 0)
+    {
+      project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
+    }
+  }
+
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
 

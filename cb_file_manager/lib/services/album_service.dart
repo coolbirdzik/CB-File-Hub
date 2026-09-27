@@ -1,3 +1,4 @@
+import 'media_library_updates.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -8,6 +9,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 
 import '../helpers/core/filesystem_utils.dart';
 import '../helpers/core/text_utils.dart';
+import '../helpers/files/file_type_registry.dart';
 import '../models/database/sqlite_database_provider.dart';
 import '../models/objectbox/album.dart';
 import '../models/objectbox/album_config.dart';
@@ -97,6 +99,7 @@ class AlbumService {
     String? description,
     String? coverImagePath,
     String? colorTheme,
+    bool isNsfw = false,
     List<String>? directories,
     AlbumConfig? config,
   }) async {
@@ -118,6 +121,7 @@ class AlbumService {
         description: description,
         coverImagePath: coverImagePath,
         colorTheme: colorTheme,
+        isNsfw: isNsfw,
       );
 
       final albumId = await database.insert('albums', album.toDatabaseMap());
@@ -137,6 +141,7 @@ class AlbumService {
         _triggerBackgroundScan(album, albumConfig);
       }
 
+      MediaLibraryUpdates.notifyChanged();
       return album;
     } catch (error) {
       debugPrint('Error creating album: $error');
@@ -154,6 +159,7 @@ class AlbumService {
         where: 'id = ?',
         whereArgs: <Object?>[album.id],
       );
+      MediaLibraryUpdates.notifyChanged();
       return true;
     } catch (error) {
       debugPrint('Error updating album: $error');
@@ -190,6 +196,7 @@ class AlbumService {
 
       _scanner.clearCache(albumId);
       _lazyScanner.disposeAlbum(albumId);
+      MediaLibraryUpdates.notifyChanged();
       return true;
     } catch (error) {
       debugPrint('Error deleting album: $error');
@@ -250,7 +257,6 @@ class AlbumService {
       if (album != null) {
         await updateAlbum(album);
       }
-
       return true;
     } catch (error) {
       debugPrint('Error adding file to album: $error');
@@ -469,7 +475,6 @@ class AlbumService {
       if (album != null) {
         await updateAlbum(album);
       }
-
       return true;
     } catch (error) {
       debugPrint('Error removing file from album: $error');
@@ -587,6 +592,7 @@ class AlbumService {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
+      MediaLibraryUpdates.notifyChanged();
       _scanner.clearCache(config.albumId);
       await _processor.refreshMonitoring();
     } catch (error) {
@@ -598,6 +604,69 @@ class AlbumService {
     final controller = StreamController<List<FileInfo>>();
     _initLazyStream(albumId, controller);
     return controller.stream;
+  }
+
+  /// Resolves the files displayed by an album, regardless of whether they
+  /// were added manually or discovered from configured source directories.
+  Future<List<FileInfo>> getAlbumFileInfos(int albumId) async {
+    final album = await getAlbumById(albumId);
+    if (album == null) return <FileInfo>[];
+
+    final config = await getAlbumConfig(albumId);
+    if (config != null && config.directoriesList.isNotEmpty) {
+      final sourceFiles = await _scanner.scanAlbumFiles(album, config);
+      return sourceFiles.where((file) => file.isImage).toList(growable: false);
+    }
+
+    final manualFiles = await getAlbumFiles(albumId);
+    final result = <FileInfo>[];
+    for (final albumFile in manualFiles) {
+      final file = File(albumFile.filePath);
+      FileStat? stat;
+      try {
+        stat = await file.stat();
+      } catch (_) {
+        continue;
+      }
+      result.add(
+        FileInfo(
+          path: albumFile.filePath,
+          name: path.basename(albumFile.filePath),
+          size: stat.size,
+          modifiedTime: stat.modified,
+          isImage: FileTypeRegistry.isCategory(
+            path.extension(albumFile.filePath),
+            FileCategory.image,
+          ),
+          isVideo: false,
+        ),
+      );
+    }
+    return result.where((file) => file.isImage).toList(growable: false);
+  }
+
+  /// Returns the real image total rather than the in-memory scan limit.
+  Future<int> getAlbumImageCount(int albumId) async {
+    final album = await getAlbumById(albumId);
+    if (album == null) return 0;
+
+    final config = await getAlbumConfig(albumId);
+    if (config != null && config.directoriesList.isNotEmpty) {
+      return _scanner.countAlbumImages(album, config);
+    }
+
+    final manualFiles = await getAlbumFiles(albumId);
+    var count = 0;
+    for (final albumFile in manualFiles) {
+      if (!FileTypeRegistry.isCategory(
+        path.extension(albumFile.filePath),
+        FileCategory.image,
+      )) {
+        continue;
+      }
+      if (await File(albumFile.filePath).exists()) count++;
+    }
+    return count;
   }
 
   Future<void> _initLazyStream(
@@ -649,6 +718,7 @@ class AlbumService {
     Timer(const Duration(milliseconds: 100), () async {
       try {
         final files = await _scanner.scanAlbumFiles(album, config);
+        if (await getAlbumById(album.id) == null) return;
         config.updateScanStats(files.length);
         await updateAlbumConfig(config);
       } catch (error) {

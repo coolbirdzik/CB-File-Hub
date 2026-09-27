@@ -1,3 +1,4 @@
+import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'dart:async';
 import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
@@ -139,6 +140,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
   String? _pendingHighlightedFileName;
   String? _highlightedScrollTargetPath;
   int _highlightedScrollAttempts = 0;
+  final _propertiesPaneFocusNode = FocusNode(debugLabel: 'properties pane');
+  bool _propertiesPaneVisible = false;
+  double _propertiesPaneHeight = 260;
+  bool _propertiesPaneTouched = false;
   bool _preferencesLoaded = false;
   double? _gridItemMainAxisExtent;
 
@@ -376,6 +381,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       });
     });
     _loadAllowFileExtensionRenamePreference();
+    _loadPropertiesPanePreferences();
 
     // Initialize RefreshController
     _refreshController = RefreshController(
@@ -452,6 +458,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     _dragSelectionController.dispose();
     _keyboardController.dispose();
     _previewPaneWidthNotifier.dispose();
+    _propertiesPaneFocusNode.dispose();
     _inlineRenameController.dispose();
     FileBrowserHelper.setInlineRenameController(null);
     FileBrowserHelper.setAfterFileCreatedCallback(null);
@@ -488,6 +495,52 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
 
   void _toggleSelectionMode({bool? forceValue}) {
     _selectionCoordinator.toggleSelectionMode(forceValue: forceValue);
+  }
+
+  Future<void> _loadPropertiesPanePreferences() async {
+    final prefs = UserPreferences.instance;
+    final visible = await prefs.getPropertiesPaneVisible();
+    final height = await prefs.getPropertiesPaneHeight();
+    if (!mounted || _propertiesPaneTouched) return;
+    setState(() {
+      _propertiesPaneVisible = visible;
+      _propertiesPaneHeight = height;
+    });
+  }
+
+  void _togglePropertiesPane() {
+    _propertiesPaneTouched = true;
+    setState(() => _propertiesPaneVisible = !_propertiesPaneVisible);
+    unawaited(
+      UserPreferences.instance.setPropertiesPaneVisible(_propertiesPaneVisible),
+    );
+  }
+
+  Widget _buildBodyWithProperties(
+    BuildContext context,
+    FolderListState state,
+    SelectionState selection,
+    bool isNetworkPath,
+  ) {
+    final body = _buildBody(context, state, selection, isNetworkPath);
+    if (!isDesktopPlatform || _isDrivesMode()) return body;
+    return FilePropertiesPane(
+      panelFocusNode: _propertiesPaneFocusNode,
+      filePaths: selection.selectedFilePaths.toList(),
+      folderPaths: selection.selectedFolderPaths.toList(),
+      visible: _propertiesPaneVisible,
+      height: _propertiesPaneHeight,
+      onClose: _togglePropertiesPane,
+      onHeightChanged: (height) {
+        _propertiesPaneTouched = true;
+        setState(() => _propertiesPaneHeight = height);
+        unawaited(UserPreferences.instance.setPropertiesPaneHeight(height));
+      },
+      bottomInset: SelectionSummaryTooltip.isVisibleFor(selection)
+          ? SelectionSummaryTooltip.height
+          : 0,
+      child: body,
+    );
   }
 
   void _togglePreviewPane() {
@@ -1343,7 +1396,8 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           }
           // Keys the focused preview pane didn't use (it only claims the
           // video player's) must not drive the list behind it.
-          if (_keyboardController.previewFocusNode.hasFocus) {
+          if (_keyboardController.previewFocusNode.hasFocus ||
+              _propertiesPaneFocusNode.hasFocus) {
             return KeyEventResult.ignored;
           }
           return BrowserLikeKeyboardShortcuts.handle(
@@ -1416,6 +1470,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           onPointerDown: (PointerDownEvent event) {
             // The preview pane takes focus itself when clicked.
             if (isDesktopPlatform &&
+                !_isPointerInside(_propertiesPaneFocusNode.context, event) &&
                 !_isPointerInside(
                   _keyboardController.previewFocusNode.context,
                   event,
@@ -1596,7 +1651,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
           children: [
             ScreenScaffold(
               selectionState: selectionState,
-              body: _buildBody(
+              body: _buildBodyWithProperties(
                 context,
                 folderListState,
                 selectionState,
@@ -2141,7 +2196,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final selectionState = _selectionBloc.state;
     final folderListState = _folderListBloc.state;
 
-    return AppBarActionsBuilder.buildActions(
+    final actions = AppBarActionsBuilder.buildActions(
       context: context,
       selectionState: selectionState,
       folderListState: folderListState,
@@ -2174,6 +2229,31 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
       isPreviewPaneVisible: isPreviewPaneVisible,
       showDesktopViewModes: isDesktopPlatform,
     );
+    if (isDesktopPlatform) {
+      final l10n = AppLocalizations.of(context)!;
+      // Keep the search button on the left of the properties (tag) toggle.
+      final searchIndex = actions.indexWhere(
+        (w) => w.key == const ValueKey('shared-search-action'),
+      );
+      actions.insert(
+        searchIndex + 1,
+        IconButton(
+          key: const ValueKey('toggle-properties-pane'),
+          tooltip: _propertiesPaneVisible
+              ? l10n.hidePropertiesPane
+              : l10n.showPropertiesPane,
+          isSelected: _propertiesPaneVisible,
+          icon: Icon(
+            _propertiesPaneVisible
+                ? PhosphorIconsFill.tag
+                : PhosphorIconsLight.tag,
+            size: 20,
+          ),
+          onPressed: _togglePropertiesPane,
+        ),
+      );
+    }
+    return actions;
   }
 }
 

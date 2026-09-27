@@ -8,12 +8,14 @@ class DirectoryListWidget extends StatelessWidget {
   final List<String> directories;
   final Function(String) onRemove;
   final String? emptyMessage;
+  final String? removeTooltip;
 
   const DirectoryListWidget({
     super.key,
     required this.directories,
     required this.onRemove,
     this.emptyMessage,
+    this.removeTooltip,
   });
 
   @override
@@ -42,22 +44,26 @@ class DirectoryListWidget extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(maxHeight: 200),
       decoration: CbDecorations.card(context, radius: 16),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: directories.length,
-        itemBuilder: (context, index) {
-          final directory = directories[index];
-          return ListTile(
-            dense: true,
-            leading: const Icon(PhosphorIconsLight.folder),
-            title: Text(directory, overflow: TextOverflow.ellipsis),
-            trailing: IconButton(
-              icon: const Icon(PhosphorIconsLight.x),
-              onPressed: () => onRemove(directory),
-              tooltip: localizations.removeVideoSource,
-            ),
-          );
-        },
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: directories.length,
+          itemBuilder: (context, index) {
+            final directory = directories[index];
+            return ListTile(
+              dense: true,
+              leading: const Icon(PhosphorIconsLight.folder),
+              title: Text(directory, overflow: TextOverflow.ellipsis),
+              trailing: IconButton(
+                icon: const Icon(PhosphorIconsLight.x),
+                onPressed: () => onRemove(directory),
+                tooltip: removeTooltip ?? localizations.removeVideoSource,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

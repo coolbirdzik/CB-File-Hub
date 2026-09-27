@@ -457,6 +457,9 @@ class FolderListBloc extends Bloc<FolderListEvent, FolderListState> {
   // ── External tag change listener ────────────────────────────────
 
   void _onExternalTagChanged(String filePath) {
+    if (filePath.startsWith('preserve_scroll:')) {
+      filePath = filePath.substring('preserve_scroll:'.length);
+    }
     if (filePath == "global:tag_deleted") {
       add(LoadAllTags(state.currentPath.path));
     } else {

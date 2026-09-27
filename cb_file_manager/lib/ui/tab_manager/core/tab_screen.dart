@@ -29,6 +29,7 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_dialog.dart';
 import 'package:cb_file_manager/design_system/fluent_chrome_surface.dart';
 import 'package:cb_file_manager/design_system/fluent_surface_tokens.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 // import 'package:cb_file_manager/widgets/test_native_streaming.dart'; // Test widget removed
 import '../../utils/route.dart';
 import '../../screens/home/home_screen.dart'; // Import home screen
@@ -317,7 +318,12 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   String _tabNameForRestoredPath(String path) {
     if (path == '#home') return context.tr.homeTab;
     if (path == '#gallery') return context.tr.imageGallery;
-    if (path == '#video') return context.tr.videoGallery;
+    if (path == '#video') return context.tr.videoHubTitle;
+    // The album/library screen renames the tab once its name has loaded.
+    if (path == '#albums' || path.startsWith('#album/')) {
+      return context.tr.albums;
+    }
+    if (path.startsWith('#video-library')) return context.tr.videoLibrary;
     if (path == '#tags') return context.tr.tags;
     if (path == '#network') return context.tr.networkTab;
     if (path == '#trash') return context.tr.trashBin;
@@ -420,8 +426,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
             size: 20,
           ),
           style: fluent.ButtonStyle(
-            shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape: const WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
             ),
             backgroundColor: WidgetStatePropertyAll(
               isDarkMode
@@ -446,7 +452,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
           size: 20,
         ),
         style: IconButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape: const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
           backgroundColor: isDarkMode
               ? Colors.white.withValues(alpha: 0.04)
               : theme.colorScheme.onSurface.withValues(alpha: 0.05),
@@ -473,8 +479,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         child: fluent.IconButton(
           icon: Icon(PhosphorIconsLight.sparkle, color: iconColor, size: 20),
           style: fluent.ButtonStyle(
-            shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape: const WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
             ),
             backgroundColor: WidgetStatePropertyAll(
               isOpen
@@ -493,7 +499,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       child: IconButton(
         icon: Icon(PhosphorIconsLight.sparkle, color: iconColor, size: 20),
         style: IconButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape: const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
           backgroundColor: isOpen
               ? theme.colorScheme.primary.withValues(alpha: 0.12)
               : Colors.transparent,
@@ -524,8 +530,8 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         child: fluent.IconButton(
           icon: icon,
           style: fluent.ButtonStyle(
-            shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape: const WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
             ),
             backgroundColor: WidgetStatePropertyAll(backgroundColor),
           ),
@@ -540,7 +546,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       child: IconButton(
         icon: icon,
         style: IconButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          shape: const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
           backgroundColor: backgroundColor,
         ),
         onPressed: onPressed,
@@ -556,7 +562,16 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         child: Semantics(
           button: true,
           label: label,
+          // Icon-only, styled like the Material FAB below: a soft rounded
+          // rect with symmetric padding rather than Button's own asymmetric
+          // label padding.
           child: fluent.Button(
+            style: const fluent.ButtonStyle(
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
+              ),
+              padding: WidgetStatePropertyAll(EdgeInsets.all(CbSpacing.md)),
+            ),
             onPressed: _handleAddNewTab,
             child: const Icon(PhosphorIconsLight.plus),
           ),
@@ -570,7 +585,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
       tooltip: label,
       elevation: 0,
       backgroundColor: theme.colorScheme.primary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      shape: const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
       child: const Icon(PhosphorIconsLight.plus, size: 24),
     );
   }

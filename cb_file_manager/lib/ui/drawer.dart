@@ -449,7 +449,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                         onTap: () => _navigateTo(
                           context,
                           '#video',
-                          context.tr.videoGallery,
+                          context.tr.videoHubTitle,
                         ),
                       ),
 
@@ -690,7 +690,7 @@ class _CBDrawerContentState extends State<_CBDrawerContent> {
                           onPressed: () => _navigateTo(
                             context,
                             '#video',
-                            context.tr.videoGallery,
+                            context.tr.videoHubTitle,
                           ),
                         ),
                         const SizedBox(height: _FluentDrawerTokens.groupGap),

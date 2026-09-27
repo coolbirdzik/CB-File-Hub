@@ -16,31 +16,32 @@ class VideoPlaybackLauncher {
 
   /// [onClosed] runs when the player is dismissed (in-window mode) or right
   /// after the separate window was launched (new-window mode).
+  ///
+  /// [inNewWindow] skips the preference read when the caller already has it.
   static Future<void> open(
     BuildContext context, {
     File? file,
     String? contentUri,
     VoidCallback? onClosed,
     bool forceNewWindow = false,
+    bool? inNewWindow,
   }) async {
     assert(file != null || (contentUri != null && contentUri.isNotEmpty));
 
     if (file != null && VideoWindowService.isSupported) {
-      bool inNewWindow = true;
-      try {
-        inNewWindow = await locator<UserPreferences>()
-            .getOpenVideoInNewWindow();
-      } catch (_) {
-        inNewWindow = true;
-      }
+      // Independent lookups: issue them together rather than one round trip
+      // after another before the player can be reused or spawned.
+      final (useNewWindow, parentIsMaximized, parentWindowId) = await (
+        inNewWindow != null
+            ? Future<bool>.value(inNewWindow)
+            : locator<UserPreferences>().getOpenVideoInNewWindow().catchError(
+                (_) => true,
+              ),
+        windowManager.isMaximized().catchError((_) => false),
+        windowManager.getId().then<int?>((id) => id).catchError((_) => null),
+      ).wait;
 
-      if (inNewWindow || forceNewWindow) {
-        var parentIsMaximized = false;
-        int? parentWindowId;
-        try {
-          parentIsMaximized = await windowManager.isMaximized();
-          parentWindowId = await windowManager.getId();
-        } catch (_) {}
+      if (useNewWindow || forceNewWindow) {
         final launched = await AppBusyCursor.run(
           () => VideoWindowService.openVideoWindow(
             file.path,

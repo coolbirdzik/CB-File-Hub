@@ -16,6 +16,7 @@ class AlbumImageTile extends StatefulWidget {
   final bool isDesktopMode;
   final VoidCallback onOpen;
   final void Function({bool shiftSelect, bool ctrlSelect}) onSelect;
+  final ValueChanged<TapUpDetails> onSecondaryTapUp;
 
   const AlbumImageTile({
     super.key,
@@ -25,6 +26,7 @@ class AlbumImageTile extends StatefulWidget {
     required this.isDesktopMode,
     required this.onOpen,
     required this.onSelect,
+    required this.onSecondaryTapUp,
   });
 
   @override
@@ -119,6 +121,7 @@ class _AlbumImageTileState extends State<AlbumImageTile> {
           onTap: _handleTap,
           onDoubleTap: _handleDoubleTap,
           onLongPress: () => widget.onSelect(),
+          onSecondaryTapUp: widget.onSecondaryTapUp,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

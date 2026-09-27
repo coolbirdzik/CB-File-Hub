@@ -72,6 +72,135 @@ class SharedActionBar {
     }
   }
 
+  static List<PopupMenuEntry<SortOption>> _buildSortMenuItems(
+    BuildContext context,
+    SortOption currentOption,
+    Set<SortOption> allowedOptions,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final entries = <PopupMenuEntry<SortOption>>[];
+    void addGroup(List<PopupMenuItem<SortOption>> group) {
+      final visible = group
+          .where((item) => allowedOptions.contains(item.value))
+          .toList();
+      if (visible.isEmpty) return;
+      if (entries.isNotEmpty) entries.add(const PopupMenuDivider());
+      entries.addAll(visible);
+    }
+
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.nameAsc,
+        l10n.sortNameAsc,
+        PhosphorIconsLight.fileText,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.nameDesc,
+        l10n.sortNameDesc,
+        PhosphorIconsLight.fileText,
+        currentOption,
+      ),
+    ]);
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.dateAsc,
+        l10n.sortDateModifiedOldest,
+        PhosphorIconsLight.calendar,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.dateDesc,
+        l10n.sortDateModifiedNewest,
+        PhosphorIconsLight.calendar,
+        currentOption,
+      ),
+    ]);
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.dateCreatedAsc,
+        l10n.sortDateCreatedOldest,
+        PhosphorIconsLight.clock,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.dateCreatedDesc,
+        l10n.sortDateCreatedNewest,
+        PhosphorIconsLight.clock,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.sizeAsc,
+        l10n.sortSizeSmallest,
+        PhosphorIconsLight.chartBar,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.sizeDesc,
+        l10n.sortSizeLargest,
+        PhosphorIconsLight.chartBar,
+        currentOption,
+      ),
+    ]);
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.typeAsc,
+        l10n.sortTypeAsc,
+        PhosphorIconsLight.file,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.typeDesc,
+        l10n.sortTypeDesc,
+        PhosphorIconsLight.file,
+        currentOption,
+      ),
+    ]);
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.extensionAsc,
+        l10n.sortExtensionAsc,
+        PhosphorIconsLight.at,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.extensionDesc,
+        l10n.sortExtensionDesc,
+        PhosphorIconsLight.at,
+        currentOption,
+      ),
+    ]);
+    addGroup([
+      buildSortMenuItem(
+        context,
+        SortOption.attributesAsc,
+        l10n.sortAttributesAsc,
+        PhosphorIconsLight.info,
+        currentOption,
+      ),
+      buildSortMenuItem(
+        context,
+        SortOption.attributesDesc,
+        l10n.sortAttributesDesc,
+        PhosphorIconsLight.info,
+        currentOption,
+      ),
+    ]);
+    return entries;
+  }
+
   /// Shows grid size selector as a modal bottom sheet (for mobile callers).
   static void showGridSizeDialog(
     BuildContext context, {
@@ -585,6 +714,7 @@ class SharedActionBar {
     VoidCallback? onPreviewPaneToggled,
     bool isPreviewPaneVisible = true,
     bool showDesktopViewModes = false,
+    Set<SortOption>? allowedSortOptions,
     List<PopupMenuEntry<String>>? additionalMoreOptions,
     Function(String)? onAdditionalMoreOptionSelected,
   }) {
@@ -594,6 +724,7 @@ class SharedActionBar {
     // Add search button
     actions.add(
       IconButton(
+        key: const ValueKey('shared-search-action'),
         icon: Icon(
           isSearchActive
               ? PhosphorIconsLight.x
@@ -607,116 +738,17 @@ class SharedActionBar {
     // Add sort button
     actions.add(
       PopupMenuButton<SortOption>(
+        key: const ValueKey('shared-sort-menu'),
         icon: const Icon(PhosphorIconsLight.sortAscending),
         tooltip: l10n.sortByTooltip,
         offset: const Offset(0, 50),
         initialValue: currentSortOption,
         onSelected: onSortOptionSelected,
-        itemBuilder: (context) => [
-          buildSortMenuItem(
-            context,
-            SortOption.nameAsc,
-            l10n.sortNameAsc,
-            PhosphorIconsLight.fileText,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.nameDesc,
-            l10n.sortNameDesc,
-            PhosphorIconsLight.fileText,
-            currentSortOption,
-          ),
-          const PopupMenuDivider(),
-          buildSortMenuItem(
-            context,
-            SortOption.dateAsc,
-            l10n.sortDateModifiedOldest,
-            PhosphorIconsLight.calendar,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.dateDesc,
-            l10n.sortDateModifiedNewest,
-            PhosphorIconsLight.calendar,
-            currentSortOption,
-          ),
-          const PopupMenuDivider(),
-          buildSortMenuItem(
-            context,
-            SortOption.dateCreatedAsc,
-            l10n.sortDateCreatedOldest,
-            PhosphorIconsLight.clock,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.dateCreatedDesc,
-            l10n.sortDateCreatedNewest,
-            PhosphorIconsLight.clock,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.sizeAsc,
-            l10n.sortSizeSmallest,
-            PhosphorIconsLight.chartBar,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.sizeDesc,
-            l10n.sortSizeLargest,
-            PhosphorIconsLight.chartBar,
-            currentSortOption,
-          ),
-          const PopupMenuDivider(),
-          buildSortMenuItem(
-            context,
-            SortOption.typeAsc,
-            l10n.sortTypeAsc,
-            PhosphorIconsLight.file,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.typeDesc,
-            l10n.sortTypeDesc,
-            PhosphorIconsLight.file,
-            currentSortOption,
-          ),
-          const PopupMenuDivider(),
-          buildSortMenuItem(
-            context,
-            SortOption.extensionAsc,
-            l10n.sortExtensionAsc,
-            PhosphorIconsLight.at,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.extensionDesc,
-            l10n.sortExtensionDesc,
-            PhosphorIconsLight.at,
-            currentSortOption,
-          ),
-          const PopupMenuDivider(),
-          buildSortMenuItem(
-            context,
-            SortOption.attributesAsc,
-            l10n.sortAttributesAsc,
-            PhosphorIconsLight.info,
-            currentSortOption,
-          ),
-          buildSortMenuItem(
-            context,
-            SortOption.attributesDesc,
-            l10n.sortAttributesDesc,
-            PhosphorIconsLight.info,
-            currentSortOption,
-          ),
-        ],
+        itemBuilder: (context) => _buildSortMenuItems(
+          context,
+          currentSortOption,
+          allowedSortOptions ?? SortOption.values.toSet(),
+        ),
       ),
     );
 
@@ -801,6 +833,7 @@ class SharedActionBar {
     // Add view mode toggle button
     actions.add(
       PopupMenuButton<ViewMode>(
+        key: const ValueKey('shared-view-mode-menu'),
         icon: const Icon(PhosphorIconsLight.eye),
         tooltip: l10n.viewModeTooltip,
         offset: const Offset(0, 50),
@@ -1021,6 +1054,7 @@ class SharedActionBar {
     // Add refresh button
     actions.add(
       IconButton(
+        key: const ValueKey('shared-refresh-action'),
         icon: const Icon(PhosphorIconsLight.arrowsClockwise),
         tooltip: l10n.refreshTooltip,
         onPressed: onRefresh,

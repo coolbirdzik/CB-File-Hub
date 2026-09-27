@@ -256,8 +256,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                     ),
                     backgroundColor: theme.colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16.0),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: CbRadii.buttonAll,
                     ),
                   ),
                   child: Text(
@@ -282,8 +282,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                   ),
                   backgroundColor: theme.colorScheme.surfaceContainerHighest
                       .withValues(alpha: 0.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.0),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: CbRadii.buttonAll,
                   ),
                 ),
                 child: Text(
@@ -306,8 +306,8 @@ class _MobileSearchDialogState extends State<MobileSearchDialog> {
                     horizontal: 20,
                     vertical: 12,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.0),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: CbRadii.buttonAll,
                   ),
                 ),
                 child: Text(

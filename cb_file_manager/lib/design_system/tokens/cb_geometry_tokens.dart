@@ -41,9 +41,13 @@ class CbSpacing {
 /// Corner-radius scale.
 ///
 /// The single biggest tell of a Material app is its radius: M3's 20px pill on
-/// every button and card reads as consumer-mobile. This scale tops out far
-/// lower and reserves the round end for genuinely pill-shaped things
-/// (chips, avatars, progress tracks).
+/// every card and panel reads as consumer-mobile. This scale tops out far
+/// lower for those surfaces. Buttons get their own step, [button]: square
+/// rather than round, but with the corner softened enough to read as a
+/// deliberate shape rather than a sharp rectangle — every button in the app
+/// (filled/tonal/outlined/text, and their icon-only cousins) draws with
+/// [buttonAll]. [full] is reserved for the handful of things that are
+/// genuinely pill/circle-shaped: chips, avatars, progress tracks.
 class CbRadii {
   const CbRadii._();
 
@@ -53,20 +57,26 @@ class CbRadii {
   /// 3 — tiny chrome: checkbox, tag dot, thumbnail badge.
   static const double xs = 3;
 
-  /// 5 — inputs, small buttons, list-row selection.
+  /// 5 — inputs, list-row selection.
   static const double sm = 5;
 
-  /// 7 — buttons, cards, menu items.
+  /// 7 — cards, menu items, and the smallest buttons (under ~26px tall,
+  /// where [button]'s 10px would read as almost fully round).
   static const double md = 7;
 
-  /// 10 — panels, popovers, toasts.
+  /// 10 — panels, popovers, toasts. Also the standard button radius — see
+  /// [button], which is this same value named for that use.
   static const double lg = 10;
 
   /// 14 — dialogs, sheets, the window shell.
   static const double xl = 14;
 
-  /// Fully round — chips, avatars, progress tracks.
+  /// Fully round — chips, avatars, progress tracks. Not used for buttons.
   static const double full = 999;
+
+  /// 10 — every button in the app: a soft, square corner rather than a pill.
+  /// Named separately from [lg] because the two scales can diverge later.
+  static const double button = 10;
 
   static BorderRadius all(double r) => BorderRadius.circular(r);
 
@@ -74,6 +84,11 @@ class CbRadii {
   static const BorderRadius mdAll = BorderRadius.all(Radius.circular(md));
   static const BorderRadius lgAll = BorderRadius.all(Radius.circular(lg));
   static const BorderRadius xlAll = BorderRadius.all(Radius.circular(xl));
+
+  /// The shape every button in the app draws with (see [button]).
+  static const BorderRadius buttonAll = BorderRadius.all(
+    Radius.circular(button),
+  );
 }
 
 /// Stroke widths.

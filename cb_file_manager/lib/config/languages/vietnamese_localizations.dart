@@ -2,6 +2,32 @@ import 'app_localizations.dart';
 
 class VietnameseLocalizations implements AppLocalizations {
   @override
+  String get galleryNsfwLabel => 'Nội dung NSFW';
+  @override
+  String get galleryNsfwDescription =>
+      'Không hiển thị ảnh và thumbnail video của bộ sưu tập này trên Home.';
+
+  @override
+  String get homeSubtitle =>
+      'Thư mục, ảnh và video của bạn, luôn trong tầm tay.';
+  @override
+  String get homeRecentFolders => 'Tiếp tục từ lần trước';
+  @override
+  String get homeRecentEmpty =>
+      'Thư mục bạn truy cập sẽ xuất hiện ở đây. Mở một thư mục để bắt đầu.';
+  @override
+  String get homeRecentUnavailable => 'Chưa tải được thư mục gần đây.';
+  @override
+  String get homePhotosSubtitle =>
+      'Một góc cảm hứng từ bộ sưu tập ảnh của bạn.';
+  @override
+  String get homeVideosSubtitle =>
+      'Bộ sưu tập video của bạn, sẵn sàng khám phá.';
+  @override
+  String get homePinnedEmpty =>
+      'Ghim thư mục yêu thích khi duyệt file để truy cập nhanh tại đây.';
+
+  @override
   String get sshDisplayName => 'Tên';
   @override
   String get sshRequired => 'Vui lòng nhập thông tin.';
@@ -310,6 +336,23 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get defaultViewModeDescription =>
       'Áp dụng cho thư mục chưa lưu chế độ xem riêng';
+
+  @override
+  String get propertiesAndTags => 'Thuộc tính và thẻ';
+  @override
+  String get showPropertiesPane => 'Hiện thuộc tính và thẻ';
+  @override
+  String get hidePropertiesPane => 'Thu gọn thuộc tính và thẻ';
+  @override
+  String get propertiesSelectFile => 'Chọn file để xem thuộc tính và thẻ.';
+  @override
+  String get propertiesFilesOnly => 'Thẻ chỉ áp dụng cho các file đang chọn.';
+  @override
+  String get propertiesTagFailure => 'Một số file chưa cập nhật được';
+  @override
+  String get propertiesResize => 'Đổi chiều cao khung thuộc tính';
+  @override
+  String get propertiesTagHint => 'Tên thẻ hoặc cha:con';
 
   @override
   String get previewPaneTitle => 'Xem trước';
@@ -3080,6 +3123,24 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get noVideoSources => 'Chưa có nguồn video nào';
+
+  @override
+  String get createImageSource => 'Tạo Nguồn Ảnh';
+
+  @override
+  String get editImageSource => 'Chỉnh Sửa Nguồn Ảnh';
+
+  @override
+  String get addImageSource => 'Thêm Nguồn Ảnh';
+
+  @override
+  String get removeImageSource => 'Xóa Nguồn';
+
+  @override
+  String get imageSources => 'Nguồn Ảnh';
+
+  @override
+  String get noImageSources => 'Chưa có nguồn ảnh nào';
 
   @override
   String get filterByTags => 'Lọc Theo Thẻ';

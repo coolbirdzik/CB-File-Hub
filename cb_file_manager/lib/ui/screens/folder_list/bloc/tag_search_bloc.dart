@@ -1,3 +1,4 @@
+import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/helpers/core/search_request_guard.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
@@ -79,12 +80,17 @@ class TagSearchState extends Equatable {
 
 class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   final _searchRequests = SearchRequestGuard();
+  Timer? _editRefreshTimer;
+  List<String> _activeTags = const [];
+  String? _activeDirectory;
+
   final FileNavigationBloc navigationBloc;
   late final StreamSubscription<String> _tagChangeSubscription;
 
   TagSearchBloc({required this.navigationBloc})
     : super(const TagSearchState()) {
     on<TagSearchLoadTagsForFile>(_onLoadTagsForFile);
+    on<TagSearchRefreshAfterEdit>(_onRefreshAfterEdit);
     on<TagSearchLoadTagsForFiles>(_onLoadTagsForFiles);
     on<TagSearchLoadAllTags>(_onLoadAllTags);
     on<TagSearchAddTagToFile>(_onAddTagToFile);
@@ -105,6 +111,7 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
 
   @override
   Future<void> close() async {
+    _editRefreshTimer?.cancel();
     _searchRequests.dispose();
     await _tagChangeSubscription.cancel();
     await super.close();
@@ -136,10 +143,68 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   }
 
   void _onTagChanged(String filePath) {
+    if (filePath.startsWith('preserve_scroll:')) {
+      filePath = filePath.substring('preserve_scroll:'.length);
+      _editRefreshTimer?.cancel();
+      _editRefreshTimer = Timer(const Duration(milliseconds: 150), () {
+        if (!isClosed && state.currentSearchTag != null) {
+          add(const TagSearchRefreshAfterEdit());
+        }
+      });
+    }
+
     if (filePath == "global:tag_deleted") {
       add(TagSearchLoadAllTags(navigationBloc.state.currentPath.path));
     } else {
       add(TagSearchLoadTagsForFile(filePath));
+    }
+  }
+
+  /// Refresh membership without blanking the list or entering loading state.
+  Future<void> _onRefreshAfterEdit(
+    TagSearchRefreshAfterEdit event,
+    Emitter<TagSearchState> emit,
+  ) async {
+    if (_activeTags.isEmpty || state.currentSearchTag == null) return;
+    if (state.isLoading) {
+      _editRefreshTimer?.cancel();
+      _editRefreshTimer = Timer(const Duration(milliseconds: 150), () {
+        if (!isClosed) add(const TagSearchRefreshAfterEdit());
+      });
+      return;
+    }
+    final request = _searchRequests.begin();
+    final tags = List<String>.of(_activeTags);
+    final directory = _activeDirectory;
+    try {
+      final results = directory == null
+          ? await TagManager.findFilesByTagGlobally(tags.first)
+          : await TagManager.findFilesByTag(directory, tags.first);
+      final paths = <String>[];
+      for (final file in results.whereType<File>()) {
+        if (directory != null && !path.isWithin(directory, file.path)) continue;
+        if (!await file.exists()) continue;
+        final assigned = await TagManager.getTags(file.path);
+        if (tags
+            .skip(1)
+            .every(
+              (query) =>
+                  assigned.any((tag) => TextUtils.matchesSearch(tag, query)),
+            )) {
+          paths.add(file.path);
+        }
+      }
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+      emit(
+        state.copyWith(
+          searchResultPaths: paths,
+          searchResultsTotal: paths.length,
+          isLoading: false,
+        ),
+      );
+    } catch (error) {
+      if (!_searchRequests.isCurrent(request) || emit.isDone) return;
+      emit(state.copyWith(isLoading: false, error: error.toString()));
     }
   }
 
@@ -265,6 +330,8 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByTag event,
     Emitter<TagSearchState> emit,
   ) async {
+    _activeTags = [event.tag];
+    _activeDirectory = event.currentDirectory;
     final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true));
     try {
@@ -299,6 +366,8 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByTagGlobally event,
     Emitter<TagSearchState> emit,
   ) async {
+    _activeTags = [event.tag];
+    _activeDirectory = null;
     final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true, searchResultPaths: []));
     try {
@@ -336,6 +405,8 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByMultipleTags event,
     Emitter<TagSearchState> emit,
   ) async {
+    _activeTags = List.of(event.tags);
+    _activeDirectory = event.currentDirectory;
     final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true));
     try {
@@ -391,6 +462,8 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchByMultipleTagsGlobally event,
     Emitter<TagSearchState> emit,
   ) async {
+    _activeTags = List.of(event.tags);
+    _activeDirectory = null;
     final request = _searchRequests.begin();
     emit(state.copyWith(isLoading: true, searchResultPaths: []));
     try {
@@ -446,6 +519,10 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
   }
 
   void _onSetResults(TagSearchSetResults event, Emitter<TagSearchState> emit) {
+    _activeTags = [event.tagName];
+    _activeDirectory = event.isGlobal
+        ? null
+        : navigationBloc.state.currentPath.path;
     _searchRequests.invalidate();
     emit(
       state.copyWith(
@@ -462,6 +539,8 @@ class TagSearchBloc extends Bloc<TagSearchEvent, TagSearchState> {
     TagSearchClearResults event,
     Emitter<TagSearchState> emit,
   ) {
+    _activeTags = const [];
+    _editRefreshTimer?.cancel();
     _searchRequests.invalidate();
     emit(
       state.copyWith(

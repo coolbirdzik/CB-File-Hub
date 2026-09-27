@@ -6,11 +6,12 @@ import 'dart:math' show min, max;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'package:cb_file_manager/models/objectbox/album.dart';
 import 'package:cb_file_manager/services/album_service.dart';
-import 'package:cb_file_manager/ui/utils/base_screen.dart';
+import 'package:cb_file_manager/ui/components/common/library_hub_scaffold.dart';
 import 'package:cb_file_manager/ui/screens/media_gallery/image_viewer_screen.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/ui/widgets/app_progress_indicator.dart';
@@ -23,6 +24,7 @@ import 'package:cb_file_manager/helpers/core/user_preferences.dart';
 import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:cb_file_manager/ui/components/common/browser_like_action_handlers.dart';
 import 'package:cb_file_manager/ui/components/common/shared_action_bar.dart';
+import 'package:cb_file_manager/ui/components/common/shared_file_context_menu.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
 import 'package:cb_file_manager/services/album_auto_rule_service.dart';
 import 'auto_rules_screen.dart';
@@ -34,39 +36,59 @@ import 'package:cb_file_manager/ui/utils/view_mode_spectrum.dart';
 import 'package:cb_file_manager/ui/components/common/breadcrumb_address_bar.dart';
 import 'package:cb_file_manager/ui/tab_manager/core/tab_manager.dart';
 import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
+import 'package:cb_file_manager/ui/components/common/grid_list_collection.dart';
 import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'package:cb_file_manager/ui/utils/format_utils.dart';
 import 'package:cb_file_manager/ui/widgets/selection_summary_tooltip.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
+import 'package:cb_file_manager/ui/tab_manager/components/search_bar.dart'
+    as tab_components;
 
 // Selection BLoC + drag-selection
 import 'package:cb_file_manager/bloc/selection/selection_bloc.dart';
 import 'package:cb_file_manager/bloc/selection/selection_event.dart';
 import 'package:cb_file_manager/bloc/selection/selection_state.dart';
-import 'album_drag_selection_controller.dart';
+import 'package:cb_file_manager/ui/tab_manager/core/tabbed_folder/tabbed_folder_drag_selection_controller.dart';
 import 'album_image_tile.dart';
 import 'package:cb_file_manager/ui/widgets/slim_progress_bar.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Album album;
+  final String tabId;
 
-  const AlbumDetailScreen({super.key, required this.album});
+  const AlbumDetailScreen({
+    super.key,
+    required this.album,
+    required this.tabId,
+  });
 
   @override
   State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
 }
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
+  static const _supportedViewModes = {
+    ViewMode.list,
+    ViewMode.tiles,
+    ViewMode.grid,
+    ViewMode.details,
+    ViewMode.tree,
+  };
   final AlbumService _albumService = AlbumService.instance;
 
   // ── File data ──────────────────────────────────────────────────────────────
   List<File> _imageFiles = [];
   List<File> _originalImageFiles = [];
+  Map<String, FileStat> _fileStats = {};
   bool _isLoading = true;
   // Grid zoom level — uses the SAME key, range, and column-count formula
   // as the main file browser so that the same setting produces identical
   // column density on every screen.
   int _gridZoomLevel = UserPreferences.defaultGridZoomLevel;
+  ViewMode _viewMode = ViewMode.grid;
   String? _searchQuery;
+  bool _showSearchBar = false;
+  SortOption _sortOption = SortOption.nameAsc;
   bool _isShuffled = false;
   late UserPreferences _preferences;
 
@@ -99,7 +121,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   // ── Selection — using the shared SelectionBloc + drag controller ──────────
   late SelectionBloc _selectionBloc;
-  late AlbumDragSelectionController _dragController;
+  late TabbedFolderDragSelectionController _dragController;
+  late TabbedFolderDragSelectionController _collectionDragController;
 
   // ---------------------------------------------------------------------------
   // Life-cycle
@@ -109,11 +132,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void initState() {
     super.initState();
     _selectionBloc = SelectionBloc();
-    _dragController = AlbumDragSelectionController(
+    _dragController = TabbedFolderDragSelectionController(
+      selectionBloc: _selectionBloc,
+    );
+    _collectionDragController = TabbedFolderDragSelectionController(
       selectionBloc: _selectionBloc,
     );
     _preferences = UserPreferences.instance;
-    _loadGridPreference();
+    _loadViewPreferences();
     _initSmartStateAndLoad();
     _albumUpdateSub = AlbumService.instance.albumUpdatedStream
         .where((id) => id == widget.album.id)
@@ -128,6 +154,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void dispose() {
     _selectionBloc.close();
     _dragController.dispose();
+    _collectionDragController.dispose();
     _gridScrollController.dispose();
     _albumUpdateSub?.cancel();
     _progressSub?.cancel();
@@ -272,6 +299,36 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     );
   }
 
+  void _showImageContextMenu(File file, Offset globalPosition) {
+    final selected = _selectionBloc.state.selectedFilePaths;
+    if (selected.contains(file.path) && selected.length > 1) {
+      showMultipleFilesContextMenu(
+        context: context,
+        selectedPaths: selected.toList(growable: false),
+        globalPosition: globalPosition,
+        onClearSelection: _clearSelection,
+        onDeleteFiles: (_, paths) =>
+            _deleteSelectedFilesFromDisk(paths.toSet()),
+      );
+      return;
+    }
+
+    if (!selected.contains(file.path)) {
+      _selectionBloc.add(ToggleFileSelection(file.path));
+    }
+    showFileContextMenu(
+      context: context,
+      file: file,
+      fileTags: const <String>[],
+      isVideo: FileTypeUtils.isVideoFile(file.path),
+      isImage: FileTypeUtils.isImageFile(file.path),
+      showOpenFileLocation: true,
+      globalPosition: globalPosition,
+      onDeleteFile: (_, target) =>
+          _deleteSelectedFilesFromDisk(<String>{target.path}),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Initialization helpers
   // ---------------------------------------------------------------------------
@@ -323,13 +380,35 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     return '$_activeRulesCount rules • $_sourceFoldersCount sources • Last: $last';
   }
 
-  Future<void> _loadGridPreference() async {
+  Future<void> _loadViewPreferences() async {
     try {
       await _preferences.init();
       // Use the shared gridZoomLevel key so album and file browser
       // stay in sync (same preference, same default, same range).
       final level = await _preferences.getGridZoomLevel();
-      if (mounted) setState(() => _gridZoomLevel = level);
+      final viewMode = await _preferences.getGridListCollectionMode(
+        'album-detail-${widget.album.id}',
+        supportedModes: _supportedViewModes,
+      );
+      if (mounted) {
+        setState(() {
+          _gridZoomLevel = level;
+          _viewMode = viewMode;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setViewMode(ViewMode mode) async {
+    if (!_supportedViewModes.contains(mode) || mode == _viewMode) return;
+    setState(() => _viewMode = mode);
+    _dragController.clearItemPositions();
+    _collectionDragController.clearItemPositions();
+    try {
+      await _preferences.setGridListCollectionMode(
+        'album-detail-${widget.album.id}',
+        mode,
+      );
     } catch (_) {}
   }
 
@@ -379,14 +458,20 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         // Gate opened at end of _scanSmartAlbumImages.
         return;
       }
-      final albumFiles = await _albumService.getAlbumFiles(widget.album.id);
+      final albumFiles = await _albumService.getAlbumFileInfos(widget.album.id);
       final imageFiles = <File>[];
+      final fileStats = <String, FileStat>{};
       for (final af in albumFiles) {
-        final file = File(af.filePath);
-        if (await file.exists()) imageFiles.add(file);
+        final file = File(af.path);
+        final stat = await file.stat();
+        if (stat.type == FileSystemEntityType.file) {
+          imageFiles.add(file);
+          fileStats[file.path] = stat;
+        }
       }
       if (mounted) {
         setState(() {
+          _fileStats = fileStats;
           _originalImageFiles = List<File>.from(imageFiles);
           _applyFiltersAndOrder();
           _isLoading = false;
@@ -645,8 +730,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (mounted) _loadAlbumFiles();
   }
 
-  /// Unified Ctrl+scroll spectrum handler. The album detail view is grid-only,
-  /// so the spectrum collapses to pure grid item-size zoom (no mode changes).
+  /// Unified Ctrl+scroll spectrum handler used by the normal file browser.
   /// `+1` = more spacious (bigger items), `-1` = denser (smaller items).
   void _handleViewScaleDelta(int delta) {
     if (delta == 0) return;
@@ -655,15 +739,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       mode: GridSizeMode.referenceWidth,
     );
     final result = ViewModeSpectrum.step(
-      currentMode: ViewMode.grid,
+      currentMode: _viewMode,
       currentZoom: _gridZoomLevel,
-      supported: const {},
+      supported: const {
+        ViewMode.tree,
+        ViewMode.details,
+        ViewMode.list,
+        ViewMode.tiles,
+      },
       delta: delta,
       minZoom: UserPreferences.minGridZoomLevel,
       maxZoom: maxZoom,
     );
-    if (result.gridZoomLevel == _gridZoomLevel) return;
-    _applyGridSize(result.gridZoomLevel);
+    if (result.mode != _viewMode) unawaited(_setViewMode(result.mode));
+    if (result.gridZoomLevel != _gridZoomLevel) {
+      _applyGridSize(result.gridZoomLevel);
+    }
   }
 
   Future<void> _applyGridSize(int size) async {
@@ -681,11 +772,94 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           .where((f) => TextUtils.matchesSearch(pathlib.basename(f.path), q))
           .toList();
     }
-    if (_isShuffled) files.shuffle();
+    if (_isShuffled) {
+      files.shuffle();
+    } else {
+      files.sort(_compareAlbumFiles);
+    }
     _imageFiles = files;
     _updateThumbnailPriorityMap();
     // Clear stale item positions whenever the file list changes.
     _dragController.clearItemPositions();
+    _collectionDragController.clearItemPositions();
+  }
+
+  int _compareAlbumFiles(File a, File b) {
+    final aName = pathlib.basename(a.path).toLowerCase();
+    final bName = pathlib.basename(b.path).toLowerCase();
+    int result;
+    switch (_sortOption) {
+      case SortOption.nameDesc:
+        result = bName.compareTo(aName);
+        break;
+      case SortOption.dateAsc:
+      case SortOption.dateCreatedAsc:
+        result = _statFor(a).modified.compareTo(_statFor(b).modified);
+        break;
+      case SortOption.dateDesc:
+      case SortOption.dateCreatedDesc:
+        result = _statFor(b).modified.compareTo(_statFor(a).modified);
+        break;
+      case SortOption.sizeAsc:
+        result = _statFor(a).size.compareTo(_statFor(b).size);
+        break;
+      case SortOption.sizeDesc:
+        result = _statFor(b).size.compareTo(_statFor(a).size);
+        break;
+      case SortOption.typeAsc:
+      case SortOption.extensionAsc:
+        result = pathlib
+            .extension(a.path)
+            .toLowerCase()
+            .compareTo(pathlib.extension(b.path).toLowerCase());
+        break;
+      case SortOption.typeDesc:
+      case SortOption.extensionDesc:
+        result = pathlib
+            .extension(b.path)
+            .toLowerCase()
+            .compareTo(pathlib.extension(a.path).toLowerCase());
+        break;
+      case SortOption.attributesAsc:
+      case SortOption.attributesDesc:
+      case SortOption.nameAsc:
+        result = aName.compareTo(bName);
+        break;
+    }
+    return result == 0 ? aName.compareTo(bName) : result;
+  }
+
+  FileStat _statFor(File file) => _fileStats.putIfAbsent(file.path, () {
+    try {
+      return file.statSync();
+    } catch (_) {
+      return FileStat.statSync('');
+    }
+  });
+
+  void _setSortOption(SortOption option) {
+    setState(() {
+      _sortOption = option;
+      _isShuffled = false;
+      _applyFiltersAndOrder();
+    });
+  }
+
+  void _toggleSearchBar() => setState(() => _showSearchBar = !_showSearchBar);
+
+  void _closeSearchBar() => setState(() => _showSearchBar = false);
+
+  void _setSearchQuery(String value) {
+    setState(() {
+      _searchQuery = value.trim().isEmpty ? null : value;
+      _applyFiltersAndOrder();
+    });
+  }
+
+  void _toggleSelectionMode() {
+    _selectionBloc.add(
+      ToggleSelectionMode(forceValue: !_selectionBloc.state.isSelectionMode),
+    );
   }
 
   void _updateThumbnailPriorityMap() {
@@ -699,48 +873,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       _isShuffled = !_isShuffled;
       _applyFiltersAndOrder();
     });
-  }
-
-  void _showSearchDialog() {
-    String query = _searchQuery ?? '';
-    RouteUtils.showAcrylicDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Search in Album'),
-        content: TextField(
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Enter image name...',
-            prefixIcon: Icon(PhosphorIconsLight.magnifyingGlass),
-          ),
-          controller: TextEditingController(text: query),
-          onChanged: (value) => query = value,
-          onSubmitted: (_) {
-            RouteUtils.safePopDialog(context);
-            setState(() {
-              _searchQuery = query.trim().isEmpty ? null : query.trim();
-              _applyFiltersAndOrder();
-            });
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => RouteUtils.safePopDialog(context),
-            child: Text(AppLocalizations.of(context)!.cancel),
-          ),
-          TextButton(
-            onPressed: () {
-              RouteUtils.safePopDialog(context);
-              setState(() {
-                _searchQuery = query.trim().isEmpty ? null : query.trim();
-                _applyFiltersAndOrder();
-              });
-            },
-            child: const Text('Search'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _showAddFilesMenu() async {
@@ -782,7 +914,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     if (!mounted) return;
     await RouteUtils.showAcrylicDialog<Album>(
       context: context,
-      builder: (context) => CreateAlbumDialog(editingAlbum: widget.album),
+      builder: (context) => CreateAlbumDialog(
+        editingAlbum: widget.album,
+        sourceMode: !_isSmartAlbum,
+      ),
     );
     if (mounted) setState(() {});
   }
@@ -790,49 +925,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   // _resolveGridColumns() removed — column count is now computed inside
   // _buildGrid() with a LayoutBuilder so it can use the actual available
   // width, matching the file-browser formula exactly.
-
-  Widget _buildAddressBar(BuildContext context) {
-    final count = _imageFiles.length;
-    return BreadcrumbAddressBar(
-      segments: [
-        BreadcrumbSegment(
-          label: 'Albums',
-          icon: PhosphorIconsLight.images,
-          onTap: () => _navigateToAlbums(context),
-        ),
-        BreadcrumbSegment(
-          label: widget.album.name,
-          badge: count > 0 ? '$count' : null,
-        ),
-      ],
-    );
-  }
-
-  /// Navigate back to the Albums list. The album detail screen is rendered as
-  /// a tab path (`#album/<id>`) by [SystemScreenRouter], not pushed on a
-  /// Navigator stack, so [Navigator.maybePop] would instead close the tab.
-  /// Use the tab's navigation history when available, falling back to an
-  /// explicit `#albums` path update.
-  void _navigateToAlbums(BuildContext context) {
-    try {
-      final tabBloc = context.read<TabManagerBloc>();
-      final activeTab = tabBloc.state.activeTab;
-      if (activeTab != null) {
-        if (tabBloc.canTabNavigateBack(activeTab.id)) {
-          tabBloc.backNavigationToPath(activeTab.id);
-        } else {
-          TabNavigator.updateTabPath(context, activeTab.id, '#albums');
-        }
-        return;
-      }
-    } catch (_) {
-      // TabManagerBloc not available in this context — fall through below.
-    }
-    // Last-resort fallback: pop if something is actually on the stack.
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).maybePop();
-    }
-  }
 
   // ---------------------------------------------------------------------------
   // AppBar action builders
@@ -848,6 +940,91 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     bool isDesktop,
   ) {
     final hasSelection = sel.selectedFilePaths.isNotEmpty;
+    final commonActions = SharedActionBar.buildCommonActions(
+      context: context,
+      onSearchPressed: _toggleSearchBar,
+      isSearchActive: _showSearchBar,
+      onSortOptionSelected: _setSortOption,
+      currentSortOption: _sortOption,
+      allowedSortOptions: const {
+        SortOption.nameAsc,
+        SortOption.nameDesc,
+        SortOption.dateAsc,
+        SortOption.dateDesc,
+        SortOption.dateCreatedAsc,
+        SortOption.dateCreatedDesc,
+        SortOption.sizeAsc,
+        SortOption.sizeDesc,
+        SortOption.typeAsc,
+        SortOption.typeDesc,
+        SortOption.extensionAsc,
+        SortOption.extensionDesc,
+      },
+      viewMode: _viewMode,
+      onViewModeToggled: () => unawaited(
+        _setViewMode(
+          _viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid,
+        ),
+      ),
+      onViewModeSelected: (mode) => unawaited(_setViewMode(mode)),
+      onRefresh: _loadAlbumFiles,
+      currentGridZoomLevel: _viewMode == ViewMode.grid ? _gridZoomLevel : null,
+      onGridZoomChanged: _applyGridSize,
+      onSelectionModeToggled: _toggleSelectionMode,
+      additionalMoreOptions: [
+        const PopupMenuItem(
+          value: 'edit_album',
+          child: Row(
+            children: [
+              Icon(PhosphorIconsLight.pencilSimple),
+              SizedBox(width: 8),
+              Text('Edit Album'),
+            ],
+          ),
+        ),
+        if (_searchQuery?.isNotEmpty ?? false)
+          const PopupMenuItem(
+            value: 'clear_album_search',
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.x),
+                SizedBox(width: 8),
+                Text('Clear Search'),
+              ],
+            ),
+          ),
+        if (_isSmartAlbum)
+          const PopupMenuItem(
+            value: 'manage_album_rules',
+            child: Row(
+              children: [
+                Icon(PhosphorIconsLight.faders),
+                SizedBox(width: 8),
+                Text('Manage Rules'),
+              ],
+            ),
+          ),
+      ],
+      onAdditionalMoreOptionSelected: _handleAlbumMoreOption,
+    );
+    final moreIndex = commonActions.length - 1;
+    commonActions.insert(
+      moreIndex,
+      IconButton(
+        icon: const Icon(PhosphorIconsLight.shuffle),
+        color: _isShuffled ? Theme.of(context).colorScheme.primary : null,
+        tooltip: _isShuffled ? 'Unshuffle' : 'Shuffle',
+        onPressed: _toggleShuffle,
+      ),
+    );
+    commonActions.insert(
+      moreIndex + 1,
+      IconButton(
+        icon: const Icon(PhosphorIconsLight.plus),
+        onPressed: _showAddFilesMenu,
+        tooltip: 'Add images',
+      ),
+    );
     return [
       // ── Album-specific: remove selected items ─────────────────────────────
       // Visible on desktop when in selection mode (mirrors file-browser: no
@@ -864,150 +1041,34 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           tooltip: 'Move selected files to Trash Bin',
           onPressed: () => _deleteSelectedFilesFromDisk(sel.selectedFilePaths),
         ),
-
-      // ── Standard album actions ────────────────────────────────────────────
-      IconButton(
-        icon: const Icon(PhosphorIconsLight.magnifyingGlass),
-        tooltip: 'Search',
-        onPressed: _showSearchDialog,
-      ),
-      if (Platform.isAndroid || Platform.isIOS)
-        IconButton(
-          icon: const Icon(PhosphorIconsLight.squaresFour),
-          tooltip: 'Grid Size',
-          onPressed: () => SharedActionBar.showGridSizeDialog(
-            context,
-            currentGridSize: _gridZoomLevel,
-            onApply: _applyGridSize,
-            sizeMode: GridSizeMode.referenceWidth,
-            minGridSize: UserPreferences.minGridZoomLevel,
-            maxGridSize: UserPreferences.maxGridZoomLevel,
-          ),
-        )
-      else
-        PopupMenuButton<void>(
-          icon: const Icon(PhosphorIconsLight.squaresFour),
-          tooltip: 'Grid Size',
-          offset: const Offset(0, 50),
-          itemBuilder: (context) => [
-            PopupMenuItem<void>(
-              enabled: false,
-              padding: EdgeInsets.zero,
-              child: GridSizeSliderMenu(
-                currentValue: _gridZoomLevel,
-                minValue: UserPreferences.minGridZoomLevel,
-                maxValue: GridZoomConstraints.maxGridSizeForContext(
-                  context,
-                  mode: GridSizeMode.referenceWidth,
-                  minValue: UserPreferences.minGridZoomLevel,
-                  maxValue: UserPreferences.maxGridZoomLevel,
-                ),
-                onChanged: _applyGridSize,
-              ),
-            ),
-          ],
-        ),
-      IconButton(
-        icon: const Icon(PhosphorIconsLight.shuffle),
-        color: _isShuffled ? Theme.of(context).colorScheme.primary : null,
-        tooltip: _isShuffled ? 'Unshuffle' : 'Shuffle',
-        onPressed: _toggleShuffle,
-      ),
-      IconButton(
-        icon: const Icon(PhosphorIconsLight.plus),
-        onPressed: _showAddFilesMenu,
-        tooltip: 'Add images',
-      ),
-      PopupMenuButton<String>(
-        onSelected: (value) async {
-          switch (value) {
-            case 'edit':
-              _editAlbum();
-              break;
-            case 'select':
-              _selectionBloc.add(const ToggleSelectionMode(forceValue: true));
-              break;
-            case 'shuffle':
-              _toggleShuffle();
-              break;
-            case 'clear_search':
-              setState(() {
-                _searchQuery = null;
-                _applyFiltersAndOrder();
-              });
-              break;
-            case 'manage_rules':
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AutoRulesScreen(
-                    scopedAlbumId: widget.album.id,
-                    scopedAlbumName: widget.album.name,
-                  ),
-                ),
-              );
-              if (mounted && _isSmartAlbum) {
-                await _loadCachedSmartImages();
-                _scanSmartAlbumImages();
-              }
-              break;
-          }
-        },
-        itemBuilder: (context) => [
-          const PopupMenuItem(
-            value: 'edit',
-            child: Row(
-              children: [
-                Icon(PhosphorIconsLight.pencilSimple),
-                SizedBox(width: 8),
-                Text('Edit Album'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'select',
-            child: Row(
-              children: [
-                Icon(PhosphorIconsLight.checks),
-                SizedBox(width: 8),
-                Text('Select Images'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'shuffle',
-            child: Row(
-              children: [
-                Icon(PhosphorIconsLight.shuffle),
-                SizedBox(width: 8),
-                Text('Shuffle'),
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'clear_search',
-            child: Row(
-              children: [
-                Icon(PhosphorIconsLight.x),
-                SizedBox(width: 8),
-                Text('Clear Search'),
-              ],
-            ),
-          ),
-          if (_isSmartAlbum)
-            const PopupMenuItem(
-              value: 'manage_rules',
-              child: Row(
-                children: [
-                  Icon(PhosphorIconsLight.faders),
-                  SizedBox(width: 8),
-                  Text('Manage Rules'),
-                ],
-              ),
-            ),
-        ],
-      ),
+      ...commonActions,
     ];
+  }
+
+  Future<void> _handleAlbumMoreOption(String value) async {
+    switch (value) {
+      case 'edit_album':
+        await _editAlbum();
+        break;
+      case 'clear_album_search':
+        _setSearchQuery('');
+        break;
+      case 'manage_album_rules':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AutoRulesScreen(
+              scopedAlbumId: widget.album.id,
+              scopedAlbumName: widget.album.name,
+            ),
+          ),
+        );
+        if (mounted && _isSmartAlbum) {
+          await _loadCachedSmartImages();
+          _scanSmartAlbumImages();
+        }
+        break;
+    }
   }
 
   /// Mobile-only AppBar actions shown when in selection mode.
@@ -1065,27 +1126,59 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       child: BlocBuilder<SelectionBloc, SelectionState>(
         builder: (context, sel) {
           final inSel = sel.isSelectionMode;
-          final selectedCount = sel.selectedFilePaths.length;
 
           // Mobile shows a dedicated selection AppBar; desktop keeps the
           // normal AppBar (with "Remove" button enabled when items selected).
           final bool useMobileSelectionBar = inSel && !isDesktop;
 
-          return BaseScreen(
-            // Desktop: always show normal title/addressbar.
-            // Mobile-selection: show "N selected" as plain title.
-            title: useMobileSelectionBar
-                ? '$selectedCount selected'
-                : widget.album.name,
-            titleWidget: useMobileSelectionBar
-                ? null
-                : _buildAddressBar(context),
-            automaticallyImplyLeading: !useMobileSelectionBar,
+          return LibraryHubScaffold(
+            tabId: widget.tabId,
+            path: '#album/${widget.album.id}',
+            title: widget.album.name,
+            icon: PhosphorIconsLight.images,
+            parentPath: '#gallery',
+            enablePathEditing: true,
+            onRefresh: _loadAlbumFiles,
+            showRefreshAction: false,
+            showSearchBar: _showSearchBar,
+            searchBar: tab_components.SearchBar(
+              currentPath: '#album/${widget.album.id}',
+              tabId: widget.tabId,
+              initialQuery: _searchQuery,
+              hintText: 'Search images in ${widget.album.name}',
+              onQueryChanged: _setSearchQuery,
+              onClearSearch: () => _setSearchQuery(''),
+              onCloseSearch: _closeSearchBar,
+              showTipsButton: false,
+              showTagSearch: false,
+              showGlobalSearchToggle: false,
+              showRegexToggle: false,
+            ),
+            onEscape: inSel
+                ? _clearSelection
+                : _showSearchBar
+                ? _closeSearchBar
+                : null,
+            breadcrumbSegments: [
+              BreadcrumbSegment(
+                label: AppLocalizations.of(context)!.imageGallery,
+                icon: PhosphorIconsLight.images,
+                onTap: () => TabNavigator.updateTabPath(
+                  context,
+                  widget.tabId,
+                  '#gallery',
+                ),
+              ),
+              BreadcrumbSegment(
+                label: widget.album.name,
+                badge: '#album/${widget.album.id}',
+              ),
+            ],
             actions: useMobileSelectionBar
                 ? _buildMobileSelectionActions(context, sel)
                 : _buildNormalActions(context, sel, isDesktop),
             body: FileViewShell(
-              viewMode: ViewMode.grid,
+              viewMode: _viewMode,
               onViewScaleDelta: _handleViewScaleDelta,
               onEscape: inSel ? _clearSelection : null,
               onSelectAll: _selectAll,
@@ -1095,8 +1188,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 children: [
                   Column(
                     children: [
-                      if (isDesktop) const SizedBox(height: kToolbarHeight),
-
                       // Smart album banner
                       if (_isSmartAlbum)
                         Container(
@@ -1217,12 +1308,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         child: GestureDetector(
                           behavior: HitTestBehavior.translucent,
                           // Tap on empty grid area → deselect
-                          onTap: inSel ? _clearSelection : null,
+                          onTap: inSel && _viewMode == ViewMode.grid
+                              ? _clearSelection
+                              : null,
                           // Desktop pan → rubber-band drag selection.
                           // Before starting, we force a setState so that the
                           // grid rebuilds with isDragging=true and registers
                           // all item positions via addPostFrameCallback.
-                          onPanStart: isDesktop
+                          onPanStart: isDesktop && _viewMode == ViewMode.grid
                               ? (d) {
                                   final focused =
                                       FocusManager.instance.primaryFocus;
@@ -1244,22 +1337,23 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                   }
                                 }
                               : null,
-                          onPanUpdate: isDesktop
+                          onPanUpdate: isDesktop && _viewMode == ViewMode.grid
                               ? (d) => _dragController.update(d.localPosition)
                               : null,
-                          onPanEnd: isDesktop
+                          onPanEnd: isDesktop && _viewMode == ViewMode.grid
                               ? (_) => _dragController.end()
                               : null,
                           child: _imageFiles.isEmpty && !_isLoading
                               ? _buildEmptyState()
-                              : _buildGrid(context, sel, inSel, isDesktop),
+                              : _buildAlbumView(context, sel, inSel, isDesktop),
                         ),
                       ),
                     ],
                   ),
 
                   // Rubber-band selection overlay
-                  _dragController.buildOverlay(),
+                  if (_viewMode == ViewMode.grid)
+                    _dragController.buildOverlay(),
 
                   // Desktop: SelectionSummaryTooltip at the bottom — exactly
                   // like the file browser (no AppBar change on desktop).
@@ -1276,10 +1370,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       ),
                     ),
 
-                  // Slim bottom progress bar — same style as folder list screen.
-                  // Shown during initial load and background scan.
-                  // Does NOT displace the grid layout (Positioned overlay).
-                  if (_isLoading || _isBackgroundProcessing)
+                  // Background work already has its own progress panel above.
+                  // Keep this bar for the initial load only so adding images
+                  // never renders two loading indicators at the same time.
+                  if (_isLoading && !_isBackgroundProcessing)
                     const Positioned(
                       left: 0,
                       right: 0,
@@ -1298,6 +1392,214 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildAlbumView(
+    BuildContext context,
+    SelectionState selection,
+    bool inSelectionMode,
+    bool isDesktop,
+  ) {
+    if (_viewMode == ViewMode.grid) {
+      return _buildGrid(context, selection, inSelectionMode, isDesktop);
+    }
+    return GridListCollection<File>(
+      mode: _viewMode,
+      supportedModes: _supportedViewModes,
+      items: _imageFiles,
+      isDesktop: isDesktop,
+      identity: (file) => file.path,
+      onRefresh: _loadAlbumFiles,
+      dragSelectionController: _collectionDragController,
+      onBackgroundTap: inSelectionMode ? _clearSelection : null,
+      detailsHeader: _buildDetailsHeader(context),
+      itemBuilder: (itemContext, file, mode) {
+        final index = _imageFiles.indexOf(file);
+        return _buildAlbumFileRow(
+          itemContext,
+          file,
+          index,
+          mode,
+          selection.selectedFilePaths.contains(file.path),
+          inSelectionMode,
+          isDesktop,
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailsHeader(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelMedium;
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Row(
+        children: [
+          Expanded(flex: 5, child: Text('Name', style: style)),
+          Expanded(flex: 2, child: Text('Type', style: style)),
+          Expanded(flex: 2, child: Text('Size', style: style)),
+          Expanded(flex: 3, child: Text('Modified', style: style)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumFileRow(
+    BuildContext context,
+    File file,
+    int index,
+    ViewMode mode,
+    bool isSelected,
+    bool inSelectionMode,
+    bool isDesktop,
+  ) {
+    final theme = Theme.of(context);
+    final name = pathlib.basename(file.path);
+    final stat = mode == ViewMode.details ? _fileStats[file.path] : null;
+    final selectedColor = isSelected
+        ? theme.colorScheme.primary.withValues(alpha: 0.16)
+        : Colors.transparent;
+
+    void select() {
+      final keyboard = HardwareKeyboard.instance;
+      _toggleFileSelection(
+        file.path,
+        shiftSelect: keyboard.isShiftPressed,
+        ctrlSelect: keyboard.isControlPressed || keyboard.isMetaPressed,
+      );
+    }
+
+    final Widget content = switch (mode) {
+      ViewMode.tiles => Row(
+        children: [
+          _buildRowThumbnail(file, 68),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+      ViewMode.details => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            _buildRowThumbnail(file, 32),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 5,
+              child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                pathlib
+                    .extension(file.path)
+                    .replaceFirst('.', '')
+                    .toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                stat == null ? '—' : FormatUtils.formatFileSize(stat.size),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                stat == null
+                    ? '—'
+                    : DateFormat('dd/MM/yyyy HH:mm').format(stat.modified),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+      ViewMode.tree => Padding(
+        padding: const EdgeInsets.only(left: 12),
+        child: ListTile(
+          dense: true,
+          leading: const Icon(PhosphorIconsLight.image, size: 20),
+          title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(
+            pathlib.dirname(file.path),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      _ => ListTile(
+        dense: true,
+        leading: _buildRowThumbnail(file, 40),
+        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          pathlib.dirname(file.path),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    };
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapUp: (details) =>
+          _showImageContextMenu(file, details.globalPosition),
+      child: Material(
+        color: selectedColor,
+        borderRadius: BorderRadius.circular(6),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: isDesktop || inSelectionMode
+              ? select
+              : () => _openFile(file, index),
+          onDoubleTap: isDesktop ? () => _openFile(file, index) : null,
+          onLongPress: select,
+          child: content,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRowThumbnail(File file, double size) => ClipRRect(
+    borderRadius: BorderRadius.circular(4),
+    child: Image.file(
+      file,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      cacheWidth: (size * 2).round(),
+      errorBuilder: (_, _, _) => SizedBox.square(
+        dimension: size,
+        child: const Icon(PhosphorIconsLight.image),
+      ),
+    ),
+  );
+
+  void _openFile(File file, int index) {
+    final resolvedIndex = index < 0 ? _imageFiles.indexOf(file) : index;
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        fullscreenDialog: true,
+        pageBuilder: (_, _, _) => ImageViewerScreen(
+          file: file,
+          imageFiles: _imageFiles,
+          initialIndex: resolvedIndex < 0 ? 0 : resolvedIndex,
+        ),
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        ),
+        transitionDuration: const Duration(milliseconds: 180),
+        reverseTransitionDuration: const Duration(milliseconds: 150),
       ),
     );
   }
@@ -1378,6 +1680,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       ctrlSelect: ctrlSelect,
                     );
                   },
+                  onSecondaryTapUp: (details) =>
+                      _showImageContextMenu(file, details.globalPosition),
                   onOpen: () {
                     Navigator.of(context, rootNavigator: true).push(
                       PageRouteBuilder(

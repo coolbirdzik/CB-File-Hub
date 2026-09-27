@@ -8,6 +8,7 @@ class Album {
   DateTime modifiedAt;
   String? colorTheme;
   bool isSystemAlbum;
+  bool isNsfw;
 
   Album({
     required this.name,
@@ -17,6 +18,7 @@ class Album {
     DateTime? modifiedAt,
     this.colorTheme,
     this.isSystemAlbum = false,
+    this.isNsfw = false,
   }) : createdAt = createdAt ?? DateTime.now(),
        modifiedAt = modifiedAt ?? DateTime.now();
 
@@ -32,6 +34,7 @@ class Album {
         map['modified_at'] as int? ?? 0,
       ),
       colorTheme: map['color_theme'] as String?,
+      isNsfw: (map['is_nsfw'] as int? ?? 0) == 1,
       isSystemAlbum: (map['is_system_album'] as int? ?? 0) == 1,
     )..id = map['id'] as int? ?? 0;
   }
@@ -45,6 +48,7 @@ class Album {
       'created_at': createdAt.millisecondsSinceEpoch,
       'modified_at': modifiedAt.millisecondsSinceEpoch,
       'color_theme': colorTheme,
+      'is_nsfw': isNsfw ? 1 : 0,
       'is_system_album': isSystemAlbum ? 1 : 0,
     };
   }
@@ -61,6 +65,7 @@ class Album {
     DateTime? modifiedAt,
     String? colorTheme,
     bool? isSystemAlbum,
+    bool? isNsfw,
   }) {
     return Album(
       name: name ?? this.name,
@@ -69,6 +74,7 @@ class Album {
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
       colorTheme: colorTheme ?? this.colorTheme,
+      isNsfw: isNsfw ?? this.isNsfw,
       isSystemAlbum: isSystemAlbum ?? this.isSystemAlbum,
     )..id = id;
   }
@@ -93,7 +99,8 @@ class Album {
         other.createdAt == createdAt &&
         other.modifiedAt == modifiedAt &&
         other.colorTheme == colorTheme &&
-        other.isSystemAlbum == isSystemAlbum;
+        other.isSystemAlbum == isSystemAlbum &&
+        other.isNsfw == isNsfw;
   }
 
   @override
@@ -107,6 +114,7 @@ class Album {
       modifiedAt,
       colorTheme,
       isSystemAlbum,
+      isNsfw,
     );
   }
 }

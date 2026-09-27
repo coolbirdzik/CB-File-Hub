@@ -91,11 +91,11 @@ class SystemScreenRouter {
       case '#tags':
         return TagManagementTab(tabId: tabId);
       case '#gallery':
-        return const GalleryHubScreen();
+        return GalleryHubScreen(tabId: tabId);
       case '#video':
         return VideoHubScreen(tabId: tabId);
       case '#albums':
-        return const AlbumManagementScreen();
+        return AlbumManagementScreen(tabId: tabId);
       case '#auto-rules':
         return const AutoRulesScreen();
       case '#trash':
@@ -139,7 +139,7 @@ class SystemScreenRouter {
     } else if (path.startsWith('#ai-chat')) {
       return _handleAiChatRoute(path, tabId);
     } else if (path.startsWith('#album/')) {
-      return _handleAlbumRoute(path);
+      return _handleAlbumRoute(path, tabId);
     } else if (path.startsWith('#video-library-settings/')) {
       return _handleVideoLibrarySettingsRoute(path, tabId);
     } else if (path.startsWith('#video-library/')) {
@@ -164,7 +164,7 @@ class SystemScreenRouter {
     );
   }
 
-  static Widget _handleAlbumRoute(String path) {
+  static Widget _handleAlbumRoute(String path, String tabId) {
     final albumIdStr = path.substring('#album/'.length);
     final albumId = int.tryParse(albumIdStr);
     if (albumId != null) {
@@ -175,13 +175,24 @@ class SystemScreenRouter {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasData && snapshot.data != null) {
-            return AlbumDetailScreen(album: snapshot.data!);
+            _syncTabName(context, tabId, snapshot.data!.name);
+            return AlbumDetailScreen(album: snapshot.data!, tabId: tabId);
           }
           return const Center(child: Text('Album not found'));
         },
       );
     }
     return const Center(child: Text('Invalid album ID'));
+  }
+
+  /// Names the tab after the loaded album or library. Back/forward and tab
+  /// restore only know the path, which would otherwise show the raw id.
+  static void _syncTabName(BuildContext context, String tabId, String name) {
+    final tabBloc = BlocProvider.of<TabManagerBloc>(context);
+    final tab = tabBloc.state.tabs.where((t) => t.id == tabId).firstOrNull;
+    if (tab != null && tab.name != name) {
+      tabBloc.add(UpdateTabName(tabId, name));
+    }
   }
 
   static Widget _handleImageRoute(
@@ -246,6 +257,7 @@ class SystemScreenRouter {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasData && snapshot.data != null) {
+            _syncTabName(context, tabId, snapshot.data!.name);
             return VideoLibraryFilesScreen(
               library: snapshot.data!,
               tabId: tabId,
@@ -269,6 +281,11 @@ class SystemScreenRouter {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasData && snapshot.data != null) {
+            _syncTabName(
+              context,
+              tabId,
+              '${snapshot.data!.name} — ${context.tr.videoLibrarySettings}',
+            );
             return VideoLibrarySettingsScreen(
               library: snapshot.data!,
               tabId: tabId,

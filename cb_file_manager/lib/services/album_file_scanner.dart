@@ -13,7 +13,69 @@ class AlbumFileScanner {
   AlbumFileScanner._();
 
   final Map<int, List<FileInfo>> _cachedFiles = {};
+  final Map<int, int> _cachedImageCounts = {};
   final Map<int, DateTime> _lastScanTime = {};
+
+  /// Counts every matching image in the configured source directories.
+  ///
+  /// [scanAlbumFiles] intentionally stops at [AlbumConfig.maxFileCount] so a
+  /// very large source cannot fill memory. That limit must not be presented as
+  /// the album's total, so the lightweight counter walks the complete source
+  /// without reading file metadata or retaining every path.
+  Future<int> countAlbumImages(Album album, AlbumConfig config) async {
+    final lastScan = _lastScanTime[album.id];
+    if (lastScan != null &&
+        DateTime.now().difference(lastScan).inMinutes < 5 &&
+        _cachedImageCounts.containsKey(album.id)) {
+      return _cachedImageCounts[album.id]!;
+    }
+
+    final extensions = config.fileExtensionsList
+        .map((extension) => extension.toLowerCase())
+        .toSet();
+    final excludePatterns = config.excludePatternsList
+        .where((pattern) => pattern.isNotEmpty)
+        .map((pattern) {
+          try {
+            return RegExp(pattern, caseSensitive: false);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<RegExp>()
+        .toList(growable: false);
+
+    var count = 0;
+    for (final dirPath in config.directoriesList) {
+      final directory = Directory(dirPath);
+      if (!await directory.exists()) continue;
+      try {
+        await for (final entity in directory.list(
+          recursive: config.includeSubdirectories,
+          followLinks: false,
+        )) {
+          if (entity is! File) continue;
+          final fileName = path.basename(entity.path);
+          final extension = path.extension(entity.path).toLowerCase();
+          if (!_isImageFile(extension)) continue;
+          if (extensions.isNotEmpty && !extensions.contains(extension)) {
+            continue;
+          }
+          if (excludePatterns.any((pattern) => pattern.hasMatch(fileName))) {
+            continue;
+          }
+          count++;
+        }
+      } on FileSystemException {
+        // A source may contain an inaccessible child. Match the main scanner's
+        // best-effort behavior and continue counting the remaining roots.
+      }
+    }
+
+    _cachedImageCounts[album.id] = count;
+    _lastScanTime[album.id] = DateTime.now();
+    return count;
+  }
 
   /// Scan album directories and return file list based on config
   Future<List<FileInfo>> scanAlbumFiles(Album album, AlbumConfig config) async {
@@ -263,12 +325,14 @@ class AlbumFileScanner {
   /// Clear cache for album
   void clearCache(int albumId) {
     _cachedFiles.remove(albumId);
+    _cachedImageCounts.remove(albumId);
     _lastScanTime.remove(albumId);
   }
 
   /// Clear all cache
   void clearAllCache() {
     _cachedFiles.clear();
+    _cachedImageCounts.clear();
     _lastScanTime.clear();
   }
 }

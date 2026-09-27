@@ -115,10 +115,15 @@ class _SearchBarState extends State<SearchBar> {
     if (oldWidget.initialQuery != widget.initialQuery &&
         widget.initialQuery != _searchController.text) {
       final query = widget.initialQuery ?? '';
+      // A controlled parent may rebuild with the just-emitted query. Sync the
+      // controller without emitting the same live-search callback during that
+      // build, which would call setState on the parent recursively.
+      _searchController.removeQueryListener(_onSearchChanged);
       _searchController.text = query;
       _searchController.selection = TextSelection.fromPosition(
         TextPosition(offset: query.length),
       );
+      _searchController.addQueryListener(_onSearchChanged);
     }
   }
 

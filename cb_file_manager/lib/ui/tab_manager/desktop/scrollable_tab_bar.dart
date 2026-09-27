@@ -1105,7 +1105,7 @@ class _ModernTabState extends State<_ModernTab>
                                               (0.08 * 255).round(),
                                             ))
                                     : Colors.transparent,
-                                shape: BoxShape.circle,
+                                borderRadius: CbRadii.smAll,
                               ),
                               child: Icon(
                                 PhosphorIconsLight.x,

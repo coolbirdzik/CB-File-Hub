@@ -523,48 +523,14 @@ class FileOperationsHandler {
               lastSelectedPath: file.path,
             )
           : currentSelection;
-      // Priority:
-      // 1) User-selected preferred external app for video (if set)
-      // 2) System default app when setting enabled
-      // 3) In-app player (default)
-      ExternalAppHelper.openWithPreferredVideoApp(file.path).then((
-        openedPreferred,
-      ) {
-        if (openedPreferred) return;
-
-        locator<UserPreferences>().getUseSystemDefaultForVideo().then((
-          useSystem,
-        ) {
-          if (useSystem) {
-            ExternalAppHelper.openWithSystemDefault(file.path).then((success) {
-              if (!success && context.mounted) {
-                RouteUtils.showAcrylicDialog(
-                  context: context,
-                  builder: (context) => OpenWithDialog(filePath: file.path),
-                );
-              }
-            });
-          } else {
-            if (context.mounted) {
-              unawaited(
-                VideoPlaybackLauncher.open(
-                  // ignore: use_build_context_synchronously
-                  context,
-                  file: file,
-                  onClosed: () {
-                    _tryRestoreSelectionAfterViewer(
-                      // ignore: use_build_context_synchronously
-                      context,
-                      snapshot: selectionSnapshot,
-                      selectionBloc: selectionBloc,
-                    );
-                  },
-                ),
-              );
-            }
-          }
-        });
-      });
+      unawaited(
+        _openVideoFile(
+          context: context,
+          file: file,
+          selectionSnapshot: selectionSnapshot,
+          selectionBloc: selectionBloc,
+        ),
+      );
     } else if (isImage) {
       // Get all image files in the same directory for gallery navigation
       List<File> imageFiles = [];
@@ -623,6 +589,53 @@ class FileOperationsHandler {
         }
       });
     }
+  }
+
+  /// Priority:
+  /// 1) User-selected preferred external app for video (if set)
+  /// 2) System default app when setting enabled
+  /// 3) In-app player (default)
+  static Future<void> _openVideoFile({
+    required BuildContext context,
+    required File file,
+    required SelectionState selectionSnapshot,
+    SelectionBloc? selectionBloc,
+  }) async {
+    final prefs = locator<UserPreferences>();
+    // The preference reads are independent SQLite round trips; issue them
+    // together so the player is not held back by three sequential queries.
+    final (openedPreferred, useSystem, inNewWindow) = await (
+      ExternalAppHelper.openWithPreferredVideoApp(file.path),
+      prefs.getUseSystemDefaultForVideo().catchError((_) => false),
+      prefs.getOpenVideoInNewWindow().catchError((_) => true),
+    ).wait;
+    if (openedPreferred) return;
+
+    if (useSystem) {
+      final success = await ExternalAppHelper.openWithSystemDefault(file.path);
+      if (!success && context.mounted) {
+        RouteUtils.showAcrylicDialog(
+          context: context,
+          builder: (context) => OpenWithDialog(filePath: file.path),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    await VideoPlaybackLauncher.open(
+      context,
+      file: file,
+      inNewWindow: inNewWindow,
+      onClosed: () {
+        _tryRestoreSelectionAfterViewer(
+          // ignore: use_build_context_synchronously
+          context,
+          snapshot: selectionSnapshot,
+          selectionBloc: selectionBloc,
+        );
+      },
+    );
   }
 
   static void _openArchiveWithSystemDefault(

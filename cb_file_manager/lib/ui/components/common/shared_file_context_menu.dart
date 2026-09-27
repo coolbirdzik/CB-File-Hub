@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_page_transitions.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
@@ -685,8 +686,8 @@ class _ContextMenuQuickActionsState extends State<_ContextMenuQuickActions> {
                         foregroundColor: action.isDestructive
                             ? Theme.of(context).colorScheme.error
                             : Theme.of(context).colorScheme.onSurface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: CbRadii.buttonAll,
                         ),
                       ),
                       child: Column(

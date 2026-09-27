@@ -1,3 +1,9 @@
+import 'package:cb_file_manager/services/media_library_updates.dart';
+import 'package:cb_file_manager/ui/components/common/file_view_shell.dart';
+import 'package:cb_file_manager/ui/screens/folder_list/folder_list_state.dart';
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -7,130 +13,201 @@ import 'package:cb_file_manager/ui/tab_manager/core/tab_paths.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
 import 'package:cb_file_manager/ui/widgets/drawer/cubit/drawer_cubit.dart';
-import 'dart:io';
+import 'package:cb_file_manager/services/home_content_service.dart';
 
-/// Simple home screen that doesn't scan file system to avoid performance issues
+import 'home_media_card.dart';
+
 class HomeScreen extends StatefulWidget {
   final String tabId;
+  final HomeContentService? contentService;
 
-  const HomeScreen({super.key, required this.tabId});
+  const HomeScreen({super.key, required this.tabId, this.contentService});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _slideController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entryController;
+  late final HomeContentService _content;
+  List<String> _recentPaths = const [];
+  HomeMediaPreviews _previews = const HomeMediaPreviews();
+  bool _loadingRecent = true;
+  bool _recentFailed = false;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _content = widget.contentService ?? HomeContentService();
+    MediaLibraryUpdates.revision.addListener(_onLibraryChanged);
+    _entryController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 460),
     );
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _entryController.value = 1;
+      } else {
+        _entryController.forward();
+      }
+      unawaited(_loadContent());
+    });
+  }
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
-    );
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
-        );
+  void _onLibraryChanged() {
+    if (mounted) unawaited(_loadContent());
+  }
 
-    _fadeController.forward();
-    _slideController.forward();
+  Future<void> _loadContent() async {
+    final generation = ++_loadGeneration;
+    setState(() {
+      _previews = const HomeMediaPreviews();
+      _loadingRecent = true;
+      _recentFailed = false;
+    });
+    var paths = <String>[];
+    try {
+      paths = await _content.loadRecentPaths();
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _recentPaths = paths;
+        _loadingRecent = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _loadingRecent = false;
+        _recentFailed = true;
+      });
+    }
+    try {
+      final previews = await _content.loadMediaPreviews(paths);
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() => _previews = previews);
+    } catch (_) {
+      // Library navigation remains available without previews.
+    }
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
+    MediaLibraryUpdates.revision.removeListener(_onLibraryChanged);
+    _entryController.dispose();
     super.dispose();
+  }
+
+  Widget _enter(int index, Widget child) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final animation = _entryController.drive(
+      CurveTween(
+        curve: Interval(
+          index * 0.10,
+          0.70 + index * 0.10,
+          curve: CbCurves.standard,
+        ),
+      ),
+    );
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: animation.drive(
+          Tween(begin: const Offset(0, 0.035), end: Offset.zero),
+        ),
+        child: child,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isLightMode = theme.brightness == Brightness.light;
-    final isDesktopPlatform =
-        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final localizations = AppLocalizations.of(context)!;
-    final size = MediaQuery.of(context).size;
-
-    const desktopUnifiedBackgroundColor = Colors.transparent;
-    final double desktopLightAlpha = isDesktopPlatform ? 0.42 : 1.0;
-    final backgroundGradientColors = isLightMode
-        ? <Color>[
-            cs.surfaceContainerLowest.withValues(alpha: desktopLightAlpha),
-            cs.surfaceContainerLow.withValues(alpha: desktopLightAlpha),
-            Color.alphaBlend(
-              cs.primary.withValues(alpha: 0.02),
-              cs.surfaceContainer.withValues(alpha: desktopLightAlpha),
-            ).withValues(alpha: desktopLightAlpha),
-          ]
-        : const <Color>[];
-    final darkBackgroundColor = isDesktopPlatform
-        ? cs.surface.withValues(alpha: 0.30)
-        : cs.surface;
-
-    return Scaffold(
-      backgroundColor: isDesktopPlatform
-          ? Colors.transparent
-          : (isLightMode
-                ? cs.surfaceContainerLowest
-                : theme.scaffoldBackgroundColor),
-      body: Container(
-        decoration: isDesktopPlatform
-            ? const BoxDecoration(color: desktopUnifiedBackgroundColor)
-            : (isLightMode
-                  ? BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: backgroundGradientColors,
-                      ),
-                    )
-                  : BoxDecoration(color: darkBackgroundColor)),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: size.width > 800 ? 48 : 20,
-                vertical: 32,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Welcome section
-                      _buildWelcomeSection(theme),
-                      const SizedBox(height: 40),
-
-                      // Quick actions
-                      _buildQuickActions(theme, localizations),
-                      const SizedBox(height: 40),
-
-                      // Pinned items
-                      _buildPinnedSection(theme, localizations),
-                      const SizedBox(height: 32),
-                    ],
+    final l10n = context.tr;
+    return BlocListener<TabManagerBloc, TabManagerState>(
+      listenWhen: (previous, current) =>
+          previous.activeTabId != current.activeTabId &&
+          current.activeTabId == widget.tabId,
+      listener: (_, _) => unawaited(_loadContent()),
+      child: FileViewShell(
+        viewMode: ViewMode.grid,
+        enableKeyboardShortcuts: false,
+        onMouseBack: () =>
+            context.read<TabManagerBloc>().backNavigationToPath(widget.tabId),
+        onMouseForward: () => context
+            .read<TabManagerBloc>()
+            .forwardNavigationToPath(widget.tabId),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth > 800 ? 40 : 20,
+                  vertical: 28,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1120),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _enter(0, _buildWelcomeSection(theme)),
+                        const SizedBox(height: 28),
+                        _enter(1, _buildRecentSection(theme)),
+                        const SizedBox(height: 28),
+                        _enter(
+                          2,
+                          LayoutBuilder(
+                            builder: (context, space) {
+                              final photos = HomeMediaCard(
+                                key: const ValueKey('home-photos'),
+                                title: l10n.imageGallery,
+                                subtitle: l10n.homePhotosSubtitle,
+                                previews: _previews.images,
+                                onPressed: _openImageGallery,
+                              );
+                              final videos = HomeMediaCard(
+                                key: const ValueKey('home-videos'),
+                                title: l10n.videoGallery,
+                                subtitle: l10n.homeVideosSubtitle,
+                                previews: [
+                                  if (_previews.videoCover != null)
+                                    _previews.videoCover!,
+                                ],
+                                video: true,
+                                onPressed: _openVideoGallery,
+                              );
+                              if (space.maxWidth < 620) {
+                                return Column(
+                                  children: [
+                                    photos,
+                                    const SizedBox(height: 16),
+                                    videos,
+                                  ],
+                                );
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(flex: 6, child: photos),
+                                  const SizedBox(width: 16),
+                                  Expanded(flex: 5, child: videos),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        _enter(3, _buildPinnedSection(theme, l10n)),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -138,319 +215,196 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildWelcomeSection(ThemeData theme) {
-    final cs = theme.colorScheme;
-    final isLightMode = theme.brightness == Brightness.light;
-    final isDesktopPlatform =
-        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final welcomeGradientColors = isLightMode
-        ? <Color>[
-            Color.alphaBlend(
-              cs.primary.withValues(alpha: 0.09),
-              cs.surfaceContainerHigh,
-            ).withValues(alpha: isDesktopPlatform ? 0.44 : 1.0),
-            Color.alphaBlend(
-              cs.primary.withValues(alpha: 0.05),
-              cs.surfaceContainer,
-            ).withValues(alpha: isDesktopPlatform ? 0.40 : 1.0),
-          ]
-        : const <Color>[];
-    final darkWelcomeColor = isDesktopPlatform
-        ? cs.surfaceContainerHigh.withValues(alpha: 0.52)
-        : cs.surfaceContainerHigh;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isLightMode ? null : darkWelcomeColor,
-        gradient: isLightMode
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: welcomeGradientColors,
-              )
-            : null,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(PhosphorIconsLight.house, color: cs.primary, size: 32),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.tr.welcomeTitle,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onPrimaryContainer,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      context.tr.welcomeSubtitle,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: cs.onPrimaryContainer.withValues(alpha: 0.7),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isLightMode
-                  ? cs.surfaceContainerHighest.withValues(
-                      alpha: isDesktopPlatform ? 0.44 : 0.75,
-                    )
-                  : cs.surface.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Icon(PhosphorIconsLight.lightbulb, color: cs.primary, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    context.tr.quickActionsTip,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface.withValues(alpha: 0.8),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(ThemeData theme, AppLocalizations localizations) {
+    final l10n = context.tr;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Text(
+          l10n.welcomeTitle,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          l10n.homeSubtitle,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
           children: [
-            Container(
-              width: 6,
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(3),
-              ),
+            CbButton(
+              label: l10n.browseFiles,
+              icon: PhosphorIconsLight.folderOpen,
+              onPressed: () => _navigateToPath(''),
+              size: CbButtonSize.lg,
+              variant: CbButtonVariant.primary,
             ),
-            const SizedBox(width: 16),
-            Text(
-              context.tr.quickActionsHome,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-              ),
+            CbButton(
+              label: l10n.newTabAction,
+              icon: PhosphorIconsLight.plus,
+              onPressed: _openNewTab,
+              size: CbButtonSize.lg,
             ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: CbDecorations.tint(
-                context,
-                theme.colorScheme.primary,
-                radius: 20,
-              ),
-              child: Text(
-                context.tr.startHere,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+            CbButton(
+              label: l10n.tagsAction,
+              icon: PhosphorIconsLight.tag,
+              onPressed: _openTagsTab,
+              size: CbButtonSize.lg,
             ),
           ],
-        ),
-        const SizedBox(height: 24),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            int crossAxis = 2;
-            double aspectRatio = 1.2;
-
-            if (constraints.maxWidth > 1200) {
-              crossAxis = 4;
-              aspectRatio = 1.2;
-            } else if (constraints.maxWidth > 900) {
-              crossAxis = 3;
-              aspectRatio = 1.2;
-            } else if (constraints.maxWidth > 600) {
-              crossAxis = 2;
-              aspectRatio = 1.1;
-            } else {
-              // Mobile screens - need more vertical space
-              crossAxis = 2;
-              aspectRatio = 0.95;
-            }
-
-            return GridView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxis,
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
-                childAspectRatio: aspectRatio,
-              ),
-              children: [
-                _buildActionCard(
-                  theme,
-                  context.tr.newTabAction,
-                  context.tr.newTabActionDesc,
-                  PhosphorIconsLight.plusCircle,
-                  [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7),
-                  ],
-                  () => _openNewTab(),
-                ),
-                _buildActionCard(
-                  theme,
-                  localizations.browseFiles,
-                  localizations.browseFilesDescription,
-                  PhosphorIconsLight.folder,
-                  [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7),
-                  ],
-                  () => _navigateToPath(''),
-                ),
-                _buildActionCard(
-                  theme,
-                  localizations.imageGallery,
-                  localizations.manageMediaDescription,
-                  PhosphorIconsLight.image,
-                  [
-                    theme.colorScheme.tertiary,
-                    theme.colorScheme.tertiary.withValues(alpha: 0.7),
-                  ],
-                  () => _openImageGallery(),
-                ),
-                _buildActionCard(
-                  theme,
-                  localizations.videoGallery,
-                  localizations.manageMediaDescription,
-                  PhosphorIconsLight.videoCamera,
-                  [
-                    theme.colorScheme.secondary,
-                    theme.colorScheme.secondary.withValues(alpha: 0.7),
-                  ],
-                  () => _openVideoGallery(),
-                ),
-                _buildActionCard(
-                  theme,
-                  context.tr.tagsAction,
-                  context.tr.tagsActionDesc,
-                  PhosphorIconsLight.tag,
-                  [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.7),
-                  ],
-                  () => _openTagsTab(),
-                ),
-              ],
-            );
-          },
         ),
       ],
     );
   }
 
-  Widget _buildActionCard(
-    ThemeData theme,
-    String title,
-    String description,
-    IconData icon,
-    List<Color> gradientColors,
-    VoidCallback onTap,
-  ) {
-    final isDesktopPlatform =
-        Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    final isLightMode = theme.brightness == Brightness.light;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Adjust padding and spacing for smaller screens
-        final isMobile = constraints.maxWidth < 200;
-        final cardPadding = isMobile ? 12.0 : 20.0;
-        final iconSize = isMobile ? 20.0 : 24.0;
-        final spacing = isMobile ? 8.0 : 12.0;
-
-        return Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: EdgeInsets.all(cardPadding),
-              decoration: BoxDecoration(
-                color: isLightMode
-                    ? theme.colorScheme.surface.withValues(
-                        alpha: isDesktopPlatform ? 0.46 : 1.0,
-                      )
-                    : theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+  Widget _buildRecentSection(ThemeData theme) {
+    final l10n = context.tr;
+    final cs = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.homeRecentFolders,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_loadingRecent)
+          Semantics(
+            label: l10n.loading,
+            child: Row(
+              children: [
+                for (var i = 0; i < 2; i++)
+                  Expanded(
+                    child: Container(
+                      height: 76,
+                      margin: EdgeInsets.only(right: i == 0 ? 12 : 0),
+                      decoration: BoxDecoration(
+                        color: cs.surface.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          )
+        else if (_recentFailed)
+          Wrap(
+            spacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                l10n.homeRecentUnavailable,
+                style: theme.textTheme.bodyMedium,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: iconSize + 4, color: gradientColors[0]),
-                  SizedBox(height: spacing),
-                  Flexible(
-                    child: Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: isMobile ? 13 : null,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Flexible(
-                    child: Text(
-                      description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                        fontSize: isMobile ? 11 : null,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+              CbButton(
+                label: l10n.retry,
+                onPressed: () => unawaited(_loadContent()),
+              ),
+            ],
+          )
+        else if (_recentPaths.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cs.surface.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              l10n.homeRecentEmpty,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
               ),
             ),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, space) {
+              final columns = space.maxWidth >= 900
+                  ? 3
+                  : (space.maxWidth >= 560 ? 2 : 1);
+              final width = (space.maxWidth - (columns - 1) * 12) / columns;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final path in _recentPaths)
+                    SizedBox(
+                      width: width,
+                      child: CbPressable(
+                        tooltip: path,
+                        onPressed: () => _navigateToPath(path),
+                        builder: (context, state) => AnimatedContainer(
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : CbDurations.fast,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: state.pressed
+                                ? cs.primary.withValues(alpha: 0.13)
+                                : (state.hovered
+                                      ? cs.primary.withValues(alpha: 0.08)
+                                      : cs.surface.withValues(alpha: 0.55)),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: state.focused
+                                  ? cs.primary
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                PhosphorIconsLight.folder,
+                                color: cs.primary,
+                                size: 26,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _getPinnedDisplayName(path),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      path,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
-        );
-      },
+      ],
     );
   }
 
@@ -479,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      "No pinned items yet",
+                      localizations.homePinnedEmpty,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
@@ -533,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         const SizedBox(width: 16),
         Text(
           localizations.pinnedSection,
-          style: theme.textTheme.headlineSmall?.copyWith(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
             letterSpacing: -0.3,
           ),
@@ -607,6 +561,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
                 IconButton(
+                  tooltip: context.tr.unpinFromSidebar,
                   icon: const Icon(PhosphorIconsLight.pushPinSlash, size: 20),
                   onPressed: () {
                     context.read<DrawerCubit>().togglePinnedPath(path);
@@ -643,7 +598,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return normalized;
     }
     if (normalized == '/') return '/';
-    final parts = normalized.split(Platform.pathSeparator);
+    final parts = normalized.split(RegExp(r'[/\\]'));
     return parts.where((part) => part.isNotEmpty).isNotEmpty
         ? parts.where((part) => part.isNotEmpty).last
         : normalized;
@@ -652,24 +607,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _openImageGallery() {
     // Navigate to Gallery Hub within the current tab to maintain navigation history
     final tabManager = context.read<TabManagerBloc>();
-    final activeTab = tabManager.state.activeTab;
+    final activeTab = tabManager.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
     if (activeTab != null) {
       TabNavigator.updateTabPath(context, activeTab.id, '#gallery');
-      tabManager.add(UpdateTabName(activeTab.id, 'Gallery Hub'));
+      tabManager.add(UpdateTabName(activeTab.id, context.tr.imageGallery));
     } else {
       // Fallback: create new tab if no active tab exists
-      tabManager.add(AddTab(path: '#gallery', name: 'Gallery Hub'));
+      tabManager.add(AddTab(path: '#gallery', name: context.tr.imageGallery));
     }
   }
 
   void _openVideoGallery() {
     final tabManager = context.read<TabManagerBloc>();
-    final activeTab = tabManager.state.activeTab;
+    final activeTab = tabManager.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
     if (activeTab != null) {
       TabNavigator.updateTabPath(context, activeTab.id, '#video');
-      tabManager.add(UpdateTabName(activeTab.id, 'Video Hub'));
+      tabManager.add(UpdateTabName(activeTab.id, context.tr.videoHubTitle));
     } else {
-      tabManager.add(AddTab(path: '#video', name: 'Video Hub'));
+      tabManager.add(AddTab(path: '#video', name: context.tr.videoHubTitle));
     }
   }
 
@@ -683,12 +642,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _navigateToPath(String path) async {
     final tabBloc = context.read<TabManagerBloc>();
-    final activeTab = tabBloc.state.activeTab;
+    final activeTab = tabBloc.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
 
     final targetPath = path.isEmpty ? kDrivesPath : path;
     final tabName = isDrivesPath(targetPath)
         ? context.tr.drivesTab
-        : targetPath.split('/').last;
+        : _getPinnedDisplayName(targetPath);
 
     if (!mounted) return;
 
@@ -704,15 +665,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _openTagsTab() {
     final tabBloc = context.read<TabManagerBloc>();
-    final activeTab = tabBloc.state.activeTab;
+    final activeTab = tabBloc.state.tabs
+        .where((tab) => tab.id == widget.tabId)
+        .firstOrNull;
 
     if (activeTab != null) {
       // Navigate within the current tab to maintain navigation history
       TabNavigator.updateTabPath(context, activeTab.id, '#tags');
-      tabBloc.add(UpdateTabName(activeTab.id, 'Tags'));
+      tabBloc.add(UpdateTabName(activeTab.id, context.tr.tagsAction));
     } else {
       // Fallback: create new tab if no active tab exists
-      tabBloc.add(AddTab(path: '#tags', name: 'Tags', switchToTab: true));
+      tabBloc.add(
+        AddTab(path: '#tags', name: context.tr.tagsAction, switchToTab: true),
+      );
     }
   }
 }

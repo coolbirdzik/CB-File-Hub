@@ -1,17 +1,28 @@
+import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/models/objectbox/album.dart';
+import 'package:cb_file_manager/models/objectbox/album_config.dart';
 import 'package:cb_file_manager/services/album_service.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/utils/route.dart';
 import 'package:cb_file_manager/services/smart_album_service.dart';
+import 'package:cb_file_manager/ui/screens/video_library/widgets/directory_list_widget.dart';
+import 'package:file_picker/file_picker.dart';
 
 class CreateAlbumDialog extends StatefulWidget {
   final Album? editingAlbum;
+  final bool sourceMode;
+  final Future<String?> Function()? directoryPicker;
 
-  const CreateAlbumDialog({super.key, this.editingAlbum});
+  const CreateAlbumDialog({
+    super.key,
+    this.editingAlbum,
+    this.sourceMode = false,
+    this.directoryPicker,
+  });
 
   @override
   State<CreateAlbumDialog> createState() => _CreateAlbumDialogState();
@@ -22,10 +33,13 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final AlbumService _albumService = AlbumService.instance;
+  final List<String> _selectedDirectories = [];
 
   String? _selectedColor;
   bool _isLoading = false;
+  bool _includeSubdirectories = true;
   bool _isSmartAlbum = false;
+  bool _isNsfw = false;
 
   // Predefined color options
   final List<String> _colorOptions = [
@@ -54,8 +68,35 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       _nameController.text = widget.editingAlbum!.name;
       _descriptionController.text = widget.editingAlbum!.description ?? '';
       _selectedColor = widget.editingAlbum!.colorTheme;
+      _isNsfw = widget.editingAlbum!.isNsfw;
     }
-    _loadSmartFlag();
+    if (widget.sourceMode) {
+      _loadSourceConfig();
+    } else {
+      _loadSmartFlag();
+    }
+  }
+
+  Future<void> _loadSourceConfig() async {
+    final album = widget.editingAlbum;
+    if (album == null) return;
+    final config = await _albumService.getAlbumConfig(album.id);
+    if (!mounted || config == null) return;
+    setState(() {
+      _selectedDirectories
+        ..clear()
+        ..addAll(config.directoriesList);
+      _includeSubdirectories = config.includeSubdirectories;
+    });
+  }
+
+  Future<void> _pickDirectory() async {
+    final directory =
+        await (widget.directoryPicker?.call() ?? FilePicker.getDirectoryPath());
+    if (!mounted || directory == null || directory.isEmpty) return;
+    if (!_selectedDirectories.contains(directory)) {
+      setState(() => _selectedDirectories.add(directory));
+    }
   }
 
   Future<void> _loadSmartFlag() async {
@@ -97,11 +138,23 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
               ? null
               : _descriptionController.text.trim(),
           colorTheme: _selectedColor,
+          isNsfw: _isNsfw,
         );
 
         final success = await _albumService.updateAlbum(updatedAlbum);
         if (success) {
           result = updatedAlbum;
+          if (widget.sourceMode) {
+            final existing = await _albumService.getAlbumConfig(result.id);
+            final config = (existing ?? AlbumConfig(albumId: result.id))
+                .copyWith(
+                  includeSubdirectories: _includeSubdirectories,
+                  fileExtensions: _imageExtensions,
+                  directories: _selectedDirectories.join(','),
+                );
+            await _albumService.updateAlbumConfig(config);
+            await _albumService.refreshAlbum(result.id);
+          }
         }
       } else {
         // Create new album
@@ -111,17 +164,28 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
               ? null
               : _descriptionController.text.trim(),
           colorTheme: _selectedColor,
+          isNsfw: _isNsfw,
+          directories: widget.sourceMode ? _selectedDirectories : null,
+          config: widget.sourceMode
+              ? AlbumConfig(
+                  albumId: 0,
+                  includeSubdirectories: _includeSubdirectories,
+                  fileExtensions: _imageExtensions,
+                )
+              : null,
         );
       }
 
       if (result != null) {
         // Persist smart flag mapping
-        try {
-          await SmartAlbumService.instance.setSmartAlbum(
-            result.id,
-            _isSmartAlbum,
-          );
-        } catch (_) {}
+        if (!widget.sourceMode) {
+          try {
+            await SmartAlbumService.instance.setSmartAlbum(
+              result.id,
+              _isSmartAlbum,
+            );
+          } catch (_) {}
+        }
         if (mounted) {
           Navigator.of(context).pop(result);
         }
@@ -148,6 +212,8 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
       }
     }
   }
+
+  static const _imageExtensions = '.jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff,.tif';
 
   Widget _buildColorPicker() {
     return Column(
@@ -202,65 +268,116 @@ class _CreateAlbumDialogState extends State<CreateAlbumDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Text(
-        widget.editingAlbum != null ? 'Edit Album' : 'Create New Album',
+        widget.sourceMode
+            ? (widget.editingAlbum != null
+                  ? l10n.editImageSource
+                  : l10n.createImageSource)
+            : (widget.editingAlbum != null ? 'Edit Album' : 'Create New Album'),
       ),
       content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Album Name *',
-                  hintText: 'Enter album name',
+        child: SizedBox(
+          width: 500,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Album Name *',
+                    hintText: 'Enter album name',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Album name is required';
+                    }
+                    if (value.trim().length > 50) {
+                      return 'Album name must be 50 characters or less';
+                    }
+                    return null;
+                  },
+                  maxLength: 50,
+                  textCapitalization: TextCapitalization.words,
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Album name is required';
-                  }
-                  if (value.trim().length > 50) {
-                    return 'Album name must be 50 characters or less';
-                  }
-                  return null;
-                },
-                maxLength: 50,
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (Optional)',
-                  hintText: 'Enter album description',
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (Optional)',
+                    hintText: 'Enter album description',
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                  validator: (value) {
+                    if (value != null && value.trim().length > 200) {
+                      return 'Description must be 200 characters or less';
+                    }
+                    return null;
+                  },
                 ),
-                maxLines: 3,
-                maxLength: 200,
-                validator: (value) {
-                  if (value != null && value.trim().length > 200) {
-                    return 'Description must be 200 characters or less';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildColorPicker(),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Dynamic (Smart) Album'),
-                subtitle: const Text(
-                  'Content is defined by Auto Rules. No files are stored explicitly.',
+                const SizedBox(height: 20),
+                GalleryNsfwToggle(
+                  value: _isNsfw,
+                  onChanged: _isLoading
+                      ? null
+                      : (value) => setState(() => _isNsfw = value),
                 ),
-                value: _isSmartAlbum,
-                onChanged: (val) {
-                  setState(() => _isSmartAlbum = val);
-                },
-              ),
-            ],
+                _buildColorPicker(),
+                const SizedBox(height: 16),
+                if (widget.sourceMode) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        l10n.imageSources,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('add-image-source-directory'),
+                        onPressed: _isLoading ? null : _pickDirectory,
+                        icon: const Icon(PhosphorIconsLight.plus),
+                        label: Text(l10n.addImageSource),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DirectoryListWidget(
+                    directories: _selectedDirectories,
+                    onRemove: (directory) =>
+                        setState(() => _selectedDirectories.remove(directory)),
+                    emptyMessage: l10n.noImageSources,
+                    removeTooltip: l10n.removeImageSource,
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    value: _includeSubdirectories,
+                    onChanged: _isLoading
+                        ? null
+                        : (value) => setState(
+                            () => _includeSubdirectories = value ?? true,
+                          ),
+                    title: Text(l10n.includeSubdirectories),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ] else
+                  SwitchListTile(
+                    title: const Text('Dynamic (Smart) Album'),
+                    subtitle: const Text(
+                      'Content is defined by Auto Rules. No files are stored explicitly.',
+                    ),
+                    value: _isSmartAlbum,
+                    onChanged: (val) {
+                      setState(() => _isSmartAlbum = val);
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
       ),

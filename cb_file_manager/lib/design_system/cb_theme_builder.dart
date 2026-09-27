@@ -118,10 +118,13 @@ class CbThemeBuilder {
       ),
 
       // ─── Buttons ─────────────────────────────────────────────────────────
-      // Mirrors CbButton: 32px tall, 5px radius, label type, no elevation,
-      // no outline. `OutlinedButton` keeps its name but renders as the
-      // tonal secondary button — the outline was the only thing separating
-      // it from a text button, and a fill does that job without a border.
+      // Mirrors CbButton: 32px tall, softly rounded (CbRadii.button), label
+      // type, no elevation, no outline. Every button — filled, tonal, text,
+      // icon-only — is a square with a 10px corner, not a pill; the radius
+      // is the one thing that says "button" since the fill alone doesn't.
+      // `OutlinedButton` keeps its name but renders as the tonal secondary
+      // button — the outline was the only thing separating it from a text
+      // button, and a fill does that job without a border.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: _filledStyle(c, c.accent, isDark),
       ),
@@ -157,7 +160,7 @@ class CbThemeBuilder {
           }),
           overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           shape: const WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: CbRadii.smAll),
+            RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
           ),
           padding: const WidgetStatePropertyAll(EdgeInsets.all(CbSpacing.xs)),
         ),
@@ -170,6 +173,8 @@ class CbThemeBuilder {
         hoverElevation: 0,
         focusElevation: 0,
         highlightElevation: 0,
+        // Larger than a normal button, so it takes the next radius step up
+        // rather than looking under-rounded at its size.
         shape: const RoundedRectangleBorder(borderRadius: CbRadii.lgAll),
       ),
 
@@ -241,7 +246,7 @@ class CbThemeBuilder {
           }),
           overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           shape: const WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: CbRadii.smAll),
+            RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
           ),
         ),
       ),
@@ -437,7 +442,7 @@ class CbThemeBuilder {
         borderColor: Colors.transparent,
         selectedBorderColor: Colors.transparent,
         disabledBorderColor: Colors.transparent,
-        borderRadius: CbRadii.smAll,
+        borderRadius: CbRadii.buttonAll,
         borderWidth: 0,
       ),
 
@@ -599,7 +604,7 @@ class CbThemeBuilder {
       splashFactory: NoSplash.splashFactory,
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       shape: const WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: CbRadii.smAll),
+        RoundedRectangleBorder(borderRadius: CbRadii.buttonAll),
       ),
       side: const WidgetStatePropertyAll(BorderSide.none),
       foregroundColor: WidgetStateProperty.resolveWith((states) {

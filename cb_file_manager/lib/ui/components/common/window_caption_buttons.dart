@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -177,12 +178,14 @@ class _CaptionButtonState extends State<_CaptionButton> {
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
             hoverColor: Colors.transparent,
-            borderRadius: BorderRadius.circular(16.0),
+            // Icon-only button: the standard soft-rounded-rect radius,
+            // matching the Container's decoration below.
+            borderRadius: CbRadii.buttonAll,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: _isHovered ? hoverBg : idleBg,
-                borderRadius: BorderRadius.circular(16.0),
+                borderRadius: CbRadii.buttonAll,
               ),
               child: Icon(
                 _dynamicIcon ?? widget.icon,

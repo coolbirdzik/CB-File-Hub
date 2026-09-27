@@ -982,20 +982,30 @@ class UserPreferences {
     return ViewMode.values[resolvedIndex];
   }
 
-  /// Scoped preference for collections that support only Grid and List.
-  Future<ViewMode> getGridListCollectionMode(String collectionId) async {
+  /// Scoped preference for browser-like collections.
+  Future<ViewMode> getGridListCollectionMode(
+    String collectionId, {
+    Set<ViewMode> supportedModes = const {ViewMode.grid, ViewMode.list},
+  }) async {
     final value = await _getPreference<String>('collection_view_$collectionId');
-    return value == ViewMode.list.name ? ViewMode.list : ViewMode.grid;
+    ViewMode? restored;
+    for (final mode in ViewMode.values) {
+      if (mode.name == value) {
+        restored = mode;
+        break;
+      }
+    }
+    if (restored != null && supportedModes.contains(restored)) return restored;
+    return supportedModes.contains(ViewMode.grid)
+        ? ViewMode.grid
+        : supportedModes.first;
   }
 
   Future<void> setGridListCollectionMode(
     String collectionId,
     ViewMode mode,
   ) async {
-    await _savePreference<String>(
-      'collection_view_$collectionId',
-      mode == ViewMode.list ? ViewMode.list.name : ViewMode.grid.name,
-    );
+    await _savePreference<String>('collection_view_$collectionId', mode.name);
   }
 
   Future<bool> setNetworkBrowserViewMode(ViewMode viewMode) async {
@@ -1742,4 +1752,27 @@ class UserPreferences {
   Future<bool> setPreviewPaneWidth(double width) async {
     return await _savePreference<double>(_previewPaneWidthKey, width);
   }
+
+  Future<bool> getPropertiesPaneVisible() async =>
+      await _getPreference<bool>(
+        'properties_pane_visible',
+        defaultValue: false,
+      ) ??
+      false;
+
+  Future<bool> setPropertiesPaneVisible(bool visible) =>
+      _savePreference<bool>('properties_pane_visible', visible);
+
+  Future<double> getPropertiesPaneHeight() async {
+    final height =
+        await _getPreference<double>(
+          'properties_pane_height',
+          defaultValue: 260,
+        ) ??
+        260;
+    return height.isFinite && height >= 100 ? height : 260;
+  }
+
+  Future<bool> setPropertiesPaneHeight(double height) =>
+      _savePreference<double>('properties_pane_height', height);
 }

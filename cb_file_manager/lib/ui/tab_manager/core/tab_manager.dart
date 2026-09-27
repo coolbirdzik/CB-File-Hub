@@ -622,6 +622,15 @@ class TabManagerBloc extends Bloc<TabEvent, TabManagerState> {
       switch (path) {
         case '#video':
           return l10n?.videoHubTitle ?? 'Video Hub';
+        case '#gallery':
+          return l10n?.imageGallery ?? 'Image Gallery';
+        case '#albums':
+          return l10n?.albums ?? 'Albums';
+      }
+      // The album/library screen renames the tab once its name has loaded.
+      if (path.startsWith('#album/')) return l10n?.albums ?? 'Albums';
+      if (path.startsWith('#video-library')) {
+        return l10n?.videoLibrary ?? 'Video Library';
       }
     }
     final tag = UriUtils.extractTagFromSearchPath(path);

@@ -387,7 +387,10 @@ class _ModelSelectorButtonState extends State<ModelSelectorButton> {
               ),
               decoration: BoxDecoration(
                 color: background,
-                borderRadius: BorderRadius.circular(widget.compact ? 999 : 8),
+                // A dropdown trigger with a label — the same soft rounded
+                // rect as every other button, in both compact and full size
+                // (compact mode used to be a pill; unified for consistency).
+                borderRadius: CbRadii.buttonAll,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

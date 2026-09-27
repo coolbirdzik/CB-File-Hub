@@ -15,6 +15,27 @@ CREATE TABLE file_tags (
 );
 ```
 
+## Desktop Properties and Tags Panel
+
+Use **Show properties and tags** (the tag icon in the folder toolbar)
+to open the panel below the file list. Drag its top edge to resize it, or use
+the collapse button to return the space to the list. Visibility and height are
+remembered; the first open uses 260 px, capped at half the available content
+height. Each tab or split pane follows its own selection.
+
+The panel shows file properties alongside an inline tag editor. On narrow
+panes, the sections stack vertically. Multiple selections show aggregate
+properties and each tag's coverage (`n/N` selected files). Click a partially
+assigned tag to apply it to the remaining files; its remove button removes it
+from every selected file. Folders contribute to properties only.
+
+Tag edits save immediately. Enter a new tag, choose an autocomplete suggestion,
+use recent/popular tags, or expand the tag browser. The existing `parent:child`
+syntax assigns the child tags and creates their hierarchy. Unsubmitted text is
+discarded when selecting different files. Failed writes expose a retry action
+for only the failed files, even after the selection changes. Renaming, coloring,
+and deleting tags globally remain in the tag management screen.
+
 ## Database Location
 
 - **Windows**: `C:\Users\<username>\Documents\CBFileHub_v2\cb_file_hub.sqlite`

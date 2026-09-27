@@ -1,3 +1,4 @@
+import 'media_library_updates.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -85,6 +86,7 @@ class SmartAlbumService {
     final path = await _getFilePath();
     final f = File(path);
     await f.writeAsString(jsonEncode(data));
+    MediaLibraryUpdates.notifyChanged();
   }
 
   Future<List<int>> getSmartAlbumIds() async {

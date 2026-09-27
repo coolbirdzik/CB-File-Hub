@@ -559,17 +559,21 @@ class _TagManagementSectionState extends State<TagManagementSection> {
 class PopularTagsWidget extends StatelessWidget {
   final Function(String) onTagSelected;
   final int limit;
+  final Future<Map<String, int>> Function(int limit)? loadPopularTags;
 
   const PopularTagsWidget({
     super.key,
     required this.onTagSelected,
     this.limit = 20,
+    this.loadPopularTags,
   });
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, int>>(
-      future: TagManager.instance.getPopularTags(limit: limit),
+      future:
+          loadPopularTags?.call(limit) ??
+          TagManager.instance.getPopularTags(limit: limit),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();

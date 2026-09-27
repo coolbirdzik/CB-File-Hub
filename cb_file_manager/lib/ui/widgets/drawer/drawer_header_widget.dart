@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/config/translation_helper.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 
 /// Top of the drawer: clears the status bar and, on wide screens, holds the
 /// pin toggle.
@@ -39,8 +40,8 @@ class DrawerHeaderWidget extends StatelessWidget {
             backgroundColor: cs.onSurface.withValues(
               alpha: isPinned ? 0.05 : 0.06,
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+            shape: const RoundedRectangleBorder(
+              borderRadius: CbRadii.buttonAll,
             ),
           ),
           onPressed: () {

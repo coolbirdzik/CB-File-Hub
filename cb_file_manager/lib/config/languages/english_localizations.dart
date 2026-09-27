@@ -2,6 +2,30 @@ import 'app_localizations.dart';
 
 class EnglishLocalizations implements AppLocalizations {
   @override
+  String get galleryNsfwLabel => 'NSFW content';
+  @override
+  String get galleryNsfwDescription =>
+      'Keep this collection’s images and video previews off Home.';
+
+  @override
+  String get homeSubtitle => 'Your folders, photos and videos, close at hand.';
+  @override
+  String get homeRecentFolders => 'Pick up where you left off';
+  @override
+  String get homeRecentEmpty =>
+      'Folders you visit will appear here. Open a folder to get started.';
+  @override
+  String get homeRecentUnavailable => 'Recent folders could not be loaded.';
+  @override
+  String get homePhotosSubtitle =>
+      'A little inspiration from your photo collection.';
+  @override
+  String get homeVideosSubtitle => 'Your video collection, ready to explore.';
+  @override
+  String get homePinnedEmpty =>
+      'Pin your favorite folders from the file browser for quick access.';
+
+  @override
   String get sshDisplayName => 'Name';
   @override
   String get sshRequired => 'This field is required.';
@@ -313,6 +337,24 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get defaultViewModeDescription =>
       'Used for folders without their own saved view mode';
+
+  @override
+  String get propertiesAndTags => 'Properties & tags';
+  @override
+  String get showPropertiesPane => 'Show properties and tags';
+  @override
+  String get hidePropertiesPane => 'Collapse properties and tags';
+  @override
+  String get propertiesSelectFile =>
+      'Select a file to view its properties and tags.';
+  @override
+  String get propertiesFilesOnly => 'Tags apply only to selected files.';
+  @override
+  String get propertiesTagFailure => 'Some files could not be updated';
+  @override
+  String get propertiesResize => 'Resize properties panel';
+  @override
+  String get propertiesTagHint => 'Tag name or parent:child';
 
   @override
   String get previewPaneTitle => 'Preview';
@@ -3088,6 +3130,24 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get noVideoSources => 'No video sources added yet';
+
+  @override
+  String get createImageSource => 'Create Image Source';
+
+  @override
+  String get editImageSource => 'Edit Image Source';
+
+  @override
+  String get addImageSource => 'Add Image Source';
+
+  @override
+  String get removeImageSource => 'Remove Source';
+
+  @override
+  String get imageSources => 'Image Sources';
+
+  @override
+  String get noImageSources => 'No image sources added yet';
 
   @override
   String get filterByTags => 'Filter by Tags';

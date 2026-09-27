@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -263,7 +264,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   final AppStorageAnalyzer _appStorageAnalyzer = const AppStorageAnalyzer();
 
   OutlinedBorder get _cleanerButtonShape =>
-      ChipTheme.of(context).shape ?? const StadiumBorder();
+      const RoundedRectangleBorder(borderRadius: CbRadii.buttonAll);
 
   _Phase _phase = _Phase.setup;
 
@@ -350,7 +351,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   _TreePreset _activePreset = _TreePreset.none;
 
   /// Memoised [_matchesPresetSubtree] results for the current (root, preset).
-  final Map<DiskTreeNode, bool> _presetMatchCache = <DiskTreeNode, bool>{};
+  ///
+  /// Only directories are stored — a leaf is answered directly — which keeps
+  /// the map a fraction of the tree size on file-heavy drives.
+  final Map<DiskTreeNode, bool> _presetMatchCache =
+      HashMap<DiskTreeNode, bool>.identity();
 
   static const int _largeFileThresholdBytes = 1024 * 1024 * 1024;
   static const int _installerThresholdBytes = 50 * 1024 * 1024;
@@ -381,7 +386,35 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   StreamSubscription<CleanerAppInsightsState>? _appInsightsStateSub;
   AppStorageReport? _appStorageReport;
   FullDiskScanResult? _lastDiskScanResult;
-  List<CleanerFolderGrowth> _recentFolderGrowth = const <CleanerFolderGrowth>[];
+  List<CleanerFolderGrowth> _recentFolderGrowthList =
+      const <CleanerFolderGrowth>[];
+
+  /// Normalised growth path → entry, so tree rows look up their badge in O(1).
+  final Map<String, CleanerFolderGrowth> _growthByPath =
+      <String, CleanerFolderGrowth>{};
+
+  /// Normalised growth paths plus every ancestor of them — the folders the
+  /// growth filter keeps visible.
+  final Set<String> _growthVisiblePaths = <String>{};
+
+  List<CleanerFolderGrowth> get _recentFolderGrowth => _recentFolderGrowthList;
+
+  set _recentFolderGrowth(List<CleanerFolderGrowth> folders) {
+    _recentFolderGrowthList = folders;
+    _growthByPath.clear();
+    _growthVisiblePaths.clear();
+    for (final growth in folders) {
+      final path = AppStorageAnalyzer.normalizeWindowsPath(growth.path);
+      _growthByPath.putIfAbsent(path, () => growth);
+      _growthVisiblePaths.add(path);
+      for (var i = 1; i < path.length; i++) {
+        if (path.codeUnitAt(i) == 0x5C) {
+          _growthVisiblePaths.add(path.substring(0, i));
+        }
+      }
+    }
+  }
+
   FullDiskScanResult? _appInsightsScanResult;
   bool _isScanningAppInsights = false;
   final ValueNotifier<FullDiskScanProgress?> _appInsightsProgressListenable =
@@ -1680,6 +1713,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   /// Results are memoised per (root, preset); [_invalidatePresetCache] clears
   /// the cache whenever either changes.
   bool _matchesPresetSubtree(DiskTreeNode node) {
+    if (node.children.isEmpty) return _matchesPresetDirectly(node);
     final cached = _presetMatchCache[node];
     if (cached != null) return cached;
     var matches = _matchesPresetDirectly(node);
@@ -1698,6 +1732,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   void _invalidatePresetCache() => _presetMatchCache.clear();
 
   void _setTreePreset(_TreePreset preset) {
+    if (preset == _activePreset) return;
     setState(() {
       _activePreset = preset;
       if (preset != _TreePreset.none) {
@@ -1705,13 +1740,12 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         _showGrowthOnly = false;
       }
       _invalidatePresetCache();
+      final root = _rootNode;
+      if (preset != _TreePreset.none && root != null) {
+        _expandPresetAncestors(root, 0);
+      }
       _flatRowsValid = false;
     });
-    final root = _rootNode;
-    if (preset != _TreePreset.none && root != null) {
-      _expandPresetAncestors(root, 0);
-      setState(() => _flatRowsValid = false);
-    }
   }
 
   /// Opens the branches leading to matches so the user sees results without
@@ -1740,25 +1774,17 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   }
 
   CleanerFolderGrowth? _growthForNode(DiskTreeNode node) {
-    final nodePath = AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
-    for (final growth in _recentFolderGrowth) {
-      if (AppStorageAnalyzer.normalizeWindowsPath(growth.path) == nodePath) {
-        return growth;
-      }
-    }
-    return null;
+    if (_growthByPath.isEmpty || node.isFile) return null;
+    return _growthByPath[AppStorageAnalyzer.normalizeWindowsPath(
+      node.fullPath,
+    )];
   }
 
   bool _isGrowthNodeOrAncestor(DiskTreeNode node) {
-    if (node.isFile) return false;
-    final nodePath = AppStorageAnalyzer.normalizeWindowsPath(node.fullPath);
-    for (final growth in _recentFolderGrowth) {
-      final growthPath = AppStorageAnalyzer.normalizeWindowsPath(growth.path);
-      if (growthPath == nodePath || growthPath.startsWith('$nodePath\\')) {
-        return true;
-      }
-    }
-    return false;
+    if (node.isFile || _growthVisiblePaths.isEmpty) return false;
+    return _growthVisiblePaths.contains(
+      AppStorageAnalyzer.normalizeWindowsPath(node.fullPath),
+    );
   }
 
   void _expandGrowthAncestors(DiskTreeNode node) {
@@ -3308,9 +3334,11 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
   ) {
     // Re-flatten only when cache is invalid or the root object changed.
     if (!_flatRowsValid || _cachedFlatRows == null || _cachedFlatRoot != root) {
-      // Every tree mutation invalidates the flat rows, so this is also the
-      // one place that has to drop memoised preset matches.
-      _invalidatePresetCache();
+      // Tree mutations reset [_cachedFlatRoot] (or swap the root), which is
+      // what stales preset matches. Expand/collapse, selection and filter
+      // toggles only re-flatten, so they keep the memoised matches instead
+      // of re-walking the whole disk tree on every click.
+      if (_cachedFlatRoot != root) _invalidatePresetCache();
       final rows = <_FlatRow>[];
       void flatten(DiskTreeNode node, int depth, int parentSize) {
         if (!_passesTreeFilter(node)) return;
@@ -5943,6 +5971,7 @@ class _CbAgentCleanerScreenState extends State<CbAgentCleanerScreen> {
         if (_selectedNode?.fullPath == node.fullPath) {
           _selectedNode = node;
         }
+        _cachedFlatRoot = null;
         _flatRowsValid = false;
       });
       _replaceTreeTargets(DiskTreeSelection.collectDeletionTargets(root));

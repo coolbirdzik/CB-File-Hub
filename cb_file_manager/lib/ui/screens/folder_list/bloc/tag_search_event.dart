@@ -136,3 +136,9 @@ class TagSearchRemovePaths extends TagSearchEvent {
   @override
   List<Object> get props => [paths];
 }
+
+/// Re-evaluate an active search after an inline edit, preserving its content
+/// while querying and without resetting the file-list scroll position.
+class TagSearchRefreshAfterEdit extends TagSearchEvent {
+  const TagSearchRefreshAfterEdit();
+}

@@ -1,4 +1,6 @@
+import 'package:cb_file_manager/ui/widgets/gallery_nsfw_toggle.dart';
 import 'package:cb_file_manager/design_system/primitives/cb_tooltip.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -118,6 +120,20 @@ class _VideoLibrarySettingsScreenState
     }
   }
 
+  Future<void> _setNsfw(bool value) async {
+    final updated = _library.copyWith(isNsfw: value);
+    final success = await _service.updateLibrary(updated);
+    if (!mounted) return;
+    if (success) {
+      setState(() => _library = updated);
+    } else {
+      VideoLibraryHelpers.showErrorMessage(
+        context,
+        AppLocalizations.of(context)!.operationFailed,
+      );
+    }
+  }
+
   Future<void> _toggleSubdirectories(bool value) async {
     if (_config == null) return;
 
@@ -183,6 +199,7 @@ class _VideoLibrarySettingsScreenState
       modifiedAt: _library.modifiedAt,
       colorTheme: _library.colorTheme,
       isSystemLibrary: _library.isSystemLibrary,
+      isNsfw: _library.isNsfw,
     )..id = _library.id;
   }
 
@@ -600,6 +617,10 @@ class _VideoLibrarySettingsScreenState
       icon: PhosphorIconsLight.gear,
       title: localizations.settings,
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GalleryNsfwToggle(value: _library.isNsfw, onChanged: _setNsfw),
+        ),
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           value: _config!.includeSubdirectories,
@@ -685,11 +706,9 @@ class _VideoLibrarySettingsScreenState
     return SizedBox(
       height: 52,
       child: FilledButton.icon(
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
+        // No shape override: the theme's filled-button style already draws
+        // the soft rounded rect this button should have (this used to force
+        // its own 14px radius).
         onPressed: _isScanning ? null : _rescanLibrary,
         icon: _isScanning
             ? const SizedBox(
@@ -784,7 +803,7 @@ class _CoverBadge extends StatelessWidget {
   }
 }
 
-/// Translucent circular icon button overlaid on the cover image.
+/// Translucent icon button overlaid on the cover image.
 class _CoverIconButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
@@ -798,12 +817,17 @@ class _CoverIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tiny (~29px) icon button: CbRadii.md, not the full CbRadii.button —
+    // the larger radius would read as almost round at this size.
+    const shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(CbRadii.md)),
+    );
     return Material(
       color: Colors.black.withValues(alpha: 0.5),
-      shape: const CircleBorder(),
+      shape: shape,
       child: InkWell(
         onTap: onTap,
-        customBorder: const CircleBorder(),
+        customBorder: shape,
         child: CbTooltip(
           message: tooltip,
           child: Padding(

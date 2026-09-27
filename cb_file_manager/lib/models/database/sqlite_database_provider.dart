@@ -91,7 +91,7 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     return databaseFactory.openDatabase(
       databasePath,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         onConfigure: (db) async {
           await _configureDatabase(db);
         },
@@ -201,7 +201,8 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         created_at INTEGER NOT NULL,
         modified_at INTEGER NOT NULL,
         color_theme TEXT,
-        is_system_album INTEGER NOT NULL DEFAULT 0
+        is_system_album INTEGER NOT NULL DEFAULT 0,
+        is_nsfw INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -250,7 +251,8 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
         created_at INTEGER NOT NULL,
         modified_at INTEGER NOT NULL,
         color_theme TEXT,
-        is_system_library INTEGER NOT NULL DEFAULT 0
+        is_system_library INTEGER NOT NULL DEFAULT 0,
+        is_nsfw INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -368,6 +370,15 @@ class SqliteDatabaseProvider implements IDatabaseProvider {
     int oldVersion,
     int newVersion,
   ) async {
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE albums ADD COLUMN is_nsfw INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE video_libraries ADD COLUMN is_nsfw INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+
     if (oldVersion < 2) {
       // v2: tag_metadata (thumbnails) and tag_hierarchy (parent-child)
       // Drop first in case partially-created tables exist from development.

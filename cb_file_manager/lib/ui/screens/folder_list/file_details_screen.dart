@@ -1,3 +1,5 @@
+import 'package:cb_file_manager/ui/widgets/file_properties_details.dart';
+import 'package:cb_file_manager/design_system/tokens/cb_geometry_tokens.dart';
 import 'dart:io';
 
 import 'package:cb_file_manager/helpers/core/io_extensions.dart';
@@ -11,7 +13,6 @@ import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/components/common/app_toast.dart';
-import '../../utils/format_utils.dart';
 import '../../utils/route.dart';
 
 class FileDetailsScreen extends StatefulWidget {
@@ -463,7 +464,9 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
                   AppToast.error(context, localizations.operationFailed);
                 },
                 style: ElevatedButton.styleFrom(
-                  shape: const CircleBorder(),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: CbRadii.buttonAll,
+                  ),
                   padding: const EdgeInsets.all(20),
                   backgroundColor: theme.colorScheme.tertiary,
                 ),
@@ -485,122 +488,11 @@ class _FileDetailsScreenState extends State<FileDetailsScreen> {
     );
   }
 
-  Widget _buildFileDetails(Color textColor, Color secondaryTextColor) {
-    final localizations = AppLocalizations.of(context)!;
-    return FutureBuilder<FileStat>(
-      future: _fileStatFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-
-        if (!snapshot.hasData) {
-          return Center(
-            child: Text(
-              localizations.operationFailed,
-              style: TextStyle(color: textColor),
-            ),
-          );
-        }
-
-        final stat = snapshot.data!;
-        final fileSize = FormatUtils.formatFileSizeExact(stat.size);
-        final formattedDate = stat.modified.toString().split('.')[0];
-        final extension = FileTypeUtils.getFileExtension(widget.file.path);
-        final localizedFileType = FileTypeUtils.getFileTypeLabel(
-          context,
-          extension,
-        );
-        final extensionLabel = extension.isEmpty
-            ? ''
-            : ' (${extension.substring(1).toUpperCase()})';
-
-        return Column(
-          children: [
-            _buildDetailRow(
-              localizations.fileName,
-              pathlib.basename(widget.file.path),
-              PhosphorIconsLight.fileText,
-              textColor,
-              secondaryTextColor,
-            ),
-            const Divider(height: 24),
-            _buildDetailRow(
-              localizations.fileType,
-              '$localizedFileType$extensionLabel',
-              PhosphorIconsLight.tag,
-              textColor,
-              secondaryTextColor,
-            ),
-            const Divider(height: 24),
-            _buildDetailRow(
-              localizations.fileSize,
-              fileSize,
-              PhosphorIconsLight.hardDrives,
-              textColor,
-              secondaryTextColor,
-            ),
-            const Divider(height: 24),
-            _buildDetailRow(
-              localizations.fileLocation,
-              pathlib.dirname(widget.file.path),
-              PhosphorIconsLight.folder,
-              textColor,
-              secondaryTextColor,
-            ),
-            const Divider(height: 24),
-            _buildDetailRow(
-              localizations.fileCreated,
-              stat.changed.toString().split('.')[0],
-              PhosphorIconsLight.calendarBlank,
-              textColor,
-              secondaryTextColor,
-            ),
-            const Divider(height: 24),
-            _buildDetailRow(
-              localizations.fileModified,
-              formattedDate,
-              PhosphorIconsLight.pencilSimple,
-              textColor,
-              secondaryTextColor,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailRow(
-    String label,
-    String value,
-    IconData icon,
-    Color textColor,
-    Color secondaryTextColor,
-  ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: secondaryTextColor),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(fontSize: 14, color: secondaryTextColor),
-            ),
-            const SizedBox(height: 4),
-            Text(value, style: TextStyle(fontSize: 16, color: textColor)),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget _buildFileDetails(Color textColor, Color secondaryTextColor) =>
+      FilePropertiesDetails(
+        filePath: widget.file.path,
+        statFuture: _fileStatFuture,
+      );
 
   void _showOpenWithDialog({bool saveAsDefaultOnSelect = false}) {
     RouteUtils.showAcrylicDialog(
