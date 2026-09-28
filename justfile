@@ -177,6 +177,12 @@ e2e-file file suite="": kill-cb
 run device="windows": deps
     cd {{project_dir}} && {{flutter}} run -d {{device}} {{dart_env}}
 
+# Run the macOS debug app with its own privacy permissions (not the terminal's)
+# and attach for hot reload. Use instead of `just run macos` when the app needs
+# Full Disk Access; app logs go to cb_file_manager/build/macos/dev_app.log.
+macos-dev: deps
+    bash scripts/macos_dev.sh {{dart_env}}
+
 # =============================================================================
 # Build
 # =============================================================================

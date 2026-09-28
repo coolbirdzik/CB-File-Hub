@@ -37,6 +37,29 @@ codesign -d -r- "/Applications/CB File Hub.app"
   - `MACOS_CERT_BASE64`: `base64 -i cb-signing.p12`
   - `MACOS_CERT_PASSWORD`: the `.p12` export password
 
+- Local `flutter run` / `flutter build macos` builds use it when
+  `macos/Runner/Configs/Signing.local.xcconfig` (git-ignored, copy of the
+  `.example` next to it) exists. Dev builds then share the release app's
+  identity, so one Full Disk Access grant covers both. Without the file they
+  are ad-hoc signed and lose permissions on every rebuild. The Runner target
+  does not set `CODE_SIGN_STYLE` itself so that this file can switch it to
+  Manual.
+
+## Dev runs: `just macos-dev`, not `flutter run`
+
+`flutter run -d macos` starts the app as a child of the terminal, so macOS
+checks privacy permissions against that "responsible" process (VS Code,
+Terminal), not CB File Hub; granting Full Disk Access to CB File Hub does not
+reach the dev build. `just macos-dev` (`scripts/macos_dev.sh`) builds the debug
+app, launches it with `open` so it is responsible for itself, and runs
+`flutter attach` for hot reload. App logs go to
+`cb_file_manager/build/macos/dev_app.log`.
+
+The installed app and the dev build share one permission entry
+(`com.cb.cbFileManager`). If one of them is still ad-hoc signed (a release from
+before this certificate), each grant replaces the other's and they keep losing
+access; install a certificate-signed release.
+
 No hardened runtime: without a Team ID, library validation would refuse the
 bundled frameworks.
 

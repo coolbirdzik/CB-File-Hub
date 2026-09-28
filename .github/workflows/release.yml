@@ -514,6 +514,17 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           rm -f "$CERT"
+          # An identity needs the private key too; a .p12 exported without it
+          # imports fine but cannot sign. Fail here with the reason.
+          IDENTITIES="$(security find-identity -p codesigning "$KEYCHAIN")"
+          echo "$IDENTITIES"
+          if ! grep -qF '"CB File Hub Signing"' <<<"$IDENTITIES"; then
+            echo "Certificates in MACOS_CERT_BASE64:"
+            security find-certificate -a "$KEYCHAIN" | grep '"labl"' || echo "  (none)"
+            echo "Private keys: $(security dump-keychain "$KEYCHAIN" | grep -c 'class: 0x00000010' || true)"
+            echo "::error::MACOS_CERT_BASE64 has no \"CB File Hub Signing\" signing identity (certificate + private key). Re-export it from Keychain Access > login > My Certificates as .p12."
+            exit 1
+          fi
           echo "MACOS_SIGNING_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
 
       - name: Build macOS DMG

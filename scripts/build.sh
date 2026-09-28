@@ -906,9 +906,11 @@ MACOS_SIGN_IDENTITY="${MACOS_SIGN_IDENTITY:-CB File Hub Signing}"
 # in the keychain. Signing by hash avoids "ambiguous identity" errors when the
 # name exists twice. MACOS_REQUIRE_SIGN_IDENTITY=1 makes a missing certificate
 # an error instead, so a release never falls back to ad-hoc by accident.
+# MACOS_SIGNING_KEYCHAIN (set by CI) limits the lookup and signing to that
+# keychain instead of relying on the user keychain search list.
 resolve_macos_sign_identity() {
     local hash
-    hash=$(security find-identity -p codesigning 2>/dev/null |
+    hash=$(security find-identity -p codesigning ${MACOS_SIGNING_KEYCHAIN:+"$MACOS_SIGNING_KEYCHAIN"} 2>/dev/null |
         awk -v name="\"$MACOS_SIGN_IDENTITY\"" 'index($0, name) { print $2; exit }')
     if [ -n "$hash" ]; then
         echo "$hash"
@@ -929,12 +931,16 @@ sign_macos_app() {
     local entitlements="$2"
     local identity="$3"
     local item
+    local sign_args=(--force --sign "$identity" --timestamp=none)
+    if [ "$identity" != "-" ] && [ -n "${MACOS_SIGNING_KEYCHAIN:-}" ]; then
+        sign_args+=(--keychain "$MACOS_SIGNING_KEYCHAIN")
+    fi
 
     while IFS= read -r -d '' item; do
-        codesign --force --sign "$identity" --timestamp=none "$item"
+        codesign "${sign_args[@]}" "$item"
     done < <(find "$app/Contents/Frameworks" -mindepth 1 -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
 
-    codesign --force --sign "$identity" --timestamp=none --entitlements "$entitlements" "$app"
+    codesign "${sign_args[@]}" --entitlements "$entitlements" "$app"
     codesign --verify --deep --strict --verbose=2 "$app"
 }
 
@@ -972,7 +978,8 @@ build_macos() {
 
     local SIGN_IDENTITY
     if ! SIGN_IDENTITY=$(resolve_macos_sign_identity); then
-        print_error "Signing certificate \"$MACOS_SIGN_IDENTITY\" not found in the keychain"
+        print_error "Signing certificate \"$MACOS_SIGN_IDENTITY\" not found in ${MACOS_SIGNING_KEYCHAIN:-the keychain}"
+        security find-identity -p codesigning ${MACOS_SIGNING_KEYCHAIN:+"$MACOS_SIGNING_KEYCHAIN"} || true
         return 1
     fi
     if [ "$SIGN_IDENTITY" = "-" ]; then

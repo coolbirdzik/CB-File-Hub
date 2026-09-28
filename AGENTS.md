@@ -32,6 +32,7 @@ Run from repo root via `just` (requires Git Bash on Windows):
 | Show all recipes         | `just`                                              |
 | Install deps             | `just deps`                                         |
 | Fetch llama.cpp runtime  | `just fetch-llama`                                  |
+| Run macOS dev build      | `just macos-dev` (own permissions + hot reload)     |
 | Unit/widget tests        | `just test`                                         |
 | E2E tests (parallel)     | `just e2e-parallel`                                 |
 | E2E single suite         | `just e2e Navigation`                               |
