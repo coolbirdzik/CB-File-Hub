@@ -13,6 +13,7 @@ return here for narrative background.
 7. [07-ui-theming-localization.md](07-ui-theming-localization.md) — Theming, UI standards, and localization.
 8. [08-logging-testing-platform.md](08-logging-testing-platform.md) — Logging, testing tools, and platform notes.
 9. [09-gotchas-extension.md](09-gotchas-extension.md) — Known gotchas, workarounds, and extension checklist.
+10. [10-macos-code-signing.md](10-macos-code-signing.md) — macOS signing certificate and why it keeps permissions across updates.
 
 The implementation is authoritative. When a technical page conflicts with the
 Agent Graph or source, update the page as part of the same change.

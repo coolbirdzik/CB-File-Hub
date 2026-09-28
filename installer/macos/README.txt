@@ -16,7 +16,8 @@ ENGLISH
    Settings opens on the Full Disk Access list with a CB File Hub icon
    beside it: drag the icon into the list, approve with Touch ID or your
    password, then choose "Quit & Reopen". If CB File Hub is already listed,
-   just switch it on. After an update you may need to switch it on again.
+   just switch it on. If it is already on and the app still asks, remove it
+   with the "-" button and add it again.
 
 Why: the app is not notarized with a paid Apple Developer ID, so macOS asks
 you to allow it once.
@@ -41,8 +42,8 @@ TIẾNG VIỆT
    "Cấp quyền". Cài đặt hệ thống mở danh sách Full Disk Access, bên cạnh có
    biểu tượng CB File Hub: kéo biểu tượng vào danh sách, xác nhận bằng
    Touch ID hoặc mật khẩu, rồi chọn "Quit & Reopen" (Thoát & Mở lại). Nếu
-   CB File Hub đã có trong danh sách thì chỉ cần bật công tắc. Sau khi cập
-   nhật có thể phải bật lại.
+   CB File Hub đã có trong danh sách thì chỉ cần bật công tắc. Nếu công tắc
+   đã bật mà ứng dụng vẫn xin quyền, xoá nó bằng nút "-" rồi thêm lại.
 
 Lý do: ứng dụng chưa được notarize bằng Apple Developer ID trả phí, nên macOS
 yêu cầu bạn cho phép một lần.

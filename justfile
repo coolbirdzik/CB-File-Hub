@@ -213,7 +213,7 @@ linux: clean deps
     mkdir -p {{build_dir}}/linux/portable
     cd {{build_dir}}/linux/x64/release && tar -czf ../portable/CBFileHub-Linux.tar.gz bundle/
 
-# Build macOS DMG (ad-hoc signed; output: build/macos/dmg/*.dmg)
+# Build macOS DMG (signed with "CB File Hub Signing" if in the keychain, else ad-hoc; output: build/macos/dmg/*.dmg)
 macos:
     bash scripts/build.sh macos
 

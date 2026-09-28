@@ -476,8 +476,10 @@ jobs:
           SUBMISSION_ID="$(node scripts/partner_center_msix.mjs submit)"
           echo "Partner Center draft prepared: $SUBMISSION_ID"
 
-  # Build macOS DMG (ad-hoc signed, not notarized: users allow it once via
-  # System Settings > Privacy & Security > Open Anyway)
+  # Build macOS DMG (signed with a self-signed certificate, not notarized: users
+  # allow it once via System Settings > Privacy & Security > Open Anyway). The
+  # certificate must stay the same across releases, or installs lose their
+  # macOS privacy permissions on update. See docs/technical/10-macos-code-signing.md.
   build-macos:
     runs-on: macos-latest
     needs: generate-release-notes
@@ -491,8 +493,40 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
 
+      - name: Import signing certificate
+        env:
+          MACOS_CERT_BASE64: ${{ secrets.MACOS_CERT_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERT_BASE64" ] || [ -z "$MACOS_CERT_PASSWORD" ]; then
+            echo "::error::MACOS_CERT_BASE64 and MACOS_CERT_PASSWORD secrets are required to sign the macOS app"
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/cb-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          CERT="$RUNNER_TEMP/cb-signing.p12"
+          echo "$MACOS_CERT_BASE64" | base64 --decode > "$CERT"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          # Lets codesign use the key without a keychain access prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$CERT"
+          echo "MACOS_SIGNING_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
       - name: Build macOS DMG
+        env:
+          MACOS_REQUIRE_SIGN_IDENTITY: "1"
         run: bash scripts/build.sh macos
+
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          if [ -n "${MACOS_SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$MACOS_SIGNING_KEYCHAIN" || true
+          fi
 
       - name: Check DMG name
         run: |

@@ -894,21 +894,47 @@ build_linux() {
     cd ..
 }
 
-# Ad-hoc sign a macOS app bundle inside-out. There is no Developer ID, so users
-# open the app via System Settings > Privacy & Security > Open Anyway; macOS only
-# offers that button when the signature is intact (a broken one reads "damaged").
-# No hardened runtime: with ad-hoc signatures there is no Team ID, so library
+# Code signing identity for macOS builds. A self-signed certificate, not a
+# Developer ID: macOS privacy permissions (Full Disk Access, Files & Folders...)
+# are keyed to the app's designated requirement. An ad-hoc signature pins that
+# to the binary's hash, so every update looked like a new app and lost them; a
+# fixed certificate keeps it the same across versions. CI imports it from the
+# MACOS_CERT_BASE64 secret. See docs/technical/10-macos-code-signing.md.
+MACOS_SIGN_IDENTITY="${MACOS_SIGN_IDENTITY:-CB File Hub Signing}"
+
+# Prints the SHA-1 of the signing certificate, or "-" (ad-hoc) when it is not
+# in the keychain. Signing by hash avoids "ambiguous identity" errors when the
+# name exists twice. MACOS_REQUIRE_SIGN_IDENTITY=1 makes a missing certificate
+# an error instead, so a release never falls back to ad-hoc by accident.
+resolve_macos_sign_identity() {
+    local hash
+    hash=$(security find-identity -p codesigning 2>/dev/null |
+        awk -v name="\"$MACOS_SIGN_IDENTITY\"" 'index($0, name) { print $2; exit }')
+    if [ -n "$hash" ]; then
+        echo "$hash"
+    elif [ "${MACOS_REQUIRE_SIGN_IDENTITY:-}" = "1" ]; then
+        return 1
+    else
+        echo "-"
+    fi
+}
+
+# Sign a macOS app bundle inside-out. It is not notarized, so users open the
+# app via System Settings > Privacy & Security > Open Anyway; macOS only offers
+# that button when the signature is intact (a broken one reads "damaged").
+# No hardened runtime: without a Developer ID there is no Team ID, so library
 # validation would refuse to load the bundled frameworks.
-adhoc_sign_macos_app() {
+sign_macos_app() {
     local app="$1"
     local entitlements="$2"
+    local identity="$3"
     local item
 
     while IFS= read -r -d '' item; do
-        codesign --force --sign - --timestamp=none "$item"
+        codesign --force --sign "$identity" --timestamp=none "$item"
     done < <(find "$app/Contents/Frameworks" -mindepth 1 -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
 
-    codesign --force --sign - --timestamp=none --entitlements "$entitlements" "$app"
+    codesign --force --sign "$identity" --timestamp=none --entitlements "$entitlements" "$app"
     codesign --verify --deep --strict --verbose=2 "$app"
 }
 
@@ -944,8 +970,17 @@ build_macos() {
         return 1
     fi
 
-    print_info "Ad-hoc signing $(basename "$APP_PATH")..."
-    adhoc_sign_macos_app "$APP_PATH" "$PROJECT_DIR/macos/Runner/Release.entitlements"
+    local SIGN_IDENTITY
+    if ! SIGN_IDENTITY=$(resolve_macos_sign_identity); then
+        print_error "Signing certificate \"$MACOS_SIGN_IDENTITY\" not found in the keychain"
+        return 1
+    fi
+    if [ "$SIGN_IDENTITY" = "-" ]; then
+        print_warning "\"$MACOS_SIGN_IDENTITY\" not found, signing ad-hoc: installs of this build lose macOS privacy permissions on every update"
+    else
+        print_info "Signing $(basename "$APP_PATH") with \"$MACOS_SIGN_IDENTITY\"..."
+    fi
+    sign_macos_app "$APP_PATH" "$PROJECT_DIR/macos/Runner/Release.entitlements" "$SIGN_IDENTITY"
 
     print_info "Creating DMG..."
     local DMG_DIR="$BUILD_DIR/macos/dmg"
