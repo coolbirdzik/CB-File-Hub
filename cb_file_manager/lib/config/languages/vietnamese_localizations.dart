@@ -4253,6 +4253,19 @@ class VietnameseLocalizations implements AppLocalizations {
   String updateAvailableVersion(String version) => 'Đã có phiên bản $version';
   @override
   String updateCurrentVersion(String version) => 'Phiên bản hiện tại: $version';
+  @override
+  String get updateStatusSection => 'Cập nhật ứng dụng';
+  @override
+  String get updateSectionFeatures => 'Tính năng mới';
+  @override
+  String get updateSectionFixes => 'Sửa lỗi';
+  @override
+  String get updateSectionImprovements => 'Cải thiện';
+  @override
+  String get updateMinorChanges => 'Sửa lỗi nhỏ và cải thiện độ ổn định.';
+  @override
+  String get updateBackgroundHint =>
+      'Bản cập nhật tải trong nền, bạn có thể đóng cửa sổ này và theo dõi ở chuông thông báo.';
 
   // Hardcoded-string cleanup
   @override

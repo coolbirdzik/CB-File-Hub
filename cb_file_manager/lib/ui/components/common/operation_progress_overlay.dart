@@ -2,6 +2,8 @@ import 'dart:io' show Platform;
 
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:cb_file_manager/core/service_locator.dart';
+import 'package:cb_file_manager/services/app_update/app_update_service.dart';
+import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
 import 'package:cb_file_manager/ui/controllers/operation_progress_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -66,6 +68,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     with TickerProviderStateMixin {
   final OperationProgressController _controller =
       locator<OperationProgressController>();
+  final AppUpdateService _updates = AppUpdateService.instance;
   late final AnimationController _pulseController;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _turnAnimation;
@@ -77,7 +80,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   @override
   void initState() {
     super.initState();
-    _lastUnseenCount = _controller.unseenCount;
+    _lastUnseenCount = _unseenCount;
     _lastRunningCount = _controller.runningCount;
     _pulseController = AnimationController(
       vsync: this,
@@ -107,7 +110,12 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
       curve: Curves.easeOut,
     );
     _controller.addListener(_onChanged);
+    _updates.addListener(_onChanged);
   }
+
+  /// Unseen task notifications plus an update the user has not looked at.
+  int get _unseenCount =>
+      _controller.unseenCount + (_updates.hasUnseenUpdate ? 1 : 0);
 
   @override
   void dispose() {
@@ -117,13 +125,14 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
     _panelOverlay?.remove();
     _panelOverlay = null;
     _controller.removeListener(_onChanged);
+    _updates.removeListener(_onChanged);
     _pulseController.dispose();
     _glowController.dispose();
     super.dispose();
   }
 
   void _onChanged() {
-    final unseenCount = _controller.unseenCount;
+    final unseenCount = _unseenCount;
     final runningCount = _controller.runningCount;
     if (unseenCount > _lastUnseenCount) {
       _pulseController.forward(from: 0);
@@ -144,6 +153,7 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
       return;
     }
     _controller.markAllSeen();
+    _updates.markUpdateSeen();
 
     final overlay = Overlay.of(context);
     final overlayBox = overlay.context.findRenderObject() as RenderBox;
@@ -188,9 +198,11 @@ class _StatusCenterToolbarButtonState extends State<StatusCenterToolbarButton>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final unseenCount = _controller.unseenCount;
+    final unseenCount = _unseenCount;
     final runningCount = _controller.runningCount;
-    final hasWork = _controller.entries.isNotEmpty;
+    final hasWork =
+        _controller.entries.isNotEmpty ||
+        AppUpdateStatusCard.isVisible(_updates);
     final hasUnread = unseenCount > 0;
 
     return Padding(
@@ -421,11 +433,13 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onChanged);
+    AppUpdateService.instance.addListener(_onChanged);
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onChanged);
+    AppUpdateService.instance.removeListener(_onChanged);
     super.dispose();
   }
 
@@ -439,6 +453,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
     final controller = widget.controller;
     final running = controller.runningEntries;
     final finished = controller.finishedEntries;
+    final showUpdate = AppUpdateStatusCard.isVisible(AppUpdateService.instance);
 
     final bg =
         widget.solidBackground ??
@@ -483,6 +498,14 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                   children: [
+                    if (showUpdate) ...[
+                      _SectionHeader(
+                        title: AppLocalizations.of(
+                          context,
+                        )!.updateStatusSection,
+                      ),
+                      const AppUpdateStatusCard(),
+                    ],
                     if (running.isNotEmpty) ...[
                       const _SectionHeader(title: 'Running'),
                       for (final entry in running)
@@ -499,7 +522,7 @@ class _StatusCenterPanelState extends State<StatusCenterPanel> {
                           controller: controller,
                         ),
                     ],
-                    if (running.isEmpty && finished.isEmpty)
+                    if (running.isEmpty && finished.isEmpty && !showUpdate)
                       Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(

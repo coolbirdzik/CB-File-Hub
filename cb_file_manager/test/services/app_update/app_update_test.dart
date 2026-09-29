@@ -1,7 +1,7 @@
 import 'package:cb_file_manager/services/app_update/app_update_models.dart';
 import 'package:cb_file_manager/services/app_update/desktop_update_installer.dart';
 import 'package:cb_file_manager/services/app_update/github_release_source.dart';
-import 'package:cb_file_manager/ui/components/app_update/app_update_dialog.dart';
+import 'package:cb_file_manager/services/app_update/release_notes.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Map<String, dynamic> _release({
@@ -119,6 +119,52 @@ void main() {
       trimReleaseNotes(notes),
       "## 📝 What's Changed\n\n- Add updater (abc123)",
     );
+  });
+
+  group('parseReleaseChanges', () {
+    test('groups conventional commits and drops hashes and CI noise', () {
+      const notes = '''
+# 🎉 CB File Hub 1.2.0
+
+## 📝 What's Changed
+
+Changes from `v1.1.0` to `v1.2.0`.
+
+- feat(update): show updates in the status center (4b8b237)
+- fix: keep macOS permissions after updating (f8a31fe)
+- ci: auto bump build number to 2 (7405a9b)
+- test: cover the updater (96df98a)
+- perf: faster thumbnails (f59793a)
+- Tweak spacing by @someone in https://github.com/o/r/pull/12
+- feat(update): show updates in the status center (1234567)
+
+## 📦 Downloads
+
+- **Portable**: zip
+''';
+      expect(parseReleaseChanges(notes), const [
+        ReleaseChange(
+          ReleaseChangeKind.feature,
+          'Show updates in the status center',
+        ),
+        ReleaseChange(
+          ReleaseChangeKind.fix,
+          'Keep macOS permissions after updating',
+        ),
+        ReleaseChange(ReleaseChangeKind.improvement, 'Faster thumbnails'),
+        ReleaseChange(ReleaseChangeKind.improvement, 'Tweak spacing'),
+      ]);
+      expect(releaseNotesHaveList(notes), isTrue);
+    });
+
+    test('is empty for prose and for lists of hidden changes only', () {
+      expect(parseReleaseChanges('Bug fixes.'), isEmpty);
+      expect(releaseNotesHaveList('Bug fixes.'), isFalse);
+
+      const ciOnly = '- ci: bump (abc1234)\n- No commits found';
+      expect(parseReleaseChanges(ciOnly), isEmpty);
+      expect(releaseNotesHaveList(ciOnly), isTrue);
+    });
   });
 
   group('DesktopUpdateInstaller', () {

@@ -52,6 +52,10 @@ class AppUpdateService extends ChangeNotifier {
   String? _error;
   String? _packagePath;
 
+  /// Whether the user has opened the Status Center since the current update
+  /// (or its finished download) showed up there. Drives the bell badge.
+  bool _updateSeen = true;
+
   http.Client? _downloadClient;
   bool _cancelRequested = false;
   StreamSubscription<play.InstallStatus>? _playSubscription;
@@ -72,6 +76,17 @@ class AppUpdateService extends ChangeNotifier {
           _phase == AppUpdatePhase.downloading ||
           _phase == AppUpdatePhase.readyToInstall ||
           _phase == AppUpdatePhase.installing);
+
+  /// An update (or a finished download) the user has not looked at yet.
+  bool get hasUnseenUpdate =>
+      !_updateSeen &&
+      (hasUpdate || (_phase == AppUpdatePhase.error && _update != null));
+
+  void markUpdateSeen() {
+    if (_updateSeen) return;
+    _updateSeen = true;
+    notifyListeners();
+  }
 
   /// Direct-download builds can cancel; store downloads belong to the store.
   bool get canCancelDownload =>
@@ -161,6 +176,7 @@ class AppUpdateService extends ChangeNotifier {
     final distribution = await resolveDistribution();
     if (distribution == AppDistribution.unsupported) return;
 
+    final previousVersion = _update?.version;
     _setPhase(AppUpdatePhase.checking);
     try {
       switch (distribution) {
@@ -193,6 +209,11 @@ class AppUpdateService extends ChangeNotifier {
           await _checkGooglePlay();
         case AppDistribution.unsupported:
           break;
+      }
+      final update = _update;
+      if (update != null && update.version != previousVersion) {
+        _updateSeen = false;
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('AppUpdateService: update check failed: $e');
@@ -462,7 +483,37 @@ class AppUpdateService extends ChangeNotifier {
   }
 
   void _setPhase(AppUpdatePhase phase) {
+    // A download finishing while the user looks elsewhere is news again.
+    if (phase == AppUpdatePhase.readyToInstall &&
+        _phase == AppUpdatePhase.downloading) {
+      _updateSeen = false;
+    }
     _phase = phase;
+    notifyListeners();
+  }
+
+  /// Puts the service in a given state, for widget tests and previews.
+  @visibleForTesting
+  void debugSetState({
+    required AppUpdatePhase phase,
+    AppUpdateInfo? update,
+    AppDistribution distribution = AppDistribution.macosDmg,
+    String currentVersion = '',
+    double? progress,
+    int receivedBytes = 0,
+    int totalBytes = 0,
+    String? error,
+    bool seen = false,
+  }) {
+    _phase = phase;
+    _update = update;
+    _resolvedDistribution = distribution;
+    _currentVersion = currentVersion;
+    _progress = progress;
+    _receivedBytes = receivedBytes;
+    _totalBytes = totalBytes;
+    _error = error;
+    _updateSeen = seen;
     notifyListeners();
   }
 }

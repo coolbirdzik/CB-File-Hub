@@ -4256,6 +4256,19 @@ class EnglishLocalizations implements AppLocalizations {
       'Version $version is available';
   @override
   String updateCurrentVersion(String version) => 'Current version: $version';
+  @override
+  String get updateStatusSection => 'App update';
+  @override
+  String get updateSectionFeatures => 'New features';
+  @override
+  String get updateSectionFixes => 'Fixes';
+  @override
+  String get updateSectionImprovements => 'Improvements';
+  @override
+  String get updateMinorChanges => 'Minor fixes and stability improvements.';
+  @override
+  String get updateBackgroundHint =>
+      'The update downloads in the background. You can close this window and follow it from the notification bell.';
 
   // Hardcoded-string cleanup
   @override

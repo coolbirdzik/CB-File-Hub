@@ -9,8 +9,10 @@ lib/services/app_update/
 ├── app_update_models.dart        # AppDistribution, AppUpdateInfo, phases, compareVersions
 ├── app_update_service.dart       # state machine (check → download → confirm → install)
 ├── github_release_source.dart    # latest release + asset per distribution
-└── desktop_update_installer.dart # detached helper scripts for MSI / portable / DMG
-lib/ui/components/app_update/app_update_dialog.dart
+├── desktop_update_installer.dart # detached helper scripts for MSI / portable / DMG
+└── release_notes.dart            # release notes → grouped change list for the UI
+lib/ui/components/app_update/app_update_dialog.dart   # dialog + AppUpdateStatusCard
+lib/ui/components/common/operation_progress_overlay.dart # Status Center (bell) hosts the card
 windows/runner/store_update_plugin.{h,cpp}   # cb_file_manager/store_update channel
 ```
 
@@ -28,10 +30,10 @@ Debug builds, E2E runs, sideloaded APKs, Linux and iOS resolve to `unsupported`,
 
 ## Flow
 
-1. The primary window checks once, 8 s after launch (`scheduleStartupCheck` in `main.dart`). A newer version shows a toast with an **Update** action. The sidebar footer and Settings → *Check for updates* show it too.
-2. The dialog shows release notes (the "What's Changed" part only). **Download** starts the download and shows percent and bytes.
+1. The primary window checks once, 8 s after launch (`scheduleStartupCheck` in `main.dart`). Nothing pops up on desktop: the update appears as a card in the Status Center (toolbar bell), and the bell shows a badge until the Status Center or the dialog is opened (`hasUnseenUpdate` / `markUpdateSeen`). Mobile has no bell and shows a toast with an **Update** action. The sidebar footer and Settings → *Check for updates* open the dialog.
+2. The card offers **Download** and **What's new**. The dialog shows the release notes grouped into new features, fixes and improvements (`parseReleaseChanges`: conventional-commit prefixes and hashes removed; `ci`/`build`/`chore`/`docs`/`test`/`style` commits hidden). Progress (percent and bytes) shows in both; the dialog can be closed while the download continues.
 3. Downloads go to `%TEMP%/cbfilehub-update/`. They are checked against the asset size and GitHub's `sha256` digest. A complete earlier download is reused.
-4. When the download finishes, the dialog asks for confirmation: **Install and restart** or **Later**.
+4. When the download finishes, the bell badges again and the card (or dialog) offers **Install and restart**. Nothing installs without that click.
 5. Desktop installs run in a detached helper script. It waits for the app process to exit, closes the app's other window processes, installs, and relaunches. Errors go to `update.log` next to the package.
 
 Release asset names come from `.github/workflows/release.yml`. If you rename them, update `GithubReleaseSource.assetMatches` too.

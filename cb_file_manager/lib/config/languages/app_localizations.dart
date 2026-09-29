@@ -1861,6 +1861,12 @@ abstract class AppLocalizations {
   String get updateAction;
   String updateAvailableVersion(String version);
   String updateCurrentVersion(String version);
+  String get updateStatusSection;
+  String get updateSectionFeatures;
+  String get updateSectionFixes;
+  String get updateSectionImprovements;
+  String get updateMinorChanges;
+  String get updateBackgroundHint;
 
   // Hardcoded-string cleanup
   String get chooseLocation;
