@@ -69,7 +69,7 @@ assets = APP / "assets/images"
 save(assets / "logo.png", (1024, 1024))
 save(assets / "logo512.png", (512, 512))
 save(assets / "logo2160.png", (2160, 2160))
-save(assets / "logo1440.png", (1440, 2160), 0.72, "#FFFFFF")
+save(assets / "logo1440.png", (1440, 2160), 0.72)
 circle_badge((756, 711)).save(assets / "logo_circle.png", optimize=True)
 
 web = APP / "web"
