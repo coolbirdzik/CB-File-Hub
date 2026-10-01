@@ -223,22 +223,18 @@ def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int) -> str:
 def draw_desktop_frame(base: Image.Image, screenshot: Image.Image, spec: PromoSpec) -> None:
     frame_x, frame_y = 760, 260
     frame_w, frame_h = 1490, 820
-    chrome_h = 58
-    draw_shadow(base, (frame_x - 28, frame_y - 18, frame_x + frame_w + 28, frame_y + frame_h + 42), 44, 38, 150)
+    # Keep the real Windows tab/title bar and its caption buttons visible.
+    # A separate decorative title bar duplicates the app's window controls;
+    # cover-resizing also crops those controls and the bottom status bar.
+    screen = contain_resize(screenshot, (frame_w - 4, frame_h - 4))
+    window_w, window_h = screen.width + 4, screen.height + 4
+    window_x = frame_x + (frame_w - window_w) // 2
+    window_y = frame_y + (frame_h - window_h) // 2
+    box = (window_x, window_y, window_x + window_w, window_y + window_h)
+    draw_shadow(base, (box[0] - 12, box[1] + 12, box[2] + 12, box[3] + 28), 12, 32, 150)
     draw = ImageDraw.Draw(base)
-    draw.rounded_rectangle((frame_x, frame_y, frame_x + frame_w, frame_y + frame_h), radius=42, fill=(24, 35, 52, 255), outline=(104, 124, 148, 160), width=2)
-    draw.rounded_rectangle((frame_x + 18, frame_y + 18, frame_x + frame_w - 18, frame_y + frame_h - 18), radius=28, fill=(10, 14, 24, 255))
-    draw.rounded_rectangle((frame_x + 18, frame_y + 18, frame_x + frame_w - 18, frame_y + 18 + chrome_h), radius=28, fill=(30, 41, 59, 255))
-    draw.rectangle((frame_x + 18, frame_y + 18 + chrome_h // 2, frame_x + frame_w - 18, frame_y + 18 + chrome_h), fill=(30, 41, 59, 255))
-    for i, color in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
-        cx = frame_x + 58 + i * 32
-        cy = frame_y + 47
-        draw.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), fill=(*color, 255))
-    screen_box = (frame_x + 18, frame_y + 18 + chrome_h, frame_w - 36, frame_h - 36 - chrome_h)
-    screen = cover_resize(screenshot, (screen_box[2], screen_box[3]))
-    paste_rounded(base, screen, (screen_box[0], screen_box[1]), 22)
-    draw.rounded_rectangle((frame_x + 590, frame_y + frame_h + 18, frame_x + 900, frame_y + frame_h + 44), radius=13, fill=(45, 55, 72, 255))
-    draw.rounded_rectangle((frame_x + 505, frame_y + frame_h + 42, frame_x + 985, frame_y + frame_h + 70), radius=14, fill=(21, 29, 43, 255))
+    draw.rounded_rectangle(box, radius=12, fill=(104, 124, 148, 255))
+    paste_rounded(base, screen, (window_x + 2, window_y + 2), 10)
     draw_text_block(draw, (130, 330), spec.title, spec.subtitle, 550, 92)
 
 
@@ -399,17 +395,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--desktop-source", type=Path, default=DEFAULT_DESKTOP_SOURCE)
     parser.add_argument("--mobile-source", type=Path, default=DEFAULT_MOBILE_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--desktop-only", action="store_true", help="Regenerate only English and Vietnamese desktop promos.")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
     desktop_sources = discover_desktop_sources(args.desktop_source)
-    mobile_sources = discover_mobile_sources(args.mobile_source)
+    mobile_sources = [] if args.desktop_only else discover_mobile_sources(args.mobile_source)
 
     if not desktop_sources:
         raise SystemExit(f"No desktop screenshots found in {args.desktop_source}")
-    if not mobile_sources:
+    if not args.desktop_only and not mobile_sources:
         raise SystemExit(f"No mobile screenshots found in {args.mobile_source}")
 
     desktop_output = args.output / "desktop"
@@ -424,6 +421,11 @@ def main() -> None:
         create_desktop_promo(source, desktop_output / desktop_promo_filename(index, spec), spec)
         vi_spec = DESKTOP_SPECS_VI[index % len(DESKTOP_SPECS_VI)]
         create_desktop_promo(source, desktop_vi_output / desktop_promo_filename(index, vi_spec), vi_spec)
+
+    if args.desktop_only:
+        print(f"Created {len(desktop_sources)} desktop promo images in {desktop_output}")
+        print(f"Created {len(desktop_sources)} Vietnamese desktop promo images in {desktop_vi_output}")
+        return
 
     for index, source in enumerate(mobile_sources):
         spec = MOBILE_SPECS[index % len(MOBILE_SPECS)]
