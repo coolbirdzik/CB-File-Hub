@@ -817,7 +817,14 @@ class VietnameseLocalizations implements AppLocalizations {
   String childTagHint(String parent) => 'Thẻ con mới trong "$parent"...';
   @override
   String addingUnderTag(String parent) =>
-      'Đang thêm trong "$parent" — Enter để thêm thẻ con tiếp theo, Backspace để thoát.';
+      'Thêm thẻ con vào "$parent". Esc để thoát thẻ cha.';
+  @override
+  String get tagInputHelp =>
+      'Gõ thẻ cha, rồi nhấn ":" hoặc → để nhập thẻ con ngay trong chip.';
+  @override
+  String get tagSuggestionsLabel => 'Thẻ gợi ý';
+  @override
+  String childTagCount(int count) => '$count thẻ con';
   @override
   String deleteTagConfirmation(String tag) => 'Xóa thẻ "$tag"?';
   @override

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/ui/utils/file_type_utils.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
 
@@ -11,10 +12,14 @@ class FilePropertiesDetails extends StatelessWidget {
     super.key,
     required this.filePath,
     required this.statFuture,
+    this.dense = false,
   });
 
   final String filePath;
   final Future<FileStat> statFuture;
+
+  /// Label beside value, one row each, for the compact properties pane.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -51,25 +56,65 @@ class FilePropertiesDetails extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final entry in values.entries)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.key,
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                    SelectableText(
-                      entry.value,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
+              if (dense)
+                FilePropertyRow(label: entry.key, value: entry.value)
+              else
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.key,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      SelectableText(
+                        entry.value,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
           ],
         );
       },
+    );
+  }
+}
+
+/// One label/value line of the compact properties pane.
+class FilePropertyRow extends StatelessWidget {
+  const FilePropertyRow({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.cbColors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: CbSpacing.xxs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: CbTypography.bodySm.copyWith(color: c.textSecondary),
+            ),
+          ),
+          const SizedBox(width: CbSpacing.sm),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: CbTypography.bodySm.copyWith(color: c.textPrimary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

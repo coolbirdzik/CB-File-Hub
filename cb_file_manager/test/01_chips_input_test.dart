@@ -213,12 +213,18 @@ void main() {
 
     expect(find.widgetWithText(TagScopeChip, 'Actress'), findsOneWidget);
     expect(find.text('Parent:'), findsOneWidget);
-    expect(find.text('Type child tag…'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(TagScopeChip),
+        matching: find.byType(EditableText),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(
       find.descendant(
         of: find.byType(TagScopeChip),
-        matching: find.byType(InkWell),
+        matching: find.byType(IconButton),
       ),
     );
     await tester.pumpAndSettle();
@@ -253,36 +259,36 @@ void main() {
       await tester.pumpAndSettle();
 
       final controller = key.currentState!.controller;
-      expect(controller.selection, const TextSelection.collapsed(offset: 3));
-      expect(find.text('Type child tag…'), findsOneWidget);
+      expect(controller.selection, const TextSelection.collapsed(offset: 0));
+      expect(find.text('People'), findsOneWidget);
 
       await tester.tap(find.byType(TextField));
       tester.testTextInput.updateEditingValue(
         const TextEditingValue(
           // Reproduces a click-derived insertion before the chip placeholders.
-          text: 'n\uFFFE\uFFFE\uFFFC',
+          text: 'n',
           selection: TextSelection.collapsed(offset: 1),
         ),
       );
       await tester.pump();
 
-      expect(controller.textWithReplacements, '\uFFFE\uFFFE\uFFFCn');
+      expect(controller.textWithReplacements, 'n');
       expect(controller.textWithoutReplacements, 'n');
-      expect(controller.selection, const TextSelection.collapsed(offset: 4));
+      expect(controller.selection, const TextSelection.collapsed(offset: 1));
       expect(draftText, 'n');
-      expect(find.text('Type child tag…'), findsNothing);
+      expect(find.text('People'), findsOneWidget);
 
       tester.testTextInput.updateEditingValue(
         const TextEditingValue(
-          text: '\uFFFE\uFFFE\uFFFC',
-          selection: TextSelection.collapsed(offset: 3),
+          text: '',
+          selection: TextSelection.collapsed(offset: 0),
         ),
       );
       await tester.pump();
 
-      expect(controller.textWithReplacements, '\uFFFE\uFFFE\uFFFC\uFFFB');
-      expect(controller.selection, const TextSelection.collapsed(offset: 3));
-      expect(find.text('Type child tag…'), findsOneWidget);
+      expect(controller.textWithReplacements, '');
+      expect(controller.selection, const TextSelection.collapsed(offset: 0));
+      expect(find.text('People'), findsOneWidget);
     },
   );
 
@@ -415,26 +421,25 @@ void main() {
       expect(key.currentState!.controller.textWithoutReplacements, isEmpty);
       expect(
         key.currentState!.controller.selection,
-        TextSelection.collapsed(offset: selectedTags.length + 1),
+        const TextSelection.collapsed(offset: 0),
       );
-      expect(
-        key.currentState!.controller.textWithReplacements,
-        '${'\uFFFE' * selectedTags.length}\uFFFC\uFFFB',
-      );
+      expect(key.currentState!.controller.textWithReplacements, '');
 
-      final span = key.currentState!.controller.buildTextSpan(
-        context: key.currentContext!,
-        style: const TextStyle(),
-        withComposing: false,
-      );
-      final inlineWidgets = span.children!.whereType<WidgetSpan>().toList();
-      expect(inlineWidgets, hasLength(selectedTags.length + 2));
+      expect(find.widgetWithText(TagScopeChip, 'People'), findsOneWidget);
       expect(
-        (inlineWidgets[selectedTags.length].child as TagScopeChip).parent,
-        'People',
-        reason: 'the parent scope must render after a,b,c rather than first',
+        find.descendant(
+          of: find.byType(TagScopeChip),
+          matching: find.byType(EditableText),
+        ),
+        findsOneWidget,
       );
-      expect(inlineWidgets.last.child, isA<ChildTagInputHint>());
+      for (final tag in selectedTags) {
+        expect(find.text(tag), findsOneWidget);
+      }
+      final parentBounds = tester.getRect(find.byType(TagScopeChip));
+      final inputBounds = tester.getRect(find.byType(InputDecorator).first);
+      expect(inputBounds.contains(parentBounds.center), isTrue);
+      expect(tester.takeException(), isNull);
     },
   );
 }

@@ -267,7 +267,9 @@ void main() {
             .widget<mk.Video>(find.byType(mk.Video))
             .controller
             .player;
-        expect(second, isNot(same(first)));
+        // A healthy player is reused across source changes; only a failed
+        // source gets a fresh one (see VideoPlayer.didUpdateWidget).
+        expect(second, same(first));
         await waitFor(tester, () => second.state.position.inMilliseconds > 500);
         expect(errors, isEmpty);
         await tester.pumpWidget(const SizedBox.shrink());

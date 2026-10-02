@@ -36,10 +36,10 @@ class ChipsInput<T> extends StatefulWidget {
   final ValueChanged<String>? onTextChanged;
 
   /// Autocomplete suggestions shown below the input.
-  /// Press Tab or click to pick a suggestion.
+  /// Press Tab, or Enter after arrow navigation, or click to pick a suggestion.
   final List<String> suggestions;
 
-  /// Called when a suggestion is picked (via Tab or click).
+  /// Called when a suggestion is picked (via keyboard or click).
   final ValueChanged<String>? onSuggestionSelected;
 
   /// Custom builder for suggestion items. If null, uses default rendering.
@@ -59,14 +59,14 @@ class ChipsInput<T> extends StatefulWidget {
   final bool enableColonAutocomplete;
 
   /// The parent tag the field is scoped to, or null when typing at the top
-  /// level. While scoped, a pill is shown after the selected tag chips and
-  /// immediately before the child draft — the caller composes
+  /// level. While scoped, the draft is edited inside the parent's inline chip.
+  /// The caller composes
   /// "parent:child" itself and decides when the scope is dropped.
   final String? scopeParent;
 
-  /// Called when the scope changes: a parent is entered (":" or "->" on a
-  /// highlighted suggestion) or left (Backspace on an empty draft, or the
-  /// pill's "x"). Leaving this null keeps the older inline "parent:" prefix
+  /// Called when a parent is entered through its child action or ":" / "→",
+  /// or left through Esc, Backspace on an empty draft, or the context's "x".
+  /// Leaving this null keeps the older inline "parent:" prefix
   /// behavior of [enableColonAutocomplete].
   final ValueChanged<String?>? onScopeChanged;
 
@@ -91,9 +91,14 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   TextSelection? _previousSelection;
 
   /// Index of the currently highlighted suggestion (-1 = none).
-  int _highlightedIndex = 0;
+  int _highlightedIndex = -1;
+  bool _suggestionNavigated = false;
+  bool _suggestionsDismissed = false;
 
   final LayerLink _layerLink = LayerLink();
+  final GlobalKey _targetKey = GlobalKey();
+  final GlobalKey _editableKey = GlobalKey();
+  final ScrollController _suggestionScroll = ScrollController();
   OverlayEntry? _overlayEntry;
 
   @override
@@ -103,8 +108,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     controller = ChipsInputEditingController<T>(
       <T>[...widget.values],
       widget.chipBuilder,
-      _exitScope,
-      scopeParent: widget.scopeParent,
+      editingChild: widget.scopeParent != null,
     );
     controller.addListener(_textListener);
     _focusNode = FocusNode();
@@ -114,9 +118,11 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   @override
   void didUpdateWidget(covariant ChipsInput<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+    controller.updateChildMode(widget.scopeParent != null);
     // Reset highlight when suggestions change
     if (widget.suggestions != oldWidget.suggestions) {
-      _highlightedIndex = 0;
+      _highlightedIndex = -1;
+      _suggestionNavigated = false;
       _updateOverlay();
     }
   }
@@ -124,6 +130,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   @override
   void dispose() {
     _removeOverlay();
+    _suggestionScroll.dispose();
     controller.removeListener(_textListener);
     controller.dispose();
     _focusNode.removeListener(_onFocusChanged);
@@ -132,9 +139,11 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   }
 
   void _onFocusChanged() {
+    if (mounted) setState(() {});
     if (!_focusNode.hasFocus) {
       _removeOverlay();
     } else {
+      _suggestionsDismissed = false;
       _updateOverlay();
     }
   }
@@ -146,7 +155,9 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     // during a build phase (e.g. when called from didUpdateWidget).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (widget.suggestions.isNotEmpty && _focusNode.hasFocus) {
+      if (widget.suggestions.isNotEmpty &&
+          _focusNode.hasFocus &&
+          !_suggestionsDismissed) {
         if (_overlayEntry != null) {
           _overlayEntry!.markNeedsBuild();
         } else {
@@ -165,13 +176,27 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   }
 
   OverlayEntry _buildOverlayEntry() {
-    final renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-
     return OverlayEntry(
       builder: (context) {
         final suggestions = widget.suggestions;
         if (suggestions.isEmpty) return const SizedBox.shrink();
+        final renderBox = _targetKey.currentContext?.findRenderObject();
+        if (renderBox is! RenderBox || !renderBox.hasSize) {
+          return const SizedBox.shrink();
+        }
+        final size = renderBox.size;
+        final position = renderBox.localToGlobal(Offset.zero);
+        final media = MediaQuery.of(context);
+        final below =
+            media.size.height -
+            media.viewInsets.bottom -
+            media.padding.bottom -
+            position.dy -
+            size.height -
+            8;
+        final above = position.dy - media.padding.top - 8;
+        final showAbove = below < 180 && above > below;
+        final available = (showAbove ? above : below).clamp(80.0, 280.0);
 
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
@@ -181,7 +206,11 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            offset: Offset(0, size.height + 4),
+            targetAnchor: Alignment.topLeft,
+            followerAnchor: showAbove
+                ? Alignment.bottomLeft
+                : Alignment.topLeft,
+            offset: Offset(0, showAbove ? -4 : size.height + 4),
             child: TextFieldTapRegion(
               child: Material(
                 elevation: 4,
@@ -209,29 +238,35 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
                                   .withValues(alpha: 0.6),
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              'Suggestions',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.6),
+                            Expanded(
+                              child: Text(
+                                AppLocalizations.of(
+                                      context,
+                                    )?.tagSuggestionsLabel ??
+                                    'Suggested tags',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.6),
+                                ),
                               ),
                             ),
-                            const Spacer(),
                             if (widget.onScopeChanged != null &&
                                 widget.scopeParent == null) ...[
                               _keyHintBadge(theme, '→'),
                               const SizedBox(width: 4),
                             ],
-                            _keyHintBadge(theme, 'Tab ↹'),
+                            _keyHintBadge(theme, '↑↓ Enter'),
                           ],
                         ),
                       ),
                       const Divider(height: 1),
                       ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 220),
+                        constraints: BoxConstraints(maxHeight: available - 40),
                         child: ListView.builder(
+                          controller: _suggestionScroll,
+                          itemExtent: _suggestionRowHeight,
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           shrinkWrap: true,
                           itemCount: suggestions.length,
@@ -338,7 +373,25 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
   void _pickSuggestion(String suggestion) {
     widget.onSuggestionSelected?.call(suggestion);
+    _clearDraft();
+    _suggestionsDismissed = true;
+    _removeOverlay();
     _focusNode.requestFocus();
+  }
+
+  double get _suggestionRowHeight => widget.suggestionBuilder == null ? 48 : 72;
+
+  void _revealHighlightedSuggestion() {
+    if (!_suggestionScroll.hasClients) return;
+    final position = _suggestionScroll.position;
+    final start = _highlightedIndex * _suggestionRowHeight;
+    final end = start + _suggestionRowHeight;
+    final offset = start < position.pixels
+        ? start
+        : end > position.pixels + position.viewportDimension
+        ? end - position.viewportDimension
+        : position.pixels;
+    _suggestionScroll.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
   }
 
   /// Replaces the currently-typed text with `"<parent>:"` so the user can keep
@@ -365,20 +418,20 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   /// "parent:child" on every submit until the scope is left.
   void _enterScope(String parent) {
     _clearDraft();
+    _suggestionsDismissed = false;
+    _removeOverlay();
     widget.onScopeChanged!(parent);
     _restoreDraftFocusAfterScopeChange();
   }
 
   void _exitScope() {
+    _clearDraft();
+    _removeOverlay();
     widget.onScopeChanged?.call(null);
     _restoreDraftFocusAfterScopeChange();
   }
 
-  /// A scope change rebuilds the multiline field to insert/remove the parent
-  /// pill. With many wrapped chips Flutter can restore the click-derived text
-  /// selection after that rebuild, which puts the caret near the first chip.
-  /// Re-assert the logical draft end after layout so child typing always
-  /// resumes after every selected tag.
+  /// Restore the editable draft's caret after a parent action changes layout.
   void _restoreDraftFocusAfterScopeChange() {
     _focusNode.requestFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -398,7 +451,6 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   void _clearDraft() {
     final String chipChars = controller.prefixFor(
       valueCount: widget.values.length,
-      scopeParent: widget.scopeParent,
     );
     controller.value = TextEditingValue(
       text: chipChars,
@@ -436,9 +488,34 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
     final bool scopeEnabled = widget.onScopeChanged != null;
     final String typed = controller.textWithoutReplacements;
 
-    // Backspace on an empty draft leaves the parent scope. The pill sits
-    // between the chips and the caret, so it is what Backspace reaches first;
-    // deleting a chip stays one Backspace further back.
+    // Let the IME finish Vietnamese and other composed text first.
+    if (controller.value.composing.isValid &&
+        !controller.value.composing.isCollapsed) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      if (widget.scopeParent != null && scopeEnabled) {
+        _exitScope();
+        return KeyEventResult.handled;
+      }
+      if (_overlayEntry != null) {
+        _suggestionsDismissed = true;
+        _removeOverlay();
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isAltPressed ||
+        HardwareKeyboard.instance.isShiftPressed) {
+      // Preserve text-selection keys and Shift+Tab focus traversal. Colon is
+      // the sole exception because keyboards commonly produce it with Shift.
+      if (event.character != ':') return KeyEventResult.ignored;
+    }
+
+    // Leave the parent before allowing another Backspace to remove a chip.
     if (scopeEnabled &&
         widget.scopeParent != null &&
         event.logicalKey == LogicalKeyboardKey.backspace &&
@@ -456,12 +533,14 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
       if (scopeEnabled && widget.scopeParent != null) {
         return KeyEventResult.handled;
       }
-      if (suggestions.isNotEmpty && !typed.contains(':')) {
-        final index = _highlightedIndex.clamp(0, suggestions.length - 1);
+      if (typed.trim().isNotEmpty && !typed.contains(':')) {
+        final parent = suggestions.isNotEmpty && !_suggestionsDismissed
+            ? suggestions[_highlightedIndex.clamp(0, suggestions.length - 1)]
+            : typed.trim();
         if (scopeEnabled) {
-          _enterScope(suggestions[index]);
+          _enterScope(parent);
         } else {
-          _promoteToParent(suggestions[index]);
+          _promoteToParent(parent);
         }
         return KeyEventResult.handled;
       }
@@ -478,7 +557,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
         controller.selection.isCollapsed &&
         controller.selection.baseOffset >= controller.text.length) {
       final typedParent = typed.trim();
-      if (suggestions.isNotEmpty) {
+      if (suggestions.isNotEmpty && !_suggestionsDismissed) {
         final index = _highlightedIndex.clamp(0, suggestions.length - 1);
         _enterScope(suggestions[index]);
         return KeyEventResult.handled;
@@ -489,7 +568,9 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
       }
     }
 
-    if (suggestions.isEmpty) return KeyEventResult.ignored;
+    if (suggestions.isEmpty || _suggestionsDismissed) {
+      return KeyEventResult.ignored;
+    }
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       // Pick the highlighted suggestion
@@ -500,18 +581,25 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
       setState(() {
-        _highlightedIndex = (_highlightedIndex + 1) % suggestions.length;
+        _highlightedIndex = _suggestionNavigated
+            ? (_highlightedIndex + 1) % suggestions.length
+            : 0;
+        _suggestionNavigated = true;
       });
       _overlayEntry?.markNeedsBuild();
+      _revealHighlightedSuggestion();
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       setState(() {
-        _highlightedIndex =
-            (_highlightedIndex - 1 + suggestions.length) % suggestions.length;
+        _highlightedIndex = _suggestionNavigated
+            ? (_highlightedIndex - 1 + suggestions.length) % suggestions.length
+            : suggestions.length - 1;
+        _suggestionNavigated = true;
       });
       _overlayEntry?.markNeedsBuild();
+      _revealHighlightedSuggestion();
       return KeyEventResult.handled;
     }
 
@@ -523,7 +611,7 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   void _textListener() {
     final String currentText = controller.text;
 
-    if (_previousSelection != null) {
+    if (_previousSelection != null && !controller.editingChild) {
       final int currentNumber = countReplacements(currentText);
       final int previousNumber = countReplacements(_previousText);
 
@@ -563,61 +651,122 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
   }
 
   static int countPrefixReplacements(String text) {
-    return text.codeUnits.where((int unit) {
-      return unit == ChipsInputEditingController.kObjectReplacementChar ||
-          unit == ChipsInputEditingController.kScopeReplacementChar;
-    }).length;
+    return countReplacements(text);
   }
 
   @override
   Widget build(BuildContext context) {
     controller.chipBuilder = widget.chipBuilder;
     controller.updateValues(<T>[...widget.values]);
-    controller.updateScope(widget.scopeParent, _exitScope);
-
-    // Create a decoration that ensures proper padding for chips
-    final InputDecoration adjustedDecoration = widget.decoration.copyWith(
+    final parent = widget.scopeParent;
+    final decoration = widget.decoration.copyWith(
       contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       isDense: false,
     );
 
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: FocusScope(
-        onKeyEvent: _handleKeyEvent,
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 2),
-          child: TextField(
-            minLines: 1,
-            maxLines: 8,
-            textInputAction: TextInputAction.done,
-            style: widget.style,
-            strutStyle:
-                widget.strutStyle ??
+    Widget draftField({Color? childColor}) => TextField(
+      // Keep the same editor and text-input connection when moving into/out
+      // of the parent chip. Only the editing mode and decoration change.
+      key: _editableKey,
+      minLines: 1,
+      maxLines: parent == null ? 8 : 1,
+      textInputAction: TextInputAction.done,
+      style: parent == null
+          ? widget.style
+          : Theme.of(context).textTheme.bodyMedium!
+                .merge(widget.style)
+                .copyWith(fontSize: 13, color: childColor),
+      strutStyle: parent == null
+          ? widget.strutStyle ??
                 const StrutStyle(
                   fontSize: _kStrutFontSize,
                   height: _kRowHeight / _kStrutFontSize,
                   forceStrutHeight: true,
                   leadingDistribution: TextLeadingDistribution.even,
+                )
+          : null,
+      cursorHeight: parent == null
+          ? (widget.style?.fontSize ?? _kStrutFontSize) * 1.25
+          : 18,
+      cursorColor: childColor,
+      textAlignVertical: parent == null ? null : TextAlignVertical.center,
+      controller: controller,
+      focusNode: _focusNode,
+      inputFormatters: const [_ChipPrefixTextInputFormatter()],
+      decoration: parent == null
+          ? decoration
+          : InputDecoration(
+              hintText: AppLocalizations.of(context)!.childTagInputHint,
+              hintStyle: TextStyle(
+                color: childColor?.withValues(alpha: .65),
+                fontSize: 13,
+              ),
+              isDense: true,
+              // Let the chip's Row center the editor at its natural text height.
+              // Neutral density avoids the compact theme's baseline offsets.
+              isCollapsed: true,
+              visualDensity: VisualDensity.standard,
+              filled: false,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+            ),
+      onChanged: (_) {
+        _suggestionsDismissed = false;
+        _suggestionNavigated = false;
+        _highlightedIndex = -1;
+        widget.onTextChanged?.call(controller.textWithoutReplacements);
+        setState(() {});
+        _updateOverlay();
+      },
+      onSubmitted: (_) {
+        if (_suggestionNavigated &&
+            widget.suggestions.isNotEmpty &&
+            !_suggestionsDismissed) {
+          _pickSuggestion(widget.suggestions[_highlightedIndex]);
+        } else {
+          widget.onSubmitted?.call(controller.textWithoutReplacements);
+          _clearDraft();
+        }
+        _focusNode.requestFocus();
+      },
+    );
+
+    return CompositedTransformTarget(
+      key: _targetKey,
+      link: _layerLink,
+      child: FocusScope(
+        onKeyEvent: _handleKeyEvent,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          child: parent == null
+              ? draftField()
+              : InputDecorator(
+                  decoration: decoration.copyWith(hintText: null),
+                  isFocused: _focusNode.hasFocus,
+                  isEmpty: false,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        for (final tag in widget.values)
+                          widget.chipBuilder(context, tag),
+                        TagScopeChip(
+                          parent: parent,
+                          onExit: _exitScope,
+                          maxWidth: constraints.maxWidth,
+                          draft: controller.textWithoutReplacements,
+                          inputBuilder: (color) =>
+                              draftField(childColor: color),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-            // Keep the caret text-sized; it would otherwise span the whole row.
-            cursorHeight: widget.strutStyle == null
-                ? (widget.style?.fontSize ?? _kStrutFontSize) * 1.25
-                : null,
-            controller: controller,
-            focusNode: _focusNode,
-            inputFormatters: const <TextInputFormatter>[
-              _ChipPrefixTextInputFormatter(),
-            ],
-            decoration: adjustedDecoration,
-            onChanged: (String value) =>
-                widget.onTextChanged?.call(controller.textWithoutReplacements),
-            onSubmitted: (String value) {
-              widget.onSubmitted?.call(controller.textWithoutReplacements);
-              // Re-focus the input so the user can continue typing tags
-              _focusNode.requestFocus();
-            },
-          ),
         ),
       ),
     );
@@ -627,18 +776,13 @@ class ChipsInputState<T> extends State<ChipsInput<T>> {
 class ChipsInputEditingController<T> extends TextEditingController {
   ChipsInputEditingController(
     this.values,
-    this.chipBuilder,
-    this._onScopeExit, {
-    this.scopeParent,
+    this.chipBuilder, {
+    this.editingChild = false,
   }) : super() {
-    final prefix = prefixFor(
-      valueCount: values.length,
-      scopeParent: scopeParent,
-    );
-    final text = _emptyDraftText(prefix, scopeParent);
+    final text = prefixFor(valueCount: values.length);
     value = TextEditingValue(
       text: text,
-      selection: TextSelection.collapsed(offset: prefix.length),
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 
@@ -646,17 +790,19 @@ class ChipsInputEditingController<T> extends TextEditingController {
   // There will be one character for each of the InputChip displayed.
   static const int kObjectReplacementChar = 0xFFFE;
 
-  /// A separate placeholder keeps the parent scope pill in the editable text
-  /// flow without making it look like one of the selected value chips.
-  static const int kScopeReplacementChar = 0xFFFC;
-
-  /// One replacement character for the visible inline child-input hint.
-  /// The caret sits immediately before it; typing replaces it with the draft.
-  static const int kInputHintReplacementChar = 0xFFFB;
-
   List<T> values;
-  String? scopeParent;
-  VoidCallback _onScopeExit;
+  bool editingChild;
+
+  void updateChildMode(bool enabled) {
+    if (editingChild == enabled) return;
+    final draft = textWithoutReplacements;
+    editingChild = enabled;
+    final prefix = prefixFor(valueCount: values.length);
+    value = TextEditingValue(
+      text: '$prefix$draft',
+      selection: TextSelection.collapsed(offset: prefix.length + draft.length),
+    );
+  }
 
   /// Replaced on every build so chips never render through a stale closure.
   Widget Function(BuildContext context, T data) chipBuilder;
@@ -665,14 +811,13 @@ class ChipsInputEditingController<T> extends TextEditingController {
   /// from the outside the context of the text field.
   void updateValues(List<T> values) {
     if (values.length != this.values.length) {
-      final prefix = prefixFor(
-        valueCount: values.length,
-        scopeParent: scopeParent,
-      );
-      final text = _emptyDraftText(prefix, scopeParent);
+      final prefix = prefixFor(valueCount: values.length);
+      final draft = textWithoutReplacements;
       value = TextEditingValue(
-        text: text,
-        selection: TextSelection.collapsed(offset: prefix.length),
+        text: '$prefix$draft',
+        selection: TextSelection.collapsed(
+          offset: prefix.length + draft.length,
+        ),
       );
     }
     // Always take the new list: a same-length change (another file's tags,
@@ -680,51 +825,20 @@ class ChipsInputEditingController<T> extends TextEditingController {
     this.values = values;
   }
 
-  void updateScope(String? scopeParent, VoidCallback onScopeExit) {
-    _onScopeExit = onScopeExit;
-    if (scopeParent == this.scopeParent) return;
-
-    final draft = textWithoutReplacements;
-    this.scopeParent = scopeParent;
-    final prefix = prefixFor(
-      valueCount: values.length,
-      scopeParent: scopeParent,
-    );
-    final text = draft.isEmpty
-        ? _emptyDraftText(prefix, scopeParent)
-        : '$prefix$draft';
-    value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(
-        offset: draft.isEmpty ? prefix.length : text.length,
-      ),
-    );
-  }
-
-  String prefixFor({required int valueCount, required String? scopeParent}) {
+  String prefixFor({required int valueCount}) {
+    if (editingChild) return '';
     final chip = String.fromCharCode(kObjectReplacementChar);
-    final scope = String.fromCharCode(kScopeReplacementChar);
-    return '${chip * valueCount}${scopeParent == null ? '' : scope}';
-  }
-
-  String _emptyDraftText(String prefix, String? scopeParent) {
-    if (scopeParent == null) return prefix;
-    return '$prefix${String.fromCharCode(kInputHintReplacementChar)}';
+    return chip * valueCount;
   }
 
   String get textWithoutReplacements {
     final chip = String.fromCharCode(kObjectReplacementChar);
-    final scope = String.fromCharCode(kScopeReplacementChar);
-    final hint = String.fromCharCode(kInputHintReplacementChar);
-    return text.replaceAll(chip, '').replaceAll(scope, '').replaceAll(hint, '');
+    return text.replaceAll(chip, '');
   }
 
   String get textWithReplacements => text;
 
-  int get draftEndOffset {
-    final hintIndex = text.codeUnits.indexOf(kInputHintReplacementChar);
-    return hintIndex < 0 ? text.length : hintIndex;
-  }
+  int get draftEndOffset => text.length;
 
   @override
   TextSpan buildTextSpan({
@@ -732,6 +846,13 @@ class ChipsInputEditingController<T> extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
+    if (editingChild) {
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
+    }
     // Create a list to hold all spans
     final List<InlineSpan> spans = <InlineSpan>[];
 
@@ -749,27 +870,6 @@ class ChipsInputEditingController<T> extends TextEditingController {
       );
     }
 
-    final parent = scopeParent;
-    if (parent != null) {
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: TagScopeChip(parent: parent, onExit: _onScopeExit),
-        ),
-      );
-    }
-
-    if (text.codeUnits.contains(kInputHintReplacementChar)) {
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: ChildTagInputHint(
-            label: AppLocalizations.of(context)!.childTagInputHint,
-          ),
-        ),
-      );
-    }
-
     // Add text input after chips
     if (textWithoutReplacements.isNotEmpty) {
       spans.add(TextSpan(text: textWithoutReplacements));
@@ -780,7 +880,7 @@ class ChipsInputEditingController<T> extends TextEditingController {
 }
 
 /// Keeps the editable draft after the replacement characters that represent
-/// selected chips and the optional parent-scope pill.
+/// selected chips.
 ///
 /// Flutter can place the raw text selection before (or between) replacement
 /// characters when a user clicks a wrapped chip field. The controller renders
@@ -799,27 +899,10 @@ class _ChipPrefixTextInputFormatter extends TextInputFormatter {
     final chipReplacement = String.fromCharCode(
       ChipsInputEditingController.kObjectReplacementChar,
     );
-    final scopeReplacement = String.fromCharCode(
-      ChipsInputEditingController.kScopeReplacementChar,
-    );
-    final hintReplacement = String.fromCharCode(
-      ChipsInputEditingController.kInputHintReplacementChar,
-    );
     final chipCount = ChipsInputState.countReplacements(newValue.text);
-    final scopeCount = newValue.text.codeUnits
-        .where(
-          (unit) => unit == ChipsInputEditingController.kScopeReplacementChar,
-        )
-        .length;
-    final prefixLength = chipCount + scopeCount;
-    final draft = newValue.text
-        .replaceAll(chipReplacement, '')
-        .replaceAll(scopeReplacement, '')
-        .replaceAll(hintReplacement, '');
-    final normalizedText =
-        chipReplacement * chipCount +
-        scopeReplacement * scopeCount +
-        (scopeCount > 0 && draft.isEmpty ? hintReplacement : draft);
+    final prefixLength = chipCount;
+    final draft = newValue.text.replaceAll(chipReplacement, '');
+    final normalizedText = chipReplacement * chipCount + draft;
 
     int mapOffset(int offset) {
       if (offset < 0) return offset;
@@ -829,9 +912,7 @@ class _ChipPrefixTextInputFormatter extends TextInputFormatter {
           .codeUnits
           .where(
             (unit) =>
-                unit != ChipsInputEditingController.kObjectReplacementChar &&
-                unit != ChipsInputEditingController.kScopeReplacementChar &&
-                unit != ChipsInputEditingController.kInputHintReplacementChar,
+                unit != ChipsInputEditingController.kObjectReplacementChar,
           )
           .length;
       return prefixLength + draftUnitsBeforeOffset;
@@ -859,14 +940,22 @@ class _ChipPrefixTextInputFormatter extends TextInputFormatter {
   }
 }
 
-/// The parent pill that rides after selected chips in a scoped [ChipsInput]:
-/// while it is showing, everything typed after it is added as a child of
-/// [parent]. It deliberately reads as a breadcrumb rather than a tag chip.
+/// The inline parent chip contains the real child editor, including its caret.
 class TagScopeChip extends StatelessWidget {
-  const TagScopeChip({super.key, required this.parent, required this.onExit});
+  const TagScopeChip({
+    super.key,
+    required this.parent,
+    required this.onExit,
+    required this.inputBuilder,
+    required this.maxWidth,
+    required this.draft,
+  });
 
   final String parent;
   final VoidCallback onExit;
+  final Widget Function(Color color) inputBuilder;
+  final double maxWidth;
+  final String draft;
 
   @override
   Widget build(BuildContext context) {
@@ -874,95 +963,91 @@ class TagScopeChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final tagColor = TagColorManager.instance.getTagColor(parent);
-    final foregroundColor = TagChipStyle.readableOn(
+    final foreground = TagChipStyle.readableOn(
       Color.alphaBlend(
         TagChipStyle.tint(tagColor, isDark: isDark),
         theme.colorScheme.surface,
       ),
     );
-    final contentColor = foregroundColor == Colors.white
-        ? Colors.white
-        : tagColor;
+    final color = foreground == Colors.white ? Colors.white : tagColor;
+    final textStyle = theme.textTheme.bodyMedium!.copyWith(fontSize: 13);
+    double measure(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 5, 5, 5),
-        decoration: TagChipStyle.decoration(tagColor, isDark: isDark),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+    final showLabel = maxWidth >= 240;
+    final labelStyle = textStyle.copyWith(
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+    );
+    final parentStyle = textStyle.copyWith(
+      fontWeight: FontWeight.w700,
+      color: color,
+    );
+    final parentWidth = measure(parent, parentStyle).clamp(0.0, maxWidth * .32);
+    final labelWidth = showLabel
+        ? measure('${l10n.parentTagLabel}:', labelStyle) + 4
+        : 0;
+    final inputWidth =
+        measure(draft.isEmpty ? l10n.childTagInputHint : draft, textStyle) + 16;
+    final width =
+        (labelWidth + parentWidth + inputWidth.clamp(80.0, maxWidth) + 52)
+            .clamp(0.0, maxWidth);
+
+    return Container(
+      width: width,
+      constraints: const BoxConstraints(minHeight: 36),
+      padding: const EdgeInsets.only(left: 8, right: 4),
+      decoration: TagChipStyle.decoration(tagColor, isDark: isDark),
+      child: Row(
+        children: [
+          if (showLabel) ...[
             Text(
               '${l10n.parentTagLabel}:',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: contentColor.withValues(alpha: 0.72),
-              ),
+              style: labelStyle.copyWith(color: color.withValues(alpha: .72)),
             ),
             const SizedBox(width: 4),
-            Flexible(
-              fit: FlexFit.loose,
+          ],
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth * .32),
+            child: Tooltip(
+              message: parent,
               child: Text(
                 parent,
-                overflow: TextOverflow.ellipsis,
                 maxLines: 1,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: contentColor,
-                ),
+                overflow: TextOverflow.ellipsis,
+                style: parentStyle,
               ),
             ),
-            Icon(
-              PhosphorIconsLight.caretRight,
-              size: 12,
-              color: contentColor.withValues(alpha: 0.7),
+          ),
+          Icon(
+            PhosphorIconsLight.caretRight,
+            size: 12,
+            color: color.withValues(alpha: .7),
+          ),
+          const SizedBox(width: 4),
+          Expanded(child: inputBuilder(color)),
+          IconButton(
+            tooltip: l10n.exitTagScope(parent),
+            onPressed: onExit,
+            constraints: const BoxConstraints.tightFor(width: 24, height: 32),
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(24, 32),
+              maximumSize: const Size(24, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
             ),
-            const SizedBox(width: 5),
-            Tooltip(
-              message: l10n.exitTagScope(parent),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: onExit,
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: Icon(
-                    PhosphorIconsLight.x,
-                    size: 12,
-                    color: contentColor,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Ghost text rendered at the actual child-draft caret position. It occupies
-/// one replacement character and disappears as soon as the user types.
-class ChildTagInputHint extends StatelessWidget {
-  const ChildTagInputHint({super.key, required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(
-      context,
-    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.62);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13,
-          fontStyle: FontStyle.italic,
-          color: color,
-        ),
+            icon: Icon(PhosphorIconsLight.x, size: 12, color: color),
+          ),
+        ],
       ),
     );
   }

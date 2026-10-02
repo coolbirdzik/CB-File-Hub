@@ -9,7 +9,7 @@ import 'package:cb_file_manager/ui/widgets/tag_input_helpers.dart';
 
 /// The tag field shared by the Manage Tags dialogs and the properties pane:
 /// assigned tags sit as chips inside the input, suggestions show thumbnails
-/// and hierarchy, and ":" / "→" scope the draft under a parent tag.
+/// and hierarchy, and ":" / "→" place the child editor inside the parent chip.
 ///
 /// Callers own the tag list and the draft/scope state; removing a chip (its
 /// "x" or Backspace) is reported per tag through [onRemoved].

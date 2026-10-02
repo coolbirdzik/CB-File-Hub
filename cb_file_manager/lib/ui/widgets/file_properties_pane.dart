@@ -3,7 +3,9 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/design_system/cb_design_system.dart';
 import 'package:cb_file_manager/helpers/files/lazy_path_size_calculator.dart';
 import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'package:cb_file_manager/ui/utils/format_utils.dart';
@@ -54,6 +56,7 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
   Future<FileStat>? _stat;
   int? _size;
   int _generation = 0;
+  bool _propertiesExpanded = false;
 
   @override
   void initState() {
@@ -108,35 +111,58 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
     super.dispose();
   }
 
+  /// Collapsed by default so the tag editor gets the room; the choice sticks
+  /// across selections while the pane stays mounted.
   Widget _properties(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final showSize = _paths.length > 1 || widget.folderPaths.isNotEmpty;
+    return CbExpander(
+      expanded: _propertiesExpanded,
+      onExpansionChanged: (value) =>
+          setState(() => _propertiesExpanded = value),
+      headerPadding: const EdgeInsets.symmetric(
+        horizontal: CbSpacing.sm,
+        vertical: CbSpacing.xs + CbSpacing.xxs,
+      ),
+      contentPadding: const EdgeInsets.all(CbSpacing.sm),
+      title: Text(l10n.properties),
+      // What the selection is, readable without expanding.
+      subtitle: Text(
+        _paths.length == 1
+            ? p.basename(_paths.single)
+            : '${widget.filePaths.length} ${l10n.files}, ${widget.folderPaths.length} ${l10n.folders}',
+      ),
       children: [
-        Text(l10n.properties, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
         if (_paths.length == 1)
-          FilePropertiesDetails(filePath: _paths.single, statFuture: _stat!),
-        if (_paths.length > 1)
-          Text(
-            '${widget.filePaths.length} ${l10n.files}, ${widget.folderPaths.length} ${l10n.folders}',
+          FilePropertiesDetails(
+            filePath: _paths.single,
+            statFuture: _stat!,
+            dense: true,
           ),
-        if (_paths.length > 1 || widget.folderPaths.isNotEmpty)
-          Text(
-            '${l10n.fileSize}: ${_size == null ? l10n.loading : FormatUtils.formatFileSizeExact(_size!)}',
+        if (showSize)
+          FilePropertyRow(
+            label: l10n.fileSize,
+            value: _size == null
+                ? l10n.loading
+                : FormatUtils.formatFileSizeExact(_size!),
           ),
       ],
     );
   }
 
-  Widget _editor(BuildContext context) {
+  Widget _editor(BuildContext context, double browseMaxHeight) {
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final failure in _tags.failures)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(
+              CbSpacing.sm,
+              0,
+              CbSpacing.sm,
+              CbSpacing.sm,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -161,11 +187,25 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
           ),
         if (widget.folderPaths.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(l10n.propertiesFilesOnly),
+            padding: const EdgeInsets.fromLTRB(
+              CbSpacing.sm,
+              0,
+              CbSpacing.sm,
+              CbSpacing.sm,
+            ),
+            child: Text(
+              l10n.propertiesFilesOnly,
+              style: CbTypography.bodySm.copyWith(
+                color: context.cbColors.textSecondary,
+              ),
+            ),
           ),
         if (widget.filePaths.isNotEmpty)
-          SelectionTagEditor(key: _editorKey, controller: _tags),
+          SelectionTagEditor(
+            key: _editorKey,
+            controller: _tags,
+            browseMaxHeight: browseMaxHeight,
+          ),
       ],
     );
   }
@@ -177,39 +217,25 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
       );
     }
     return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 680) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _properties(context),
-                const SizedBox(height: 16),
-                _editor(context),
-              ],
-            ),
-          );
-        }
-        return Row(
+      builder: (context, constraints) => SingleChildScrollView(
+        // A narrow gutter so expander headers can show their hover fill;
+        // everything else is inset to line up with their titles.
+        padding: const EdgeInsets.fromLTRB(
+          CbSpacing.xs,
+          0,
+          CbSpacing.xs,
+          CbSpacing.md,
+        ),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              width: math.min(340, constraints.maxWidth * .34),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: _properties(context),
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: _editor(context),
-              ),
-            ),
+            if (_paths.isNotEmpty) _properties(context),
+            const SizedBox(height: CbSpacing.xs),
+            // Once scrolled to, the browser fills most of the pane.
+            _editor(context, math.max(320, constraints.maxHeight - 48)),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 

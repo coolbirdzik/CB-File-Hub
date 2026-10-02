@@ -822,7 +822,15 @@ class EnglishLocalizations implements AppLocalizations {
   String childTagHint(String parent) => 'New tag inside "$parent"...';
   @override
   String addingUnderTag(String parent) =>
-      'Adding inside "$parent" — Enter adds another child, Backspace leaves.';
+      'Adding children to "$parent". Esc leaves this parent.';
+  @override
+  String get tagInputHelp =>
+      'Type a parent tag, then press ":" or → to enter a child inside its chip.';
+  @override
+  String get tagSuggestionsLabel => 'Suggested tags';
+  @override
+  String childTagCount(int count) =>
+      '$count ${count == 1 ? 'child' : 'children'}';
   @override
   String deleteTagConfirmation(String tag) => 'Delete tag "$tag"?';
   @override

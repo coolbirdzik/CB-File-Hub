@@ -18,6 +18,7 @@ import 'package:cb_file_manager/ui/components/common/app_toast.dart';
 import 'package:cb_file_manager/ui/widgets/resizable_dialog.dart';
 import 'package:cb_file_manager/ui/widgets/tag_browse_section.dart';
 import 'package:cb_file_manager/ui/widgets/tag_chips_field.dart';
+import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 import 'package:cb_file_manager/ui/widgets/tag_management_section.dart';
 import 'package:cb_file_manager/utils/app_logger.dart';
 import '../../utils/route.dart';
@@ -68,12 +69,13 @@ class _SingleFileTagDialog extends StatefulWidget {
 }
 
 class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
+  final _inputKey = GlobalKey<ChipsInputState<String>>();
   List<String> _originalTags = <String>[];
   List<String> _selectedTags = <String>[];
   List<String> _tagSuggestions = <String>[];
   String _draftTagText = '';
 
-  /// Parent tag the input is scoped to, shown as a pill inside the field.
+  /// Parent tag whose inline chip contains the child draft.
   /// While set, the draft is only the child name and every submit composes
   /// "parent:child" — so a run of children goes in without retyping the
   /// parent once.
@@ -81,6 +83,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
   bool _isLoading = true;
   bool _isSaving = false;
   Timer? _debounceTimer;
+  int _suggestionGeneration = 0;
   final _thumbnailManager = TagThumbnailManager.instance;
   final _hierarchyManager = TagHierarchyManager.instance;
 
@@ -101,6 +104,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
   @override
   void dispose() {
+    _suggestionGeneration++;
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -161,7 +165,9 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
   Future<void> _updateTagSuggestions(String text) async {
     _debounceTimer?.cancel();
+    final generation = ++_suggestionGeneration;
     final query = _scopedQuery(text);
+    if (mounted) setState(() => _tagSuggestions = []);
 
     if (query.isEmpty) {
       if (!mounted) return;
@@ -178,7 +184,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
         hierarchyManager: _hierarchyManager,
         isSelected: _containsTag,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _suggestionGeneration) return;
       setState(() {
         _tagSuggestions = suggestions;
       });
@@ -209,6 +215,7 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
 
   void _addTag(String rawTag) {
     final tag = rawTag.trim();
+    _inputKey.currentState?.clearDraft();
     if (tag.isEmpty) {
       _draftTagText = '';
       return;
@@ -371,19 +378,18 @@ class _SingleFileTagDialogState extends State<_SingleFileTagDialog> {
     return _buildSectionCard(
       icon: PhosphorIconsLight.pencilSimpleLine,
       title: l10n.addTag,
-      subtitle: scope != null
-          ? l10n.addingUnderTag(scope)
-          : 'Type a tag. Press ":" or → on a suggestion to add inside it.',
+      subtitle: scope != null ? l10n.addingUnderTag(scope) : l10n.tagInputHelp,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TagChipsField(
+            fieldKey: _inputKey,
             tags: _selectedTags,
             suggestions: _tagSuggestions,
             scopeParent: scope,
             onScopeChanged: _onScopeChanged,
             onSuggestionSelected: _onSuggestionSelected,
-            hintText: '${l10n.enterTagName} (e.g. Actress:Hung)',
+            hintText: l10n.enterTagName,
             onTextChanged: (value) {
               _draftTagText = value;
               _updateTagSuggestions(value);
@@ -714,10 +720,11 @@ void showDeleteTagDialog(
 /// Dialog for batch adding tags
 void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   final focusNode = FocusNode();
-  final TextEditingController textController = TextEditingController();
+  final inputKey = GlobalKey<ChipsInputState<String>>();
   List<String> tagSuggestions = [];
   List<String> selectedTags = [];
   String draftTagText = '';
+  int suggestionGeneration = 0;
 
   /// Parent tag the input is scoped to — see _SingleFileTagDialogState.
   String? scopeParent;
@@ -741,11 +748,13 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
   }
 
   Future<void> updateTagSuggestions(String text) async {
-    tagSuggestions = await computeTagSuggestions(
+    final generation = ++suggestionGeneration;
+    final suggestions = await computeTagSuggestions(
       scopedQuery(text),
       hierarchyManager: hierarchyManager,
       isSelected: selectedTags.contains,
     );
+    if (generation == suggestionGeneration) tagSuggestions = suggestions;
   }
 
   /// Handles "parent:child1,child2" input by adding the parent + children to
@@ -762,7 +771,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
         .toList(growable: false);
 
     selectedTags.addAll(tagsToAdd);
-    textController.clear();
+    inputKey.currentState?.clearDraft();
     draftTagText = '';
     tagSuggestions = [];
 
@@ -790,7 +799,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
 
     if (!selectedTags.contains(trimmed)) {
       selectedTags.add(trimmed);
-      textController.clear();
+      inputKey.currentState?.clearDraft();
       draftTagText = '';
     }
   }
@@ -846,7 +855,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
 
             void handleTextChange(String value) {
               draftTagText = value;
-              setState(() {});
+              setState(() => tagSuggestions = []);
               refreshSuggestions(value);
             }
 
@@ -918,6 +927,7 @@ void showBatchAddTagDialog(BuildContext context, List<String> selectedFiles) {
                       Focus(
                         focusNode: focusNode,
                         child: TagChipsField(
+                          fieldKey: inputKey,
                           tags: selectedTags,
                           suggestions: tagSuggestions,
                           scopeParent: scopeParent,

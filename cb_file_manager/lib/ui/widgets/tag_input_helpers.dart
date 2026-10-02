@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
+import 'package:cb_file_manager/helpers/core/text_utils.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
@@ -47,7 +49,7 @@ ParsedHierarchyInput? parseHierarchyInput(String input) {
 ///
 /// - When the query contains ":", suggests existing children of the typed
 ///   parent (filtered by the partial child being typed, comma-aware).
-/// - Otherwise runs a regular tag search with parents ordered first.
+/// - Otherwise runs a regular tag search ordered by [rankTagSuggestions].
 ///
 /// [isSelected] excludes tags already chosen. Results are capped at 10.
 Future<List<String>> computeTagSuggestions(
@@ -77,6 +79,7 @@ Future<List<String>> computeTagSuggestions(
       // Comma-separated: only match the partial entry being typed now.
       final existingChildren = childPart
           .split(',')
+          .take(childPart.split(',').length - 1)
           .map((c) => c.trim().toLowerCase())
           .where((c) => c.isNotEmpty)
           .toSet();
@@ -94,17 +97,54 @@ Future<List<String>> computeTagSuggestions(
     }
   }
 
-  // Regular search with hierarchy-aware ordering (parents first).
   final suggestions = await TagManager.instance.searchTags(trimmed);
-  final sorted = suggestions.where((tag) => !isSelected(tag)).toList();
-  sorted.sort((a, b) {
-    final aIsParent = hierarchyManager.isParent(a);
-    final bIsParent = hierarchyManager.isParent(b);
-    if (aIsParent && !bIsParent) return -1;
-    if (!aIsParent && bIsParent) return 1;
-    return a.toLowerCase().compareTo(b.toLowerCase());
+  return rankTagSuggestions(
+    suggestions.where((tag) => !isSelected(tag)),
+    trimmed,
+    isParent: hierarchyManager.isParent,
+  ).take(10).toList(growable: false);
+}
+
+final _wordSeparators = RegExp(r'[\s_\-.:/()\[\]{}]+');
+
+/// Orders matches by how well they fit [query]: exact, exact ignoring accents,
+/// prefix, prefix ignoring accents, word start, then anywhere. Within a tier,
+/// parents come first, then shorter names, then A-Z.
+///
+/// Search ignores accents, so "ro" matches "rõ" — but a plain A-Z sort puts
+/// "rõ" after "robot" and even "bro"; ranking keeps the closest tag on top.
+List<String> rankTagSuggestions(
+  Iterable<String> tags,
+  String query, {
+  bool Function(String tag)? isParent,
+}) {
+  final lower = query.trim().toLowerCase();
+  final folded = TextUtils.normalizeForSearch(lower);
+  int tier(String tag) {
+    final tagLower = tag.toLowerCase();
+    final tagFolded = TextUtils.normalizeForSearch(tagLower);
+    if (tagLower == lower) return 0;
+    if (tagFolded == folded) return 1;
+    if (tagLower.startsWith(lower)) return 2;
+    if (tagFolded.startsWith(folded)) return 3;
+    if (tagFolded.split(_wordSeparators).any((w) => w.startsWith(folded))) {
+      return 4;
+    }
+    return 5;
+  }
+
+  final tiers = {for (final tag in tags) tag: tier(tag)};
+  final parents = {
+    for (final tag in tiers.keys) tag: isParent?.call(tag) ?? false,
+  };
+  return tiers.keys.toList()..sort((a, b) {
+    final byTier = tiers[a]!.compareTo(tiers[b]!);
+    if (byTier != 0) return byTier;
+    if (parents[a] != parents[b]) return parents[a]! ? -1 : 1;
+    final byLength = a.length.compareTo(b.length);
+    if (byLength != 0) return byLength;
+    return TextUtils.compareAlphabetically(a, b);
   });
-  return sorted.take(10).toList(growable: false);
 }
 
 /// Given the current draft text and a picked suggestion, reconstructs the full
@@ -221,6 +261,8 @@ Widget buildTagSuggestionItem(
             children: [
               Text(
                 suggestion,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w400,
@@ -229,7 +271,7 @@ Widget buildTagSuggestionItem(
               ),
               if (parents.isNotEmpty)
                 Text(
-                  'Parent: ${parents.join(", ")}',
+                  '${AppLocalizations.of(context)!.parentTagLabel}: ${parents.join(", ")}',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant.withValues(
@@ -242,7 +284,7 @@ Widget buildTagSuggestionItem(
                 ),
               if (children.isNotEmpty)
                 Text(
-                  '${children.length} child${children.length > 1 ? "ren" : ""}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
+                  '${AppLocalizations.of(context)!.childTagCount(children.length)}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant.withValues(

@@ -742,6 +742,8 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         userPreferences.getVideoPlayerVolume(),
         userPreferences.getVideoPlayerMute(),
       ).wait;
+      // Disposed while loading preferences: don't create an orphaned player.
+      if (!mounted) return;
       _lastVolume = savedVolume > 0 ? savedVolume : _lastVolume;
 
       setState(() {
@@ -775,6 +777,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
       // Open media based on source type
       await _openMediaSource();
+      if (!mounted) return;
 
       // Apply saved volume preferences with multiple attempts
       await _applyVolumeSettings();
@@ -932,23 +935,25 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   }
 
   Future<void> _openMediaSource() async {
+    // Held locally: dispose() can null _player while open() is in flight.
+    final player = _player!;
     if (widget.file != null) {
       // Local file playback
-      await _player!.open(
+      await player.open(
         PlaybackMedia(widget.file!.path),
         play: widget.autoPlay,
       );
-      if (widget.autoPlay) {
-        await _player!.play();
+      if (widget.autoPlay && mounted) {
+        await player.play();
       }
     } else if (widget.streamingUrl != null) {
       // Streaming URL playback
-      await _player!.open(
+      await player.open(
         PlaybackMedia(widget.streamingUrl!),
         play: widget.autoPlay,
       );
-      if (widget.autoPlay) {
-        await _player!.play();
+      if (widget.autoPlay && mounted) {
+        await player.play();
       }
     } else if (widget.smbMrl != null) {
       // Direct SMB playback uses the same media_kit backend as local files.
