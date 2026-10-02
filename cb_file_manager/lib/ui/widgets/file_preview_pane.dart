@@ -25,6 +25,7 @@ class FilePreviewPane extends StatelessWidget {
   final SelectionState selectionState;
   final Function(File, bool)? onOpenFile;
   final VoidCallback onClosePreview;
+  final Widget? headerLeading;
 
   const FilePreviewPane({
     super.key,
@@ -32,6 +33,7 @@ class FilePreviewPane extends StatelessWidget {
     required this.selectionState,
     required this.onOpenFile,
     required this.onClosePreview,
+    this.headerLeading,
   });
 
   @override
@@ -91,6 +93,7 @@ class FilePreviewPane extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _PreviewHeader(
+                leading: headerLeading,
                 title: displayName,
                 showActions: hasFile,
                 onOpen: hasFile && onOpenFile != null
@@ -302,6 +305,7 @@ class _InAppFileViewerScreen extends StatelessWidget {
 }
 
 class _PreviewHeader extends StatelessWidget {
+  final Widget? leading;
   final String title;
   final bool showActions;
   final VoidCallback? onOpen;
@@ -310,6 +314,7 @@ class _PreviewHeader extends StatelessWidget {
   final String closeTooltip;
 
   const _PreviewHeader({
+    this.leading,
     required this.title,
     required this.showActions,
     this.onOpen,
@@ -327,6 +332,7 @@ class _PreviewHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          ?leading,
           Expanded(
             child: Text(
               title,

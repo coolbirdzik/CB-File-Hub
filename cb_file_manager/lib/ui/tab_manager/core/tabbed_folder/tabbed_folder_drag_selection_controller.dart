@@ -19,6 +19,7 @@ class TabbedFolderDragSelectionController {
   final Iterable<String> Function()? folderPaths;
 
   final Map<String, Rect> _itemPositions = {};
+  final Map<String, RenderBox> _itemRenderBoxes = {};
 
   final ValueNotifier<bool> isDragging = ValueNotifier<bool>(false);
   final ValueNotifier<Offset?> dragStartPosition = ValueNotifier<Offset?>(null);
@@ -60,6 +61,7 @@ class TabbedFolderDragSelectionController {
   void dispose() {
     _folderListSub?.cancel();
     _folderListSub = null;
+    _itemRenderBoxes.clear();
     isDragging.dispose();
     dragStartPosition.dispose();
     dragCurrentPosition.dispose();
@@ -73,8 +75,30 @@ class TabbedFolderDragSelectionController {
     _itemPositions[path] = position;
   }
 
+  /// Grid tiles register once. Read their final bounds only during selection,
+  /// rather than scheduling a measurement for every tile on every resize frame.
+  void registerItemRenderBox(String path, RenderBox box) {
+    _itemRenderBoxes[path] = box;
+  }
+
+  void unregisterItemRenderBox(String path, RenderBox box) {
+    if (identical(_itemRenderBoxes[path], box)) _itemRenderBoxes.remove(path);
+  }
+
+  Iterable<MapEntry<String, Rect>> get _currentItemPositions sync* {
+    for (final entry in _itemPositions.entries) {
+      if (!_itemRenderBoxes.containsKey(entry.key)) yield entry;
+    }
+    for (final entry in _itemRenderBoxes.entries) {
+      final box = entry.value;
+      if (box.attached && box.hasSize) {
+        yield MapEntry(entry.key, box.localToGlobal(Offset.zero) & box.size);
+      }
+    }
+  }
+
   String? hitTestItem(Offset globalPosition, {Set<String>? allowedPaths}) {
-    final entries = _itemPositions.entries.toList(growable: false).reversed;
+    final entries = _currentItemPositions.toList(growable: false).reversed;
     for (final entry in entries) {
       if (allowedPaths != null && !allowedPaths.contains(entry.key)) {
         continue;
@@ -205,15 +229,16 @@ class TabbedFolderDragSelectionController {
     final Set<String> selectedFoldersInDrag = {};
     final Set<String> selectedFilesInDrag = {};
 
-    _itemPositions.forEach((path, itemRect) {
-      if (!globalSelectionRect.overlaps(itemRect)) return;
+    for (final entry in _currentItemPositions) {
+      final path = entry.key;
+      if (!globalSelectionRect.overlaps(entry.value)) continue;
 
       if (knownFolderPaths.contains(path)) {
         selectedFoldersInDrag.add(path);
       } else {
         selectedFilesInDrag.add(path);
       }
-    });
+    }
 
     selectionBloc.add(
       SelectItemsInRect(

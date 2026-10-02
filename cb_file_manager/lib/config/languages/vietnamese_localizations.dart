@@ -358,6 +358,12 @@ class VietnameseLocalizations implements AppLocalizations {
   String get previewPaneTitle => 'Xem trước';
 
   @override
+  String get dragFilePane => 'Kéo để đặt cạnh một khung khác';
+
+  @override
+  String get resetFilePaneLayout => 'Khôi phục bố cục khung mặc định';
+
+  @override
   String get previewSelectFile => 'Chọn tệp để xem trước';
 
   @override

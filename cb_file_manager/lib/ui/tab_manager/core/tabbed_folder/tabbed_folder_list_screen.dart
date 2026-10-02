@@ -1,4 +1,6 @@
 import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
+import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
+import 'package:cb_file_manager/ui/widgets/file_preview_pane.dart';
 import 'package:cb_file_manager/helpers/core/search_query.dart';
 import 'dart:async';
 import 'package:cb_file_manager/ui/widgets/file_drag_drop_item.dart';
@@ -525,6 +527,27 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
     final body = _buildBody(context, state, selection, isNetworkPath);
     if (!isDesktopPlatform || _isDrivesMode()) return body;
     return FilePropertiesPane(
+      headerLeading: const FilePaneDragHandle(pane: FilePane.properties),
+      paneLayoutBuilder: (context, panel) => ValueListenableBuilder<double>(
+        valueListenable: _previewPaneWidthNotifier,
+        builder: (context, width, _) => FilePaneLayout(
+          files: body,
+          preview: FilePreviewPane(
+            state: state,
+            selectionState: selection,
+            onOpenFile: _onFileTap,
+            onClosePreview: _togglePreviewPane,
+            headerLeading: const FilePaneDragHandle(pane: FilePane.preview),
+          ),
+          properties: panel,
+          previewVisible: isPreviewPaneVisible,
+          propertiesVisible: _propertiesPaneVisible,
+          previewWidth: width,
+          propertiesHeight: _propertiesPaneHeight,
+          listFocusNode: _keyboardController.focusNode,
+          previewFocusNode: _keyboardController.previewFocusNode,
+        ),
+      ),
       panelFocusNode: _propertiesPaneFocusNode,
       filePaths: selection.selectedFilePaths.toList(),
       folderPaths: selection.selectedFolderPaths.toList(),
@@ -2006,7 +2029,7 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   toggleSelectionMode: _toggleSelectionMode,
                   columnVisibility: columnVisibility,
                   showContextMenu: _showContextMenu,
-                  isPreviewPaneVisible: isPreviewPaneVisible,
+                  isPreviewPaneVisible: false,
                   previewPaneWidthListenable: _previewPaneWidthNotifier,
                   onZoomLevelChanged: handleZoomLevelChange,
                   onPreviewPaneWidthChanged: _updatePreviewPaneWidth,
@@ -2021,12 +2044,10 @@ class _TabbedFolderListScreenState extends State<TabbedFolderListScreen>
                   tabId: widget.tabId,
                   isMasonryLayout: _isMasonryLayout,
                   onGridCrossAxisCountChanged: (c) {
-                    // Defer setState to after build — this callback runs from LayoutBuilder during build.
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && _gridCrossAxisCount != c) {
-                        setState(() => _gridCrossAxisCount = c);
-                      }
-                    });
+                    // Read by keyboard navigation and scroll-to-item handlers,
+                    // not by the visible UI. Rebuilding the whole tab here
+                    // recreated every thumbnail when a resize changed columns.
+                    _gridCrossAxisCount = c;
                   },
                   onGridItemMainAxisExtentChanged: (extent) {
                     if (extent == null || extent <= 0) {

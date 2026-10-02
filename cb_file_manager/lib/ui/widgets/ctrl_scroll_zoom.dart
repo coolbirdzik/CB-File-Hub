@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:win32/win32.dart' as win32;
 
 /// A lightweight wrapper that intercepts **Ctrl+scroll** events and converts
 /// them into a ±1 zoom delta, leaving all other pointer-signal events (plain
@@ -27,9 +30,30 @@ class CtrlScrollZoom extends StatelessWidget {
   final void Function(int delta)? onDelta;
   final Widget child;
 
-  const CtrlScrollZoom({super.key, required this.child, this.onDelta});
+  /// Replaces the Windows key-state query in widget tests, whose synthetic
+  /// keyboard events do not change the physical keyboard state.
+  @visibleForTesting
+  final int Function(int virtualKey)? debugWindowsKeyState;
+
+  const CtrlScrollZoom({
+    super.key,
+    required this.child,
+    this.onDelta,
+    this.debugWindowsKeyState,
+  });
 
   bool _isCtrlPressed() {
+    if (Platform.isWindows || debugWindowsKeyState != null) {
+      // Key-up can be missed while another app has focus. Query the physical
+      // state for each wheel event rather than trusting Flutter's cached keys.
+      // Only the high bit means "currently down"; the low bit means a previous
+      // press and must not enable zoom after the modifier has been released.
+      final keyState = debugWindowsKeyState ?? win32.GetAsyncKeyState;
+      return (keyState(win32.VK_CONTROL) & 0x8000) != 0 ||
+          (keyState(win32.VK_LWIN) & 0x8000) != 0 ||
+          (keyState(win32.VK_RWIN) & 0x8000) != 0;
+    }
+
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
     return keys.contains(LogicalKeyboardKey.controlLeft) ||
         keys.contains(LogicalKeyboardKey.controlRight) ||

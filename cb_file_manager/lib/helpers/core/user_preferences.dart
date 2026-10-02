@@ -1775,4 +1775,10 @@ class UserPreferences {
 
   Future<bool> setPropertiesPaneHeight(double height) =>
       _savePreference<double>('properties_pane_height', height);
+
+  Future<String> getFilePaneLayout() async =>
+      await _getPreference<String>('file_pane_layout', defaultValue: '') ?? '';
+
+  Future<bool> setFilePaneLayout(String layout) =>
+      _savePreference<String>('file_pane_layout', layout);
 }

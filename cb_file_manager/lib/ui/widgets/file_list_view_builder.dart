@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
@@ -29,6 +30,7 @@ import 'package:cb_file_manager/ui/widgets/miller_columns_view.dart';
 import 'package:cb_file_manager/ui/widgets/file_tree_view.dart';
 import 'package:cb_file_manager/ui/utils/view_mode_utils.dart';
 import 'adaptive_file_list.dart';
+import 'stable_layout_builder.dart';
 
 /// Static factory class for building file list views in different modes
 class FileListViewBuilder {
@@ -402,8 +404,8 @@ class FileListViewBuilder {
                 child: CtrlScrollZoom(
                   onDelta: null,
                   child: RepaintBoundary(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
+                    child: StableLayoutBuilder<int>(
+                      layoutValue: (constraints) {
                         final maxZoom = GridZoomConstraints.maxGridSize(
                           availableWidth: constraints.maxWidth,
                           mode: GridSizeMode.referenceWidth,
@@ -415,16 +417,10 @@ class FileListViewBuilder {
                         final effectiveZoom = state.gridZoomLevel
                             .clamp(UserPreferences.minGridZoomLevel, maxZoom)
                             .toInt();
-                        final itemWidth = _gridItemWidthForZoom(effectiveZoom);
-                        final availableWidth = math.max(
-                          0.0,
-                          constraints.maxWidth - (_gridSpacing * 2),
-                        );
-                        final crossAxisCount = _gridCrossAxisCount(
-                          availableWidth,
-                          itemWidth,
-                        );
-                        onGridCrossAxisCountChanged?.call(crossAxisCount);
+                        return effectiveZoom;
+                      },
+                      builder: (context, zoom) {
+                        final itemWidth = _gridItemWidthForZoom(zoom);
                         final itemHeight = itemWidth / _gridAspectRatio;
                         onGridItemMainAxisExtentChanged?.call(
                           itemHeight + _gridSpacing,
@@ -452,203 +448,187 @@ class FileListViewBuilder {
                             itemPath,
                           );
 
+                          Widget buildContent() {
+                            if (index < state.folders.length) {
+                              final folder = state.folders[index] as Directory;
+                              return _wrapFileDragDrop(
+                                isDesktopPlatform: isDesktopPlatform,
+                                isFolder: true,
+                                path: folder.path,
+                                selectionState: selectionState,
+                                onStartFileDrag: onStartFileDrag,
+                                onMoveItemsToFolder: onMoveItemsToFolder,
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: SizedBox(
+                                    width: itemWidth,
+                                    height: itemHeight,
+                                    child: RepaintBoundary(
+                                      child:
+                                          folder_list_components.FolderGridItem(
+                                            key: ValueKey(
+                                              'folder-grid-item-${folder.path}',
+                                            ),
+                                            folder: folder,
+                                            onNavigate: onNavigateToPath,
+                                            isSelected: isSelected,
+                                            toggleFolderSelection:
+                                                toggleFolderSelection,
+                                            isDesktopMode: isDesktopPlatform,
+                                            lastSelectedPath:
+                                                selectionState.lastSelectedPath,
+                                            clearSelectionMode: clearSelection,
+                                            immediateSelectionListenable:
+                                                immediateSelectionForPath?.call(
+                                                  folder.path,
+                                                ),
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              final file =
+                                  state.files[index - state.folders.length]
+                                      as File;
+                              final masonryHeight = shouldUseMasonry
+                                  ? itemHeight * _masonryHeightFactor(file.path)
+                                  : itemHeight;
+                              return _wrapFileDragDrop(
+                                isDesktopPlatform: isDesktopPlatform,
+                                isFolder: false,
+                                path: file.path,
+                                selectionState: selectionState,
+                                onStartFileDrag: onStartFileDrag,
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: SizedBox(
+                                    width: itemWidth,
+                                    height: masonryHeight,
+                                    child: RepaintBoundary(
+                                      child:
+                                          folder_list_components.FileGridItem(
+                                            key: ValueKey(
+                                              'file-grid-item-${file.path}',
+                                            ),
+                                            file: file,
+                                            state: state,
+                                            isSelectionMode: itemSelectionMode,
+                                            isSelected: isSelected,
+                                            toggleFileSelection:
+                                                toggleFileSelection,
+                                            toggleSelectionMode:
+                                                toggleSelectionMode,
+                                            onFileTap: onFileTap,
+                                            isDesktopMode: isDesktopPlatform,
+                                            lastSelectedPath:
+                                                selectionState.lastSelectedPath,
+                                            showDeleteTagDialog:
+                                                showDeleteTagDialog,
+                                            showAddTagToFileDialog:
+                                                showAddTagToFileDialog,
+                                            onDeleteFile: onDeleteFile,
+                                            onDeleteFiles: onDeleteFiles,
+                                            showFileTags: showFileTags,
+                                            immediateSelectionListenable:
+                                                immediateSelectionForPath?.call(
+                                                  file.path,
+                                                ),
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+
                           return Container(
                             key: itemKeyForPath?.call(itemPath),
                             child: KeyedSubtree(
                               key: ValueKey(itemKey),
-                              child: LayoutBuilder(
-                                builder: (BuildContext context, BoxConstraints constraints) {
-                                  if (isDesktopPlatform) {
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          try {
-                                            final RenderBox? renderBox =
-                                                context.findRenderObject()
-                                                    as RenderBox?;
-                                            if (renderBox != null &&
-                                                renderBox.hasSize &&
-                                                renderBox.attached) {
-                                              final position = renderBox
-                                                  .localToGlobal(Offset.zero);
-                                              dragSelectionController
-                                                  .registerItemPosition(
-                                                    itemPath,
-                                                    Rect.fromLTWH(
-                                                      position.dx,
-                                                      position.dy,
-                                                      renderBox.size.width,
-                                                      renderBox.size.height,
-                                                    ),
-                                                  );
-                                            }
-                                          } catch (e) {
-                                            debugPrint(
-                                              'Layout error in grid view: $e',
-                                            );
-                                          }
-                                        });
-                                  }
-
-                                  if (index < state.folders.length) {
-                                    final folder =
-                                        state.folders[index] as Directory;
-                                    return _wrapFileDragDrop(
-                                      isDesktopPlatform: isDesktopPlatform,
-                                      isFolder: true,
-                                      path: folder.path,
-                                      selectionState: selectionState,
-                                      onStartFileDrag: onStartFileDrag,
-                                      onMoveItemsToFolder: onMoveItemsToFolder,
-                                      child: Align(
-                                        alignment: Alignment.topCenter,
-                                        child: SizedBox(
-                                          width: itemWidth,
-                                          height: itemHeight,
-                                          child: RepaintBoundary(
-                                            child: folder_list_components.FolderGridItem(
-                                              key: ValueKey(
-                                                'folder-grid-item-${folder.path}',
-                                              ),
-                                              folder: folder,
-                                              onNavigate: onNavigateToPath,
-                                              isSelected: isSelected,
-                                              toggleFolderSelection:
-                                                  toggleFolderSelection,
-                                              isDesktopMode: isDesktopPlatform,
-                                              lastSelectedPath: selectionState
-                                                  .lastSelectedPath,
-                                              clearSelectionMode:
-                                                  clearSelection,
-                                              immediateSelectionListenable:
-                                                  immediateSelectionForPath
-                                                      ?.call(folder.path),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    final file =
-                                        state.files[index -
-                                                state.folders.length]
-                                            as File;
-                                    final masonryHeight = shouldUseMasonry
-                                        ? itemHeight *
-                                              _masonryHeightFactor(file.path)
-                                        : itemHeight;
-                                    return _wrapFileDragDrop(
-                                      isDesktopPlatform: isDesktopPlatform,
-                                      isFolder: false,
-                                      path: file.path,
-                                      selectionState: selectionState,
-                                      onStartFileDrag: onStartFileDrag,
-                                      child: Align(
-                                        alignment: Alignment.topCenter,
-                                        child: SizedBox(
-                                          width: itemWidth,
-                                          height: masonryHeight,
-                                          child: RepaintBoundary(
-                                            child:
-                                                folder_list_components.FileGridItem(
-                                                  key: ValueKey(
-                                                    'file-grid-item-${file.path}',
-                                                  ),
-                                                  file: file,
-                                                  state: state,
-                                                  isSelectionMode:
-                                                      itemSelectionMode,
-                                                  isSelected: isSelected,
-                                                  toggleFileSelection:
-                                                      toggleFileSelection,
-                                                  toggleSelectionMode:
-                                                      toggleSelectionMode,
-                                                  onFileTap: onFileTap,
-                                                  isDesktopMode:
-                                                      isDesktopPlatform,
-                                                  lastSelectedPath:
-                                                      selectionState
-                                                          .lastSelectedPath,
-                                                  showDeleteTagDialog:
-                                                      showDeleteTagDialog,
-                                                  showAddTagToFileDialog:
-                                                      showAddTagToFileDialog,
-                                                  onDeleteFile: onDeleteFile,
-                                                  onDeleteFiles: onDeleteFiles,
-                                                  showFileTags: showFileTags,
-                                                  immediateSelectionListenable:
-                                                      immediateSelectionForPath
-                                                          ?.call(file.path),
-                                                ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
+                              child: _MeasuredGridItem(
+                                path: itemPath,
+                                controller: isDesktopPlatform
+                                    ? dragSelectionController
+                                    : null,
+                                child: buildContent(),
                               ),
                             ),
                           );
                         }
 
-                        if (shouldUseMasonry) {
-                          return ScrollVelocityListener(
-                            child: MasonryGridView.count(
-                              controller: scrollController,
-                              padding: const EdgeInsets.all(8.0),
-                              physics: const ClampingScrollPhysics(),
-                              cacheExtent: 400,
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: _gridSpacing,
-                              mainAxisSpacing: _gridSpacing,
-                              itemCount:
-                                  state.folders.length + state.files.length,
-                              itemBuilder: buildGridItem,
+                        // Keep the item delegate identical even when a divider
+                        // crosses a column boundary. Only the grid geometry
+                        // changes; loaded video/folder subtrees stay intact.
+                        final childrenDelegate = SliverChildBuilderDelegate(
+                          buildGridItem,
+                          childCount: state.folders.length + state.files.length,
+                          addSemanticIndexes: false,
+                          findChildIndexCallback: (Key key) {
+                            if (key is! ValueKey<String>) return null;
+                            final value = key.value;
+                            if (value.startsWith('folder-grid-')) {
+                              final folderPath = value.substring(
+                                'folder-grid-'.length,
+                              );
+                              final index = folderIndexByPath[folderPath];
+                              return index;
+                            }
+                            if (value.startsWith('file-grid-')) {
+                              final filePath = value.substring(
+                                'file-grid-'.length,
+                              );
+                              final index = fileIndexByPath[filePath];
+                              if (index == null) return null;
+                              return state.folders.length + index;
+                            }
+                            return null;
+                          },
+                        );
+                        return StableLayoutBuilder<int>(
+                          layoutValue: (constraints) => _gridCrossAxisCount(
+                            math.max(
+                              0.0,
+                              constraints.maxWidth - _gridSpacing * 2,
                             ),
-                          );
-                        }
-
-                        return ScrollVelocityListener(
-                          child: GridView.builder(
-                            controller: scrollController,
-                            padding: const EdgeInsets.all(8.0),
-                            physics: const ClampingScrollPhysics(),
-                            // cacheExtent: keep more items alive near viewport to avoid thumbnail re-render
-                            // Desktop: 400px, Mobile: 200px - balances smooth scrolling vs thumbnail generation
-                            cacheExtent: isDesktopPlatform ? 600 : 400,
-                            addAutomaticKeepAlives: true,
-                            addRepaintBoundaries: true,
-                            addSemanticIndexes: false,
-                            findChildIndexCallback: (Key key) {
-                              if (key is! ValueKey<String>) return null;
-                              final value = key.value;
-                              if (value.startsWith('folder-grid-')) {
-                                final folderPath = value.substring(
-                                  'folder-grid-'.length,
-                                );
-                                final index = folderIndexByPath[folderPath];
-                                return index;
-                              }
-                              if (value.startsWith('file-grid-')) {
-                                final filePath = value.substring(
-                                  'file-grid-'.length,
-                                );
-                                final index = fileIndexByPath[filePath];
-                                if (index == null) return null;
-                                return state.folders.length + index;
-                              }
-                              return null;
-                            },
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: crossAxisCount,
+                            itemWidth,
+                          ),
+                          builder: (context, crossAxisCount) {
+                            onGridCrossAxisCountChanged?.call(crossAxisCount);
+                            if (shouldUseMasonry) {
+                              return ScrollVelocityListener(
+                                child: MasonryGridView.custom(
+                                  controller: scrollController,
+                                  padding: const EdgeInsets.all(8.0),
+                                  physics: const ClampingScrollPhysics(),
+                                  cacheExtent: 400,
+                                  gridDelegate:
+                                      SliverSimpleGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: crossAxisCount,
+                                      ),
                                   crossAxisSpacing: _gridSpacing,
                                   mainAxisSpacing: _gridSpacing,
-                                  mainAxisExtent: itemHeight,
+                                  childrenDelegate: childrenDelegate,
                                 ),
-                            itemCount:
-                                state.folders.length + state.files.length,
-                            itemBuilder: buildGridItem,
-                          ),
+                              );
+                            }
+                            return ScrollVelocityListener(
+                              child: GridView.custom(
+                                controller: scrollController,
+                                padding: const EdgeInsets.all(8.0),
+                                physics: const ClampingScrollPhysics(),
+                                cacheExtent: isDesktopPlatform ? 600 : 400,
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: crossAxisCount,
+                                      crossAxisSpacing: _gridSpacing,
+                                      mainAxisSpacing: _gridSpacing,
+                                      mainAxisExtent: itemHeight,
+                                    ),
+                                childrenDelegate: childrenDelegate,
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -1127,18 +1107,20 @@ class FileListViewBuilder {
                     : null,
                 behavior: HitTestBehavior.translucent,
                 child: RepaintBoundary(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
+                  child: StableLayoutBuilder<int>(
+                    layoutValue: (constraints) {
                       final availableWidth = math.max(
                         0.0,
-                        constraints.maxWidth - (_tilesSpacing * 2),
+                        constraints.maxWidth - _tilesSpacing * 2,
                       );
-                      final crossAxisCount = math.max(
+                      return math.max(
                         1,
                         ((availableWidth + _tilesSpacing) /
                                 (_tilesMaxCrossAxisExtent + _tilesSpacing))
                             .floor(),
                       );
+                    },
+                    builder: (context, crossAxisCount) {
                       onGridCrossAxisCountChanged?.call(crossAxisCount);
                       onGridItemMainAxisExtentChanged?.call(
                         _tilesMainAxisExtent + _tilesSpacing,
@@ -1336,12 +1318,63 @@ class FileListViewBuilder {
           onPreviewPaneWidthCommitted: onPreviewPaneWidthCommitted,
           minPreviewWidth: effectiveMinPreviewWidth,
           maxPreviewWidth: maxPreviewWidth,
-          availableWidth: constraints.maxWidth,
           listFocusNode: listFocusNode,
           previewFocusNode: previewFocusNode,
         );
       },
     );
+  }
+}
+
+/// Registers geometry without rebuilding or measuring each tile every frame.
+class _MeasuredGridItem extends SingleChildRenderObjectWidget {
+  const _MeasuredGridItem({
+    required this.path,
+    required this.controller,
+    required super.child,
+  });
+  final String path;
+  final TabbedFolderDragSelectionController? controller;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _GridItemGeometry(path, controller);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _GridItemGeometry renderObject,
+  ) {
+    renderObject.updateRegistration(path, controller);
+  }
+}
+
+class _GridItemGeometry extends RenderProxyBox {
+  _GridItemGeometry(this._path, this._controller);
+  String _path;
+  TabbedFolderDragSelectionController? _controller;
+
+  void updateRegistration(
+    String path,
+    TabbedFolderDragSelectionController? controller,
+  ) {
+    if (_path == path && identical(_controller, controller)) return;
+    if (attached) _controller?.unregisterItemRenderBox(_path, this);
+    _path = path;
+    _controller = controller;
+    if (attached) _controller?.registerItemRenderBox(_path, this);
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _controller?.registerItemRenderBox(_path, this);
+  }
+
+  @override
+  void detach() {
+    _controller?.unregisterItemRenderBox(_path, this);
+    super.detach();
   }
 }
 
@@ -1356,7 +1389,6 @@ class _PreviewPaneLayout extends StatefulWidget {
   final ValueChanged<double> onPreviewPaneWidthCommitted;
   final double minPreviewWidth;
   final double maxPreviewWidth;
-  final double availableWidth;
 
   /// The list's keyboard node; the preview pane's node sits below it.
   /// Without both, neither side is outlined as focused.
@@ -1374,7 +1406,6 @@ class _PreviewPaneLayout extends StatefulWidget {
     required this.onPreviewPaneWidthCommitted,
     required this.minPreviewWidth,
     required this.maxPreviewWidth,
-    required this.availableWidth,
     this.listFocusNode,
     this.previewFocusNode,
   });
@@ -1387,6 +1418,34 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
   double? _dragStartX;
   double? _dragStartWidth;
   double? _dragPreviewWidth;
+  late FilePreviewPane _previewContent;
+
+  @override
+  void initState() {
+    super.initState();
+    _updatePreviewContent();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PreviewPaneLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updatePreviewContent();
+  }
+
+  void _updatePreviewContent() {
+    _previewContent = FilePreviewPane(
+      state: widget.state,
+      selectionState: widget.selectionState,
+      onOpenFile: widget.onFileTap,
+      onClosePreview: widget.onPreviewPaneToggled,
+    );
+  }
+
+  void _handlePanCancel() {
+    setState(() => _dragPreviewWidth = null);
+    _dragStartX = null;
+    _dragStartWidth = null;
+  }
 
   void _handlePreviewPointerDown(PointerDownEvent event) {
     final previewNode = widget.previewFocusNode;
@@ -1426,6 +1485,7 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
       widget.minPreviewWidth,
       widget.maxPreviewWidth,
     );
+    if (newWidth == _dragPreviewWidth) return;
     setState(() {
       _dragPreviewWidth = newWidth;
     });
@@ -1449,20 +1509,12 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
       valueListenable: widget.previewPaneWidthListenable,
       child: widget.contentView,
       builder: (context, currentWidth, child) {
-        final double effectivePreviewWidth = currentWidth.clamp(
-          widget.minPreviewWidth,
-          widget.maxPreviewWidth,
-        );
-        final double? dragPreviewWidth = _dragPreviewWidth;
+        final double effectivePreviewWidth = (_dragPreviewWidth ?? currentWidth)
+            .clamp(widget.minPreviewWidth, widget.maxPreviewWidth);
 
         Widget previewPane = SizedBox(
           width: effectivePreviewWidth,
-          child: FilePreviewPane(
-            state: widget.state,
-            selectionState: widget.selectionState,
-            onOpenFile: widget.onFileTap,
-            onClosePreview: widget.onPreviewPaneToggled,
-          ),
+          child: RepaintBoundary(child: _previewContent),
         );
         final previewNode = widget.previewFocusNode;
         if (previewNode != null) {
@@ -1476,104 +1528,20 @@ class _PreviewPaneLayoutState extends State<_PreviewPaneLayout> {
           );
         }
 
-        return Stack(
-          fit: StackFit.expand,
+        return Row(
           children: [
-            Row(
-              children: [
-                Expanded(child: child!),
-                _PreviewResizeHandle(
-                  onPanStart: (details) =>
-                      _handlePanStart(details, effectivePreviewWidth),
-                  onPanUpdate: _handlePanUpdate,
-                  onPanEnd: _handlePanEnd,
-                ),
-                previewPane,
-              ],
+            Expanded(child: RepaintBoundary(child: child!)),
+            _PreviewResizeHandle(
+              onPanStart: (details) =>
+                  _handlePanStart(details, effectivePreviewWidth),
+              onPanUpdate: _handlePanUpdate,
+              onPanEnd: _handlePanEnd,
+              onPanCancel: _handlePanCancel,
             ),
-            if (dragPreviewWidth != null)
-              Positioned(
-                top: 0,
-                bottom: 0,
-                right: 0,
-                // Line up the ghost edge with where the handle line lands
-                // once the new width is committed.
-                width:
-                    (dragPreviewWidth +
-                            _PreviewResizeHandle.handleWidth / 2 +
-                            _PreviewResizeHandle.lineWidth / 2)
-                        .clamp(0.0, widget.availableWidth),
-                child: IgnorePointer(
-                  child: _PreviewResizeGhost(
-                    width: dragPreviewWidth,
-                    atLimit:
-                        dragPreviewWidth <= widget.minPreviewWidth ||
-                        dragPreviewWidth >= widget.maxPreviewWidth,
-                  ),
-                ),
-              ),
+            previewPane,
           ],
         );
       },
-    );
-  }
-}
-
-/// Outline of the preview pane's target size, shown while the resize handle
-/// is dragged. The real pane only resizes on release.
-class _PreviewResizeGhost extends StatelessWidget {
-  final double width;
-  final bool atLimit;
-
-  const _PreviewResizeGhost({required this.width, required this.atLimit});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final accent = atLimit ? colorScheme.outline : colorScheme.primary;
-    final onAccent = atLimit ? colorScheme.surface : colorScheme.onPrimary;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.08),
-        border: Border(
-          left: BorderSide(
-            color: accent,
-            width: _PreviewResizeHandle.lineWidth,
-          ),
-        ),
-      ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: FractionalTranslation(
-          translation: const Offset(-0.5, 0),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.shadowColor.withValues(alpha: 0.18),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                '${width.round()} px',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: onAccent,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1582,6 +1550,7 @@ class _PreviewResizeHandle extends StatefulWidget {
   final GestureDragStartCallback onPanStart;
   final GestureDragUpdateCallback onPanUpdate;
   final GestureDragEndCallback onPanEnd;
+  final GestureDragCancelCallback onPanCancel;
   static const double _handleWidth = 6.0;
   static const double lineWidth = 2.0;
 
@@ -1589,9 +1558,8 @@ class _PreviewResizeHandle extends StatefulWidget {
     required this.onPanStart,
     required this.onPanUpdate,
     required this.onPanEnd,
+    required this.onPanCancel,
   });
-
-  static double get handleWidth => _handleWidth;
 
   @override
   State<_PreviewResizeHandle> createState() => _PreviewResizeHandleState();
@@ -1600,15 +1568,14 @@ class _PreviewResizeHandle extends StatefulWidget {
 class _PreviewResizeHandleState extends State<_PreviewResizeHandle> {
   bool _hovering = false;
   bool _dragging = false;
+  bool _cancelled = false;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // While dragging, the ghost shows the target edge in the accent color;
-    // the handle stays behind as a faint marker of the starting edge.
     final Color lineColor;
     if (_dragging) {
-      lineColor = colorScheme.onSurface.withValues(alpha: 0.2);
+      lineColor = colorScheme.primary;
     } else if (_hovering) {
       lineColor = colorScheme.primary.withValues(alpha: 0.7);
     } else {
@@ -1619,28 +1586,40 @@ class _PreviewResizeHandleState extends State<_PreviewResizeHandle> {
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       cursor: SystemMouseCursors.resizeLeftRight,
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        dragStartBehavior: DragStartBehavior.down,
-        onPanStart: (details) {
-          setState(() => _dragging = true);
-          widget.onPanStart(details);
-        },
-        onPanUpdate: widget.onPanUpdate,
-        onPanEnd: (details) {
+      child: Listener(
+        onPointerCancel: (_) {
+          _cancelled = true;
           setState(() => _dragging = false);
-          widget.onPanEnd(details);
+          widget.onPanCancel();
         },
-        child: SizedBox(
-          width: _PreviewResizeHandle._handleWidth,
-          height: double.infinity,
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOut,
-              width: _PreviewResizeHandle.lineWidth,
-              height: double.infinity,
-              color: lineColor,
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          dragStartBehavior: DragStartBehavior.down,
+          onPanStart: (details) {
+            _cancelled = false;
+            setState(() => _dragging = true);
+            widget.onPanStart(details);
+          },
+          onPanUpdate: widget.onPanUpdate,
+          onPanEnd: (details) {
+            setState(() => _dragging = false);
+            if (!_cancelled) widget.onPanEnd(details);
+          },
+          onPanCancel: () {
+            setState(() => _dragging = false);
+            widget.onPanCancel();
+          },
+          child: SizedBox(
+            width: _PreviewResizeHandle._handleWidth,
+            height: double.infinity,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOut,
+                width: _PreviewResizeHandle.lineWidth,
+                height: double.infinity,
+                color: lineColor,
+              ),
             ),
           ),
         ),

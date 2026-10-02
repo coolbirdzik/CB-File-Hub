@@ -360,6 +360,12 @@ class EnglishLocalizations implements AppLocalizations {
   String get previewPaneTitle => 'Preview';
 
   @override
+  String get dragFilePane => 'Drag to dock beside another pane';
+
+  @override
+  String get resetFilePaneLayout => 'Restore default pane layout';
+
+  @override
   String get previewSelectFile => 'Select a file to preview';
 
   @override

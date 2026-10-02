@@ -14,6 +14,7 @@ import 'package:cb_file_manager/models/database/database_manager.dart';
 import 'package:cb_file_manager/models/database/sqlite_database_provider.dart';
 import 'package:cb_file_manager/ui/controllers/selection_tags_controller.dart';
 import 'package:cb_file_manager/ui/widgets/file_properties_pane.dart';
+import 'package:cb_file_manager/ui/widgets/file_pane_layout.dart';
 import 'package:cb_file_manager/ui/widgets/chips_input.dart';
 
 void main() {
@@ -125,6 +126,20 @@ void main() {
     expect(await prefs.getPropertiesPaneHeight(), 310);
   });
 
+  test('custom pane layout is persisted through user preferences', () async {
+    final prefs = UserPreferences.instance;
+    expect(await prefs.getFilePaneLayout(), '');
+    final layout = FilePaneLayoutNode.defaults.dock(
+      FilePane.properties,
+      FilePane.preview,
+      FilePaneEdge.left,
+    );
+    expect(await prefs.setFilePaneLayout(layout.encode()), isTrue);
+    final restored = FilePaneLayoutNode.decode(await prefs.getFilePaneLayout());
+    expect(restored.encode(), layout.encode());
+    await prefs.setFilePaneLayout('');
+  });
+
   testWidgets('empty and folder-only selection do not offer file tag input', (
     tester,
   ) async {
@@ -204,6 +219,72 @@ void main() {
       );
       expect(state.controller.textWithoutReplacements, isEmpty);
       expect(store[second], ['personal']);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+    },
+  );
+
+  testWidgets(
+    'docking properties preserves a tag draft when its contents change columns',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final layout = FilePaneLayoutController();
+      addTearDown(layout.dispose);
+      await tester.pumpWidget(
+        app(
+          FilePropertiesPane(
+            controller: controller,
+            filePaths: [first],
+            folderPaths: const [],
+            visible: true,
+            height: 260,
+            onHeightChanged: (_) {},
+            onClose: () {},
+            headerLeading: const FilePaneDragHandle(pane: FilePane.properties),
+            paneLayoutBuilder: (context, panel) => FilePaneLayout(
+              controller: layout,
+              files: const Text('file list'),
+              preview: const SizedBox(),
+              properties: panel,
+              previewVisible: true,
+              propertiesVisible: true,
+              previewWidth: 360,
+              propertiesHeight: 260,
+            ),
+            child: const SizedBox(),
+          ),
+        ),
+      );
+      await settle(tester);
+      final input = find.descendant(
+        of: find.byType(ChipsInput<String>),
+        matching: find.byType(TextField),
+      );
+      await tester.ensureVisible(input);
+      await tester.enterText(input, 'uncommitted');
+      final before = tester.state<ChipsInputState<String>>(
+        find.byType(ChipsInput<String>),
+      );
+      layout.update(
+        layout.value.dock(
+          FilePane.properties,
+          FilePane.files,
+          FilePaneEdge.left,
+        ),
+        persist: false,
+      );
+      await settle(tester);
+      final after = tester.state<ChipsInputState<String>>(
+        find.byType(ChipsInput<String>),
+      );
+      expect(identical(before, after), isTrue);
+      expect(after.controller.textWithoutReplacements, 'uncommitted');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await settle(tester);
+      expect(store[first], ['work', 'uncommitted']);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await settle(tester);

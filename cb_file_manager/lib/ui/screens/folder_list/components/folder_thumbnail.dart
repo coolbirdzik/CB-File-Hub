@@ -7,7 +7,6 @@ import 'package:cb_file_manager/helpers/media/folder_thumbnail_service.dart';
 import 'package:cb_file_manager/helpers/media/video_thumbnail_helper.dart';
 import 'package:cb_file_manager/helpers/tags/tag_color_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_thumbnail_manager.dart';
-import 'package:cb_file_manager/ui/components/common/skeleton.dart';
 import 'package:cb_file_manager/ui/widgets/thumbnail_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -123,12 +122,15 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
     super.dispose();
   }
 
-  void _loadFromCacheOrFetch() {
+  Future<void> _loadFromCacheOrFetch() async {
+    final folderPath = widget.folder.path;
     final cached = _folderThumbnailPathCache[widget.folder.path];
-    if (cached != null && _isCachedPathValid(cached)) {
+    final valid = cached != null && await _isCachedPathValid(cached);
+    if (_disposed || widget.folder.path != folderPath) return;
+    if (valid) {
       // Apply immediately without awaiting for faster display
       _isLoading = false;
-      _applyFolderThumbnailPath(cached);
+      await _applyFolderThumbnailPath(cached);
       return;
     }
     if (cached != null) {
@@ -137,25 +139,14 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
     _loadThumbnail();
   }
 
-  bool _isCachedPathValid(String cached) {
+  Future<bool> _isCachedPathValid(String cached) {
     if (_isVideoPath(cached)) {
       final videoPath = _getVideoPath(cached);
-      return videoPath.isNotEmpty && File(videoPath).existsSync();
+      return videoPath.isNotEmpty
+          ? File(videoPath).exists()
+          : Future.value(false);
     }
-    return File(cached).existsSync();
-  }
-
-  void _reloadThumbnailAfterInvalidCache() {
-    if (_disposed || _isLoading) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_disposed || _isLoading) {
-        return;
-      }
-      _folderThumbnailPathCache.remove(widget.folder.path);
-      _loadThumbnail();
-    });
+    return File(cached).exists();
   }
 
   Future<void> _fallbackToImageIfPossible() async {
@@ -198,6 +189,7 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
 
   Future<void> _loadThumbnail() async {
     if (_disposed) return;
+    final folderPath = widget.folder.path;
 
     // Only show loading if we don't already have a thumbnail
     if (_thumbnailPath == null) {
@@ -208,11 +200,9 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
     }
 
     try {
-      final path = await _thumbnailService.getFolderThumbnail(
-        widget.folder.path,
-      );
+      final path = await _thumbnailService.getFolderThumbnail(folderPath);
 
-      if (_disposed) return;
+      if (_disposed || widget.folder.path != folderPath) return;
 
       // Cache the result for future use
       if (path != null) {
@@ -299,29 +289,7 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
 
     try {
       if (isVideo) {
-        if (!File(videoPath).existsSync()) {
-          // Check if we've already tried and failed with this path
-          if (!_thumbnailService.isVideoPathFailed(videoPath)) {
-            debugPrint('Video file does not exist: $videoPath');
-            _thumbnailService.markVideoPathAsFailed(videoPath);
-            _reloadThumbnailAfterInvalidCache();
-          }
-          return _buildFolderIcon(context);
-        }
-
         final cachedPath = _cachedVideoThumbnailPath;
-        final hasCached = cachedPath != null && File(cachedPath).existsSync();
-        if (cachedPath != null && !hasCached && !_videoThumbnailRequested) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_disposed || !mounted) return;
-            setState(() {
-              _cachedVideoThumbnailPath = null;
-              _isVideoThumbnailLoading = true;
-              _videoThumbnailRequested = false;
-            });
-            _scheduleVideoThumbnailGeneration(videoPath);
-          });
-        }
 
         return Container(
           width: double.infinity,
@@ -330,7 +298,7 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (hasCached)
+              if (cachedPath != null)
                 Image.file(
                   File(cachedPath),
                   width: double.infinity,
@@ -340,19 +308,22 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
                   errorBuilder: (context, error, stackTrace) {
                     debugPrint('Error loading folder video thumbnail: $error');
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && _cachedVideoThumbnailPath == cachedPath) {
-                        _reloadThumbnailAfterInvalidCache();
+                      if (!mounted || _cachedVideoThumbnailPath != cachedPath) {
+                        return;
                       }
+                      setState(() {
+                        _cachedVideoThumbnailPath = null;
+                        _isVideoThumbnailLoading = true;
+                        _videoThumbnailRequested = false;
+                      });
+                      VideoThumbnailHelper.removeFromCache(videoPath);
+                      _scheduleVideoThumbnailGeneration(videoPath);
                     });
                     return _buildFolderIcon(context);
                   },
                 )
               else if (_isVideoThumbnailLoading)
-                ShimmerBox(
-                  width: double.infinity,
-                  height: double.infinity,
-                  borderRadius: BorderRadius.circular(0),
-                )
+                _buildLoadingPlaceholder()
               else
                 _buildFolderIcon(context),
               Positioned(
@@ -375,13 +346,6 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
           ),
         );
       } else {
-        final file = File(thumbnailPath);
-        if (!file.existsSync()) {
-          debugPrint('Image file does not exist: $thumbnailPath');
-          _reloadThumbnailAfterInvalidCache();
-          return _buildFolderIcon(context);
-        }
-
         return Container(
           width: double.infinity,
           height: double.infinity,
@@ -422,7 +386,7 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
       tagName,
     );
 
-    if (thumbnailPath != null && File(thumbnailPath).existsSync()) {
+    if (thumbnailPath != null) {
       return SizedBox(
         width: double.infinity,
         height: double.infinity,
@@ -465,6 +429,14 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
 
   Future<void> _applyFolderThumbnailPath(String? path) async {
     if (_disposed) return;
+    final folderPath = widget.folder.path;
+
+    // Validate when the source changes, never from build during a resize.
+    if (path != null && !await _isCachedPathValid(path)) {
+      if (_disposed || widget.folder.path != folderPath) return;
+      _folderThumbnailPathCache.remove(folderPath);
+      path = null;
+    }
 
     String? videoPath;
     String? cachedVideoThumbnailPath;
@@ -475,7 +447,7 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
       );
     }
 
-    if (_disposed) return;
+    if (_disposed || widget.folder.path != folderPath) return;
 
     setState(() {
       _thumbnailPath = path;
@@ -516,9 +488,11 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
           quality: 45,
           thumbnailSize: targetSize,
         )
-        .then((thumbPath) {
+        .then((thumbPath) async {
           if (_disposed) return;
-          if (thumbPath != null && File(thumbPath).existsSync()) {
+          final valid = thumbPath != null && await File(thumbPath).exists();
+          if (_disposed || _videoPath != videoPath) return;
+          if (valid) {
             setState(() {
               _cachedVideoThumbnailPath = thumbPath;
               _isVideoThumbnailLoading = false;
@@ -540,10 +514,11 @@ class _FolderThumbnailState extends State<FolderThumbnail> {
   }
 
   Widget _buildLoadingPlaceholder() {
-    return ShimmerBox(
-      width: double.infinity,
-      height: double.infinity,
-      borderRadius: BorderRadius.circular(0),
+    // Many folders can be waiting on video frames simultaneously. A static
+    // placeholder avoids a shader animation and ticker for every visible tile.
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: _buildFolderIcon(context),
     );
   }
 }

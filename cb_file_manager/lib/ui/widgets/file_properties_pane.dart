@@ -25,6 +25,8 @@ class FilePropertiesPane extends StatefulWidget {
     this.bottomInset = 0,
     this.controller,
     this.panelFocusNode,
+    this.paneLayoutBuilder,
+    this.headerLeading,
   });
 
   final Widget child;
@@ -37,12 +39,15 @@ class FilePropertiesPane extends StatefulWidget {
   final double bottomInset;
   final SelectionTagsController? controller;
   final FocusNode? panelFocusNode;
+  final Widget Function(BuildContext context, Widget panel)? paneLayoutBuilder;
+  final Widget? headerLeading;
 
   @override
   State<FilePropertiesPane> createState() => _FilePropertiesPaneState();
 }
 
 class _FilePropertiesPaneState extends State<FilePropertiesPane> {
+  final _editorKey = GlobalKey();
   late final SelectionTagsController _tags;
   double? _dragHeight;
   List<String> _paths = [];
@@ -159,7 +164,8 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(l10n.propertiesFilesOnly),
           ),
-        if (widget.filePaths.isNotEmpty) SelectionTagEditor(controller: _tags),
+        if (widget.filePaths.isNotEmpty)
+          SelectionTagEditor(key: _editorKey, controller: _tags),
       ],
     );
   }
@@ -210,6 +216,49 @@ class _FilePropertiesPaneState extends State<FilePropertiesPane> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (widget.paneLayoutBuilder != null) {
+      return widget.paneLayoutBuilder!(
+        context,
+        Focus(
+          focusNode: widget.panelFocusNode,
+          child: Material(
+            color: Theme.of(context).colorScheme.surface,
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 32,
+                  child: Row(
+                    children: [
+                      if (widget.headerLeading != null) widget.headerLeading!,
+                      Expanded(
+                        child: Text(
+                          l10n.propertiesAndTags,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        tooltip: l10n.hidePropertiesPane,
+                        icon: const Icon(Icons.close, size: 16),
+                        onPressed: widget.onClose,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: widget.bottomInset),
+                    child: _contents(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxHeight = constraints.maxHeight / 2;

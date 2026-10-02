@@ -167,6 +167,8 @@ abstract class AppLocalizations {
   String get propertiesTagFailure;
   String get propertiesResize;
   String get propertiesTagHint;
+  String get dragFilePane;
+  String get resetFilePaneLayout;
 
   String get previewPaneTitle;
   String get previewSelectFile;
