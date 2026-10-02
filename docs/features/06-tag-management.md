@@ -36,6 +36,26 @@ discarded when selecting different files. Failed writes expose a retry action
 for only the failed files, even after the selection changes. Renaming, coloring,
 and deleting tags globally remain in the tag management screen.
 
+### Entering child tags
+
+The Properties editor and the single/batch file tag dialogs share the same
+input. Type a parent name and press `:` or Right Arrow to enter its child
+tags. Entering this mode does not assign the parent to the selected files.
+
+The parent stays inline with assigned tags. Its chip contains a real text
+editor after the parent name and arrow, so the caret, text selection, and
+child draft all stay inside the chip. Type a child name and press Enter to
+add it. The parent stays active for the next child.
+Use Up/Down then Enter, Tab, or a click to choose an existing suggestion;
+keyboard navigation scrolls the selected row into view. Enter without
+suggestion navigation submits the text as typed, allowing new child names.
+
+The chip's close button or Esc exits the parent and clears the draft;
+Backspace also exits when the draft is empty. Existing assigned tags remain.
+The `:` and Right Arrow shortcuts still enter a parent, while modified arrow
+keys retain normal text-selection behavior. Suggestion popups open above the
+editor when there is insufficient space below it.
+
 ## Database Location
 
 - **Windows**: `C:\Users\<username>\Documents\CBFileHub_v2\cb_file_hub.sqlite`

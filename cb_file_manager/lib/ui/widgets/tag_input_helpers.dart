@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cb_file_manager/config/languages/app_localizations.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cb_file_manager/helpers/tags/tag_manager.dart';
 import 'package:cb_file_manager/helpers/tags/tag_hierarchy_manager.dart';
@@ -77,6 +78,7 @@ Future<List<String>> computeTagSuggestions(
       // Comma-separated: only match the partial entry being typed now.
       final existingChildren = childPart
           .split(',')
+          .take(childPart.split(',').length - 1)
           .map((c) => c.trim().toLowerCase())
           .where((c) => c.isNotEmpty)
           .toSet();
@@ -221,6 +223,8 @@ Widget buildTagSuggestionItem(
             children: [
               Text(
                 suggestion,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w400,
@@ -229,7 +233,7 @@ Widget buildTagSuggestionItem(
               ),
               if (parents.isNotEmpty)
                 Text(
-                  'Parent: ${parents.join(", ")}',
+                  '${AppLocalizations.of(context)!.parentTagLabel}: ${parents.join(", ")}',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant.withValues(
@@ -242,7 +246,7 @@ Widget buildTagSuggestionItem(
                 ),
               if (children.isNotEmpty)
                 Text(
-                  '${children.length} child${children.length > 1 ? "ren" : ""}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
+                  '${AppLocalizations.of(context)!.childTagCount(children.length)}: ${children.take(3).join(", ")}${children.length > 3 ? "..." : ""}',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant.withValues(

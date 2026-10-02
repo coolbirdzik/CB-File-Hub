@@ -393,6 +393,9 @@ abstract class AppLocalizations {
   String exitTagScope(String parent);
   String childTagHint(String parent);
   String addingUnderTag(String parent);
+  String get tagInputHelp;
+  String get tagSuggestionsLabel;
+  String childTagCount(int count);
   String deleteTagConfirmation(String tag);
   String get tagDeleteConfirmationText;
   String tagDeleted(String tag);

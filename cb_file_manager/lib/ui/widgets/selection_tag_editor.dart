@@ -95,6 +95,7 @@ class _SelectionTagEditorState extends State<SelectionTagEditor> {
     _debounce?.cancel();
     final generation = ++_generation;
     final query = _query(value);
+    setState(() => _suggestions = []);
     if (query.trim().isEmpty) {
       setState(() => _suggestions = []);
       return;
