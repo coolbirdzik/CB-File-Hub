@@ -817,6 +817,8 @@ class EnglishLocalizations implements AppLocalizations {
   @override
   String get childTagInputHint => 'Type child tag…';
   @override
+  String get copyTags => 'Copy tags';
+  @override
   String exitTagScope(String parent) => 'Leave "$parent"';
   @override
   String childTagHint(String parent) => 'New tag inside "$parent"...';
@@ -3054,6 +3056,10 @@ class EnglishLocalizations implements AppLocalizations {
 
   @override
   String get folders => 'Folders';
+
+  // Video player playlist
+  @override
+  String get videoPlaylist => 'Playlist';
 
   // Video player screenshot
   @override

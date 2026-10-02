@@ -390,6 +390,7 @@ abstract class AppLocalizations {
   String get tagManagement;
   String get parentTagLabel;
   String get childTagInputHint;
+  String get copyTags;
   String exitTagScope(String parent);
   String childTagHint(String parent);
   String addingUnderTag(String parent);
@@ -1321,6 +1322,9 @@ abstract class AppLocalizations {
   String get browseTab;
   String get documentsTab;
   String get homeTab;
+
+  // Video player playlist
+  String get videoPlaylist;
 
   // Video player screenshot
   String get takeScreenshot;

@@ -812,6 +812,8 @@ class VietnameseLocalizations implements AppLocalizations {
   @override
   String get childTagInputHint => 'Nhập thẻ con…';
   @override
+  String get copyTags => 'Sao chép thẻ';
+  @override
   String exitTagScope(String parent) => 'Thoát "$parent"';
   @override
   String childTagHint(String parent) => 'Thẻ con mới trong "$parent"...';
@@ -3047,6 +3049,10 @@ class VietnameseLocalizations implements AppLocalizations {
 
   @override
   String get folders => 'Thư mục';
+
+  // Video player playlist
+  @override
+  String get videoPlaylist => 'Danh sách phát';
 
   // Video player screenshot
   @override

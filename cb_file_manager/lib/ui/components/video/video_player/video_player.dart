@@ -43,6 +43,7 @@ import 'video_player_models.dart';
 import 'video_player_seek_preview.dart';
 import 'video_player_seek_slider.dart';
 import 'video_player_utils.dart';
+import 'video_playlist.dart';
 
 part 'video_player.volume.dart';
 part 'video_player.settings.dart';
@@ -80,8 +81,17 @@ class VideoPlayer extends StatefulWidget {
   final Function(String folderPath, String highlightedFileName)? onOpenFolder;
 
   // Navigation state
+  /// [onNextVideo] also runs when a non-looping video plays to the end.
   final bool hasNextVideo;
   final bool hasPreviousVideo;
+
+  /// Starts in fullscreen, for a player that replaces one already in
+  /// fullscreen (the window or system UI is still in that state).
+  final bool initiallyFullScreen;
+
+  /// Files offered by the playlist button; it is hidden for fewer than two.
+  final List<File>? playlist;
+  final ValueChanged<File>? onPlaylistItemSelected;
 
   // UI configuration
   final bool showStreamingSpeed;
@@ -112,6 +122,9 @@ class VideoPlayer extends StatefulWidget {
     this.onOpenFolder,
     this.hasNextVideo = false,
     this.hasPreviousVideo = false,
+    this.playlist,
+    this.onPlaylistItemSelected,
+    this.initiallyFullScreen = false,
     this.showStreamingSpeed = false,
     this.onToggleStreamingSpeed,
   }) : assert(
@@ -142,6 +155,9 @@ class VideoPlayer extends StatefulWidget {
     Function(String folderPath, String highlightedFileName)? onOpenFolder,
     bool hasNextVideo = false,
     bool hasPreviousVideo = false,
+    List<File>? playlist,
+    ValueChanged<File>? onPlaylistItemSelected,
+    bool initiallyFullScreen = false,
     bool showStreamingSpeed = false,
     VoidCallback? onToggleStreamingSpeed,
   }) : this._(
@@ -167,6 +183,9 @@ class VideoPlayer extends StatefulWidget {
          onOpenFolder: onOpenFolder,
          hasNextVideo: hasNextVideo,
          hasPreviousVideo: hasPreviousVideo,
+         playlist: playlist,
+         onPlaylistItemSelected: onPlaylistItemSelected,
+         initiallyFullScreen: initiallyFullScreen,
          showStreamingSpeed: showStreamingSpeed,
          onToggleStreamingSpeed: onToggleStreamingSpeed,
        );
@@ -327,7 +346,7 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   // State variables
   bool _isLoading = true;
   bool _hasError = false;
-  bool _isFullScreen = false;
+  late bool _isFullScreen = widget.initiallyFullScreen;
   bool _isDesktopFullScreenToggleInProgress = false;
   bool _desktopWasMaximizedBeforeFullScreen = false;
   bool? _desktopWasResizableBeforeFullScreen;
@@ -340,6 +359,9 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
   double _savedVolume = 70.0;
   bool _showControls = true;
   final bool _showSpeedIndicator = false;
+
+  // The end of playback hands over to the next video only once.
+  bool _advancedToNextVideo = false;
 
   // Persist a software-decoding preference only once after a GPU error.
   bool _hwDecodeFallbackAttempted = false;
@@ -464,12 +486,14 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
 
     // Ensure system UI is visible when video player starts (not fullscreen)
     if (Platform.isAndroid || Platform.isIOS) {
-      SystemChrome.setEnabledSystemUIMode(
-        SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
-      );
-      // Explicitly set light status bar icons to ensure visibility on dark backgrounds
-      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+      if (!_isFullScreen) {
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+        );
+        // Explicitly set light status bar icons to ensure visibility on dark backgrounds
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+      }
       // Guard against plugins or platform views hiding system UI unexpectedly
       SystemChrome.setSystemUIChangeCallback((visible) async {
         if (!mounted) return;
@@ -839,6 +863,12 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
     });
     _player!.stream.width.listen((width) {
       if (mounted && width != null) _extractVideoMetadata();
+    });
+    _player!.stream.completed.listen((completed) {
+      if (!completed || !mounted || _advancedToNextVideo) return;
+      if (widget.looping || !widget.hasNextVideo) return;
+      _advancedToNextVideo = true;
+      widget.onNextVideo?.call();
     });
 
     // Track errors
@@ -2029,6 +2059,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                       tooltip: 'Forward 10s',
                     ),
                     const Spacer(),
+                    if (_hasPlaylist) ...[
+                      _buildPlaylistButton(),
+                      const SizedBox(width: 6),
+                    ],
                     if (widget.allowMuting) _buildVolumeButtonOnly(),
                     const SizedBox(width: 6),
                     _buildAdvancedControlsMenu(),
@@ -2227,6 +2261,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                       _buildPlayPauseButton(),
                       const SizedBox(width: 8),
                       seekSlider,
+                      if (_hasPlaylist) ...[
+                        const SizedBox(width: 8),
+                        _buildPlaylistButton(),
+                      ],
                       if (fullScreenButton != null) ...[
                         const SizedBox(width: 8),
                         fullScreenButton,
@@ -2274,6 +2312,10 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
                     ),
 
                     const SizedBox(width: 8),
+                    if (_hasPlaylist) ...[
+                      _buildPlaylistButton(),
+                      const SizedBox(width: 4),
+                    ],
                     if (showSecondaryActions && widget.allowMuting)
                       _buildVolumeControl(),
                     if (showSecondaryActions) ...[
@@ -2917,6 +2959,33 @@ class _VideoPlayerState extends _VideoPlayerSettingsHost
         );
       }
     }
+  }
+
+  bool get _hasPlaylist =>
+      widget.onPlaylistItemSelected != null &&
+      (widget.playlist?.length ?? 0) > 1;
+
+  Widget _buildPlaylistButton() {
+    return VideoPlayerControlButton(
+      icon: PhosphorIconsLight.playlist,
+      onPressed: _showPlaylist,
+      tooltip: AppLocalizations.of(context)!.videoPlaylist,
+    );
+  }
+
+  Future<void> _showPlaylist() async {
+    final items = widget.playlist;
+    final onSelected = widget.onPlaylistItemSelected;
+    if (items == null || onSelected == null) return;
+    // Keep the controls up while the panel is open.
+    _hideControlsTimer?.cancel();
+    await showVideoPlaylistPanel(
+      context: context,
+      items: items,
+      currentPath: widget.file?.path ?? '',
+      onSelected: onSelected,
+    );
+    if (mounted) _startHideControlsTimer();
   }
 
   /// Advanced controls menu với popup menu để giảm số nút trên thanh điều khiển
